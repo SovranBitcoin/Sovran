@@ -1,0 +1,79 @@
+import "app/global";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { useSelector } from "react-redux";
+import { memoizedGetTheme } from "helper/redux/settings";
+import React from "react";
+import { SovranTextIcon } from "assets/icons";
+import { Text } from "components/common/Themed";
+import { greys } from "helper/colors";
+import { useNavigation } from "expo-router";
+import Icon from "assets/icons";
+
+export default function ModalScreen() {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+  const navigation = useNavigation();
+
+  return (
+    <View style={styles.centeredContainer}>
+      <View style={styles.centeredContent}>
+        <Text size={32} weight="heavy">
+          Welcome to
+        </Text>
+        <View style={styles.spacer} />
+        <SovranTextIcon size={200} />
+      </View>
+      <View style={styles.bottomButtons}>
+        <View />
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigation.navigate("onboard/ecash")}
+        >
+          <Text size={16} style={styles.navButtonText}>
+            Next
+          </Text>
+          <Icon
+            name="fa6-solid:chevron-right"
+            size={20}
+            color={greys(theme)[0]}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const createStyles = (theme) =>
+  StyleSheet.create({
+    centeredContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100%",
+      backgroundColor: greys(theme)[2300],
+    },
+    centeredContent: {
+      justifyContent: "center",
+      alignItems: "center",
+      flex: 1,
+      alignSelf: "stretch",
+    },
+    spacer: {
+      marginBottom: 4,
+    },
+    bottomButtons: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "100%",
+      padding: 16,
+      position: "absolute",
+      bottom: 16,
+    },
+    navButton: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    navButtonText: {
+      marginRight: 8,
+    },
+  });

@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Sovran",
+    "slug": "sovran",
+    "version": "0.0.1",
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "orientation": "portrait",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/bg_.png",
+      "backgroundColor": "#000000",
+      "resizeMode": "contain"
+    },
+    "icon": "./assets/images/icon_.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "buildNumber": "182",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments."
+      },
+      "bundleIdentifier": "com.sovran.money",
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.sovranbitcoin"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
+        }
+      ],
+      "react-native-nfc-manager",
+      "expo-build-properties",
+      "expo-font",
+      "expo-router",
+      "expo-localization",
+      "expo-video"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "09112d75-3a3a-49ba-bec6-ab881c5a2fa6"
+      }
+    }
+  }
+}

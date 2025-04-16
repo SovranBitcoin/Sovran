@@ -1,0 +1,170 @@
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+} from "react-native";
+import { useSelector } from "react-redux";
+import { memoizedGetTheme } from "helper/redux/settings";
+import { greys } from "helper/colors";
+import { useNostr } from "helper/redux/nostr";
+import { Card } from "components/common/Card";
+import SettingsButton from "components/common/SettingsButton";
+
+const VerifySeedPhrase = () => {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+  const { currentProfile } = useNostr();
+  const [shuffledWords, setShuffledWords] = useState([]);
+  const [selectedWords, setSelectedWords] = useState([]);
+
+  useEffect(() => {
+    if (currentProfile?.mnemonic) {
+      const words = currentProfile.mnemonic.split(" ");
+      setShuffledWords([...words].sort(() => Math.random() - 0.5));
+    }
+  }, [currentProfile]);
+
+  const handleWordPress = (word) => {
+    setSelectedWords((prev) => [...prev, word]);
+  };
+
+  const handleDeleteLastWord = () => {
+    setSelectedWords((prev) => prev.slice(0, -1));
+  };
+
+  const isVerified = selectedWords.join(" ") === currentProfile?.mnemonic;
+
+  const handleVerify = () => {
+    if (isVerified) {
+      Alert.alert("Success", "Seed Phrase Verified!");
+    } else {
+      Alert.alert("Error", "Incorrect Seed Phrase. Please try again.");
+    }
+  };
+
+  const renderWord = ({ item }) => (
+    <TouchableOpacity
+      onPress={() => handleWordPress(item)}
+      style={styles.wordButton}
+    >
+      <Text style={styles.wordText}>{item}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTitle}>Verify Seed Phrase</Text>
+        <Card
+          message="Select the words in the correct order to verify your seed phrase."
+          theme={theme}
+          variant="info"
+        />
+        <View style={styles.selectedWordsContainer}>
+          <Text style={styles.selectedWordsText}>
+            {selectedWords.join(" ")}
+          </Text>
+        </View>
+        {isVerified && (
+          <Text style={styles.verifiedText}>Seed Phrase Verified!</Text>
+        )}
+      </ScrollView>
+      <View style={styles.buttonContainer}>
+        <FlatList
+          data={shuffledWords}
+          renderItem={renderWord}
+          keyExtractor={(_, index) => index.toString()}
+          numColumns={3}
+          columnWrapperStyle={styles.columnWrapper}
+          contentContainerStyle={styles.wordContainer}
+        />
+        <SettingsButton
+          variant="primary"
+          style={styles.button}
+          onPress={handleDeleteLastWord}
+          text="Delete"
+        />
+        <SettingsButton
+          variant="secondary"
+          onPress={handleVerify}
+          text="Verify"
+          style={styles.button}
+        />
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: greys(theme)[2300],
+    },
+    content: {
+      paddingHorizontal: 16,
+    },
+    sectionTitle: {
+      marginVertical: 6,
+      marginLeft: 8,
+      fontSize: 13,
+      letterSpacing: 0.33,
+      fontWeight: "500",
+      color: greys(theme)[600],
+      textTransform: "uppercase",
+    },
+    wordContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+    },
+    wordButton: {
+      backgroundColor: greys(theme)[1800],
+      padding: 8,
+      margin: 4,
+      borderRadius: 8,
+      width: "30%",
+      height: 45,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    wordText: {
+      color: greys(theme)[0],
+      fontSize: 14,
+    },
+    selectedWordsContainer: {
+      marginVertical: 8,
+      padding: 8,
+      backgroundColor: greys(theme)[1800],
+      borderRadius: 8,
+    },
+    selectedWordsText: {
+      color: greys(theme)[0],
+      fontSize: 16,
+    },
+    verifiedText: {
+      color: "green",
+      fontSize: 18,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginTop: 20,
+    },
+    columnWrapper: {
+      justifyContent: "space-between",
+    },
+    buttonContainer: {
+      padding: 8,
+    },
+    button: {
+      margin: 8,
+      marginTop: 0,
+    },
+  });
+
+export default VerifySeedPhrase;

@@ -1,0 +1,97 @@
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { TouchableOpacity } from "components/common/TouchableOpacity";
+import { Text } from "components/common/Themed";
+import { greys } from "helper/colors";
+import { useSelector } from "react-redux";
+import { ScrollView } from "react-native-actions-sheet"; // <- important this is from react-native-actions-sheet
+import { memoizedGetTheme } from "helper/redux/settings";
+
+interface WrapperProps {
+  children: React.ReactNode;
+  buttons: React.ReactNode;
+  containerStyle?: StyleProp<ViewStyle>;
+  scrollContainerStyle?: StyleProp<ViewStyle>;
+}
+
+interface ButtonProps {
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}
+
+export const SheetButton: React.FC<ButtonProps> = ({
+  onPress,
+  children,
+  disabled,
+}) => {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+
+  return (
+    <TouchableOpacity
+      disabled={disabled}
+      style={[styles.button]}
+      onPress={onPress}
+    >
+      <Text style={styles.buttonText}>{children}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const Wrapper: React.FC<WrapperProps> = ({
+  children,
+  buttons,
+  containerStyle,
+  scrollContainerStyle,
+}) => {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+
+  return (
+    <View style={[styles.actionSheetContainer, containerStyle]}>
+      <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>
+        {children}
+      </ScrollView>
+      {buttons && <View style={styles.buttonContainer}>{buttons}</View>}
+    </View>
+  );
+};
+
+const createStyles = (theme: string) =>
+  StyleSheet.create({
+    actionSheetContainer: {
+      height: "100%",
+      backgroundColor: greys(theme)[2300],
+    },
+    scrollContainer: {
+      padding: 16,
+      height: "100%",
+    },
+    buttonContainer: {
+      padding: 16,
+      backgroundColor: greys(theme)[2300],
+    },
+    sectionHeader: {
+      color: greys(theme)[0],
+      fontSize: 18,
+      fontWeight: "600",
+      marginBottom: 12,
+    },
+    button: {
+      padding: 16,
+      marginTop: 12,
+      alignItems: "center",
+      backgroundColor: greys(theme)[1800],
+      borderBottomRightRadius: 1000,
+      borderRadius: 1000,
+      borderWidth: 0.5,
+      borderColor: greys(theme)[1400],
+    },
+    buttonText: {
+      color: greys(theme)[0],
+      fontSize: 16,
+    },
+  });
+
+export default Wrapper;

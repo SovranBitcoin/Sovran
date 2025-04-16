@@ -1,0 +1,380 @@
+import { Pressable, StyleSheet } from "react-native";
+import { greys, shades } from "helper/colors";
+import Modal from "components/layout/Modal";
+import { Button } from "components/common/Button";
+import { Text, View } from "components/common/Themed";
+import { FlagIcon } from "assets/icons";
+import { useEffect, useState } from "react";
+import { useNavigation } from "expo-router";
+import lookup from "country-code-lookup";
+import { useSelector } from "react-redux";
+import { useVpn } from "helper/redux/lnvpn";
+import { memoizedGetTheme } from "helper/redux/settings";
+import { useRoute } from "@react-navigation/native";
+import { ButtonHandler } from "./ecashSendConfirmation";
+
+export default function ModalScreen() {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+
+  const { params } = useRoute();
+  const [country, setCountry] = useState("RU");
+
+  const [dataType, setDataType] = useState("Local");
+  const [packages, setPackages] = useState([
+    {
+      packageCode: 1,
+      duration: "1 hour",
+      duration_code: 0.1,
+      price: 0.1,
+    },
+    {
+      packageCode: 2,
+      duration: "1 day",
+      duration_code: 0.5,
+      price: 0.5,
+    },
+    {
+      packageCode: 3,
+      duration: "1 week",
+      duration_code: 1.5,
+      price: 1.5,
+    },
+    {
+      packageCode: 4,
+      duration: "1 month",
+      duration_code: 4,
+      price: 4,
+    },
+    {
+      packageCode: 5,
+      duration: "3 months",
+      duration_code: 9,
+      price: 9,
+    },
+  ]);
+  const [countries, setCountries] = useState([]);
+  const [selectedPackage, setSelectedPackage] = useState(3);
+  const [loading, setLoading] = useState(false);
+
+  // useEffect(() => {
+  //   if (params.country) {
+  //     return;
+  //   }
+  //   const localeCountry = Localization.region; // Get the region code (e.g., 'US')
+  //   if (localeCountry) {
+  //     setCountry(localeCountry); // Set the detected country code
+  //   }
+  // }, []);
+
+  useEffect(() => {
+    function getCountryCode(countryName) {
+      // Map the input country string to match the format recognized by Intl.DisplayNames
+      const countryMap = {
+        "🇸🇬 Singapore": "SG",
+        "🇺🇸 United States": "US",
+        // "🇺🇸 United States 2 (NY)": "US",
+        "🇫🇮 Finland": "FI",
+        "🇬🇧 United Kingdom": "GB",
+        "🇨🇦 Canada": "CA",
+        "🇮🇳 India": "IN",
+        "🇳🇱 Netherlands": "NL",
+        "🇷🇺 Russia": "RU",
+        "🇺🇦 Ukraine": "UA",
+        "🇨🇭 Switzerland": "CH",
+        "🇮🇱 Israel": "IL",
+        "🇰🇿 Kazakhstan": "KZ",
+        "🇷🇴 Romania": "RO",
+        "🇰🇪 Kenya": "KE",
+        "🇮🇸 Iceland": "IS",
+      };
+
+      return countryMap[countryName];
+    }
+
+    if (params?.packageList) {
+      setPackages(JSON.parse(params?.packageList));
+    }
+
+    fetch("https://lnvpn.net/api/v1/countryList")
+      .then((response) => {
+        response.json().then((data) => {
+          const c = data
+            .map((country) => {
+              return {
+                country: getCountryCode(country.country),
+                cc: country.cc,
+              };
+            })
+            .filter((d) => {
+              return d.country !== "NL" && d.country !== "CH";
+            });
+          setCountries(c);
+        });
+      })
+      .catch((error) => {})
+      .finally(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (params?.country) {
+      setCountry(params?.country);
+    }
+  }, [params?.country]);
+
+  const handleCountryChange = (newCountry) => {
+    setCountry(newCountry);
+  };
+
+  const handleDataTypeChange = (newDataType) => {
+    setDataType(newDataType);
+  };
+
+  const handlePackageSelect = (packageCode) => {
+    setSelectedPackage(packageCode);
+  };
+
+  const navigation = useNavigation();
+
+  const { setVpn, vpn } = useVpn();
+
+  const handleContinue = async () => {
+    const selectedPackageDuration = packages.find(
+      (p) => p.packageCode === selectedPackage
+    )?.duration;
+    const selectedPackageDurationCode = packages.find(
+      (p) => p.packageCode === selectedPackage
+    )?.duration_code;
+    try {
+      const response = await fetch("https://lnvpn.net/api/v1/getInvoice", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "same-origin",
+          Priority: "u=0",
+        },
+        body: `duration=${selectedPackageDurationCode}`,
+        mode: "cors",
+        credentials: "omit",
+      });
+      const data = await response.json();
+
+      setVpn({
+        location: country,
+        duration: selectedPackageDuration,
+        duration_code: selectedPackageDurationCode,
+        cc: countries.find((c) => c.country === country)?.cc,
+        created_at: new Date().toISOString(),
+        ...data,
+      });
+
+      navigation.navigate("vpnCheckout", {
+        location: country,
+        duration: selectedPackageDuration,
+        hash: data.payment_hash,
+        request: data.payment_request,
+        price: packages.find((p) => p.packageCode === selectedPackage)?.price,
+      });
+    } catch (error) {}
+  };
+
+  return (
+    <Modal
+      showClose
+      title={`Get vpn plan`}
+      children={
+        <>
+          <View
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              margin: 8,
+              padding: 8,
+              marginBottom: 0,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderColor: greys(theme)[1300],
+              borderWidth: 0.2,
+            }}
+          >
+            <FlagIcon width={32} height={32} country={country} />
+            <Text
+              weight="heavy"
+              size={20}
+              style={{
+                marginLeft: 8,
+                flex: 1, // Allows the text to take up available space
+                marginRight: 8, // Adds space between the text and the button
+              }}
+              numberOfLines={1} // Ensures the text will not wrap to the next line
+              ellipsizeMode="tail" // Truncates the text with an ellipsis if it's too long
+            >
+              {lookup.byIso(country).country}
+            </Text>
+            <View
+              style={{
+                alignItems: "flex-end", // Aligns the button to the right
+                backgroundColor: "transparent",
+              }}
+            >
+              <Button
+                text={"Change"}
+                variant="primary"
+                position="left"
+                noPadding
+                onPress={() => {
+                  navigation.navigate("esimCountrySelection", {
+                    countries: countries.map((c) => c.country),
+                    type: "vpn",
+                  });
+                }}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  padding: 16,
+                  // marginRight: -16, // idk why i need this
+                }}
+              />
+            </View>
+          </View>
+
+          <View
+            style={{
+              padding: 8,
+              margin: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 16,
+              borderColor: greys(theme)[1300],
+              borderWidth: 0.2,
+              overflow: "hidden",
+            }}
+          >
+            {packages.map((pkg) => (
+              <Pressable
+                key={pkg.packageCode} // Added key prop here
+                onPress={() => {
+                  setSelectedPackage(pkg.packageCode);
+                }}
+                style={{
+                  backgroundColor:
+                    selectedPackage === pkg.packageCode
+                      ? greys(theme)[1500]
+                      : greys(theme)[1800],
+
+                  borderRadius: 16,
+                  padding: 8,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    backgroundColor: "transparent",
+                    borderRadius: 16,
+                  }}
+                >
+                  <View
+                    style={{
+                      backgroundColor: "transparent",
+                      borderRadius: 16,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: "transparent",
+                        borderRadius: 16,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: 16,
+                          backgroundColor:
+                            selectedPackage === pkg.packageCode
+                              ? shades[200]
+                              : greys(theme)[1400],
+                          borderColor:
+                            selectedPackage === pkg.packageCode
+                              ? shades[100]
+                              : greys(theme)[1000],
+                          borderWidth: 0.5,
+                        }}
+                      ></View>
+                      <View
+                        style={{
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        <Text
+                          weight="bold"
+                          size={16}
+                          style={{
+                            marginLeft: 8,
+                          }}
+                        >
+                          {pkg.duration}
+                        </Text>
+                        <Text style={{ marginLeft: 8 }}>{pkg.duration}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={{ marginLeft: 8 }}>{"$" + pkg.price}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      }
+      buttons={
+        <ButtonHandler
+          buttons={[
+            {
+              text: "Continue",
+              variant: "primary",
+              onPress: handleContinue,
+              loading: loading,
+              disabled: loading,
+            },
+          ]}
+        />
+      }
+    />
+  );
+}
+
+const createStyles = (theme) =>
+  StyleSheet.create({
+    minus: {
+      fontFamily: "OverpassBold",
+      fontSize: 32,
+      color: "#9A4141",
+      marginRight: 4,
+    },
+    plus: {
+      fontFamily: "OverpassBold",
+      fontSize: 32,
+      color: "#499A41",
+      marginRight: 4,
+    },
+    container: {
+      backgroundColor: greys(theme)[2300],
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: greys(theme)[1000],
+    },
+    separator: {
+      marginVertical: 30,
+      height: 1,
+      width: "80%",
+    },
+  });

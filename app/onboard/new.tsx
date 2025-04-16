@@ -1,0 +1,443 @@
+import "../../shim";
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Image,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { useSelector } from "react-redux";
+import { memoizedGetTheme } from "helper/redux/settings";
+import { greys, shades } from "helper/colors";
+import Container from "components/layout/Container";
+import { Text } from "components/common/Themed";
+import { useTypedNavigation } from "helper/navigation";
+import NDK, { NDKPrivateKeySigner, NDKUser } from "@nostr-dev-kit/ndk";
+import { nip19 } from "nostr-tools";
+import * as nip06 from "node_modules/nostr-tools/lib/cjs/nip06";
+import { useNostr } from "helper/redux/nostr";
+import * as bip39 from "@scure/bip39";
+import { useNDK } from "@nostr-dev-kit/ndk-mobile";
+global.Buffer = require("buffer").Buffer;
+
+import { entropyToMnemonic } from "bip39";
+import * as Crypto from "expo-crypto";
+import { store } from "helper/redux/store";
+import { HDKey } from "@scure/bip32";
+
+/**
+ * Executes an async function within a requestAnimationFrame to improve UI responsiveness
+ */
+export const runWithAnimationFrame = <T extends any[]>(
+  asyncFunction: (...args: T) => Promise<void>,
+  setIsSubmitting?: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  return async (...args: T) => {
+    if (setIsSubmitting) {
+      setIsSubmitting(true);
+    }
+
+    requestAnimationFrame(async () => {
+      try {
+        await asyncFunction(...args);
+      } catch (error) {
+      } finally {
+        if (setIsSubmitting) {
+          setIsSubmitting(false);
+        }
+      }
+    });
+  };
+};
+
+export function generateMnemonic(): string {
+  const mnemonic = store.getState()?.nostr?.profiles?.[0]?.mnemonic;
+  if (mnemonic) return mnemonic;
+
+  const entropy = Buffer.from(Crypto.getRandomBytes(16));
+  return entropyToMnemonic(entropy);
+}
+
+const profilePictures = [
+  {
+    uri: "https://i.ibb.co/hFLfs20/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-96aab0a7-3406-4a14-a262-893d4a07fd7d.webp",
+  },
+  {
+    uri: "https://i.ibb.co/NWRGTD1/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-b86bf261-8011-4b6d-9760-ac3e13792c8e.png",
+  },
+  {
+    uri: "https://i.ibb.co/s6P30Bs/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-583aad52-cf85-41a1-a4d7-594bfa816efb.webp",
+  },
+  {
+    uri: "https://i.ibb.co/Snm98B9/kelbiee-A-photorealistic-White-woman-facing-forward-a-digital-i-23363858-885f-434d-befa-8d112acc90e7.png",
+  },
+  {
+    uri: "https://i.ibb.co/xYPtXtJ/kelbiee-A-photorealistic-german-man-facing-forward-a-digital-il-7acde628-0725-4900-adb3-3640bef4eff1.webp",
+  },
+  {
+    uri: "https://i.ibb.co/G7yjvGf/kelbiee-A-photorealistic-latina-woman-facing-forward-a-digital-2340219e-5afd-4701-95d6-934f2c1e480f.webp",
+  },
+  {
+    uri: "https://i.ibb.co/CshqCky/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-f1d772bc-e3ff-4cfe-bee8-4b0f067b2fde.webp",
+  },
+  {
+    uri: "https://i.ibb.co/86mmHXG/kelbiee-A-photorealistic-man-facing-forward-a-digital-illustrat-8151d836-41be-48c0-8b4c-c1664de23150.webp",
+  },
+  {
+    uri: "https://i.ibb.co/2Zj79j7/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-0e565a6b-b105-41b3-8fc6-eabb72e50591.png",
+  },
+];
+
+// Relay URLs used for Nostr connections
+const RELAY_URLS = [
+  "wss://relay.primal.net",
+  "wss://relay.damus.io",
+  "wss://relay.8333.space/",
+  "wss://relay.snort.social",
+  "wss://nostr.mutinywallet.com",
+  "wss://nos.lol",
+];
+
+const RecoveryScreen = () => {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+  const navigation = useTypedNavigation();
+  const { profiles, setProfiles, setCurrentProfile } = useNostr();
+
+  // State
+  const [name, setName] = useState("");
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState(
+    profilePictures[0]
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mnemonic] = useState(generateMnemonic());
+
+  const handleProfilePictureSelect = (profile) => {
+    if (isSubmitting) return;
+    setSelectedProfilePicture(profile);
+  };
+
+  const { ndk } = useNDK();
+
+  const handleCreateProfile = runWithAnimationFrame(async () => {
+    try {
+      if (!name.trim() || isSubmitting) return;
+
+      const accountIndex = profiles ? profiles.length : 0;
+
+      // Generate keys from mnemonic
+      const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
+        mnemonic,
+        undefined,
+        accountIndex
+      );
+
+      let nsec = nip19.nsecEncode(sk);
+      const npub = nip19.npubEncode(pk);
+      const hexpk = nip19.decode(nsec).data;
+
+      // Set up NDK signer and connect
+      const signer = new NDKPrivateKeySigner(hexpk);
+      ndk.signer = signer;
+
+      // Create and update user profile
+      const user = ndk.getUser({ npub });
+      await user.fetchProfile();
+
+      const profile = user.profile || {};
+      profile.image = selectedProfilePicture.uri;
+      profile.name = name;
+      await user.publish();
+
+      // Update local profile storage
+      const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+      const newProfile = {
+        ...profile,
+        picture: profile.image,
+        pubkey: pk,
+        npub,
+        nsec,
+        mnemonic,
+        root: {
+          xpriv: root.privateExtendedKey,
+          xpub: root.publicExtendedKey,
+        },
+        id: accountIndex,
+      };
+
+      setProfiles([...(profiles || []), newProfile]);
+      setCurrentProfile(newProfile);
+      navigation.navigate("onboard/displayMnemonic", { mnemonic });
+    } catch (err) {}
+  }, setIsSubmitting);
+
+  const handleExistingAccount = () => {
+    if (isSubmitting) return;
+    navigation.navigate("onboard/mnemonic", {
+      type: "recover",
+      mnemonic: null,
+    });
+  };
+
+  // Components
+  const ProfilePictureSelector = () => (
+    <View style={styles.profileImageContainer}>
+      <View style={styles.selectedProfileContainer}>
+        {selectedProfilePicture && (
+          <Image
+            source={{ uri: selectedProfilePicture.uri }}
+            style={styles.selectedProfileImage}
+          />
+        )}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.profileOptionsScroll}
+        contentContainerStyle={styles.profileOptionsContent}
+      >
+        {profilePictures.map((profile, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => handleProfilePictureSelect(profile)}
+            style={[
+              styles.profileOption,
+              selectedProfilePicture === profile &&
+                styles.selectedProfileOption,
+              isSubmitting && styles.disabledControl,
+            ]}
+            disabled={isSubmitting}
+          >
+            <Image
+              source={{ uri: profile.uri }}
+              style={styles.profileOptionImage}
+            />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const NameInput = () => (
+    <View style={styles.inputContainer}>
+      <Text weight="medium" size={14} style={styles.inputLabel}>
+        Enter your name
+      </Text>
+      <TextInput
+        style={[styles.textInput, isSubmitting && styles.disabledControl]}
+        placeholder="Your public profile name"
+        placeholderTextColor={greys(theme)[600]}
+        value={name}
+        onChangeText={setName}
+        editable={!isSubmitting}
+      />
+      <Text weight="regular" size={12} style={styles.privacyNote}>
+        Note that your profile will be public, so anyone can search for you and
+        send funds. While your profile is public, your transactions remain
+        private.
+      </Text>
+    </View>
+  );
+
+  const ButtonBar = () => (
+    <View style={styles.bottomButtons}>
+      <TouchableOpacity
+        style={[styles.createButton, isSubmitting && styles.disabledControl]}
+        onPress={handleCreateProfile}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={greys(theme)[0]} />
+            <Text
+              weight="bold"
+              size={16}
+              style={[styles.createButtonText, { marginLeft: 8 }]}
+            >
+              Creating...
+            </Text>
+          </View>
+        ) : (
+          <Text weight="bold" size={16} style={styles.createButtonText}>
+            Create Sovran Account
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.existingButton, isSubmitting && styles.disabledControl]}
+        onPress={handleExistingAccount}
+        disabled={isSubmitting}
+      >
+        <Text
+          size={16}
+          weight="bold"
+          style={[
+            styles.existingButtonText,
+            isSubmitting && styles.disabledButtonText,
+          ]}
+        >
+          I already have a Sovran account
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <>
+      <Container>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            <Text weight="bold" size={24} style={styles.headerTitle}>
+              Create Sovran Profile
+            </Text>
+            <Text weight="regular" size={14} style={styles.headerSubtitle}>
+              Your profile lets others find you and send you bitcoin easily.
+            </Text>
+
+            <ProfilePictureSelector />
+            <NameInput />
+          </View>
+        </ScrollView>
+      </Container>
+      <ButtonBar />
+    </>
+  );
+};
+
+const createStyles = (theme) =>
+  StyleSheet.create({
+    scrollContainer: {
+      flexGrow: 1,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: greys(theme)[2300],
+    },
+    headerTitle: {
+      fontFamily: "OverpassBold",
+      color: greys(theme)[0],
+      marginBottom: 8,
+      marginTop: 16,
+    },
+    headerSubtitle: {
+      color: greys(theme)[400],
+      marginBottom: 24,
+    },
+    profileImageContainer: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    selectedProfileContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: greys(theme)[1800],
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 24,
+      overflow: "hidden",
+    },
+    selectedProfileImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+    },
+    profileOptionsScroll: {
+      maxHeight: 80,
+    },
+    profileOptionsContent: {
+      flexDirection: "row",
+      justifyContent: "center",
+      paddingHorizontal: 4,
+    },
+    profileOption: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      marginHorizontal: 4,
+      overflow: "hidden",
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    selectedProfileOption: {
+      borderColor: shades[300],
+    },
+    profileOptionImage: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+    },
+    inputContainer: {
+      marginTop: 16,
+    },
+    inputLabel: {
+      color: greys(theme)[200],
+      marginBottom: 8,
+    },
+    textInput: {
+      backgroundColor: greys(theme)[1800],
+      color: greys(theme)[0],
+      borderRadius: 8,
+      padding: 16,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: greys(theme)[1500],
+      marginBottom: 16,
+    },
+    privacyNote: {
+      color: greys(theme)[400],
+      marginBottom: 16,
+      lineHeight: 18,
+    },
+    bottomButtons: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      backgroundColor: greys(theme)[2300],
+    },
+    createButton: {
+      backgroundColor: shades[300],
+      padding: 16,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    createButtonText: {
+      color: greys(theme)[0],
+      textAlign: "center",
+    },
+    existingButton: {
+      backgroundColor: greys(theme)[1800],
+      padding: 16,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    existingButtonText: {
+      color: greys(theme)[0],
+      textAlign: "center",
+    },
+    disabledControl: {
+      opacity: 0.6,
+    },
+    disabledButtonText: {
+      color: greys(theme)[400],
+    },
+    loadingContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });
+
+export default RecoveryScreen;
