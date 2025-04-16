@@ -17,7 +17,12 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
   - [x] Backup balance with mnemonic
   - [x] Send money over Nostr
   - [x] npub.cash lightning URL
+  - [] Custom Lightning URLs
   - [x] Easy to use QR scanner
+  - [] Multipath Payment: Implement MPP and design an intuitive UI to pay from multiple mints
+  - [] Mint Management: Implement better ways to help the user distribute ecash between mints
+  - [] Unified payment addresses: Write a formal NUT for this to get community input & implement it in Sovran
+  - [x] Basic NFC functionality
 
 - [x] Marketplace features include:
   - [x] Bitrefill gift cards
