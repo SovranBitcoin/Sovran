@@ -1,18 +1,19 @@
-import React from "react";
-import { View, Button } from "react-native";
-import {
-  useSheetRouter,
-  useSheetRouteParams,
-} from "react-native-actions-sheet";
+import { Text } from 'components/common/Themed';
+import React from 'react';
+import { View, Button } from 'react-native';
+import { useSheetRouter, useSheetRouteParams } from 'react-native-actions-sheet';
 
-const RouteB = () => {
-  const router = useSheetRouter("example-sheet-with-router");
-  const params = useSheetRouteParams("example-sheet-with-router", "route-b");
+const RouteB = ({ router }) => {
+  const params = useSheetRouteParams('example-sheet-with-router', 'route-b');
+  // get params from the route
+
   if (!router) {
     return null; // Handle the case where router is undefined
   }
+
   return (
     <View>
+      <Text>{JSON.stringify(params)}</Text>
       <Button
         title="Go Back to Route A"
         onPress={() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,16 +7,16 @@ import {
   ScrollView,
   TextInput,
   Keyboard,
-} from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greens, greys, reds } from "helper/colors";
-import Container from "components/layout/Container";
-import { Text } from "components/common/Themed";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation";
-import * as nip06 from "node_modules/nostr-tools/lib/cjs/nip06";
-import { wordlist } from "@scure/bip39/wordlists/english";
-import BottomButtons from "./BottomButtons";
+} from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greens, greys, reds } from 'helper/colors';
+import Container from 'components/layout/Container';
+import { Text } from 'components/common/Themed';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import { wordlist } from '@scure/bip39/wordlists/english';
+import BottomButtons from './BottomButtons';
 
 // BIP39 wordlist for validation
 const BIP39_WORDLIST = wordlist;
@@ -31,17 +31,19 @@ const RecoveryScreen: React.FC<{}> = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { type = "recover", mnemonic = null } = useTypedRoute() || {};
+  const { type = 'recover', mnemonic = null } = useTypedRoute() || {};
   const inputRef = useRef<TextInput>(null);
 
   // State for managing word input
-  const [words, setWords] = useState<string[]>(Array(TOTAL_WORDS).fill(""));
+  const [words, setWords] = useState(
+    'trial canoe short dust quantum false jewel wonder alter jelly crime entire'.split(' ')
+  );
   const [verifyIndices, setVerifyIndices] = useState<number[]>([]);
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [invalidWords, setInvalidWords] = useState<number[]>([]);
-  const [currentInput, setCurrentInput] = useState("");
+  const [currentInput, setCurrentInput] = useState('');
 
-  const isVerifyMode = type === "verify";
+  const isVerifyMode = type === 'verify';
 
   // Set up verification or recovery mode
   useEffect(() => {
@@ -49,10 +51,10 @@ const RecoveryScreen: React.FC<{}> = () => {
       setVerifyIndices(VERIFICATION_INDICES);
 
       // Create masked version of the mnemonic
-      const mnemonicWords = mnemonic.split(" ");
+      const mnemonicWords = mnemonic.split(' ');
       const masked = [...mnemonicWords];
       VERIFICATION_INDICES.forEach((index) => {
-        masked[index] = "";
+        masked[index] = '';
       });
 
       setWords(masked);
@@ -88,7 +90,7 @@ const RecoveryScreen: React.FC<{}> = () => {
   // Handle text change
   const handleTextChange = (text: string) => {
     // Only allow alphabetic characters
-    const alphabeticText = text.replace(/[^a-zA-Z]/g, "").toLowerCase();
+    const alphabeticText = text.replace(/[^a-zA-Z]/g, '').toLowerCase();
 
     // Update the current input state
     setCurrentInput(alphabeticText);
@@ -99,7 +101,7 @@ const RecoveryScreen: React.FC<{}> = () => {
     setWords(updatedWords);
 
     // If original text includes a space, move to next word
-    if (text.includes(" ")) {
+    if (text.includes(' ')) {
       // If it's the last word, submit
       if (activeWordIndex === TOTAL_WORDS - 1) {
         handleSubmit();
@@ -118,12 +120,12 @@ const RecoveryScreen: React.FC<{}> = () => {
       const currentIndexPosition = verifyIndices.indexOf(activeWordIndex);
       if (currentIndexPosition < verifyIndices.length - 1) {
         setActiveWordIndex(verifyIndices[currentIndexPosition + 1]);
-        setCurrentInput("");
+        setCurrentInput('');
       }
     } else {
       // Normal recovery mode behavior
       setActiveWordIndex(activeWordIndex + 1);
-      setCurrentInput("");
+      setCurrentInput('');
     }
   };
 
@@ -133,16 +135,8 @@ const RecoveryScreen: React.FC<{}> = () => {
   };
 
   // Handle key press for backspace functionality
-  const handleKeyPress = ({
-    nativeEvent,
-  }: {
-    nativeEvent: { key: string };
-  }) => {
-    if (
-      nativeEvent.key === "Backspace" &&
-      currentInput === "" &&
-      activeWordIndex > 0
-    ) {
+  const handleKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    if (nativeEvent.key === 'Backspace' && currentInput === '' && activeWordIndex > 0) {
       // Move to previous word if current word is empty and backspace is pressed
       if (isVerifyMode) {
         // In verify mode, move to the previous index that needs verification
@@ -165,29 +159,24 @@ const RecoveryScreen: React.FC<{}> = () => {
 
     if (isVerifyMode) {
       // Verification mode - check if verified words match original
-      const originalWords = mnemonic!.split(" ");
+      const originalWords = mnemonic!.split(' ');
       const isCorrect = verifyIndices.every(
-        (index) =>
-          words[index].toLowerCase() === originalWords[index].toLowerCase()
+        (index) => words[index].toLowerCase() === originalWords[index].toLowerCase()
       );
 
       if (isCorrect) {
         // All verified words match - continue with onboarding
-        Alert.alert(
-          "Success!",
-          "You've correctly verified your recovery phrase.",
-          [
-            {
-              text: "Continue",
-              onPress: () => {
-                navigation.navigate("onboard/animate", { mnemonic });
-              },
+        Alert.alert('Success!', "You've correctly verified your recovery phrase.", [
+          {
+            text: 'Continue',
+            onPress: () => {
+              navigation.navigate('onboard/animate', { mnemonic });
             },
-          ]
-        );
+          },
+        ]);
       } else {
         Alert.alert(
-          "Verification Failed",
+          'Verification Failed',
           "The words you entered don't match your recovery phrase. Please try again."
         );
       }
@@ -197,24 +186,21 @@ const RecoveryScreen: React.FC<{}> = () => {
       const emptyWordsCount = words.filter((w) => !w).length;
 
       if (invalidWordsCount > 0) {
-        Alert.alert(
-          "Error",
-          `You have ${invalidWordsCount} invalid words. Please correct them.`
-        );
+        Alert.alert('Error', `You have ${invalidWordsCount} invalid words. Please correct them.`);
         return;
       }
 
       if (emptyWordsCount > 0) {
         Alert.alert(
-          "Error",
+          'Error',
           `You have ${emptyWordsCount} empty words. Please complete your seed phrase.`
         );
         return;
       }
 
       // Proceed with recovery
-      const recoveredMnemonic = words.join(" ");
-      navigation.navigate("onboard/animate", { mnemonic: recoveredMnemonic });
+      const recoveredMnemonic = words.join(' ');
+      navigation.navigate('onboard/animate', { mnemonic: recoveredMnemonic });
     }
   };
 
@@ -224,15 +210,12 @@ const RecoveryScreen: React.FC<{}> = () => {
     const isInvalid = invalidWords.includes(index);
     const isFilled = Boolean(words[index]);
     const isVerifyCell = isVerifyMode && verifyIndices.includes(index);
-    const originalWord = mnemonic?.split(" ")[index];
+    const originalWord = mnemonic?.split(' ')[index];
 
     // Check if the word is correct in verify mode
-    const isCorrectWord =
-      words[index]?.toLowerCase() === originalWord?.toLowerCase();
+    const isCorrectWord = words[index]?.toLowerCase() === originalWord?.toLowerCase();
 
-    const isValidWord = isVerifyCell
-      ? isCorrectWord
-      : isFilled && isCompleteWord(words[index]);
+    const isValidWord = isVerifyCell ? isCorrectWord : isFilled && isCompleteWord(words[index]);
 
     return (
       <TouchableOpacity
@@ -242,17 +225,16 @@ const RecoveryScreen: React.FC<{}> = () => {
           isInvalid
             ? styles.invalidWordCell
             : isFilled && isValidWord
-            ? styles.validWordCell
-            : isFilled
-            ? styles.invalidWordCell
-            : null,
+              ? styles.validWordCell
+              : isFilled
+                ? styles.invalidWordCell
+                : null,
           isActive && styles.activeWordCell,
         ]}
         onPress={() => {
           setActiveWordIndex(index);
-          setCurrentInput(words[index] || "");
-        }}
-      >
+          setCurrentInput(words[index] || '');
+        }}>
         <Text style={[styles.wordNumber, isActive && styles.activeWordText]}>
           {`${index + 1}.`}
         </Text>
@@ -263,14 +245,13 @@ const RecoveryScreen: React.FC<{}> = () => {
             (isVerifyCell ? isCorrectWord : isFilled && isValidWord)
               ? styles.validWordText
               : isInvalid
-              ? styles.invalidWordText
-              : null,
+                ? styles.invalidWordText
+                : null,
             isActive && styles.activeWordText,
           ]}
           numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {words[index] || ""}
+          ellipsizeMode="tail">
+          {words[index] || ''}
         </Text>
       </TouchableOpacity>
     );
@@ -283,7 +264,6 @@ const RecoveryScreen: React.FC<{}> = () => {
     try {
       return nip06.validateWords(mnemonicStr);
     } catch (error) {
-      
       return false;
     }
   };
@@ -295,7 +275,7 @@ const RecoveryScreen: React.FC<{}> = () => {
       return verifyIndices.every((index) => isCompleteWord(words[index]));
     } else {
       // For recovery, the entire mnemonic should be valid
-      return isValidMnemonic(words.join(" "));
+      return isValidMnemonic(words.join(' '));
     }
   };
 
@@ -304,19 +284,16 @@ const RecoveryScreen: React.FC<{}> = () => {
       <Container>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
             <Text style={styles.title}>
-              {isVerifyMode
-                ? "Verify your Recovery Phrase"
-                : "Enter your Recovery Phrase"}
+              {isVerifyMode ? 'Verify your Recovery Phrase' : 'Enter your Recovery Phrase'}
             </Text>
 
             {isVerifyMode && (
               <Text style={styles.subtitle}>
-                Please enter the missing words from your recovery phrase to
-                verify you've saved it correctly
+                Please enter the missing words from your recovery phrase to verify you've saved it
+                correctly
               </Text>
             )}
 
@@ -372,9 +349,9 @@ const RecoveryScreen: React.FC<{}> = () => {
                 },
               ]),
           {
-            text: isVerifyMode ? "Verify" : "Submit",
+            text: isVerifyMode ? 'Verify' : 'Submit',
             onPress: handleSubmit,
-            variant: "primary",
+            variant: 'primary',
             disabled: !isSubmitEnabled(),
           },
         ]}
@@ -398,10 +375,10 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   // Convert RGB back to hex
   const rgbToHex = (r, g, b) => {
     return (
-      "#" +
-      Math.round(r).toString(16).padStart(2, "0") +
-      Math.round(g).toString(16).padStart(2, "0") +
-      Math.round(b).toString(16).padStart(2, "0")
+      '#' +
+      Math.round(r).toString(16).padStart(2, '0') +
+      Math.round(g).toString(16).padStart(2, '0') +
+      Math.round(b).toString(16).padStart(2, '0')
     );
   };
 
@@ -428,13 +405,13 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[2300],
     },
     title: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 20,
       color: greys(theme)[0],
       marginBottom: 8,
     },
     subtitle: {
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       fontSize: 16,
       color: greys(theme)[200],
       marginBottom: 16,
@@ -444,13 +421,13 @@ const createStyles = (theme: any) =>
       marginBottom: 24,
     },
     gridRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       marginBottom: 8,
     },
     verifyRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       marginBottom: 16,
     },
     wordCell: {
@@ -460,9 +437,9 @@ const createStyles = (theme: any) =>
       padding: 12,
       marginHorizontal: 4,
       minHeight: 60,
-      justifyContent: "center",
+      justifyContent: 'center',
       borderBottomWidth: 2,
-      borderBottomColor: "transparent",
+      borderBottomColor: 'transparent',
     },
     activeWordCell: {
       backgroundColor: greys(theme)[1500],
@@ -483,11 +460,11 @@ const createStyles = (theme: any) =>
       color: greys(theme)[600],
       fontSize: 12,
       marginBottom: 4,
-      textAlign: "left",
+      textAlign: 'left',
     },
     wordText: {
       color: greys(theme)[600],
-      textAlign: "center",
+      textAlign: 'center',
       fontSize: 14,
     },
     filledWordText: {

@@ -197,7 +197,7 @@ export async function checkLNPaymentComplete({
 
       await updateStateAfterPayment(profileId, proofs, quote, mintUrl);
       publishWalletEvent(
-        store.getState().cashu?.profiles?.[profileId]?.transactions.map(t => t.mintUrl)
+        [...new Set([...store.getState().cashu?.profiles?.[profileId]?.transactions.map(t => t.mintUrl), mintUrl])]
       );
     } catch (err) {
       Alert.alert("error", JSON.stringify(err));

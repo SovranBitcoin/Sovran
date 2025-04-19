@@ -1,16 +1,25 @@
-import React from "react";
-import { View, Button } from "react-native";
-import { RouteScreenProps } from "react-native-actions-sheet";
+import React from 'react';
+import { View, Button } from 'react-native';
+import { RouteScreenProps, useSheetRef, useSheetRouteParams } from 'react-native-actions-sheet';
 
-const RouteA = ({
-  router,
-}: RouteScreenProps<"example-sheet-with-router", "route-a">) => {
+const RouteA = ({ router, payload }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
+  // when data is passed from .show() method, it will be available in the payload
+  const ref = useSheetRef('mint-adder');
+
   return (
     <View>
       <Button
         title="Go to Route B"
         onPress={() => {
-          router.navigate("route-b", { data: "test" });
+          router.navigate('route-b', { data: 'test' });
+        }}
+      />
+      <Button
+        title="Return data"
+        onPress={() => {
+          ref.current.hide({
+            // Respond with data here that is needed in the SheetManager.show() method
+          });
         }}
       />
     </View>
