@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Animated, ScrollView, Dimensions, Easing, Image, Alert } from 'react-native';
+import { View, Animated, ScrollView, Dimensions, Easing, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
@@ -14,7 +14,7 @@ import { createStyles } from './helper';
 import { FlagIcon } from 'assets/icons/flag';
 import { CurrencyIcon } from 'assets/icons';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
-import { useNostr } from 'helper/redux/nostr';
+import { setCurrentProfile, setProfiles, useNostr } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
 import { appendProofsV2 } from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
@@ -24,11 +24,37 @@ import { MintItem } from './MintItem';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { SheetManager } from 'react-native-actions-sheet';
+import _ from 'lodash';
 
 const { height } = Dimensions.get('window');
 
+const ensureCompleteStep = (currentSteps, newStepsOrUpdater) => {
+  // Find existing complete step if it exists
+  const completeStep = currentSteps.find((step) => step.type === 'complete');
+
+  // Calculate new steps (handling both direct array and updater function)
+  let updatedSteps;
+  if (typeof newStepsOrUpdater === 'function') {
+    updatedSteps = newStepsOrUpdater(currentSteps);
+  } else {
+    updatedSteps = newStepsOrUpdater;
+  }
+
+  // Remove any complete steps that might be in the updated array
+  const stepsWithoutComplete = updatedSteps.filter((step) => step.type !== 'complete');
+
+  // Add the complete step at the end
+  if (completeStep) {
+    return [...stepsWithoutComplete, completeStep];
+  } else {
+    // Create a default complete step if none exists
+    return [...stepsWithoutComplete, { type: 'complete' }];
+  }
+};
+
 // Main animation component for restoring wallet/mints
 const ChainLoadingAnimation = () => {
+  const [recovery, setRecovery] = useState({});
   async function* onMessage(message: { type: string }) {
     switch (message.type) {
       case 'processing': {
@@ -78,7 +104,7 @@ const ChainLoadingAnimation = () => {
           id: `profile-${index}`,
         }));
 
-        setSteps([...steps, ...profileSteps]);
+        setSteps(ensureCompleteStep(steps, [...steps, ...profileSteps]));
 
         return { type: 'complete' };
       }
@@ -105,11 +131,12 @@ const ChainLoadingAnimation = () => {
 
         // Helper function to insert step after profile
         const insertStepAfterProfile = (step) => {
-          const newSteps = [
+          const newSteps = ensureCompleteStep(steps, [
             ...steps.slice(0, currentProfileIndex + 1),
             step,
             ...steps.slice(currentProfileIndex + 1),
-          ];
+          ]);
+
           setSteps(newSteps);
           return { type: 'complete', payload: newSteps };
         };
@@ -169,7 +196,6 @@ const ChainLoadingAnimation = () => {
         // This case will handle the button click event
         // For now, we'll just yield a complete message
         // You would implement the actual functionality here
-        Alert.alert('add mint', 'add mint');
         yield {
           label: 'WAITING_FOR_INPUT',
           message: "Sovran couldn't detect a mint. Please add the one your account was using.",
@@ -180,9 +206,9 @@ const ChainLoadingAnimation = () => {
         };
 
       case 'mint-group':
-        Alert.alert('mint group', 'mint group');
         const profile = steps.find((step) => step.type === 'profile')?.profile;
 
+        const mints = [];
         for (const mint of message.payload.mints) {
           const { mintUrl } = mint;
           const generator = await restoreMint({ mintUrl, profile });
@@ -196,14 +222,30 @@ const ChainLoadingAnimation = () => {
           const { value: restoredMint } = result;
           const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
 
-          store.dispatch(
-            appendProofsV2({
-              profileId: profile.id,
-              mintUrl,
-              proofs,
-            })
-          );
+          mints.push({
+            profileId: mint.id,
+            mintUrl,
+            proofs,
+          });
         }
+
+        setSteps(
+          steps.map((step) => {
+            if (step.type === 'mint-group' && step.id === message.payload.id) {
+              return {
+                ...step,
+                mints: step.mints.map((mint) => {
+                  const mintData = mints.find((m) => m.profileId === mint.id);
+                  return {
+                    ...mint,
+                    proofs: mintData?.proofs || [],
+                  };
+                }),
+              };
+            }
+            return step;
+          })
+        );
 
         return { type: 'complete' };
     }
@@ -239,9 +281,12 @@ const ChainLoadingAnimation = () => {
       icon: 'settings',
       id: 0,
     },
+    {
+      type: 'complete',
+      label: 'Complete',
+      icon: 'checkmark',
+    },
   ]);
-
-  const { setProfiles, setCurrentProfile } = useNostr();
 
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -270,17 +315,6 @@ const ChainLoadingAnimation = () => {
       }
     });
   }, [steps]);
-
-  // Initialize active mints for each mint group
-  // useEffect(() => {
-  //   const initialActiveMints = {};
-  //   steps.forEach((step) => {
-  //     if (step.type === 'mint-group' && step.mints.length > 0) {
-  //       initialActiveMints[step.id] = step.mints[0].id;
-  //     }
-  //   });
-  //   setActiveMints(initialActiveMints);
-  // }, [steps]);
 
   // Scroll to active step
   useEffect(() => {
@@ -333,6 +367,38 @@ const ChainLoadingAnimation = () => {
 
   // Handle completion
   const handleComplete = () => {
+    console.log(298738273872, JSON.stringify(steps, null, 2));
+    const profileSteps = _.filter(steps, { type: 'profile' });
+    const uniqueProfiles = _.keyBy(profileSteps, 'id');
+    const profiles = _.values(uniqueProfiles).map((profile) => profile.profile);
+
+    store.dispatch(setProfiles(profiles));
+    store.dispatch(setCurrentProfile(profiles[0]));
+
+    // Find all mint groups in the steps
+    const mintGroups = _.filter(steps, { type: 'mint-group' });
+
+    // Process each mint group
+    _.forEach(mintGroups, (mintGroup) => {
+      const profileId = mintGroup.forProfileId;
+
+      // Process each mint within the group
+      _.forEach(mintGroup.mints, (mint) => {
+        const mintUrl = mint.mintUrl;
+        const proofs = mint.proofs || [];
+
+        // Only dispatch if there are proofs available
+        if (proofs.length > 0) {
+          store.dispatch(
+            appendProofsV2({
+              profileId: profileId,
+              mintUrl: mintUrl,
+              proofs: proofs,
+            })
+          );
+        }
+      });
+    });
     navigation.navigate(
       '',
       {},
@@ -525,7 +591,9 @@ const ChainLoadingAnimation = () => {
           handleProfileAnimation();
         }, 1000);
       } else if (steps[activeStep].type === 'complete') {
-        handleComplete();
+        setTimeout(() => {
+          handleComplete();
+        }, 1000);
       }
     });
   }, [steps[activeStep]]);
@@ -581,8 +649,6 @@ const ChainLoadingAnimation = () => {
     return progressObject[mintUrl]?.currencies?.[unit]?.progress || 0;
   };
 
-  console.log(JSON.stringify(steps, null, 2));
-
   const renderAddButtonStep = (step, index) => {
     const isActive = isStepActive(index);
     const isComplete = isStepComplete(index);
@@ -600,22 +666,22 @@ const ChainLoadingAnimation = () => {
                     // data.mints
 
                     // add mints to profile step
-                    setSteps([
-                      ...steps,
-
-                      // get step for profile we currently are on
-                      {
-                        ...steps.find(
-                          (s) => s.type === 'profile' && s.profile?.id === step.forProfileId
-                        ),
-                        profile: {
+                    setSteps(
+                      ensureCompleteStep(steps, [
+                        ...steps,
+                        {
                           ...steps.find(
                             (s) => s.type === 'profile' && s.profile?.id === step.forProfileId
-                          ).profile,
-                          mints: data.mints,
+                          ),
+                          profile: {
+                            ...steps.find(
+                              (s) => s.type === 'profile' && s.profile?.id === step.forProfileId
+                            ).profile,
+                            mints: data.mints,
+                          },
                         },
-                      },
-                    ]);
+                      ])
+                    );
 
                     // go to next step
                     setTimeout(() => {
@@ -677,7 +743,11 @@ const ChainLoadingAnimation = () => {
         <View style={styles.stepContent}>
           {/* Step icon and progress */}
           <View style={styles.iconContainer}>
-            {renderProgressCircle(isActive ? progress : isComplete ? 1 : 0, 100, theme)}
+            {renderProgressCircle(
+              step.type === 'complete' ? 100 : isActive ? progress : isComplete ? 1 : 0,
+              100,
+              theme
+            )}
 
             {/* Icon */}
             <View style={styles.iconOverlay}>
@@ -696,7 +766,7 @@ const ChainLoadingAnimation = () => {
                     isComplete
                       ? '#ED0C46'
                       : isActive && step.type === 'complete'
-                        ? '#10B981'
+                        ? shades[300]
                         : 'white'
                   }
                 />
