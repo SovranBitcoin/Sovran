@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Animated, ScrollView, Dimensions, Easing, Image } from 'react-native';
+import { View, Animated, ScrollView, Dimensions, Easing, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
@@ -7,24 +7,21 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Text } from 'components/common/Themed';
 import { getMint, restoreMint } from 'helper/cashu';
-import { fetchEventFromRelays } from 'helper/nostr/cashu';
-import { getPublicKey, nip19 } from 'nostr-tools';
-import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { createStyles } from './helper';
-import { FlagIcon } from 'assets/icons/flag';
-import { CurrencyIcon } from 'assets/icons';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
-import { setCurrentProfile, setProfiles, useNostr } from 'helper/redux/nostr';
+import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
 import { addMints, appendProofsV2, setSelectedMint } from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
-import NDK, { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 import { MintItem } from './MintItem';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { SheetManager } from 'react-native-actions-sheet';
 import _ from 'lodash';
+import { getProfile } from './components/fetchAccountData';
+import { Currency } from './components/CurrencyIcon';
+import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
 
 const { height } = Dimensions.get('window');
 
@@ -52,10 +49,28 @@ const ensureCompleteStep = (currentSteps, newStepsOrUpdater) => {
   }
 };
 
+function findAndInsertAfter(array, itemToFind, itemToInsert) {
+  const _ = require('lodash');
+
+  // Find the index of the item
+  const index = _.findLastIndex(array, (item) => _.isEqual(item, itemToFind));
+
+  // If item is found, insert the new item after it
+  if (index !== -1) {
+    // Create a new array with the item inserted
+    const result = _.clone(array);
+
+    // Use lodash's slice and concat to create a new array
+    return _.concat(_.slice(result, 0, index + 1), [itemToInsert], _.slice(result, index + 1));
+  }
+
+  // If item is not found, return a copy of the original array
+  return _.clone(array);
+}
 // Main animation component for restoring wallet/mints
 const ChainLoadingAnimation = () => {
-  const [recovery, setRecovery] = useState({});
   async function* onMessage(message: { type: string }) {
+    // Alert.alert('onMessage', JSON.stringify(message));
     switch (message.type) {
       case 'processing': {
         const accountIndexes = [0, 1, 2];
@@ -63,7 +78,7 @@ const ChainLoadingAnimation = () => {
 
         // Fetch profiles and yield progress
         for (const index of accountIndexes) {
-          const profile = await getProfile(index);
+          const profile = await getProfile({ mnemonic, accountIndex: index });
 
           yield {
             label: 'PROFILE_FOUND',
@@ -74,6 +89,19 @@ const ChainLoadingAnimation = () => {
           if (profile) {
             profiles.push(profile);
           }
+        }
+
+        if (Math.random() < 0.5) {
+          setSteps(
+            ensureCompleteStep(
+              steps,
+              findAndInsertAfter(steps, message.payload, {
+                type: 'retry',
+                step: message.payload,
+              })
+            )
+          );
+          break;
         }
 
         // Generate HD root key
@@ -252,26 +280,6 @@ const ChainLoadingAnimation = () => {
   }
 
   const { mnemonic } = useTypedRoute();
-  async function getProfile(accountIndex: number) {
-    const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
-      mnemonic,
-      undefined,
-      accountIndex
-    );
-
-    let nsec = nip19.nsecEncode(sk);
-    const profileData = await fetchAccountData({ nsec });
-
-    if (profileData?.profile?.created_at) {
-      const mintsInfo = await fetchEventFromRelays(pk);
-
-      const mints = mintsInfo?.tags.filter((tag) => tag[0] === 'mint').map((tag) => tag[1]) || [];
-
-      return { ...profileData, mints, mnemonic, id: accountIndex, nsec };
-    } else {
-      return null;
-    }
-  }
 
   // Initialize with processing step
   const [steps, setSteps] = useState([
@@ -297,6 +305,7 @@ const ChainLoadingAnimation = () => {
   const [currencyIndex, setCurrencyIndex] = useState(0);
   const [connectingLines, setConnectingLines] = useState({});
   const [message, setMessage] = useState('');
+  const [error, setError] = useState(false);
   const [progressObject, setProgressObject] = useState({});
 
   // References
@@ -352,22 +361,10 @@ const ChainLoadingAnimation = () => {
     }, 500);
   };
 
-  // const handleProfileAnimationBackwards = () => {
-  //   animateConnectingLine(activeStep);
-
-  //   // Wait for line animation to complete before moving to next step
-  //   setTimeout(() => {
-  //     setProgress(0);
-  //     setCurrencyIndex(0);
-  //     setActiveStep((prevStep) => prevStep - 1);
-  //   }, 500);
-  // };
-
   const navigation = useTypedNavigation();
 
   // Handle completion
   const handleComplete = () => {
-    console.log(298738273872, JSON.stringify(steps, null, 2));
     const profileSteps = _.filter(steps, { type: 'profile' });
     const uniqueProfiles = _.keyBy(profileSteps, 'id');
     const profiles = _.values(uniqueProfiles).map((profile) => profile.profile);
@@ -447,6 +444,11 @@ const ChainLoadingAnimation = () => {
         const totalCurrencies = currentMint?.currencies?.length || 1;
 
         switch (result.value.label) {
+          case 'NO_PROFILES_FOUND': {
+            setMessage('No profiles found');
+            setError(true);
+            break;
+          }
           case 'PROFILE_FOUND': {
             // Calculate progress based on current index and maximum accounts
             const currentIndex = result.value.current;
@@ -653,6 +655,49 @@ const ChainLoadingAnimation = () => {
     return progressObject[mintUrl]?.currencies?.[unit]?.progress || 0;
   };
 
+  const renderRetryStep = (step, index) => {
+    const isActive = isStepActive(index);
+    const isComplete = isStepComplete(index);
+    const opacity = isComplete ? 0.7 : isActive ? 1 : 0.5;
+    const styles = createStyles(theme);
+    return (
+      <View style={[styles.stepContainer, { opacity }]}>
+        <View style={styles.stepContent}>
+          {/* Step icon and button */}
+          <View style={[styles.iconContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+            <TouchableOpacity
+              onPress={() => {
+                setSteps(ensureCompleteStep(steps, findAndInsertAfter(steps, step, step.step)));
+                setTimeout(() => {
+                  handleProfileAnimation();
+                }, 1000);
+              }}
+              style={[styles.addButtonContainer, { backgroundColor: shades[300] }]}>
+              <Icon size={32} name="ic:round-refresh" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Step label */}
+          <Text style={styles.stepLabel}>Retry</Text>
+          {/* <Text style={styles.stepMessage}>{message}</Text> */}
+        </View>
+
+        {/* Connecting line */}
+        {index < steps.length - 1 && (
+          <Animated.View
+            style={[
+              styles.connectingLine,
+              {
+                backgroundColor: isComplete || connectingLines[index] ? '#ED0C46' : '#444444',
+                transform: [{ scaleY: lineScaleY[index] || 0 }],
+              },
+            ]}
+          />
+        )}
+      </View>
+    );
+  };
+
   const renderAddButtonStep = (step, index) => {
     const isActive = isStepActive(index);
     const isComplete = isStepComplete(index);
@@ -746,37 +791,20 @@ const ChainLoadingAnimation = () => {
       <View style={[styles.stepContainer, { opacity }]}>
         <View style={styles.stepContent}>
           {/* Step icon and progress */}
-          <View style={styles.iconContainer}>
-            {renderProgressCircle(
-              step.type === 'complete' ? 100 : isActive ? progress : isComplete ? 1 : 0,
-              100,
-              theme
-            )}
-
-            {/* Icon */}
-            <View style={styles.iconOverlay}>
-              {step.type === 'profile' ? (
-                <Image
-                  source={{
-                    uri: step.iconUrl,
-                  }}
-                  style={styles.profileIcon}
-                />
-              ) : (
-                <Ionicons
-                  name={step.icon}
-                  size={24}
-                  color={
-                    isComplete
-                      ? '#ED0C46'
-                      : isActive && step.type === 'complete'
-                        ? shades[300]
-                        : 'white'
-                  }
-                />
-              )}
-            </View>
-          </View>
+          <TouchableOpacityProgress
+            ensureCompleteStep={ensureCompleteStep}
+            isActive={isActive}
+            progress={progress}
+            isComplete={isComplete}
+            renderProgressCircle={renderProgressCircle}
+            step={step}
+            setSteps={setSteps}
+            handleProfileAnimation={handleProfileAnimation}
+            steps={steps}
+            setMessage={setMessage}
+            setError={setError}
+            error={error}
+          />
 
           {/* Step label */}
           <Text style={styles.stepLabel}>{step.label}</Text>
@@ -879,23 +907,7 @@ const ChainLoadingAnimation = () => {
                           const currencyProgress = getCurrencyProgress(mint.mintUrl, currency.name);
                           return (
                             <View key={currency.name} style={styles.currencyRow}>
-                              {currency.name === 'usd' ||
-                              currency.name === 'eur' ||
-                              currency.name === 'gbp' ? (
-                                <FlagIcon
-                                  country={
-                                    currency.name === 'usd'
-                                      ? 'US'
-                                      : currency.name === 'eur'
-                                        ? 'EU'
-                                        : 'GB'
-                                  }
-                                  height={32}
-                                  width={32}
-                                />
-                              ) : (
-                                <CurrencyIcon currency={currency.name.toLowerCase()} />
-                              )}
+                              <Currency currency={currency.name} size={32} />
                               <View style={styles.progressBarContainer}>
                                 <View
                                   style={[
@@ -952,43 +964,16 @@ const ChainLoadingAnimation = () => {
                   ? renderMintGroup(step, index)
                   : step.type === 'add-button'
                     ? renderAddButtonStep(step, index)
-                    : renderBasicStep(step, index)}
+                    : step.type === 'retry'
+                      ? renderRetryStep(step, index)
+                      : renderBasicStep(step, index)}
               </View>
             ))}
           </View>
         </ScrollView>
-
-        <Text style={styles.remainingSteps}>
-          {7 - activeStep - 1} more step
-          {7 - activeStep - 1 === 1 ? '' : 's'}
-        </Text>
       </View>
     </View>
   );
-};
-
-export const fetchAccountData = async ({ nsec }) => {
-  let { data: sk } = nip19.decode(nsec);
-  const pk = getPublicKey(sk);
-  const npub = nip19.npubEncode(pk);
-
-  const signer = new NDKPrivateKeySigner(nsec);
-  const ndk = new NDK({
-    signer: signer,
-    explicitRelayUrls: [
-      'wss://relay.primal.net',
-      'wss://relay.damus.io',
-      'wss://relay.8333.space/',
-      'wss://relay.snort.social',
-      'wss://nostr.mutinywallet.com',
-      'wss://nos.lol',
-    ],
-  });
-
-  await ndk.connect();
-
-  const pablo = ndk.getUser({ npub });
-  return { profile: await pablo.fetchProfile(), pubkey: pk, npub, nsec };
 };
 
 // Profile retrieval component that initializes the animation

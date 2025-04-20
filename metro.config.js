@@ -55,6 +55,8 @@ const configWithMonicon = withMonicon(config, {
     'fa6-solid:chevron-left',
     'fa6-solid:chevron-right',
     'fluent:add-24-filled',
+    'material-symbols:refresh-rounded',
+    'ic:round-refresh',
   ],
 });
 
