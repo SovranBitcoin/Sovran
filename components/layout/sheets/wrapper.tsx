@@ -1,11 +1,12 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { Text } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { ScrollView } from "react-native-actions-sheet"; // <- important this is from react-native-actions-sheet
-import { memoizedGetTheme } from "helper/redux/settings";
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { Text } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { Dimensions } from 'react-native';
 
 interface WrapperProps {
   children: React.ReactNode;
@@ -20,20 +21,12 @@ interface ButtonProps {
   disabled?: boolean;
 }
 
-export const SheetButton: React.FC<ButtonProps> = ({
-  onPress,
-  children,
-  disabled,
-}) => {
+export const SheetButton: React.FC<ButtonProps> = ({ onPress, children, disabled }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   return (
-    <TouchableOpacity
-      disabled={disabled}
-      style={[styles.button]}
-      onPress={onPress}
-    >
+    <TouchableOpacity disabled={disabled} style={[styles.button]} onPress={onPress}>
       <Text style={styles.buttonText}>{children}</Text>
     </TouchableOpacity>
   );
@@ -46,42 +39,50 @@ const Wrapper: React.FC<WrapperProps> = ({
   scrollContainerStyle,
 }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const [buttonHeight, setButtonHeight] = useState(0);
+  const styles = createStyles(theme, buttonHeight);
 
   return (
     <View style={[styles.actionSheetContainer, containerStyle]}>
-      <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>
-        {children}
-      </ScrollView>
-      {buttons && <View style={styles.buttonContainer}>{buttons}</View>}
+      <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>{children}</ScrollView>
+      {buttons && (
+        <View
+          style={styles.buttonContainer}
+          onLayout={(event) => setButtonHeight(event.nativeEvent.layout.height)}>
+          {buttons}
+        </View>
+      )}
     </View>
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: string, buttonHeight: number) =>
   StyleSheet.create({
     actionSheetContainer: {
-      height: "100%",
+      height: '100%',
       backgroundColor: greys(theme)[2300],
     },
     scrollContainer: {
       padding: 16,
-      height: "100%",
+      height: '100%',
     },
     buttonContainer: {
-      padding: 16,
-      backgroundColor: greys(theme)[2300],
+      padding: 0,
+      backgroundColor: 'transparent',
+      position: 'absolute',
+      top: Dimensions.get('window').height - buttonHeight - 100,
+      width: '100%',
     },
     sectionHeader: {
       color: greys(theme)[0],
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       marginBottom: 12,
     },
     button: {
       padding: 16,
       marginTop: 12,
-      alignItems: "center",
+      alignItems: 'center',
       backgroundColor: greys(theme)[1800],
       borderBottomRightRadius: 1000,
       borderRadius: 1000,

@@ -15,6 +15,7 @@ import Wrapper, { SheetButton } from '../wrapper';
 import { sovran } from '.';
 import { useSheetRef } from 'react-native-actions-sheet';
 import { getMint } from 'components/cashu';
+import { ButtonHandler } from 'app/ecashSendConfirmation';
 
 interface MintCount {
   mintUrl: string;
@@ -269,6 +270,7 @@ function getMintsFromAudit() {
 }
 
 function useRecommendedMints(): { mintCounts: MintCount[] } {
+  // Same as original implementation
   const filters = useMemo(() => ({ kinds: [38000], limit: 2000 }), []);
 
   const { events } = useSubscribe({ filters });
@@ -327,6 +329,7 @@ interface ProcessedMintData {
   info: MintInfo;
   supportedUnits: string[];
   isLoading: boolean;
+  error?: string | null;
 }
 
 function AddMintItem({
@@ -342,9 +345,8 @@ function AddMintItem({
 }) {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
-  console.log(mintData);
 
-  if (!mintData || mintData.isLoading || !mint) {
+  if (!mintData || !mint) {
     return null;
   }
 
@@ -398,6 +400,7 @@ export function MintAddMore({ onClose, params }) {
   const [selectedCurrency, setSelectedCurrency] = useState<string>('All');
   const [mintsData, setMintsData] = useState<Map<string, ProcessedMintData>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadedMintIds, setLoadedMintIds] = useState<Set<string>>(new Set());
   const router = useSheetRouter('mint');
   const { mintCounts } = useRecommendedMints();
 
@@ -426,47 +429,69 @@ export function MintAddMore({ onClose, params }) {
     [mintCounts]
   );
 
-  // Fetch all mint data
+  // Fetch mint data progressively
   useEffect(() => {
     const fetchAllMintData = async () => {
       setLoading(true);
-      const newMintsData = new Map<string, ProcessedMintData>();
 
-      // Fetch mint data for all recommended mints
-      await Promise.all(
-        recommendedMints.map(async (mint) => {
-          try {
-            const mintInfo = await (await getMint({ mintUrl: mint.id })).getInfo();
-            const supportedUnits: string[] = [];
+      // Process each mint one at a time
+      for (const mint of recommendedMints) {
+        try {
+          // Skip if we've already loaded this mint
+          if (loadedMintIds.has(mint.id)) continue;
 
-            if (mintInfo?.nuts?.[4]?.methods) {
-              mintInfo.nuts[4].methods.forEach((method) => {
-                const unit =
-                  method.unit.toUpperCase() === 'BTC' ? 'SAT' : method.unit.toUpperCase();
-                if (!supportedUnits.includes(unit)) {
-                  supportedUnits.push(unit);
-                }
-              });
-            }
+          const mintInfo = await (await getMint({ mintUrl: mint.id })).getInfo();
+          const supportedUnits: string[] = [];
 
-            newMintsData.set(mint.id, {
+          if (mintInfo?.nuts?.[4]?.methods) {
+            mintInfo.nuts[4].methods.forEach((method) => {
+              const unit = method.unit.toUpperCase() === 'BTC' ? 'SAT' : method.unit.toUpperCase();
+              if (!supportedUnits.includes(unit)) {
+                supportedUnits.push(unit);
+              }
+            });
+          }
+
+          // Update the state for this individual mint
+          setMintsData((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(mint.id, {
               info: mintInfo,
               supportedUnits,
               isLoading: false,
               error: null,
             });
-          } catch (err) {
-            newMintsData.set(mint.id, {
+            return newMap;
+          });
+
+          // Mark this mint as loaded
+          setLoadedMintIds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(mint.id);
+            return newSet;
+          });
+        } catch (err) {
+          setMintsData((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(mint.id, {
               info: { icon_url: '' },
               supportedUnits: [],
               isLoading: false,
               error: 'Failed to fetch mint details',
             });
-          }
-        })
-      );
+            return newMap;
+          });
 
-      setMintsData(newMintsData);
+          // Still mark this mint as loaded even if it failed
+          setLoadedMintIds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(mint.id);
+            return newSet;
+          });
+        }
+      }
+
+      // All mints have been processed
       setLoading(false);
     };
 
@@ -499,7 +524,15 @@ export function MintAddMore({ onClose, params }) {
       if (mints.includes(mint.id)) return false;
       return mintData.supportedUnits.includes(selectedCurrency);
     });
-  }, [recommendedMints, selectedCurrency, mintsData]);
+  }, [recommendedMints, selectedCurrency, mintsData, mints]);
+
+  // Get loaded mints that match the currency filter
+  const loadedMints = useMemo(() => {
+    return filteredMints.filter((mint) => loadedMintIds.has(mint.id));
+  }, [filteredMints, loadedMintIds]);
+
+  // Determine if there are still mints to load
+  const hasMoreMintsToLoad = loadedMintIds.size < recommendedMints.length;
 
   return (
     <Wrapper
@@ -548,17 +581,13 @@ export function MintAddMore({ onClose, params }) {
           <Text style={[{ marginBottom: 12, color: greys(theme)[700] }]}>
             Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
           </Text>
-          <View>
-            {loading ? (
-              <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                <ActivityIndicator size="large" />
-                <Text style={{ marginTop: 10 }}>Loading mints...</Text>
-              </View>
-            ) : filteredMints.length > 0 ? (
-              filteredMints.map((mint) => {
+
+          <ScrollView style={styles.mintsContainer}>
+            {loadedMints.length > 0 ? (
+              loadedMints.map((mint) => {
                 const mintData = mintsData.get(mint.id);
-                // Skip mints with errors
-                if (mintData?.error) return null;
+                // Skip mints with errors or that are still loading
+                if (!mintData || mintData.error) return null;
 
                 return (
                   <AddMintItem
@@ -570,43 +599,45 @@ export function MintAddMore({ onClose, params }) {
                   />
                 );
               })
-            ) : (
+            ) : !hasMoreMintsToLoad ? (
               <Text style={[styles.noResults, { marginTop: 20, textAlign: 'center' }]}>
                 No mints found for the selected currency
               </Text>
+            ) : null}
+
+            {/* Show a loading indicator at the bottom while more mints are loading */}
+            {hasMoreMintsToLoad && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={greens[300]} />
+                <Text style={styles.loadingText}>Loading more mints...</Text>
+              </View>
             )}
-          </View>
+          </ScrollView>
         </>
       }
       buttons={
-        <>
-          <SheetButton
-            onPress={async () => {
-              // store.dispatch(
-              //   addMintsAction({
-              //     profileId: store.getState().nostr?.currentProfile?.id,
-              //     mintUrls: Array.from(selectedMints),
-              //   })
-              // );
-
-              // ref.current.hide({
-              //   mints: Array.from(selectedMints),
-              // });
-
-              await onClose({
-                mints: Array.from(selectedMints),
-              });
-            }}>
-            Save ({selectedMints.size})
-          </SheetButton>{' '}
-          <SheetButton
-            onPress={() => {
-              setSelectedMints(new Set());
-              router?.goBack();
-            }}>
-            Cancel
-          </SheetButton>
-        </>
+        <ButtonHandler
+          context="sheet"
+          buttons={[
+            {
+              text: `Save (${selectedMints.size})`,
+              variant: 'primary',
+              onPress: async () => {
+                await onClose({
+                  mints: Array.from(selectedMints),
+                });
+              },
+            },
+            {
+              text: 'Cancel',
+              variant: 'secondary',
+              onPress: () => {
+                setSelectedMints(new Set());
+                router?.goBack();
+              },
+            },
+          ]}
+        />
       }></Wrapper>
   );
 }
@@ -668,6 +699,19 @@ const createStyles = (theme: string) =>
     mintName: {
       color: greys(theme)[0],
       fontSize: 16,
+    },
+    mintsContainer: {
+      maxHeight: 400, // Limit height to make it scrollable if needed
+    },
+    loadingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+    },
+    loadingText: {
+      marginLeft: 8,
+      color: greys(theme)[400],
     },
   });
 
