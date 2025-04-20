@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { greens, greys, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetMints } from 'helper/redux/cashu/selectors';
@@ -13,7 +13,7 @@ import { addMintsAction } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import Wrapper, { SheetButton } from '../wrapper';
 import { sovran } from '.';
-import { useSheetRef } from 'react-native-actions-sheet';
+import { ScrollView } from 'react-native-actions-sheet';
 import { getMint } from 'components/cashu';
 import { ButtonHandler } from 'app/ecashSendConfirmation';
 

@@ -3,7 +3,6 @@
 ## Directory Structure
 
 For each sheet, maintain the following structure:
-
 ```
 /components/layout/sheets/[sheet-name]/
 ├── index.tsx                # Main sheet component
@@ -264,6 +263,10 @@ SheetManager.show('your-sheet-name', {
   }
 });
 ```
+
+### Scroll View
+
+When using ScrollView make sure to import from `import { ScrollView } from 'react-native-actions-sheet';` so that it respects both the scroll of the sheet and scroll inside the sheet.
 
 ### TypeScript Integration
 
