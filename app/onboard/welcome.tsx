@@ -1,13 +1,15 @@
-import "app/global";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import React from "react";
-import { SovranTextIcon } from "assets/icons";
-import { Text } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { useNavigation } from "expo-router";
-import Icon from "assets/icons";
+import 'app/global';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import React from 'react';
+import { SovranTextIcon } from 'assets/icons';
+import { Text } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { useNavigation } from 'expo-router';
+import Icon from 'assets/icons';
+import { Cashews } from 'assets/images';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -16,6 +18,22 @@ export default function ModalScreen() {
 
   return (
     <View style={styles.centeredContainer}>
+      <View
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          backgroundColor: 'black',
+        }}>
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <LinearGradient
+          colors={['black', 'transparent', 'black']}
+          locations={[0, 0.5, 1]}
+          style={styles.gradient}
+        />
+      </View>
       <View style={styles.centeredContent}>
         <Text size={32} weight="heavy">
           Welcome to
@@ -27,16 +45,11 @@ export default function ModalScreen() {
         <View />
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => navigation.navigate("onboard/ecash")}
-        >
+          onPress={() => navigation.navigate('onboard/ecash')}>
           <Text size={16} style={styles.navButtonText}>
             Next
           </Text>
-          <Icon
-            name="fa6-solid:chevron-right"
-            size={20}
-            color={greys(theme)[0]}
-          />
+          <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[0]} />
         </TouchableOpacity>
       </View>
     </View>
@@ -47,31 +60,38 @@ const createStyles = (theme) =>
   StyleSheet.create({
     centeredContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      height: "100%",
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100%',
       backgroundColor: greys(theme)[2300],
     },
+    gradient: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    },
     centeredContent: {
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       flex: 1,
-      alignSelf: "stretch",
+      alignSelf: 'stretch',
     },
     spacer: {
       marginBottom: 4,
     },
     bottomButtons: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      width: "100%",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
       padding: 16,
-      position: "absolute",
+      position: 'absolute',
       bottom: 16,
     },
     navButton: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     navButtonText: {
       marginRight: 8,

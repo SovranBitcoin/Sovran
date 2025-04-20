@@ -486,6 +486,8 @@ export function MintAddMore({ onClose, params }) {
   };
 
   // Filter mints based on selected currency
+  const mints = useSelector(memoizedGetMints);
+
   const filteredMints = useMemo(() => {
     if (selectedCurrency === 'All') {
       return recommendedMints;
@@ -494,11 +496,10 @@ export function MintAddMore({ onClose, params }) {
     return recommendedMints.filter((mint) => {
       const mintData = mintsData.get(mint.id);
       if (!mintData) return false;
+      if (mints.includes(mint.id)) return false;
       return mintData.supportedUnits.includes(selectedCurrency);
     });
   }, [recommendedMints, selectedCurrency, mintsData]);
-
-  const mints = useSelector(memoizedGetMints);
 
   return (
     <Wrapper

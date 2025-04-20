@@ -1,9 +1,9 @@
-import React from "react";
-import { Dimensions } from "react-native";
-import { Drawer } from "expo-router/drawer";
-import ProfileComponent from "../Profile";
+import React from 'react';
+import { Dimensions } from 'react-native';
+import { Drawer } from 'expo-router/drawer';
+import ProfileComponent from '../Profile';
 
-const screenWidth = Dimensions.get("screen").width;
+const screenWidth = Dimensions.get('screen').width;
 
 export default function DrawerLayout() {
   return (
@@ -11,24 +11,23 @@ export default function DrawerLayout() {
       screenOptions={{
         swipeEnabled: true,
         headerShown: false,
-        drawerType: "slide",
+        drawerType: 'slide',
         swipeEdgeWidth: screenWidth * 0.15,
         swipeMinDistance: 25,
-        drawerPosition: "left",
+        drawerPosition: 'left',
         drawerStyle: {
-          backgroundColor: "transparent",
+          backgroundColor: 'transparent',
           width: Math.max(screenWidth - 50, screenWidth * 0.9),
           paddingRight: 0,
         },
-        keyboardDismissMode: "none",
+        keyboardDismissMode: 'none',
         drawerContentContainerStyle: {
           flexGrow: 1,
         },
       }}
       drawerContent={() => {
         return <ProfileComponent />;
-      }}
-    >
+      }}>
       <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
     </Drawer>
   );

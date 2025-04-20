@@ -1,23 +1,19 @@
-import React from "react";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
-import { StyledText, Text } from "components/common/Themed";
-import Icon from "assets/icons";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import BottomButtons from "./BottomButtons";
-import { useTypedNavigation } from "helper/navigation";
+import React from 'react';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyledText, Text } from 'components/common/Themed';
+import Icon from 'assets/icons';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import BottomButtons from './BottomButtons';
+import { useTypedNavigation } from 'helper/navigation';
+import { Cashews } from 'assets/images';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * InfoSection - Reusable component for displaying title, highlight text, and description
  */
-export const InfoSection = ({
-  title,
-  highlight,
-  description,
-  highlightColors,
-  style,
-}) => {
+export const InfoSection = ({ title, highlight, description, highlightColors, style }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -26,12 +22,7 @@ export const InfoSection = ({
       <Text size={36} style={styles.titleText}>
         {title}
       </Text>
-      <StyledText
-        style={styles.highlightText}
-        custom
-        colors={highlightColors}
-        size={32}
-      >
+      <StyledText style={styles.highlightText} custom colors={highlightColors} size={32}>
         {highlight}
       </StyledText>
       <Text size={16} style={styles.descriptionText}>
@@ -47,8 +38,8 @@ export const InfoSection = ({
 export const NavigationFooter = ({
   onBack,
   onNext,
-  backText = "Back",
-  nextText = "Next",
+  backText = 'Back',
+  nextText = 'Next',
   theme,
   style,
 }) => {
@@ -82,28 +73,23 @@ export const ActionFooter = ({ actions, theme, style }) => {
   return (
     <View style={[styles.footerContainer, style]}>
       {actions.map((action, index) => {
-        const isPrimary = action.variant === "primary";
+        const isPrimary = action.variant === 'primary';
         const buttonStyle = [
           styles.actionButton,
           isPrimary && styles.primaryButton,
           {
-            backgroundColor: isPrimary ? greys(theme)[0] : "transparent",
+            backgroundColor: isPrimary ? greys(theme)[0] : 'transparent',
           },
         ];
 
         return (
-          <TouchableOpacity
-            key={index}
-            style={buttonStyle}
-            onPress={action.onPress}
-          >
+          <TouchableOpacity key={index} style={buttonStyle} onPress={action.onPress}>
             <Text
               size={16}
               style={{
                 color: isPrimary ? greys(theme)[2300] : greys(theme)[0],
-                fontFamily: "LexendMedium",
-              }}
-            >
+                fontFamily: 'LexendMedium',
+              }}>
               {action.label}
             </Text>
           </TouchableOpacity>
@@ -117,10 +103,7 @@ export const ActionFooter = ({ actions, theme, style }) => {
  * HeaderSkipButton - Component for the skip button in the header
  */
 export const HeaderSkipButton = ({ onPress, theme }) => (
-  <TouchableOpacity
-    style={{ flexDirection: "row", alignItems: "center" }}
-    onPress={onPress}
-  >
+  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={onPress}>
     <Text size={16} style={{ marginRight: 8 }}>
       Skip
     </Text>
@@ -143,11 +126,33 @@ export function OnboardingLayout({
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
-  const handleNext = () => navigation.navigate(nextScreen || "/");
+  const handleNext = () => navigation.navigate(nextScreen || '/');
   const handleBack = () => navigation.goBack();
 
   return (
     <View style={styles.centeredContainer}>
+      <View
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          backgroundColor: 'black',
+        }}>
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <LinearGradient
+          colors={['black', 'transparent', 'black']}
+          locations={[0, 0.5, 1]}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+          }}
+        />
+      </View>
       <View style={styles.centeredContent}>
         <InfoSection
           title={title}
@@ -160,11 +165,7 @@ export function OnboardingLayout({
       {actions ? (
         <BottomButtons buttons={actions} theme={theme} />
       ) : (
-        <NavigationFooter
-          onBack={handleBack}
-          onNext={handleNext}
-          theme={theme}
-        />
+        <NavigationFooter onBack={handleBack} onNext={handleNext} theme={theme} />
       )}
     </View>
   );
@@ -173,17 +174,17 @@ export function OnboardingLayout({
 const createStyles = (theme) =>
   StyleSheet.create({
     titleText: {
-      fontFamily: "LexendBold",
+      fontFamily: 'LexendBold',
       lineHeight: 36,
     },
     highlightText: {
       fontSize: 48,
-      fontFamily: "LexendBlack",
+      fontFamily: 'LexendBlack',
       lineHeight: 48,
     },
     descriptionText: {
-      fontFamily: "LexendRegular",
-      textAlign: "left",
+      fontFamily: 'LexendRegular',
+      textAlign: 'left',
       marginVertical: 8,
     },
     buttonTextLeft: {
@@ -193,44 +194,44 @@ const createStyles = (theme) =>
       marginRight: 8,
     },
     infoContainer: {
-      alignItems: "flex-start",
-      alignSelf: "stretch",
+      alignItems: 'flex-start',
+      alignSelf: 'stretch',
     },
     centeredContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      height: "100%",
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100%',
       backgroundColor: greys(theme)[2300],
     },
     centeredContent: {
-      justifyContent: "center",
-      alignItems: "flex-start",
+      justifyContent: 'center',
+      alignItems: 'flex-start',
       flex: 1,
-      alignSelf: "stretch",
+      alignSelf: 'stretch',
       margin: 16,
     },
     footerContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      width: "100%",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
       padding: 16,
-      position: "absolute",
+      position: 'absolute',
       bottom: 16,
     },
     footerButton: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     actionButton: {
       padding: 16,
       borderRadius: 8,
       flex: 1,
       marginHorizontal: 8,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.1)",
+      borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     primaryButton: {
       borderWidth: 0,

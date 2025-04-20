@@ -16,7 +16,7 @@ import { CurrencyIcon } from 'assets/icons';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { setCurrentProfile, setProfiles, useNostr } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
-import { appendProofsV2 } from 'helper/redux/cashu';
+import { addMints, appendProofsV2, setSelectedMint } from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import NDK, { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
@@ -387,6 +387,9 @@ const ChainLoadingAnimation = () => {
         const mintUrl = mint.mintUrl;
         const proofs = mint.proofs || [];
 
+        store.dispatch(addMints({ profileId, mints: [mintUrl] }));
+        store.dispatch(setSelectedMint({ profileId, mintUrl }));
+
         // Only dispatch if there are proofs available
         if (proofs.length > 0) {
           store.dispatch(
@@ -399,6 +402,7 @@ const ChainLoadingAnimation = () => {
         }
       });
     });
+
     navigation.navigate(
       '',
       {},
