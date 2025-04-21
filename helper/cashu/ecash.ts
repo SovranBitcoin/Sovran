@@ -277,7 +277,7 @@ export async function receiveEcash({
     );
 
     await publishWalletEvent(
-      state.cashu?.profiles?.[profileId]?.transactions.map((t) => t.mintUrl)
+      [...new Set([...store.getState().cashu?.profiles?.[profileId]?.transactions.map(t => t.mintUrl), receiveMintUrl])]
     );
 
     return newTransaction;

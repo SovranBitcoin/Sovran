@@ -22,8 +22,8 @@ import { ensureProfileExists } from "./helpers";
 const initialState = {
   profiles: [
     {
-      selectedMint: "https://mint.minibits.cash/Bitcoin",
-      mints: ["https://mint.minibits.cash/Bitcoin"],
+      selectedMint: null,
+      mints: [],
       proofs: {},
       counters: {},
       keysets: {},

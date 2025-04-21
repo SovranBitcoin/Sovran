@@ -1,4 +1,4 @@
-import NDK from "@nostr-dev-kit/ndk";
+import NDK, { NDKEvent } from "@nostr-dev-kit/ndk";
 
 const relays = [
   "wss://purplepag.es",
@@ -24,5 +24,7 @@ const ndk = new NDK({
 });
 
 ndk.connect();
+
+
 
 export default ndk;

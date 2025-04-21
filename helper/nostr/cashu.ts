@@ -41,6 +41,7 @@ interface NostrEvent {
 }
 
 export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | null> {
+  return null;
   const pool = new SimplePool();
   try {
     const events = await pool.get(relays, {
@@ -57,7 +58,6 @@ export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | nu
 }
 
 async function publishWalletEvent(mints: string[], units: string[] = ["sat", "usd"]): Promise<string>[] {
-  // Alert.alert("publishWalletEvent", JSON.stringify(mints));
   try {
     const currentProfile = store.getState().nostr?.currentProfile;
 
@@ -71,9 +71,6 @@ async function publishWalletEvent(mints: string[], units: string[] = ["sat", "us
     if (!(privKeyBytes instanceof Uint8Array)) {
       throw new Error("Invalid private key format");
     }
-
-    const privKey = bytesToHex(privKeyBytes);
-
 
     const event: NostrEvent = {
       kind: 37375,

@@ -61,7 +61,7 @@ export const usePollingPaymentRequest = ({
 
   useEffect(() => {
     if (!currentProfile?.nsec) return;
-    if (!paymentRequest) return null;
+    if (!paymentRequest) return;
 
     const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
     const privKey = bytesToHex(privKeyBytes);
@@ -109,12 +109,8 @@ export const usePollingPaymentRequest = ({
     from: string;
   }) {
     const encodedEcash = getEncodedToken({
-      token: [
-        {
-          mint: mint,
-          proofs: proofs,
-        },
-      ],
+      proofs: proofs,
+      mint: mint,
       unit: unit,
     }, {
       version: 4,

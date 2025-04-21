@@ -1,5 +1,5 @@
-import "../../shim";
-import React, { useState } from "react";
+import '../../shim';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,25 +9,25 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-} from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys, shades } from "helper/colors";
-import Container from "components/layout/Container";
-import { Text } from "components/common/Themed";
-import { useTypedNavigation } from "helper/navigation";
-import NDK, { NDKPrivateKeySigner, NDKUser } from "@nostr-dev-kit/ndk";
-import { nip19 } from "nostr-tools";
-import * as nip06 from "node_modules/nostr-tools/lib/cjs/nip06";
-import { useNostr } from "helper/redux/nostr";
-import * as bip39 from "@scure/bip39";
-import { useNDK } from "@nostr-dev-kit/ndk-mobile";
-global.Buffer = require("buffer").Buffer;
+} from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys, shades } from 'helper/colors';
+import Container from 'components/layout/Container';
+import { Text } from 'components/common/Themed';
+import { useTypedNavigation } from 'helper/navigation';
+import NDK, { NDKPrivateKeySigner, NDKUser } from '@nostr-dev-kit/ndk';
+import { nip19 } from 'nostr-tools';
+import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import { useNostr } from 'helper/redux/nostr';
+import * as bip39 from '@scure/bip39';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+global.Buffer = require('buffer').Buffer;
 
-import { entropyToMnemonic } from "bip39";
-import * as Crypto from "expo-crypto";
-import { store } from "helper/redux/store";
-import { HDKey } from "@scure/bip32";
+import { entropyToMnemonic } from 'bip39';
+import * as Crypto from 'expo-crypto';
+import { store } from 'helper/redux/store';
+import { HDKey } from '@scure/bip32';
 
 /**
  * Executes an async function within a requestAnimationFrame to improve UI responsiveness
@@ -64,42 +64,42 @@ export function generateMnemonic(): string {
 
 const profilePictures = [
   {
-    uri: "https://i.ibb.co/hFLfs20/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-96aab0a7-3406-4a14-a262-893d4a07fd7d.webp",
+    uri: 'https://i.ibb.co/hFLfs20/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-96aab0a7-3406-4a14-a262-893d4a07fd7d.webp',
   },
   {
-    uri: "https://i.ibb.co/NWRGTD1/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-b86bf261-8011-4b6d-9760-ac3e13792c8e.png",
+    uri: 'https://i.ibb.co/NWRGTD1/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-b86bf261-8011-4b6d-9760-ac3e13792c8e.png',
   },
   {
-    uri: "https://i.ibb.co/s6P30Bs/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-583aad52-cf85-41a1-a4d7-594bfa816efb.webp",
+    uri: 'https://i.ibb.co/s6P30Bs/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-583aad52-cf85-41a1-a4d7-594bfa816efb.webp',
   },
   {
-    uri: "https://i.ibb.co/Snm98B9/kelbiee-A-photorealistic-White-woman-facing-forward-a-digital-i-23363858-885f-434d-befa-8d112acc90e7.png",
+    uri: 'https://i.ibb.co/Snm98B9/kelbiee-A-photorealistic-White-woman-facing-forward-a-digital-i-23363858-885f-434d-befa-8d112acc90e7.png',
   },
   {
-    uri: "https://i.ibb.co/xYPtXtJ/kelbiee-A-photorealistic-german-man-facing-forward-a-digital-il-7acde628-0725-4900-adb3-3640bef4eff1.webp",
+    uri: 'https://i.ibb.co/xYPtXtJ/kelbiee-A-photorealistic-german-man-facing-forward-a-digital-il-7acde628-0725-4900-adb3-3640bef4eff1.webp',
   },
   {
-    uri: "https://i.ibb.co/G7yjvGf/kelbiee-A-photorealistic-latina-woman-facing-forward-a-digital-2340219e-5afd-4701-95d6-934f2c1e480f.webp",
+    uri: 'https://i.ibb.co/G7yjvGf/kelbiee-A-photorealistic-latina-woman-facing-forward-a-digital-2340219e-5afd-4701-95d6-934f2c1e480f.webp',
   },
   {
-    uri: "https://i.ibb.co/CshqCky/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-f1d772bc-e3ff-4cfe-bee8-4b0f067b2fde.webp",
+    uri: 'https://i.ibb.co/CshqCky/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-f1d772bc-e3ff-4cfe-bee8-4b0f067b2fde.webp',
   },
   {
-    uri: "https://i.ibb.co/86mmHXG/kelbiee-A-photorealistic-man-facing-forward-a-digital-illustrat-8151d836-41be-48c0-8b4c-c1664de23150.webp",
+    uri: 'https://i.ibb.co/86mmHXG/kelbiee-A-photorealistic-man-facing-forward-a-digital-illustrat-8151d836-41be-48c0-8b4c-c1664de23150.webp',
   },
   {
-    uri: "https://i.ibb.co/2Zj79j7/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-0e565a6b-b105-41b3-8fc6-eabb72e50591.png",
+    uri: 'https://i.ibb.co/2Zj79j7/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-0e565a6b-b105-41b3-8fc6-eabb72e50591.png',
   },
 ];
 
 // Relay URLs used for Nostr connections
 const RELAY_URLS = [
-  "wss://relay.primal.net",
-  "wss://relay.damus.io",
-  "wss://relay.8333.space/",
-  "wss://relay.snort.social",
-  "wss://nostr.mutinywallet.com",
-  "wss://nos.lol",
+  'wss://relay.primal.net',
+  'wss://relay.damus.io',
+  'wss://relay.8333.space/',
+  'wss://relay.snort.social',
+  'wss://nostr.mutinywallet.com',
+  'wss://nos.lol',
 ];
 
 const RecoveryScreen = () => {
@@ -109,10 +109,8 @@ const RecoveryScreen = () => {
   const { profiles, setProfiles, setCurrentProfile } = useNostr();
 
   // State
-  const [name, setName] = useState("");
-  const [selectedProfilePicture, setSelectedProfilePicture] = useState(
-    profilePictures[0]
-  );
+  const [name, setName] = useState('');
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState(profilePictures[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mnemonic] = useState(generateMnemonic());
 
@@ -171,14 +169,14 @@ const RecoveryScreen = () => {
 
       setProfiles([...(profiles || []), newProfile]);
       setCurrentProfile(newProfile);
-      navigation.navigate("onboard/displayMnemonic", { mnemonic });
+      navigation.navigate('onboard/displayMnemonic', { mnemonic });
     } catch (err) {}
   }, setIsSubmitting);
 
   const handleExistingAccount = () => {
     if (isSubmitting) return;
-    navigation.navigate("onboard/mnemonic", {
-      type: "recover",
+    navigation.navigate('onboard/mnemonic', {
+      type: 'recover',
       mnemonic: null,
     });
   };
@@ -188,10 +186,7 @@ const RecoveryScreen = () => {
     <View style={styles.profileImageContainer}>
       <View style={styles.selectedProfileContainer}>
         {selectedProfilePicture && (
-          <Image
-            source={{ uri: selectedProfilePicture.uri }}
-            style={styles.selectedProfileImage}
-          />
+          <Image source={{ uri: selectedProfilePicture.uri }} style={styles.selectedProfileImage} />
         )}
       </View>
 
@@ -199,24 +194,18 @@ const RecoveryScreen = () => {
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.profileOptionsScroll}
-        contentContainerStyle={styles.profileOptionsContent}
-      >
+        contentContainerStyle={styles.profileOptionsContent}>
         {profilePictures.map((profile, index) => (
           <TouchableOpacity
             key={index}
             onPress={() => handleProfilePictureSelect(profile)}
             style={[
               styles.profileOption,
-              selectedProfilePicture === profile &&
-                styles.selectedProfileOption,
+              selectedProfilePicture === profile && styles.selectedProfileOption,
               isSubmitting && styles.disabledControl,
             ]}
-            disabled={isSubmitting}
-          >
-            <Image
-              source={{ uri: profile.uri }}
-              style={styles.profileOptionImage}
-            />
+            disabled={isSubmitting}>
+            <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -237,9 +226,8 @@ const RecoveryScreen = () => {
         editable={!isSubmitting}
       />
       <Text weight="regular" size={12} style={styles.privacyNote}>
-        Note that your profile will be public, so anyone can search for you and
-        send funds. While your profile is public, your transactions remain
-        private.
+        Note that your profile will be public, so anyone can search for you and send funds. While
+        your profile is public, your transactions remain private.
       </Text>
     </View>
   );
@@ -249,16 +237,11 @@ const RecoveryScreen = () => {
       <TouchableOpacity
         style={[styles.createButton, isSubmitting && styles.disabledControl]}
         onPress={handleCreateProfile}
-        disabled={isSubmitting}
-      >
+        disabled={isSubmitting}>
         {isSubmitting ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={greys(theme)[0]} />
-            <Text
-              weight="bold"
-              size={16}
-              style={[styles.createButtonText, { marginLeft: 8 }]}
-            >
+            <Text weight="bold" size={16} style={[styles.createButtonText, { marginLeft: 8 }]}>
               Creating...
             </Text>
           </View>
@@ -272,16 +255,11 @@ const RecoveryScreen = () => {
       <TouchableOpacity
         style={[styles.existingButton, isSubmitting && styles.disabledControl]}
         onPress={handleExistingAccount}
-        disabled={isSubmitting}
-      >
+        disabled={isSubmitting}>
         <Text
           size={16}
           weight="bold"
-          style={[
-            styles.existingButtonText,
-            isSubmitting && styles.disabledButtonText,
-          ]}
-        >
+          style={[styles.existingButtonText, isSubmitting && styles.disabledButtonText]}>
           I already have a Sovran account
         </Text>
       </TouchableOpacity>
@@ -293,8 +271,7 @@ const RecoveryScreen = () => {
       <Container>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
             <Text weight="bold" size={24} style={styles.headerTitle}>
               Create Sovran Profile
@@ -324,7 +301,7 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[2300],
     },
     headerTitle: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[0],
       marginBottom: 8,
       marginTop: 16,
@@ -334,7 +311,7 @@ const createStyles = (theme) =>
       marginBottom: 24,
     },
     profileImageContainer: {
-      alignItems: "center",
+      alignItems: 'center',
       marginBottom: 24,
     },
     selectedProfileContainer: {
@@ -342,10 +319,10 @@ const createStyles = (theme) =>
       height: 120,
       borderRadius: 60,
       backgroundColor: greys(theme)[1800],
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       marginBottom: 24,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     selectedProfileImage: {
       width: 120,
@@ -356,8 +333,8 @@ const createStyles = (theme) =>
       maxHeight: 80,
     },
     profileOptionsContent: {
-      flexDirection: "row",
-      justifyContent: "center",
+      flexDirection: 'row',
+      justifyContent: 'center',
       paddingHorizontal: 4,
     },
     profileOption: {
@@ -365,9 +342,9 @@ const createStyles = (theme) =>
       height: 60,
       borderRadius: 30,
       marginHorizontal: 4,
-      overflow: "hidden",
+      overflow: 'hidden',
       borderWidth: 2,
-      borderColor: "transparent",
+      borderColor: 'transparent',
     },
     selectedProfileOption: {
       borderColor: shades[300],
@@ -408,24 +385,24 @@ const createStyles = (theme) =>
       backgroundColor: shades[300],
       padding: 16,
       borderRadius: 16,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       marginBottom: 12,
     },
     createButtonText: {
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
     existingButton: {
       backgroundColor: greys(theme)[1800],
       padding: 16,
       borderRadius: 16,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     existingButtonText: {
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
     disabledControl: {
       opacity: 0.6,
@@ -434,9 +411,9 @@ const createStyles = (theme) =>
       color: greys(theme)[400],
     },
     loadingContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 
