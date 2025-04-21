@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, TextInput } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys } from "helper/colors";
-import { useNostr } from "helper/redux/nostr";
-import Container from "components/layout/Container";
-import { Card } from "components/common/Card";
-import SettingsButton from "components/common/SettingsButton";
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TextInput } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import { useNostr } from 'helper/redux/nostr';
+import Container from 'components/layout/Container';
+import { Card } from 'components/common/Card';
+import SettingsButton from 'components/common/SettingsButton';
 
 const ShowSeedPhrase: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -18,11 +18,7 @@ const ShowSeedPhrase: React.FC = () => {
     <Container>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mnemonic</Text>
-        <Card
-          message="Keep this private and secure!"
-          theme={theme}
-          variant="warning"
-        />
+        <Card message="Keep this private and secure!" theme={theme} variant="warning" />
         <TextInput
           style={[styles.textArea, !isVisible && styles.blurredText]}
           value={currentProfile?.mnemonic}
@@ -33,7 +29,7 @@ const ShowSeedPhrase: React.FC = () => {
           style={styles.toggleButton}
           variant="primary"
           onPress={() => setIsVisible(!isVisible)}
-          text={isVisible ? "Hide Mnemonic" : "Show Mnemonic"}
+          text={isVisible ? 'Hide Mnemonic' : 'Show Mnemonic'}
         />
       </View>
     </Container>
@@ -50,9 +46,9 @@ const createStyles = (theme) =>
       marginLeft: 14,
       fontSize: 13,
       letterSpacing: 0.33,
-      fontWeight: "500",
+      fontWeight: '500',
       color: greys(theme)[600],
-      textTransform: "uppercase",
+      textTransform: 'uppercase',
     },
     textArea: {
       padding: 12,
@@ -60,10 +56,10 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[1800],
       color: greys(theme)[0],
       fontSize: 16,
-      fontFamily: "OverpassMono",
+      fontFamily: 'OverpassMono',
     },
     blurredText: {
-      color: "transparent",
+      color: 'transparent',
       textShadowColor: greys(theme)[0],
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 8,

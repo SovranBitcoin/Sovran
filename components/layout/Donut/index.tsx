@@ -1,15 +1,15 @@
-import React from "react";
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
-import DonutChart from "./DonutChart";
-import { useFont } from "@shopify/react-native-skia";
-import { useSharedValue, withTiming } from "react-native-reanimated";
-import RenderItem from "./RenderItem";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { View } from "components/common/Themed";
-import { greys, shades } from "helper/colors";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
+import React from 'react';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
+import DonutChart from './DonutChart';
+import { useFont } from '@shopify/react-native-skia';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
+import RenderItem from './RenderItem';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'components/common/Themed';
+import { greys, shades } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export interface DonutData {
   amount: number;
@@ -39,9 +39,9 @@ export const DonutChartContainer = ({
 }: DonutChartContainerProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const [chartData, setChartData] = useState<
-    (DonutData & { percentage: number; color: string })[]
-  >([]);
+  const [chartData, setChartData] = useState<(DonutData & { percentage: number; color: string })[]>(
+    []
+  );
   const totalValue = useSharedValue(0);
   const decimals = useSharedValue<number[]>([]);
 
@@ -49,12 +49,8 @@ export const DonutChartContainer = ({
     const filteredData = data;
 
     const total = filteredData.reduce((acc, item) => acc + item.amount, 0);
-    const percentages = filteredData.map((item) =>
-      Math.round((item.amount / total) * 100)
-    );
-    const generateDecimals = percentages.map(
-      (number) => Number(number.toFixed(0)) / 100
-    );
+    const percentages = filteredData.map((item) => Math.round((item.amount / total) * 100));
+    const generateDecimals = percentages.map((number) => Number(number.toFixed(0)) / 100);
 
     totalValue.value = withTiming(total, { duration: 1000 });
     decimals.value = [...generateDecimals];
@@ -72,14 +68,8 @@ export const DonutChartContainer = ({
     generateData();
   }, [data]);
 
-  const font = useFont(
-    require("../../../assets/fonts/Overpass/overpass-bold.otf"),
-    32
-  );
-  const smallFont = useFont(
-    require("../../../assets/fonts/Overpass/overpass-bold.otf"),
-    20
-  );
+  const font = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 32);
+  const smallFont = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 20);
 
   if (!font || !smallFont) {
     return <View />;
@@ -88,9 +78,8 @@ export const DonutChartContainer = ({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        contentContainerStyle={{ alignItems: "center" }}
-        showsVerticalScrollIndicator={false}
-      >
+        contentContainerStyle={{ alignItems: 'center' }}
+        showsVerticalScrollIndicator={false}>
         <View style={styles.chartContainer}>
           <DonutChart
             radius={RADIUS}

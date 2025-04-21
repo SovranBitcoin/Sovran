@@ -1,21 +1,21 @@
-import { StyleSheet } from "react-native";
-import { Linking } from "react-native";
-import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import lookup from "country-code-lookup";
+import { StyleSheet } from 'react-native';
+import { Linking } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import lookup from 'country-code-lookup';
 
-import { greys, reds } from "helper/colors";
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import { FlagIcon, ShareIcon } from "assets/icons";
-import { useEsims } from "helper/redux/esim";
-import { Section } from "./transaction";
-import { memoizedGetTheme } from "helper/redux/settings";
-import DonutChartContainer from "components/layout/Donut";
-import { truncateMiddle } from "helper/strings";
-import React from "react";
-import { ButtonHandler } from "./ecashSendConfirmation";
+import { greys, reds } from 'helper/colors';
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import { FlagIcon, ShareIcon } from 'assets/icons';
+import { useEsims } from 'helper/redux/esim';
+import { Section } from './transaction';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import DonutChartContainer from 'components/layout/Donut';
+import { truncateMiddle } from 'helper/strings';
+import React from 'react';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {
@@ -57,16 +57,16 @@ export function convertDataUsage(data) {
 
 // API functions moved out of component for cleaner organization
 const fetchOrderData = async (esim) => {
-  const baseUrl = "https://esim.sovran.cash/api/order";
+  const baseUrl = 'https://esim.sovran.cash/api/order';
   const params = new URLSearchParams({
     request: esim.request,
     packageCode: esim.package.packageCode,
   });
 
-  if (esim.type === "TOPUP" && esim?.iccid) {
-    params.append("slug", esim.package.slug);
-    params.append("iccid", esim.iccid);
-    params.append("type", "TOPUP");
+  if (esim.type === 'TOPUP' && esim?.iccid) {
+    params.append('slug', esim.package.slug);
+    params.append('iccid', esim.iccid);
+    params.append('type', 'TOPUP');
   }
 
   const response = await fetch(`${baseUrl}?${params}`);
@@ -74,9 +74,7 @@ const fetchOrderData = async (esim) => {
 };
 
 const fetchEsimData = async (orderNo) => {
-  const response = await fetch(
-    `https://esim.sovran.cash/api/order/query?orderNo=${orderNo}`
-  );
+  const response = await fetch(`https://esim.sovran.cash/api/order/query?orderNo=${orderNo}`);
   return response.json();
 };
 
@@ -127,12 +125,12 @@ function ModalScreen() {
     return [
       {
         amount: usage.total.gb.toFixed(2),
-        label: "Remaining",
+        label: 'Remaining',
         value: `${usedGB.toFixed(2)} GB`,
       },
       {
         amount: usage.remaining.gb.toFixed(2),
-        label: "Used",
+        label: 'Used',
         value: `${usage.remaining.gb.toFixed(2)} GB`,
       },
     ];
@@ -142,13 +140,12 @@ function ModalScreen() {
     if (!esim?.order?.ac) return;
 
     Linking.openURL(
-      "https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=" +
-        esim.order.ac
+      'https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=' + esim.order.ac
     ).catch((err) => {});
   };
 
   const handleShareEsim = () => {
-    navigation.navigate("EsimShare", {
+    navigation.navigate('EsimShare', {
       esimCode: esim.order.qrCodeUrl,
       location: esim.package.location,
       esimLink: esim.order.shortUrl,
@@ -165,8 +162,7 @@ function ModalScreen() {
   });
 
   const canShareOrInstall =
-    !["IN_USE"].includes(esim?.order?.esimStatus) &&
-    !["ENABLED"].includes(esim?.order?.smdpStatus);
+    !['IN_USE'].includes(esim?.order?.esimStatus) && !['ENABLED'].includes(esim?.order?.smdpStatus);
 
   const hasActivationCode = esim?.order?.ac;
 
@@ -189,14 +185,10 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Location",
+                title: 'Location',
                 value: (
                   <View style={styles.locationContainer}>
-                    <FlagIcon
-                      width={24}
-                      height={24}
-                      country={esim.package.location}
-                    />
+                    <FlagIcon width={24} height={24} country={esim.package.location} />
                     <Text style={styles.locationText}>
                       {lookup.byIso(esim.package.location).country}
                     </Text>
@@ -204,27 +196,27 @@ function ModalScreen() {
                 ),
               },
               {
-                title: "Data remaining",
+                title: 'Data remaining',
                 value: `${usageData.remaining.gb} GB`,
               },
               {
-                title: "Total data",
+                title: 'Total data',
                 value: `${usageData.total.gb} GB`,
               },
               {
-                title: "Validity",
+                title: 'Validity',
                 value: `${esim.package.duration} days`,
               },
               {
-                title: "Speed",
+                title: 'Speed',
                 value: esim.package.speed,
               },
               {
-                title: "Status",
+                title: 'Status',
                 value: esim?.order?.esimStatus,
               },
               {
-                title: "SMDP Status",
+                title: 'SMDP Status',
                 value: esim?.order?.smdpStatus,
               },
             ]}
@@ -234,7 +226,7 @@ function ModalScreen() {
             <Section
               items={[
                 {
-                  title: "ICCID",
+                  title: 'ICCID',
                   value: esim.order.iccid,
                 },
               ]}
@@ -245,7 +237,7 @@ function ModalScreen() {
             <Section
               items={[
                 {
-                  title: "Request",
+                  title: 'Request',
                   value: truncateMiddle(esim.request, 5),
                 },
               ]}
@@ -254,8 +246,8 @@ function ModalScreen() {
 
           <View style={styles.warningContainer}>
             <Text style={styles.warningText}>
-              If you delete an eSIM from your phone's settings, you'll lose
-              access to it permanently.
+              If you delete an eSIM from your phone's settings, you'll lose access to it
+              permanently.
             </Text>
           </View>
         </>
@@ -264,27 +256,26 @@ function ModalScreen() {
         <>
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: "transparent",
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'transparent',
               paddingBottom: 8,
-            }}
-          >
+            }}>
             <ButtonHandler
               buttons={[
                 ...(canShareOrInstall && hasActivationCode
                   ? [
                       {
-                        text: "Share",
+                        text: 'Share',
                         icon: <ShareIcon />,
-                        variant: "secondary",
+                        variant: 'secondary',
                         onPress: handleShareEsim,
                         disabled: !hasActivationCode,
                       },
                       {
-                        text: "Install",
-                        variant: "primary",
+                        text: 'Install',
+                        variant: 'primary',
                         onPress: handleInstallEsim,
                         disabled: !hasActivationCode,
                       },
@@ -293,8 +284,8 @@ function ModalScreen() {
                 ...(canShareOrInstall && !hasActivationCode
                   ? [
                       {
-                        text: "Activate eSIM",
-                        variant: "primary",
+                        text: 'Activate eSIM',
+                        variant: 'primary',
                         onPress: () => fetchAndUpdateEsims(esim),
                         disabled: loadingEsim,
                       },
@@ -317,10 +308,10 @@ const createStyles = (theme) =>
       marginBottom: 20,
     },
     locationContainer: {
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: "transparent",
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
     },
     locationText: {
       marginLeft: 4,
@@ -333,7 +324,7 @@ const createStyles = (theme) =>
       padding: 15,
       borderRadius: 8,
       marginVertical: 10,
-      shadowColor: "#000",
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
@@ -344,6 +335,6 @@ const createStyles = (theme) =>
     warningText: {
       color: reds[300],
       fontSize: 16,
-      fontWeight: "500",
+      fontWeight: '500',
     },
   });

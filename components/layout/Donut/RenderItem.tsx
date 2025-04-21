@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, useWindowDimensions } from "react-native";
-import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { View } from "components/common/Themed";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { getMint } from "helper/cashu/mint";
-import Image from "components/common/Image";
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, useWindowDimensions } from 'react-native';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { View } from 'components/common/Themed';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { getMint } from 'helper/cashu/mint';
+import Image from 'components/common/Image';
 
 interface RenderItemData {
   color: string;
@@ -32,11 +32,9 @@ const RenderItem = ({ item, index }: Props) => {
       try {
         const mint = await getMint({ mintUrl: item.subtitle });
         const info = await mint.getInfo();
-        
+
         setIconUrl(info?.icon_url); // Set the icon URL from the mint info
-      } catch (error) {
-        
-      }
+      } catch (error) {}
     };
 
     fetchMintInfo();
@@ -46,16 +44,14 @@ const RenderItem = ({ item, index }: Props) => {
     <Animated.View
       style={[styles.container, { width: width * 0.9 }]}
       entering={FadeInDown.delay(index * 200)}
-      exiting={FadeOutDown}
-    >
+      exiting={FadeOutDown}>
       <View style={styles.contentContainer}>
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            backgroundColor: "transparent",
-          }}
-        >
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            backgroundColor: 'transparent',
+          }}>
           {/* Render icon if available; otherwise, fallback to the colored circle */}
           {iconUrl ? (
             <Image source={{ uri: iconUrl }} style={styles.icon} />
@@ -64,10 +60,9 @@ const RenderItem = ({ item, index }: Props) => {
           )}
           <View
             style={{
-              backgroundColor: "transparent",
+              backgroundColor: 'transparent',
               flex: 1,
-            }}
-          >
+            }}>
             <Text style={styles.text}>{item.label}</Text>
             {/* {item.subtitle && (
               <Text style={styles.smallText}>{item.subtitle}</Text>
@@ -92,16 +87,16 @@ const createStyles = (theme: any) =>
       marginBottom: 0,
     },
     contentContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       // flex: 1,
       // flexDirection: "row",
       // justifyContent: "space-between",
     },
     rightContainer: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      backgroundColor: "transparent",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      backgroundColor: 'transparent',
+      justifyContent: 'space-between',
       flex: 1,
     },
     color: {
@@ -116,13 +111,13 @@ const createStyles = (theme: any) =>
     },
     text: {
       fontSize: 16,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[0],
       marginLeft: 12,
     },
     smallText: {
       fontSize: 16,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[100],
       marginLeft: 12,
     },

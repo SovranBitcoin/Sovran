@@ -1,35 +1,29 @@
-import "react-native-get-random-values";
-import {
-  Alert,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import 'react-native-get-random-values';
+import { Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 
-import { Text, View } from "components/common/Themed";
-import { useState } from "react";
+import { Text, View } from 'components/common/Themed';
+import { useState } from 'react';
 
-import Modal from "components/layout/Modal";
-import { greys, shades } from "helper/colors";
-import { useNostr } from "helper/redux/nostr";
-import { Button } from "components/common/Button";
-import { useSelector } from "react-redux";
-import { getPublicKey, nip19 } from "nostr-tools";
-import CachedImage from "components/common/Image";
-import TextInput from "components/common/TextInput";
-import { memoizedGetTheme } from "helper/redux/settings";
+import Modal from 'components/layout/Modal';
+import { greys, shades } from 'helper/colors';
+import { useNostr } from 'helper/redux/nostr';
+import { Button } from 'components/common/Button';
+import { useSelector } from 'react-redux';
+import { getPublicKey, nip19 } from 'nostr-tools';
+import CachedImage from 'components/common/Image';
+import TextInput from 'components/common/TextInput';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   const { profiles, currentProfile, setProfiles } = useNostr();
-  const [nsec, setNsec] = useState("");
+  const [nsec, setNsec] = useState('');
 
   const handleSave = () => {
     if (!nsec) {
-      Alert.alert("Error", "Please enter a private key");
+      Alert.alert('Error', 'Please enter a private key');
       return;
     }
 
@@ -39,13 +33,13 @@ export default function ModalScreen() {
 
     // check npub matches currentProfile.npub
     if (npub !== currentProfile.npub) {
-      Alert.alert("Error", "Public key does not match");
+      Alert.alert('Error', 'Public key does not match');
       return;
     }
 
     // check pubkey matches currentProfile.pubkey
     if (pk !== currentProfile.pubkey) {
-      Alert.alert("Error", "Public key does not match");
+      Alert.alert('Error', 'Public key does not match');
       return;
     }
 
@@ -65,32 +59,24 @@ export default function ModalScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Modal
           title="Profile Settings"
           buttons={
             <>
-              <Button
-                variant="primary"
-                text="Save"
-                onPress={handleSave}
-              ></Button>
+              <Button variant="primary" text="Save" onPress={handleSave}></Button>
             </>
-          }
-        >
+          }>
           <View
             style={{
               margin: 16,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             <View
               style={{
-                backgroundColor: "transparent",
-              }}
-            >
+                backgroundColor: 'transparent',
+              }}>
               <CachedImage
                 source={{ uri: currentProfile.picture }}
                 style={styles.modalProfilePicture}
@@ -99,14 +85,13 @@ export default function ModalScreen() {
             <Text
               style={{
                 fontSize: 16,
-                fontFamily: "OverpassHeavy",
+                fontFamily: 'OverpassHeavy',
                 marginLeft: 12,
-              }}
-            >
+              }}>
               NPUB
             </Text>
             <TextInput
-              placeholder={""}
+              placeholder={''}
               editable={false}
               placeholderTextColor={greys(theme)[1000]}
               value={currentProfile?.npub}
@@ -114,14 +99,13 @@ export default function ModalScreen() {
             <Text
               style={{
                 fontSize: 16,
-                fontFamily: "OverpassHeavy",
+                fontFamily: 'OverpassHeavy',
                 marginLeft: 12,
-              }}
-            >
+              }}>
               Public key
             </Text>
             <TextInput
-              placeholder={""}
+              placeholder={''}
               editable={false}
               placeholderTextColor={greys(theme)[1000]}
               value={currentProfile?.pubkey}
@@ -129,14 +113,13 @@ export default function ModalScreen() {
             <Text
               style={{
                 fontSize: 16,
-                fontFamily: "OverpassHeavy",
+                fontFamily: 'OverpassHeavy',
                 marginLeft: 12,
-              }}
-            >
+              }}>
               NSEC
             </Text>
             <TextInput
-              placeholder={""}
+              placeholder={''}
               placeholderTextColor={greys(theme)[1000]}
               editable={currentProfile?.nsec ? false : true}
               onChangeText={(text) => setNsec(text)}
@@ -147,32 +130,28 @@ export default function ModalScreen() {
                 backgroundColor: shades[200],
                 padding: 16,
                 borderRadius: 16,
-              }}
-            >
+              }}>
               <Text
                 style={{
                   fontSize: 16,
-                  fontFamily: "OverpassBold",
-                }}
-              >
+                  fontFamily: 'OverpassBold',
+                }}>
                 Add your nsec to enable useful features like:
               </Text>
               <Text
                 style={{
                   fontSize: 16,
-                  fontFamily: "OverpassRegular",
+                  fontFamily: 'OverpassRegular',
                   marginLeft: 0,
-                }}
-              >
+                }}>
                 • Sending and receiving messages
               </Text>
               <Text
                 style={{
                   fontSize: 16,
-                  fontFamily: "OverpassRegular",
+                  fontFamily: 'OverpassRegular',
                   marginLeft: 0,
-                }}
-              >
+                }}>
                 • Generating easy to use receive address
               </Text>
             </View>
@@ -186,15 +165,15 @@ export default function ModalScreen() {
 const createStyles = (theme) =>
   StyleSheet.create({
     minus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#9A4141",
+      color: '#9A4141',
       marginRight: 4,
     },
     plus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#499A41",
+      color: '#499A41',
       marginRight: 4,
     },
     container: {
@@ -202,36 +181,36 @@ const createStyles = (theme) =>
     },
     title: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[1000],
     },
     separator: {
       marginVertical: 30,
       height: 1,
-      width: "80%",
+      width: '80%',
     },
     cornerBox: {
-      position: "absolute",
+      position: 'absolute',
       borderRadius: 32,
       zIndex: 100,
-      backgroundColor: "transparent",
-      overflow: "hidden",
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
     },
     innerBorder: {
-      position: "absolute",
+      position: 'absolute',
       borderWidth: 2,
       borderColor: greys(theme)[0],
       borderRadius: 32,
       zIndex: 100,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     barCodeScanner: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
     },
     modalProfilePicture: {
-      alignSelf: "center",
+      alignSelf: 'center',
       width: 64,
       height: 64,
       borderRadius: 32,

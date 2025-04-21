@@ -1,1 +1,1 @@
-export const SET_PRICELIST = "SET_PRICELIST";
+export const SET_PRICELIST = 'SET_PRICELIST';

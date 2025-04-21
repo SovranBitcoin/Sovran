@@ -1,15 +1,15 @@
-import { AppError } from "components/cashu";
-import { getKeys, getWallet } from ".";
+import { AppError } from 'components/cashu';
+import { getKeys, getWallet } from '.';
 import {
   appendProofsV2,
   appendTransaction,
   increaseCounterV2,
   memoizedGetCounterV2,
   memoizedGetSelectedMint,
-  removeProofs
-} from "helper/redux/cashu";
-import { store } from "helper/redux/store";
-import { getPaymentRequest } from "./ecash";
+  removeProofs,
+} from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { getPaymentRequest } from './ecash';
 
 interface SendLightningProps {
   mintUrl?: string;
@@ -33,12 +33,9 @@ export async function sendLightning({
   const keys = await getKeys({ unit, mintUrl });
 
   const profileId = store.getState().nostr?.currentProfile?.id;
-  const allProofs =
-    store.getState().cashu?.profiles[profileId]?.proofs?.[mintUrl];
+  const allProofs = store.getState().cashu?.profiles[profileId]?.proofs?.[mintUrl];
 
-  const currentProofs = allProofs.filter(
-    (p: { id: string }) => p?.id === keys.id
-  );
+  const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
 
   let fee, amount;
 
@@ -49,17 +46,14 @@ export async function sendLightning({
   amount = meltQuote.amount;
 
   if (!amount) {
-    throw new AppError(
-      "invalid_invoice",
-      "No amount specified in payment request"
-    );
+    throw new AppError('invalid_invoice', 'No amount specified in payment request');
   }
 
   const balance = currentProofs
     .map((p: { amount: number }) => p.amount)
     .reduce((a: number, b: number) => a + b, 0);
   if (amount + fee > balance) {
-    throw new AppError("insufficient_funds", "Insufficient funds");
+    throw new AppError('insufficient_funds', 'Insufficient funds');
   }
 
   try {
@@ -98,7 +92,6 @@ export async function sendLightning({
       counter: counter2, // it's going up forever, laura
     });
 
-
     store.dispatch(
       increaseCounterV2({
         profileId,
@@ -131,8 +124,8 @@ export async function sendLightning({
           request: pr,
           amount: amount,
           date: new Date().toISOString(),
-          type: "lightning",
-          transactionType: "send",
+          type: 'lightning',
+          transactionType: 'send',
           unit,
           paid: true,
           meltQuote,
@@ -145,8 +138,8 @@ export async function sendLightning({
           proofs: {
             change,
             keep: proofsToKeep,
-            send: proofsToSend
-          }
+            send: proofsToSend,
+          },
         },
       })
     );
@@ -163,7 +156,6 @@ interface ReceiveLightningProps {
   sweepId: string;
   memo?: string;
 }
-
 
 export async function receiveLightning({
   amount,
@@ -182,11 +174,10 @@ export async function receiveLightning({
       profile: null,
     });
 
-    const { quote, code, detail, error, request } =
-      await wallet.createMintQuote(amount, memo);
+    const { quote, code, detail, error, request } = await wallet.createMintQuote(amount, memo);
 
     if (error) {
-      throw new AppError("quote_error", "Error getting mint quote");
+      throw new AppError('quote_error', 'Error getting mint quote');
     }
 
     const transaction = {
@@ -197,9 +188,9 @@ export async function receiveLightning({
       error,
       amount,
       date: new Date().toISOString(),
-      type: "lightning",
+      type: 'lightning',
       paid: false,
-      transactionType: "receive",
+      transactionType: 'receive',
       unit,
       isSweep,
       sweepId,
@@ -210,7 +201,7 @@ export async function receiveLightning({
     const paymentRequest_ = await getPaymentRequest({
       amount: amount,
       unit: unit,
-      description: "",
+      description: '',
     });
     transaction.payment_request = paymentRequest_.toEncodedRequest();
     paymentRequest_.description = request;

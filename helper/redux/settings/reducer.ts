@@ -1,9 +1,9 @@
-import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME, TERMS_ACCEPTED } from "./actionTypes";
+import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME, TERMS_ACCEPTED } from './actionTypes';
 
 const initialState = {
   settings: {
-    lang: "en",
-    theme: "dark",
+    lang: 'en',
+    theme: 'dark',
     display_btc: 1,
   },
 };
@@ -44,10 +44,10 @@ export const settingsReducer = (state = initialState, action) => {
           ...state.settings,
           termsAccepted: {
             termsAccepted: true,
-            date: action.payload.date
-          }
-        }
-      }
+            date: action.payload.date,
+          },
+        },
+      };
     }
     default: {
       return state;

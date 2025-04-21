@@ -1,19 +1,19 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { nip19, SimplePool } from "nostr-tools";
-import { View, StyleSheet, Pressable } from "react-native";
-import Icon, { PlusIcon, QRIcon, ImportIcon, CheckIcon } from "assets/icons";
-import { setSearch, useNostr } from "helper/redux/nostr";
-import { greys } from "helper/colors";
-import { useDispatch, useSelector } from "react-redux";
-import { Text } from "components/common/Themed";
-import { ScrollView } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import opacity from "hex-color-opacity";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation } from "helper/navigation";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { nip19, SimplePool } from 'nostr-tools';
+import { View, StyleSheet, Pressable } from 'react-native';
+import Icon, { PlusIcon, QRIcon, ImportIcon, CheckIcon } from 'assets/icons';
+import { setSearch, useNostr } from 'helper/redux/nostr';
+import { greys } from 'helper/colors';
+import { useDispatch, useSelector } from 'react-redux';
+import { Text } from 'components/common/Themed';
+import { ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation } from 'helper/navigation';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
 import ActionSheet, {
   Route,
@@ -25,28 +25,28 @@ import ActionSheet, {
   registerSheet,
   RouteDefinition,
   SheetProps,
-} from "react-native-actions-sheet";
-import React from "react";
-import TextInput from "components/common/TextInput";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Image from "components/common/Image";
+} from 'react-native-actions-sheet';
+import React from 'react';
+import TextInput from 'components/common/TextInput';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Image from 'components/common/Image';
 
 const npubs = [];
 const relays = [
-  "wss://relay.nostr.band/all",
-  "wss://relay.roli.social",
-  "wss://deschooling.us",
-  "wss://relay-verified.deschooling.us",
-  "wss://feeds.nostr.band/nostrhispano",
-  "wss://search.nos.today",
-  "wss://nostr-relay.app",
-  "wss://nb.relay.center",
-  "wss://nostrja-kari-nip50.heguro.com",
-  "wss://nfdn.betanet.dotalgo.io",
-  "wss://saltivka.org",
-  "wss://filter.stealth.wine?broadcast=true",
-  "wss://nostr.novacisko.cz",
-  "wss://relay.noswhere.com",
+  'wss://relay.nostr.band/all',
+  'wss://relay.roli.social',
+  'wss://deschooling.us',
+  'wss://relay-verified.deschooling.us',
+  'wss://feeds.nostr.band/nostrhispano',
+  'wss://search.nos.today',
+  'wss://nostr-relay.app',
+  'wss://nb.relay.center',
+  'wss://nostrja-kari-nip50.heguro.com',
+  'wss://nfdn.betanet.dotalgo.io',
+  'wss://saltivka.org',
+  'wss://filter.stealth.wine?broadcast=true',
+  'wss://nostr.novacisko.cz',
+  'wss://relay.noswhere.com',
 ];
 
 export const EventKind = {
@@ -82,8 +82,7 @@ const Screen = () => {
   const actionSheetRef = useRef<ActionSheetRef>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const { profiles, setProfiles, currentProfile, setCurrentProfile } =
-    useNostr();
+  const { profiles, setProfiles, currentProfile, setCurrentProfile } = useNostr();
   const dispatch = useDispatch();
   const navigation = useTypedNavigation();
 
@@ -110,15 +109,11 @@ const Screen = () => {
               try {
                 const content = JSON.parse(event.content);
                 setProfiles(
-                  [
-                    ...profiles,
-                    { ...content, id: profiles.length, pubkey: event.pubkey },
-                  ]
+                  [...profiles, { ...content, id: profiles.length, pubkey: event.pubkey }]
                     // remove duplicates
                     .filter(
                       (profile, index, self) =>
-                        index ===
-                        self.findIndex((p) => p.pubkey === profile.pubkey)
+                        index === self.findIndex((p) => p.pubkey === profile.pubkey)
                     )
                 );
                 dispatch(
@@ -134,7 +129,7 @@ const Screen = () => {
             } else if (event.kind === EventKind.ContactList) {
               try {
                 const contactPubkeys = event.tags
-                  .filter((tag) => tag[0] === "p")
+                  .filter((tag) => tag[0] === 'p')
                   .map((tag) => tag[1]);
                 fetchContactProfiles(contactPubkeys);
               } catch (error) {}
@@ -181,11 +176,7 @@ const Screen = () => {
 
   function getName(profile) {
     const dn =
-      profile?.displayName ||
-      profile?.display_name ||
-      profile?.username ||
-      profile?.name ||
-      "";
+      profile?.displayName || profile?.display_name || profile?.username || profile?.name || '';
     return dn;
   }
 
@@ -199,8 +190,7 @@ const Screen = () => {
           ...profile,
         });
       }}
-      style={styles.smallProfilePicture}
-    >
+      style={styles.smallProfilePicture}>
       {profile?.picture && (
         <CachedImage
           source={{ uri: profile.picture }}
@@ -248,8 +238,7 @@ const Screen = () => {
         showsVerticalScrollIndicator={false}
         style={{
           backgroundColor: greys(theme)[2100],
-        }}
-      >
+        }}>
         <LinearGradient
           colors={[
             greys(theme)[2100],
@@ -262,55 +251,46 @@ const Screen = () => {
           ]}
           style={[styles.gradientContainer]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        >
+          end={{ x: 0, y: 1 }}>
           <View
             style={{
               padding: 16,
               paddingTop: 0,
               paddingBottom: 58,
               flex: 1,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             <View
               style={{
                 marginBottom: 16,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
               <View
                 style={{
-                  flexDirection: "row",
-                }}
-              >
+                  flexDirection: 'row',
+                }}>
                 {profileIcons}
               </View>
             </View>
             <TouchableOpacity
               style={{
-                alignItems: "center",
+                alignItems: 'center',
               }}
               onPress={() => {
                 if (currentProfile?.pubkey) {
-                  navigation.navigate("profileShare", {
+                  navigation.navigate('profileShare', {
                     npub:
-                      profiles.find(
-                        (profile) => profile.pubkey === currentProfile.pubkey
-                      )?.npub ||
+                      profiles.find((profile) => profile.pubkey === currentProfile.pubkey)?.npub ||
                       nip19.npubEncode(
-                        profiles.find(
-                          (profile) => profile.pubkey === currentProfile.pubkey
-                        )?.pubkey
+                        profiles.find((profile) => profile.pubkey === currentProfile.pubkey)?.pubkey
                       ),
                   });
                 } else {
-                  navigation.navigate("onboard");
+                  navigation.navigate('onboard');
                 }
-              }}
-            >
+              }}>
               {currentProfile?.pubkey ? (
                 <>
                   <CachedImage
@@ -337,8 +317,7 @@ const Screen = () => {
                       backgroundColor: greys(theme)[2300],
                       borderColor: greys(theme)[1300],
                       borderWidth: 0.2,
-                    }}
-                  >
+                    }}>
                     <QRIcon
                       style={{
                         width: 32,
@@ -356,14 +335,12 @@ const Screen = () => {
           style={{
             marginTop: -16,
             paddingBottom: 48,
-          }}
-        >
+          }}>
           <Pressable
             onPress={() => {
-              navigation.navigate("index", {}, { current: "drawer" });
+              navigation.navigate('index', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
+            style={styles.menuButton}>
             <Icon name="fluent:wallet-20-filled" color={greys(theme)[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Wallet
@@ -371,10 +348,9 @@ const Screen = () => {
           </Pressable>
           <Pressable
             onPress={() => {
-              navigation.navigate("payments", {}, { current: "drawer" });
+              navigation.navigate('payments', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
+            style={styles.menuButton}>
             <Icon name="fluent:arrow-swap-16-filled" color={greys(theme)[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Payments
@@ -382,10 +358,9 @@ const Screen = () => {
           </Pressable>
           <Pressable
             onPress={() => {
-              navigation.navigate("myEsims", {}, { current: "drawer" });
+              navigation.navigate('myEsims', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
+            style={styles.menuButton}>
             <Icon name="fluent:sim-24-filled" color={greys(theme)[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               eSIM
@@ -393,10 +368,9 @@ const Screen = () => {
           </Pressable>
           <Pressable
             onPress={() => {
-              navigation.navigate("myVpns", {}, { current: "drawer" });
+              navigation.navigate('myVpns', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
+            style={styles.menuButton}>
             <Icon name="ic:baseline-vpn-lock" color={greys(theme)[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               VPN
@@ -404,17 +378,16 @@ const Screen = () => {
           </Pressable>
           <Pressable
             onPress={() => {
-              navigation.navigate("lifestyle", {}, { current: "drawer" });
+              navigation.navigate('lifestyle', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
+            style={styles.menuButton}>
             <Icon
               name="clarity:internet-of-things-solid"
               color={greys(theme)[0]}
               spin={{
                 duration: 2000,
                 delay: 4000,
-                outputRange: ["0deg", "120deg"],
+                outputRange: ['0deg', '120deg'],
               }}
             />
             <Text size={18} weight="bold" style={styles.menuText}>
@@ -423,14 +396,10 @@ const Screen = () => {
           </Pressable>
           <Pressable
             onPress={() => {
-              navigation.navigate("settings", {}, { current: "drawer" });
+              navigation.navigate('settings', {}, { current: 'drawer' });
             }}
-            style={styles.menuButton}
-          >
-            <Icon
-              name="material-symbols:settings-rounded"
-              color={greys(theme)[0]}
-            />
+            style={styles.menuButton}>
+            <Icon name="material-symbols:settings-rounded" color={greys(theme)[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Settings
             </Text>
@@ -452,15 +421,12 @@ const Screen = () => {
         // isModal={false}
         initialRoute="route-a"
         springOffset={50}
-        defaultOverlayOpacity={0.75}
-      ></ActionSheet>
+        defaultOverlayOpacity={0.75}></ActionSheet>
     </>
   );
 };
 
-const RouteA = ({
-  router,
-}: RouteScreenProps<"sheet-with-router", "route-a">) => {
+const RouteA = ({ router }: RouteScreenProps<'sheet-with-router', 'route-a'>) => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const { profiles, setCurrentProfile, currentProfile } = useNostr();
   const navigation = useTypedNavigation();
@@ -468,11 +434,7 @@ const RouteA = ({
 
   function getName(profile: any) {
     const dn =
-      profile?.displayName ||
-      profile?.display_name ||
-      profile?.username ||
-      profile?.name ||
-      "";
+      profile?.displayName || profile?.display_name || profile?.username || profile?.name || '';
     return dn;
   }
 
@@ -483,8 +445,7 @@ const RouteA = ({
           key={profile.pubkey}
           style={[
             styles.profileItem,
-            currentProfile?.pubkey === profile.pubkey &&
-              styles.selectedProfileItem,
+            currentProfile?.pubkey === profile.pubkey && styles.selectedProfileItem,
           ]}
           onPress={async () => {
             setCurrentProfile({
@@ -494,12 +455,8 @@ const RouteA = ({
             });
           }}
           onPressIn={() => {}}
-          onPressOut={() => {}}
-        >
-          <CachedImage
-            source={{ uri: profile.picture }}
-            style={styles.actionSheetProfilePic}
-          />
+          onPressOut={() => {}}>
+          <CachedImage source={{ uri: profile.picture }} style={styles.actionSheetProfilePic} />
           <Text style={styles.profileName}>{getName(profile)}</Text>
           {currentProfile?.pubkey === profile.pubkey && (
             <View style={styles.checkIconContainer}>
@@ -512,22 +469,20 @@ const RouteA = ({
         <TouchableOpacity
           style={styles.createAccountButton}
           onPress={() => {
-            navigation.navigate("onboard", {});
+            navigation.navigate('onboard', {});
           }}
           onPressIn={() => {}}
-          onPressOut={() => {}}
-        >
+          onPressOut={() => {}}>
           <PlusIcon style={styles.createAccountIcon} />
           <Text style={styles.createAccountText}>Create New Account</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.createAccountButton}
           onPress={() => {
-            router.navigate("route-b");
+            router.navigate('route-b');
           }}
           onPressIn={() => {}}
-          onPressOut={() => {}}
-        >
+          onPressOut={() => {}}>
           <ImportIcon style={styles.createAccountIcon} />
           <Text style={styles.createAccountText}>Add Existing Account</Text>
         </TouchableOpacity>
@@ -537,7 +492,7 @@ const RouteA = ({
 };
 
 const RouteB = () => {
-  const router = useSheetRouter("sheet-with-router");
+  const router = useSheetRouter('sheet-with-router');
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
 
@@ -550,25 +505,21 @@ const RouteB = () => {
       <TouchableOpacity
         style={styles.importButton}
         onPress={() => {
-          router?.navigate("route-c");
+          router?.navigate('route-c');
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Import from nsec</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.importButton}
         onPress={() => {
-          router?.navigate("route-e");
+          router?.navigate('route-e');
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
-        <Text style={styles.importButtonText}>
-          Import from npub (read only)
-        </Text>
+        onPressOut={() => {}}>
+        <Text style={styles.importButtonText}>Import from npub (read only)</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -578,8 +529,7 @@ const RouteB = () => {
           router?.goBack();
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Import from seed phrase</Text>
       </TouchableOpacity>
 
@@ -589,8 +539,7 @@ const RouteB = () => {
           router?.goBack();
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>
@@ -598,11 +547,11 @@ const RouteB = () => {
 };
 
 const RouteC = () => {
-  const router = useSheetRouter("sheet-with-router");
+  const router = useSheetRouter('sheet-with-router');
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
-  const [nsec, setNsec] = useState("");
-  const [error, setError] = useState("");
+  const [nsec, setNsec] = useState('');
+  const [error, setError] = useState('');
 
   const filters = useMemo(
     () => [
@@ -635,27 +584,25 @@ const RouteC = () => {
   const handleImport = () => {
     try {
       const decoded = nip19.decode(nsec);
-      if (decoded.type === "nsec") {
+      if (decoded.type === 'nsec') {
         const pubkey = decoded.data;
         const npub = nip19.npubEncode(pubkey);
 
-        const hasEcash = mintsEvent?.tags?.some((tag) => tag[0] === "mint");
+        const hasEcash = mintsEvent?.tags?.some((tag) => tag[0] === 'mint');
 
         if (router) {
-          router.navigate("route-d", {
+          router.navigate('route-d', {
             pubkey,
             npub,
-            metadata: firstEvent
-              ? JSON.stringify(firstEvent, null, 2)
-              : "No metadata found",
-            tags: hasEcash ? ["Ecash enabled"] : [],
+            metadata: firstEvent ? JSON.stringify(firstEvent, null, 2) : 'No metadata found',
+            tags: hasEcash ? ['Ecash enabled'] : [],
           });
         }
       } else {
-        setError("Invalid nsec key");
+        setError('Invalid nsec key');
       }
     } catch (e) {
-      setError("Invalid nsec key");
+      setError('Invalid nsec key');
     }
   };
 
@@ -671,7 +618,7 @@ const RouteC = () => {
         value={nsec}
         onChangeText={(text: string) => {
           setNsec(text);
-          setError("");
+          setError('');
         }}
       />
 
@@ -681,8 +628,7 @@ const RouteC = () => {
         style={[styles.importButton, { marginTop: 20 }]}
         onPress={handleImport}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Import</Text>
       </TouchableOpacity>
 
@@ -694,8 +640,7 @@ const RouteC = () => {
           }
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>
@@ -703,15 +648,15 @@ const RouteC = () => {
 };
 
 const RouteD = () => {
-  const router = useSheetRouter("sheet-with-router");
-  const params = useSheetRouteParams<"sheet-with-router", "route-d">();
+  const router = useSheetRouter('sheet-with-router');
+  const params = useSheetRouteParams<'sheet-with-router', 'route-d'>();
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
   const { profiles, setProfiles } = useNostr();
 
   const profileData = useMemo(() => {
     try {
-      const parsed = JSON.parse(params.metadata || "{}");
+      const parsed = JSON.parse(params.metadata || '{}');
       return parsed.content ? JSON.parse(parsed.content) : parsed;
     } catch (e) {
       return {};
@@ -720,7 +665,7 @@ const RouteD = () => {
 
   const followerCount = useMemo(() => {
     if (!params.followList?.[0]?.tags) return 0;
-    return params.followList[0].tags.filter((tag) => tag[0] === "p").length;
+    return params.followList[0].tags.filter((tag) => tag[0] === 'p').length;
   }, [params.followList]);
 
   const { name, display_name, website, picture, banner } = profileData;
@@ -729,18 +674,9 @@ const RouteD = () => {
     <View style={styles.actionSheetContainer}>
       <View style={styles.bannerContainer}>
         {banner ? (
-          <Image
-            source={{ uri: banner }}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: banner }} style={styles.bannerImage} resizeMode="cover" />
         ) : (
-          <View
-            style={[
-              styles.bannerImage,
-              { backgroundColor: greys(theme)[1500] },
-            ]}
-          />
+          <View style={[styles.bannerImage, { backgroundColor: greys(theme)[1500] }]} />
         )}
         <View style={styles.profileInfoContainer}>
           {picture ? (
@@ -748,7 +684,7 @@ const RouteD = () => {
           ) : (
             <View style={[styles.profilePicture, styles.defaultProfilePicture]}>
               <Text style={styles.defaultProfileInitial}>
-                {(display_name || name || "?")[0].toUpperCase()}
+                {(display_name || name || '?')[0].toUpperCase()}
               </Text>
             </View>
           )}
@@ -757,9 +693,7 @@ const RouteD = () => {
       </View>
 
       <View style={styles.nameContainer}>
-        <Text style={styles.displayName}>
-          {display_name || name || "Anonymous User"}
-        </Text>
+        <Text style={styles.displayName}>{display_name || name || 'Anonymous User'}</Text>
         <Text style={styles.npub} numberOfLines={1} ellipsizeMode="middle">
           {params.npub}
         </Text>
@@ -799,8 +733,7 @@ const RouteD = () => {
               id: accountIndex,
             },
           ]);
-        }}
-      >
+        }}>
         <Text style={styles.continueButtonText}>Continue</Text>
       </TouchableOpacity>
     </View>
@@ -808,16 +741,16 @@ const RouteD = () => {
 };
 
 const RouteE = () => {
-  const router = useSheetRouter("sheet-with-router");
+  const router = useSheetRouter('sheet-with-router');
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
-  const [npub, setNpub] = useState("");
-  const [error, setError] = useState("");
+  const [npub, setNpub] = useState('');
+  const [error, setError] = useState('');
 
   const filters = useMemo(
     () => [
       {
-        authors: [npub ? nip19.decode(npub).data : ""],
+        authors: [npub ? nip19.decode(npub).data : ''],
         kinds: [0],
         limit: 1,
       },
@@ -828,7 +761,7 @@ const RouteE = () => {
   const mintsFilters = useMemo(
     () => [
       {
-        authors: [npub ? nip19.decode(npub).data : ""],
+        authors: [npub ? nip19.decode(npub).data : ''],
         kinds: [37375],
         limit: 1,
       },
@@ -839,7 +772,7 @@ const RouteE = () => {
   const followList = useMemo(
     () => [
       {
-        authors: [npub ? nip19.decode(npub).data : ""],
+        authors: [npub ? nip19.decode(npub).data : ''],
         kinds: [3],
         limit: 1,
       },
@@ -858,27 +791,25 @@ const RouteE = () => {
   const handleImport = () => {
     try {
       const decoded = nip19.decode(npub);
-      if (decoded.type === "npub") {
+      if (decoded.type === 'npub') {
         const pubkey = decoded.data;
 
-        const hasEcash = mintsEvent?.tags?.some((tag) => tag[0] === "mint");
-        const tags = hasEcash ? ["Ecash enabled"] : [];
+        const hasEcash = mintsEvent?.tags?.some((tag) => tag[0] === 'mint');
+        const tags = hasEcash ? ['Ecash enabled'] : [];
 
-        router?.navigate("route-d", {
+        router?.navigate('route-d', {
           pubkey,
           npub,
-          metadata: firstEvent
-            ? JSON.stringify(firstEvent, null, 2)
-            : "No metadata found",
+          metadata: firstEvent ? JSON.stringify(firstEvent, null, 2) : 'No metadata found',
           tags,
           isReadOnly: true,
           followList: followListEvent,
         });
       } else {
-        setError("Invalid npub key");
+        setError('Invalid npub key');
       }
     } catch (e) {
-      setError("Invalid npub key");
+      setError('Invalid npub key');
     }
   };
 
@@ -894,7 +825,7 @@ const RouteE = () => {
         value={npub}
         onChangeText={(text: string) => {
           setNpub(text);
-          setError("");
+          setError('');
         }}
       />
 
@@ -904,8 +835,7 @@ const RouteE = () => {
         style={[styles.importButton, { marginTop: 20 }]}
         onPress={handleImport}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Import</Text>
       </TouchableOpacity>
 
@@ -915,8 +845,7 @@ const RouteE = () => {
           router?.goBack();
         }}
         onPressIn={() => {}}
-        onPressOut={() => {}}
-      >
+        onPressOut={() => {}}>
         <Text style={styles.importButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>
@@ -925,23 +854,23 @@ const RouteE = () => {
 
 const routes: Route[] = [
   {
-    name: "route-a",
+    name: 'route-a',
     component: RouteA,
   },
   {
-    name: "route-b",
+    name: 'route-b',
     component: RouteB,
   },
   {
-    name: "route-c",
+    name: 'route-c',
     component: RouteC,
   },
   {
-    name: "route-d",
+    name: 'route-d',
     component: RouteD,
   },
   {
-    name: "route-e",
+    name: 'route-e',
     component: RouteE,
   },
 ];
@@ -949,33 +878,27 @@ const routes: Route[] = [
 function SheetWithRouter(props: SheetProps) {
   const insets = useSafeAreaInsets();
 
-  return (
-    <ActionSheet
-      enableRouterBackNavigation={true}
-      routes={routes}
-      initialRoute="route-a"
-    />
-  );
+  return <ActionSheet enableRouterBackNavigation={true} routes={routes} initialRoute="route-a" />;
 }
 
-registerSheet("sheet-with-router", SheetWithRouter);
+registerSheet('sheet-with-router', SheetWithRouter);
 
-declare module "react-native-actions-sheet" {
+declare module 'react-native-actions-sheet' {
   interface Sheets {
-    "sheet-with-router": SheetDefinition<{
+    'sheet-with-router': SheetDefinition<{
       routes: {
-        "route-a": RouteDefinition;
-        "route-b": RouteDefinition<{
+        'route-a': RouteDefinition;
+        'route-b': RouteDefinition<{
           data: string;
         }>;
-        "route-c": RouteDefinition;
-        "route-d": RouteDefinition<{
+        'route-c': RouteDefinition;
+        'route-d': RouteDefinition<{
           pubkey: string;
           npub: string;
           tags?: string[];
           isReadOnly?: boolean;
         }>;
-        "route-e": RouteDefinition;
+        'route-e': RouteDefinition;
       };
     }>;
   }
@@ -989,7 +912,7 @@ const createStyles = (theme: any) =>
       borderRadius: 16,
       marginRight: 8,
       backgroundColor: greys(theme)[1500],
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     modalProfilePicture: {
       width: 64,
@@ -1002,21 +925,21 @@ const createStyles = (theme: any) =>
       color: greys(theme)[0],
       marginBottom: 8,
       marginTop: 16,
-      textAlign: "center",
+      textAlign: 'center',
     },
     about: {
       fontSize: 16,
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
       marginBottom: 8,
     },
     website: {
       fontSize: 14,
-      color: "#1e90ff",
+      color: '#1e90ff',
       marginTop: 4,
     },
     contactContainer: {
-      alignItems: "center",
+      alignItems: 'center',
       marginBottom: 16,
     },
     contactProfilePicture: {
@@ -1028,7 +951,7 @@ const createStyles = (theme: any) =>
     contactName: {
       fontSize: 20,
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
     qrText: {
       color: greys(theme)[0],
@@ -1038,9 +961,9 @@ const createStyles = (theme: any) =>
       paddingTop: 0,
       paddingBottom: 32,
       padding: 32,
-      justifyContent: "flex-start",
-      alignItems: "center",
-      flexDirection: "row",
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      flexDirection: 'row',
     },
     menuText: {
       marginLeft: 12,
@@ -1057,27 +980,27 @@ const createStyles = (theme: any) =>
       borderColor: greys(theme)[1500],
       backgroundColor: greys(theme)[1800],
       padding: 8,
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       margin: 16,
     },
     iconRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
     },
     iconContainer: {
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: 12,
       backgroundColor: greys(theme)[1500],
-      borderCurve: "continuous",
+      borderCurve: 'continuous',
     },
     iconLabel: {
-      color: "white",
+      color: 'white',
       marginTop: 8,
       fontSize: 12,
-      textAlign: "center",
+      textAlign: 'center',
     },
     actionSheetContainer: {
       padding: 16,
@@ -1086,7 +1009,7 @@ const createStyles = (theme: any) =>
     headerText: {
       color: greys(theme)[0],
       fontSize: 24,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       marginBottom: 8,
     },
     subHeaderText: {
@@ -1095,38 +1018,38 @@ const createStyles = (theme: any) =>
       marginBottom: 24,
     },
     communitiesGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
       gap: 12,
     },
     communityBox: {
-      width: "30%",
+      width: '30%',
       aspectRatio: 1,
       backgroundColor: greys(theme)[1800],
       borderRadius: 12,
       padding: 12,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       borderWidth: 2,
-      borderColor: "transparent",
+      borderColor: 'transparent',
     },
     selectedCommunityBox: {
-      borderColor: "#1e90ff",
-      backgroundColor: opacity("#1e90ff", 0.1),
+      borderColor: '#1e90ff',
+      backgroundColor: opacity('#1e90ff', 0.1),
     },
     communityName: {
       color: greys(theme)[0],
       fontSize: 14,
-      textAlign: "center",
+      textAlign: 'center',
     },
     selectedCommunityText: {
-      color: "#1e90ff",
-      fontWeight: "bold",
+      color: '#1e90ff',
+      fontWeight: 'bold',
     },
     profileItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 12,
       // borderBottomWidth: 1,
       // borderBottomColor: greys(theme)[1800],
@@ -1147,15 +1070,15 @@ const createStyles = (theme: any) =>
       flex: 1,
     },
     checkIconContainer: {
-      marginLeft: "auto",
+      marginLeft: 'auto',
       marginRight: 8,
     },
     accountButtonsContainer: {
       marginTop: 8,
     },
     createAccountButton: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 12,
       marginTop: 8,
     },
@@ -1180,7 +1103,7 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
       marginBottom: 12,
-      alignItems: "center",
+      alignItems: 'center',
     },
     importButtonText: {
       color: greys(theme)[0],
@@ -1195,27 +1118,27 @@ const createStyles = (theme: any) =>
       marginBottom: 12,
     },
     errorText: {
-      color: "red",
+      color: 'red',
       fontSize: 14,
       marginBottom: 12,
     },
     bannerContainer: {
-      position: "relative",
+      position: 'relative',
       marginBottom: 40,
     },
     bannerImage: {
-      width: "100%",
+      width: '100%',
       aspectRatio: 3,
       borderRadius: 12,
     },
     profileInfoContainer: {
-      position: "absolute",
+      position: 'absolute',
       bottom: -40,
       left: 16,
       right: 16,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
     },
     profilePicture: {
       width: 80,
@@ -1232,20 +1155,20 @@ const createStyles = (theme: any) =>
     },
     defaultProfilePicture: {
       backgroundColor: greys(theme)[1500],
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     defaultProfileInitial: {
       color: greys(theme)[0],
       fontSize: 32,
-      fontWeight: "bold",
+      fontWeight: 'bold',
     },
     nameContainer: {
       marginHorizontal: 24,
     },
     displayName: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[0],
       marginBottom: 0,
     },
@@ -1255,20 +1178,20 @@ const createStyles = (theme: any) =>
       marginBottom: 4,
     },
     continueButton: {
-      backgroundColor: "#1e90ff",
+      backgroundColor: '#1e90ff',
       padding: 16,
       borderRadius: 8,
-      alignItems: "center",
+      alignItems: 'center',
       marginTop: 16,
     },
     continueButtonText: {
-      color: "#fff",
+      color: '#fff',
       fontSize: 16,
-      fontWeight: "bold",
+      fontWeight: 'bold',
     },
     tagsContainer: {
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       marginTop: 8,
       gap: 8,
     },

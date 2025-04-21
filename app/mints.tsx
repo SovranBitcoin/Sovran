@@ -1,9 +1,9 @@
-import React from "react";
-import { View } from "components/common/Themed";
-import DonutChartContainer from "components/layout/Donut";
-import { useSelector } from "react-redux";
-import { memoizedGetAllBalances } from "helper/redux/cashu";
-import { formatCurrency } from "helper/currency";
+import React from 'react';
+import { View } from 'components/common/Themed';
+import DonutChartContainer from 'components/layout/Donut';
+import { useSelector } from 'react-redux';
+import { memoizedGetAllBalances } from 'helper/redux/cashu';
+import { formatCurrency } from 'helper/currency';
 
 export default function TabOneScreen() {
   const balances = useSelector(memoizedGetAllBalances);
@@ -11,21 +11,21 @@ export default function TabOneScreen() {
   const chartData = balances.map((balance) => {
     const formattedValue = formatCurrency(
       {
-        currency: balance.unit === "sat" ? "BTC" : balance.unit.toUpperCase(),
+        currency: balance.unit === 'sat' ? 'BTC' : balance.unit.toUpperCase(),
         value: balance.amount,
-        denomination: balance.unit === "sat" ? "sats" : balance.unit,
+        denomination: balance.unit === 'sat' ? 'sats' : balance.unit,
       },
       {
-        locale: "en-US",
-        precision: balance.unit === "sat" ? 0 : 2,
-        currencyDisplay: balance.unit === "sat" ? "name" : "symbol",
-        denomination: balance.unit === "sat" ? "sats" : balance.unit,
+        locale: 'en-US',
+        precision: balance.unit === 'sat' ? 0 : 2,
+        currencyDisplay: balance.unit === 'sat' ? 'name' : 'symbol',
+        denomination: balance.unit === 'sat' ? 'sats' : balance.unit,
       }
     );
 
     return {
       amount: balance.amount,
-      label: balance.mintUrl.replace("https://", ""),
+      label: balance.mintUrl.replace('https://', ''),
       subtitle: balance.mintUrl,
       value: formattedValue,
     };
@@ -35,13 +35,8 @@ export default function TabOneScreen() {
     <View
       style={{
         flex: 1,
-      }}
-    >
-      <DonutChartContainer
-        data={chartData}
-        titleText="Total balance"
-        totalValueSuffix="sats"
-      />
+      }}>
+      <DonutChartContainer data={chartData} titleText="Total balance" totalValueSuffix="sats" />
     </View>
   );
 }

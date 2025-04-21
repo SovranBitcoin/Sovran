@@ -1,10 +1,6 @@
-import {
-  CashuMint
-} from "@cashu/cashu-ts";
-import {
-  memoizedGetMintInfo, setInfo
-} from "helper/redux/cashu";
-import { store } from "helper/redux/store";
+import { CashuMint } from '@cashu/cashu-ts';
+import { memoizedGetMintInfo, setInfo } from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
 
 interface GetMintParams {
   mintUrl: string;

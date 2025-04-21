@@ -1,21 +1,21 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Image } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme, useSettings } from "helper/redux/settings";
-import FeatherIcon from "@expo/vector-icons/Feather";
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Image } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
+import FeatherIcon from '@expo/vector-icons/Feather';
 
-import { greys, reds } from "helper/colors";
-import { useNostr } from "helper/redux/nostr";
+import { greys, reds } from 'helper/colors';
+import { useNostr } from 'helper/redux/nostr';
 import {
   ActionSheetProvider,
   connectActionSheet,
   useActionSheet,
-} from "@expo/react-native-action-sheet";
-import { useTypedNavigation } from "helper/navigation";
-import { truncateMiddle } from "helper/strings";
-import { Linking } from "react-native";
-import Container from "components/layout/Container";
-import { SheetManager } from "react-native-actions-sheet";
+} from '@expo/react-native-action-sheet';
+import { useTypedNavigation } from 'helper/navigation';
+import { truncateMiddle } from 'helper/strings';
+import { Linking } from 'react-native';
+import Container from 'components/layout/Container';
+import { SheetManager } from 'react-native-actions-sheet';
 
 export const Section: React.FC<{
   title: string;
@@ -42,10 +42,9 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
   return (
     <TouchableOpacity
       onPress={() => {
-        navigation.navigate("settings/profile");
+        navigation.navigate('settings/profile');
       }}
-      style={styles.profile}
-    >
+      style={styles.profile}>
       <Image
         alt=""
         source={{
@@ -55,9 +54,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
       />
       <View style={styles.profileBody}>
         <Text style={styles.profileName}>{currentProfile?.name}</Text>
-        <Text style={styles.profileHandle}>
-          {truncateMiddle(currentProfile?.npub, 8)}
-        </Text>
+        <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
       </View>
       <FeatherIcon color={greys(theme)[700]} name="chevron-right" size={22} />
     </TouchableOpacity>
@@ -78,15 +75,8 @@ export const RowButton: React.FC<{
     <View style={styles.rowWrapper}>
       <TouchableOpacity
         onPress={onPress}
-        style={[
-          styles.row,
-          isFirst && styles.rowFirst,
-          isLast && styles.rowLast,
-        ]}
-      >
-        <Text style={[styles.rowLabel, isDanger && styles.rowLabelDanger]}>
-          {label}
-        </Text>
+        style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
+        <Text style={[styles.rowLabel, isDanger && styles.rowLabelDanger]}>{label}</Text>
 
         <View style={styles.rowSpacer} />
         {value && (
@@ -95,11 +85,10 @@ export const RowButton: React.FC<{
               styles.rowValue,
               {
                 marginRight: 3,
-                fontFamily: "OverpassBold",
+                fontFamily: 'OverpassBold',
               },
               isDanger ? { color: reds[300] } : { color: greys(theme)[700] },
-            ]}
-          >
+            ]}>
             {value}
           </Text>
         )}
@@ -116,8 +105,7 @@ export const RowButton: React.FC<{
           <View
             style={{
               marginRight: 2,
-            }}
-          ></View>
+            }}></View>
         )}
       </TouchableOpacity>
     </View>
@@ -140,12 +128,7 @@ const ModalScreen: React.FC<{}> = () => {
   const { showActionSheetWithOptions } = useActionSheet();
 
   const handleBTCFormatPress = () => {
-    const options = [
-      "Bitcoin (BTC)",
-      "Satoshi (short-Sats)",
-      "Satoshis (Sats)",
-      "Cancel",
-    ];
+    const options = ['Bitcoin (BTC)', 'Satoshi (short-Sats)', 'Satoshis (Sats)', 'Cancel'];
     const cancelButtonIndex = 3;
 
     showActionSheetWithOptions(
@@ -161,7 +144,7 @@ const ModalScreen: React.FC<{}> = () => {
   };
 
   const handleFiatCurrencyPress = () => {
-    const options = ["USD", "EUR", "GBP", "Cancel"];
+    const options = ['USD', 'EUR', 'GBP', 'Cancel'];
     const cancelButtonIndex = 3;
 
     showActionSheetWithOptions(
@@ -195,25 +178,19 @@ const ModalScreen: React.FC<{}> = () => {
         />
       </Section> */}
       <Section title="Preferences">
-        <RowButton
-          label="Bitcoin Display Format"
-          onPress={handleBTCFormatPress}
-        />
-        <RowButton
-          label="Preferred Fiat Currency"
-          onPress={handleFiatCurrencyPress}
-        />
+        <RowButton label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
+        <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
         <RowButton
           label="Theme"
           onPress={() => {
-            navigation.navigate("themeSettings");
+            navigation.navigate('themeSettings');
           }}
         />
         <RowButton
           label="Language"
           onPress={() => {
-            navigation.navigate("languageSettings", {
-              countries: ["GB", "FR", "ES", "DE", "PT"],
+            navigation.navigate('languageSettings', {
+              countries: ['GB', 'FR', 'ES', 'DE', 'PT'],
             });
           }}
         />
@@ -222,19 +199,19 @@ const ModalScreen: React.FC<{}> = () => {
         <RowButton
           label="About This Release"
           onPress={() => {
-            navigation.navigate("settings/about");
+            navigation.navigate('settings/about');
           }}
         />
         <RowButton
           label="View Source on GitHub"
           onPress={() => {
-            Linking.openURL("https://github.com/SovranBitcoin/Sovran");
+            Linking.openURL('https://github.com/SovranBitcoin/Sovran');
           }}
         />
         <RowButton
           label="Contact the Developer"
           onPress={() => {
-            Linking.openURL("https://x.com/KevinKelbie");
+            Linking.openURL('https://x.com/KevinKelbie');
           }}
         />
       </Section>
@@ -242,14 +219,14 @@ const ModalScreen: React.FC<{}> = () => {
         <RowButton
           label="Show Seed Phrase"
           onPress={() => {
-            navigation.navigate("settings/showSeedPhrase");
+            navigation.navigate('settings/showSeedPhrase');
           }}
           isFirst
         />
         <RowButton
           label="Verify Seed Phrase"
           onPress={() => {
-            navigation.navigate("settings/verifySeedPhrase");
+            navigation.navigate('settings/verifySeedPhrase');
           }}
           isFirst
         />
@@ -290,7 +267,7 @@ const ModalScreen: React.FC<{}> = () => {
         <RowButton
           label="Delete Account"
           onPress={() => {
-            SheetManager.show("delete-router");
+            SheetManager.show('delete-router');
           }}
           isLast
           isDanger
@@ -300,21 +277,20 @@ const ModalScreen: React.FC<{}> = () => {
         <RowButton
           label="Show Local Storage"
           onPress={() => {
-            navigation.navigate("settings/store");
+            navigation.navigate('settings/store');
           }}
         />
         <RowButton
           label="Restore Counter"
           onPress={() => {
-            navigation.navigate("settings/restoreCounter");
+            navigation.navigate('settings/restoreCounter');
           }}
         />
       </Section>
       <TouchableOpacity
         onPress={() => {
-          navigation.navigate("settings/design");
-        }}
-      >
+          navigation.navigate('settings/design');
+        }}>
         <Text style={styles.contentFooter}>App Version x</Text>
       </TouchableOpacity>
     </Container>
@@ -324,26 +300,26 @@ const ModalScreen: React.FC<{}> = () => {
 const createStyles = (theme: any, isDanger?: boolean) =>
   StyleSheet.create({
     header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      width: "100%",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
       paddingHorizontal: 16,
     },
     headerAction: {
       width: 40,
       height: 40,
-      alignItems: "flex-start",
-      justifyContent: "center",
+      alignItems: 'flex-start',
+      justifyContent: 'center',
     },
     headerTitle: {
       fontSize: 19,
-      fontWeight: "600",
+      fontWeight: '600',
       color: greys(theme)[0],
       flexGrow: 1,
       flexShrink: 1,
       flexBasis: 0,
-      textAlign: "center",
+      textAlign: 'center',
     },
     content: {
       paddingHorizontal: 16,
@@ -351,8 +327,8 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     contentFooter: {
       marginTop: 24,
       fontSize: 13,
-      fontWeight: "500",
-      textAlign: "center",
+      fontWeight: '500',
+      textAlign: 'center',
       color: greys(theme)[600],
     },
     section: {
@@ -363,9 +339,9 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginLeft: 12,
       fontSize: 13,
       letterSpacing: 0.33,
-      fontWeight: "500",
+      fontWeight: '500',
       color: isDanger ? reds[300] : greys(theme)[600],
-      textTransform: "uppercase",
+      textTransform: 'uppercase',
     },
     sectionBody: {
       borderRadius: 12,
@@ -377,14 +353,14 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       shadowOpacity: 0.2,
       shadowRadius: 1.41,
       elevation: 2,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     profile: {
       padding: 12,
       backgroundColor: greys(theme)[1800],
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
     },
     profileAvatar: {
       width: 60,
@@ -393,25 +369,25 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginRight: 12,
     },
     profileBody: {
-      marginRight: "auto",
+      marginRight: 'auto',
     },
     profileName: {
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       color: greys(theme)[0],
     },
     profileHandle: {
       marginTop: 2,
       fontSize: 16,
-      fontWeight: "400",
+      fontWeight: '400',
       color: greys(theme)[700],
     },
     row: {
       height: 44,
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-start",
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       paddingRight: 12,
     },
     rowWrapper: {
@@ -447,9 +423,9 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       borderBottomRightRadius: 12,
     },
     rowLabelLogout: {
-      width: "100%",
-      textAlign: "center",
-      fontWeight: "600",
+      width: '100%',
+      textAlign: 'center',
+      fontWeight: '600',
       color: reds[300],
     },
     debugContainer: {
@@ -472,8 +448,8 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     changeProfileText: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontWeight: "500",
-      textAlign: "center",
+      fontWeight: '500',
+      textAlign: 'center',
     },
   });
 

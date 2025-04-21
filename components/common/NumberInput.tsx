@@ -1,33 +1,28 @@
-import { Animated, StyleSheet } from "react-native";
+import { Animated, StyleSheet } from 'react-native';
 
-import { StyledText, View } from "components/common/Themed";
+import { StyledText, View } from 'components/common/Themed';
 
-import { useEffect, useRef } from "react";
-import { greens, greys, shades } from "helper/colors";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { LightningUnit } from "assets/icons";
-import React from "react";
+import { useEffect, useRef } from 'react';
+import { greens, greys, shades } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { LightningUnit } from 'assets/icons';
+import React from 'react';
 
-export function NumberInput({
-  type = "send",
-  currency = "£",
-  value,
-  onChange,
-}) {
+export function NumberInput({ type = 'send', currency = '£', value, onChange }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Mapping currency to symbol
   const currencySymbols = {
-    usd: "$",
-    eur: "€",
-    gbp: "£",
-    sat: "lu",
+    usd: '$',
+    eur: '€',
+    gbp: '£',
+    sat: 'lu',
   };
 
   const currencySymbol = currencySymbols[currency.toLowerCase()] || currency;
 
-  const precision = currencySymbol === "sat" ? 0 : 2;
+  const precision = currencySymbol === 'sat' ? 0 : 2;
 
   useEffect(() => {
     const length = value.toString().length;
@@ -65,9 +60,7 @@ export function NumberInput({
     // Calculate proportional reduction in font size based on text length
     const shrinkRange = shrinkEndLength - shrinkStartLength;
     const fontSize =
-      maxFontSize -
-      ((textLength - shrinkStartLength) * (maxFontSize - minFontSize)) /
-        shrinkRange;
+      maxFontSize - ((textLength - shrinkStartLength) * (maxFontSize - minFontSize)) / shrinkRange;
 
     // Ensure the font size is not less than the minimum
     return Math.max(minFontSize, fontSize);
@@ -78,90 +71,83 @@ export function NumberInput({
     const numberString = String(number);
 
     // Use regular expression to insert a space every three digits from the end
-    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   };
 
   return (
     <View
       style={{
-        backgroundColor: "transparent",
-      }}
-    >
+        backgroundColor: 'transparent',
+      }}>
       <Animated.View
         style={{
-          display: "flex",
-          justifyContent: "center",
-          flexDirection: "row",
-          alignItems: "center",
+          display: 'flex',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          alignItems: 'center',
           flex: 1,
           margin: 0,
           padding: 0,
-          overflow: "visible",
+          overflow: 'visible',
           transform: [{ scale: scaleAnim }],
           marginLeft: currencySymbol.length === 1 ? -22 : 22,
-        }}
-      >
+        }}>
         {currencySymbol.length === 1 && (
           <StyledText
             style={{
-              fontFamily: "OverpassRegular",
+              fontFamily: 'OverpassRegular',
               color: value ? shades[100] : greys()[400],
               fontSize: 28,
               marginRight: 4,
               marginTop: 12,
               flexShrink: 0,
-              overflow: "hidden",
+              overflow: 'hidden',
               numberOfLines: 1,
             }}
             secondary={!value}
-            primary={type === "send" && value}
-            negative={type === "receive" && value}
-          >
+            primary={type === 'send' && value}
+            negative={type === 'receive' && value}>
             {currencySymbol}
           </StyledText>
         )}
         <View
           style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "visible",
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'visible',
             height: 100,
-            backgroundColor: "transparent",
-          }}
-        >
+            backgroundColor: 'transparent',
+          }}>
           <StyledText
             style={{
-              fontFamily: "OverpassHeavy",
+              fontFamily: 'OverpassHeavy',
               fontSize: calculateFontSize(value),
               margin: 0,
               padding: 0,
               zIndex: 100,
               flexShrink: 0,
-              overflow: "visible",
+              overflow: 'visible',
             }}
             secondary={!value}
-            primary={type === "send" && value}
-            negative={type === "receive" && value}
-            children={value ? formatNumberWithSpaces(String(value)) : "0"}
+            primary={type === 'send' && value}
+            negative={type === 'receive' && value}
+            children={value ? formatNumberWithSpaces(String(value)) : '0'}
           />
         </View>
 
-        {currencySymbol === "lu" ? (
+        {currencySymbol === 'lu' ? (
           <View
             style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "transparent",
-            }}
-          >
-            {type === "send" && (
-              <LightningUnit color={value ? shades[300] : greys(theme)[700]} />
-            )}
-            {type === "receive" && (
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+            }}>
+            {type === 'send' && <LightningUnit color={value ? shades[300] : greys(theme)[700]} />}
+            {type === 'receive' && (
               <LightningUnit color={value ? greens[300] : greys(theme)[700]} />
             )}
           </View>
@@ -169,18 +155,17 @@ export function NumberInput({
           currencySymbol.length >= 2 && (
             <StyledText
               secondary={!value}
-              primary={type === "send" && value}
-              negative={type === "receive" && value}
+              primary={type === 'send' && value}
+              negative={type === 'receive' && value}
               style={{
-                fontFamily: "OverpassRegular",
+                fontFamily: 'OverpassRegular',
                 fontSize: 28,
                 marginRight: 4,
                 marginTop: 12,
                 flexShrink: 0,
-                overflow: "hidden",
+                overflow: 'hidden',
                 numberOfLines: 1,
-              }}
-            >
+              }}>
               {currencySymbol}
             </StyledText>
           )
@@ -192,22 +177,22 @@ export function NumberInput({
 
 const styles = StyleSheet.create({
   transactionsLabel: {
-    fontFamily: "OverpassHeavy",
+    fontFamily: 'OverpassHeavy',
     fontSize: 16,
-    color: "#6E6E6E",
+    color: '#6E6E6E',
     margin: 0,
     padding: 0,
   },
   minus: {
-    fontFamily: "OverpassBold",
+    fontFamily: 'OverpassBold',
     fontSize: 32,
-    color: "#9A4141",
+    color: '#9A4141',
     marginRight: 4,
   },
   plus: {
-    fontFamily: "OverpassBold",
+    fontFamily: 'OverpassBold',
     fontSize: 32,
-    color: "#499A41",
+    color: '#499A41',
     marginRight: 4,
   },
   fullScreen: {
@@ -216,8 +201,8 @@ const styles = StyleSheet.create({
   },
   fullHeightView: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: greys()[2300],
     // padding: 16,
   },
@@ -226,12 +211,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     color: greys()[1000],
   },
   separator: {
     marginVertical: 30,
     height: 1,
-    width: "80%",
+    width: '80%',
   },
 });

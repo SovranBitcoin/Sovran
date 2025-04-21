@@ -1,9 +1,5 @@
-import { BalanceResponse, Signer, TokenReponse } from "./types";
-import {
-  authedJsonRequest,
-  createAuthHeader,
-  createAuthTemplate,
-} from "./utils";
+import { BalanceResponse, Signer, TokenReponse } from './types';
+import { authedJsonRequest, createAuthHeader, createAuthTemplate } from './utils';
 
 export class NCSDK {
   baseUrl: string;
@@ -16,25 +12,25 @@ export class NCSDK {
 
   async getInfo() {
     const url = `${this.baseUrl}/api/v1/info`;
-    // 
-    const method = "GET";
-    // 
+    //
+    const method = 'GET';
+    //
     const authTemplate = createAuthTemplate(url, method);
-    // 
+    //
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
-    // 
+    //
     const authHeader = createAuthHeader(signedAuthEvent);
-    // 
+    //
     const res = await authedJsonRequest(url, authHeader);
-    //   
+    //
     const data = await res.json();
-    // 
+    //
     return data;
   }
 
   async getToken() {
     const url = `${this.baseUrl}/api/v1/claim`;
-    const method = "GET";
+    const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);
@@ -47,7 +43,7 @@ export class NCSDK {
   }
   async getWithdraw() {
     const url = `${this.baseUrl}/api/v1/withdrawals`;
-    const method = "GET";
+    const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);
@@ -60,7 +56,7 @@ export class NCSDK {
   }
   async getBalance() {
     const url = `${this.baseUrl}/api/v1/balance`;
-    const method = "GET";
+    const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);
@@ -74,7 +70,7 @@ export class NCSDK {
 
   setUsername(
     username: string,
-    paymentToken: undefined,
+    paymentToken: undefined
   ): Promise<{
     error: true;
     message: string;
@@ -82,11 +78,11 @@ export class NCSDK {
   }>;
   setUsername(
     username: string,
-    paymentToken: string,
+    paymentToken: string
   ): Promise<{ error: true; message: string } | { error: false }>;
   async setUsername(username: string, paymentToken: string | undefined) {
     const url = `${this.baseUrl}/api/v1/info/username`;
-    const method = "PUT";
+    const method = 'PUT';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);

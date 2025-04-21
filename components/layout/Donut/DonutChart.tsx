@@ -1,11 +1,11 @@
-import { StyleSheet } from "react-native";
-import { SharedValue, useDerivedValue } from "react-native-reanimated";
-import { Canvas, Path, SkFont, Skia, Text } from "@shopify/react-native-skia";
-import { DonutPath } from "./DonutPath";
-import { View } from "components/common/Themed";
-import { greens, greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { StyleSheet } from 'react-native';
+import { SharedValue, useDerivedValue } from 'react-native-reanimated';
+import { Canvas, Path, SkFont, Skia, Text } from '@shopify/react-native-skia';
+import { DonutPath } from './DonutPath';
+import { View } from 'components/common/Themed';
+import { greens, greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 type Props = {
   n: number;
@@ -34,8 +34,8 @@ const DonutChart = ({
   radius,
   font,
   smallFont,
-  titleText = "Total balance",
-  totalValueSuffix = "sats",
+  titleText = 'Total balance',
+  totalValueSuffix = 'sats',
   isSpecialCase = false,
 }: Props) => {
   const theme = useSelector(memoizedGetTheme);
@@ -47,25 +47,21 @@ const DonutChart = ({
   path.addCircle(radius, radius, innerRadius);
 
   const targetText = useDerivedValue(() => {
-    const remaining =
-      chartData.find((item) => item.label === "Remaining")?.amount || 0;
-    const used = chartData.find((item) => item.label === "Used")?.amount || 0;
-    return isSpecialCase
-      ? `${used} GB`
-      : `${Math.round(totalValue.value)} ${totalValueSuffix}`;
+    const remaining = chartData.find((item) => item.label === 'Remaining')?.amount || 0;
+    const used = chartData.find((item) => item.label === 'Used')?.amount || 0;
+    return isSpecialCase ? `${used} GB` : `${Math.round(totalValue.value)} ${totalValueSuffix}`;
   }, [chartData, isSpecialCase]);
 
   const targetText2 = useDerivedValue(() => {
-    const remaining =
-      chartData.find((item) => item.label === "Remaining")?.amount || 0;
-    const used = chartData.find((item) => item.label === "Used")?.amount || 0;
+    const remaining = chartData.find((item) => item.label === 'Remaining')?.amount || 0;
+    const used = chartData.find((item) => item.label === 'Used')?.amount || 0;
     return isSpecialCase
       ? `/ ${remaining} GB`
       : `${Math.round(totalValue.value)} ${totalValueSuffix}`;
   }, [chartData, isSpecialCase]);
 
-  const fontSize = font.measureText("$00");
-  const smallFontSize = smallFont.measureText("$00");
+  const fontSize = font.measureText('$00');
+  const smallFontSize = smallFont.measureText('$00');
 
   const titleTextWidth = smallFont.measureText(titleText).width;
 
@@ -94,8 +90,7 @@ const DonutChart = ({
         />
         {array.map((_, index) => {
           // Exclude the "Used" segment if isSpecialCase is true
-          const shouldRenderPath =
-            !isSpecialCase || chartData[index]?.label !== "Used";
+          const shouldRenderPath = !isSpecialCase || chartData[index]?.label !== 'Used';
 
           if (shouldRenderPath) {
             return (

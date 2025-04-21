@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   SafeAreaView,
@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
-} from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys } from "helper/colors";
-import { useNostr } from "helper/redux/nostr";
-import { Card } from "components/common/Card";
-import SettingsButton from "components/common/SettingsButton";
+} from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import { useNostr } from 'helper/redux/nostr';
+import { Card } from 'components/common/Card';
+import SettingsButton from 'components/common/SettingsButton';
 
 const VerifySeedPhrase = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -25,7 +25,7 @@ const VerifySeedPhrase = () => {
 
   useEffect(() => {
     if (currentProfile?.mnemonic) {
-      const words = currentProfile.mnemonic.split(" ");
+      const words = currentProfile.mnemonic.split(' ');
       setShuffledWords([...words].sort(() => Math.random() - 0.5));
     }
   }, [currentProfile]);
@@ -38,21 +38,18 @@ const VerifySeedPhrase = () => {
     setSelectedWords((prev) => prev.slice(0, -1));
   };
 
-  const isVerified = selectedWords.join(" ") === currentProfile?.mnemonic;
+  const isVerified = selectedWords.join(' ') === currentProfile?.mnemonic;
 
   const handleVerify = () => {
     if (isVerified) {
-      Alert.alert("Success", "Seed Phrase Verified!");
+      Alert.alert('Success', 'Seed Phrase Verified!');
     } else {
-      Alert.alert("Error", "Incorrect Seed Phrase. Please try again.");
+      Alert.alert('Error', 'Incorrect Seed Phrase. Please try again.');
     }
   };
 
   const renderWord = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => handleWordPress(item)}
-      style={styles.wordButton}
-    >
+    <TouchableOpacity onPress={() => handleWordPress(item)} style={styles.wordButton}>
       <Text style={styles.wordText}>{item}</Text>
     </TouchableOpacity>
   );
@@ -67,13 +64,9 @@ const VerifySeedPhrase = () => {
           variant="info"
         />
         <View style={styles.selectedWordsContainer}>
-          <Text style={styles.selectedWordsText}>
-            {selectedWords.join(" ")}
-          </Text>
+          <Text style={styles.selectedWordsText}>{selectedWords.join(' ')}</Text>
         </View>
-        {isVerified && (
-          <Text style={styles.verifiedText}>Seed Phrase Verified!</Text>
-        )}
+        {isVerified && <Text style={styles.verifiedText}>Seed Phrase Verified!</Text>}
       </ScrollView>
       <View style={styles.buttonContainer}>
         <FlatList
@@ -115,24 +108,24 @@ const createStyles = (theme) =>
       marginLeft: 8,
       fontSize: 13,
       letterSpacing: 0.33,
-      fontWeight: "500",
+      fontWeight: '500',
       color: greys(theme)[600],
-      textTransform: "uppercase",
+      textTransform: 'uppercase',
     },
     wordContainer: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "center",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
     },
     wordButton: {
       backgroundColor: greys(theme)[1800],
       padding: 8,
       margin: 4,
       borderRadius: 8,
-      width: "30%",
+      width: '30%',
       height: 45,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     wordText: {
       color: greys(theme)[0],
@@ -149,14 +142,14 @@ const createStyles = (theme) =>
       fontSize: 16,
     },
     verifiedText: {
-      color: "green",
+      color: 'green',
       fontSize: 18,
-      fontWeight: "bold",
-      textAlign: "center",
+      fontWeight: 'bold',
+      textAlign: 'center',
       marginTop: 20,
     },
     columnWrapper: {
-      justifyContent: "space-between",
+      justifyContent: 'space-between',
     },
     buttonContainer: {
       padding: 8,

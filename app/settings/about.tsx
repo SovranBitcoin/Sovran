@@ -1,11 +1,11 @@
-import React from "react";
-import { Button } from "components/common/Button";
-import { Linking } from "react-native";
-import Icon from "assets/icons";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { Card } from "components/common/Card";
-import Container from "components/layout/Container";
+import React from 'react';
+import { Button } from 'components/common/Button';
+import { Linking } from 'react-native';
+import Icon from 'assets/icons';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { Card } from 'components/common/Card';
+import Container from 'components/layout/Container';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -23,9 +23,9 @@ export default function ModalScreen() {
       <Button
         variant="secondary"
         onPress={() => {
-          Linking.openURL("https://x.com/SovranBitcoin");
+          Linking.openURL('https://x.com/SovranBitcoin');
         }}
-        text={"Follow us on X"}
+        text={'Follow us on X'}
         icon={<Icon name="lucide:twitter" />}
       />
     </Container>

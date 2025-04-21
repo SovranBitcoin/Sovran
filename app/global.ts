@@ -1,1 +1,1 @@
-import "../shim.js"
+import '../shim.js';

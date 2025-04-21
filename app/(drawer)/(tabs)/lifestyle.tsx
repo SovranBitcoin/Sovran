@@ -1,30 +1,29 @@
-import React from "react";
-import { StyleSheet } from "react-native";
-import { Text, View } from "components/common/Themed";
-import { useNavigation } from "expo-router";
-import { useSelector } from "react-redux";
-import Modal from "components/layout/Modal";
-import { greys } from "helper/colors";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import Icon from "assets/icons";
+import React from 'react';
+import { StyleSheet } from 'react-native';
+import { Text, View } from 'components/common/Themed';
+import { useNavigation } from 'expo-router';
+import { useSelector } from 'react-redux';
+import Modal from 'components/layout/Modal';
+import { greys } from 'helper/colors';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import Icon from 'assets/icons';
 
 // Constants
-const SUPPORT_PUBKEY =
-  "1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2";
+const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
 
 // Define service menu items
 const SERVICE_MENU_ITEMS = [
   {
-    id: "esims",
-    icon: "fluent:sim-24-filled",
-    label: "eSIMs",
-    navigateTo: "myEsims",
+    id: 'esims',
+    icon: 'fluent:sim-24-filled',
+    label: 'eSIMs',
+    navigateTo: 'myEsims',
   },
   {
-    id: "vpn",
-    icon: "ic:baseline-vpn-lock",
-    label: "VPN",
-    navigateTo: "myVpns",
+    id: 'vpn',
+    icon: 'ic:baseline-vpn-lock',
+    label: 'VPN',
+    navigateTo: 'myVpns',
   },
   /* {
     id: 'address',
@@ -33,27 +32,27 @@ const SERVICE_MENU_ITEMS = [
     navigateTo: "settings/customNpub"
   }, */
   {
-    id: "giftcards",
-    icon: "ic:baseline-card-giftcard",
-    label: "Giftcards",
-    navigateTo: "giftcards/welcome",
+    id: 'giftcards',
+    icon: 'ic:baseline-card-giftcard',
+    label: 'Giftcards',
+    navigateTo: 'giftcards/welcome',
   },
   {
-    id: "donate",
-    icon: "mdi:charity",
-    label: "Donate",
-    navigateTo: "donate/donate",
+    id: 'donate',
+    icon: 'mdi:charity',
+    label: 'Donate',
+    navigateTo: 'donate/donate',
   },
   {
-    id: "support",
-    icon: "mdi:help-circle",
-    label: "Support",
-    navigateTo: "userMessages",
+    id: 'support',
+    icon: 'mdi:help-circle',
+    label: 'Support',
+    navigateTo: 'userMessages',
     params: { pubkey: SUPPORT_PUBKEY },
   },
   // Empty placeholders to maintain grid layout
-  { id: "empty1", empty: true },
-  { id: "empty2", empty: true },
+  { id: 'empty1', empty: true },
+  { id: 'empty2', empty: true },
 ];
 
 // Separate component for menu item
@@ -89,13 +88,7 @@ const ServicesSection = () => {
   };
 
   return (
-    <Modal
-      showBack={false}
-      title=""
-      buttons={null}
-      childrenStyles={{}}
-      showHeader={false}
-    >
+    <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.map((item) => (
           <MenuItem
@@ -126,39 +119,39 @@ const TabTwoScreen = () => {
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "black",
-      flexDirection: "column",
+      backgroundColor: 'black',
+      flexDirection: 'column',
       flex: 1,
       margin: 0,
     },
     gridContainer: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
       padding: 16,
-      width: "100%",
+      width: '100%',
     },
     iconContainer: {
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: 16,
       borderRadius: 8,
       backgroundColor: greys(theme)[1800],
     },
     gridItem: {
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: 8,
       backgroundColor: greys(theme)[2300],
-      flexBasis: "22%", // Ensure max 4 icons per row
+      flexBasis: '22%', // Ensure max 4 icons per row
       marginBottom: 16,
     },
     gridText: {
       marginTop: 8,
       color: greys(theme)[200],
-      textAlign: "center",
+      textAlign: 'center',
       fontSize: 11,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
     },
     // Keep unused styles for potential future use
     image: {
@@ -169,7 +162,7 @@ const createStyles = (theme) =>
       borderColor: greys(theme)[1500],
     },
     bitrefillIcon: {
-      width: "100%",
+      width: '100%',
       height: 80,
       borderRadius: 12,
     },
@@ -186,17 +179,17 @@ const createStyles = (theme) =>
       padding: 8,
     },
     textContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     titleText: {
       marginTop: 8,
       color: greys(theme)[0],
-      flexWrap: "wrap",
+      flexWrap: 'wrap',
     },
     subtitleText: {
       marginTop: 1,
       color: greys(theme)[200],
-      flexWrap: "wrap",
+      flexWrap: 'wrap',
     },
     button: {
       backgroundColor: greys(theme)[2300],
@@ -205,9 +198,9 @@ const createStyles = (theme) =>
       marginTop: 8,
     },
     buttonText: {
-      textAlign: "center",
+      textAlign: 'center',
       color: greys(theme)[0],
-      flexWrap: "wrap",
+      flexWrap: 'wrap',
     },
   });
 

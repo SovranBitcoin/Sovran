@@ -1,8 +1,8 @@
-import React from "react";
-import ActionSheet, { registerSheet } from "react-native-actions-sheet";
-import { sheetName, routes } from "./routes";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useSelector } from "react-redux";
+import React from 'react';
+import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
+import { sheetName, routes } from './routes';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector } from 'react-redux';
 
 function SheetWithRouter(props: any) {
   const theme = useSelector(memoizedGetTheme);
@@ -12,10 +12,10 @@ function SheetWithRouter(props: any) {
       routes={routes}
       initialRoute="route-a"
       containerStyle={{
-        backgroundColor: "transparent",
+        backgroundColor: 'transparent',
         flexShrink: 1,
         flexGrow: 0,
-        flexBasis: "auto",
+        flexBasis: 'auto',
       }}
     />
   );

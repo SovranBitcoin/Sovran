@@ -1,15 +1,10 @@
-import { sendEcash } from "helper/cashu/ecash";
-import { decodePaymentRequest, getDecodedToken } from "@cashu/cashu-ts";
-import { bytesToHex } from "@noble/hashes/utils";
-import {
-  NDKEvent,
-  NDKKind,
-  NDKPrivateKeySigner,
-  ProfilePointer,
-} from "@nostr-dev-kit/ndk";
-import { useNDK } from "@nostr-dev-kit/ndk-mobile";
-import { nip04, nip19 } from "nostr-tools";
-import { useSelector } from "react-redux";
+import { sendEcash } from 'helper/cashu/ecash';
+import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
+import { bytesToHex } from '@noble/hashes/utils';
+import { NDKEvent, NDKKind, NDKPrivateKeySigner, ProfilePointer } from '@nostr-dev-kit/ndk';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { nip04, nip19 } from 'nostr-tools';
+import { useSelector } from 'react-redux';
 
 export const useSendEncryptedDirectMessage = () => {
   const { ndk } = useNDK();
@@ -24,28 +19,20 @@ export const useSendEncryptedDirectMessage = () => {
     message: string;
     recipient: string;
   }) => {
-
     const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
     ndk.signer = new NDKPrivateKeySigner(bytesToHex(privKeyBytes));
     const event = new NDKEvent(ndk);
     ndk.connect();
     event.kind = NDKKind.EncryptedDirectMessage;
-    event.content = await nip04.encrypt(
-      bytesToHex(privKeyBytes),
-      recipient,
-      message
-    );
-    event.tags = [["p", recipient]];
+    event.content = await nip04.encrypt(bytesToHex(privKeyBytes), recipient, message);
+    event.tags = [['p', recipient]];
     event.sign();
     try {
       await event.publish();
-    } catch (e) {
-
-    }
+    } catch (e) {}
   };
 
   const sendPaymentRequest = async ({ request }: { request: string }) => {
-
     const decodedRequest = decodePaymentRequest(request);
 
     const result = nip19.decode(decodedRequest.transport[0].target);

@@ -1,8 +1,8 @@
-import { StyleSheet, Pressable, ViewStyle } from "react-native";
-import { Text, View } from "components/common/Themed";
-import { greys } from "helper/colors";
-import TextInput from "components/common/TextInput";
-import { ReactNode } from "react";
+import { StyleSheet, Pressable, ViewStyle } from 'react-native';
+import { Text, View } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import TextInput from 'components/common/TextInput';
+import { ReactNode } from 'react';
 
 interface SearchableListProps {
   searchText: string;
@@ -31,10 +31,9 @@ export function SearchableList({
 
   const renderItem = (item: any) => (
     <Pressable
-      key={typeof item === "string" ? item : item.id}
+      key={typeof item === 'string' ? item : item.id}
       style={[styles.pressable, itemStyle]}
-      onPress={() => onItemPress(item)}
-    >
+      onPress={() => onItemPress(item)}>
       {renderIcon(item)}
       <Text weight="heavy" size={16} style={styles.label}>
         {getLabel(item)}
@@ -44,17 +43,12 @@ export function SearchableList({
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder={searchPlaceholder}
-        value={searchText}
-        onChangeText={onSearchChange}
-      />
+      <TextInput placeholder={searchPlaceholder} value={searchText} onChangeText={onSearchChange} />
       <View
         style={{
           height: 16,
-          backgroundColor: "transparent",
-        }}
-      ></View>
+          backgroundColor: 'transparent',
+        }}></View>
       {data.map(renderItem)}
     </View>
   );
@@ -67,8 +61,8 @@ const createStyles = (theme: string) =>
     },
     pressable: {
       padding: 8,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 8,
       backgroundColor: greys(theme)[1800],
       borderRadius: 1000,

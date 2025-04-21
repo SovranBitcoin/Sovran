@@ -1,10 +1,10 @@
-import { Text, View } from "components/common/Themed";
-import { useState } from "react";
-import { useSelector } from "react-redux";
-import HighlightText from "@sanar/react-native-highlight-text";
-import { greys, shades } from "helper/colors";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { Text, View } from 'components/common/Themed';
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
+import HighlightText from '@sanar/react-native-highlight-text';
+import { greys, shades } from 'helper/colors';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export const extractUrls = (text) => {
   try {
@@ -14,9 +14,7 @@ export const extractUrls = (text) => {
     const urls = text.match(urlRegex) || [];
     const nostrEvents = text.match(nostrRegex) || [];
 
-    const contentWithoutUrls = text
-      .replace(urlRegex, "")
-      .replace(nostrEvents, "");
+    const contentWithoutUrls = text.replace(urlRegex, '').replace(nostrEvents, '');
 
     return { urls, nostrEvents, contentWithoutUrls };
   } catch (err) {
@@ -54,46 +52,44 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
   const mentions = extractMentions(content);
 
   const truncatedText = contentWithoutUrls
-    ?.replace(/\s+$/, "")
-    ?.replace(/\n+$/, "")
+    ?.replace(/\s+$/, '')
+    ?.replace(/\n+$/, '')
     ?.slice(0, length); // Truncate text to 200 chars
 
   return (
     <View
       style={{
-        backgroundColor: "transparent",
-      }}
-    >
+        backgroundColor: 'transparent',
+      }}>
       <HighlightText
         style={{
-          fontFamily: "OverpassRegular",
+          fontFamily: 'OverpassRegular',
           fontSize,
           color: greys(theme)[0],
           marginBottom: 8,
         }}
         highlightStyle={{
-          fontFamily: "OverpassHeavy",
+          fontFamily: 'OverpassHeavy',
           color: shades[300],
         }}
         searchWords={[...hashtags, ...mentions]}
         textToHighlight={
           showFullText
-            ? contentWithoutUrls?.replace(/\s+$/, "")?.replace(/\n+$/, "")
-            : truncatedText + (contentWithoutUrls?.length > 200 ? "..." : "")
+            ? contentWithoutUrls?.replace(/\s+$/, '')?.replace(/\n+$/, '')
+            : truncatedText + (contentWithoutUrls?.length > 200 ? '...' : '')
         }
       />
       {contentWithoutUrls?.length > 200 && (
         <TouchableOpacity onPress={() => setShowFullText(!showFullText)}>
           <Text
             style={{
-              fontFamily: "OverpassBold",
+              fontFamily: 'OverpassBold',
               fontSize,
               color: shades[300],
               marginBottom: 4,
-              textAlign: "right",
-            }}
-          >
-            {showFullText ? "Show less" : "Show more"}
+              textAlign: 'right',
+            }}>
+            {showFullText ? 'Show less' : 'Show more'}
           </Text>
         </TouchableOpacity>
       )}

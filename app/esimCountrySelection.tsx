@@ -1,23 +1,22 @@
-import React, { useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
-import { useSelector } from "react-redux";
-import lookup from "country-code-lookup";
+import React, { useState } from 'react';
+import { Pressable, StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import lookup from 'country-code-lookup';
 
-import { greys } from "helper/colors";
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import { FlagIcon } from "assets/icons";
-import TextInput from "components/common/TextInput";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation";
+import { greys } from 'helper/colors';
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import { FlagIcon } from 'assets/icons';
+import TextInput from 'components/common/TextInput';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { countries, packageList, type } =
-    useTypedRoute<"esimCountrySelection">();
-  const [searchText, setSearchText] = useState("");
+  const { countries, packageList, type } = useTypedRoute<'esimCountrySelection'>();
+  const [searchText, setSearchText] = useState('');
 
   const getCountry = (iso) => {
     try {
@@ -30,7 +29,7 @@ function ModalScreen() {
   const filteredCountries = countries
     .filter((c) => {
       try {
-        const countryName = lookup.byIso(c)?.country || "";
+        const countryName = lookup.byIso(c)?.country || '';
         return countryName.toLowerCase().includes(searchText.toLowerCase());
       } catch (err) {
         return false;
@@ -44,15 +43,15 @@ function ModalScreen() {
   const handleCountrySelection = (country) => {
     const navigationOptions = { closeCurrentAndParent: true };
 
-    if (type === "vpn") {
+    if (type === 'vpn') {
       navigation.navigate(
-        "vpns",
+        'vpns',
         { country, ...{ countries, packageList, type } },
         navigationOptions
       );
     } else {
       navigation.navigate(
-        "esimsDataPlan",
+        'esimsDataPlan',
         {
           country,
           countries,
@@ -77,8 +76,7 @@ function ModalScreen() {
           <Pressable
             key={countryCode}
             style={styles.pressable}
-            onPress={() => handleCountrySelection(countryCode)}
-          >
+            onPress={() => handleCountrySelection(countryCode)}>
             <FlagIcon width={32} height={32} country={countryCode} />
             <Text weight="heavy" size={16} style={styles.countryName}>
               {getCountry(countryCode)}
@@ -95,7 +93,7 @@ export default ModalScreen;
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       padding: 16,
     },
     searchInput: {
@@ -103,8 +101,8 @@ const createStyles = (theme) =>
     },
     pressable: {
       padding: 8,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 8,
       backgroundColor: greys(theme)[1800],
       borderRadius: 16,

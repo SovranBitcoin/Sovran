@@ -1,26 +1,21 @@
-import React, { useCallback, useRef, useState } from "react";
-import { useSelector } from "react-redux";
-import {
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  VirtualizedList,
-} from "react-native";
-import { Text, View } from "components/common/Themed";
-import { useNostr } from "helper/redux/nostr";
-import { useCashu } from "helper/redux/cashu";
-import { formatCurrency } from "helper/currency";
-import Modal from "components/layout/Modal";
-import { VerifiedIcon } from "assets/icons";
-import { greys } from "helper/colors";
-import opacity from "hex-color-opacity";
-import PagerView from "react-native-pager-view";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation } from "helper/navigation";
-import { LNVPN_PUBKEY } from "../../vpnCheckout";
-import { sovran } from "components/layout/sheets/mints";
+import React, { useCallback, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
+import { Text, View } from 'components/common/Themed';
+import { useNostr } from 'helper/redux/nostr';
+import { useCashu } from 'helper/redux/cashu';
+import { formatCurrency } from 'helper/currency';
+import Modal from 'components/layout/Modal';
+import { VerifiedIcon } from 'assets/icons';
+import { greys } from 'helper/colors';
+import opacity from 'hex-color-opacity';
+import PagerView from 'react-native-pager-view';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation } from 'helper/navigation';
+import { LNVPN_PUBKEY } from '../../vpnCheckout';
+import { sovran } from 'components/layout/sheets/mints';
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -28,15 +23,11 @@ const Section = () => {
   const navigation = useTypedNavigation();
   const { profiles, search, currentProfile, messages, follows } = useNostr();
   const { transactions } = useCashu();
-  const [selectedTab, setSelectedTab] = useState("Recent activity");
+  const [selectedTab, setSelectedTab] = useState('Recent activity');
   const [following, setFollowing] = useState([]);
 
-  const filteredProfiles = profiles.filter(
-    (p) => p.pubkey !== currentProfile?.pubkey
-  );
-  const filteredSearch = search.filter(
-    (s) => s.pubkey !== currentProfile?.pubkey
-  );
+  const filteredProfiles = profiles.filter((p) => p.pubkey !== currentProfile?.pubkey);
+  const filteredSearch = search.filter((s) => s.pubkey !== currentProfile?.pubkey);
 
   const groupedTransactions = transactions
     .filter((t) => t?.nostr?.pubkey)
@@ -55,13 +46,11 @@ const Section = () => {
         (profile) =>
           messages.some((m) => m.pubkey === profile.pubkey) ||
           transactions.some((t) => t.nostr?.pubkey === profile.pubkey) ||
-          profile.pubkey ===
-            "1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2" ||
+          profile.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
           profile.pubkey === LNVPN_PUBKEY
       )
       .filter(
-        (profile, index, self) =>
-          index === self.findIndex((t) => t.pubkey === profile.pubkey)
+        (profile, index, self) => index === self.findIndex((t) => t.pubkey === profile.pubkey)
       ),
     ...following.map((f) => ({ pubkey: f.pubkey, ...f.profile })),
   ];
@@ -78,26 +67,20 @@ const Section = () => {
     ...groupedTransactions,
     ...groupedMessages,
   })
-    .filter((group) => group.pubkey !== "Unknown")
+    .filter((group) => group.pubkey !== 'Unknown')
     .map((group) => ({
       pubkey: group.pubkey,
-      profile: combinedSearchAndProfiles.find(
-        (p) => p.pubkey === group.pubkey
-      ) || { display_name: "Unknown User" },
-      transactions: (group.transactions || []).sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      ),
+      profile: combinedSearchAndProfiles.find((p) => p.pubkey === group.pubkey) || {
+        display_name: 'Unknown User',
+      },
+      transactions: (group.transactions || []).sort((a, b) => new Date(b.date) - new Date(a.date)),
       messages: (group.messages || []).sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       ),
     }))
     .sort((a, b) => {
-      const dateA = new Date(
-        a.transactions[0]?.date || a.messages[0]?.created_at
-      );
-      const dateB = new Date(
-        b.transactions[0]?.date || b.messages[0]?.created_at
-      );
+      const dateA = new Date(a.transactions[0]?.date || a.messages[0]?.created_at);
+      const dateB = new Date(b.transactions[0]?.date || b.messages[0]?.created_at);
       return dateB - dateA;
     });
   combinedSearchAndProfiles
@@ -115,7 +98,7 @@ const Section = () => {
 
   const onPageSelected = useCallback((event) => {
     const pageIndex = event.nativeEvent.position;
-    const tabNames = ["Recent activity", "Following"];
+    const tabNames = ['Recent activity', 'Following'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
@@ -124,7 +107,7 @@ const Section = () => {
     pagerRef.current?.setPage(index);
   };
 
-  const tabs = ["Recent activity", "Following"].filter(Boolean);
+  const tabs = ['Recent activity', 'Following'].filter(Boolean);
 
   const getItem = (data, index) => data[index];
 
@@ -134,8 +117,7 @@ const Section = () => {
     <ContactItem
       isVerified={
         profiles.some((profile) => profile.pubkey === item.pubkey) ||
-        item.pubkey ===
-          "1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2" ||
+        item.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
         item.pubkey === LNVPN_PUBKEY
       }
       contact={item}
@@ -145,52 +127,39 @@ const Section = () => {
   );
 
   return (
-    <Modal
-      showBack={false}
-      showHeader={false}
-      buttons={null}
-      childrenStyles={styles.modalContent}
-    >
+    <Modal showBack={false} showHeader={false} buttons={null} childrenStyles={styles.modalContent}>
       <View
         style={{
           paddingHorizontal: 16,
-        }}
-      >
-        <Tabs
-          tabs={tabs}
-          selectedTab={selectedTab}
-          handleTabPress={handleTabPress}
-        />
+        }}>
+        <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
       </View>
       <View
         style={{
           flex: 1,
           paddingLeft: 16,
           paddingRight: 16,
-          backgroundColor: "transparent",
-        }}
-      >
+          backgroundColor: 'transparent',
+        }}>
         <PagerView
           ref={pagerRef}
           onPageSelected={onPageSelected}
           style={{
-            height: Dimensions.get("window").height - 265,
-            backgroundColor: "transparent",
+            height: Dimensions.get('window').height - 265,
+            backgroundColor: 'transparent',
             marginHorizontal: -16,
           }}
           initialPage={0}
-          scrollEnabled={follows.length > 0}
-        >
+          scrollEnabled={follows.length > 0}>
           <ScrollView
             key="1"
             style={{
               flex: 1,
               backgroundColor: greys(theme)[2300],
               padding: 16,
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
+              height: '100%',
+              overflow: 'hidden',
+            }}>
             <VirtualizedList
               data={enrichedContacts}
               initialNumToRender={10}
@@ -209,10 +178,9 @@ const Section = () => {
               flex: 1,
               backgroundColor: greys(theme)[2300],
               padding: 16,
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
+              height: '100%',
+              overflow: 'hidden',
+            }}>
             <VirtualizedList
               data={follows}
               initialNumToRender={1}
@@ -237,9 +205,8 @@ export const SearchBar = ({ theme, navigation }) => {
     <View style={styles.searchContainer}>
       <View style={styles.searchBlurView}>
         <TouchableOpacity
-          onPress={() => navigation.navigate("contacts", { unit: "sat" })}
-          style={styles.searchPressable}
-        >
+          onPress={() => navigation.navigate('contacts', { unit: 'sat' })}
+          style={styles.searchPressable}>
           <Text style={styles.searchPlaceholder}>Search for contacts</Text>
         </TouchableOpacity>
       </View>
@@ -247,12 +214,7 @@ export const SearchBar = ({ theme, navigation }) => {
   );
 };
 
-const ContactList = ({
-  enrichedContacts,
-  filteredProfiles,
-  theme,
-  navigation,
-}) => {
+const ContactList = ({ enrichedContacts, filteredProfiles, theme, navigation }) => {
   const styles = createStyles(theme);
   return (
     <View style={styles.contactsContainer}>
@@ -260,9 +222,7 @@ const ContactList = ({
         <ContactItem
           key={p.pubkey}
           contact={p}
-          isVerified={filteredProfiles.some(
-            (profile) => profile.pubkey === p.pubkey
-          )}
+          isVerified={filteredProfiles.some((profile) => profile.pubkey === p.pubkey)}
           theme={theme}
           navigation={navigation}
         />
@@ -279,49 +239,37 @@ const ContactItem = ({ contact, isVerified, theme, navigation }) => {
 
   const mostRecentActivity = mostRecentTransaction || mostRecentMessage;
   const formattedDate = mostRecentActivity
-    ? formatCustomDate(
-        new Date(mostRecentActivity.date || mostRecentActivity.created_at)
-      )
+    ? formatCustomDate(new Date(mostRecentActivity.date || mostRecentActivity.created_at))
     : null;
 
   const previewText = mostRecentTransaction
     ? `You sent ${formatCurrency(
         {
           currency:
-            mostRecentTransaction.unit === "sat"
-              ? "BTC"
-              : mostRecentTransaction.unit.toUpperCase(),
+            mostRecentTransaction.unit === 'sat' ? 'BTC' : mostRecentTransaction.unit.toUpperCase(),
           value: mostRecentTransaction.amount,
-          denomination:
-            mostRecentTransaction.unit === "sat"
-              ? "sats"
-              : mostRecentTransaction.unit,
+          denomination: mostRecentTransaction.unit === 'sat' ? 'sats' : mostRecentTransaction.unit,
         },
         {
-          locale: "en-US",
-          precision: mostRecentTransaction.unit === "sat" ? 0 : 2,
-          currencyDisplay:
-            mostRecentTransaction.unit === "sat" ? "name" : "symbol",
-          denomination:
-            mostRecentTransaction.unit === "sat"
-              ? "sats"
-              : mostRecentTransaction.unit,
+          locale: 'en-US',
+          precision: mostRecentTransaction.unit === 'sat' ? 0 : 2,
+          currencyDisplay: mostRecentTransaction.unit === 'sat' ? 'name' : 'symbol',
+          denomination: mostRecentTransaction.unit === 'sat' ? 'sats' : mostRecentTransaction.unit,
         }
       )}`
     : mostRecentMessage
-    ? mostRecentMessage.content
-    : "";
+      ? mostRecentMessage.content
+      : '';
 
   return (
     <TouchableOpacity
       style={styles.contactItem}
       onPress={() => {
         if (contact.profile) {
-          navigation.navigate("userMessages", { pubkey: contact.pubkey });
+          navigation.navigate('userMessages', { pubkey: contact.pubkey });
         } else {
         }
-      }}
-    >
+      }}>
       <ProfilePicture
         imageUri={contact.profile.picture || contact.profile.image}
         isVerified={isVerified}
@@ -330,14 +278,12 @@ const ContactItem = ({ contact, isVerified, theme, navigation }) => {
       <View style={styles.row}>
         <View style={styles.textContainer}>
           <Text style={styles.profileName}>
-            {contact.profile?.displayName ||
-              contact.profile?.name ||
-              "Unknown User"}
+            {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}
           </Text>
           <Text style={styles.previewText}>
             {previewText.length > 50
               ? `${previewText.slice(0, 50)}...`
-              : previewText || "No activity"}
+              : previewText || 'No activity'}
           </Text>
         </View>
         {formattedDate && <Text style={styles.date}>{formattedDate}</Text>}
@@ -376,17 +322,17 @@ const TabOneScreen = () => {
 };
 
 const formatCustomDate = (date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
   }).format(date);
 };
 
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "black",
-      flexDirection: "column",
+      backgroundColor: 'black',
+      flexDirection: 'column',
       margin: 0,
       flex: 1,
     },
@@ -395,14 +341,14 @@ const createStyles = (theme) =>
       paddingTop: 4,
     },
     searchContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     searchBlurView: {
       borderRadius: 86,
       margin: 16,
       marginBottom: 8,
       height: 38,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     searchPressable: {
       backgroundColor: opacity(greys(theme)[1800], 0.75),
@@ -414,25 +360,25 @@ const createStyles = (theme) =>
       shadowRadius: 6,
       padding: 8,
       paddingLeft: 16,
-      width: "100%",
-      height: "100%",
+      width: '100%',
+      height: '100%',
       borderRadius: 86,
     },
     searchPlaceholder: {
-      position: "absolute",
+      position: 'absolute',
       left: 16,
       top: 10,
       fontSize: 14,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       color: greys(theme)[1000],
     },
     tabContainer: {
-      flexDirection: "row",
-      backgroundColor: "transparent",
+      flexDirection: 'row',
+      backgroundColor: 'transparent',
     },
     tabButton: {
       padding: 10,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       // paddingLeft: 16,
       // paddingRight: 16,
       // backgroundColor: greys(theme)[2300],
@@ -449,13 +395,13 @@ const createStyles = (theme) =>
     },
     tabText: {
       color: greys(theme)[200],
-      fontFamily: "OverpassSemibold",
+      fontFamily: 'OverpassSemibold',
       fontSize: 14,
-      textAlign: "center",
+      textAlign: 'center',
     },
     selectedTabText: {
       color: greys(theme)[0],
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
     },
     contactsContainer: {
       backgroundColor: greys(theme)[1800],
@@ -468,26 +414,26 @@ const createStyles = (theme) =>
       borderRadius: 16,
     },
     contactItem: {
-      flexDirection: "row",
-      backgroundColor: "transparent",
-      alignItems: "center",
+      flexDirection: 'row',
+      backgroundColor: 'transparent',
+      alignItems: 'center',
       marginBottom: 8,
       marginTop: 8,
     },
     row: {
-      backgroundColor: "transparent",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      backgroundColor: 'transparent',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       flex: 1,
     },
     textContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       flex: 1,
     },
     profileName: {
       color: greys(theme)[0],
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 16,
     },
     transactionInfo: {
@@ -496,26 +442,26 @@ const createStyles = (theme) =>
     date: {
       marginLeft: 8,
       color: greys(theme)[400],
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 16,
     },
     previewText: {
       color: greys(theme)[200],
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       fontSize: 16,
       marginTop: 2,
     },
     profilePictureContainer: {
-      position: "relative",
+      position: 'relative',
       width: 48,
       height: 48,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginRight: 8,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     verifiedIconContainer: {
-      position: "absolute",
+      position: 'absolute',
       bottom: -4,
       right: -4,
       zIndex: 100,
@@ -548,29 +494,27 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
   return (
     <ScrollView
       style={{
-        backgroundColor: "transparent",
+        backgroundColor: 'transparent',
         marginBottom: 0,
         marginTop: 0,
-        overflow: "visible",
+        overflow: 'visible',
         // paddingHorizontal: 12,
       }}
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.tabContainer}
-    >
+      contentContainerStyle={styles.tabContainer}>
       <View
         style={[
           {
-            flexDirection: "row",
-            width: "100%",
+            flexDirection: 'row',
+            width: '100%',
           },
           sovran.listItem,
           {
             padding: 2,
             borderRadius: 24,
           },
-        ]}
-      >
+        ]}>
         {tabs.map((tab, index) => (
           <TouchableOpacity
             key={tab}
@@ -578,20 +522,14 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
               styles.tabButton,
               {
                 flex: 1,
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
               }, // Make each tab equal sized and align items
               selectedTab === tab && styles.selectedTabButton,
             ]}
-            onPress={() => handleTabPress(tab, index)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === tab && styles.selectedTabText,
-              ]}
-            >
+            onPress={() => handleTabPress(tab, index)}>
+            <Text style={[styles.tabText, selectedTab === tab && styles.selectedTabText]}>
               {tab}
             </Text>
             {amounts && amounts[index] && (
@@ -599,11 +537,10 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
                 style={{
                   marginLeft: 4,
                   fontSize: 12,
-                  fontFamily: "OverpassBold",
+                  fontFamily: 'OverpassBold',
                   color: greys(theme)[600],
-                }}
-              >
-                {amounts[index] ? `(${amounts[index]})` : ""}
+                }}>
+                {amounts[index] ? `(${amounts[index]})` : ''}
               </Text>
             )}
           </TouchableOpacity>

@@ -1,34 +1,33 @@
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet, Platform } from 'react-native';
 
-import { greys, shades } from "helper/colors";
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import { useNavigation } from "expo-router";
-import lookup from "country-code-lookup";
-import { FlagIcon } from "assets/icons";
-import { Section } from "./transaction";
-import { getLightningAmount, getMeltQuote } from "components/cashu";
+import { greys, shades } from 'helper/colors';
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import { useNavigation } from 'expo-router';
+import lookup from 'country-code-lookup';
+import { FlagIcon } from 'assets/icons';
+import { Section } from './transaction';
+import { getLightningAmount, getMeltQuote } from 'components/cashu';
 import {
   memoizedGetBalance,
   memoizedGetSelectedMint,
   setSelectedMint,
   useCashu,
-} from "helper/redux/cashu";
-import { useState, useEffect } from "react";
-import * as Device from "expo-device";
-import opacity from "hex-color-opacity";
-import { useDispatch, useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useRoute } from "@react-navigation/native";
-import { truncateMiddle } from "helper/strings";
-import { showMessage } from "helper/popup/popups";
-import SelectedMintDisplay from "components/layout/sheets/mints";
-import React from "react";
-import { Card } from "components/common/Card";
-import { ButtonHandler } from "./ecashSendConfirmation";
+} from 'helper/redux/cashu';
+import { useState, useEffect } from 'react';
+import * as Device from 'expo-device';
+import opacity from 'hex-color-opacity';
+import { useDispatch, useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useRoute } from '@react-navigation/native';
+import { truncateMiddle } from 'helper/strings';
+import { showMessage } from 'helper/popup/popups';
+import SelectedMintDisplay from 'components/layout/sheets/mints';
+import React from 'react';
+import { Card } from 'components/common/Card';
+import { ButtonHandler } from './ecashSendConfirmation';
 
-export const LNVPN_PUBKEY =
-  "06dde95f0268ce40128bf73ca6e85567b8567688ea52f24dcd5734e77c50f2d9";
+export const LNVPN_PUBKEY = '06dde95f0268ce40128bf73ca6e85567b8567688ea52f24dcd5734e77c50f2d9';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -37,16 +36,16 @@ function ModalScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
   const { proofs, keysets } = useCashu();
-  const [unit, setUnit] = useState("sat");
+  const [unit, setUnit] = useState('sat');
   const [loading, setLoading] = useState(false);
-  const [iosWarning, setIosWarning] = useState("");
+  const [iosWarning, setIosWarning] = useState('');
   const balance = useSelector(memoizedGetBalance(unit));
   const selectedMint = useSelector(memoizedGetSelectedMint);
   async function buyEsim() {
     try {
       const meltQuote = await getMeltQuote({
         pr: params.request,
-        unit: "sat",
+        unit: 'sat',
         mintUrl: selectedMint,
       });
 
@@ -59,40 +58,38 @@ function ModalScreen() {
 
       if (!isBalanceSufficient) {
         showMessage(
-          "insufficient_balance",
+          'insufficient_balance',
           { amount, unit, fee: meltQuote.fee_reserve },
-          { emoji: "🚨" }
+          { emoji: '🚨' }
         );
       } else {
-        navigation.navigate("lightningSendConfirmation", {
+        navigation.navigate('lightningSendConfirmation', {
           pr: params.request,
           unit,
           meltQuote: JSON.stringify(meltQuote),
           pubkey: LNVPN_PUBKEY,
-          redirect: "vpns",
+          redirect: 'vpns',
         });
       }
     } catch (error) {
-      showMessage("general_error", {}, { emoji: "❌" });
+      showMessage('general_error', {}, { emoji: '❌' });
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (Platform.OS === "ios") {
+    if (Platform.OS === 'ios') {
       const version = parseFloat(Device.osVersion);
       if (version < 17.4) {
         setIosWarning(
-          "Update to your iOS version to 17.4 or above for a better onboarding experience."
+          'Update to your iOS version to 17.4 or above for a better onboarding experience.'
         );
       }
     }
   }, []);
 
-  const profileId = useSelector(
-    (state: any) => state.nostr?.currentProfile?.id
-  );
+  const profileId = useSelector((state: any) => state.nostr?.currentProfile?.id);
   const dispatch = useDispatch();
   const handleMintSelected = async (
     mint: {
@@ -123,38 +120,32 @@ function ModalScreen() {
             camera={false}
             items={[
               {
-                title: "Location",
+                title: 'Location',
                 value: (
                   <View
                     style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    <FlagIcon
-                      width={24}
-                      height={24}
-                      country={params.location}
-                    />
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: 'transparent',
+                    }}>
+                    <FlagIcon width={24} height={24} country={params.location} />
                     <Text
                       style={{
                         marginLeft: 4,
                         fontSize: 16,
-                      }}
-                    >
+                      }}>
                       {lookup.byIso(params.location).country}
                     </Text>
                   </View>
                 ),
               },
               {
-                title: "Hash",
+                title: 'Hash',
                 value: truncateMiddle(params.hash, 5),
               },
               {
-                title: "Duration",
+                title: 'Duration',
                 value: params.duration,
               },
               // {
@@ -187,7 +178,7 @@ function ModalScreen() {
             camera={false}
             items={[
               {
-                title: "Total due",
+                title: 'Total due',
                 value: `$${params.price}`,
               },
             ]}
@@ -198,17 +189,12 @@ function ModalScreen() {
             style={{
               marginLeft: 24,
               fontSize: 16,
-              fontFamily: "OverpassBold",
+              fontFamily: 'OverpassBold',
               marginBottom: 8,
-            }}
-          >
+            }}>
             Pay with
           </Text>
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            unit={unit}
-            loading={loading}
-          />
+          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
           <View style={{ margin: 16 }}>
             <Card
               variant="warning"
@@ -231,8 +217,7 @@ function ModalScreen() {
                 padding: 8,
                 borderRadius: 8,
                 borderWidth: 0.2,
-              }}
-            >
+              }}>
               <Text size={14} style={{ color: shades[400], marginTop: 8 }}>
                 {iosWarning}
               </Text>
@@ -241,8 +226,8 @@ function ModalScreen() {
           <ButtonHandler
             buttons={[
               {
-                text: "Buy",
-                variant: "primary",
+                text: 'Buy',
+                variant: 'primary',
                 loading: loading,
                 onPress: async () => {
                   setLoading(true);
@@ -274,18 +259,18 @@ const createStyles = (theme) =>
       color: greys(theme)[0],
       marginBottom: 8,
       paddingLeft: 16,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     minus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#9A4141",
+      color: '#9A4141',
       marginRight: 4,
     },
     plus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#499A41",
+      color: '#499A41',
       marginRight: 4,
     },
     container: {
@@ -293,12 +278,12 @@ const createStyles = (theme) =>
     },
     title: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[1000],
     },
     separator: {
       marginVertical: 30,
       height: 1,
-      width: "80%",
+      width: '80%',
     },
   });

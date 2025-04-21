@@ -1,13 +1,8 @@
-import { runWithAnimationFrame } from "app/onboard/new";
-import { useRef } from "react";
-import { TouchableOpacity as TO } from "react-native";
+import { runWithAnimationFrame } from 'app/onboard/new';
+import { useRef } from 'react';
+import { TouchableOpacity as TO } from 'react-native';
 
-export const TouchableOpacity = ({
-  onPress,
-  onPressIn,
-  onPressOut,
-  ...props
-}) => {
+export const TouchableOpacity = ({ onPress, onPressIn, onPressOut, ...props }) => {
   const _touchActivatePositionRef = useRef(null);
 
   function _onPressIn(e) {
@@ -34,12 +29,7 @@ export const TouchableOpacity = ({
   }
 
   return (
-    <TO
-      onPressIn={_onPressIn}
-      onPress={_onPress}
-      onPressOut={onPressOut}
-      {...props}
-    >
+    <TO onPressIn={_onPressIn} onPress={_onPress} onPressOut={onPressOut} {...props}>
       {props.children}
     </TO>
   );

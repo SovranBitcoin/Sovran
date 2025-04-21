@@ -1,23 +1,16 @@
-import React from "react";
-import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-  View,
-} from "react-native";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { shades } from "helper/colors";
+import React from 'react';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, View } from 'react-native';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { shades } from 'helper/colors';
 
 interface SettingsButtonProps {
   onPress: () => void;
   text: string;
   style?: ViewStyle;
   textStyle?: TextStyle;
-  variant?: "primary" | "secondary";
+  variant?: 'primary' | 'secondary';
   iconRight?: React.ReactNode;
 }
 
@@ -26,7 +19,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   text,
   style,
   textStyle,
-  variant = "secondary",
+  variant = 'secondary',
   iconRight,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -34,7 +27,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
 
   const buttonStyle = [
     styles.button,
-    variant === "primary" && { backgroundColor: shades[300] },
+    variant === 'primary' && { backgroundColor: shades[300] },
     style,
   ];
 
@@ -52,14 +45,14 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[1800],
       padding: 10,
       borderRadius: 8,
-      alignItems: "center",
-      justifyContent: "center",
-      flexDirection: "row",
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
     },
     buttonText: {
       color: greys(theme)[0],
       fontSize: 16,
-      fontWeight: "bold",
+      fontWeight: 'bold',
     },
     iconRightContainer: {
       marginLeft: 8,

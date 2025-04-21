@@ -1,8 +1,9 @@
-import { getMint } from "helper/cashu";
+import { getMint } from 'helper/cashu';
 import {
   ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,
-  SET_INFO, SET_TRANSACTIONS,
+  SET_INFO,
+  SET_TRANSACTIONS,
   APPEND_TRANSACTIONS_V2,
   SET_SELECTED_MINT,
   APPEND_PROOFS_V2,
@@ -13,8 +14,8 @@ import {
   REMOVE_PROOFS,
   RESET_COUNTER,
   UPDATE_TRANSACTION,
-  APPEND_TRANSACTION
-} from "./actionTypes";
+  APPEND_TRANSACTION,
+} from './actionTypes';
 
 export const addMints = ({ profileId, mints }) => ({
   type: ADD_MINTS,
@@ -84,12 +85,7 @@ export const incrementCounter = ({ profileId, mintUrl, amount }) => ({
   payload: { profileId, mintUrl, amount },
 });
 
-export const increaseCounterV2 = ({
-  profileId,
-  mintUrl,
-  keysetId,
-  amount,
-}) => ({
+export const increaseCounterV2 = ({ profileId, mintUrl, keysetId, amount }) => ({
   type: INCREASE_COUNTER_V2,
   payload: { profileId, mintUrl, keysetId, amount },
 });
@@ -131,7 +127,6 @@ export const updateMint = ({ mintUrl }) => {
 
       return { success: true };
     } catch (error) {
-
       // You might want to dispatch an error action here
       return { success: false };
     }
@@ -142,9 +137,7 @@ export const addMintsAction = ({ profileId, mintUrls }) => {
   return async (dispatch) => {
     try {
       // First update all mints (fetch and store keysets and info)
-      const updatePromises = mintUrls.map((mintUrl) =>
-        dispatch(updateMint({ mintUrl }))
-      );
+      const updatePromises = mintUrls.map((mintUrl) => dispatch(updateMint({ mintUrl })));
 
       // Wait for all updates to complete
       const results = await Promise.all(updatePromises);
@@ -163,11 +156,9 @@ export const addMintsAction = ({ profileId, mintUrls }) => {
 
         return { success: true };
       } else {
-
-        return { success: false, error: "Some mint updates failed" };
+        return { success: false, error: 'Some mint updates failed' };
       }
     } catch (error) {
-
       return { success: false };
     }
   };

@@ -1,6 +1,6 @@
-import { CashuMint, decodePaymentRequest, getDecodedToken } from "@cashu/cashu-ts";
-import _ from "lodash";
-import { getWallet } from "helper/cashu";
+import { CashuMint, decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
+import _ from 'lodash';
+import { getWallet } from 'helper/cashu';
 
 /**
  * Validates if a mint meets the required nuts specifications
@@ -8,9 +8,9 @@ import { getWallet } from "helper/cashu";
 export async function isValidMint(mint) {
   const requiredNuts = {
     nuts: {
-      "15": [
-        { unit: "sat", mpp: true },
-        { unit: "usd", mpp: true },
+      '15': [
+        { unit: 'sat', mpp: true },
+        { unit: 'usd', mpp: true },
       ],
     },
   };
@@ -27,7 +27,7 @@ export async function checkTokenSpent({ token }) {
   const { unit, mint, proofs } = decodedToken;
 
   const wallet = await getWallet({ unit, mintUrl: mint });
-  return (await wallet.checkProofsStates(proofs)).some(p => p.state === "SPENT");
+  return (await wallet.checkProofsStates(proofs)).some((p) => p.state === 'SPENT');
 }
 
 /**
@@ -58,15 +58,15 @@ export function isValidPaymentRequest(paymentRequest: string): boolean {
  */
 export async function getMintFromToken(token) {
   // Parse token if it's a string
-  const tokenData = typeof token === "string" ? JSON.parse(token) : token;
+  const tokenData = typeof token === 'string' ? JSON.parse(token) : token;
 
-  if (typeof tokenData !== "object") {
-    throw new Error("Invalid token format. Token should be a JSON string or a Token object.");
+  if (typeof tokenData !== 'object') {
+    throw new Error('Invalid token format. Token should be a JSON string or a Token object.');
   }
 
   const { mintUrl } = tokenData;
   if (!mintUrl) {
-    throw new Error("Mint URL not found in the token.");
+    throw new Error('Mint URL not found in the token.');
   }
 
   return new CashuMint(mintUrl);

@@ -1,4 +1,12 @@
-import { SET_CURRENT_PROFILE, SET_SEARCH, SET_PROFILES, SET_FOLLOWS, UPDATE_MESSAGE_STATUS, ADD_MESSAGE, APPEND_QUERY } from './actionTypes';
+import {
+  SET_CURRENT_PROFILE,
+  SET_SEARCH,
+  SET_PROFILES,
+  SET_FOLLOWS,
+  UPDATE_MESSAGE_STATUS,
+  ADD_MESSAGE,
+  APPEND_QUERY,
+} from './actionTypes';
 
 export const setCurrentProfile = (profile) => ({
   type: SET_CURRENT_PROFILE,
@@ -12,8 +20,8 @@ export const setSearch = (keysets) => ({
 
 export const appendQuery = (query) => ({
   type: APPEND_QUERY,
-  payload: query
-})
+  payload: query,
+});
 
 export const setProfiles = (profiles) => ({
   type: SET_PROFILES,

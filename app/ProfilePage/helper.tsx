@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { eventKind } from "nostr-fetch";
-import { useNostrEvents as useNE } from "nostr-react";
-import { EventKind } from "../../app/Profile";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Assuming you're using AsyncStorage as backend for cache
-import { Cache } from "react-native-cache";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
-import { extractUrls } from "./TextContent";
+import { useEffect, useMemo, useState } from 'react';
+import { eventKind } from 'nostr-fetch';
+import { useNostrEvents as useNE } from 'nostr-react';
+import { EventKind } from '../../app/Profile';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
+import { Cache } from 'react-native-cache';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { extractUrls } from './TextContent';
 
 export const useNostrEvents = (authors, ids, kinds, type) => {
   const [since, setSince] = useState(Math.floor(Date.now() / 1000));
@@ -13,23 +13,22 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
   // Helper function to categorize events
   const categorizeEvent = (event) => {
     const isMetadata = event.kind === EventKind.Metadata;
-    const hasRootTag =
-      event.kind === eventKind.text || event.kind === eventKind.repost;
-    const hasReplyTag = event.tags.some((tag) => tag[3] === "reply");
+    const hasRootTag = event.kind === eventKind.text || event.kind === eventKind.repost;
+    const hasReplyTag = event.tags.some((tag) => tag[3] === 'reply');
     const hasMediaTag = extractUrls(event.content)?.urls?.length > 0;
 
     let categories = [];
     if (isMetadata) {
-      categories.push("metadata");
+      categories.push('metadata');
     }
     if (hasRootTag && !hasReplyTag) {
-      categories.push("post");
+      categories.push('post');
     }
     if (hasReplyTag) {
-      categories.push("reply");
+      categories.push('reply');
     }
     if (hasMediaTag) {
-      categories.push("media");
+      categories.push('media');
     }
     return categories;
   };
@@ -38,7 +37,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
     () => [
       {
         kinds,
-        "#e": ids,
+        '#e': ids,
         authors: ids?.length ? undefined : authors,
         // until: ids?.length ? undefined : since,
         // since: ids?.length ? 0 : since - 24 * 60 * 60 * 1,
@@ -63,12 +62,10 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
     },
   });
 
-  const metadata = metadataEvents.filter((event) =>
-    categorizeEvent(event).includes("metadata")
-  );
+  const metadata = metadataEvents.filter((event) => categorizeEvent(event).includes('metadata'));
   // Filter the events into posts, replies, and media
   const posts = sortedEvents
-    .filter((event) => categorizeEvent(event).includes("post"))
+    .filter((event) => categorizeEvent(event).includes('post'))
     .map((e) => {
       return {
         ...e,
@@ -77,7 +74,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
     });
 
   const replies = sortedEvents
-    .filter((event) => categorizeEvent(event).includes("reply"))
+    .filter((event) => categorizeEvent(event).includes('reply'))
     .map((e) => {
       return {
         ...e,
@@ -85,7 +82,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
       };
     });
   const media = sortedEvents
-    .filter((event) => categorizeEvent(event).includes("media"))
+    .filter((event) => categorizeEvent(event).includes('media'))
     .map((e) => {
       return {
         ...e,
@@ -95,9 +92,9 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
 
   // Check if a specific type of event is found
   const hasDesiredEventType = (type) => {
-    if (type === "posts") return posts.length > 0;
-    if (type === "replies") return replies.length > 0;
-    if (type === "media") return media.length > 0;
+    if (type === 'posts') return posts.length > 0;
+    if (type === 'replies') return replies.length > 0;
+    if (type === 'media') return media.length > 0;
     return false;
   };
 
@@ -109,10 +106,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
 
       // Wait until the next fetch has completed, then check if new events were added
       setTimeout(() => {
-        if (
-          sortedEvents.length === previousEventCount &&
-          retryCount < maxRetries
-        ) {
+        if (sortedEvents.length === previousEventCount && retryCount < maxRetries) {
           // No new events, try again
           fetchMore(retryCount + 1, maxRetries);
         } else if (!hasDesiredEventType(type) && retryCount < maxRetries) {
@@ -137,7 +131,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
 };
 
 const myCache = new Cache({
-  namespace: "profiles",
+  namespace: 'profiles',
   policy: {
     maxEntries: 100,
     stdTTL: 24 * 60 * 60, // 24 hours TTL in seconds

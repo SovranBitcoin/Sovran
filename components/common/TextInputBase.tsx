@@ -1,8 +1,8 @@
-import React from "react";
-import { StyleSheet } from "react-native";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
+import React from 'react';
+import { StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 const TextInputBase = ({ Component, style, ...props }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -24,9 +24,9 @@ const createStyles = (theme) =>
       padding: 10,
       color: greys(theme)[0],
       paddingLeft: 16,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       marginBottom: 0,
-      borderStyle: "solid",
+      borderStyle: 'solid',
     },
   });
 

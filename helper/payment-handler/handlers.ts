@@ -1,29 +1,26 @@
-import { getLightningAmount, getMeltQuote, isValidEcashToken, Transaction } from "components/cashu";
+import { getLightningAmount, getMeltQuote, isValidEcashToken, Transaction } from 'components/cashu';
 
-import { getGiveaway } from "app/ecashReceiveConfirmation";
-import { store } from "../redux/store";
-import { decodePaymentRequest, PaymentRequestTransportType } from "@cashu/cashu-ts";
-import { memoizedGetBalance } from "../redux/cashu";
-import { nip19 } from "nostr-tools";
-import { URDecoder } from "@gandlaf21/bc-ur";
-import Haptics from "components/common/Haptics";
-import { isLnurl, lnTrim } from "helper/third-party/lnurl";
-import { isValidPaymentRequest } from "../cashu/helper";
-import { showMessage } from "../popup/popups";
+import { getGiveaway } from 'app/ecashReceiveConfirmation';
+import { store } from '../redux/store';
+import { decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
+import { memoizedGetBalance } from '../redux/cashu';
+import { nip19 } from 'nostr-tools';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import Haptics from 'components/common/Haptics';
+import { isLnurl, lnTrim } from 'helper/third-party/lnurl';
+import { isValidPaymentRequest } from '../cashu/helper';
+import { showMessage } from '../popup/popups';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
-  const transactions =
-    store.getState().cashu?.profiles[profileId]?.transactions || [];
+  const transactions = store.getState().cashu?.profiles[profileId]?.transactions || [];
 
   const giveaway = getGiveaway({ token });
   if (!giveaway) return false;
 
   return transactions.some(
     (tx: Transaction) =>
-      tx.privkey === giveaway.private_key &&
-      tx.transactionType === "receive" &&
-      !tx.isRefund
+      tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
   );
 };
 
@@ -67,13 +64,13 @@ export const handlePaymentRequest = async ({
   let { data } = nip19.decode(receiverTarget);
   const { pubkey } = data as { pubkey: string };
   return {
-    screen: "paymentRequestSendConfirmation",
+    screen: 'paymentRequestSendConfirmation',
     params: {
       request,
       unit,
       amount: receiverAmount,
       to: pubkey,
-    }
+    },
   };
 };
 
@@ -119,11 +116,11 @@ const handleUR = async ({
     const tokenString = new TextDecoder().decode(decoded);
     setProgress(0);
     return {
-      screen: "ecashReceiveConfirmation",
+      screen: 'ecashReceiveConfirmation',
       params: {
         token: tokenString,
         unit,
-      }
+      },
     };
   }
   return null;
@@ -149,11 +146,11 @@ const handleEcash = async ({
     }
   }
   return {
-    screen: "ecashReceiveConfirmation",
+    screen: 'ecashReceiveConfirmation',
     params: {
       token: data,
       unit,
-    }
+    },
   };
 };
 
@@ -173,12 +170,12 @@ const handleLightning = async ({
   const lnurl = lnTrim(data);
   if (isLnurl(lnurl)) {
     return {
-      screen: "currency",
+      screen: 'currency',
       params: {
-        to: "lightningSendConfirmation",
+        to: 'lightningSendConfirmation',
         lud16: lnurl,
         unit,
-      }
+      },
     };
   }
   try {
@@ -192,17 +189,21 @@ const handleLightning = async ({
       const totalAmount = amount + meltQuote.fee_reserve;
       const isBalanceSufficient = balance >= totalAmount;
       if (!isBalanceSufficient) {
-        showMessage('insufficient_balance', { amount, unit, fee: meltQuote.fee_reserve }, { emoji: '🚨' });
+        showMessage(
+          'insufficient_balance',
+          { amount, unit, fee: meltQuote.fee_reserve },
+          { emoji: '🚨' }
+        );
         return null;
       }
       return {
-        screen: "lightningSendConfirmation",
+        screen: 'lightningSendConfirmation',
         params: {
           pr: lnurl,
-          amount: unit === "sat" ? amount : amount * 100,
+          amount: unit === 'sat' ? amount : amount * 100,
           meltQuote: JSON.stringify(meltQuote),
           unit,
-        }
+        },
       };
     }
   } catch (error) {
@@ -223,32 +224,32 @@ export const handleBarcode = async ({
   setScanned,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
-  if (!scanning.data.startsWith("ur:")) {
+  if (!scanning.data.startsWith('ur:')) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
   }
 
-  let type: "ur" | "ecash" | "paymentRequest" | "lightning";
-  if (scanning.data.startsWith("ur:")) {
-    type = "ur";
+  let type: 'ur' | 'ecash' | 'paymentRequest' | 'lightning';
+  if (scanning.data.startsWith('ur:')) {
+    type = 'ur';
   } else if (isValidEcashToken(scanning.data)) {
-    type = "ecash";
+    type = 'ecash';
   } else if (isValidPaymentRequest(scanning.data)) {
-    type = "paymentRequest";
+    type = 'paymentRequest';
   } else {
-    type = "lightning";
+    type = 'lightning';
   }
 
   switch (type) {
-    case "ur":
+    case 'ur':
       return handleUR({ scanning, urDecoder, unit, setProgress });
-    case "ecash":
+    case 'ecash':
       return handleEcash({ data: scanning.data, unit });
-    case "paymentRequest":
+    case 'paymentRequest':
       return handlePaymentRequest({
         request: scanning.data,
       });
-    case "lightning":
+    case 'lightning':
       return handleLightning({
         data: scanning.data,
         selectedMint,

@@ -1,27 +1,27 @@
-import { useEffect, useState } from "react";
-import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { useNavigation } from "expo-router";
-import { greys } from "helper/colors";
-import { URDecoder } from "@gandlaf21/bc-ur";
-import { memoizedGetSelectedMint } from "helper/redux/cashu";
-import { Text } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedRoute } from "helper/navigation";
-import React from "react";
-import { barcodeHandler } from "helper/payment-handler/handlers";
-import * as Clipboard from "expo-clipboard";
-import Svg, { Path } from "react-native-svg";
-import { LightOff } from "assets/icons";
-import { LightOn } from "assets/icons";
-import { showMessage } from "helper/popup/popups";
-import opacity from "hex-color-opacity";
-import { BlurView } from "expo-blur";
+import { useEffect, useState } from 'react';
+import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useNavigation } from 'expo-router';
+import { greys } from 'helper/colors';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { Text } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedRoute } from 'helper/navigation';
+import React from 'react';
+import { barcodeHandler } from 'helper/payment-handler/handlers';
+import * as Clipboard from 'expo-clipboard';
+import Svg, { Path } from 'react-native-svg';
+import { LightOff } from 'assets/icons';
+import { LightOn } from 'assets/icons';
+import { showMessage } from 'helper/popup/popups';
+import opacity from 'hex-color-opacity';
+import { BlurView } from 'expo-blur';
 
 // Make the camera full screen; recalc dimensions accordingly
-const screenWidth = Dimensions.get("window").width;
-const screenHeight = Dimensions.get("window").height;
+const screenWidth = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height;
 const scanBoxSize = screenWidth * 0.8;
 
 interface IconProps {
@@ -53,8 +53,8 @@ const FlashlightIcon = ({ color, on }: IconProps & { on: boolean }) => (
       fill={color}
       d={
         on
-          ? "M6 2h12v3H6zm0 5v11h12V7zm6 8.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-          : "M6 2v3h12V2zm0 5v11h12V7zm6 8.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+          ? 'M6 2h12v3H6zm0 5v11h12V7zm6 8.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'
+          : 'M6 2v3h12V2zm0 5v11h12V7zm6 8.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'
       }
     />
   </Svg>
@@ -82,13 +82,13 @@ function Camera({}: CameraProps) {
   const [flashlightOn, setFlashlightOn] = useState<Boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
-  const { unit, accountIndex } = useTypedRoute<"camera">();
+  const { unit, accountIndex } = useTypedRoute<'camera'>();
   const [hasPermission, requestPermission] = useCameraPermissions();
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
   // Reset state when the component comes into focus
   useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
+    const unsubscribe = navigation.addListener('focus', () => {
       setScanned(false);
       setLoading(false);
       setProgress(0);
@@ -134,7 +134,7 @@ function Camera({}: CameraProps) {
 
   const handleGalleryPress = async () => {
     // We'll implement this later when we add image picker functionality
-    showMessage("feature_coming_soon", {}, { emoji: "📸" });
+    showMessage('feature_coming_soon', {}, { emoji: '📸' });
   };
 
   const handleClosePress = () => {
@@ -149,14 +149,14 @@ function Camera({}: CameraProps) {
         facing="back"
         enableTorch={flashlightOn}
         barcodeScannerSettings={{
-          barcodeTypes: ["qr"],
+          barcodeTypes: ['qr'],
         }}
         onCameraReady={handleCameraReady}
         onBarcodeScanned={(scanning) => {
           if (!navigation.isFocused()) {
             return;
           }
-          if (!scanned || scanning.data.startsWith("ur:")) {
+          if (!scanned || scanning.data.startsWith('ur:')) {
             setLoading(true);
             barcodeHandler({
               scanning,
@@ -187,9 +187,7 @@ function Camera({}: CameraProps) {
         <View style={styles.scanBoxBottomRight} />
         <View style={styles.progressContainer}>
           {progress > 0 ? (
-            <Text style={styles.progressText}>
-              Progress: {Math.round(progress * 100)}%
-            </Text>
+            <Text style={styles.progressText}>Progress: {Math.round(progress * 100)}%</Text>
           ) : loading ? (
             <Text style={styles.progressText}>Loading...</Text>
           ) : (
@@ -223,7 +221,7 @@ interface BlurredCircleButtonProps {
   children: React.ReactNode;
   style?: any;
   intensity?: number;
-  tint?: "light" | "dark" | "default";
+  tint?: 'light' | 'dark' | 'default';
 }
 
 const BlurredCircleButton = ({
@@ -231,17 +229,13 @@ const BlurredCircleButton = ({
   children,
   style,
   intensity = 75,
-  tint = "dark",
+  tint = 'dark',
 }: BlurredCircleButtonProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   return (
-    <BlurView
-      intensity={intensity}
-      tint={tint}
-      style={[styles.blurContainer, style]}
-    >
+    <BlurView intensity={intensity} tint={tint} style={[styles.blurContainer, style]}>
       <TouchableOpacity style={styles.button} onPress={onPress}>
         {children}
       </TouchableOpacity>
@@ -255,24 +249,24 @@ const createStyles = (theme: any) =>
       width: 56,
       height: 56,
       borderRadius: 28,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     container: {
       flex: 1,
-      position: "relative",
-      backgroundColor: "black",
+      position: 'relative',
+      backgroundColor: 'black',
     },
     topLeftContainer: {
-      position: "absolute",
+      position: 'absolute',
       top: 48,
       left: 24,
       zIndex: 10,
     },
     progressContainer: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 0,
-      alignSelf: "center",
-      backgroundColor: "rgba(0,0,0,0.5)",
+      alignSelf: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
       padding: 8,
       borderRadius: 8,
     },
@@ -281,9 +275,9 @@ const createStyles = (theme: any) =>
       fontSize: 16,
     },
     loadingContainer: {
-      position: "absolute",
+      position: 'absolute',
       top: screenHeight / 2,
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backgroundColor: 'rgba(0,0,0,0.5)',
       borderRadius: 10,
       padding: 20,
     },
@@ -298,15 +292,15 @@ const createStyles = (theme: any) =>
     sectionHeader: {
       color: greys(theme)[0],
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       marginBottom: 12,
     },
     currencyScroll: {
       flexGrow: 0,
     },
     currencyButton: {
-      flexDirection: "column",
-      alignItems: "center",
+      flexDirection: 'column',
+      alignItems: 'center',
       marginRight: 12,
       padding: 12,
       borderRadius: 8,
@@ -331,8 +325,8 @@ const createStyles = (theme: any) =>
       maxHeight: 300,
     },
     mintItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 12,
       borderRadius: 8,
       backgroundColor: greys(theme)[1800],
@@ -366,7 +360,7 @@ const createStyles = (theme: any) =>
       fontSize: 14,
     },
     checkIconContainer: {
-      marginLeft: "auto",
+      marginLeft: 'auto',
       marginRight: 8,
     },
     button: {
@@ -374,7 +368,7 @@ const createStyles = (theme: any) =>
       backgroundColor: opacity(greys(theme)[1800], 0.1),
       borderRadius: 8,
       // marginTop: 16,
-      alignItems: "center",
+      alignItems: 'center',
     },
     buttonText: {
       color: greys(theme)[0],
@@ -385,24 +379,24 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
       marginBottom: 12,
-      alignItems: "center",
+      alignItems: 'center',
     },
     flashlightButtonText: {
       color: greys(theme)[0],
       fontSize: 16,
     },
     bottomButtonsContainer: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 96,
       left: 0,
       right: 0,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       paddingHorizontal: 32,
     },
     rightButtonsContainer: {
-      flexDirection: "row",
+      flexDirection: 'row',
       gap: 16,
     },
     circleButton: {
@@ -410,24 +404,21 @@ const createStyles = (theme: any) =>
       height: 56,
       borderRadius: 28,
       backgroundColor: opacity(greys(theme)[1800], 0.75),
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       marginHorizontal: 8,
     },
     // Scanning box overlay styles
     scanBoxContainer: {
-      position: "absolute",
-      top: "50%",
-      left: "50%",
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
       width: scanBoxSize,
       height: scanBoxSize,
-      transform: [
-        { translateX: -scanBoxSize / 2 },
-        { translateY: -scanBoxSize / 2 },
-      ],
+      transform: [{ translateX: -scanBoxSize / 2 }, { translateY: -scanBoxSize / 2 }],
     },
     scanBoxTopLeft: {
-      position: "absolute",
+      position: 'absolute',
       top: 0,
       left: 0,
       width: 30,
@@ -435,14 +426,14 @@ const createStyles = (theme: any) =>
       borderTopWidth: 4,
       borderLeftWidth: 4,
       borderColor: greys(theme)[0],
-      shadowColor: "black",
+      shadowColor: 'black',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
       shadowRadius: 1,
       elevation: 2,
     },
     scanBoxTopRight: {
-      position: "absolute",
+      position: 'absolute',
       top: 0,
       right: 0,
       width: 30,
@@ -450,14 +441,14 @@ const createStyles = (theme: any) =>
       borderTopWidth: 4,
       borderRightWidth: 4,
       borderColor: greys(theme)[0],
-      shadowColor: "black",
+      shadowColor: 'black',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
       shadowRadius: 1,
       elevation: 2,
     },
     scanBoxBottomLeft: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 0,
       left: 0,
       width: 30,
@@ -465,14 +456,14 @@ const createStyles = (theme: any) =>
       borderBottomWidth: 4,
       borderLeftWidth: 4,
       borderColor: greys(theme)[0],
-      shadowColor: "black",
+      shadowColor: 'black',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
       shadowRadius: 1,
       elevation: 2,
     },
     scanBoxBottomRight: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 0,
       right: 0,
       width: 30,
@@ -480,7 +471,7 @@ const createStyles = (theme: any) =>
       borderBottomWidth: 4,
       borderRightWidth: 4,
       borderColor: greys(theme)[0],
-      shadowColor: "black",
+      shadowColor: 'black',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.2,
       shadowRadius: 1,

@@ -1,22 +1,16 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
-import emoji from "emoji-dictionary"; // Import the emoji dictionary package
-import { EventKind } from "./Profile";
-import { FlashList } from "@shopify/flash-list";
-import Image from "components/common/Image";
-import { Tabs } from "./(drawer)/(tabs)/payments";
-import PagerView from "react-native-pager-view";
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import emoji from 'emoji-dictionary'; // Import the emoji dictionary package
+import { EventKind } from './Profile';
+import { FlashList } from '@shopify/flash-list';
+import Image from 'components/common/Image';
+import { Tabs } from './(drawer)/(tabs)/payments';
+import PagerView from 'react-native-pager-view';
 
-export function UserNameProfiles({
-  pubkey,
-  style,
-}: {
-  pubkey: string;
-  style: any;
-}) {
+export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
   const filters = useMemo(
     () => [
       {
@@ -38,21 +32,16 @@ export function UserNameProfiles({
     if (latestEvent?.content) {
       try {
         const metadata = JSON.parse(latestEvent.content);
-        return metadata.displayName || metadata.name || "Unknown User"; // Extract name or fallback
+        return metadata.displayName || metadata.name || 'Unknown User'; // Extract name or fallback
       } catch (e) {}
     }
-    return "Unknown User";
+    return 'Unknown User';
   }, [events]);
 
   return <Text style={style}>{displayName}</Text>;
 }
 
-export function UserReactionProfiles({
-  pubkey,
-  isOverlapping = true,
-}: {
-  pubkey: string;
-}) {
+export function UserReactionProfiles({ pubkey, isOverlapping = true }: { pubkey: string }) {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
 
@@ -86,12 +75,7 @@ export function UserReactionProfiles({
   if (!profilePicture) return null;
 
   return (
-    <View
-      style={[
-        styles.profilePictureWrapper,
-        isOverlapping && styles.overlappingProfile,
-      ]}
-    >
+    <View style={[styles.profilePictureWrapper, isOverlapping && styles.overlappingProfile]}>
       <Image source={{ uri: profilePicture }} style={styles.profilePicture} />
     </View>
   );
@@ -111,13 +95,7 @@ function ReactionProfiles({ reactions }: { reactions: any[] }) {
         <UserReactionProfiles pubkey={reaction.pubkey} />
       ))}
       {remainingCount > 0 && (
-        <View
-          style={[
-            styles.profilePictureWrapper,
-            styles.moreCircle,
-            styles.overlappingProfile,
-          ]}
-        >
+        <View style={[styles.profilePictureWrapper, styles.moreCircle, styles.overlappingProfile]}>
           <Text style={styles.moreText}>+{remainingCount}</Text>
         </View>
       )}
@@ -135,16 +113,12 @@ const TabTwoScreen = () => {
   const filters = useMemo(
     () => [
       {
-        "#p": [
-          "1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2",
-        ], // Filter reactions, reposts, and zaps
+        '#p': ['1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2'], // Filter reactions, reposts, and zaps
         kinds: [EventKind.Reaction, EventKind.Repost, EventKind.ZapReceipt],
         since: since - 30 * day,
       },
       {
-        authors: [
-          "1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2",
-        ], // Filter the user's notes
+        authors: ['1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2'], // Filter the user's notes
         kinds: [EventKind.TextNote, EventKind.Repost, 30023],
         since: since - 30 * day,
       },
@@ -155,37 +129,26 @@ const TabTwoScreen = () => {
   const { events, isLoading } = useSubscribe({ filters });
 
   // Parse events into categories
-  const { reactionEvents, repostEvents, zapEvents, noteEvents } =
-    useMemo(() => {
-      const reactionEvents = events.filter(
-        (event: any) => event.kind === EventKind.Reaction
-      );
+  const { reactionEvents, repostEvents, zapEvents, noteEvents } = useMemo(() => {
+    const reactionEvents = events.filter((event: any) => event.kind === EventKind.Reaction);
 
-      const repostEvents = events.filter(
-        (event: any) => event.kind === EventKind.Repost
-      );
+    const repostEvents = events.filter((event: any) => event.kind === EventKind.Repost);
 
-      const zapEvents = events.filter(
-        (event: any) => event.kind === EventKind.ZapReceipt
-      );
+    const zapEvents = events.filter((event: any) => event.kind === EventKind.ZapReceipt);
 
-      const noteEvents = events.filter(
-        (event: any) =>
-          event.kind === EventKind.TextNote ||
-          event.kind === EventKind.Repost ||
-          event.kind === 30023
-      );
+    const noteEvents = events.filter(
+      (event: any) =>
+        event.kind === EventKind.TextNote || event.kind === EventKind.Repost || event.kind === 30023
+    );
 
-      return { reactionEvents, repostEvents, zapEvents, noteEvents };
-    }, [events]);
+    return { reactionEvents, repostEvents, zapEvents, noteEvents };
+  }, [events]);
 
   const groupedReactions = useMemo(() => {
     const groups: Record<string, any[]> = {};
 
     reactionEvents.forEach((event: any) => {
-      const eventId = event.tags.find(
-        ([key]: [string, string]) => key === "e"
-      )?.[1];
+      const eventId = event.tags.find(([key]: [string, string]) => key === 'e')?.[1];
 
       if (eventId) {
         if (!groups[eventId]) {
@@ -201,9 +164,7 @@ const TabTwoScreen = () => {
   const groupedReposts = useMemo(() => {
     const groups: Record<string, any[]> = {};
     repostEvents.forEach((event: any) => {
-      const eventId = event.tags.find(
-        ([key]: [string, string]) => key === "e"
-      )?.[1];
+      const eventId = event.tags.find(([key]: [string, string]) => key === 'e')?.[1];
 
       if (eventId) {
         if (!groups[eventId]) {
@@ -219,9 +180,7 @@ const TabTwoScreen = () => {
   const groupedZaps = useMemo(() => {
     const groups: Record<string, any[]> = {};
     zapEvents.forEach((event: any) => {
-      const eventId = event.tags.find(
-        ([key]: [string, string]) => key === "e"
-      )?.[1];
+      const eventId = event.tags.find(([key]: [string, string]) => key === 'e')?.[1];
 
       if (eventId) {
         if (!groups[eventId]) {
@@ -237,28 +196,28 @@ const TabTwoScreen = () => {
   const getEventKind = (event) => {
     switch (event.kind) {
       case EventKind.TextNote: {
-        return { noun: "note", verb: "noted to" };
+        return { noun: 'note', verb: 'noted to' };
       }
       case EventKind.Repost: {
-        return { noun: "repost", verb: "reposted" };
+        return { noun: 'repost', verb: 'reposted' };
       }
       case 30023: {
-        return { noun: "long post", verb: "wrote a long post to" };
+        return { noun: 'long post', verb: 'wrote a long post to' };
       }
       case EventKind.Reaction: {
-        return { noun: "reaction", verb: "reacted to" };
+        return { noun: 'reaction', verb: 'reacted to' };
       }
       case EventKind.ZapReceipt: {
-        return { noun: "zap", verb: "zapped" };
+        return { noun: 'zap', verb: 'zapped' };
       }
       default: {
-        return { noun: "action", verb: "performed an action" }; // Default fallback
+        return { noun: 'action', verb: 'performed an action' }; // Default fallback
       }
     }
   };
 
   const getEvent = (event) => {
-    if (typeof event.content === "string") {
+    if (typeof event.content === 'string') {
       try {
         const parsed = JSON.parse(event.content);
         return parsed;
@@ -272,7 +231,7 @@ const TabTwoScreen = () => {
   };
 
   const getPersonCountLabel = (count) => {
-    return count === 1 ? "person" : "people";
+    return count === 1 ? 'person' : 'people';
   };
 
   const renderEventContent = (event: any, reactions) => {
@@ -286,7 +245,7 @@ const TabTwoScreen = () => {
       return (
         <>
           <Text style={styles.reactionCount}>
-            {reactions.length} {getPersonCountLabel(reactions.length)}{" "}
+            {reactions.length} {getPersonCountLabel(reactions.length)}{' '}
             {getEventKind(reactions[0]).verb} your {getEventKind(event_).noun}
           </Text>
           <View style={styles.reactionRow}>
@@ -294,9 +253,7 @@ const TabTwoScreen = () => {
           </View>
 
           {notificationKind === EventKind.Reaction && (
-            <View
-              style={{ display: "flex", flexDirection: "row", marginBottom: 8 }}
-            >
+            <View style={{ display: 'flex', flexDirection: 'row', marginBottom: 8 }}>
               {renderReactions(reactions)}
             </View>
           )}
@@ -304,7 +261,7 @@ const TabTwoScreen = () => {
             {content && (
               <Text style={styles.eventContent}>
                 {content.slice(0, 100)}
-                {content.length !== content.slice(0, 100).length ? "..." : ""}
+                {content.length !== content.slice(0, 100).length ? '...' : ''}
               </Text>
             )}
             <Text style={styles.eventDate}>{date}</Text>
@@ -318,8 +275,7 @@ const TabTwoScreen = () => {
   const renderReactions = (reactions: any[]) => {
     const reactionCountMap = reactions.reduce((acc: any, reaction: any) => {
       const { content, id } = reaction;
-      const emojiContent =
-        emoji.getUnicode(content.replace(/-/g, "_")) || content;
+      const emojiContent = emoji.getUnicode(content.replace(/-/g, '_')) || content;
 
       if (acc[emojiContent]) {
         acc[emojiContent].count++;
@@ -337,12 +293,11 @@ const TabTwoScreen = () => {
           <View style={styles.reactionContent}>
             <Text
               style={{
-                color: "white",
-              }}
-            >
+                color: 'white',
+              }}>
               {emojiContent}
             </Text>
-            <Text style={{ color: "white", marginLeft: 8 }}>{count}</Text>
+            <Text style={{ color: 'white', marginLeft: 8 }}>{count}</Text>
           </View>
         </View>
       );
@@ -352,16 +307,15 @@ const TabTwoScreen = () => {
   const renderItem = ({ item }: { item: [string, any[]] }) => {
     const [eventId, reactions] = item;
     const event = noteEvents.find(
-      (e: any) =>
-        e.tags.find(([key]: [string, string]) => key === "e")?.[1] === eventId
+      (e: any) => e.tags.find(([key]: [string, string]) => key === 'e')?.[1] === eventId
     );
 
     return <View key={eventId}>{renderEventContent(event, reactions)}</View>;
   };
 
   const pagerRef = useRef(null);
-  const [selectedTab, setSelectedTab] = useState("Reactions");
-  const tabs = ["Reactions", "Reposts", "Zaps"];
+  const [selectedTab, setSelectedTab] = useState('Reactions');
+  const tabs = ['Reactions', 'Reposts', 'Zaps'];
 
   const onPageSelected = useCallback((event) => {
     const pageIndex = event.nativeEvent.position;
@@ -376,11 +330,7 @@ const TabTwoScreen = () => {
   return (
     <View style={styles.container}>
       <View>
-        <Tabs
-          tabs={tabs}
-          selectedTab={selectedTab}
-          handleTabPress={handleTabPress}
-        />
+        <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
       </View>
       {isLoading ? (
         <Text style={styles.loadingText}>Loading...</Text>
@@ -389,20 +339,18 @@ const TabTwoScreen = () => {
           ref={pagerRef}
           onPageSelected={onPageSelected}
           style={{
-            height: Dimensions.get("window").height - 200,
-            backgroundColor: "transparent",
+            height: Dimensions.get('window').height - 200,
+            backgroundColor: 'transparent',
           }}
-          initialPage={0}
-        >
+          initialPage={0}>
           <View
             key="1"
             style={{
               flex: 1,
               backgroundColor: greys(theme)[2300],
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
+              height: '100%',
+              overflow: 'hidden',
+            }}>
             <FlashList
               data={Object.entries(groupedReactions)}
               renderItem={renderItem}
@@ -415,10 +363,9 @@ const TabTwoScreen = () => {
             style={{
               flex: 1,
               backgroundColor: greys(theme)[2300],
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
+              height: '100%',
+              overflow: 'hidden',
+            }}>
             <FlashList
               data={Object.entries(groupedReposts)}
               renderItem={renderItem}
@@ -431,10 +378,9 @@ const TabTwoScreen = () => {
             style={{
               flex: 1,
               backgroundColor: greys(theme)[2300],
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
+              height: '100%',
+              overflow: 'hidden',
+            }}>
             <FlashList
               data={Object.entries(groupedZaps)}
               renderItem={renderItem}
@@ -478,7 +424,7 @@ const createStyles = (theme: any) =>
     loadingText: {
       color: greys(theme)[0],
       fontSize: 16,
-      textAlign: "center",
+      textAlign: 'center',
       marginTop: 20,
     },
     reactionCount: {
@@ -491,23 +437,23 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[1800],
       borderRadius: 50,
       padding: 8,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       marginRight: 8,
       borderWidth: 1,
       borderColor: greys(theme)[1500],
     },
     reactionContent: {
-      flexDirection: "row",
+      flexDirection: 'row',
     },
     reactionRow: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 4,
       paddingLeft: 6,
     },
     profilePictureWrapper: {
-      position: "relative",
+      position: 'relative',
     },
     overlappingProfile: {
       marginLeft: -12, // Adjust this value for the amount of overlap
@@ -524,15 +470,15 @@ const createStyles = (theme: any) =>
       height: 40,
       borderRadius: 20,
       backgroundColor: greys(theme)[1500],
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       borderWidth: 2,
       borderColor: greys(theme)[1000],
     },
     moreText: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontWeight: "bold",
+      fontWeight: 'bold',
     },
   });
 

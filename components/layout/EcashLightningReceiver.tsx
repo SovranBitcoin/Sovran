@@ -1,23 +1,23 @@
-import { Dimensions, StyleSheet, View } from "react-native";
-import * as Clipboard from "expo-clipboard";
-import { greys, shades } from "helper/colors";
-import { isValidEcashToken } from "components/cashu";
-import Modal from "components/layout/Modal";
-import { SimplePool } from "nostr-tools";
-import { PaymentInfo } from "../layout/PaymentInfo";
-import { useNostr } from "helper/redux/nostr";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useCameraPermissions } from "expo-camera";
-import { getGiveaway } from "app/ecashReceiveConfirmation";
-import { checkIfAlreadyRedeemed } from "helper/payment-handler/handlers";
-import { showMessage } from "helper/popup/popups";
-import { ButtonHandler } from "app/ecashSendConfirmation";
-import { useTypedNavigation } from "helper/navigation";
+import { Dimensions, StyleSheet, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { greys, shades } from 'helper/colors';
+import { isValidEcashToken } from 'components/cashu';
+import Modal from 'components/layout/Modal';
+import { SimplePool } from 'nostr-tools';
+import { PaymentInfo } from '../layout/PaymentInfo';
+import { useNostr } from 'helper/redux/nostr';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useCameraPermissions } from 'expo-camera';
+import { getGiveaway } from 'app/ecashReceiveConfirmation';
+import { checkIfAlreadyRedeemed } from 'helper/payment-handler/handlers';
+import { showMessage } from 'helper/popup/popups';
+import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { useTypedNavigation } from 'helper/navigation';
 
 export const pool = new SimplePool();
 
-const screenWidth = Dimensions.get("window").width;
+const screenWidth = Dimensions.get('window').width;
 const boxSize = (screenWidth - 128) / 4;
 
 const EcashLightningReceiver = ({ unit, type }) => {
@@ -32,18 +32,18 @@ const EcashLightningReceiver = ({ unit, type }) => {
     if (giveaway?.id) {
       // Check if already redeemed
       if (checkIfAlreadyRedeemed(token)) {
-        showMessage("already_redeemed", {}, { emoji: "🚨" });
+        showMessage('already_redeemed', {}, { emoji: '🚨' });
         return;
       }
       if (giveaway.condition()) {
       } else {
         const e = giveaway.error();
-        showMessage("general_error", {}, { emoji: "🚨" });
+        showMessage('general_error', {}, { emoji: '🚨' });
         return;
       }
     }
 
-    navigation.navigate("ecashReceiveConfirmation", {
+    navigation.navigate('ecashReceiveConfirmation', {
       token: token,
       unit,
     });
@@ -53,7 +53,7 @@ const EcashLightningReceiver = ({ unit, type }) => {
     const hasReadPermission = await Clipboard.hasStringAsync();
 
     if (!hasReadPermission) {
-      showMessage("clipboard_permission_denied", {}, { emoji: "🚨" });
+      showMessage('clipboard_permission_denied', {}, { emoji: '🚨' });
       return;
     }
 
@@ -61,10 +61,10 @@ const EcashLightningReceiver = ({ unit, type }) => {
 
     if (!isValidEcashToken(text)) {
       if (text) {
-        showMessage("invalid_address", { address: text }, { emoji: "🚨" });
+        showMessage('invalid_address', { address: text }, { emoji: '🚨' });
         return;
       } else {
-        showMessage("no_clipboard_address", {}, { emoji: "🚨" });
+        showMessage('no_clipboard_address', {}, { emoji: '🚨' });
         return;
       }
     } else {
@@ -77,47 +77,46 @@ const EcashLightningReceiver = ({ unit, type }) => {
   return (
     <Modal
       showClose
-      title={`Receive ${unit === "sat" ? "Bitcoin" : unit.toUpperCase()}`}
+      title={`Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`}
       buttons={
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "transrparent",
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transrparent',
             paddingBottom: 8,
-          }}
-        >
+          }}>
           <ButtonHandler
             buttons={[
               {
-                text: "Scan QR",
-                icon: "stash:qr-code",
-                variant: "secondary",
+                text: 'Scan QR',
+                icon: 'stash:qr-code',
+                variant: 'secondary',
                 onPress: () => {
                   if (!hasPermission?.granted) {
                     requestPermission();
                     return;
                   }
 
-                  navigation.navigate("camera", {
+                  navigation.navigate('camera', {
                     unit,
                   });
                 },
               },
               {
-                text: "Paste",
-                icon: "lets-icons:copy",
-                variant: "primary",
+                text: 'Paste',
+                icon: 'lets-icons:copy',
+                variant: 'primary',
                 onPress: handleEcashPaste,
               },
               {
-                text: "Fixed Amount",
-                icon: "mdi:decimal",
-                variant: "secondary",
+                text: 'Fixed Amount',
+                icon: 'mdi:decimal',
+                variant: 'secondary',
                 onPress: () => {
-                  navigation.navigate("currency", {
-                    to: "lightningReceiveConfirmation",
+                  navigation.navigate('currency', {
+                    to: 'lightningReceiveConfirmation',
                     unit,
                   });
                 },
@@ -130,8 +129,7 @@ const EcashLightningReceiver = ({ unit, type }) => {
               //     navigation.navigate("settings/customNpub");
               //   },
               // },
-            ]}
-          ></ButtonHandler>
+            ]}></ButtonHandler>
         </View>
 
         // <>
@@ -197,10 +195,10 @@ const EcashLightningReceiver = ({ unit, type }) => {
       }
       children={
         <View>
-          {currentProfile?.npub && unit === "sat" && (
+          {currentProfile?.npub && unit === 'sat' && (
             <PaymentInfo
               data={`${currentProfile?.npub}@npub.cash`}
-              popupMessage={"lightning_address_copied"}
+              popupMessage={'lightning_address_copied'}
               unit="sat"
             />
           )}
@@ -215,28 +213,28 @@ export default EcashLightningReceiver;
 const createStyles = (theme) =>
   StyleSheet.create({
     cornerBox: {
-      position: "absolute",
+      position: 'absolute',
       width: boxSize,
       height: boxSize,
       borderRadius: 16,
       zIndex: 100,
-      backgroundColor: "transparent",
-      overflow: "hidden",
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
     },
     innerBorder: {
-      position: "absolute",
+      position: 'absolute',
       borderWidth: 1,
       borderColor: greys(theme)[0],
       borderRadius: 16,
       zIndex: 100,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       width: screenWidth - 128,
       height: screenWidth - 128,
     },
     barCodeScanner: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
     },
     input: {
       backgroundColor: greys(theme)[1800],
@@ -255,10 +253,10 @@ const createStyles = (theme) =>
       marginTop: 8,
       marginBottom: 8,
       paddingLeft: 16,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     pasteButton: {
-      position: "absolute",
+      position: 'absolute',
       right: 16,
       padding: 16,
       top: 0,
@@ -266,12 +264,12 @@ const createStyles = (theme) =>
     },
     pasteText: {
       color: shades[100],
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     buttonRow: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
       marginTop: 8,
     },
   });

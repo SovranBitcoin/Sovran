@@ -1,36 +1,36 @@
-import { MeltQuoteResponse } from "@cashu/cashu-ts";
-import { decode } from "@gandlaf21/bolt11-decode";
+import { MeltQuoteResponse } from '@cashu/cashu-ts';
+import { decode } from '@gandlaf21/bolt11-decode';
 import {
   appendProofsV2,
   increaseCounterV2,
   memoizedGetCounterV2,
   memoizedGetTransactions,
-  updateTransaction
-} from "helper/redux/cashu";
-import { store } from "helper/redux/store";
-import { getKeys, getWallet, sendLightning } from "helper/cashu";
-import { Alert } from "react-native";
-import { publishWalletEvent } from "helper/nostr/cashu";
-import { convertTime } from "helper/time";
-import { showMessage } from "helper/popup/popups";
+  updateTransaction,
+} from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { getKeys, getWallet, sendLightning } from 'helper/cashu';
+import { Alert } from 'react-native';
+import { publishWalletEvent } from 'helper/nostr/cashu';
+import { convertTime } from 'helper/time';
+import { showMessage } from 'helper/popup/popups';
 
 // Lightning invoice parsing utilities
 export function getLightningAmount({ pr }) {
   const decodedPR = decode(pr as string);
-  return decodedPR.sections.find(route => route.name === "amount")?.value / 1000;
+  return decodedPR.sections.find((route) => route.name === 'amount')?.value / 1000;
 }
 
 export function getTimestamp({ pr }) {
   const decodedPR = decode(pr as string);
-  const timestamp = decodedPR.sections.find(route => route.name === "timestamp")?.value;
+  const timestamp = decodedPR.sections.find((route) => route.name === 'timestamp')?.value;
   return convertTime(new Date(timestamp * 1000));
 }
 
 export function getRawExpiry({ pr }) {
   if (!pr) return null;
   const decodedPR = decode(pr as string);
-  const timestamp = decodedPR.sections.find(route => route.name === "timestamp")?.value;
-  const expiry = decodedPR.sections.find(route => route.name === "expiry")?.value;
+  const timestamp = decodedPR.sections.find((route) => route.name === 'timestamp')?.value;
+  const expiry = decodedPR.sections.find((route) => route.name === 'expiry')?.value;
   return new Date((timestamp + expiry) * 1000);
 }
 
@@ -40,13 +40,14 @@ export function getExpiry({ pr }) {
 
 export function getExpiresIn({ pr }) {
   const decodedPR = decode(pr as string);
-  const expiresInHours = decodedPR.sections.find(route => route.name === "expiry")?.value / 60 / 60;
+  const expiresInHours =
+    decodedPR.sections.find((route) => route.name === 'expiry')?.value / 60 / 60;
   return expiresInHours > 1 ? `${expiresInHours} hours` : `${expiresInHours} mins`;
 }
 
 export function getDescription({ pr }) {
   const decodedPR = decode(pr as string);
-  return decodedPR.sections.find(route => route.name === "description")?.value;
+  return decodedPR.sections.find((route) => route.name === 'description')?.value;
 }
 
 export function isValidLNURL(url: string): boolean {
@@ -75,7 +76,7 @@ export async function checkSpecificTransaction({ quoteToCheck }) {
   const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
   // Find and validate transaction
-  const tx = transactions.find(transaction => transaction.quote === quoteToCheck);
+  const tx = transactions.find((transaction) => transaction.quote === quoteToCheck);
   if (!tx || tx.paid) return;
 
   const { quote, amount, unit, mintUrl } = tx;
@@ -83,18 +84,14 @@ export async function checkSpecificTransaction({ quoteToCheck }) {
 
   try {
     const wallet = await getWallet({ unit, mintUrl });
-    const isUnpaid = (await wallet.checkMintQuote(quote)).state === "UNPAID";
+    const isUnpaid = (await wallet.checkMintQuote(quote)).state === 'UNPAID';
     if (isUnpaid) return;
 
     const proofs = await wallet.mintProofs(amount, quote, { keysetId: keyset.id });
     const balance = proofs.reduce((total, proof) => total + proof.amount, 0);
 
     if (balance > 0) {
-      showMessage(
-        "funds_received",
-        { amount: balance, unit: keyset.unit },
-        { emoji: "🎉" }
-      );
+      showMessage('funds_received', { amount: balance, unit: keyset.unit }, { emoji: '🎉' });
     }
 
     await updateStateAfterPayment(profileId, proofs, quote, mintUrl);
@@ -116,7 +113,7 @@ async function updateStateAfterPayment(profileId, proofs, quote, mintUrl) {
   await store.dispatch(
     updateTransaction({
       profileId,
-      matcher: (tx) => tx.quote === quote || (!tx.paid && tx.npubcash && tx.type === "ecash"),
+      matcher: (tx) => tx.quote === quote || (!tx.paid && tx.npubcash && tx.type === 'ecash'),
       updateFn: (tx) => ({ ...tx, paid: true }),
     })
   );
@@ -126,7 +123,7 @@ async function updateStateAfterPayment(profileId, proofs, quote, mintUrl) {
 export async function loopOverCheckLnPaymentComplete({
   transaction = {},
   abortSignal,
-  callback = () => { },
+  callback = () => {},
 }) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -136,10 +133,7 @@ export async function loopOverCheckLnPaymentComplete({
   }
 }
 
-export async function checkLNPaymentComplete({
-  transaction,
-  callback = () => { },
-}) {
+export async function checkLNPaymentComplete({ transaction, callback = () => {} }) {
   const profileId = store.getState().nostr?.currentProfile?.id;
   const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
   const sortedTransactions = transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -152,7 +146,10 @@ export async function checkLNPaymentComplete({
     if (!tx || tx.paid || new Date() > getRawExpiry({ pr: tx.request })) continue;
 
     // Skip if another transaction with the same sweepId is already paid
-    if (tx.isSweep && sortedTransactions.some(t => t.isSweep && t.sweepId === tx.sweepId && t.paid)) {
+    if (
+      tx.isSweep &&
+      sortedTransactions.some((t) => t.isSweep && t.sweepId === tx.sweepId && t.paid)
+    ) {
       continue;
     }
 
@@ -161,7 +158,7 @@ export async function checkLNPaymentComplete({
 
     try {
       const wallet = await getWallet({ unit, mintUrl, profile: null });
-      const isUnpaid = (await wallet.checkMintQuote(quote)).state === "UNPAID";
+      const isUnpaid = (await wallet.checkMintQuote(quote)).state === 'UNPAID';
       if (isUnpaid) continue;
 
       const counter = memoizedGetCounterV2({
@@ -187,20 +184,20 @@ export async function checkLNPaymentComplete({
       const balance = proofs.reduce((total, proof) => total + proof.amount, 0);
 
       if (balance > 0) {
-        showMessage(
-          "funds_received",
-          { amount: balance, unit: keyset.unit },
-          { emoji: "🎉" },
-          () => callback()
+        showMessage('funds_received', { amount: balance, unit: keyset.unit }, { emoji: '🎉' }, () =>
+          callback()
         );
       }
 
       await updateStateAfterPayment(profileId, proofs, quote, mintUrl);
-      publishWalletEvent(
-        [...new Set([...store.getState().cashu?.profiles?.[profileId]?.transactions.map(t => t.mintUrl), mintUrl])]
-      );
+      publishWalletEvent([
+        ...new Set([
+          ...store.getState().cashu?.profiles?.[profileId]?.transactions.map((t) => t.mintUrl),
+          mintUrl,
+        ]),
+      ]);
     } catch (err) {
-      Alert.alert("error", JSON.stringify(err));
+      Alert.alert('error', JSON.stringify(err));
     }
   }
 }
@@ -227,7 +224,7 @@ export async function getMeltQuote({
       ...options,
     });
   } catch (error) {
-    throw new AppError("melt_quote_error", JSON.stringify(error));
+    throw new AppError('melt_quote_error', JSON.stringify(error));
   }
 }
 
@@ -235,31 +232,31 @@ export async function sendMultiPathPayment({ pr }) {
   try {
     const quoteA = await getMeltQuote({
       pr,
-      unit: "sat",
-      mintUrl: "https://mint.utxo.one",
+      unit: 'sat',
+      mintUrl: 'https://mint.utxo.one',
       mppAmount: 10,
     });
 
     const quoteB = await getMeltQuote({
       pr,
-      unit: "sat",
-      mintUrl: "https://mint.utxo.one",
+      unit: 'sat',
+      mintUrl: 'https://mint.utxo.one',
       mppAmount: 10,
     });
 
     await sendLightning({
       pr,
-      unit: "sat",
+      unit: 'sat',
       meltQuote: quoteA,
-      mintUrl: "https://mint.utxo.one",
+      mintUrl: 'https://mint.utxo.one',
       mpp: true,
     });
 
     await sendLightning({
       pr,
-      unit: "sat",
+      unit: 'sat',
       meltQuote: quoteB,
-      mintUrl: "https://mint.103100.xyz",
+      mintUrl: 'https://mint.103100.xyz',
       mpp: true,
     });
   } catch (err) {
@@ -272,16 +269,16 @@ export async function monitorLightningPayment({
   mintUrl,
   subId,
   bolt11Invoice,
-  subscriptionKind = "bolt11_mint_quote",
+  subscriptionKind = 'bolt11_mint_quote',
   onUpdate,
 }) {
-  const wsUrl = `${mintUrl.replace(/\/$/, "")}/v1/ws`;
+  const wsUrl = `${mintUrl.replace(/\/$/, '')}/v1/ws`;
   const socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
     const subscribeMessage = {
-      jsonrpc: "2.0",
-      method: "subscribe",
+      jsonrpc: '2.0',
+      method: 'subscribe',
       params: {
         kind: subscriptionKind,
         subId: subId,
@@ -294,21 +291,18 @@ export async function monitorLightningPayment({
 
   socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    if (data.method === "subscribe" && data.params?.subId === subId) {
+    if (data.method === 'subscribe' && data.params?.subId === subId) {
       onUpdate(data.params.payload);
     } else if (data.error) {
-
     }
   };
 
-  socket.onerror = (error) => {
-
-  };
+  socket.onerror = (error) => {};
 
   return () => {
     const unsubscribeMessage = {
-      jsonrpc: "2.0",
-      method: "unsubscribe",
+      jsonrpc: '2.0',
+      method: 'unsubscribe',
       params: { subId: subId },
       id: 2,
     };
@@ -318,18 +312,18 @@ export async function monitorLightningPayment({
 }
 
 export async function startMonitoringLightningInvoice(invoice) {
-  const mintUrl = "https://mint.minibits.cash/Bitcoin";
-  const subId = "your-unique-subscription-id";
+  const mintUrl = 'https://mint.minibits.cash/Bitcoin';
+  const subId = 'your-unique-subscription-id';
 
   return monitorLightningPayment({
     mintUrl,
     subId,
     bolt11Invoice: invoice,
-    subscriptionKind: "bolt11_mint_quote",
+    subscriptionKind: 'bolt11_mint_quote',
     onUpdate: (payload) => {
       // Handler for updates
     },
   });
 }
 
-export * from "../helper/cashu/index";
+export * from '../helper/cashu/index';

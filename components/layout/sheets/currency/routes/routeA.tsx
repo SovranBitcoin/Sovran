@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
-import { useSelector } from "react-redux";
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { useSelector } from 'react-redux';
 import {
   memoizedGetAllBalancesMultipleCurrencies,
   memoizedGetSelectedMint,
-} from "helper/redux/cashu/selectors";
-import { getMint } from "helper/cashu";
-import { CheckIcon, CurrencyIcon, FlagIcon } from "assets/icons";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { useSheetRouter } from "react-native-actions-sheet/dist/src/hooks/use-router";
-import { Text } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { formatCurrency } from "helper/currency";
-import Image from "components/common/Image";
-import Wrapper, { SheetButton } from "../../wrapper";
-import { showMessage } from "helper/popup/popups";
+} from 'helper/redux/cashu/selectors';
+import { getMint } from 'helper/cashu';
+import { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
+import { Text } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { formatCurrency } from 'helper/currency';
+import Image from 'components/common/Image';
+import Wrapper, { SheetButton } from '../../wrapper';
+import { showMessage } from 'helper/popup/popups';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -34,7 +34,7 @@ interface SelectedMintDisplayProps {
   loading?: boolean;
 }
 
-type SupportedCurrency = "SAT" | "USD" | "EUR" | "GBP";
+type SupportedCurrency = 'SAT' | 'USD' | 'EUR' | 'GBP';
 
 interface MintState {
   selected: {
@@ -85,53 +85,46 @@ const MintItem: React.FC<MintItemProps> = ({
     ? formatCurrency(
         {
           currency:
-            selectedCurrency === "SAT"
-              ? "BTC"
-              : (selectedCurrency as
-                  | "USD"
-                  | "EUR"
-                  | "GBP"
-                  | "AUD"
-                  | "CAD"
-                  | "NZD"
-                  | "KRW"),
+            selectedCurrency === 'SAT'
+              ? 'BTC'
+              : (selectedCurrency as 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW'),
           value: balance.amount,
-          denomination: (selectedCurrency.toLowerCase() === "sat"
-            ? "sats"
+          denomination: (selectedCurrency.toLowerCase() === 'sat'
+            ? 'sats'
             : selectedCurrency.toLowerCase()) as
-            | "btc"
-            | "sats"
-            | "bits"
-            | "finneys"
-            | "usd"
-            | "eur"
-            | "gbp"
-            | "aud"
-            | "cad"
-            | "nzd"
-            | "krw",
+            | 'btc'
+            | 'sats'
+            | 'bits'
+            | 'finneys'
+            | 'usd'
+            | 'eur'
+            | 'gbp'
+            | 'aud'
+            | 'cad'
+            | 'nzd'
+            | 'krw',
         },
         {
-          locale: "en-US",
-          precision: selectedCurrency === "SAT" ? 0 : 2,
-          currencyDisplay: selectedCurrency === "SAT" ? "name" : "symbol",
-          denomination: (selectedCurrency.toLowerCase() === "sat"
-            ? "sats"
+          locale: 'en-US',
+          precision: selectedCurrency === 'SAT' ? 0 : 2,
+          currencyDisplay: selectedCurrency === 'SAT' ? 'name' : 'symbol',
+          denomination: (selectedCurrency.toLowerCase() === 'sat'
+            ? 'sats'
             : selectedCurrency.toLowerCase()) as
-            | "btc"
-            | "sats"
-            | "bits"
-            | "finneys"
-            | "usd"
-            | "eur"
-            | "gbp"
-            | "aud"
-            | "cad"
-            | "nzd"
-            | "krw",
+            | 'btc'
+            | 'sats'
+            | 'bits'
+            | 'finneys'
+            | 'usd'
+            | 'eur'
+            | 'gbp'
+            | 'aud'
+            | 'cad'
+            | 'nzd'
+            | 'krw',
         }
       )
-    : "0";
+    : '0';
 
   return (
     <TouchableOpacity
@@ -142,8 +135,7 @@ const MintItem: React.FC<MintItemProps> = ({
         isSelected && styles.selectedMintItem,
       ]}
       onPress={handlePress}
-      disabled={globalLoading}
-    >
+      disabled={globalLoading}>
       {mint.iconUrl ? (
         <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
       ) : (
@@ -164,24 +156,19 @@ const MintItem: React.FC<MintItemProps> = ({
   );
 };
 
-export function MintSelect({
-  onMintSelected,
-  unit = "sat",
-}: SelectedMintDisplayProps) {
+export function MintSelect({ onMintSelected, unit = 'sat' }: SelectedMintDisplayProps) {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
-  const router = useSheetRouter("mint");
+  const router = useSheetRouter('mint');
 
-  const multipleBalances = useSelector(
-    memoizedGetAllBalancesMultipleCurrencies
-  );
+  const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const [mintState, setMintState] = useState<MintState>({
     selected: null,
     loadingId: null,
   });
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>(
-    (unit?.toUpperCase() || "SAT") as SupportedCurrency
+    (unit?.toUpperCase() || 'SAT') as SupportedCurrency
   );
   const [mints, setMints] = useState<
     Array<{
@@ -193,7 +180,7 @@ export function MintSelect({
     }>
   >([]);
 
-  const currencies: SupportedCurrency[] = ["SAT", "USD", "EUR", "GBP"];
+  const currencies: SupportedCurrency[] = ['SAT', 'USD', 'EUR', 'GBP'];
 
   const handleMintSelection = async (
     mint: {
@@ -234,7 +221,7 @@ export function MintSelect({
           ...prev,
           loadingId: null,
         }));
-        showMessage("general_error", {}, { emoji: "🚨" });
+        showMessage('general_error', {}, { emoji: '🚨' });
       }
     }
 
@@ -255,26 +242,19 @@ export function MintSelect({
           ...prev,
           selected: {
             id: selectedBalance.mintUrl,
-            name: selectedBalance.mintUrl
-              .replace("https://", "")
-              ?.split("/")?.[0],
+            name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
             balance: selectedBalance.amount,
             iconUrl: info?.icon_url || null,
             unit: selectedBalance.unit,
           },
         }));
       } catch (error) {
-        console.error(
-          `Error fetching info for mint ${selectedBalance.mintUrl}:`,
-          error
-        );
+        console.error(`Error fetching info for mint ${selectedBalance.mintUrl}:`, error);
         setMintState((prev) => ({
           ...prev,
           selected: {
             id: selectedBalance.mintUrl,
-            name: selectedBalance.mintUrl
-              .replace("https://", "")
-              ?.split("/")?.[0],
+            name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
             balance: selectedBalance.amount,
             iconUrl: null,
             unit: selectedBalance.unit,
@@ -289,24 +269,18 @@ export function MintSelect({
   }, [selectedMintUrl, multipleBalances]);
 
   const displayCurrency = (currency: string) => {
-    return currency === "SAT" ? "BTC" : currency;
+    return currency === 'SAT' ? 'BTC' : currency;
   };
 
   const fetchMintsWithIcons = async () => {
-    const balancesByMint: Record<
-      string,
-      Array<{ amount: number; unit: string }>
-    > = {};
+    const balancesByMint: Record<string, Array<{ amount: number; unit: string }>> = {};
     multipleBalances.forEach((balance) => {
       if (!balancesByMint[balance.mintUrl]) {
         balancesByMint[balance.mintUrl] = [];
       }
       balancesByMint[balance.mintUrl].push({
         amount: balance.amount,
-        unit:
-          balance.unit.toUpperCase() === "BTC"
-            ? "SAT"
-            : balance.unit.toUpperCase(),
+        unit: balance.unit.toUpperCase() === 'BTC' ? 'SAT' : balance.unit.toUpperCase(),
       });
     });
 
@@ -318,10 +292,7 @@ export function MintSelect({
           const supportedUnits: string[] = [];
           if (info?.nuts?.[4]?.methods) {
             info.nuts[4].methods.forEach((method) => {
-              const unit =
-                method.unit.toUpperCase() === "BTC"
-                  ? "SAT"
-                  : method.unit.toUpperCase();
+              const unit = method.unit.toUpperCase() === 'BTC' ? 'SAT' : method.unit.toUpperCase();
               if (!supportedUnits.includes(unit)) {
                 supportedUnits.push(unit);
               }
@@ -330,7 +301,7 @@ export function MintSelect({
 
           return {
             id: mintUrl,
-            name: mintUrl.replace("https://", "")?.split("/")?.[0],
+            name: mintUrl.replace('https://', '')?.split('/')?.[0],
             balances: balancesByMint[mintUrl],
             iconUrl: info?.icon_url,
             supportedUnits,
@@ -338,10 +309,10 @@ export function MintSelect({
         } catch (error) {
           return {
             id: mintUrl,
-            name: mintUrl.replace("https://", "")?.split("/")?.[0],
+            name: mintUrl.replace('https://', '')?.split('/')?.[0],
             balances: balancesByMint[mintUrl],
             iconUrl: null,
-            supportedUnits: ["SAT"],
+            supportedUnits: ['SAT'],
           };
         }
       })
@@ -353,9 +324,7 @@ export function MintSelect({
     fetchMintsWithIcons();
   }, [multipleBalances]);
 
-  const filteredMints = mints.filter((mint) =>
-    mint.supportedUnits.includes(selectedCurrency)
-  );
+  const filteredMints = mints.filter((mint) => mint.supportedUnits.includes(selectedCurrency));
 
   function handleMintPress(
     mint: { id: string; name: string; iconUrl: string | null },
@@ -379,39 +348,26 @@ export function MintSelect({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.currencyScroll}
-          >
+            style={styles.currencyScroll}>
             {currencies.map((currency) => (
               <TouchableOpacity
                 key={currency}
                 style={[
                   styles.currencyButton,
-                  selectedCurrency === currency &&
-                    styles.selectedCurrencyButton,
+                  selectedCurrency === currency && styles.selectedCurrencyButton,
                 ]}
-                onPress={() => setSelectedCurrency(currency)}
-              >
+                onPress={() => setSelectedCurrency(currency)}>
                 <View style={styles.currencyContent}>
-                  {currency === "USD" ||
-                  currency === "EUR" ||
-                  currency === "GBP" ? (
+                  {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                     <FlagIcon
-                      country={
-                        currency === "USD"
-                          ? "US"
-                          : currency === "EUR"
-                          ? "EU"
-                          : "GB"
-                      }
+                      country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
                       height={32}
                       width={32}
                     />
                   ) : (
                     <CurrencyIcon currency={currency.toLowerCase()} />
                   )}
-                  <Text style={styles.currencyText}>
-                    {displayCurrency(currency)}
-                  </Text>
+                  <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -422,9 +378,7 @@ export function MintSelect({
           </Text>
           <View style={styles.mintScroll}>
             {filteredMints.map((mint) => {
-              const balance = mint.balances.find(
-                (b) => b.unit.toUpperCase() === selectedCurrency
-              );
+              const balance = mint.balances.find((b) => b.unit.toUpperCase() === selectedCurrency);
               return (
                 <MintItem
                   key={mint.id}
@@ -450,17 +404,15 @@ export function MintSelect({
           <SheetButton
             disabled={mintState.loadingId !== null}
             onPress={() => {
-              router.navigate("mintAddMore");
-            }}
-          >
+              router.navigate('mintAddMore');
+            }}>
             Add more mints
           </SheetButton>
           <SheetButton
             disabled={mintState.loadingId !== null}
             onPress={() => {
               router?.goBack();
-            }}
-          >
+            }}>
             Cancel
           </SheetButton>
         </>
@@ -474,7 +426,7 @@ const createStyles = (theme: string) =>
     sectionHeader: {
       color: greys(theme)[0],
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       marginBottom: 12,
     },
     currencyScroll: {
@@ -488,9 +440,9 @@ const createStyles = (theme: string) =>
       minWidth: 100,
     },
     currencyContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       gap: 8,
     },
     selectedCurrencyButton: {
@@ -499,14 +451,14 @@ const createStyles = (theme: string) =>
     currencyText: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     mintScroll: {
       maxHeight: 300,
     },
     mintItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 12,
       borderRadius: 8,
       backgroundColor: greys(theme)[1800],
@@ -535,7 +487,7 @@ const createStyles = (theme: string) =>
       fontSize: 14,
     },
     checkIconContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginLeft: 8,
     },
     disabledMintItem: {

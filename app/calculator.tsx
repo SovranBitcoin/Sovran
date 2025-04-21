@@ -1,22 +1,15 @@
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import React, { useState } from 'react';
+import { View, Text, SafeAreaView, StatusBar, StyleSheet, Dimensions } from 'react-native';
 
 const Calculator = () => {
-  const [display, setDisplay] = useState("0");
-  const [calculation, setCalculation] = useState("");
+  const [display, setDisplay] = useState('0');
+  const [calculation, setCalculation] = useState('');
   const [operatorPressed, setOperatorPressed] = useState(false);
   const [equalsPressed, setEqualsPressed] = useState(false);
 
   const handleNumberPress = (num) => {
-    if (display === "0" || operatorPressed || equalsPressed) {
+    if (display === '0' || operatorPressed || equalsPressed) {
       setDisplay(num);
       setOperatorPressed(false);
       setEqualsPressed(false);
@@ -40,16 +33,16 @@ const Calculator = () => {
 
       let result;
       switch (operator) {
-        case "+":
+        case '+':
           result = firstNum + secondNum;
           break;
-        case "-":
+        case '-':
           result = firstNum - secondNum;
           break;
-        case "×":
+        case '×':
           result = firstNum * secondNum;
           break;
-        case "÷":
+        case '÷':
           result = firstNum / secondNum;
           break;
         default:
@@ -61,20 +54,20 @@ const Calculator = () => {
         setDisplay(result.toString());
       } else {
         // Show decimal result with up to 10 decimal places (like iOS)
-        setDisplay(result.toFixed(10).replace(/\.?0+$/, ""));
+        setDisplay(result.toFixed(10).replace(/\.?0+$/, ''));
       }
 
       // Show calculation above the result
       setCalculation(`${firstNum}${operator}${secondNum}=`);
       setEqualsPressed(true);
     } catch (e) {
-      setDisplay("Error");
+      setDisplay('Error');
     }
   };
 
   const handleClear = () => {
-    setDisplay("0");
-    setCalculation("");
+    setDisplay('0');
+    setCalculation('');
     setOperatorPressed(false);
     setEqualsPressed(false);
   };
@@ -89,22 +82,20 @@ const Calculator = () => {
   };
 
   const handleDecimal = () => {
-    if (!display.includes(".")) {
-      setDisplay(display + ".");
+    if (!display.includes('.')) {
+      setDisplay(display + '.');
     }
   };
 
   // Calculate button dimensions based on screen width to maintain proportions
-  const screen = Dimensions.get("window");
+  const screen = Dimensions.get('window');
   const buttonSize = (screen.width - 50) / 4; // We'll keep this for reference but use fixed values in styles
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.displayContainer}>
-        {calculation ? (
-          <Text style={styles.calculationText}>{calculation}</Text>
-        ) : null}
+        {calculation ? <Text style={styles.calculationText}>{calculation}</Text> : null}
         <Text style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>
           {display}
         </Text>
@@ -112,28 +103,20 @@ const Calculator = () => {
 
       <View style={styles.buttonsContainer}>
         <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.button, styles.functionButton]}
-            onPress={handleClear}
-          >
+          <TouchableOpacity style={[styles.button, styles.functionButton]} onPress={handleClear}>
             <Text style={styles.buttonText}>AC</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.functionButton]}
-            onPress={handlePlusMinus}
-          >
+            onPress={handlePlusMinus}>
             <Text style={styles.buttonText}>+/-</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.functionButton]}
-            onPress={handlePercent}
-          >
+          <TouchableOpacity style={[styles.button, styles.functionButton]} onPress={handlePercent}>
             <Text style={styles.buttonText}>%</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.operatorButton]}
-            onPress={() => handleOperatorPress("÷")}
-          >
+            onPress={() => handleOperatorPress('÷')}>
             <Text style={styles.buttonText}>÷</Text>
           </TouchableOpacity>
         </View>
@@ -141,26 +124,22 @@ const Calculator = () => {
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("7")}
-          >
+            onPress={() => handleNumberPress('7')}>
             <Text style={styles.buttonText}>7</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("8")}
-          >
+            onPress={() => handleNumberPress('8')}>
             <Text style={styles.buttonText}>8</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("9")}
-          >
+            onPress={() => handleNumberPress('9')}>
             <Text style={styles.buttonText}>9</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.operatorButton]}
-            onPress={() => handleOperatorPress("×")}
-          >
+            onPress={() => handleOperatorPress('×')}>
             <Text style={styles.buttonText}>×</Text>
           </TouchableOpacity>
         </View>
@@ -168,26 +147,22 @@ const Calculator = () => {
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("4")}
-          >
+            onPress={() => handleNumberPress('4')}>
             <Text style={styles.buttonText}>4</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("5")}
-          >
+            onPress={() => handleNumberPress('5')}>
             <Text style={styles.buttonText}>5</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("6")}
-          >
+            onPress={() => handleNumberPress('6')}>
             <Text style={styles.buttonText}>6</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.operatorButton]}
-            onPress={() => handleOperatorPress("-")}
-          >
+            onPress={() => handleOperatorPress('-')}>
             <Text style={styles.buttonText}>−</Text>
           </TouchableOpacity>
         </View>
@@ -195,26 +170,22 @@ const Calculator = () => {
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("1")}
-          >
+            onPress={() => handleNumberPress('1')}>
             <Text style={styles.buttonText}>1</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("2")}
-          >
+            onPress={() => handleNumberPress('2')}>
             <Text style={styles.buttonText}>2</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.numberButton]}
-            onPress={() => handleNumberPress("3")}
-          >
+            onPress={() => handleNumberPress('3')}>
             <Text style={styles.buttonText}>3</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.operatorButton]}
-            onPress={() => handleOperatorPress("+")}
-          >
+            onPress={() => handleOperatorPress('+')}>
             <Text style={styles.buttonText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -222,20 +193,13 @@ const Calculator = () => {
         <View style={styles.row}>
           <TouchableOpacity
             style={[styles.button, styles.numberButton, styles.zeroButton]}
-            onPress={() => handleNumberPress("0")}
-          >
+            onPress={() => handleNumberPress('0')}>
             <Text style={[styles.buttonText, styles.zeroText]}>0</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.numberButton]}
-            onPress={handleDecimal}
-          >
+          <TouchableOpacity style={[styles.button, styles.numberButton]} onPress={handleDecimal}>
             <Text style={styles.buttonText}>.</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.operatorButton]}
-            onPress={handleEquals}
-          >
+          <TouchableOpacity style={[styles.button, styles.operatorButton]} onPress={handleEquals}>
             <Text style={styles.buttonText}>=</Text>
           </TouchableOpacity>
         </View>
@@ -247,25 +211,25 @@ const Calculator = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "black",
-    justifyContent: "flex-end",
+    backgroundColor: 'black',
+    justifyContent: 'flex-end',
   },
   displayContainer: {
     padding: 20,
-    alignItems: "flex-end",
+    alignItems: 'flex-end',
     marginBottom: 10,
   },
   calculationText: {
-    color: "rgba(255, 255, 255, 0.6)",
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 30,
     marginBottom: 10,
-    fontFamily: "System",
+    fontFamily: 'System',
   },
   displayText: {
-    color: "white",
+    color: 'white',
     fontSize: 80,
-    fontWeight: "200",
-    fontFamily: "System",
+    fontWeight: '200',
+    fontFamily: 'System',
   },
   buttonsContainer: {
     paddingHorizontal: 10,
@@ -273,41 +237,41 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
   button: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginHorizontal: 3,
   },
   numberButton: {
-    backgroundColor: "#333333",
+    backgroundColor: '#333333',
   },
   functionButton: {
-    backgroundColor: "#A5A5A5",
+    backgroundColor: '#A5A5A5',
   },
   operatorButton: {
-    backgroundColor: "#FF9F0A",
+    backgroundColor: '#FF9F0A',
   },
   buttonText: {
-    color: "white",
+    color: 'white',
     fontSize: 34,
-    fontWeight: "400",
-    fontFamily: "System",
+    fontWeight: '400',
+    fontFamily: 'System',
   },
   zeroButton: {
     width: 150,
-    alignItems: "flex-start",
+    alignItems: 'flex-start',
     paddingLeft: 28,
     marginRight: 3,
   },
   zeroText: {
-    textAlign: "left",
+    textAlign: 'left',
   },
 });
 

@@ -1,10 +1,10 @@
-import { View } from "react-native";
-import { useState, useEffect, useRef } from "react";
-import "react-native-gesture-handler";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { View } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import 'react-native-gesture-handler';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function VideoScreen({ videoSource, ...props }) {
   const theme = useSelector(memoizedGetTheme);
@@ -16,7 +16,7 @@ export function VideoScreen({ videoSource, ...props }) {
   });
 
   useEffect(() => {
-    const subscription = player.addListener("playingChange", (isPlaying) => {
+    const subscription = player.addListener('playingChange', (isPlaying) => {
       setIsPlaying(isPlaying);
     });
 
@@ -29,7 +29,7 @@ export function VideoScreen({ videoSource, ...props }) {
     <View {...props}>
       <VideoView
         style={{
-          width: "100%",
+          width: '100%',
           height: 250,
           marginBottom: 8,
           borderRadius: 8,

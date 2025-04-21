@@ -1,4 +1,4 @@
-import { SET_ESIM, UPDATE_ESIM } from "./actionTypes";
+import { SET_ESIM, UPDATE_ESIM } from './actionTypes';
 
 export const setEsims = (keysets) => ({
   type: SET_ESIM,

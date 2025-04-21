@@ -1,13 +1,13 @@
-import React from "react";
+import React from 'react';
 
-import Icon, { LightningIcon } from "assets/icons";
+import Icon, { LightningIcon } from 'assets/icons';
 
 // Screen imports
-import HomeView from "app/(drawer)/(tabs)/index";
-import LifestyleView from "app/(drawer)/(tabs)/lifestyle";
-import PaymentsView from "app/(drawer)/(tabs)/payments";
-import MyEsims from "app/(drawer)/(tabs)/myEsims";
-import MyVpns from "app/(drawer)/(tabs)/myVpns";
+import HomeView from 'app/(drawer)/(tabs)/index';
+import LifestyleView from 'app/(drawer)/(tabs)/lifestyle';
+import PaymentsView from 'app/(drawer)/(tabs)/payments';
+import MyEsims from 'app/(drawer)/(tabs)/myEsims';
+import MyVpns from 'app/(drawer)/(tabs)/myVpns';
 
 // Tab configuration
 interface TabConfig {
@@ -21,39 +21,33 @@ interface TabConfig {
 // Tab screens configuration
 export const TAB_SCREENS: TabConfig[] = [
   {
-    name: "payments",
+    name: 'payments',
     component: PaymentsView,
-    title: "Payments",
-    icon: ({ color }) => (
-      <Icon name="fluent:arrow-swap-16-filled" color={color} size={32} />
-    ),
+    title: 'Payments',
+    icon: ({ color }) => <Icon name="fluent:arrow-swap-16-filled" color={color} size={32} />,
   },
   {
-    name: "myEsims",
+    name: 'myEsims',
     component: MyEsims,
-    title: "",
-    icon: ({ color }) => (
-      <Icon name="fluent:sim-24-filled" color={color} size={32} />
-    ),
+    title: '',
+    icon: ({ color }) => <Icon name="fluent:sim-24-filled" color={color} size={32} />,
   },
   {
-    name: "index",
+    name: 'index',
     component: HomeView,
-    title: "Wallet",
+    title: 'Wallet',
     icon: LightningIcon,
   },
   {
-    name: "myVpns",
+    name: 'myVpns',
     component: MyVpns,
-    title: "",
-    icon: ({ color }) => (
-      <Icon name="ic:baseline-vpn-lock" color={color} size={32} />
-    ),
+    title: '',
+    icon: ({ color }) => <Icon name="ic:baseline-vpn-lock" color={color} size={32} />,
   },
   {
-    name: "lifestyle",
+    name: 'lifestyle',
     component: LifestyleView,
-    title: "Products & Services",
+    title: 'Products & Services',
     icon: ({ color }) => (
       <Icon
         name="clarity:internet-of-things-solid"
@@ -62,7 +56,7 @@ export const TAB_SCREENS: TabConfig[] = [
         spin={{
           duration: 2000,
           delay: 4000,
-          outputRange: ["0deg", "120deg"],
+          outputRange: ['0deg', '120deg'],
         }}
       />
     ),
@@ -78,184 +72,184 @@ interface ModalConfig {
 
 export const MODAL_SCREENS: ModalConfig[] = [
   {
-    name: "TabLayout",
+    name: 'TabLayout',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "notifications",
+    name: 'notifications',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "feed",
+    name: 'feed',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "contacts",
+    name: 'contacts',
   },
   {
-    name: "userMessages",
+    name: 'userMessages',
     options: {
-      presentation: "card",
+      presentation: 'card',
     },
   },
   {
-    name: "esim",
+    name: 'esim',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "esimsDataPlan",
+    name: 'esimsDataPlan',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "currency",
+    name: 'currency',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "mints",
+    name: 'mints',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "receive",
+    name: 'receive',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "send",
+    name: 'send',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "camera",
+    name: 'camera',
     options: {},
   },
   {
-    name: "passcode",
+    name: 'passcode',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "backup",
+    name: 'backup',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "profile",
+    name: 'profile',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "profileShare",
+    name: 'profileShare',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "esimShare",
+    name: 'esimShare',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "vpnShare",
+    name: 'vpnShare',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "lightningSendConfirmation",
+    name: 'lightningSendConfirmation',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "ecashReceiveConfirmation",
+    name: 'ecashReceiveConfirmation',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "scanner",
+    name: 'scanner',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "paymentRequestSendConfirmation",
+    name: 'paymentRequestSendConfirmation',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "lightningReceiveConfirmation",
+    name: 'lightningReceiveConfirmation',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "vpn",
+    name: 'vpn',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "esimCountrySelection",
+    name: 'esimCountrySelection',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "esimCheckout",
+    name: 'esimCheckout',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "vpnCheckout",
+    name: 'vpnCheckout',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "nostrSettings",
+    name: 'nostrSettings',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "vpns",
+    name: 'vpns',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "onboard",
+    name: 'onboard',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "post",
+    name: 'post',
     options: {
-      presentation: "card",
+      presentation: 'card',
       fullScreenGestureEnabled: true,
     },
   },
@@ -263,140 +257,140 @@ export const MODAL_SCREENS: ModalConfig[] = [
 
 export const MODAL_SCREENS_ALT: ModalConfig[] = [
   {
-    name: "bitrefill",
-    title: "Gift Cards",
+    name: 'bitrefill',
+    title: 'Gift Cards',
   },
   {
-    name: "onboard/welcome",
-    title: "",
+    name: 'onboard/welcome',
+    title: '',
   },
   {
-    name: "onboard/displayMnemonic",
-    title: "",
+    name: 'onboard/displayMnemonic',
+    title: '',
   },
   {
-    name: "onboard/mnemonic",
-    title: "",
+    name: 'onboard/mnemonic',
+    title: '',
   },
   {
-    name: "onboard/new",
-    title: "",
+    name: 'onboard/new',
+    title: '',
   },
   {
-    name: "onboard/animate",
-    title: "Loading...",
+    name: 'onboard/animate',
+    title: 'Loading...',
   },
   {
-    name: "onboard/restore",
-    title: "",
+    name: 'onboard/restore',
+    title: '',
   },
   {
-    name: "onboard/nsec",
-    title: "",
+    name: 'onboard/nsec',
+    title: '',
   },
   {
-    name: "onboard/ecash",
-    title: "",
+    name: 'onboard/ecash',
+    title: '',
   },
   {
-    name: "onboard/go",
-    title: "",
+    name: 'onboard/go',
+    title: '',
   },
   {
-    name: "onboard/recover",
-    title: "",
+    name: 'onboard/recover',
+    title: '',
   },
   {
-    name: "onboard/nostr",
-    title: "",
+    name: 'onboard/nostr',
+    title: '',
   },
   {
-    name: "giftcards/welcome",
-    title: "Gift cards",
+    name: 'giftcards/welcome',
+    title: 'Gift cards',
     options: {
       headerLargeTitle: true,
     },
   },
   {
-    name: "giftcards/welcome2",
+    name: 'giftcards/welcome2',
     options: {
       headerLargeTitle: true,
     },
   },
   {
-    name: "settings",
-    title: "Settings",
+    name: 'settings',
+    title: 'Settings',
   },
   {
-    name: "settings/showSeedPhrase",
-    title: "Seed Phrase",
+    name: 'settings/showSeedPhrase',
+    title: 'Seed Phrase',
   },
   {
-    name: "settings/about",
-    title: "About",
+    name: 'settings/about',
+    title: 'About',
   },
   {
-    name: "settings/design",
-    title: "Design",
+    name: 'settings/design',
+    title: 'Design',
   },
   {
-    name: "settings/store",
-    title: "Store",
+    name: 'settings/store',
+    title: 'Store',
   },
   {
-    name: "settings/restoreCounter",
-    title: "Restore Counter",
+    name: 'settings/restoreCounter',
+    title: 'Restore Counter',
   },
   {
-    name: "settings/terms",
-    title: "Terms & Conditions",
+    name: 'settings/terms',
+    title: 'Terms & Conditions',
   },
   {
-    name: "settings/customNpub",
-    title: "Custom Lightning URL",
+    name: 'settings/customNpub',
+    title: 'Custom Lightning URL',
   },
   {
-    name: "settings/verifySeedPhrase",
-    title: "Verify Seed Phrase",
+    name: 'settings/verifySeedPhrase',
+    title: 'Verify Seed Phrase',
   },
   {
-    name: "settings/profile",
-    title: "Profile",
+    name: 'settings/profile',
+    title: 'Profile',
   },
   {
-    name: "transactions",
-    title: "Transactions",
+    name: 'transactions',
+    title: 'Transactions',
     options: {
       headerLargeTitle: true,
     },
   },
   {
-    name: "donate/donate",
-    title: "Donate",
+    name: 'donate/donate',
+    title: 'Donate',
     options: {
       headerLargeTitle: true,
     },
   },
   {
-    name: "transaction",
-    title: "",
+    name: 'transaction',
+    title: '',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
   {
-    name: "languageSettings",
-    title: "Language",
+    name: 'languageSettings',
+    title: 'Language',
   },
   {
-    name: "themeSettings",
-    title: "Theme",
+    name: 'themeSettings',
+    title: 'Theme',
   },
   {
-    name: "ecashSendConfirmation",
-    title: "Send Ecash",
+    name: 'ecashSendConfirmation',
+    title: 'Send Ecash',
     options: {
-      presentation: "modal",
+      presentation: 'modal',
     },
   },
 ];

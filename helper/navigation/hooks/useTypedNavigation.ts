@@ -1,6 +1,6 @@
-import { useNavigation, NavigationProp } from "expo-router";
-import { NavigationParams } from "..";
-import { SheetManager } from "react-native-actions-sheet";
+import { useNavigation, NavigationProp } from 'expo-router';
+import { NavigationParams } from '..';
+import { SheetManager } from 'react-native-actions-sheet';
 
 // Type the navigation prop
 type AppNavigationProp = NavigationProp<NavigationParams>;
@@ -10,17 +10,21 @@ export const useTypedNavigation = <T extends keyof NavigationParams>() => {
   const navigate = (
     target: T,
     params: NavigationParams[T],
-    options?: { closeParents?: boolean; closeCurrentAndParent?: boolean; closeCurrentAndParents?: boolean; current: 'drawer' }
+    options?: {
+      closeParents?: boolean;
+      closeCurrentAndParent?: boolean;
+      closeCurrentAndParents?: boolean;
+      current: 'drawer';
+    }
   ) => {
     // https://github.com/ammarahm-ed/react-native-actions-sheet/issues/346
-    SheetManager.hide("button-handler")
+    SheetManager.hide('button-handler');
     if (options?.closeParents) {
       // Close all parent screens
       let parentNavigation: AppNavigationProp = navigation;
       while (parentNavigation.canGoBack()) {
         parentNavigation.goBack();
-        parentNavigation =
-          parentNavigation.getParent<AppNavigationProp>() || parentNavigation;
+        parentNavigation = parentNavigation.getParent<AppNavigationProp>() || parentNavigation;
       }
     } else if (options?.closeCurrentAndParent) {
       // Close the current screen and its immediate parent
@@ -48,7 +52,7 @@ export const useTypedNavigation = <T extends keyof NavigationParams>() => {
       setTimeout(() => {
         const { navigate, navigateDeprecated } = navigation;
         switch (options?.current) {
-          case "drawer":
+          case 'drawer':
             navigateDeprecated(target, params);
           default:
             navigate(target, params);

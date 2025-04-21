@@ -1,7 +1,7 @@
-import React from "react";
-import { shades } from "helper/colors";
-import { OnboardingLayout } from "./OnboardLayout";
-import { useTypedNavigation } from "helper/navigation";
+import React from 'react';
+import { shades } from 'helper/colors';
+import { OnboardingLayout } from './OnboardLayout';
+import { useTypedNavigation } from 'helper/navigation';
 
 export default function ModalScreen() {
   const navigation = useTypedNavigation();
@@ -15,17 +15,17 @@ export default function ModalScreen() {
       nextScreen="onboard/displayMnemonic"
       actions={[
         {
-          text: "Recover Wallet",
+          text: 'Recover Wallet',
           onPress: () =>
-            navigation.navigate("onboard/mnemonic", {
-              type: "recover",
+            navigation.navigate('onboard/mnemonic', {
+              type: 'recover',
               mnemonic: null,
             }),
         },
         {
-          text: "New Wallet",
-          onPress: () => navigation.navigate("onboard/displayMnemonic"),
-          variant: "primary",
+          text: 'New Wallet',
+          onPress: () => navigation.navigate('onboard/displayMnemonic'),
+          variant: 'primary',
         },
       ]}
     />

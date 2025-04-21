@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Animated } from "react-native";
-import { RouteScreenProps } from "react-native-actions-sheet";
-import { Text } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys } from "helper/colors";
-import { Button } from "components/common/Button";
-import { useTypedNavigation } from "helper/navigation";
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import { RouteScreenProps } from 'react-native-actions-sheet';
+import { Text } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import { Button } from 'components/common/Button';
+import { useTypedNavigation } from 'helper/navigation';
 
 const RouteA = ({
   router,
   payload,
-}: RouteScreenProps<"popup-sheet", "route-a"> & {
+}: RouteScreenProps<'popup-sheet', 'route-a'> & {
   payload: {
     variant?: string;
     emoji?: string;
@@ -24,7 +24,7 @@ const RouteA = ({
   const styles = createStyles(theme);
   const [progress] = useState(new Animated.Value(0));
 
-  const isModal = payload?.variant === "modal";
+  const isModal = payload?.variant === 'modal';
   const navigation = useTypedNavigation();
 
   useEffect(() => {
@@ -43,37 +43,31 @@ const RouteA = ({
     }
   }, [router, progress, isModal]);
 
-  
   return (
     <View
       style={{
         marginHorizontal: 16,
         marginBottom: 0,
         borderRadius: 16,
-        overflow: "hidden",
+        overflow: 'hidden',
         backgroundColor: greys(theme)[1800],
         padding: 16,
-        justifyContent: isModal ? "center" : "flex-end",
+        justifyContent: isModal ? 'center' : 'flex-end',
         // flex: 1,
         // height: "90%",
-      }}
-    >
+      }}>
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>{payload?.emoji || "🎉"}</Text>
-        <Text style={styles.text}>{payload?.message || "Error"}</Text>
-        {payload?.submessage && (
-          <Text style={styles.subText}>{payload?.submessage}</Text>
-        )}
+        <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>
+        <Text style={styles.text}>{payload?.message || 'Error'}</Text>
+        {payload?.submessage && <Text style={styles.subText}>{payload?.submessage}</Text>}
       </View>
       {payload?.buttons?.map((button) => {
-        
         return (
           <Button
             onPress={() => {
               navigation.navigate(button.page);
             }}
-            text={button.text}
-          ></Button>
+            text={button.text}></Button>
         );
       })}
       {!isModal && (
@@ -84,7 +78,7 @@ const RouteA = ({
               {
                 width: progress.interpolate({
                   inputRange: [0, 100],
-                  outputRange: ["0%", "100%"],
+                  outputRange: ['0%', '100%'],
                 }),
               },
             ]}
@@ -98,9 +92,9 @@ const RouteA = ({
 const createStyles = (theme: string) =>
   StyleSheet.create({
     iconContainer: {
-      flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
       marginBottom: 10,
     },
     icon: {
@@ -110,18 +104,18 @@ const createStyles = (theme: string) =>
     },
     text: {
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
       fontSize: 20,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     subText: {
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
       fontSize: 14,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
     },
     progressBar: {
-      height: "100%",
+      height: '100%',
       backgroundColor: greys(theme)[0],
       borderRadius: 10000,
     },
@@ -131,7 +125,7 @@ const createStyles = (theme: string) =>
       borderRadius: 10000,
       marginTop: 10,
       width: 30,
-      alignSelf: "center",
+      alignSelf: 'center',
     },
   });
 

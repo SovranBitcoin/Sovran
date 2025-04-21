@@ -1,6 +1,6 @@
-import React from "react";
-import { greens } from "helper/colors";
-import { OnboardingLayout } from "./OnboardLayout";
+import React from 'react';
+import { greens } from 'helper/colors';
+import { OnboardingLayout } from './OnboardLayout';
 
 export default function ModalScreen() {
   return (

@@ -1,10 +1,10 @@
-import React from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
-import { Text } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { FlagIcon, CurrencyIcon } from "assets/icons";
-import { memoizedGetAllBalancesMultipleCurrencies } from "helper/redux/cashu";
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Text } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { FlagIcon, CurrencyIcon } from 'assets/icons';
+import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 
 const CurrencySelector = ({
   selectedCurrency,
@@ -16,19 +16,13 @@ const CurrencySelector = ({
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
 
-  const multipleBalances = useSelector(
-    memoizedGetAllBalancesMultipleCurrencies
-  );
+  const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
   const currencies = multipleBalances.map((b) => b.unit?.toUpperCase());
 
   return (
     <View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.currencyScroll}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
         {currencies.map((currency) => (
           <TouchableOpacity
             key={currency}
@@ -36,16 +30,11 @@ const CurrencySelector = ({
               styles.currencyButton,
               selectedCurrency === currency && styles.selectedCurrencyButton,
             ]}
-            onPress={() => onCurrencyChange(currency)}
-          >
+            onPress={() => onCurrencyChange(currency)}>
             <View style={styles.currencyContent}>
-              {currency === "USD" ||
-              currency === "EUR" ||
-              currency === "GBP" ? (
+              {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                 <FlagIcon
-                  country={
-                    currency === "USD" ? "US" : currency === "EUR" ? "EU" : "GB"
-                  }
+                  country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
                   height={32}
                   width={32}
                 />
@@ -66,7 +55,7 @@ const createStyles = (theme: string) =>
     sectionHeader: {
       color: greys(theme)[0],
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       marginBottom: 12,
     },
     currencyScroll: {
@@ -82,9 +71,9 @@ const createStyles = (theme: string) =>
       minWidth: 100,
     },
     currencyContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       gap: 8,
       width: 36,
       height: 36,
@@ -96,7 +85,7 @@ const createStyles = (theme: string) =>
     currencyText: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
   });
 

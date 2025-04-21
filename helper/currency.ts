@@ -1,24 +1,44 @@
-
-import { store } from "helper/redux/store";
-import { memoizedPricelist } from "helper/redux/pricelist";
+import { store } from 'helper/redux/store';
+import { memoizedPricelist } from 'helper/redux/pricelist';
 
 interface Currency {
   currency: 'BTC' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW';
   value: number;
-  denomination: 'btc' | 'sats' | 'sat' | 'bits' | 'finneys' | 'usd' | 'eur' | 'gbp' | 'aud' | 'cad' | 'nzd' | 'krw';
+  denomination:
+    | 'btc'
+    | 'sats'
+    | 'sat'
+    | 'bits'
+    | 'finneys'
+    | 'usd'
+    | 'eur'
+    | 'gbp'
+    | 'aud'
+    | 'cad'
+    | 'nzd'
+    | 'krw';
 }
 
 interface Options {
   locale: string;
   precision: number;
-  currencyDisplay: "symbol" | "code" | "name" | "none";
-  denomination: 'btc' | 'sats' | 'bits' | 'finneys' | 'usd' | 'eur' | 'gbp' | 'aud' | 'cad' | 'nzd' | 'krw';
+  currencyDisplay: 'symbol' | 'code' | 'name' | 'none';
+  denomination:
+    | 'btc'
+    | 'sats'
+    | 'bits'
+    | 'finneys'
+    | 'usd'
+    | 'eur'
+    | 'gbp'
+    | 'aud'
+    | 'cad'
+    | 'nzd'
+    | 'krw';
   pricelist?: { [key: string]: number };
 }
 
 export function formatCurrency(currency: Currency, options: Options): string {
-
-
   // Conversion rates
   const conversionRates: { [key: string]: number } = {
     btc: 1,
@@ -38,7 +58,11 @@ export function formatCurrency(currency: Currency, options: Options): string {
 
   // Adjust the currency value if the denomination is a fiat currency
   let adjustedCurrencyValue = currency.value;
-  if (['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'krw', 'mstr', 'tsla'].includes(currency.denomination)) {
+  if (
+    ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'krw', 'mstr', 'tsla'].includes(
+      currency.denomination
+    )
+  ) {
     adjustedCurrencyValue = currency.value / 100;
   }
 
@@ -51,42 +75,42 @@ export function formatCurrency(currency: Currency, options: Options): string {
   // Determine the currency display symbol, code, or name
   let currencyDisplay;
   const currencySymbols: { [key: string]: string } = {
-    usd: "$",
-    eur: "€",
-    gbp: "£",
-    btc: "₿",
-    aud: "A$", // Example symbol
-    cad: "C$", // Example symbol
-    nzd: "NZ$", // Example symbol
-    krw: "₩", // Example symbol
-    sat: "ṩ"
+    usd: '$',
+    eur: '€',
+    gbp: '£',
+    btc: '₿',
+    aud: 'A$', // Example symbol
+    cad: 'C$', // Example symbol
+    nzd: 'NZ$', // Example symbol
+    krw: '₩', // Example symbol
+    sat: 'ṩ',
   };
   const currencyNames: { [key: string]: string } = {
-    usd: "US Dollar",
-    eur: "Euro",
-    gbp: "British Pound",
-    btc: "Bitcoin",
-    aud: "Australian Dollar", // Added currency name
-    cad: "Canadian Dollar", // Added currency name
-    nzd: "New Zealand Dollar", // Added currency name
-    krw: "Korean Won", // Added currency name
+    usd: 'US Dollar',
+    eur: 'Euro',
+    gbp: 'British Pound',
+    btc: 'Bitcoin',
+    aud: 'Australian Dollar', // Added currency name
+    cad: 'Canadian Dollar', // Added currency name
+    nzd: 'New Zealand Dollar', // Added currency name
+    krw: 'Korean Won', // Added currency name
   };
 
   switch (options.currencyDisplay) {
-    case "symbol":
-      currencyDisplay = currencySymbols[options.denomination] || "";
+    case 'symbol':
+      currencyDisplay = currencySymbols[options.denomination] || '';
       break;
-    case "code":
+    case 'code':
       currencyDisplay = currency.currency;
       break;
-    case "name":
-      currencyDisplay = currencyNames[options.denomination] || "";
+    case 'name':
+      currencyDisplay = currencyNames[options.denomination] || '';
       break;
-    case "none":
-      currencyDisplay = "";
+    case 'none':
+      currencyDisplay = '';
       break;
     default:
-      currencyDisplay = ""; // Fallback case, though not expected
+      currencyDisplay = ''; // Fallback case, though not expected
   }
 
   // Format the number according to locale and precision
@@ -96,21 +120,20 @@ export function formatCurrency(currency: Currency, options: Options): string {
   }).format(valueInTargetDenomination);
 
   // Construct the final string
-  const finalString = options.currencyDisplay === "name" ?
-    `${formattedNumber} ${options.denomination.toUpperCase() !== 'SATS' ? options.denomination.toUpperCase() : options.denomination}` :
-    `${currencyDisplay}${formattedNumber}`;
+  const finalString =
+    options.currencyDisplay === 'name'
+      ? `${formattedNumber} ${options.denomination.toUpperCase() !== 'SATS' ? options.denomination.toUpperCase() : options.denomination}`
+      : `${currencyDisplay}${formattedNumber}`;
 
   return finalString;
 }
 
 export const formatCurrencyWrapper = (amount, unit, display = 1) => {
   const display_btc = display ?? 1;
-  const currency = unit === "sat" ? "BTC" : unit.toUpperCase();
-  const precision = unit === "sat" ? (display_btc === 0 ? 8 : 0) : 2;
-  const currencyDisplay =
-    unit === "sat" ? (display_btc === 2 ? "name" : "none") : "symbol";
-  const denomination =
-    unit === "sat" ? (display_btc === 0 ? "btc" : "sats") : unit;
+  const currency = unit === 'sat' ? 'BTC' : unit.toUpperCase();
+  const precision = unit === 'sat' ? (display_btc === 0 ? 8 : 0) : 2;
+  const currencyDisplay = unit === 'sat' ? (display_btc === 2 ? 'name' : 'none') : 'symbol';
+  const denomination = unit === 'sat' ? (display_btc === 0 ? 'btc' : 'sats') : unit;
   const value = display_btc === 0 && unit === 'sat' ? amount / 100_000_000 : amount;
 
   return formatCurrency(
@@ -120,7 +143,7 @@ export const formatCurrencyWrapper = (amount, unit, display = 1) => {
       denomination,
     },
     {
-      locale: "en-US",
+      locale: 'en-US',
       precision,
       currencyDisplay,
       denomination,

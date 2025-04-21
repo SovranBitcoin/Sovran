@@ -1,13 +1,13 @@
-import Modal from "components/layout/Modal";
-import { View } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { EventKind } from "./Profile";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedRoute } from "helper/navigation";
-import { Post } from "./ProfilePage/post";
-import React, { useMemo } from "react";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
+import Modal from 'components/layout/Modal';
+import { View } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { EventKind } from './Profile';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedRoute } from 'helper/navigation';
+import { Post } from './ProfilePage/post';
+import React, { useMemo } from 'react';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
 function ParentPosts({ parentPosts }) {
   return (
@@ -23,7 +23,7 @@ function Replies({ post }) {
   const filters = useMemo(
     () => [
       {
-        "#e": [post?.id],
+        '#e': [post?.id],
         kinds: [EventKind.TextNote],
       },
     ],
@@ -44,7 +44,7 @@ function Replies({ post }) {
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
 
-  const { event, parentPosts } = useTypedRoute<"post">();
+  const { event, parentPosts } = useTypedRoute<'post'>();
 
   return (
     <Modal
@@ -52,8 +52,7 @@ export default function ModalScreen() {
       title=""
       childrenStyles={{
         backgroundColor: greys(theme)[1800],
-      }}
-    >
+      }}>
       {parentPosts && <ParentPosts parentPosts={parentPosts} />}
       <Post active post={event} parentPosts={parentPosts} />
       <Replies post={event} />

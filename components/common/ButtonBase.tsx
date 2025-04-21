@@ -1,24 +1,18 @@
-import {
-  StyleSheet,
-  View,
-  Pressable,
-  Animated,
-  useWindowDimensions,
-} from "react-native";
-import { useRef, useEffect, useState } from "react";
-import { greys, shades, white } from "helper/colors";
-import { Text } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { StyleSheet, View, Pressable, Animated, useWindowDimensions } from 'react-native';
+import { useRef, useEffect, useState } from 'react';
+import { greys, shades, white } from 'helper/colors';
+import { Text } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export const ButtonBase = ({
   disabled = false,
   loading = false,
-  variant = "primary",
+  variant = 'primary',
   text,
   onPress,
   icon,
-  position = "center",
+  position = 'center',
   style,
   noPadding = false,
   useGradientBackground = false, // New prop to control gradient rendering in specific implementations
@@ -34,7 +28,7 @@ export const ButtonBase = ({
   const colorsMap = {
     primary: [shades[200], shades[300], shades[500]],
     secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
-    transparent: ["transparent", "transparent"],
+    transparent: ['transparent', 'transparent'],
   };
 
   const { width } = useWindowDimensions();
@@ -62,7 +56,7 @@ export const ButtonBase = ({
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: ['0deg', '360deg'],
   });
 
   return (
@@ -72,14 +66,13 @@ export const ButtonBase = ({
           transform: [{ scale: scaleRef.current }],
           opacity: disabled || loading ? 0.5 : 1,
         },
-      ]}
-    >
+      ]}>
       <Pressable
         disabled={disabled || isLoading || loading}
         style={[
           {
             paddingVertical: 4,
-            overflow: "hidden",
+            overflow: 'hidden',
             margin: 3,
             borderRadius: 32,
             // margin: position === "center" ? 16 : 0,
@@ -87,15 +80,14 @@ export const ButtonBase = ({
             // marginRight: position === "left" ? 4 : 16,
             // marginTop: 8,
             marginBottom: 8,
-            ...(variant === "transparent" || noPadding ? { margin: 0 } : {}),
+            ...(variant === 'transparent' || noPadding ? { margin: 0 } : {}),
             opacity: disabled || isLoading ? 0.5 : 1,
-            width: circle ? 48 : "auto",
-            height: circle ? 48 : "auto",
-            alignItems: "center",
-            justifyContent: "center",
+            width: circle ? 48 : 'auto',
+            height: circle ? 48 : 'auto',
+            alignItems: 'center',
+            justifyContent: 'center',
             borderWidth: 0.33,
-            borderColor:
-              variant === "primary" ? shades[100] : greys(theme)[1000],
+            borderColor: variant === 'primary' ? shades[100] : greys(theme)[1000],
             ...style,
           },
         ]}
@@ -123,30 +115,26 @@ export const ButtonBase = ({
             tension: 90,
             useNativeDriver: true,
           }).start();
-        }}
-      >
+        }}>
         <View style={styles.buttonContent}>
           {isLoading ? (
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
               {/* Replace this icon with your loading icon */}
             </Animated.View>
           ) : (
-            <View style={{ marginRight: icon ? (text ? 8 : 0) : 0 }}>
-              {icon}
-            </View>
+            <View style={{ marginRight: icon ? (text ? 8 : 0) : 0 }}>{icon}</View>
           )}
           <Text
             style={{
-              backgroundColor: "transparent",
-              color: variant === "transparent" ? shades[100] : white,
-              textAlign: "center",
+              backgroundColor: 'transparent',
+              color: variant === 'transparent' ? shades[100] : white,
+              textAlign: 'center',
               paddingTop: 12,
               paddingBottom: 12,
-              fontFamily: "OverpassBold",
+              fontFamily: 'OverpassBold',
               fontSize: 16,
-              width: text ? "auto" : 0,
-            }}
-          >
+              width: text ? 'auto' : 0,
+            }}>
             {text}
           </Text>
         </View>
@@ -159,9 +147,9 @@ export const ButtonBase = ({
 const createStyles = (theme) =>
   StyleSheet.create({
     buttonContent: {
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

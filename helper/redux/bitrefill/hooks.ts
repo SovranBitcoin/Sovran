@@ -1,5 +1,5 @@
-import { useDispatch, useSelector } from "react-redux";
-import { setEvents, appendEvents } from "./actions";
+import { useDispatch, useSelector } from 'react-redux';
+import { setEvents, appendEvents } from './actions';
 
 export const useBitrefill = () => {
   const dispatch = useDispatch();

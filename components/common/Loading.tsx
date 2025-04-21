@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { StyleSheet, Text, View, TextStyle } from "react-native";
+import { memo } from 'react';
+import { StyleSheet, Text, View, TextStyle } from 'react-native';
 import Animated, {
   Extrapolate,
   SharedValue,
@@ -9,13 +9,13 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   interpolateColor,
-} from "react-native-reanimated";
-import hexRgb from "hex-rgb";
-import MaskedView from "@react-native-masked-view/masked-view";
-import { Svg, Defs, RadialGradient, Stop, Circle } from "react-native-svg";
+} from 'react-native-reanimated';
+import hexRgb from 'hex-rgb';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { Svg, Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
-import { AnimatedText } from "components/common/AnimatedText";
-import { shades } from "helper/colors";
+import { AnimatedText } from 'components/common/AnimatedText';
+import { shades } from 'helper/colors';
 
 const lines = 100;
 
@@ -28,11 +28,11 @@ export type ProgressProps = {
 };
 
 export function Progress({
-  text = "progressing",
+  text = 'progressing',
   size = 300,
   value = 0,
-  inactiveColor = "#777",
-  color = "gold",
+  inactiveColor = '#777',
+  color = 'gold',
   textStyle,
 }: ProgressProps) {
   const progress = useSharedValue(-1);
@@ -46,32 +46,23 @@ export function Progress({
       style={{
         width: size,
         height: size,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <MaskedView
-        style={StyleSheet.absoluteFillObject}
-        maskElement={<Gradient size={size} />}
-      >
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+      <MaskedView style={StyleSheet.absoluteFillObject} maskElement={<Gradient size={size} />}>
         <View
           style={{
             flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
           {[...Array(lines).keys()].map((i) => {
             const color1 = hexRgb(shades[300], { alpha: 1 });
             const color2 = hexRgb(shades[500], { alpha: 1 });
             let color;
-            color = `rgba(${
-              color1.red * (1 - i / lines) + color2.red * (i / lines)
-            }, ${
+            color = `rgba(${color1.red * (1 - i / lines) + color2.red * (i / lines)}, ${
               color1.green * (1 - i / lines) + color2.green * (i / lines)
-            }, ${
-              color1.blue * (1 - i / lines) + color2.blue * (i / lines)
-            }, 1)`;
+            }, ${color1.blue * (1 - i / lines) + color2.blue * (i / lines)}, 1)`;
             return (
               <Line
                 progress={progress}
@@ -85,17 +76,17 @@ export function Progress({
           })}
         </View>
       </MaskedView>
-      <View style={{ alignItems: "center" }}>
+      <View style={{ alignItems: 'center' }}>
         <AnimatedText
           text={progress}
           style={[
             {
               fontSize: Math.floor(size * 0.15),
-              color: "#fff",
-              fontWeight: "600",
+              color: '#fff',
+              fontWeight: '600',
               width: size / 2,
-              textAlign: "center",
-              fontVariant: ["tabular-nums"],
+              textAlign: 'center',
+              fontVariant: ['tabular-nums'],
             },
             textStyle,
           ]}
@@ -104,14 +95,13 @@ export function Progress({
         <Text
           style={[
             {
-              color: "#fff",
+              color: '#fff',
               opacity: 0.7,
               width: size / 2,
-              textAlign: "center",
+              textAlign: 'center',
             },
             textStyle,
-          ]}
-        >
+          ]}>
           {text}
         </Text>
       </View>
@@ -127,65 +117,57 @@ type LineProps = {
   index: number;
 };
 
-const Line = memo(
-  ({ progress, color, size, index, inactiveColor }: LineProps) => {
-    const progressToAngle = 360 / lines;
-    const stylez = useAnimatedStyle(() => {
-      const inputRange = [
-        ((index - 2) * 100) / lines,
-        (index * 100) / lines,
-        ((index + 2) * 100) / lines,
-      ];
-      return {
-        transform: [
-          {
-            translateY: interpolate(
-              progress.value,
-              inputRange,
-              [size * 0.07, size * 0.07, 0],
-              Extrapolate.CLAMP
-            ),
-          },
-        ],
+const Line = memo(({ progress, color, size, index, inactiveColor }: LineProps) => {
+  const progressToAngle = 360 / lines;
+  const stylez = useAnimatedStyle(() => {
+    const inputRange = [
+      ((index - 2) * 100) / lines,
+      (index * 100) / lines,
+      ((index + 2) * 100) / lines,
+    ];
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            progress.value,
+            inputRange,
+            [size * 0.07, size * 0.07, 0],
+            Extrapolate.CLAMP
+          ),
+        },
+      ],
 
-        backgroundColor: interpolateColor(progress.value, inputRange, [
-          inactiveColor,
-          inactiveColor,
-          color,
-        ]),
-      };
-    });
-    return (
-      <Animated.View
-        style={[
-          {
-            flex: 1,
-            width: 4,
-            height: size,
-            position: "absolute",
-            overflow: "hidden",
-            justifyContent: "flex-start",
-            transform: [
-              {
-                rotateZ: `${progressToAngle * index}deg`,
-              },
-            ],
-          },
-        ]}
-      >
-        <Animated.View
-          style={[
-            stylez,
-            { height: "50%", borderRadius: 6, overflow: "hidden" },
-          ]}
-        />
-      </Animated.View>
-    );
-  }
-);
+      backgroundColor: interpolateColor(progress.value, inputRange, [
+        inactiveColor,
+        inactiveColor,
+        color,
+      ]),
+    };
+  });
+  return (
+    <Animated.View
+      style={[
+        {
+          flex: 1,
+          width: 4,
+          height: size,
+          position: 'absolute',
+          overflow: 'hidden',
+          justifyContent: 'flex-start',
+          transform: [
+            {
+              rotateZ: `${progressToAngle * index}deg`,
+            },
+          ],
+        },
+      ]}>
+      <Animated.View style={[stylez, { height: '50%', borderRadius: 6, overflow: 'hidden' }]} />
+    </Animated.View>
+  );
+});
 
 const Gradient = ({ size }: { size: number }) => (
-  <Svg height={size} width={size} style={{ position: "absolute" }}>
+  <Svg height={size} width={size} style={{ position: 'absolute' }}>
     <Defs>
       <RadialGradient
         id="grad"
@@ -195,8 +177,7 @@ const Gradient = ({ size }: { size: number }) => (
         ry={size / 2}
         fx={size / 2}
         fy={size / 2}
-        gradientUnits="userSpaceOnUse"
-      >
+        gradientUnits="userSpaceOnUse">
         <Stop offset="0.6" stopColor="#000" stopOpacity="0" />
         <Stop offset="1" stopColor="#00000000" stopOpacity="1" />
       </RadialGradient>

@@ -1,16 +1,16 @@
-import Modal from "components/layout/Modal";
-import { PaymentInfo } from "components/layout/PaymentInfo";
-import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
-import { Section } from "./transaction";
-import { useTypedRoute } from "helper/navigation";
-import { truncateMiddle } from "helper/strings";
-import { showMessage } from "helper/popup/popups";
-import { ButtonHandler } from "./ecashSendConfirmation";
-import { View } from "components/common/Themed";
+import Modal from 'components/layout/Modal';
+import { PaymentInfo } from 'components/layout/PaymentInfo';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Section } from './transaction';
+import { useTypedRoute } from 'helper/navigation';
+import { truncateMiddle } from 'helper/strings';
+import { showMessage } from 'helper/popup/popups';
+import { ButtonHandler } from './ecashSendConfirmation';
+import { View } from 'components/common/Themed';
 
 function ModalScreen() {
-  const { vpnCode, location, config, hash } = useTypedRoute<"vpnShare">();
+  const { vpnCode, location, config, hash } = useTypedRoute<'vpnShare'>();
 
   const downloadAndShareVPN = async () => {
     try {
@@ -22,7 +22,7 @@ function ModalScreen() {
 
       // Check if the Sharing API is available and use it
       if (!(await Sharing.isAvailableAsync())) {
-        showMessage("sharing_unavailable", {}, { emoji: "⚠️" });
+        showMessage('sharing_unavailable', {}, { emoji: '⚠️' });
         return;
       }
 
@@ -30,7 +30,7 @@ function ModalScreen() {
       await Sharing.shareAsync(path);
       // showMessage("VPN configuration shared", path, null, null);
     } catch (err) {
-      showMessage("download_failed", {}, { emoji: "🚨" });
+      showMessage('download_failed', {}, { emoji: '🚨' });
     }
   };
 
@@ -41,27 +41,25 @@ function ModalScreen() {
       buttons={
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "transparent",
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
             paddingBottom: 8,
-          }}
-        >
+          }}>
           <ButtonHandler
             buttons={[
               {
-                text: "Download",
-                variant: "primary",
+                text: 'Download',
+                variant: 'primary',
                 onPress: downloadAndShareVPN,
               },
             ]}
           />
         </View>
-      }
-    >
+      }>
       <PaymentInfo
-        popupMessage={"vpn_copied"}
+        popupMessage={'vpn_copied'}
         data={vpnCode}
         showSection={false}
         variant="secondary"
@@ -71,57 +69,49 @@ function ModalScreen() {
         <Section
           items={[
             {
-              title: "Private Key",
+              title: 'Private Key',
               value: truncateMiddle(
-                config
-                  ?.find((w) => w?.startsWith("PrivateKey"))
-                  ?.split("=")?.[1],
+                config?.find((w) => w?.startsWith('PrivateKey'))?.split('=')?.[1],
                 5
               ),
             },
             {
-              title: "Public Key",
+              title: 'Public Key',
               value: truncateMiddle(
-                config
-                  ?.find((w) => w?.startsWith("PublicKey"))
-                  ?.split("=")?.[1],
+                config?.find((w) => w?.startsWith('PublicKey'))?.split('=')?.[1],
                 5
               ),
             },
             {
-              title: "Preshared Key",
+              title: 'Preshared Key',
               value: truncateMiddle(
-                config
-                  ?.find((w) => w?.startsWith("PresharedKey"))
-                  ?.split("=")?.[1],
+                config?.find((w) => w?.startsWith('PresharedKey'))?.split('=')?.[1],
                 5
               ),
             },
             {
-              title: "Address",
+              title: 'Address',
+              value: config?.find((w) => w?.startsWith('Address'))?.split('=')?.[1],
+            },
+            {
+              title: 'DNS',
               value: config
-                ?.find((w) => w?.startsWith("Address"))
-                ?.split("=")?.[1],
-            },
-            {
-              title: "DNS",
-              value: config
-                ?.find((w) => w?.startsWith("DNS"))
-                ?.split("=")?.[1]
+                ?.find((w) => w?.startsWith('DNS'))
+                ?.split('=')?.[1]
                 ?.trim(),
             },
             {
-              title: "Endpoint",
+              title: 'Endpoint',
               value: config
-                ?.find((w) => w?.startsWith("Endpoint"))
-                ?.split("=")?.[1]
+                ?.find((w) => w?.startsWith('Endpoint'))
+                ?.split('=')?.[1]
                 ?.trim(),
             },
             {
-              title: "AllowedIPs",
+              title: 'AllowedIPs',
               value: config
-                ?.find((w) => w?.startsWith("AllowedIPs"))
-                ?.split("=")?.[1]
+                ?.find((w) => w?.startsWith('AllowedIPs'))
+                ?.split('=')?.[1]
                 ?.trim(),
             },
           ]}

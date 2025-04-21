@@ -518,7 +518,6 @@ export function MintAddMore({ onClose, params }) {
       return recommendedMints.filter((mint) => !mints.includes(mint.id));
     }
 
-
     return recommendedMints.filter((mint) => {
       const mintData = mintsData.get(mint.id)?.supportedUnits;
       if (!mintData) return false;
@@ -555,7 +554,7 @@ export function MintAddMore({ onClose, params }) {
                   ((option === 'BTC' && selectedCurrency === 'SAT') ||
                     (option === 'All' && selectedCurrency === 'All') ||
                     (option !== 'BTC' && option !== 'All' && selectedCurrency === option)) &&
-                  styles.selectedCurrencyButton,
+                    styles.selectedCurrencyButton,
                 ]}
                 onPress={() => {
                   setSelectedCurrency(option === 'BTC' ? 'SAT' : option);

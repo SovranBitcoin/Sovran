@@ -1,4 +1,4 @@
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector } from 'react-redux';
 import {
   setCurrentProfile,
   setProfiles,
@@ -6,7 +6,7 @@ import {
   updateMessageStatus,
   setFollows,
   setSearch,
-} from "./actions";
+} from './actions';
 
 export const useNostr = () => {
   const dispatch = useDispatch();
@@ -20,10 +20,7 @@ export const useNostr = () => {
     search: [...search, ...Object.values(follows).flat()],
     currentProfile,
     profiles: profiles || [],
-    messages: [
-      ...(messages[currentProfile.pubkey] || []),
-      ...(messages["loaded_messages"] || []),
-    ],
+    messages: [...(messages[currentProfile.pubkey] || []), ...(messages['loaded_messages'] || [])],
     setCurrentProfile: (profile) => dispatch(setCurrentProfile(profile)),
     setProfiles: (profiles) => dispatch(setProfiles(profiles)),
     addMessage: (pubkey, message) => dispatch(addMessage(pubkey, message)),

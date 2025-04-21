@@ -1,29 +1,29 @@
-import React, { useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
-import { useNavigation } from "expo-router";
-import { useCameraPermissions } from "expo-camera";
-import "react-native-get-random-values";
-import { Platform, StyleSheet } from "react-native";
-import Swiper from "react-native-web-infinite-swiper";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigation } from 'expo-router';
+import { useCameraPermissions } from 'expo-camera';
+import 'react-native-get-random-values';
+import { Platform, StyleSheet } from 'react-native';
+import Swiper from 'react-native-web-infinite-swiper';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { Text, View } from "components/common/Themed";
-import Icon, { ArrowIcon } from "assets/icons";
+import { Text, View } from 'components/common/Themed';
+import Icon, { ArrowIcon } from 'assets/icons';
 
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import Haptics from "components/common/Haptics";
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import Haptics from 'components/common/Haptics';
 
 import {
   memoizedGetAllBalancesMultipleCurrencies,
   memoizedGetBalance,
   memoizedGetSelectedMint,
   useCashu,
-} from "helper/redux/cashu";
-import { greys, shades } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { store } from "helper/redux/store";
-import { showMessage } from "helper/popup/popups";
-import { Account } from "./Account";
+} from 'helper/redux/cashu';
+import { greys, shades } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { store } from 'helper/redux/store';
+import { showMessage } from 'helper/popup/popups';
+import { Account } from './Account';
 
 export function AccountPagerView({ accounts, setAccount, account }) {
   const { proofs, keysets } = useCashu();
@@ -35,13 +35,10 @@ export function AccountPagerView({ accounts, setAccount, account }) {
   const navigation = useNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-  const multipleBalances = useSelector(
-    memoizedGetAllBalancesMultipleCurrencies
-  );
+  const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const loopedAccounts = accounts.filter((account) => {
     return multipleBalances.some(
-      (balance) =>
-        balance.unit === account.unit && balance.mintUrl === selectedMintUrl
+      (balance) => balance.unit === account.unit && balance.mintUrl === selectedMintUrl
     );
   });
 
@@ -73,9 +70,8 @@ export function AccountPagerView({ accounts, setAccount, account }) {
           onIndexChanged={onPageSelected}
           controlsProps={{
             dotsTouchable: true,
-            dotsPos: "top",
-          }}
-        >
+            dotsPos: 'top',
+          }}>
           {loopedAccounts.map((acc, index) => (
             <View key={acc.key + index} style={styles.swiperView}>
               <Account
@@ -92,28 +88,26 @@ export function AccountPagerView({ accounts, setAccount, account }) {
       <View style={styles.absoluteTop}>
         {[
           {
-            page: "receive",
+            page: 'receive',
             text: {
-              id: "onchain_receive_button",
-              children: "Receive",
+              id: 'onchain_receive_button',
+              children: 'Receive',
             },
             icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
           },
           {
-            page: "camera",
+            page: 'camera',
             text: {
-              id: "scan_button",
-              children: "Scan",
+              id: 'scan_button',
+              children: 'Scan',
             },
-            icon: (
-              <Icon name="stash:qr-code" size={24} color={greys(theme)[0]} />
-            ),
+            icon: <Icon name="stash:qr-code" size={24} color={greys(theme)[0]} />,
           },
           {
-            page: "currency",
+            page: 'currency',
             text: {
-              id: "onchain_send_button",
-              children: "Send",
+              id: 'onchain_send_button',
+              children: 'Send',
             },
             icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
           },
@@ -123,64 +117,55 @@ export function AccountPagerView({ accounts, setAccount, account }) {
               key={page}
               style={[
                 styles.touchableOpacity,
-                page === "camera" && styles.cameraButton,
-                page === "receive" && styles.receiveButton,
-                page === "currency" && styles.sendButton,
+                page === 'camera' && styles.cameraButton,
+                page === 'receive' && styles.receiveButton,
+                page === 'currency' && styles.sendButton,
               ]}
               onPress={async () => {
-                const balance = memoizedGetBalance(account.unit)(
-                  store.getState()
-                );
-                if (page === "currency" && balance <= 0) {
+                const balance = memoizedGetBalance(account.unit)(store.getState());
+                if (page === 'currency' && balance <= 0) {
                   showMessage(
-                    "insufficient_balance",
+                    'insufficient_balance',
                     {
                       amount: balance,
                       unit: account.unit,
                       fee: 0,
                     },
-                    { emoji: "🚨" }
+                    { emoji: '🚨' }
                   );
                 } else {
-                  if (page === "camera" && !hasPermission?.granted) {
+                  if (page === 'camera' && !hasPermission?.granted) {
                     const res = await requestPermission();
                     if (!res.granted) {
-                      showMessage(
-                        "camera_permission_denied",
-                        {},
-                        { emoji: "🚨" }
-                      );
+                      showMessage('camera_permission_denied', {}, { emoji: '🚨' });
                       return;
                     }
                   }
                   navigation.navigate(page, {
-                    to: "ecashSendConfirmation",
+                    to: 'ecashSendConfirmation',
                     unit: account.unit,
                     type: account.type,
                     accountIndex: account.accountIndex,
                   });
                 }
-              }}
-            >
+              }}>
               <LinearGradient
-                style={[page === "camera" && styles.cameraGradient]}
+                style={[page === 'camera' && styles.cameraGradient]}
                 colors={
-                  page === "camera"
+                  page === 'camera'
                     ? [shades[200], shades[400]]
-                    : ["rgba(0,0,0,0)", "rgba(0,0,0,0)"]
-                }
-              >
+                    : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
+                }>
                 <View style={styles.iconContainer}>
                   <View
                     style={[
                       styles.iconView,
-                      page === "camera" && styles.cameraIconView,
-                      page === "receive" && styles.receiveIconView,
-                      page === "currency" && styles.sendIconView,
-                    ]}
-                  >
+                      page === 'camera' && styles.cameraIconView,
+                      page === 'receive' && styles.receiveIconView,
+                      page === 'currency' && styles.sendIconView,
+                    ]}>
                     <View style={styles.transparentBackground}>{icon}</View>
-                    {page !== "camera" && (
+                    {page !== 'camera' && (
                       <Text weight="bold" size={14} style={styles.iconText}>
                         {text.children}
                       </Text>
@@ -199,39 +184,39 @@ export function AccountPagerView({ accounts, setAccount, account }) {
 const createStyles = (theme) =>
   StyleSheet.create({
     transparentBackground: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     accountPagerView: {
-      display: "flex",
+      display: 'flex',
       height: 300,
-      width: "100%",
+      width: '100%',
     },
     swiperView: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       backgroundColor: greys(theme)[2300],
     },
     absoluteTop: {
-      position: "absolute",
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-around",
-      top: Platform.OS === "web" ? 159 + 64 : 159,
+      position: 'absolute',
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      top: Platform.OS === 'web' ? 159 + 64 : 159,
       padding: 0,
       margin: 0,
       zIndex: 3,
       height: 130,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       paddingLeft: 16,
       paddingRight: 16,
     },
     touchableOpacity: {
       flex: 1,
-      maxWidth: "auto",
+      maxWidth: 'auto',
       zIndex: -1,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     cameraButton: {
       maxWidth: 64,
@@ -256,22 +241,22 @@ const createStyles = (theme) =>
       borderRadius: 1000,
     },
     iconContainer: {
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "transparent",
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
     },
     iconView: {
-      alignContent: "center",
-      flexDirection: "row",
+      alignContent: 'center',
+      flexDirection: 'row',
       padding: 12,
       minWidth: 90,
-      width: "100%",
-      justifyContent: "center",
-      alignItems: "center",
+      width: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     cameraIconView: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       borderRadius: 1000,
     },
     receiveIconView: {

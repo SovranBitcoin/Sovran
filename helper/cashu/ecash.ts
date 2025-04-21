@@ -5,8 +5,8 @@ import {
   PaymentRequestTransport,
   PaymentRequestTransportType,
   Token,
-} from "@cashu/cashu-ts";
-import { getWallet } from ".";
+} from '@cashu/cashu-ts';
+import { getWallet } from '.';
 import {
   appendProofsV2,
   appendTransaction,
@@ -16,16 +16,16 @@ import {
   memoizedGetProofs,
   memoizedGetSelectedMint,
   removeProofs,
-  updateTransaction
-} from "helper/redux/cashu";
-import { store } from "helper/redux/store";
-import { AppError } from "components/cashu";
-import { giveaways } from "./secrets";
-import { publishWalletEvent } from "../nostr/cashu";
-import { nip19 } from "nostr-tools";
-import { v4 as uuidv4 } from "uuid";
-import { showMessage } from "../popup/popups";
-import { SheetManager } from "react-native-actions-sheet";
+  updateTransaction,
+} from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { AppError } from 'components/cashu';
+import { giveaways } from './secrets';
+import { publishWalletEvent } from '../nostr/cashu';
+import { nip19 } from 'nostr-tools';
+import { v4 as uuidv4 } from 'uuid';
+import { showMessage } from '../popup/popups';
+import { SheetManager } from 'react-native-actions-sheet';
 
 interface SendEcashProps {
   amount: number;
@@ -73,7 +73,7 @@ export async function sendEcash({
   const profileId = state.nostr?.currentProfile?.id;
 
   if (amount > balance) {
-    throw new AppError("insufficient_funds", "Insufficient funds");
+    throw new AppError('insufficient_funds', 'Insufficient funds');
   }
 
   const wallet = await getWallet({
@@ -83,7 +83,7 @@ export async function sendEcash({
   });
 
   if (!wallet) {
-    throw new AppError("wallet_not_found", "Wallet not found");
+    throw new AppError('wallet_not_found', 'Wallet not found');
   }
 
   try {
@@ -139,9 +139,9 @@ export async function sendEcash({
         transaction: {
           amount,
           date: new Date().toISOString(),
-          type: "ecash",
+          type: 'ecash',
           token: encodedToken,
-          transactionType: "send",
+          transactionType: 'send',
           unit,
           nostr: {
             pubkey: to,
@@ -152,8 +152,8 @@ export async function sendEcash({
           counter,
           proofs: {
             send,
-            keep
-          }
+            keep,
+          },
         },
       })
     );
@@ -172,7 +172,7 @@ export async function receiveEcash({
   isRefund = false,
   isSweep = false,
   lnurl,
-  from = "Unknown",
+  from = 'Unknown',
   note,
   trust = false,
 }: ReceiveEcashProps): Promise<any> {
@@ -192,11 +192,7 @@ export async function receiveEcash({
         } catch (e) {
           parsed = proof.secret;
         }
-        return (
-          Array.isArray(parsed) &&
-          parsed[0] === "P2PK" &&
-          parsed[1].data === pubkey
-        );
+        return Array.isArray(parsed) && parsed[0] === 'P2PK' && parsed[1].data === pubkey;
       });
     });
 
@@ -207,7 +203,7 @@ export async function receiveEcash({
     });
 
     if (!wallet) {
-      throw new AppError("wallet_not_found", "Wallet not found");
+      throw new AppError('wallet_not_found', 'Wallet not found');
     }
 
     const counter = memoizedGetCounterV2({
@@ -222,7 +218,7 @@ export async function receiveEcash({
     });
 
     if (!response) {
-      throw new AppError("invalid_token", "Invalid token");
+      throw new AppError('invalid_token', 'Invalid token');
     }
 
     const newProofs = [...response];
@@ -236,20 +232,16 @@ export async function receiveEcash({
       })
     );
 
-    await store.dispatch(
-      appendProofsV2({ profileId, mintUrl: receiveMintUrl, proofs: newProofs })
-    );
+    await store.dispatch(appendProofsV2({ profileId, mintUrl: receiveMintUrl, proofs: newProofs }));
 
-    const totalAmount = decodedToken.proofs
-      .map((p) => p.amount)
-      .reduce((a, b) => a + b, 0);
+    const totalAmount = decodedToken.proofs.map((p) => p.amount).reduce((a, b) => a + b, 0);
 
     const newTransaction: Transaction = {
       amount: totalAmount,
       date: new Date().toISOString(),
-      type: "ecash",
+      type: 'ecash',
       token,
-      transactionType: "receive",
+      transactionType: 'receive',
       unit,
       isBuy,
       isCancel,
@@ -266,7 +258,7 @@ export async function receiveEcash({
       proofs: {
         keep: newProofs,
       },
-      lnurl
+      lnurl,
     };
 
     store.dispatch(
@@ -276,9 +268,12 @@ export async function receiveEcash({
       })
     );
 
-    await publishWalletEvent(
-      [...new Set([...store.getState().cashu?.profiles?.[profileId]?.transactions.map(t => t.mintUrl), receiveMintUrl])]
-    );
+    await publishWalletEvent([
+      ...new Set([
+        ...store.getState().cashu?.profiles?.[profileId]?.transactions.map((t) => t.mintUrl),
+        receiveMintUrl,
+      ]),
+    ]);
 
     return newTransaction;
   } catch (error) {
@@ -304,7 +299,7 @@ export async function getPaymentRequest({
       {
         type: PaymentRequestTransportType.NOSTR,
         target: nprofile,
-        tags: [["n", "17"]],
+        tags: [['n', '17']],
       } as PaymentRequestTransport,
     ],
     uuidv4(),
@@ -340,9 +335,9 @@ export async function cancelEcashTransaction(
       })
     );
 
-    SheetManager.hide("button-handler");
-    navigation.navigate("", {}, { closeParents: true });
+    SheetManager.hide('button-handler');
+    navigation.navigate('', {}, { closeParents: true });
   } catch (error) {
-    showMessage(error.message, {}, { emoji: "🚨" });
+    showMessage(error.message, {}, { emoji: '🚨' });
   }
 }

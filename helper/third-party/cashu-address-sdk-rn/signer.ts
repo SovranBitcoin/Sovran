@@ -6,16 +6,16 @@ import {
   generateSecretKey,
   getPublicKey,
   nip04,
-} from "nostr-tools";
-import { Signer } from "./types";
-import { createRandomString } from "./utils";
+} from 'nostr-tools';
+import { Signer } from './types';
+import { createRandomString } from './utils';
 
 export class NsecSigner implements Signer {
   secretKey: Uint8Array;
 
   constructor(secretKey: Uint8Array) {
     if (secretKey.length !== 32) {
-      throw new Error("Expected secret key of 32 bytes");
+      throw new Error('Expected secret key of 32 bytes');
     }
     this.secretKey = secretKey;
   }
@@ -45,21 +45,17 @@ export class Nip46Signer implements Signer {
     this.clientPublicKey = getPublicKey(this.clientSecretKey);
     const parsedConnectionString = new URL(connectionString);
     this.connectionString = parsedConnectionString;
-    this.signerKey =
-      parsedConnectionString.hostname ||
-      parsedConnectionString.pathname.slice(2);
-    const relay = parsedConnectionString.searchParams.get("relay");
+    this.signerKey = parsedConnectionString.hostname || parsedConnectionString.pathname.slice(2);
+    const relay = parsedConnectionString.searchParams.get('relay');
     if (!relay) {
-      throw new Error("Connection String is missing relay param...");
+      throw new Error('Connection String is missing relay param...');
     }
     this.relay = relay;
   }
 
   async signEvent(e: EventTemplate) {
     if (!this.isConnected) {
-      throw new Error(
-        "Not connected to signer. Please make sure to call connect() first",
-      );
+      throw new Error('Not connected to signer. Please make sure to call connect() first');
     }
     return this.createSignRequest(e);
   }
@@ -68,17 +64,17 @@ export class Nip46Signer implements Signer {
     const id = createRandomString();
     const requestJson = JSON.stringify({
       id: id,
-      method: "connect",
+      method: 'connect',
       params: [this.clientPublicKey],
     });
     const encryptedRequestJson = await nip04.encrypt(
       this.clientSecretKey,
       this.signerKey,
-      requestJson,
+      requestJson
     );
     let eventTemplate: EventTemplate = {
       kind: 24133,
-      tags: [["p", this.signerKey]],
+      tags: [['p', this.signerKey]],
       content: encryptedRequestJson,
       created_at: Math.floor(Date.now() / 1000),
     };
@@ -86,31 +82,27 @@ export class Nip46Signer implements Signer {
     const res = await new Promise((res, rej) => {
       const timer = setTimeout(() => {
         sub.close();
-        rej("Signer request timed out...");
+        rej('Signer request timed out...');
       }, 60000);
       const sub = this.pool.subscribeMany(
         [this.relay],
-        [{ authors: [this.signerKey], "#p": [this.clientPublicKey] }],
+        [{ authors: [this.signerKey], '#p': [this.clientPublicKey] }],
         {
           onevent: async (e) => {
             try {
-              const decrypted = await nip04.decrypt(
-                this.clientSecretKey,
-                e.pubkey,
-                e.content,
-              );
+              const decrypted = await nip04.decrypt(this.clientSecretKey, e.pubkey, e.content);
               const resultJSON = JSON.parse(decrypted);
-              if (resultJSON.id === id && resultJSON.result === "ack") {
+              if (resultJSON.id === id && resultJSON.result === 'ack') {
                 this.isConnected = true;
                 sub.close();
                 clearTimeout(timer);
-                res("yay");
+                res('yay');
               }
             } catch (e) {
-              // 
+              //
             }
           },
-        },
+        }
       );
       this.pool.publish([this.relay], event);
     });
@@ -121,48 +113,40 @@ export class Nip46Signer implements Signer {
     const id = createRandomString();
     const requestJson = JSON.stringify({
       id: id,
-      method: "sign_event",
+      method: 'sign_event',
       params: [JSON.stringify(event)],
     });
     const encryptedRequestJson = await nip04.encrypt(
       this.clientSecretKey,
       this.signerKey,
-      requestJson,
+      requestJson
     );
     const signRequest: EventTemplate = {
       kind: 24133,
-      tags: [["p", this.signerKey]],
+      tags: [['p', this.signerKey]],
       content: encryptedRequestJson,
       created_at: Math.floor(Date.now() / 1000),
     };
     return new Promise<Event>(async (res, rej) => {
       const timer = setTimeout(() => {
         sub.close();
-        rej("Signer request timed out...");
+        rej('Signer request timed out...');
       }, 60000);
       const finalizedEvent = finalizeEvent(signRequest, this.clientSecretKey);
       const sub = this.pool.subscribeMany(
         [this.relay],
-        [{ "#p": [this.clientPublicKey], authors: [this.signerKey] }],
+        [{ '#p': [this.clientPublicKey], authors: [this.signerKey] }],
         {
           onevent: async (e) => {
-            const decrypted = await nip04.decrypt(
-              this.clientSecretKey,
-              e.pubkey,
-              e.content,
-            );
+            const decrypted = await nip04.decrypt(this.clientSecretKey, e.pubkey, e.content);
             const resultJSON = JSON.parse(decrypted);
-            if (
-              !resultJSON.error &&
-              resultJSON.result &&
-              resultJSON.id === id
-            ) {
+            if (!resultJSON.error && resultJSON.result && resultJSON.id === id) {
               sub.close();
               clearTimeout(timer);
               res(JSON.parse(resultJSON.result));
             }
           },
-        },
+        }
       );
       this.pool.publish([this.relay], finalizedEvent);
     });

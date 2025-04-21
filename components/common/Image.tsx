@@ -1,6 +1,6 @@
-import { Image } from "expo-image";
+import { Image } from 'expo-image';
 
-const blurhash = "000000";
+const blurhash = '000000';
 
 export default function App({ style, source }) {
   return (

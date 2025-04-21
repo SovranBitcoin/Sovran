@@ -1,21 +1,21 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet } from 'react-native';
 
-import { greys } from "helper/colors";
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import { FlagIcon, ShareIcon } from "assets/icons";
-import { useEffect, useState } from "react";
-import lookup from "country-code-lookup";
-import { Section } from "./transaction";
-import { useSelector } from "react-redux";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { useVpn } from "helper/redux/lnvpn";
-import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { truncateMiddle } from "helper/strings";
-import { showMessage } from "helper/popup/popups";
-import { ButtonHandler } from "./ecashSendConfirmation";
+import { greys } from 'helper/colors';
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import { FlagIcon, ShareIcon } from 'assets/icons';
+import { useEffect, useState } from 'react';
+import lookup from 'country-code-lookup';
+import { Section } from './transaction';
+import { useSelector } from 'react-redux';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useVpn } from 'helper/redux/lnvpn';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { truncateMiddle } from 'helper/strings';
+import { showMessage } from 'helper/popup/popups';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes
@@ -66,19 +66,19 @@ function ModalScreen() {
   const { vpn, updateVpn } = useVpn();
   //
   const activateVPN = async () => {
-    const response = await fetch("https://lnvpn.net/api/v1/getTunnelConfig", {
-      method: "POST",
+    const response = await fetch('https://lnvpn.net/api/v1/getTunnelConfig', {
+      method: 'POST',
       headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        Priority: "u=0",
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        Priority: 'u=0',
       },
       body: `paymentHash=${params.payment_hash}&location=${params.cc}`,
-      mode: "cors",
-      credentials: "omit",
+      mode: 'cors',
+      credentials: 'omit',
     });
     const data = await response.json();
     //
@@ -86,19 +86,19 @@ function ModalScreen() {
     const orderedAt = new Date();
     let expiryDate;
     switch (params.duration) {
-      case "1 hour":
+      case '1 hour':
         expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
         break;
-      case "1 day":
+      case '1 day':
         expiryDate = new Date(orderedAt.getTime() + 24 * 60 * 60 * 1000);
         break;
-      case "1 week":
+      case '1 week':
         expiryDate = new Date(orderedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
         break;
-      case "1 month":
+      case '1 month':
         expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 1));
         break;
-      case "3 months":
+      case '3 months':
         expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 3));
         break;
       default:
@@ -114,11 +114,9 @@ function ModalScreen() {
   const downloadAndShareVPN = async () => {
     const vpnCode = vpn
       ?.find((v) => v.payment_request === params.payment_request)
-      ?.order?.WireguardConfig.join("\n");
+      ?.order?.WireguardConfig.join('\n');
 
-    const hash = vpn?.find(
-      (v) => v.payment_request === params.payment_request
-    )?.payment_hash;
+    const hash = vpn?.find((v) => v.payment_request === params.payment_request)?.payment_hash;
 
     try {
       // Save the file in the app's document directory first
@@ -129,7 +127,7 @@ function ModalScreen() {
 
       // Check if the Sharing API is available and use it
       if (!(await Sharing.isAvailableAsync())) {
-        showMessage("sharing_unavailable", {}, { emoji: "⚠️" });
+        showMessage('sharing_unavailable', {}, { emoji: '⚠️' });
         return;
       }
 
@@ -137,11 +135,11 @@ function ModalScreen() {
       await Sharing.shareAsync(path);
       // showMessage("VPN configuration shared", path, null, null);
     } catch (err) {
-      showMessage("download_failed", {}, { emoji: "🚨" });
+      showMessage('download_failed', {}, { emoji: '🚨' });
     }
   };
 
-  const [remainingTime, setRemainingTime] = useState("Calculating...");
+  const [remainingTime, setRemainingTime] = useState('Calculating...');
 
   const calculateRemainingTime = (expiryDate) => {
     const currentDate = new Date();
@@ -151,9 +149,7 @@ function ModalScreen() {
       const timeDiff = expiry - currentDate;
 
       const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-      );
+      const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
 
       if (days > 0) {
@@ -163,17 +159,16 @@ function ModalScreen() {
       } else if (minutes > 0) {
         return `${minutes} minutes remaining`;
       } else {
-        return "Expired";
+        return 'Expired';
       }
     } else {
-      return "Expired";
+      return 'Expired';
     }
   };
 
   useEffect(() => {
-    const expiryDate = vpn?.find(
-      (v) => v.payment_request === params.payment_request
-    )?.order?.expiry_date;
+    const expiryDate = vpn?.find((v) => v.payment_request === params.payment_request)?.order
+      ?.expiry_date;
 
     if (expiryDate) {
       const interval = setInterval(() => {
@@ -182,7 +177,7 @@ function ModalScreen() {
 
       return () => clearInterval(interval); // Cleanup interval on component unmount
     } else {
-      setRemainingTime("Not activated");
+      setRemainingTime('Not activated');
     }
   }, [vpn, params.payment_request]);
 
@@ -196,32 +191,24 @@ function ModalScreen() {
             special={false}
             items={[
               {
-                title: "Location",
+                title: 'Location',
                 value: (
                   <View
                     style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    <FlagIcon
-                      width={24}
-                      height={24}
-                      country={params.location}
-                    />
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: 'transparent',
+                    }}>
+                    <FlagIcon width={24} height={24} country={params.location} />
                     <Text
                       style={{
                         marginLeft: 4,
                         fontSize: 16,
-                      }}
-                    >
+                      }}>
                       {
                         lookup.byIso(
-                          vpn?.find(
-                            (v) => v.payment_request === params.payment_request
-                          ).location
+                          vpn?.find((v) => v.payment_request === params.payment_request).location
                         ).country
                       }
                     </Text>
@@ -229,36 +216,31 @@ function ModalScreen() {
                 ),
               },
               {
-                title: "Payment Hash",
+                title: 'Payment Hash',
                 value: truncateMiddle(
-                  vpn?.find((v) => v.payment_request === params.payment_request)
-                    ?.payment_hash,
+                  vpn?.find((v) => v.payment_request === params.payment_request)?.payment_hash,
                   5
                 ),
               },
               {
-                title: "Payment Request",
+                title: 'Payment Request',
                 value: truncateMiddle(
-                  vpn?.find((v) => v.payment_request === params.payment_request)
-                    ?.payment_request,
+                  vpn?.find((v) => v.payment_request === params.payment_request)?.payment_request,
                   5
                 ),
               },
               {
-                title: "Duration",
-                value: vpn?.find(
-                  (v) => v.payment_request === params.payment_request
-                )?.duration,
+                title: 'Duration',
+                value: vpn?.find((v) => v.payment_request === params.payment_request)?.duration,
               },
               {
-                title: "Time Remaining",
+                title: 'Time Remaining',
                 value: remainingTime,
               },
-              ...(vpn?.find((v) => v.payment_request === params.payment_request)
-                ?.order?.expiry_date
+              ...(vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
                 ? [
                     {
-                      title: "Valid until",
+                      title: 'Valid until',
                       value: new Date(
                         vpn?.find(
                           (v) => v.payment_request === params.payment_request
@@ -268,8 +250,8 @@ function ModalScreen() {
                   ]
                 : []),
               {
-                title: "Provider",
-                value: "LNVPN",
+                title: 'Provider',
+                value: 'LNVPN',
               },
             ]}
           />
@@ -278,73 +260,62 @@ function ModalScreen() {
       buttons={
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "transparent",
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
             paddingBottom: 8,
-          }}
-        >
+          }}>
           <ButtonHandler
             buttons={[
               ...(new Date() <
               new Date(
-                vpn?.find(
-                  (v) => v.payment_request === params.payment_request
-                )?.order?.expiry_date
+                vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
               )
                 ? [
                     {
-                      text: "Share",
+                      text: 'Share',
                       icon: <ShareIcon />,
-                      variant: "secondary",
+                      variant: 'secondary',
                       onPress: () => {
-                        navigation.navigate("VpnShare", {
+                        navigation.navigate('VpnShare', {
                           vpnCode: vpn
-                            ?.find(
-                              (v) =>
-                                v.payment_request === params.payment_request
-                            )
-                            ?.order?.WireguardConfig.join("\n"),
-                          location: vpn?.find(
-                            (v) => v.payment_request === params.payment_request
-                          ).location,
-                          config: vpn?.find(
-                            (v) => v.payment_request === params.payment_request
-                          )?.order?.WireguardConfig,
-                          hash: vpn?.find(
-                            (v) => v.payment_request === params.payment_request
-                          )?.payment_hash,
+                            ?.find((v) => v.payment_request === params.payment_request)
+                            ?.order?.WireguardConfig.join('\n'),
+                          location: vpn?.find((v) => v.payment_request === params.payment_request)
+                            .location,
+                          config: vpn?.find((v) => v.payment_request === params.payment_request)
+                            ?.order?.WireguardConfig,
+                          hash: vpn?.find((v) => v.payment_request === params.payment_request)
+                            ?.payment_hash,
                         });
                       },
                     },
                     {
-                      text: "Download",
-                      variant: "primary",
+                      text: 'Download',
+                      variant: 'primary',
                       onPress: downloadAndShareVPN,
                     },
                   ]
                 : []),
               ...(new Date() <
               new Date(
-                vpn?.find(
-                  (v) => v.payment_request === params.payment_request
-                )?.order?.expiry_date
+                vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
               )
                 ? [
                     {
-                      text: "Activate",
-                      variant: "primary",
-                      disabled: remainingTime === "Calculating...",
+                      text: 'Activate',
+                      variant: 'primary',
+                      disabled: remainingTime === 'Calculating...',
                       onPress: activateVPN,
                     },
                   ]
                 : []),
-              ...(remainingTime === "Not activated"
+              ...(remainingTime === 'Not activated'
                 ? [
                     {
-                      text: "Activate",
-                      variant: "primary",
+                      text: 'Activate',
+                      variant: 'primary',
                       onPress: activateVPN,
                     },
                   ]
@@ -362,15 +333,15 @@ export default ModalScreen;
 const createStyles = (theme) =>
   StyleSheet.create({
     minus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#9A4141",
+      color: '#9A4141',
       marginRight: 4,
     },
     plus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#499A41",
+      color: '#499A41',
       marginRight: 4,
     },
     container: {
@@ -378,12 +349,12 @@ const createStyles = (theme) =>
     },
     title: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[1000],
     },
     separator: {
       marginVertical: 30,
       height: 1,
-      width: "80%",
+      width: '80%',
     },
   });

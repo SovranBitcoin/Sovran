@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import lookup from "country-code-lookup";
-import { useSelector } from "react-redux";
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import lookup from 'country-code-lookup';
+import { useSelector } from 'react-redux';
 
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import CircularProgress from "components/common/CircleProgress";
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import CircularProgress from 'components/common/CircleProgress';
 
-import { useCashu } from "helper/redux/cashu";
-import { greys } from "helper/colors";
-import { useVpn } from "helper/redux/lnvpn";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { Tabs } from "./payments";
-import { ButtonHandler } from "app/ecashSendConfirmation";
+import { useCashu } from 'helper/redux/cashu';
+import { greys } from 'helper/colors';
+import { useVpn } from 'helper/redux/lnvpn';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { Tabs } from './payments';
+import { ButtonHandler } from 'app/ecashSendConfirmation';
 
 function TabTwoScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -22,16 +22,11 @@ function TabTwoScreen() {
   const { transactions: cashuTransactions } = useCashu();
   const { vpn } = useVpn();
   const [fetchingPackages, setFetchingPackages] = useState(false);
-  const [selectedTab, setSelectedTab] = useState("New"); // State for selected tab
+  const [selectedTab, setSelectedTab] = useState('New'); // State for selected tab
 
   const paidVpns = vpn.filter((vpn: any) =>
     cashuTransactions.some((tx: any) => {
-      if (
-        tx.request &&
-        vpn.payment_request &&
-        tx.request === vpn.payment_request &&
-        tx.paid
-      ) {
+      if (tx.request && vpn.payment_request && tx.request === vpn.payment_request && tx.paid) {
         return true;
       }
       return false;
@@ -48,9 +43,9 @@ function TabTwoScreen() {
   );
 
   const amounts = [
-    nonActiveVpns.length > 99 ? "99+" : nonActiveVpns.length,
-    nonExpiredVpns.length > 99 ? "99+" : nonExpiredVpns.length,
-    expiredVpns.length > 99 ? "99+" : expiredVpns.length,
+    nonActiveVpns.length > 99 ? '99+' : nonActiveVpns.length,
+    nonExpiredVpns.length > 99 ? '99+' : nonExpiredVpns.length,
+    expiredVpns.length > 99 ? '99+' : expiredVpns.length,
   ];
 
   return (
@@ -63,39 +58,36 @@ function TabTwoScreen() {
           context="tab"
           buttons={[
             {
-              text: "Get a VPN",
-              variant: "primary",
-              onPress: () => navigation.navigate("vpns"),
+              text: 'Get a VPN',
+              variant: 'primary',
+              onPress: () => navigation.navigate('vpns'),
             },
           ]}
         />
-      }
-    >
+      }>
       <Text
         size={32}
         style={{
-          fontFamily: "OverpassHeavy",
+          fontFamily: 'OverpassHeavy',
           marginLeft: 16,
           marginBottom: 4,
           marginTop: 4,
-        }}
-      >
+        }}>
         VPNs
       </Text>
       <View
         style={{
           paddingHorizontal: 16,
-        }}
-      >
+        }}>
         <Tabs
-          tabs={["New", "Active", "Expired"]}
+          tabs={['New', 'Active', 'Expired']}
           amounts={amounts}
           selectedTab={selectedTab}
           handleTabPress={setSelectedTab}
         />
       </View>
       <ScrollView style={styles.scrollView}>
-        {selectedTab === "New" &&
+        {selectedTab === 'New' &&
           (nonActiveVpns.length > 0 ? (
             nonActiveVpns.map((vpn: any) => {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
@@ -104,7 +96,7 @@ function TabTwoScreen() {
             <Text style={styles.noItemsText}>No inactive VPNs</Text>
           ))}
 
-        {selectedTab === "Active" &&
+        {selectedTab === 'Active' &&
           (nonExpiredVpns.length > 0 ? (
             nonExpiredVpns.map((vpn: any) => {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
@@ -113,7 +105,7 @@ function TabTwoScreen() {
             <Text style={styles.noItemsText}>No active VPNs</Text>
           ))}
 
-        {selectedTab === "Expired" &&
+        {selectedTab === 'Expired' &&
           (expiredVpns.length > 0 ? (
             expiredVpns.map((vpn: any) => {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
@@ -157,14 +149,14 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
 
   const handlePress = () => {
     const { package: p, order: o } = vpn;
-    navigation.navigate("vpn", {
+    navigation.navigate('vpn', {
       ...vpn,
     });
   };
 
   const [expiryDate, setExpiryDate] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [remainingTime, setRemainingTime] = useState("VPN"); // Default text
+  const [remainingTime, setRemainingTime] = useState('VPN'); // Default text
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -181,12 +173,8 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
           const timeDiff = expiryDate - currentDate;
 
           const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-          const hours = Math.floor(
-            (timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-          );
-          const minutes = Math.floor(
-            (timeDiff % (1000 * 60 * 60)) / (1000 * 60)
-          );
+          const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
 
           if (days > 0) {
             setRemainingTime(`${days} days remaining`);
@@ -195,13 +183,13 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
           } else if (minutes > 0) {
             setRemainingTime(`${minutes} minutes remaining`);
           } else {
-            setRemainingTime("Expired");
+            setRemainingTime('Expired');
           }
         } else {
-          setRemainingTime("Expired");
+          setRemainingTime('Expired');
         }
       } else {
-        setRemainingTime("VPN"); // Default if no expiry date
+        setRemainingTime('VPN'); // Default if no expiry date
       }
     }, 1000);
 
@@ -218,7 +206,7 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
         <Text style={styles.remainingDataText}>
           {vpn?.order?.expiry_date
             ? new Date(vpn?.order?.expiry_date).toLocaleString()
-            : "Not activated"}
+            : 'Not activated'}
         </Text>
         <Text style={styles.expirationText}>{remainingTime}</Text>
       </View>
@@ -239,8 +227,8 @@ const createStyles = (theme: any) =>
       flex: 1,
     },
     vpnItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 16,
       padding: 12,
       borderRadius: 16,
@@ -249,13 +237,13 @@ const createStyles = (theme: any) =>
       borderWidth: 0.2,
     },
     progressContainer: {
-      alignItems: "center",
-      backgroundColor: "transparent",
-      flexDirection: "row",
-      justifyContent: "space-between",
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
     },
     vpnInfo: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginLeft: 12,
       flex: 1,
     },
@@ -265,21 +253,21 @@ const createStyles = (theme: any) =>
     },
     remainingDataText: {
       fontSize: 18,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     expirationText: {
       marginTop: 12,
       fontSize: 14,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
     },
     buttonContainer: {
       margin: 16,
       marginBottom: 42,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     sectionTitle: {
       fontSize: 16,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       marginBottom: 8,
       color: greys(theme)[200],
     },

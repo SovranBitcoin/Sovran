@@ -1,31 +1,30 @@
-import React from "react";
-import { useState } from "react";
-import { formatCurrency } from "helper/currency";
-import { BalanceUpdate, Section } from "./transaction";
-import { useNavigation } from "expo-router";
-import Modal from "components/layout/Modal";
-import { greys } from "helper/colors";
-import { Button } from "components/common/Button";
-import { ArrowIcon, CancelSendIcon } from "assets/icons";
-import withConfirmation from "components/layout/ConfirmationProvider";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { View } from "components/common/Themed";
-import { useTypedRoute } from "helper/navigation/index";
-import { decodePaymentRequest } from "@cashu/cashu-ts";
-import { useSendEncryptedDirectMessage } from "helper/navigation/hooks/useEncryptedDirectMessage";
+import React from 'react';
+import { useState } from 'react';
+import { formatCurrency } from 'helper/currency';
+import { BalanceUpdate, Section } from './transaction';
+import { useNavigation } from 'expo-router';
+import Modal from 'components/layout/Modal';
+import { greys } from 'helper/colors';
+import { Button } from 'components/common/Button';
+import { ArrowIcon, CancelSendIcon } from 'assets/icons';
+import withConfirmation from 'components/layout/ConfirmationProvider';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { View } from 'components/common/Themed';
+import { useTypedRoute } from 'helper/navigation/index';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
+import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
-  const { request, unit, amount, to } =
-    useTypedRoute<"paymentRequestSendConfirmation">();
+  const { request, unit, amount, to } = useTypedRoute<'paymentRequestSendConfirmation'>();
   const [loading, setLoading] = useState(false);
   const { sendPaymentRequest } = useSendEncryptedDirectMessage();
 
-  const isSats = unit === "sat";
-  const currency = isSats ? "BTC" : unit.toUpperCase();
-  const denomination = isSats ? "sats" : unit;
+  const isSats = unit === 'sat';
+  const currency = isSats ? 'BTC' : unit.toUpperCase();
+  const denomination = isSats ? 'sats' : unit;
 
   const formatAmount = (displayDenomination) => {
     return formatCurrency(
@@ -35,9 +34,9 @@ function ModalScreen() {
         denomination,
       },
       {
-        locale: "en-US",
-        precision: displayDenomination === "btc" ? 8 : 2,
-        currencyDisplay: "symbol",
+        locale: 'en-US',
+        precision: displayDenomination === 'btc' ? 8 : 2,
+        currencyDisplay: 'symbol',
         denomination: displayDenomination,
       }
     );
@@ -50,10 +49,10 @@ function ModalScreen() {
   };
 
   const handleCancel = () => {
-    navigation.navigate("Tabs", { screen: "index" });
+    navigation.navigate('Tabs', { screen: 'index' });
   };
 
-  const transparentViewStyle = { backgroundColor: "transparent" };
+  const transparentViewStyle = { backgroundColor: 'transparent' };
   const decodedRequest = decodePaymentRequest(request);
 
   return (
@@ -65,19 +64,19 @@ function ModalScreen() {
           <BalanceUpdate
             pubkey={to}
             transactionType="send"
-            topAmount={formatAmount(isSats ? "btc" : unit)}
-            bottomAmount={formatAmount("usd")}
+            topAmount={formatAmount(isSats ? 'btc' : unit)}
+            bottomAmount={formatAmount('usd')}
           />
 
           <Section
             items={[
               {
                 title: `Amount (${currency})`,
-                value: formatAmount(isSats ? "btc" : unit),
+                value: formatAmount(isSats ? 'btc' : unit),
               },
               {
-                title: "Amount (USD)",
-                value: "≈" + formatAmount("usd"),
+                title: 'Amount (USD)',
+                value: '≈' + formatAmount('usd'),
               },
             ]}
           />
@@ -85,11 +84,11 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Mints",
-                value: decodedRequest?.mints?.join(", "),
+                title: 'Mints',
+                value: decodedRequest?.mints?.join(', '),
               },
               {
-                title: "Supported Unit",
+                title: 'Supported Unit',
                 value: decodedRequest?.unit,
               },
             ]}
@@ -98,12 +97,12 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Type",
-                value: "Payment Request (ecash)",
+                title: 'Type',
+                value: 'Payment Request (ecash)',
               },
               {
-                title: "Transaction Type",
-                value: "Send",
+                title: 'Transaction Type',
+                value: 'Send',
               },
             ]}
           />

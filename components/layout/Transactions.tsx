@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { View, Animated, StyleSheet } from "react-native";
-import { TouchableOpacity } from "react-native";
-import { useNavigation } from "expo-router";
-import { useSelector } from "react-redux";
+import React, { useState, useEffect } from 'react';
+import { View, Animated, StyleSheet } from 'react-native';
+import { TouchableOpacity } from 'react-native';
+import { useNavigation } from 'expo-router';
+import { useSelector } from 'react-redux';
 
-import { greys } from "helper/colors";
-import { Transaction } from "components/layout/Transaction";
-import { useCashu } from "helper/redux/cashu";
-import { Text } from "components/common/Themed";
-import { store } from "helper/redux/store";
-import Icon from "assets/icons";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { getRawExpiry } from "../cashu"; // Importing the function to check expiry
+import { greys } from 'helper/colors';
+import { Transaction } from 'components/layout/Transaction';
+import { useCashu } from 'helper/redux/cashu';
+import { Text } from 'components/common/Themed';
+import { store } from 'helper/redux/store';
+import Icon from 'assets/icons';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { getRawExpiry } from '../cashu'; // Importing the function to check expiry
 
 // Helper function to format the date as needed
 const formatDate = (date: string): string => {
-  const language = store.getState().settings?.settings.lang || "en";
+  const language = store.getState().settings?.settings.lang || 'en';
   return new Intl.DateTimeFormat(language, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   }).format(new Date(date));
 };
 
@@ -46,7 +46,7 @@ interface TransactionsProps {
   days: number;
   limit?: number;
   showMore: boolean;
-  filter: "all" | "incoming" | "outgoing";
+  filter: 'all' | 'incoming' | 'outgoing';
   type?: string;
   at?: string;
   tab?: string;
@@ -55,10 +55,10 @@ interface TransactionsProps {
 export const Transactions: React.FC<TransactionsProps> = ({
   account,
   showMore = true,
-  tab = "All",
-  filter = "all",
-  type = "all",
-  at = "all",
+  tab = 'All',
+  filter = 'all',
+  type = 'all',
+  at = 'all',
   days = 30,
   limit,
 }) => {
@@ -74,20 +74,20 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
     // Then filter by transaction type
     filtered = filtered.filter((tx) => {
-      if (filter === "all") return true;
-      if (filter === "incoming") return tx.transactionType === "receive";
-      if (filter === "outgoing") return tx.transactionType === "send";
+      if (filter === 'all') return true;
+      if (filter === 'incoming') return tx.transactionType === 'receive';
+      if (filter === 'outgoing') return tx.transactionType === 'send';
       return true;
     });
 
     filtered = filtered.filter((tx) => {
-      if (type === "all") return true;
+      if (type === 'all') return true;
       return tx.type === type;
     });
 
     filtered = filtered.filter((tx) => {
-      if (at === "all") return true;
-      return at === "at" && tx?.lnurl;
+      if (at === 'all') return true;
+      return at === 'at' && tx?.lnurl;
     });
 
     return filtered;
@@ -103,8 +103,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
         confirmed.push(tx);
       } else {
         // Check if the pending transaction is expired
-        const isExpired =
-          tx.request && new Date() >= getRawExpiry({ pr: tx.request });
+        const isExpired = tx.request && new Date() >= getRawExpiry({ pr: tx.request });
         if (!isExpired) {
           pending.push(tx);
         }
@@ -116,10 +115,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
   // Apply filters to transactions
   const filteredTransactions = filterTransactions(cashuTransactions || []);
-  const {
-    pending: filteredPendingTransactions,
-    confirmed: filteredConfirmedTransactions,
-  } = splitTransactionsByStatus(filteredTransactions);
+  const { pending: filteredPendingTransactions, confirmed: filteredConfirmedTransactions } =
+    splitTransactionsByStatus(filteredTransactions);
 
   // Group transactions by date for better display
   const groupTransactionsByStatusAndDate = (txs: Transaction[]) => {
@@ -135,16 +132,14 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
     // filter transactions that are expired
     const isExpired = (tx: Transaction) =>
-      !tx.paid && tx.request
-        ? new Date() >= getRawExpiry({ pr: tx.request })
-        : false;
+      !tx.paid && tx.request ? new Date() >= getRawExpiry({ pr: tx.request }) : false;
 
     // Filter out expired transactions
     sortedTxs = sortedTxs.filter((tx) => !isExpired(tx));
 
     sortedTxs.forEach((tx) => {
       const date = formatDate(tx.date);
-      const status = tx.paid === true ? "confirmed" : "pending";
+      const status = tx.paid === true ? 'confirmed' : 'pending';
 
       if (!grouped[status][date]) {
         grouped[status][date] = [];
@@ -156,24 +151,20 @@ export const Transactions: React.FC<TransactionsProps> = ({
     return grouped;
   };
 
-  const groupedTransactions =
-    groupTransactionsByStatusAndDate(filteredTransactions);
+  const groupedTransactions = groupTransactionsByStatusAndDate(filteredTransactions);
 
   // Get appropriate label based on filter
   const getLabel = () => {
-    if (
-      filteredConfirmedTransactions.length === 0 &&
-      filteredPendingTransactions.length === 0
-    ) {
-      return "No Transactions";
+    if (filteredConfirmedTransactions.length === 0 && filteredPendingTransactions.length === 0) {
+      return 'No Transactions';
     }
     switch (filter) {
-      case "incoming":
-        return "Incoming Transactions";
-      case "outgoing":
-        return "Outgoing Transactions";
+      case 'incoming':
+        return 'Incoming Transactions';
+      case 'outgoing':
+        return 'Outgoing Transactions';
       default:
-        return "All Transactions";
+        return 'All Transactions';
     }
   };
 
@@ -181,14 +172,14 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
   // Determine which transactions to show based on the selected tab
   const getTransactionsToShow = () => {
-    if (tab === "All") {
-      return ["pending", "confirmed"];
-    } else if (tab === "Confirmed") {
-      return ["confirmed"];
-    } else if (tab === "Pending") {
-      return ["pending"];
+    if (tab === 'All') {
+      return ['pending', 'confirmed'];
+    } else if (tab === 'Confirmed') {
+      return ['confirmed'];
+    } else if (tab === 'Pending') {
+      return ['pending'];
     }
-    return ["pending", "confirmed"]; // Default to all
+    return ['pending', 'confirmed']; // Default to all
   };
 
   const transactionsToShow = getTransactionsToShow();
@@ -205,19 +196,15 @@ export const Transactions: React.FC<TransactionsProps> = ({
       <Text
         weight="heavy"
         size={16}
-        style={[styles.transactionsLabel, { color: greys(theme)[700] }]}
-      >
-        {!showMore ? `No ${tab !== "All" ? tab : ""} Transactions` : label}
+        style={[styles.transactionsLabel, { color: greys(theme)[700] }]}>
+        {!showMore ? `No ${tab !== 'All' ? tab : ''} Transactions` : label}
       </Text>
-      <Text
-        size={14}
-        style={[styles.transactionsLabel, styles.noTransactionsText]}
-      >
-        {label.startsWith("No") && label !== "No Transactions"
-          ? "Try changing your filter settings"
+      <Text size={14} style={[styles.transactionsLabel, styles.noTransactionsText]}>
+        {label.startsWith('No') && label !== 'No Transactions'
+          ? 'Try changing your filter settings'
           : !showMore && !hasTransactionsToDisplay
-          ? `No ${tab.toLowerCase()} transactions to display`
-          : "Your transactions will show up here"}
+            ? `No ${tab.toLowerCase()} transactions to display`
+            : 'Your transactions will show up here'}
       </Text>
     </View>
   );
@@ -233,10 +220,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
         return null;
       }
       return (
-        <View
-          key={`empty-${status}`}
-          style={[styles.header, styles.headerNoTransactions]}
-        >
+        <View key={`empty-${status}`} style={[styles.header, styles.headerNoTransactions]}>
           <Text
             weight="heavy"
             size={16}
@@ -246,9 +230,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
                 color: greys(theme)[700],
                 marginTop: 10,
               },
-            ]}
-          >
-            No {status === "confirmed" ? "Confirmed" : "Pending"} Transactions
+            ]}>
+            No {status === 'confirmed' ? 'Confirmed' : 'Pending'} Transactions
           </Text>
         </View>
       );
@@ -258,14 +241,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
       <View key={status}>
         {showMore && (
           <View style={styles.pendingHeader}>
-            <Text
-              weight="heavy"
-              size={showMore ? 16 : 20}
-              style={styles.transactionsLabel}
-            >
-              {status === "confirmed"
-                ? "Confirmed transactions"
-                : "Pending transactions"}
+            <Text weight="heavy" size={showMore ? 16 : 20} style={styles.transactionsLabel}>
+              {status === 'confirmed' ? 'Confirmed transactions' : 'Pending transactions'}
             </Text>
           </View>
         )}
@@ -280,23 +257,13 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
               <View style={styles.transactionContainer}>
                 {Array.isArray(transactions) &&
-                  (limit ? transactions.slice(0, limit) : transactions).map(
-                    (tx: Transaction) => (
-                      <View
-                        key={
-                          tx.request ||
-                          `${tx.token || ""}${tx.transactionType || ""}`
-                        }
-                        style={{ flexDirection: "column" }}
-                      >
-                        <Transaction
-                          tx={tx}
-                          transactions={transactions}
-                          account={account}
-                        />
-                      </View>
-                    )
-                  )}
+                  (limit ? transactions.slice(0, limit) : transactions).map((tx: Transaction) => (
+                    <View
+                      key={tx.request || `${tx.token || ''}${tx.transactionType || ''}`}
+                      style={{ flexDirection: 'column' }}>
+                      <Transaction tx={tx} transactions={transactions} account={account} />
+                    </View>
+                  ))}
               </View>
             </View>
           ))}
@@ -308,17 +275,13 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const renderViewMoreButton = () => (
     <TouchableOpacity
       onPress={() => {
-        navigation.navigate("transactions", {
+        navigation.navigate('transactions', {
           account: account,
         });
       }}
-      style={styles.viewMoreButton}
-    >
+      style={styles.viewMoreButton}>
       <Text style={styles.viewMoreButtonText}>
-        View all (
-        {filteredConfirmedTransactions.length +
-          filteredPendingTransactions.length}
-        )
+        View all ({filteredConfirmedTransactions.length + filteredPendingTransactions.length})
       </Text>
     </TouchableOpacity>
   );
@@ -342,32 +305,32 @@ const createStyles = (theme: any) =>
       marginBottom: 96,
     },
     pendingHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       paddingBottom: 0,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     header: {
-      flexDirection: "row",
-      alignItems: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       paddingBottom: 0,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     headerNoTransactions: {
-      flexDirection: "column",
-      alignItems: "center",
-      backgroundColor: "transparent",
+      flexDirection: 'column',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
     },
     noTransactionsText: {
       color: greys(theme)[1000],
-      alignSelf: "center",
+      alignSelf: 'center',
     },
     dateHeader: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[0],
-      textAlign: "left",
+      textAlign: 'left',
       marginVertical: 4,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     transactionsLabel: {
       color: greys(theme)[0],
@@ -381,7 +344,7 @@ const createStyles = (theme: any) =>
       marginVertical: 8,
     },
     viewMoreButton: {
-      alignItems: "center",
+      alignItems: 'center',
       padding: 12,
       backgroundColor: greys(theme)[1800],
       borderRadius: 10000,
@@ -391,7 +354,7 @@ const createStyles = (theme: any) =>
       marginTop: 8,
     },
     viewMoreButtonText: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 14,
       color: greys(theme)[0],
     },

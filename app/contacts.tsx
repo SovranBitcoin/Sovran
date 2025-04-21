@@ -1,23 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  ActivityIndicator,
-  Keyboard,
-} from "react-native"; // Added Keyboard import
-import { useDispatch, useSelector } from "react-redux";
-import { greys, shades } from "helper/colors";
-import TextInput from "components/common/TextInput";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation } from "helper/navigation";
-import NDK, {
-  NDKEvent,
-  NDKRelaySet,
-  NDKSubscriptionCacheUsage,
-} from "@nostr-dev-kit/ndk";
-import Icon from "assets/icons";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, Image, ScrollView, ActivityIndicator, Keyboard } from 'react-native'; // Added Keyboard import
+import { useDispatch, useSelector } from 'react-redux';
+import { greys, shades } from 'helper/colors';
+import TextInput from 'components/common/TextInput';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation } from 'helper/navigation';
+import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
+import Icon from 'assets/icons';
 
 export function useNDK() {
   const [ndk, setNDK] = useState<NDK | null>(null);
@@ -27,10 +16,10 @@ export function useNDK() {
     const initNDK = async () => {
       const newNDK = new NDK({
         explicitRelayUrls: [
-          "wss://relay.damus.io",
-          "wss://relay.snort.social",
-          "wss://nos.lol",
-          "wss://relay.nostr.band",
+          'wss://relay.damus.io',
+          'wss://relay.snort.social',
+          'wss://nos.lol',
+          'wss://relay.nostr.band',
         ],
         signer,
       });
@@ -47,18 +36,16 @@ export function useNDK() {
   return { ndk };
 }
 
-import { NDKPrivateKeySigner } from "@nostr-dev-kit/ndk";
-import { appendQuery, setSearch } from "helper/redux/nostr";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import Container from "components/layout/Container";
+import { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
+import { appendQuery, setSearch } from 'helper/redux/nostr';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import Container from 'components/layout/Container';
 
 export function useSigner() {
   const [signer, setSigner] = useState<NDKPrivateKeySigner | null>(null);
 
   useEffect(() => {
     setSigner(
-      new NDKPrivateKeySigner(
-      )
     );
   }, []);
 
@@ -68,7 +55,7 @@ export function useSigner() {
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const ref = useRef(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const { ndk } = useNDK();
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false); // Loading state
@@ -76,7 +63,7 @@ export default function ModalScreen() {
 
   const dvmRelaySet = useCallback(() => {
     if (!ndk) return null;
-    return NDKRelaySet.fromRelayUrls(["wss://relay.vertexlab.io"], ndk);
+    return NDKRelaySet.fromRelayUrls(['wss://relay.vertexlab.io'], ndk);
   }, [ndk]);
 
   const dispatch = useDispatch();
@@ -89,7 +76,7 @@ export default function ModalScreen() {
 
       const req = new NDKEvent(ndk, {
         kind: 5315,
-        tags: [["param", "search", input]],
+        tags: [['param', 'search', input]],
       });
       await req.sign();
 
@@ -103,7 +90,7 @@ export default function ModalScreen() {
           {
             onEvent: async (event) => {
               if (event.kind === 7000) {
-                const statusTag = event.getMatchingTags("status")?.[0];
+                const statusTag = event.getMatchingTags('status')?.[0];
                 const status = statusTag?.[2] ?? statusTag?.[1];
                 if (status) {
                 }
@@ -128,13 +115,9 @@ export default function ModalScreen() {
                       const user = ndk.getUser({ pubkey: record.pubkey });
                       const profile = await user.fetchProfile();
 
-                      const newResults = [
-                        { pubkey: profile?.pubkey, profile: profile },
-                      ];
+                      const newResults = [{ pubkey: profile?.pubkey, profile: profile }];
                       const uniqueResults = [
-                        ...new Map(
-                          newResults.map((item) => [item.pubkey, item])
-                        ).values(),
+                        ...new Map(newResults.map((item) => [item.pubkey, item])).values(),
                       ];
                       dispatch(setSearch(uniqueResults));
 
@@ -143,23 +126,21 @@ export default function ModalScreen() {
                         profile,
                       };
                     } catch (e) {
-                      console.error("Failed to fetch profile:", e);
+                      console.error('Failed to fetch profile:', e);
                       return {
                         pubkey: record.pubkey,
                         profile: {
-                          name: "Anonymous",
-                          about: "",
+                          name: 'Anonymous',
+                          about: '',
                         },
                       };
                     }
                   });
 
                 const results = await Promise.all(profilePromises);
-                setSearchResults(
-                  results.sort((a, b) => (b.rank || 0) - (a.rank || 0))
-                );
+                setSearchResults(results.sort((a, b) => (b.rank || 0) - (a.rank || 0)));
               } catch (e) {
-                console.log("Failed to parse results:", e);
+                console.log('Failed to parse results:', e);
               } finally {
                 setLoading(false); // Set loading to false after processing results
               }
@@ -199,30 +180,24 @@ export default function ModalScreen() {
   };
 
   return (
-    <Container
-      scroll={false}
-      contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}
-    >
+    <Container scroll={false} contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
       <ScrollView
         style={{
           backgroundColor: greys(theme)[2300],
         }}
         onScrollBeginDrag={handleScroll} // Dismiss keyboard on scroll
-        scrollEventThrottle={16}
-      >
+        scrollEventThrottle={16}>
         {/* Added ScrollView with onScroll */}
         <View
           style={{
             backgroundColor: greys(theme)[2300],
             paddingHorizontal: 16,
-          }}
-        >
+          }}>
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
             <TextInput
               ref={ref}
               autoFocus={true}
@@ -240,18 +215,13 @@ export default function ModalScreen() {
                   color: greys(theme)[100],
                   marginLeft: 12,
                   fontSize: 16,
-                }}
-              >
+                }}>
                 Cancel
               </Text>
             </TouchableOpacity>
           </View>
           {loading && ( // Show loading indicator when loading
-            <ActivityIndicator
-              size="large"
-              color={shades[300]}
-              style={{ marginTop: 16 }}
-            />
+            <ActivityIndicator size="large" color={shades[300]} style={{ marginTop: 16 }} />
           )}
           {searchResults.length > 0 &&
             !loading && ( // Only show results if not loading
@@ -259,27 +229,26 @@ export default function ModalScreen() {
                 {searchResults.map((result) => (
                   <TouchableOpacity
                     onPress={() => {
-                      navigation.navigate("userMessages", {
+                      navigation.navigate('userMessages', {
                         pubkey: result.pubkey,
                       });
                     }}
                     key={result?.pubkey}
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
+                      flexDirection: 'row',
+                      alignItems: 'center',
                       padding: 8,
                       backgroundColor: greys(theme)[1800],
                       borderRadius: 8,
                       marginBottom: 8,
-                    }}
-                  >
+                    }}>
                     <View style={{ marginRight: 8 }}>
                       {result?.profile?.picture ? (
                         <Image
                           source={{ uri: result?.profile?.picture }}
                           style={{ width: 48, height: 48, borderRadius: 24 }}
                           onError={(e) => {
-                            e.currentTarget.src = "";
+                            e.currentTarget.src = '';
                           }}
                         />
                       ) : (
@@ -289,21 +258,18 @@ export default function ModalScreen() {
                             height: 48,
                             borderRadius: 24,
                             backgroundColor: greys(theme)[2300],
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
                           <Icon
                             name="mdi:user"
-                            className="w-6 h-6 text-purple-600 dark:text-purple-300"
+                            className="h-6 w-6 text-purple-600 dark:text-purple-300"
                           />
                         </View>
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text
-                        style={{ fontWeight: "bold", color: greys(theme)[100] }}
-                      >
+                      <Text style={{ fontWeight: 'bold', color: greys(theme)[100] }}>
                         {result?.profile?.displayName || result?.profile?.name}
                       </Text>
                       {result?.profile?.nip05 && (

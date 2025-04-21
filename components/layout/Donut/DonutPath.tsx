@@ -1,9 +1,5 @@
-import { Path, Skia } from "@shopify/react-native-skia";
-import {
-  SharedValue,
-  useDerivedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { Path, Skia } from '@shopify/react-native-skia';
+import { SharedValue, useDerivedValue, withTiming } from 'react-native-reanimated';
 
 type Props = {
   strokeWidth: number;
@@ -35,10 +31,7 @@ export const DonutPath = ({
     }
     const decimal = decimals.value.slice(0, index);
 
-    const sum = decimal.reduce(
-      (accumulator, currentValue) => accumulator + currentValue,
-      0
-    );
+    const sum = decimal.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
 
     return withTiming(sum + gap, {
       duration: 1000,
@@ -52,10 +45,7 @@ export const DonutPath = ({
 
     const decimal = decimals.value.slice(0, index + 1);
 
-    const sum = decimal.reduce(
-      (accumulator, currentValue) => accumulator + currentValue,
-      0
-    );
+    const sum = decimal.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
 
     return withTiming(sum, {
       duration: 1000,

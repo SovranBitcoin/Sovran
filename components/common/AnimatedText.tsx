@@ -1,8 +1,5 @@
-import { TextInput, TextInputProps } from "react-native";
-import Animated, {
-  SharedValue,
-  useAnimatedProps,
-} from "react-native-reanimated";
+import { TextInput, TextInputProps } from 'react-native';
+import Animated, { SharedValue, useAnimatedProps } from 'react-native-reanimated';
 
 Animated.addWhitelistedNativeProps({ text: true });
 
@@ -13,16 +10,11 @@ type TextProps = TextInputProps & {
 
 const AnimatedTextInput = Animated.createAnimatedComponent<any>(TextInput);
 
-export function AnimatedText({
-  text,
-  style,
-  formatter = "",
-  ...props
-}: TextProps) {
+export function AnimatedText({ text, style, formatter = '', ...props }: TextProps) {
   const animatedProps = useAnimatedProps(() => {
     if (!text) {
       return {
-        text: "",
+        text: '',
       };
     }
     return {

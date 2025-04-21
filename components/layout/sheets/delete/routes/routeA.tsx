@@ -1,17 +1,15 @@
-import { Button } from "components/common/Button";
-import { Card } from "components/common/Card";
-import { View, Text } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { useTypedNavigation } from "helper/navigation";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { resetApp } from "helper/redux/store/reducer";
-import React from "react";
-import { RouteScreenProps } from "react-native-actions-sheet";
-import { useDispatch, useSelector } from "react-redux";
+import { Button } from 'components/common/Button';
+import { Card } from 'components/common/Card';
+import { View, Text } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { useTypedNavigation } from 'helper/navigation';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { resetApp } from 'helper/redux/store/reducer';
+import React from 'react';
+import { RouteScreenProps } from 'react-native-actions-sheet';
+import { useDispatch, useSelector } from 'react-redux';
 
-const RouteA = ({
-  router,
-}: RouteScreenProps<"example-sheet-with-router", "route-a">) => {
+const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
   const dispatch = useDispatch();
@@ -20,7 +18,7 @@ const RouteA = ({
       await dispatch(resetApp());
       router.close();
       navigation.navigate(
-        "index",
+        'index',
         {},
         {
           closeParents: true,
@@ -35,8 +33,7 @@ const RouteA = ({
         Are you sure you want to delete your profile?
       </Text>
       <Text style={{ marginBottom: 20 }}>
-        This action cannot be reversed. Please ensure you have backed up your
-        mnemonic phrase.
+        This action cannot be reversed. Please ensure you have backed up your mnemonic phrase.
       </Text>
       <Card
         variant="warning"

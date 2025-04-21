@@ -1,34 +1,30 @@
-import React from "react";
-import "react-native-get-random-values";
-import { KeyboardAvoidingView } from "react-native";
+import React from 'react';
+import 'react-native-get-random-values';
+import { KeyboardAvoidingView } from 'react-native';
 
-import { GeneralizedBlurInput, View } from "components/common/Themed";
-import { useState } from "react";
-import { getMeltQuote, isValidLNURL } from "components/cashu";
+import { GeneralizedBlurInput, View } from 'components/common/Themed';
+import { useState } from 'react';
+import { getMeltQuote, isValidLNURL } from 'components/cashu';
 
-import { useNavigation } from "expo-router";
-import { Button } from "components/common/Button";
-import Modal from "components/layout/Modal";
-import { EcashIcon, QRCodeIcon } from "assets/icons";
-import {
-  memoizedGetBalance,
-  memoizedGetSelectedMint,
-  setSelectedMint,
-} from "helper/redux/cashu";
-import * as Clipboard from "expo-clipboard";
+import { useNavigation } from 'expo-router';
+import { Button } from 'components/common/Button';
+import Modal from 'components/layout/Modal';
+import { EcashIcon, QRCodeIcon } from 'assets/icons';
+import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
+import * as Clipboard from 'expo-clipboard';
 
-import { PermissionsButton } from "components/common/Permissions";
-import { greys, shades } from "helper/colors";
-import { useCameraPermissions } from "expo-camera";
-import opacity from "hex-color-opacity";
-import { useDispatch, useSelector } from "react-redux";
+import { PermissionsButton } from 'components/common/Permissions';
+import { greys, shades } from 'helper/colors';
+import { useCameraPermissions } from 'expo-camera';
+import opacity from 'hex-color-opacity';
+import { useDispatch, useSelector } from 'react-redux';
 
-import { URL } from "url";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { isValidPaymentRequest } from "helper/cashu/helper";
-import SelectedMintDisplay from "components/layout/sheets/mints";
-import { showMessage } from "helper/popup/popups";
-import { handlePaymentRequest } from "helper/payment-handler/handlers";
+import { URL } from 'url';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { isValidPaymentRequest } from 'helper/cashu/helper';
+import SelectedMintDisplay from 'components/layout/sheets/mints';
+import { showMessage } from 'helper/popup/popups';
+import { handlePaymentRequest } from 'helper/payment-handler/handlers';
 
 function mintDisplayText(mint) {
   // https://mint.minibits.cash/Bitcoin -> mint.minibits.cash
@@ -40,12 +36,12 @@ export default function EcashLightningSender({ type, ...params }) {
   const theme = useSelector(memoizedGetTheme);
 
   const navigation = useNavigation();
-  const [unit, setUnit] = useState(params?.unit || "sat");
+  const [unit, setUnit] = useState(params?.unit || 'sat');
 
   const [hasPermission, requestPermission] = useCameraPermissions();
 
   const handleInputPress = () => {
-    navigation.navigate("contacts", { unit });
+    navigation.navigate('contacts', { unit });
   };
 
   const handleLightningUrl = async ({ lightningUrl }) => {
@@ -55,7 +51,7 @@ export default function EcashLightningSender({ type, ...params }) {
       mintUrl: selectedMint,
     });
 
-    navigation.navigate("lightningSendConfirmation", {
+    navigation.navigate('lightningSendConfirmation', {
       pr: lightningUrl,
       unit,
       meltQuote: JSON.stringify(meltQuote),
@@ -64,17 +60,17 @@ export default function EcashLightningSender({ type, ...params }) {
 
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
-    
+
     if (isValidPaymentRequest(text)) {
       await handlePaymentRequest({ request: text, navigation });
     }
 
     if (!isValidLNURL(text)) {
       if (text) {
-        showMessage("invalid_address", { address: text }, { emoji: "🚨" });
+        showMessage('invalid_address', { address: text }, { emoji: '🚨' });
         return;
       } else {
-        showMessage("no_clipboard_address", {}, { emoji: "🚨" });
+        showMessage('no_clipboard_address', {}, { emoji: '🚨' });
         return;
       }
     }
@@ -86,9 +82,7 @@ export default function EcashLightningSender({ type, ...params }) {
 
   const balance = useSelector(memoizedGetBalance(unit));
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const profileId = useSelector(
-    (state: any) => state.nostr?.currentProfile?.id
-  );
+  const profileId = useSelector((state: any) => state.nostr?.currentProfile?.id);
 
   const dispatch = useDispatch();
   const handleMintSelected = async (
@@ -109,8 +103,8 @@ export default function EcashLightningSender({ type, ...params }) {
       // Update navigation params
       navigation.setParams({ ...params, unit: mint.unit });
     } catch (error) {
-      showMessage("mint_update_failed", {}, { emoji: "🚨" });
-      
+      showMessage('mint_update_failed', {}, { emoji: '🚨' });
+
       throw error;
     }
   };
@@ -120,38 +114,32 @@ export default function EcashLightningSender({ type, ...params }) {
       <Modal
         showClose
         transparent={true}
-        title={`Send ${unit === "sat" ? "Bitcoin" : unit.toUpperCase()}`}
+        title={`Send ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`}
         children={
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            unit={unit}
-            loading={false}
-          />
+          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={false} />
         }
         buttons={
           <>
             <View
               style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
                 marginTop: 8,
-                backgroundColor: "transparent",
-              }}
-            >
+                backgroundColor: 'transparent',
+              }}>
               <View
                 style={{
                   flex: hasPermission?.granted ? 1 : 0,
-                  backgroundColor: "transparent",
-                }}
-              >
+                  backgroundColor: 'transparent',
+                }}>
                 {hasPermission?.granted ? (
                   <Button
-                    variant={"secondary"}
+                    variant={'secondary'}
                     icon={<QRCodeIcon />}
-                    text={"Scan QR"}
+                    text={'Scan QR'}
                     onPress={() =>
-                      navigation.navigate("camera", {
+                      navigation.navigate('camera', {
                         unit,
                       })
                     }
@@ -170,21 +158,20 @@ export default function EcashLightningSender({ type, ...params }) {
               <View
                 style={{
                   flex: 1,
-                  backgroundColor: "transparent",
-                }}
-              >
+                  backgroundColor: 'transparent',
+                }}>
                 <Button
-                  variant={"secondary"}
-                  position={hasPermission?.granted ? "right" : "right"}
+                  variant={'secondary'}
+                  position={hasPermission?.granted ? 'right' : 'right'}
                   onPress={() => {
-                    navigation.navigate("currency", {
-                      to: "ecashSendConfirmation",
+                    navigation.navigate('currency', {
+                      to: 'ecashSendConfirmation',
                       unit,
                       type,
                     });
                   }}
                   icon={<EcashIcon />}
-                  text={"Create Ecash"}
+                  text={'Create Ecash'}
                 />
               </View>
             </View>
@@ -202,12 +189,11 @@ export default function EcashLightningSender({ type, ...params }) {
           </>
         }
       />
-      <KeyboardAvoidingView behavior={"padding"}>
+      <KeyboardAvoidingView behavior={'padding'}>
         <View
           style={{
             height: 32,
-          }}
-        ></View>
+          }}></View>
       </KeyboardAvoidingView>
     </>
   );

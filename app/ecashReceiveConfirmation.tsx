@@ -1,23 +1,23 @@
-import React, { useState } from "react";
-import { StyleSheet } from "react-native";
-import { formatCurrency } from "helper/currency";
-import { getDecodedToken } from "@cashu/cashu-ts";
-import { receiveEcash } from "components/cashu";
-import { BalanceUpdate, Section } from "./transaction";
-import Modal from "components/layout/Modal";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import withConfirmation from "components/layout/ConfirmationProvider";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { schnorr } from "@noble/curves/secp256k1";
-import Snow from "react-native-snow-bg";
-import { showMessage } from "helper/popup/popups";
-import { giveaways } from "helper/cashu/secrets";
-import { useRoute } from "@react-navigation/native";
-import { useTypedNavigation } from "helper/navigation";
-import { memoizedGetMints } from "helper/redux/cashu";
-import { SheetManager } from "react-native-actions-sheet";
-import { ButtonHandler } from "./ecashSendConfirmation";
+import React, { useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { formatCurrency } from 'helper/currency';
+import { getDecodedToken } from '@cashu/cashu-ts';
+import { receiveEcash } from 'components/cashu';
+import { BalanceUpdate, Section } from './transaction';
+import Modal from 'components/layout/Modal';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import withConfirmation from 'components/layout/ConfirmationProvider';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { schnorr } from '@noble/curves/secp256k1';
+import Snow from 'react-native-snow-bg';
+import { showMessage } from 'helper/popup/popups';
+import { giveaways } from 'helper/cashu/secrets';
+import { useRoute } from '@react-navigation/native';
+import { useTypedNavigation } from 'helper/navigation';
+import { memoizedGetMints } from 'helper/redux/cashu';
+import { SheetManager } from 'react-native-actions-sheet';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 // Types
 interface TokenProps {
@@ -39,24 +39,22 @@ export const getGiveaway = ({ token }: TokenProps) => {
     }
 
     if (Array.isArray(parsed)) {
-      if (parsed[0] === "P2PK") {
+      if (parsed[0] === 'P2PK') {
         pubkeys.add(parsed[1].data as string);
       } else {
-        throw new Error("Unsupported well-known secret");
+        throw new Error('Unsupported well-known secret');
       }
     }
   });
 
   if (pubkeys.size > 1) {
     throw new Error(
-      "Received a token with multiple pubkeys. This is not supported yet. Please report this."
+      'Received a token with multiple pubkeys. This is not supported yet. Please report this.'
     );
   }
 
   if (pubkeys.size === 1) {
-    return Object.values(giveaways).find(
-      (p) => p.public_key === Array.from(pubkeys)[0]
-    );
+    return Object.values(giveaways).find((p) => p.public_key === Array.from(pubkeys)[0]);
   }
 
   return null;
@@ -82,21 +80,19 @@ function getTokenMints({ token }: TokenProps): string {
 // Crypto utilities
 const hexToBytes = (hex: string): Uint8Array => {
   if (hex.length % 2 !== 0) {
-    throw new Error("Hex string must have an even number of characters");
+    throw new Error('Hex string must have an even number of characters');
   }
-  return new Uint8Array(
-    hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-  );
+  return new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
 };
 
 export const generatePublicKey = (hexPrivateKey: string): string => {
   if (hexPrivateKey.length !== 64) {
-    throw new Error("Private key must be 32 bytes (64 hex characters)");
+    throw new Error('Private key must be 32 bytes (64 hex characters)');
   }
 
   const privateKeyBytes = hexToBytes(hexPrivateKey);
   const publicKeyBytes = schnorr.getPublicKey(privateKeyBytes);
-  return Buffer.from(publicKeyBytes).toString("hex");
+  return Buffer.from(publicKeyBytes).toString('hex');
 };
 
 // Main component
@@ -127,7 +123,7 @@ function ModalScreen({
   const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
-    navigation.navigate("Tabs", { screen: "index" });
+    navigation.navigate('Tabs', { screen: 'index' });
   };
 
   const handleRedeem = async () => {
@@ -135,13 +131,13 @@ function ModalScreen({
       setLoading(true);
       await receiveEcash({ token, unit });
 
-      showMessage("funds_received", { amount, unit }, { emoji: "🎉" }, () => {
-        navigation.navigate("index", {}, { closeParents: true });
+      showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
+        navigation.navigate('index', {}, { closeParents: true });
       });
 
       setLoading(false);
     } catch (error) {
-      showMessage(error.name, {}, { emoji: "🚨" });
+      showMessage(error.name, {}, { emoji: '🚨' });
     }
   };
 
@@ -150,21 +146,21 @@ function ModalScreen({
     if (isMintTrusted) {
       await handleRedeem();
     } else {
-      SheetManager.show("mint-accepter", { payload: { mint: mintUrl } });
+      SheetManager.show('mint-accepter', { payload: { mint: mintUrl } });
     }
   };
 
   const renderFormattedAmount = (currency, showApprox = false) => {
-    return `${showApprox ? "≈" : ""}${formatCurrency(
+    return `${showApprox ? '≈' : ''}${formatCurrency(
       {
-        currency: unit === "sat" ? "BTC" : unit.toUpperCase(),
+        currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
         value: amount,
-        denomination: unit === "sat" ? "sats" : unit,
+        denomination: unit === 'sat' ? 'sats' : unit,
       },
       {
-        locale: "en-US",
-        precision: currency === "BTC" ? 8 : 2,
-        currencyDisplay: "symbol",
+        locale: 'en-US',
+        precision: currency === 'BTC' ? 8 : 2,
+        currencyDisplay: 'symbol',
         denomination: currency.toLowerCase(),
       }
     )}`;
@@ -180,59 +176,48 @@ function ModalScreen({
         <ButtonHandler
           buttons={[
             {
-              text: "Cancel",
+              text: 'Cancel',
               icon: null,
-              variant: "secondary",
+              variant: 'secondary',
               onPress: handleCancel,
             },
             {
-              text: "Redeem Ecash",
+              text: 'Redeem Ecash',
               icon: null,
-              variant: "primary",
+              variant: 'primary',
               onPress: handleRedeemPress,
               loading: loading,
             },
           ]}
         />
-      }
-    >
+      }>
       <>
-        {giveaway?.id && (
-          <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />
-        )}
+        {giveaway?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
 
         <BalanceUpdate
           transactionType="receive"
           amount={amount}
           unit={unit}
-          bottomAmount={unit !== "sat" ? <></> : null}
+          bottomAmount={unit !== 'sat' ? <></> : null}
           topAmount={null}
-          pubkey={""}
+          pubkey={''}
           request=""
         />
 
-        {memo && (
-          <Section
-            items={[{ title: "Note", value: memo }]}
-            style={{}}
-            camera={false}
-          />
-        )}
+        {memo && <Section items={[{ title: 'Note', value: memo }]} style={{}} camera={false} />}
 
         <Section
           items={[
             {
-              title: `Amount (${unit === "sat" ? "BTC" : unit.toUpperCase()})`,
-              value: renderFormattedAmount(
-                unit === "sat" ? "BTC" : unit.toUpperCase()
-              ),
+              title: `Amount (${unit === 'sat' ? 'BTC' : unit.toUpperCase()})`,
+              value: renderFormattedAmount(unit === 'sat' ? 'BTC' : unit.toUpperCase()),
             },
             {
-              title: "Amount (USD)",
-              value: renderFormattedAmount("usd", true),
+              title: 'Amount (USD)',
+              value: renderFormattedAmount('usd', true),
             },
             {
-              title: "Mints",
+              title: 'Mints',
               value: mintUrl,
             },
           ]}
@@ -240,16 +225,12 @@ function ModalScreen({
           camera={false}
         />
 
-        <Section
-          items={[{ title: "Date", value: "Now" }]}
-          style={{}}
-          camera={false}
-        />
+        <Section items={[{ title: 'Date', value: 'Now' }]} style={{}} camera={false} />
 
         <Section
           items={[
-            { title: "Type", value: "Ecash" },
-            { title: "Transaction Type", value: "Receive" },
+            { title: 'Type', value: 'Ecash' },
+            { title: 'Transaction Type', value: 'Receive' },
           ]}
           style={{}}
           camera={false}
@@ -263,22 +244,22 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     label: {
       fontSize: 20,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       color: greys(theme)[0],
       marginLeft: 16,
-      textAlign: "center",
+      textAlign: 'center',
     },
     description: {
       fontSize: 14,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       color: greys(theme)[100],
       marginLeft: 16,
       marginBottom: 8,
       marginTop: 8,
-      textAlign: "center",
+      textAlign: 'center',
     },
     link: {
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       fontSize: 20,
       marginBottom: -3,
     },

@@ -1,9 +1,9 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { formatCurrency } from "helper/currency";
-import { convertTime } from "helper/time";
-import { greys, shades } from "helper/colors";
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { formatCurrency } from 'helper/currency';
+import { convertTime } from 'helper/time';
+import { greys, shades } from 'helper/colors';
 
 const TransactionComponent = ({ transaction, theme, isReceived }) => {
   const styles = createStyles(theme);
@@ -18,44 +18,34 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
     transaction.unit &&
     formatCurrency(
       {
-        currency:
-          transaction.unit === "sat" ? "BTC" : transaction.unit.toUpperCase(),
+        currency: transaction.unit === 'sat' ? 'BTC' : transaction.unit.toUpperCase(),
         value: transaction.amount,
-        denomination: transaction.unit === "sat" ? "sats" : transaction.unit,
+        denomination: transaction.unit === 'sat' ? 'sats' : transaction.unit,
       },
       {
-        locale: "en-US",
-        precision: transaction.unit === "sat" ? 0 : 2,
-        currencyDisplay: transaction.unit === "sat" ? "name" : "symbol",
-        denomination: transaction.unit === "sat" ? "sats" : transaction.unit,
+        locale: 'en-US',
+        precision: transaction.unit === 'sat' ? 0 : 2,
+        currencyDisplay: transaction.unit === 'sat' ? 'name' : 'symbol',
+        denomination: transaction.unit === 'sat' ? 'sats' : transaction.unit,
       }
     );
 
   return (
     <View
-      style={[
-        styles.transactionWrapper,
-        { alignSelf: isReceived ? "flex-start" : "flex-end" },
-      ]}
-    >
+      style={[styles.transactionWrapper, { alignSelf: isReceived ? 'flex-start' : 'flex-end' }]}>
       <View
         style={[
           styles.arrow,
           {
             backgroundColor: arrowBackgroundColor,
-            left: isReceived ? 16 : "auto",
-            right: isReceived ? "auto" : 16,
+            left: isReceived ? 16 : 'auto',
+            right: isReceived ? 'auto' : 16,
           },
         ]}
       />
-      <LinearGradient
-        colors={gradientColors}
-        style={[styles.transactionContainer]}
-      >
+      <LinearGradient colors={gradientColors} style={[styles.transactionContainer]}>
         <View style={styles.transactionTypeContainer}>
-          <Text style={styles.transactionTypeText}>
-            {isReceived ? "You received" : "You sent"}
-          </Text>
+          <Text style={styles.transactionTypeText}>{isReceived ? 'You received' : 'You sent'}</Text>
         </View>
         <Text style={styles.transactionText}>{formattedAmount}</Text>
         <Text style={styles.timestamp}>
@@ -70,35 +60,35 @@ const createStyles = (theme) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,
-      position: "relative",
-      backgroundColor: "transparent",
+      position: 'relative',
+      backgroundColor: 'transparent',
     },
     transactionContainer: {
       padding: 16,
       borderRadius: 16,
-      maxWidth: "75%",
+      maxWidth: '75%',
     },
     arrow: {
-      position: "absolute",
+      position: 'absolute',
       bottom: -4,
       width: 8,
       height: 8,
-      transform: [{ rotate: "45deg" }],
+      transform: [{ rotate: '45deg' }],
     },
     transactionTypeContainer: {
-      backgroundColor: "rgba(0,0,0,0.25)",
+      backgroundColor: 'rgba(0,0,0,0.25)',
       padding: 4,
       marginBottom: 4,
       borderRadius: 16,
     },
     transactionTypeText: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 14,
-      textAlign: "center",
+      textAlign: 'center',
       color: greys(theme)[0],
     },
     transactionText: {
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       fontSize: 16,
       marginBottom: 8,
       color: greys(theme)[0],
@@ -106,9 +96,9 @@ const createStyles = (theme) =>
     timestamp: {
       color: greys(theme)[0],
       opacity: 0.75,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 12,
-      textAlign: "right",
+      textAlign: 'right',
     },
   });
 

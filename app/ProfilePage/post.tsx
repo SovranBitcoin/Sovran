@@ -1,28 +1,28 @@
-import { View } from "react-native";
-import React from "react";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { Text } from "components/common/Themed";
-import "react-native-gesture-handler";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { RepostIcon } from "assets/icons";
-import { GradientSkeleton } from "components/common/GradientSkeleton";
-import { useNostrEvents } from "nostr-react";
-import { useNostrProfile } from "./helper";
-import { nip19 } from "nostr-tools";
+import { View } from 'react-native';
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { Text } from 'components/common/Themed';
+import 'react-native-gesture-handler';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { RepostIcon } from 'assets/icons';
+import { GradientSkeleton } from 'components/common/GradientSkeleton';
+import { useNostrEvents } from 'nostr-react';
+import { useNostrProfile } from './helper';
+import { nip19 } from 'nostr-tools';
 dayjs.extend(relativeTime);
 
-import { ActionItems, usePostReactions } from "./ActionItems";
-import { ExternalLink } from "./ExternalLink";
-import { VideoScreen } from "./VideoPlayer";
-import { ImageContainer } from "./ImageContainer";
-import { extractUrls, TextContent } from "./TextContent";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { UserNameProfiles } from "../notifications";
-import { useTypedNavigation } from "helper/navigation";
+import { ActionItems, usePostReactions } from './ActionItems';
+import { ExternalLink } from './ExternalLink';
+import { VideoScreen } from './VideoPlayer';
+import { ImageContainer } from './ImageContainer';
+import { extractUrls, TextContent } from './TextContent';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { UserNameProfiles } from '../notifications';
+import { useTypedNavigation } from 'helper/navigation';
 
 export const PostQuote = React.memo(({ id }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -42,9 +42,8 @@ export const PostQuote = React.memo(({ id }) => {
         padding: 8,
         marginBottom: 8,
         marginLeft: 56,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <CachedImage
           style={{ width: 32, height: 32, borderRadius: 100000 }}
           source={{ uri: profile?.picture }}
@@ -53,17 +52,15 @@ export const PostQuote = React.memo(({ id }) => {
           style={{
             marginLeft: 4,
             marginBottom: 4,
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}>
           <Text>{profile?.displayName}</Text>
           <Text
             style={{
               color: greys(theme)[200],
-            }}
-          >
-            {"  "}•{"  "}
+            }}>
+            {'  '}•{'  '}
             {timeAgo}
           </Text>
         </View>
@@ -82,11 +79,10 @@ export function PostSkeleton() {
         padding: 12,
         borderBottomWidth: 1,
         borderColor: greys(theme)[1800],
-        width: "100%",
+        width: '100%',
         flex: 1,
-      }}
-    >
-      <View style={{ flexDirection: "row" }}>
+      }}>
+      <View style={{ flexDirection: 'row' }}>
         {/* Profile Picture */}
         <GradientSkeleton
           startColor={greys(theme)[1500]}
@@ -101,11 +97,10 @@ export function PostSkeleton() {
           {/* Username and Time Ago */}
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              alignContent: "center",
-            }}
-          >
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignContent: 'center',
+            }}>
             <GradientSkeleton
               startColor={greys(theme)[1500]}
               endColor={greys(theme)[1300]}
@@ -129,7 +124,7 @@ export function PostSkeleton() {
           <GradientSkeleton
             startColor={greys(theme)[1500]}
             endColor={greys(theme)[1300]}
-            width={"100%"}
+            width={'100%'}
             height={16}
             borderRadius={8}
             marginBottom={8}
@@ -137,7 +132,7 @@ export function PostSkeleton() {
           <GradientSkeleton
             startColor={greys(theme)[1500]}
             endColor={greys(theme)[1300]}
-            width={"90%"}
+            width={'90%'}
             height={16}
             borderRadius={8}
             marginBottom={8}
@@ -145,7 +140,7 @@ export function PostSkeleton() {
           <GradientSkeleton
             startColor={greys(theme)[1500]}
             endColor={greys(theme)[1300]}
-            width={"80%"}
+            width={'80%'}
             height={16}
             borderRadius={8}
             marginBottom={8}
@@ -155,7 +150,7 @@ export function PostSkeleton() {
           <GradientSkeleton
             startColor={greys(theme)[1500]}
             endColor={greys(theme)[1300]}
-            width={"100%"}
+            width={'100%'}
             height={250}
             borderRadius={8}
             backgroundColor={greys(theme)[1500]}
@@ -163,10 +158,9 @@ export function PostSkeleton() {
           />
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-            }}
-          >
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+            }}>
             <GradientSkeleton
               startColor={greys(theme)[1500]}
               endColor={greys(theme)[1300]}
@@ -217,14 +211,14 @@ export function PostSkeleton() {
 function getTime(created_at) {
   const postDate = dayjs.unix(created_at);
   const now = dayjs();
-  const diffSeconds = now.diff(postDate, "second");
-  const diffMinutes = now.diff(postDate, "minute");
-  const diffHours = now.diff(postDate, "hour");
-  const diffDays = now.diff(postDate, "day");
+  const diffSeconds = now.diff(postDate, 'second');
+  const diffMinutes = now.diff(postDate, 'minute');
+  const diffHours = now.diff(postDate, 'hour');
+  const diffDays = now.diff(postDate, 'day');
   let timeAgo;
 
   if (diffDays >= 7) {
-    timeAgo = postDate.format("MM/DD/YYYY");
+    timeAgo = postDate.format('MM/DD/YYYY');
   } else if (diffDays > 0) {
     timeAgo = `${diffDays}d`;
   } else if (diffHours > 0) {
@@ -239,11 +233,11 @@ function getTime(created_at) {
 }
 
 export function getPost(post) {
-  if (typeof post?.content === "string") {
+  if (typeof post?.content === 'string') {
     try {
       post = JSON.parse(post?.content);
     } catch (error) {
-      // 
+      //
     }
   }
   return post;
@@ -279,17 +273,16 @@ function RepostText({ pubkey, repostCounter }) {
   return (
     <View
       style={{
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 12,
-      }}
-    >
+      }}>
       <RepostIcon width={16} height={16} color={greys(theme)[700]} />
 
       <UserNameProfiles
         pubkey={pubkey}
         style={{
-          fontFamily: "OverpassBold",
+          fontFamily: 'OverpassBold',
           fontSize: 14,
           color: greys(theme)[700],
         }}
@@ -297,24 +290,22 @@ function RepostText({ pubkey, repostCounter }) {
       {repostCounter > 1 ? (
         <Text
           style={{
-            fontFamily: "OverpassBold",
+            fontFamily: 'OverpassBold',
             fontSize: 14,
             color: greys(theme)[700],
-          }}
-        >
+          }}>
           {` and ${repostCounter - 1} other ${
-            repostCounter - 1 > 1 ? "people" : "person"
+            repostCounter - 1 > 1 ? 'people' : 'person'
           } reposted`}
         </Text>
       ) : (
         <Text
           style={{
-            fontFamily: "OverpassBold",
+            fontFamily: 'OverpassBold',
             fontSize: 14,
             color: greys(theme)[700],
-          }}
-        >
-          {" reposted"}
+          }}>
+          {' reposted'}
         </Text>
       )}
     </View>
@@ -334,11 +325,10 @@ export function ProfileIcon({ pubkey }) {
         backgroundColor: greys(theme)[1500],
         borderRadius: 16111,
         marginRight: 8,
-        overflow: "hidden",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
       {profile?.picture ? (
         <>
           {imageLoading && (
@@ -348,7 +338,7 @@ export function ProfileIcon({ pubkey }) {
               width={48}
               height={48}
               style={{
-                position: "absolute",
+                position: 'absolute',
                 borderRadius: 16111,
               }}
             />
@@ -369,10 +359,9 @@ export function ProfileIcon({ pubkey }) {
           style={{
             fontSize: 20,
             color: greys(theme)[200],
-            fontFamily: "OverpassBold",
-          }}
-        >
-          {(profile?.displayName || profile?.name || "A")?.[0]?.toUpperCase()}
+            fontFamily: 'OverpassBold',
+          }}>
+          {(profile?.displayName || profile?.name || 'A')?.[0]?.toUpperCase()}
         </Text>
       )}
     </View>
@@ -395,11 +384,10 @@ function PostTop({ post, font }) {
   return (
     <View
       style={{
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
         // alignSelf: "flex-start",
-      }}
-    >
+      }}>
       {!displayName ? (
         <GradientSkeleton
           startColor={greys(theme)[1500]}
@@ -414,22 +402,20 @@ function PostTop({ post, font }) {
       ) : (
         <Text
           style={{
-            fontFamily: "OverpassBold",
+            fontFamily: 'OverpassBold',
             fontSize: 14,
             color: greys(theme)[0],
-          }}
-        >
+          }}>
           {displayName}
         </Text>
       )}
       <Text
         style={{
-          fontFamily: "OverpassRegular",
+          fontFamily: 'OverpassRegular',
           fontSize: 14,
           color: greys(theme)[400],
-        }}
-      >
-        {" "}
+        }}>
+        {' '}
         • {timeAgo}
       </Text>
     </View>
@@ -452,15 +438,15 @@ export const Post = React.memo(
       id: post_.id,
     });
 
-    const navigation = useTypedNavigation<"post">();
+    const navigation = useTypedNavigation<'post'>();
 
     try {
       const { nostrEvents } = extractUrls(post_?.content);
       const quote =
-        post_?.tags?.find((t) => t?.[0] === "alt")?.[1] === "Repost event" ||
-        post_?.tags?.find((t) => t?.[0] === "q")?.[1] ||
-        (nostrEvents?.[0]?.replace("nostr:", "")
-          ? nip19.decode(nostrEvents?.[0]?.replace("nostr:", ""))?.data
+        post_?.tags?.find((t) => t?.[0] === 'alt')?.[1] === 'Repost event' ||
+        post_?.tags?.find((t) => t?.[0] === 'q')?.[1] ||
+        (nostrEvents?.[0]?.replace('nostr:', '')
+          ? nip19.decode(nostrEvents?.[0]?.replace('nostr:', ''))?.data
           : null);
 
       return (
@@ -477,33 +463,25 @@ export const Post = React.memo(
             padding: 12,
             borderBottomWidth: 1,
             borderColor: greys(theme)[1300],
-          }}
-        >
-          {post.kind === 6 && (
-            <RepostText pubkey={post.pubkey} repostCounter={repostCount} />
-          )}
+          }}>
+          {post.kind === 6 && <RepostText pubkey={post.pubkey} repostCounter={repostCount} />}
           <View
             style={{
-              flexDirection: "row",
-            }}
-          >
+              flexDirection: 'row',
+            }}>
             {!active && <ProfileIcon pubkey={post_?.pubkey} />}
             <View style={{ flex: 1 }}>
               <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  alignSelf: "flex-start",
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
                   marginBottom: active ? 16 : 0,
-                }}
-              >
+                }}>
                 {active && <ProfileIcon pubkey={post_?.pubkey} />}
                 <PostTop post={post_} />
               </View>
-              <TextContent
-                content={post_.content}
-                fontSize={active ? 18 : 14}
-              />
+              <TextContent content={post_.content} fontSize={active ? 18 : 14} />
               <UrlProcessor urls={extractUrls(post_?.content)?.urls} />
             </View>
           </View>

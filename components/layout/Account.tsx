@@ -1,23 +1,18 @@
-import React, { useEffect, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import "react-native-get-random-values";
-import { Animated, Platform, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import 'react-native-get-random-values';
+import { Animated, Platform, StyleSheet } from 'react-native';
 
-import { Text, View } from "components/common/Themed";
-import {
-  BitcoinMaskIcon,
-  DollarMaskIcon,
-  EuroMaskIcon,
-  PoundMaskIcon,
-} from "assets/icons";
-import { PrimaryBalance } from "components/layout/PrimaryBalance";
+import { Text, View } from 'components/common/Themed';
+import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
+import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 
-import { setSelectedMint } from "helper/redux/cashu";
-import { greys, shades } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import SelectedMintDisplay, { sovran } from "components/layout/sheets/mints";
-import { useTypedNavigation } from "helper/navigation/hooks/useTypedNavigation";
-import { NonGestureView } from "./NonGestureView";
+import { setSelectedMint } from 'helper/redux/cashu';
+import { greys, shades } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
+import { useTypedNavigation } from 'helper/navigation/hooks/useTypedNavigation';
+import { NonGestureView } from './NonGestureView';
 
 export function Account({ accounts, account, keysets, proofs, goToIndex }) {
   const theme = useSelector(memoizedGetTheme);
@@ -57,9 +52,7 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
     ).start();
   }, [pulseAnim]);
 
-  const profileId = useSelector(
-    (state: any) => state.nostr?.currentProfile?.id
-  );
+  const profileId = useSelector((state: any) => state.nostr?.currentProfile?.id);
 
   const dispatch = useDispatch();
   const handleMintSelected = async (
@@ -78,7 +71,6 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
       const index = accounts.findIndex((a) => a.unit === mint.unit);
       goToIndex(index);
     } catch (error) {
-      
       throw error;
     }
   };
@@ -88,24 +80,15 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
       <View style={styles.transparentBackground}>
         <View style={styles.transparentBackgroundWithPadding}></View>
         <View style={styles.transparentBackgroundRow}>
-          <View
-            style={[
-              styles.accountUnitContainer,
-              sovran.backgroundSolid,
-              sovran.borderSubtle,
-            ]}
-          >
+          <View style={[styles.accountUnitContainer, sovran.backgroundSolid, sovran.borderSubtle]}>
             <Text style={styles.accountUnitText} weight="bold">
-              {account.unit === "sat" ? "BTC" : account.unit.toUpperCase()}
+              {account.unit === 'sat' ? 'BTC' : account.unit.toUpperCase()}
             </Text>
           </View>
         </View>
 
         <View style={styles.transparentBackgroundRowCenter}>
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            unit={account.unit}
-          />
+          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={account.unit} />
         </View>
         <PrimaryBalance account={account} proofs={proofs} keysets={keysets} />
       </View>
@@ -114,20 +97,18 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
         <View style={styles.transparentBackgroundRow}></View>
 
         <View style={styles.transparentBackgroundRow}>
-          {"•"
-            .repeat(accounts.filter((acc) => acc.type === "onchain").length)
-            .split("")
+          {'•'
+            .repeat(accounts.filter((acc) => acc.type === 'onchain').length)
+            .split('')
             .map((dot, index) => {
               return (
                 <Text
                   key={index}
                   weight={
                     index ===
-                    accounts.findIndex(
-                      (a) => a.unit === account.unit && a.type === account.type
-                    )
-                      ? "bold"
-                      : "regular"
+                    accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
+                      ? 'bold'
+                      : 'regular'
                   }
                   size={16}
                   style={{
@@ -144,8 +125,7 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
                     marginLeft: 1,
                     marginRight: 1,
                     marginTop: 3,
-                  }}
-                >
+                  }}>
                   •
                 </Text>
               );
@@ -158,45 +138,33 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
               marginLeft: 4,
               marginRight: 4,
               marginTop: 6,
-            }}
-          >
-            {" "}
+            }}>
+            {' '}
           </Text>
-          {"•"
-            .repeat(accounts.filter((acc) => acc.type !== "onchain").length)
-            .split("")
+          {'•'
+            .repeat(accounts.filter((acc) => acc.type !== 'onchain').length)
+            .split('')
             .map((dot, index) => {
               return (
                 <Text
-                  key={
-                    accounts.filter((acc) => acc.type === "onchain").length +
-                    index
-                  }
+                  key={accounts.filter((acc) => acc.type === 'onchain').length + index}
                   weight={
-                    accounts.filter((acc) => acc.type === "onchain").length +
-                      index ===
-                    accounts.findIndex(
-                      (a) => a.unit === account.unit && a.type === account.type
-                    )
-                      ? "bold"
-                      : "regular"
+                    accounts.filter((acc) => acc.type === 'onchain').length + index ===
+                    accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
+                      ? 'bold'
+                      : 'regular'
                   }
                   size={16}
                   style={{
                     color:
-                      accounts.filter((acc) => acc.type === "onchain").length +
-                        index ===
-                      accounts.findIndex(
-                        (a) =>
-                          a.unit === account.unit && a.type === account.type
-                      )
+                      accounts.filter((acc) => acc.type === 'onchain').length + index ===
+                      accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
                         ? greys(theme)[0]
                         : greys(theme)[1500],
                     marginLeft: 1,
                     marginRight: 1,
                     marginTop: 3,
-                  }}
-                >
+                  }}>
                   •
                 </Text>
               );
@@ -208,13 +176,13 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
 
       <View style={styles.absoluteRightBottomBorder}>
         <View style={styles.bottomNegative}>
-          {account.unit === "sat" ? (
+          {account.unit === 'sat' ? (
             <BitcoinMaskIcon />
-          ) : account.unit === "usd" ? (
+          ) : account.unit === 'usd' ? (
             <DollarMaskIcon />
-          ) : account.unit === "eur" ? (
+          ) : account.unit === 'eur' ? (
             <EuroMaskIcon />
-          ) : account.unit === "gbp" ? (
+          ) : account.unit === 'gbp' ? (
             <PoundMaskIcon />
           ) : null}
         </View>
@@ -236,32 +204,32 @@ const createStyles = (theme) =>
     },
     nonGestureView: {
       backgroundColor: greys(theme)[2300],
-      overflow: "hidden",
+      overflow: 'hidden',
       zIndex: 1,
       height: 335,
-      width: "100%",
+      width: '100%',
     },
     transparentBackground: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     transparentBackgroundWithPadding: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       padding: 16,
-      marginTop: Platform.OS === "web" ? 64 : 16,
+      marginTop: Platform.OS === 'web' ? 64 : 16,
       paddingBottom: 0,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       paddingTop: 16,
       zIndex: 9,
-      justifyContent: "space-around",
+      justifyContent: 'space-around',
     },
     transparentBackgroundRow: {
-      flexDirection: "row",
-      backgroundColor: "transparent",
+      flexDirection: 'row',
+      backgroundColor: 'transparent',
     },
     accountUnitContainer: {
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: 99999,
       elevation: 1,
       zIndex: 1,
@@ -272,83 +240,83 @@ const createStyles = (theme) =>
       paddingRight: 12,
       paddingTop: 8,
       paddingBottom: 8,
-      margin: "auto",
+      margin: 'auto',
       marginBottom: 8,
     },
     accountUnitText: {
       color: greys(theme)[200],
     },
     transparentBackgroundRowCenter: {
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: "transparent",
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
     },
     maxWidthContainer: {
-      width: "max-width",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "space-around",
-      backgroundColor: "transparent",
-      alignSelf: "center",
+      width: 'max-width',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      backgroundColor: 'transparent',
+      alignSelf: 'center',
     },
     absoluteBottomBorder: {
-      position: "absolute",
-      bottom: Platform.OS === "web" ? 28.8 : 64 + 28.8,
+      position: 'absolute',
+      bottom: Platform.OS === 'web' ? 28.8 : 64 + 28.8,
       borderBottomColor: greys(theme)[1300],
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 1,
-      backgroundColor: "transparent",
-      overflow: "hidden",
-      width: "100%",
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
+      width: '100%',
     },
     absoluteRightBottomBorder: {
-      position: "absolute",
+      position: 'absolute',
       right: -8,
-      bottom: Platform.OS === "web" ? 28.8 : 64 + 28.8,
+      bottom: Platform.OS === 'web' ? 28.8 : 64 + 28.8,
       borderBottomColor: greys(theme)[1300],
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 128,
-      backgroundColor: "transparent",
-      overflow: "hidden",
+      backgroundColor: 'transparent',
+      overflow: 'hidden',
     },
     bottomNegative: {
       bottom: -16,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     accountPagerView: {
-      display: "flex",
+      display: 'flex',
       height: 300,
-      width: "100%",
+      width: '100%',
     },
     swiperView: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       backgroundColor: greys(theme)[2300],
     },
     absoluteTop: {
-      position: "absolute",
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-around",
-      top: Platform.OS === "web" ? 159 + 64 : 159,
+      position: 'absolute',
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      top: Platform.OS === 'web' ? 159 + 64 : 159,
       padding: 0,
       margin: 0,
       zIndex: 3,
       height: 130,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       paddingLeft: 16,
       paddingRight: 16,
     },
     touchableOpacity: {
       flex: 1,
-      maxWidth: "auto",
+      maxWidth: 'auto',
       zIndex: -1,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     cameraButton: {
       maxWidth: 64,
@@ -373,22 +341,22 @@ const createStyles = (theme) =>
       borderRadius: 1000,
     },
     iconContainer: {
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "transparent",
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
     },
     iconView: {
-      alignContent: "center",
-      flexDirection: "row",
+      alignContent: 'center',
+      flexDirection: 'row',
       padding: 12,
       minWidth: 90,
-      width: "100%",
-      justifyContent: "center",
-      alignItems: "center",
+      width: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     cameraIconView: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       borderRadius: 1000,
     },
     receiveIconView: {

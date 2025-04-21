@@ -1,32 +1,32 @@
-import { useNavigation } from "expo-router";
-import { StyleSheet } from "react-native";
-import Modal from "components/layout/Modal";
-import { StyledText, Text, View } from "components/common/Themed";
-import { convertTime } from "helper/time";
-import { formatCurrency } from "helper/currency";
-import { cancelEcashTransaction, getLightningAmount } from "components/cashu";
-import Icon, { FalseIcon, TrueIcon } from "assets/icons";
-import { useDispatch, useSelector } from "react-redux"; // Import useDispatch from react-redux
-import { useCashu } from "helper/redux/cashu";
-import { useNostr } from "helper/redux/nostr";
-import { store } from "helper/redux/store";
-import { greens, greys, shades } from "helper/colors";
-import opacity from "hex-color-opacity";
-import { BlurView } from "expo-blur";
-import { useEsims } from "helper/redux/esim";
+import { useNavigation } from 'expo-router';
+import { StyleSheet } from 'react-native';
+import Modal from 'components/layout/Modal';
+import { StyledText, Text, View } from 'components/common/Themed';
+import { convertTime } from 'helper/time';
+import { formatCurrency } from 'helper/currency';
+import { cancelEcashTransaction, getLightningAmount } from 'components/cashu';
+import Icon, { FalseIcon, TrueIcon } from 'assets/icons';
+import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch from react-redux
+import { useCashu } from 'helper/redux/cashu';
+import { useNostr } from 'helper/redux/nostr';
+import { store } from 'helper/redux/store';
+import { greens, greys, shades } from 'helper/colors';
+import opacity from 'hex-color-opacity';
+import { BlurView } from 'expo-blur';
+import { useEsims } from 'helper/redux/esim';
 
-import { AmountFormatter } from "components/layout/PrimaryBalance";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
-import Snow from "react-native-snow-bg";
-import { getGiveaway } from "./ecashReceiveConfirmation";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation";
-import React from "react";
-import { truncateMiddle } from "helper/strings";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { Card } from "components/common/Card";
-import { showMessage } from "helper/popup/popups";
-import { ButtonHandler } from "./ecashSendConfirmation";
+import { AmountFormatter } from 'components/layout/PrimaryBalance';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import Snow from 'react-native-snow-bg';
+import { getGiveaway } from './ecashReceiveConfirmation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import React from 'react';
+import { truncateMiddle } from 'helper/strings';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { Card } from 'components/common/Card';
+import { showMessage } from 'helper/popup/popups';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 export function BalanceUpdate({
   topAmount,
@@ -51,39 +51,35 @@ export function BalanceUpdate({
   return (
     <View
       style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         padding: 16,
         paddingLeft: 8,
-        backgroundColor: "transparent",
-      }}
-    >
+        backgroundColor: 'transparent',
+      }}>
       <View
         style={{
-          backgroundColor: "transparent",
-        }}
-      >
+          backgroundColor: 'transparent',
+        }}>
         <View
           style={{
-            flexDirection: "row",
-            backgroundColor: "transparent",
-            alignItems: "center",
-          }}
-        >
-          {transactionType === "send" ? (
+            flexDirection: 'row',
+            backgroundColor: 'transparent',
+            alignItems: 'center',
+          }}>
+          {transactionType === 'send' ? (
             <Text
               size={32}
               weight="bold"
               style={{
                 color: shades[300],
                 marginRight: 6,
-              }}
-            >
+              }}>
               -
             </Text>
           ) : (
-            transactionType === "receive" && (
+            transactionType === 'receive' && (
               <Text
                 weight="bold"
                 size={24}
@@ -93,8 +89,7 @@ export function BalanceUpdate({
                   textShadowOffset: { width: 0, height: 0 },
                   textShadowRadius: 1,
                   marginRight: 6,
-                }}
-              >
+                }}>
                 +
               </Text>
             )
@@ -103,13 +98,12 @@ export function BalanceUpdate({
             weight="bold"
             size={32}
             style={{
-              color: transactionType === "send" ? shades[300] : greens[300],
+              color: transactionType === 'send' ? shades[300] : greens[300],
               textShadowColor: opacity(greys(theme)[0], 0.5),
               textShadowOffset: { width: 0, height: 0 },
               textShadowRadius: 1,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             {topAmount ? (
               topAmount
             ) : (
@@ -118,9 +112,7 @@ export function BalanceUpdate({
                 unit={unit}
                 size={32}
                 weight="heavy"
-                color={
-                  transactionType === "receive" ? greens[300] : shades[300]
-                }
+                color={transactionType === 'receive' ? greens[300] : shades[300]}
               />
             )}
           </Text>
@@ -130,23 +122,22 @@ export function BalanceUpdate({
           style={{
             color: greys(theme)[0],
             marginLeft: 18,
-            backgroundColor: "transparent",
-          }}
-        >
-          {amount < 0 ? "-" : ""}
+            backgroundColor: 'transparent',
+          }}>
+          {amount < 0 ? '-' : ''}
           {bottomAmount
             ? bottomAmount
             : formatCurrency(
                 {
-                  currency: unit === "sat" ? "BTC" : unit?.toUpperCase(),
+                  currency: unit === 'sat' ? 'BTC' : unit?.toUpperCase(),
                   value: Math.abs(amount),
-                  denomination: unit === "sat" ? "sats" : unit,
+                  denomination: unit === 'sat' ? 'sats' : unit,
                 },
                 {
-                  locale: "en-US",
+                  locale: 'en-US',
                   precision: 2,
-                  currencyDisplay: unit === "usd" ? "name" : "symbol",
-                  denomination: unit === "usd" ? "sats" : "usd",
+                  currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
+                  denomination: unit === 'usd' ? 'sats' : 'usd',
                 }
               )}
         </Text>
@@ -154,22 +145,20 @@ export function BalanceUpdate({
       <View
         style={{
           padding: 16,
-          backgroundColor: "transparent",
+          backgroundColor: 'transparent',
           transform: [{ scale: 1.25 }],
-        }}
-      >
+        }}>
         {profilePicture ? (
           <View
             style={{
-              position: "relative",
+              position: 'relative',
               width: 28,
               height: 28,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             <View
               style={{
-                position: "absolute",
+                position: 'absolute',
                 bottom: -4,
                 right: -4,
                 zIndex: 100,
@@ -180,22 +169,13 @@ export function BalanceUpdate({
                 padding: 3,
                 borderColor: greys(theme)[1300],
                 borderWidth: 0.2,
-              }}
-            >
-              {transactionType === "receive" ? (
-                <Icon
-                  name="fluent:arrow-download-16-filled"
-                  color={greys(theme)[100]}
-                  size={10}
-                />
+              }}>
+              {transactionType === 'receive' ? (
+                <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} size={10} />
               ) : transaction?.isCancel ? (
                 <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
               ) : (
-                <Icon
-                  name="fluent:arrow-upload-16-filled"
-                  color={greys(theme)[100]}
-                  size={10}
-                />
+                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} size={10} />
               )}
             </View>
             <CachedImage
@@ -211,19 +191,15 @@ export function BalanceUpdate({
               }}
             />
           </View>
-        ) : transactionType === "receive" ? (
+        ) : transactionType === 'receive' ? (
           <View
             style={{
-              position: "relative",
+              position: 'relative',
               width: 28,
               height: 28,
-              backgroundColor: "transparent",
-            }}
-          >
-            <Icon
-              name="fluent:arrow-download-16-filled"
-              color={greys(theme)[100]}
-            />
+              backgroundColor: 'transparent',
+            }}>
+            <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
           </View>
         ) : esims
             .map((e) => e.request)
@@ -231,15 +207,14 @@ export function BalanceUpdate({
             .includes(request) ? (
           <View
             style={{
-              position: "relative",
+              position: 'relative',
               width: 28,
               height: 28,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             <View
               style={{
-                position: "absolute",
+                position: 'absolute',
                 bottom: -4,
                 right: -4,
                 zIndex: 100,
@@ -250,15 +225,11 @@ export function BalanceUpdate({
                 padding: 3,
                 borderColor: greys(theme)[1300],
                 borderWidth: 0.2,
-              }}
-            >
+              }}>
               {transaction?.isCancel ? (
                 <Icon name="mdi:cancel" color={greys(theme)[100]} />
               ) : (
-                <Icon
-                  name="fluent:arrow-upload-16-filled"
-                  color={greys(theme)[100]}
-                />
+                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
               )}
             </View>
             <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
@@ -266,19 +237,15 @@ export function BalanceUpdate({
         ) : (
           <View
             style={{
-              position: "relative",
+              position: 'relative',
               width: 28,
               height: 28,
-              backgroundColor: "transparent",
-            }}
-          >
+              backgroundColor: 'transparent',
+            }}>
             {transaction?.isCancel ? (
               <Icon name="mdi:cancel" color={greys(theme)[100]} />
             ) : (
-              <Icon
-                name="fluent:arrow-upload-16-filled"
-                color={greys(theme)[100]}
-              />
+              <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
             )}
           </View>
         )}
@@ -294,35 +261,29 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: (tx, key) =>
-              `Amount (${tx.unit === "sat" ? "BTC" : tx.unit.toUpperCase()})`,
+            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
             output: (tx, value) => {
               return (
-                <AmountFormatter
-                  weight={"regular"}
-                  size={16}
-                  amount={tx.amount}
-                  unit={tx.unit}
-                />
+                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
               );
             },
           },
           {
-            label: "Amount (USD)",
+            label: 'Amount (USD)',
             output: (tx, value) => {
               return (
-                "≈ " +
+                '≈ ' +
                 formatCurrency(
                   {
-                    currency: "BTC",
+                    currency: 'BTC',
                     value: Math.abs(tx.amount),
-                    denomination: "sats",
+                    denomination: 'sats',
                   },
                   {
-                    locale: "en-US",
+                    locale: 'en-US',
                     precision: 2,
-                    currencyDisplay: "symbol",
-                    denomination: "usd",
+                    currencyDisplay: 'symbol',
+                    denomination: 'usd',
                   }
                 )
               );
@@ -333,7 +294,7 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "date",
+            label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
             },
@@ -343,12 +304,10 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "type",
+            label: 'type',
             output: (tx, value) => {
               return (
-                capitalizeFirstLetter(tx.transactionType) +
-                " • " +
-                capitalizeFirstLetter(value)
+                capitalizeFirstLetter(tx.transactionType) + ' • ' + capitalizeFirstLetter(value)
               );
             },
           },
@@ -357,13 +316,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "token",
+            label: 'token',
             output: (tx, value) => {
-              return value ? truncateMiddle(value, 5) : "";
+              return value ? truncateMiddle(value, 5) : '';
             },
           },
           {
-            label: "counter",
+            label: 'counter',
             output: (tx, value) => {
               return value;
             },
@@ -373,13 +332,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "Cancelled",
+            label: 'Cancelled',
             output: (tx, value) => {
               return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
             },
           },
           {
-            label: "Is Refund Transaction",
+            label: 'Is Refund Transaction',
             output: (tx, value) => {
               return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
@@ -391,39 +350,33 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: (tx, key) =>
-              `Amount (${tx.unit === "sat" ? "BTC" : tx.unit.toUpperCase()})`,
+            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
             output: (tx, value) => {
               return (
-                <AmountFormatter
-                  weight={"regular"}
-                  size={16}
-                  amount={tx.amount}
-                  unit={tx.unit}
-                />
+                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
               );
             },
           },
           {
-            label: "Amount (USD)",
+            label: 'Amount (USD)',
             output: (tx, value) => {
-              if (tx.unit === "usd") {
+              if (tx.unit === 'usd') {
                 return null;
               }
 
               return (
-                "≈ " +
+                '≈ ' +
                 formatCurrency(
                   {
-                    currency: "BTC",
+                    currency: 'BTC',
                     value: Math.abs(tx.amount),
-                    denomination: "sats",
+                    denomination: 'sats',
                   },
                   {
-                    locale: "en-US",
+                    locale: 'en-US',
                     precision: 2,
-                    currencyDisplay: "symbol",
-                    denomination: "usd",
+                    currencyDisplay: 'symbol',
+                    denomination: 'usd',
                   }
                 )
               );
@@ -434,7 +387,7 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "date",
+            label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
             },
@@ -444,12 +397,10 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "type",
+            label: 'type',
             output: (tx, value) => {
               return (
-                capitalizeFirstLetter(tx.transactionType) +
-                " • " +
-                capitalizeFirstLetter(value)
+                capitalizeFirstLetter(tx.transactionType) + ' • ' + capitalizeFirstLetter(value)
               );
             },
           },
@@ -458,13 +409,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "token",
+            label: 'token',
             output: (tx, value) => {
-              return value ? truncateMiddle(value, 5) : "";
+              return value ? truncateMiddle(value, 5) : '';
             },
           },
           {
-            label: "counter",
+            label: 'counter',
             output: (tx, value) => {
               return value;
             },
@@ -474,13 +425,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "Cancelled",
+            label: 'Cancelled',
             output: (tx, value) => {
               return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
             },
           },
           {
-            label: "Is Refund Transaction",
+            label: 'Is Refund Transaction',
             output: (tx, value) => {
               return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
@@ -494,7 +445,7 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "to",
+            label: 'to',
             output: (tx, value) => {
               const profiles = store.getState().nostr?.profiles;
               const search = store.getState().nostr?.search;
@@ -506,40 +457,34 @@ const transactionConfig = {
             },
           },
         ],
-        title: "",
+        title: '',
       },
       {
         keys: [
           {
-            label: (tx, key) =>
-              `Amount (${tx.unit === "sat" ? "BTC" : tx.unit.toUpperCase()})`,
+            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
             output: (tx, value) => {
               return (
-                <AmountFormatter
-                  weight={"regular"}
-                  size={16}
-                  amount={tx.amount}
-                  unit={tx.unit}
-                />
+                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
               );
             },
           },
           {
-            label: "Amount (USD)",
+            label: 'Amount (USD)',
             output: (tx, value) => {
               return (
-                "≈ " +
+                '≈ ' +
                 formatCurrency(
                   {
-                    currency: "BTC",
+                    currency: 'BTC',
                     value: Math.abs(tx.amount),
-                    denomination: "sats",
+                    denomination: 'sats',
                   },
                   {
-                    locale: "en-US",
+                    locale: 'en-US',
                     precision: 2,
-                    currencyDisplay: "symbol",
-                    denomination: "usd",
+                    currencyDisplay: 'symbol',
+                    denomination: 'usd',
                   }
                 )
               );
@@ -550,7 +495,7 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "date",
+            label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
             },
@@ -560,12 +505,10 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "type",
+            label: 'type',
             output: (tx, value) => {
               return (
-                capitalizeFirstLetter(tx.transactionType) +
-                " • " +
-                capitalizeFirstLetter(value)
+                capitalizeFirstLetter(tx.transactionType) + ' • ' + capitalizeFirstLetter(value)
               );
             },
           },
@@ -574,13 +517,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "request",
+            label: 'request',
             output: (tx, value) => {
               return truncateMiddle(value, 5);
             },
           },
           {
-            label: "counter",
+            label: 'counter',
             output: (tx, value) => {
               return value;
             },
@@ -590,13 +533,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "Cancelled",
+            label: 'Cancelled',
             output: (tx, value) => {
               return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
             },
           },
           {
-            label: "Is Refund Transaction",
+            label: 'Is Refund Transaction',
             output: (tx, value) => {
               return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
@@ -608,51 +551,45 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: (tx, key) =>
-              `Amount (${tx.unit === "sat" ? "BTC" : tx.unit.toUpperCase()})`,
+            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
             output: (tx, value) => {
               return (
-                <AmountFormatter
-                  weight={"regular"}
-                  size={16}
-                  amount={tx.amount}
-                  unit={tx.unit}
-                />
+                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
               );
             },
           },
           {
-            label: (tx, key) => `Amount (${tx.unit === "usd" ? "BTC" : "USD"})`,
+            label: (tx, key) => `Amount (${tx.unit === 'usd' ? 'BTC' : 'USD'})`,
             output: (tx, value) => {
-              if (tx.unit === "usd") {
+              if (tx.unit === 'usd') {
                 return formatCurrency(
                   {
-                    currency: "BTC",
+                    currency: 'BTC',
                     value: getLightningAmount({ pr: tx.request }),
-                    denomination: "sats",
+                    denomination: 'sats',
                   },
                   {
-                    locale: "en-US",
+                    locale: 'en-US',
                     precision: 0,
-                    currencyDisplay: "name",
-                    denomination: "sats",
+                    currencyDisplay: 'name',
+                    denomination: 'sats',
                   }
                 );
               }
 
               return (
-                "≈ " +
+                '≈ ' +
                 formatCurrency(
                   {
-                    currency: "BTC",
+                    currency: 'BTC',
                     value: Math.abs(tx.amount),
-                    denomination: "sats",
+                    denomination: 'sats',
                   },
                   {
-                    locale: "en-US",
+                    locale: 'en-US',
                     precision: 2,
-                    currencyDisplay: "symbol",
-                    denomination: "usd",
+                    currencyDisplay: 'symbol',
+                    denomination: 'usd',
                   }
                 )
               );
@@ -663,7 +600,7 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "date",
+            label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
             },
@@ -673,12 +610,10 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "type",
+            label: 'type',
             output: (tx, value) => {
               return (
-                capitalizeFirstLetter(tx.transactionType) +
-                " • " +
-                capitalizeFirstLetter(value)
+                capitalizeFirstLetter(tx.transactionType) + ' • ' + capitalizeFirstLetter(value)
               );
             },
           },
@@ -687,19 +622,19 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "request",
+            label: 'request',
             output: (tx, value) => {
               return truncateMiddle(value, 5);
             },
           },
           {
-            label: "quote",
+            label: 'quote',
             output: (tx, value) => {
               return truncateMiddle(value, 5);
             },
           },
           {
-            label: "counter",
+            label: 'counter',
             output: (tx, value) => {
               return value;
             },
@@ -709,13 +644,13 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: "Cancelled",
+            label: 'Cancelled',
             output: (tx, value) => {
               return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
             },
           },
           {
-            label: "Is Refund Transaction",
+            label: 'Is Refund Transaction',
             output: (tx, value) => {
               return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
@@ -727,24 +662,21 @@ const transactionConfig = {
 };
 
 export function getSectionData(transaction, dispatch) {
-  const config =
-    transactionConfig?.[transaction?.type]?.[transaction?.transactionType] ||
-    [];
+  const config = transactionConfig?.[transaction?.type]?.[transaction?.transactionType] || [];
   return config.map((section) => {
     const items = section.keys.map((key) => {
-      if (typeof key === "string") {
+      if (typeof key === 'string') {
         return {
           title: capitalizeFirstLetter(key),
-          value: transaction[key] || "N/A",
+          value: transaction[key] || 'N/A',
         };
-      } else if (typeof key === "object" && key.label && key.output) {
+      } else if (typeof key === 'object' && key.label && key.output) {
         return {
           title:
-            typeof key.label === "string"
+            typeof key.label === 'string'
               ? capitalizeFirstLetter(key.label)
               : key.label(transaction, key.label),
-          value:
-            key.output(transaction, transaction[key.label], dispatch) || "N/A",
+          value: key.output(transaction, transaction[key.label], dispatch) || 'N/A',
         };
       }
     });
@@ -761,7 +693,7 @@ function ModalScreen() {
   const styles = createStyles(theme);
 
   const navigation = useNavigation();
-  const { id, transactionType } = useTypedRoute<"modal">();
+  const { id, transactionType } = useTypedRoute<'modal'>();
   const { transactions: cashuTransactions } = useCashu();
   const dispatch = useDispatch();
 
@@ -801,14 +733,11 @@ function ModalScreen() {
         <View
           style={{
             backgroundColor: greys(theme)[2300],
-          }}
-        >
+          }}>
           {transaction.token &&
             getGiveaway({
               token: transaction.token,
-            })?.id && (
-              <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />
-            )}
+            })?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
           <BalanceUpdate
             transaction={transaction}
             transactionType={transaction.transactionType}
@@ -830,29 +759,20 @@ function ModalScreen() {
               longitudeDelta: 0.0421,
             }}
           /> */}
-          {transaction.transactionType === "send" &&
-            transaction.type === "ecash" &&
+          {transaction.transactionType === 'send' &&
+            transaction.type === 'ecash' &&
             !transaction.paid && (
               <View style={{ marginHorizontal: 16 }}>
                 <Card
                   onPress={() => {
-                    showMessage(
-                      "pending_ecash_transaction",
-                      {},
-                      { variant: "modal" }
-                    );
+                    showMessage('pending_ecash_transaction', {}, { variant: 'modal' });
                   }}
                   variant="info"
                   message="Why is this transaction pending?"
                   theme={theme}
                   icon={
-                    <Icon
-                      name="mdi:information-outline"
-                      size={24}
-                      color={greys(theme)[100]}
-                    />
-                  }
-                ></Card>
+                    <Icon name="mdi:information-outline" size={24} color={greys(theme)[100]} />
+                  }></Card>
               </View>
             )}
           {sections.map((section) => (
@@ -868,26 +788,25 @@ function ModalScreen() {
       buttons={
         <View
           style={{
-            backgroundColor: "transparent",
-          }}
-        >
+            backgroundColor: 'transparent',
+          }}>
           <ButtonHandler
             context="transactionButtons"
             buttons={[
               transaction?.nostr?.pubkey && {
-                text: "View Chat",
+                text: 'View Chat',
                 onPress: () => {
                   navigation.goBack();
-                  navigation.navigate("userMessages", {
+                  navigation.navigate('userMessages', {
                     pubkey: transaction.nostr.pubkey,
                   });
                 },
               },
               transaction.request &&
                 !transaction.paid && {
-                  text: "Open Invoice",
+                  text: 'Open Invoice',
                   onPress: () => {
-                    navigation.navigate("lightningReceiveConfirmation", {
+                    navigation.navigate('lightningReceiveConfirmation', {
                       unit: transaction.unit,
                       request: transaction.request,
                       amount: transaction.amount,
@@ -897,12 +816,12 @@ function ModalScreen() {
                     });
                   },
                 },
-              transaction.type === "ecash" &&
+              transaction.type === 'ecash' &&
                 !transaction.paid &&
-                transaction.transactionType === "send" && {
-                  text: "Open Invoice",
+                transaction.transactionType === 'send' && {
+                  text: 'Open Invoice',
                   onPress: () => {
-                    navigation.navigate("ecashSendConfirmation", {
+                    navigation.navigate('ecashSendConfirmation', {
                       unit: transaction.unit,
                       token: transaction.token,
                       amount: transaction.amount,
@@ -928,23 +847,19 @@ export function Section({ items, style, camera, special = true }) {
     <UseView
       style={{
         borderRadius: 8,
-        flexDirection: "column",
+        flexDirection: 'column',
         margin: 16,
-        overflow: "hidden",
-        backgroundColor: "transparent",
+        overflow: 'hidden',
+        backgroundColor: 'transparent',
         ...style,
-      }}
-    >
+      }}>
       <View
         style={{
           borderRadius: 8,
-          flexDirection: "column",
-          backgroundColor: camera
-            ? opacity(greys(theme)[1800], 0.75)
-            : greys(theme)[1800],
+          flexDirection: 'column',
+          backgroundColor: camera ? opacity(greys(theme)[1800], 0.75) : greys(theme)[1800],
           padding: 8,
-        }}
-      >
+        }}>
         {items.map((item) => {
           const title_id = item?.title?.id;
           const title = item?.title || item?.title.children;
@@ -953,68 +868,62 @@ export function Section({ items, style, camera, special = true }) {
             <View
               key={title}
               style={{
-                display: "flex",
-                flexDirection: item.direction || "row",
-                backgroundColor: "transparent",
+                display: 'flex',
+                flexDirection: item.direction || 'row',
+                backgroundColor: 'transparent',
                 padding: 8,
-                justifyContent: "space-between",
-              }}
-            >
+                justifyContent: 'space-between',
+              }}>
               <Text
                 id={title_id}
                 weight="bold"
                 size={16}
                 style={{
                   color: greys(theme)[600],
-                  marginRight: title === "" ? 0 : 8,
-                }}
-              >
+                  marginRight: title === '' ? 0 : 8,
+                }}>
                 {title}
               </Text>
 
-              {Boolean(item?.value?.includes?.("@")) ? (
+              {Boolean(item?.value?.includes?.('@')) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="mono"
                     size={11}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.value.split("@")[0]}
+                      textAlign: 'center',
+                    }}>
+                    {item.value.split('@')[0]}
                   </Text>
                   <TouchableOpacity
                     onPress={() => {
                       // navigation.navigate("settings/customNpub");
                     }}
-                    style={{ flexDirection: "row", alignItems: "center" }}
-                  >
+                    style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <StyledText
                       primary
                       style={{
                         color: shades[100],
-                        fontFamily: "OverpassHeavy",
+                        fontFamily: 'OverpassHeavy',
                         fontSize: 24,
-                        textAlign: "center",
-                        textShadowColor: "rgba(0, 0, 0, 0.75)",
+                        textAlign: 'center',
+                        textShadowColor: 'rgba(0, 0, 0, 0.75)',
                         textShadowOffset: { width: 0, height: 0 },
                         textShadowRadius: 8,
                         padding: 4,
-                      }}
-                    >
-                      @{item.value.split("@")[1]}
+                      }}>
+                      @{item.value.split('@')[1]}
                     </StyledText>
                     {/* <View style={{ marginLeft: 4 }}>
                       <Icon
@@ -1025,29 +934,25 @@ export function Section({ items, style, camera, special = true }) {
                     </View> */}
                   </TouchableOpacity>
                 </View>
-              ) : Boolean(
-                  item?.value?.startsWith && item.value.startsWith("npub")
-                ) ? (
+              ) : Boolean(item?.value?.startsWith && item.value.startsWith('npub')) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="heavy"
                     size={24}
                     style={{
                       color: shades[300],
-                      textAlign: "center",
-                    }}
-                  >
+                      textAlign: 'center',
+                    }}>
                     npub
                   </Text>
                   <Text
@@ -1055,36 +960,31 @@ export function Section({ items, style, camera, special = true }) {
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                      fontFamily: "OverpassMono",
-                    }}
-                  >
-                    {item.value.split("npub")[1]}
+                      textAlign: 'center',
+                      fontFamily: 'OverpassMono',
+                    }}>
+                    {item.value.split('npub')[1]}
                   </Text>
                 </View>
-              ) : Boolean(
-                  item?.value?.startsWith && item.value.startsWith("npub")
-                ) ? (
+              ) : Boolean(item?.value?.startsWith && item.value.startsWith('npub')) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="heavy"
                     size={24}
                     style={{
                       color: shades[300],
-                      textAlign: "center",
-                    }}
-                  >
+                      textAlign: 'center',
+                    }}>
                     npub
                   </Text>
                   <Text
@@ -1092,36 +992,31 @@ export function Section({ items, style, camera, special = true }) {
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                      fontFamily: "OverpassMono",
-                    }}
-                  >
-                    {item.value.split("npub")[1]}
+                      textAlign: 'center',
+                      fontFamily: 'OverpassMono',
+                    }}>
+                    {item.value.split('npub')[1]}
                   </Text>
                 </View>
-              ) : Boolean(
-                  item?.value?.startsWith && item.value.startsWith("creqA")
-                ) ? (
+              ) : Boolean(item?.value?.startsWith && item.value.startsWith('creqA')) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="heavy"
                     size={24}
                     style={{
                       color: shades[300],
-                      textAlign: "center",
-                    }}
-                  >
+                      textAlign: 'center',
+                    }}>
                     creqA
                   </Text>
                   <Text
@@ -1129,38 +1024,31 @@ export function Section({ items, style, camera, special = true }) {
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                      fontFamily: "OverpassMono",
-                    }}
-                  >
-                    {item.value.split("creqA")[1]}
+                      textAlign: 'center',
+                      fontFamily: 'OverpassMono',
+                    }}>
+                    {item.value.split('creqA')[1]}
                   </Text>
                 </View>
-              ) : Boolean(
-                  item?.value?.startsWith &&
-                    item.value.startsWith("lnbc1") &&
-                    special
-                ) ? (
+              ) : Boolean(item?.value?.startsWith && item.value.startsWith('lnbc1') && special) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="heavy"
                     size={24}
                     style={{
                       color: shades[300],
-                      textAlign: "center",
-                    }}
-                  >
+                      textAlign: 'center',
+                    }}>
                     lnbc1
                   </Text>
                   <Text
@@ -1168,105 +1056,90 @@ export function Section({ items, style, camera, special = true }) {
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                      fontFamily: "OverpassMono",
-                    }}
-                  >
-                    {item.value.split("lnbc1")[1]}
+                      textAlign: 'center',
+                      fontFamily: 'OverpassMono',
+                    }}>
+                    {item.value.split('lnbc1')[1]}
                   </Text>
                 </View>
               ) : Boolean(
-                  ((item?.value?.startsWith &&
-                    item.value.startsWith("cashuB")) ||
-                    (item?.value?.startsWith &&
-                      item.value.startsWith("cashuA"))) &&
+                  ((item?.value?.startsWith && item.value.startsWith('cashuB')) ||
+                    (item?.value?.startsWith && item.value.startsWith('cashuA'))) &&
                     special
                 ) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="heavy"
                     size={24}
                     style={{
                       color: shades[300],
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.value.startsWith("cashuA") ? "cashuA" : "cashuB"}
+                      textAlign: 'center',
+                    }}>
+                    {item.value.startsWith('cashuA') ? 'cashuA' : 'cashuB'}
                   </Text>
                   <Text
                     weight="bold"
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "center",
-                      fontFamily: "OverpassMono",
-                    }}
-                  >
-                    {item.value.split("cashuA")[1] ||
-                      item.value.split("cashuB")[1]}
+                      textAlign: 'center',
+                      fontFamily: 'OverpassMono',
+                    }}>
+                    {item.value.split('cashuA')[1] || item.value.split('cashuB')[1]}
                   </Text>
                 </View>
               ) : Boolean(
                   item?.value?.startsWith &&
-                    item.value.startsWith("bitcoin:?lightning=") &&
-                    item.value.includes("&cashu=")
+                    item.value.startsWith('bitcoin:?lightning=') &&
+                    item.value.includes('&cashu=')
                 ) ? (
                 <View
                   style={{
-                    marginRight: title === "" ? 0 : 8,
+                    marginRight: title === '' ? 0 : 8,
 
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "transparent",
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                     flex: 1,
-                  }}
-                >
+                  }}>
                   <Text
                     weight="bold"
                     size={12}
                     style={{
                       color: greys(theme)[100],
-                      textAlign: "left",
-                      fontFamily: "OverpassMono",
-                      wordBreak: "break-all",
-                    }}
-                  >
+                      textAlign: 'left',
+                      fontFamily: 'OverpassMono',
+                      wordBreak: 'break-all',
+                    }}>
                     {item.value}
                   </Text>
                 </View>
               ) : (
                 <View
                   style={{
-                    backgroundColor: "transparent",
-                  }}
-                >
+                    backgroundColor: 'transparent',
+                  }}>
                   <Text
-                    weight={item.title === "" ? "mono" : "regular"}
-                    size={item.title === "" ? 12 : 16}
+                    weight={item.title === '' ? 'mono' : 'regular'}
+                    size={item.title === '' ? 12 : 16}
                     style={{
                       color: greys(theme)[0],
                       textAlign:
-                        item.title === ""
-                          ? "left"
-                          : item.align === "left"
-                          ? "left"
-                          : "right",
+                        item.title === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
                       flex: 1,
-                    }}
-                  >
+                    }}>
                     {item.value}
                   </Text>
                 </View>
@@ -1282,15 +1155,15 @@ export function Section({ items, style, camera, special = true }) {
 const createStyles = (theme) =>
   StyleSheet.create({
     minus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#9A4141",
+      color: '#9A4141',
       marginRight: 4,
     },
     plus: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 32,
-      color: "#499A41",
+      color: '#499A41',
       marginRight: 4,
     },
     container: {
@@ -1298,12 +1171,12 @@ const createStyles = (theme) =>
     },
     title: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[1000],
     },
     separator: {
       marginVertical: 30,
       height: 1,
-      width: "80%",
+      width: '80%',
     },
   });

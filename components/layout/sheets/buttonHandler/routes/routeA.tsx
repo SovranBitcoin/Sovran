@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
-import { useSheetRouter } from "react-native-actions-sheet";
-import { Text } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys, shades } from "helper/colors";
-import Icon from "assets/icons";
-import opacity from "hex-color-opacity";
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSheetRouter } from 'react-native-actions-sheet';
+import { Text } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys, shades } from 'helper/colors';
+import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
 
 const RouteA = ({ payload }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -21,7 +21,7 @@ const RouteA = ({ payload }) => {
     const result = onPress();
 
     // If it's a promise, reset the processing state when it resolves or rejects
-    if (result && typeof result.then === "function") {
+    if (result && typeof result.then === 'function') {
       result.finally(() => {
         setProcessingButtonIndex(null);
       });
@@ -34,26 +34,24 @@ const RouteA = ({ payload }) => {
   };
 
   const reorderedButtons = [
-    ...payload.buttons.filter((button) => button.text !== "Next"),
-    ...payload.buttons.filter((button) => button.text === "Next"),
+    ...payload.buttons.filter((button) => button.text !== 'Next'),
+    ...payload.buttons.filter((button) => button.text === 'Next'),
   ];
 
   return (
     <View
       style={{
         borderRadius: 16,
-        overflow: "hidden",
+        overflow: 'hidden',
         backgroundColor: greys(theme)[1800],
         padding: 16,
-      }}
-    >
+      }}>
       <View
         style={{
           backgroundColor: greys(theme)[1500],
           padding: 16,
           borderRadius: 16,
-        }}
-      >
+        }}>
         {reorderedButtons.map((button, i) => {
           const isProcessing = processingButtonIndex !== null;
           const isDisabled = isProcessing && processingButtonIndex !== i;
@@ -62,22 +60,20 @@ const RouteA = ({ payload }) => {
             <TouchableOpacity
               key={i}
               style={{
-                justifyContent: "flex-start",
-                flexDirection: "row",
-                alignItems: "center",
+                justifyContent: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
                 marginBottom: i === payload.buttons.length - 1 ? 0 : 32,
                 opacity: isDisabled ? 0.5 : 1,
               }}
               onPress={() => handleButtonPress(button.onPress, i)}
-              disabled={isDisabled}
-            >
+              disabled={isDisabled}>
               <View
                 style={{
                   backgroundColor: opacity(shades[200], 0.25),
                   borderRadius: 1000,
                   padding: 4,
-                }}
-              >
+                }}>
                 <Icon color={shades[200]} name={button.icon} size={32} />
               </View>
               <Text
@@ -86,8 +82,7 @@ const RouteA = ({ payload }) => {
                   color: shades[200],
                 }}
                 size={18}
-                weight="bold"
-              >
+                weight="bold">
                 {button.text}
               </Text>
             </TouchableOpacity>
@@ -101,29 +96,29 @@ const RouteA = ({ payload }) => {
 const createStyles = (theme: string) =>
   StyleSheet.create({
     headerText: {
-      fontFamily: "OverpassBold",
-      textAlign: "center",
+      fontFamily: 'OverpassBold',
+      textAlign: 'center',
       marginTop: 16,
       color: shades[500],
       fontSize: 16,
     },
     contentContainer: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingBottom: 40,
-      position: "absolute",
+      position: 'absolute',
       left: 0,
       right: 0,
-      top: "50%",
+      top: '50%',
       transform: [
         {
-          translateY: "-150%",
+          translateY: '-150%',
         },
       ],
     },
     iconButton: {
-      position: "absolute",
+      position: 'absolute',
       top: 0,
       zIndex: 10,
     },
@@ -132,16 +127,16 @@ const createStyles = (theme: string) =>
       height: 100,
       borderRadius: 50,
       backgroundColor: shades[500],
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       elevation: 5,
-      shadowColor: "#000",
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 3.84,
     },
     pulseCircle: {
-      position: "absolute",
+      position: 'absolute',
       width: 100,
       height: 100,
       top: 0,
@@ -151,7 +146,7 @@ const createStyles = (theme: string) =>
     statusText: {
       marginTop: 24,
       color: greys(theme)[2300],
-      fontFamily: "OverpassMedium",
+      fontFamily: 'OverpassMedium',
       fontSize: 16,
     },
     cancelButton: {

@@ -1,30 +1,26 @@
-import {
-  Route,
-  SheetDefinition,
-  RouteDefinition,
-} from "react-native-actions-sheet";
-import RouteA from "./routeA";
-import RouteB from "./routeB";
+import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
+import RouteA from './routeA';
+import RouteB from './routeB';
 
-export const sheetName = "nfc";
+export const sheetName = 'nfc';
 
 export const routes: Route[] = [
   {
-    name: "route-a",
+    name: 'route-a',
     component: RouteA,
   },
   {
-    name: "route-b",
+    name: 'route-b',
     component: RouteB,
   },
 ];
 
-declare module "react-native-actions-sheet" {
+declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        "route-a": RouteDefinition;
-        "route-b": RouteDefinition<{ data: string }>;
+        'route-a': RouteDefinition;
+        'route-b': RouteDefinition<{ data: string }>;
       };
     }>;
   }

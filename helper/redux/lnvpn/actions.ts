@@ -1,4 +1,4 @@
-import { SET_VPN, UPDATE_VPN } from "./actionTypes";
+import { SET_VPN, UPDATE_VPN } from './actionTypes';
 
 export const setVpn = (keysets) => ({
   type: SET_VPN,

@@ -1,10 +1,10 @@
-import React from "react";
-import MessageComponent from "./MessageComponent";
-import EsimComponent from "./EsimComponent";
-import TransactionComponent from "./TransactionComponent";
-import { useNostr } from "helper/redux/nostr";
-import EventComponent from "./EventsComponent";
-import VpnComponent from "./VpnComponent";
+import React from 'react';
+import MessageComponent from './MessageComponent';
+import EsimComponent from './EsimComponent';
+import TransactionComponent from './TransactionComponent';
+import { useNostr } from 'helper/redux/nostr';
+import EventComponent from './EventsComponent';
+import VpnComponent from './VpnComponent';
 
 const TimelineItem = ({ item, theme }) => {
   const { currentProfile } = useNostr();
@@ -26,13 +26,7 @@ const TimelineItem = ({ item, theme }) => {
 
   // Render appropriate component based on item type
   if (isMessage) {
-    return (
-      <MessageComponent
-        message={item}
-        theme={theme}
-        isReceived={isMessageReceived}
-      />
-    );
+    return <MessageComponent message={item} theme={theme} isReceived={isMessageReceived} />;
   }
 
   if (isVPN) {
@@ -49,11 +43,7 @@ const TimelineItem = ({ item, theme }) => {
 
   if (isTransaction) {
     return (
-      <TransactionComponent
-        transaction={item}
-        theme={theme}
-        isReceived={isTransactionReceived}
-      />
+      <TransactionComponent transaction={item} theme={theme} isReceived={isTransactionReceived} />
     );
   }
 

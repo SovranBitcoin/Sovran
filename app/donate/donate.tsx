@@ -1,12 +1,12 @@
-import React from "react";
-import { StyleSheet, View, TouchableOpacity, Linking } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import Container from "components/layout/Container";
-import { Text } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { useNavigation } from "expo-router";
-import CachedImage from "components/common/Image";
+import React from 'react';
+import { StyleSheet, View, TouchableOpacity, Linking } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import Container from 'components/layout/Container';
+import { Text } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { useNavigation } from 'expo-router';
+import CachedImage from 'components/common/Image';
 
 // Organization interface
 interface Organization {
@@ -20,13 +20,13 @@ interface Organization {
 // Predefined organizations
 const FEATURED_ORGANIZATIONS: Organization[] = [
   {
-    pubkey: "f1989a96d75aa386b4c871543626cbb362c03248b220dc9ae53d7cefbcaaf2c1",
-    displayName: "HRF",
+    pubkey: 'f1989a96d75aa386b4c871543626cbb362c03248b220dc9ae53d7cefbcaaf2c1',
+    displayName: 'HRF',
     image:
-      "https://image.nostr.build/cf2831d214006f97688d669eb95c2b224e6d4579492d05a9086e4e64c7af9845.png",
+      'https://image.nostr.build/cf2831d214006f97688d669eb95c2b224e6d4579492d05a9086e4e64c7af9845.png',
     about:
-      "The Human Rights Foundation is a nonpartisan, nonprofit organization that promotes and protects human rights globally, with a focus on closed societies.",
-    website: "HRF.org",
+      'The Human Rights Foundation is a nonpartisan, nonprofit organization that promotes and protects human rights globally, with a focus on closed societies.',
+    website: 'HRF.org',
   },
   // {
   //   pubkey: "787338757fc25d65cd929394d5e7713cf43638e8d259e8dcf5c73b834eb851f2",
@@ -70,7 +70,7 @@ export default function OrganizationScreen() {
   const navigation = useNavigation();
 
   const handleNavigation = (pubkey: string) => {
-    navigation.navigate("userMessages", { pubkey });
+    navigation.navigate('userMessages', { pubkey });
   };
 
   return (
@@ -104,9 +104,7 @@ function OrganizationTile({ organization, onPress }: OrganizationTileProps) {
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.organizationTile}>
-      {image && (
-        <CachedImage source={{ uri: image }} style={styles.tileImage} />
-      )}
+      {image && <CachedImage source={{ uri: image }} style={styles.tileImage} />}
       <View style={styles.tileTitleContainer}>
         <Text style={styles.tileTitle}>{displayName}</Text>
         {about && (
@@ -127,30 +125,30 @@ function OrganizationTile({ organization, onPress }: OrganizationTileProps) {
 const createStyles = (theme: any) =>
   StyleSheet.create({
     organizationGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
       marginTop: 8,
     },
     organizationTile: {
-      width: "48%",
+      width: '48%',
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
-      alignItems: "flex-start",
+      alignItems: 'flex-start',
       marginBottom: 16,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     tileImage: {
-      width: "100%",
+      width: '100%',
       aspectRatio: 1,
       backgroundColor: greys(theme)[1500],
     },
     tileTitleContainer: {
       padding: 8,
-      width: "100%",
+      width: '100%',
     },
     tileTitle: {
-      fontWeight: "bold",
+      fontWeight: 'bold',
     },
     tileAbout: {
       fontSize: 12,

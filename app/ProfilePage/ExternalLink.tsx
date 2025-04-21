@@ -1,16 +1,16 @@
-import { View } from "react-native";
-import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { Text } from "components/common/Themed";
-import { getLinkPreview } from "link-preview-js";
-import { Cache } from "react-native-cache";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { View } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { Text } from 'components/common/Themed';
+import { getLinkPreview } from 'link-preview-js';
+import { Cache } from 'react-native-cache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 const linkPreviewCache = new Cache({
-  namespace: "linkPreviews",
+  namespace: 'linkPreviews',
   policy: {
     maxEntries: 100,
     stdTTL: 60 * 60 * 24, // 24 hours TTL in seconds
@@ -44,7 +44,7 @@ const useLinkPreview = (url) => {
           await linkPreviewCache.set(url, JSON.stringify(data));
         }
       } catch (err) {
-        setError("Failed to fetch link preview.");
+        setError('Failed to fetch link preview.');
       } finally {
         setLoading(false);
       }
@@ -57,15 +57,15 @@ const useLinkPreview = (url) => {
 };
 
 const LinkImage = ({ theme, linkData }) =>
-  linkData?.images?.find((image) => image.endsWith(".png")) && (
+  linkData?.images?.find((image) => image.endsWith('.png')) && (
     <CachedImage
       style={{
-        width: "auto",
+        width: 'auto',
         height: 100,
         backgroundColor: greys(theme)[1800],
         borderRadius: 8,
       }}
-      source={{ uri: linkData.images.find((image) => image.endsWith(".png")) }}
+      source={{ uri: linkData.images.find((image) => image.endsWith('.png')) }}
     />
   );
 
@@ -76,24 +76,21 @@ const LinkDetails = ({ theme, url, linkData }) => (
       style={{
         color: greys(theme)[600],
         marginTop: 4,
-      }}
-    >
+      }}>
       {url}
     </Text>
     <Text
       weight="heavy"
       style={{
         color: greys(theme)[0],
-      }}
-    >
+      }}>
       {linkData?.title}
     </Text>
     <Text
       size={12}
       style={{
         color: greys(theme)[400],
-      }}
-    >
+      }}>
       {linkData?.description}
     </Text>
   </View>
@@ -104,9 +101,7 @@ export const ExternalLink = ({ url }) => {
   const { loading, linkData, error } = useLinkPreview(url);
 
   if (loading) {
-    return (
-      <View>{/* <ActivityIndicator size="large" color="#0000ff" /> */}</View>
-    );
+    return <View>{/* <ActivityIndicator size="large" color="#0000ff" /> */}</View>;
   }
 
   if (error) {
@@ -120,8 +115,7 @@ export const ExternalLink = ({ url }) => {
         borderRadius: 16,
         padding: 12,
         marginBottom: 12,
-      }}
-    >
+      }}>
       <LinkImage theme={theme} linkData={linkData} />
       <LinkDetails theme={theme} url={url} linkData={linkData} />
     </View>

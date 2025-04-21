@@ -1,51 +1,48 @@
-import React from "react";
+import React from 'react';
 
-import { Button } from "components/common/Button";
-import { StyledText, Text, View } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useSelector } from "react-redux";
-import { store } from "helper/redux/store";
-import { addMintsAction } from "helper/redux/cashu";
-import { useSheetRouter } from "react-native-actions-sheet";
+import { Button } from 'components/common/Button';
+import { StyledText, Text, View } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector } from 'react-redux';
+import { store } from 'helper/redux/store';
+import { addMintsAction } from 'helper/redux/cashu';
+import { useSheetRouter } from 'react-native-actions-sheet';
 
 export function RouteA({ payload }) {
   const theme = useSelector(memoizedGetTheme);
-  const router = useSheetRouter("mint-accepter");
+  const router = useSheetRouter('mint-accepter');
   return (
     <View
       style={{
         marginHorizontal: 8,
         marginBottom: 0,
         borderRadius: 16,
-        overflow: "hidden",
+        overflow: 'hidden',
         backgroundColor: greys(theme)[1800],
         padding: 8,
         paddingVertical: 32,
-      }}
-    >
+      }}>
       <Text
         size={24}
         style={{
           fontSize: 20,
-          fontFamily: "OverpassHeavy",
+          fontFamily: 'OverpassHeavy',
           color: greys(theme)[0],
           marginLeft: 16,
-          textAlign: "center",
+          textAlign: 'center',
           marginBottom: 16,
-        }}
-      >
-        Do you want to trust{" "}
+        }}>
+        Do you want to trust{' '}
         <View>
           <StyledText
             primary
             style={{
-              fontFamily: "OverpassHeavy",
+              fontFamily: 'OverpassHeavy',
               fontSize: 20,
               marginBottom: -5.5,
-            }}
-          >
-            {payload.mint.replace("https://", "").replace("http://", "")}
+            }}>
+            {payload.mint.replace('https://', '').replace('http://', '')}
           </StyledText>
         </View>
         ?

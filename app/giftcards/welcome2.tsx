@@ -1,26 +1,26 @@
-import { StyleSheet, View, TouchableOpacity } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import Container from "components/layout/Container";
-import React, { useEffect, useState } from "react";
-import { Text } from "components/common/Themed";
-import { greys, shades } from "helper/colors";
-import { useTypedRoute } from "helper/navigation";
-import Icon from "assets/icons";
-import { useNavigation } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import CachedImage from "components/common/Image";
-import { useActionSheet } from "@expo/react-native-action-sheet";
-import { Button } from "components/common/Button";
-import { products } from "./products";
-import { TextContent } from "../ProfilePage/TextContent";
-import { Card } from "components/common/Card";
-import lookup from "country-code-lookup";
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import Container from 'components/layout/Container';
+import React, { useEffect, useState } from 'react';
+import { Text } from 'components/common/Themed';
+import { greys, shades } from 'helper/colors';
+import { useTypedRoute } from 'helper/navigation';
+import Icon from 'assets/icons';
+import { useNavigation } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import CachedImage from 'components/common/Image';
+import { useActionSheet } from '@expo/react-native-action-sheet';
+import { Button } from 'components/common/Button';
+import { products } from './products';
+import { TextContent } from '../ProfilePage/TextContent';
+import { Card } from 'components/common/Card';
+import lookup from 'country-code-lookup';
 
 const createStyles = (theme) =>
   StyleSheet.create({
     productImage: {
-      width: "100%",
+      width: '100%',
       height: 200,
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
@@ -29,7 +29,7 @@ const createStyles = (theme) =>
       padding: 24,
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
-      alignItems: "center",
+      alignItems: 'center',
       margin: 2,
     },
     productDetails: {
@@ -37,20 +37,13 @@ const createStyles = (theme) =>
       padding: 16,
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
   });
 
-const AmountList = ({
-  packages,
-  currency,
-  styles,
-  filterCondition,
-  selectedAmount,
-  onSelect,
-}) => {
+const AmountList = ({ packages, currency, styles, filterCondition, selectedAmount, onSelect }) => {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -59,12 +52,9 @@ const AmountList = ({
         flex: 1,
         marginRight: filterCondition ? 4 : 0,
         marginLeft: filterCondition ? 0 : 4,
-      }}
-    >
+      }}>
       {packages
-        .filter((_, index) =>
-          filterCondition ? index % 2 === 0 : index % 2 !== 0
-        )
+        .filter((_, index) => (filterCondition ? index % 2 === 0 : index % 2 !== 0))
         .map((pkg, index) => {
           const isSelected = pkg.value === selectedAmount;
 
@@ -74,34 +64,16 @@ const AmountList = ({
                 style={{
                   borderRadius: 8,
                   marginTop: 8,
-                  backgroundColor: isSelected
-                    ? "transparent"
-                    : greys(theme)[1500],
-                }}
-              >
+                  backgroundColor: isSelected ? 'transparent' : greys(theme)[1500],
+                }}>
                 {isSelected ? (
                   <LinearGradient
-                    colors={[
-                      shades[100],
-                      shades[200],
-                      shades[300],
-                      shades[400],
-                      shades[500],
-                    ]}
-                    style={{ borderRadius: 8 }}
-                  >
-                    <AmountItem
-                      value={pkg.value}
-                      currency={currency}
-                      styles={styles}
-                    />
+                    colors={[shades[100], shades[200], shades[300], shades[400], shades[500]]}
+                    style={{ borderRadius: 8 }}>
+                    <AmountItem value={pkg.value} currency={currency} styles={styles} />
                   </LinearGradient>
                 ) : (
-                  <AmountItem
-                    value={pkg.value}
-                    currency={currency}
-                    styles={styles}
-                  />
+                  <AmountItem value={pkg.value} currency={currency} styles={styles} />
                 )}
               </View>
             </TouchableOpacity>
@@ -155,7 +127,7 @@ export default function ModalScreen() {
 
   const handleCountrySelect = () => {
     const options = countries.map((c) => lookup.byIso(c).country) || [];
-    options.push("Cancel");
+    options.push('Cancel');
     const cancelButtonIndex = options.length - 1;
 
     showActionSheetWithOptions(
@@ -196,15 +168,9 @@ export default function ModalScreen() {
       <TouchableOpacity onPress={handleCountrySelect}>
         <View style={styles.productDetails}>
           <Text size={16} weight="bold">
-            {selectedCountry
-              ? lookup.byIso(selectedCountry)?.country
-              : "Select Country"}
+            {selectedCountry ? lookup.byIso(selectedCountry)?.country : 'Select Country'}
           </Text>
-          <Icon
-            name="fluent:chevron-down-12-filled"
-            size={16}
-            color={greys(theme)[0]}
-          />
+          <Icon name="fluent:chevron-down-12-filled" size={16} color={greys(theme)[0]} />
         </View>
       </TouchableOpacity>
 
@@ -213,15 +179,14 @@ export default function ModalScreen() {
           <SectionTitle title="Amount" />
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-              backgroundColor: "transparent",
-            }}
-          >
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+              backgroundColor: 'transparent',
+            }}>
             <AmountList
               packages={selectedProduct?.packages || []}
-              currency={selectedProduct?.currency || ""}
+              currency={selectedProduct?.currency || ''}
               styles={styles}
               filterCondition={true}
               selectedAmount={selectedAmount}
@@ -229,7 +194,7 @@ export default function ModalScreen() {
             />
             <AmountList
               packages={selectedProduct?.packages || []}
-              currency={selectedProduct?.currency || ""}
+              currency={selectedProduct?.currency || ''}
               styles={styles}
               filterCondition={false}
               selectedAmount={selectedAmount}
@@ -248,24 +213,16 @@ export default function ModalScreen() {
           </View>
 
           {selectedProduct?.specialNote?.en && (
-            <Card
-              message={selectedProduct?.specialNote?.en}
-              variant="warning"
-              theme={theme}
-            />
+            <Card message={selectedProduct?.specialNote?.en} variant="warning" theme={theme} />
           )}
 
-          <Text
-            weight="regular"
-            size={14}
-            style={{ marginTop: 16, marginBottom: 16 }}
-          >
+          <Text weight="regular" size={14} style={{ marginTop: 16, marginBottom: 16 }}>
             Gift cards are provided through a third party.
           </Text>
 
           <Button
             onPress={() =>
-              navigation.navigate("bitrefill", {
+              navigation.navigate('bitrefill', {
                 product: selectedProduct,
                 country: selectedCountry,
                 amount: selectedAmount,

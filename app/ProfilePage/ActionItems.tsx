@@ -1,17 +1,17 @@
-import { Text, View } from "components/common/Themed";
-import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from "assets/icons";
-import { greys } from "helper/colors";
-import { useSelector } from "react-redux";
-import { useEffect, useMemo, useState } from "react";
-import { EventKind } from "../../app/Profile";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Assuming you're using AsyncStorage as backend for cache
-import { Cache } from "react-native-cache";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
-import { getLightningAmount } from "components/cashu";
+import { Text, View } from 'components/common/Themed';
+import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
+import { greys } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { useEffect, useMemo, useState } from 'react';
+import { EventKind } from '../../app/Profile';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
+import { Cache } from 'react-native-cache';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { getLightningAmount } from 'components/cashu';
 
 const reactionCache = new Cache({
-  namespace: "reactions",
+  namespace: 'reactions',
   policy: {
     maxEntries: 100,
     stdTTL: 60 * 5, // 24 hours TTL in seconds
@@ -30,12 +30,8 @@ export const usePostReactions = ({ id }) => {
     async function checkCache() {
       if (!id) return;
 
-      const cachedReactionCount = Number(
-        await reactionCache.get(`${id}.reactions`)
-      );
-      const cachedRepostCount = Number(
-        await reactionCache.get(`${id}.reposts`)
-      ); // Check for cached reposts
+      const cachedReactionCount = Number(await reactionCache.get(`${id}.reactions`));
+      const cachedRepostCount = Number(await reactionCache.get(`${id}.reposts`)); // Check for cached reposts
       const cachedZapCount = Number(await reactionCache.get(`${id}.zaps`)); // Check for cached zaps
 
       if (cachedReactionCount !== undefined) {
@@ -62,7 +58,7 @@ export const usePostReactions = ({ id }) => {
   const filters = useMemo(
     () => [
       {
-        "#e": [id], // Use the post ID to filter reactions, reposts, and zaps
+        '#e': [id], // Use the post ID to filter reactions, reposts, and zaps
         kinds: [EventKind.Reaction, EventKind.Repost, EventKind.ZapReceipt], // Include all event types
       },
     ],
@@ -89,7 +85,7 @@ export const usePostReactions = ({ id }) => {
         reactionEvents
           .filter((event) => event.kind === EventKind.ZapReceipt)
           .forEach((event) => {
-            const ln = event.tags.find((t) => t[0] === "bolt11")?.[1];
+            const ln = event.tags.find((t) => t[0] === 'bolt11')?.[1];
             if (ln) {
               newZapCount += getLightningAmount({ pr: ln });
             }
@@ -121,11 +117,10 @@ export const usePostReactions = ({ id }) => {
 const ActionItem = ({ Icon, count, theme, size }) => (
   <View
     style={{
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: "transparent",
-    }}
-  >
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+    }}>
     <Icon width={size} height={size} color={greys(theme)[700]} />
     <Text
       size={size}
@@ -133,29 +128,22 @@ const ActionItem = ({ Icon, count, theme, size }) => (
       style={{
         color: greys(theme)[700],
         marginLeft: 4,
-      }}
-    >
+      }}>
       {count}
     </Text>
   </View>
 );
 
-export function ActionItems({
-  id,
-  reactionCount,
-  repostCount,
-  zapCount,
-  size = 24,
-}) {
+export function ActionItems({ id, reactionCount, repostCount, zapCount, size = 24 }) {
   const theme = useSelector(memoizedGetTheme);
 
   function formatNumber(num) {
     if (num >= 1000000000) {
-      return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "b";
+      return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'b';
     } else if (num >= 1000000) {
-      return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "m";
+      return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'm';
     } else if (num >= 1000) {
-      return (num / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+      return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
     } else {
       return num.toString();
     }
@@ -164,36 +152,15 @@ export function ActionItems({
   return (
     <View
       style={{
-        flexDirection: "row",
+        flexDirection: 'row',
         marginLeft: size === 16 ? 56 : 0,
-        justifyContent: "space-between",
-        backgroundColor: "transparent",
-      }}
-    >
-      <ActionItem
-        size={size}
-        Icon={CommentIcon}
-        count={formatNumber(0)}
-        theme={theme}
-      />
-      <ActionItem
-        size={size}
-        Icon={RepostIcon}
-        count={formatNumber(repostCount)}
-        theme={theme}
-      />
-      <ActionItem
-        size={size}
-        Icon={HeartIcon}
-        count={formatNumber(reactionCount)}
-        theme={theme}
-      />
-      <ActionItem
-        size={size}
-        Icon={ZapIcon}
-        count={formatNumber(zapCount)}
-        theme={theme}
-      />
+        justifyContent: 'space-between',
+        backgroundColor: 'transparent',
+      }}>
+      <ActionItem size={size} Icon={CommentIcon} count={formatNumber(0)} theme={theme} />
+      <ActionItem size={size} Icon={RepostIcon} count={formatNumber(repostCount)} theme={theme} />
+      <ActionItem size={size} Icon={HeartIcon} count={formatNumber(reactionCount)} theme={theme} />
+      <ActionItem size={size} Icon={ZapIcon} count={formatNumber(zapCount)} theme={theme} />
     </View>
   );
 }

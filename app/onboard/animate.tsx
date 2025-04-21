@@ -287,7 +287,6 @@ const ChainLoadingAnimation = () => {
         )
       );
     }
-
   }
 
   const { mnemonic } = useTypedRoute();

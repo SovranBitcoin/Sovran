@@ -1,20 +1,20 @@
-import React from "react";
-import { View, StyleSheet, Linking } from "react-native";
-import { Text } from "components/common/Themed";
-import { greens, greys } from "helper/colors";
-import Wrapper, { SheetButton } from "../wrapper";
-import { Card } from "components/common/Card";
-import { truncateMiddle } from "helper/strings";
-import { RowButton, Section } from "app/settings";
-import { useSheetRouter } from "react-native-actions-sheet";
+import React from 'react';
+import { View, StyleSheet, Linking } from 'react-native';
+import { Text } from 'components/common/Themed';
+import { greens, greys } from 'helper/colors';
+import Wrapper, { SheetButton } from '../wrapper';
+import { Card } from 'components/common/Card';
+import { truncateMiddle } from 'helper/strings';
+import { RowButton, Section } from 'app/settings';
+import { useSheetRouter } from 'react-native-actions-sheet';
 
 const MintDetailPage = () => {
   // Mock theme for the example
-  const theme = "dark";
+  const theme = 'dark';
   const styles = createStyles(theme);
 
   const handleEmailPress = () => {
-    Linking.openURL("mailto:support@minibits.cash");
+    Linking.openURL('mailto:support@minibits.cash');
   };
 
   const handleNostrPress = () => {
@@ -22,7 +22,7 @@ const MintDetailPage = () => {
     // For example, you might want to copy the Nostr key to clipboard
     // Clipboard.setString("npub1kvaln6tm0re4d99q9e4ma788wpvnw0jzkz595cljtfgwhldd75xsj9tkzv");
   };
-  const router = useSheetRouter("mint");
+  const router = useSheetRouter('mint');
 
   return (
     <Wrapper
@@ -31,13 +31,11 @@ const MintDetailPage = () => {
           <SheetButton
             onPress={() => {
               router?.goBack();
-            }}
-          >
+            }}>
             Cancel
           </SheetButton>
         </>
-      }
-    >
+      }>
       {/* Mint Header */}
       <View style={styles.headerContainer}>
         <View style={styles.logoContainer}>
@@ -61,12 +59,12 @@ const MintDetailPage = () => {
         <RowButton
           label="@MinibitsCash"
           onPress={() => {
-            Linking.openURL("https://x.com/MinibitsCash");
+            Linking.openURL('https://x.com/MinibitsCash');
           }}
         />
         <RowButton
           label={truncateMiddle(
-            "npub1kvaln6tm0re4d99q9e4ma788wpvnw0jzkz595cljtfgwhldd75xsj9tkzv",
+            'npub1kvaln6tm0re4d99q9e4ma788wpvnw0jzkz595cljtfgwhldd75xsj9tkzv',
             13
           )}
           onPress={handleNostrPress}
@@ -134,7 +132,7 @@ const MintDetailPage = () => {
 const createStyles = (theme) =>
   StyleSheet.create({
     headerContainer: {
-      alignItems: "center",
+      alignItems: 'center',
       paddingVertical: 24,
     },
     logoContainer: {
@@ -144,18 +142,18 @@ const createStyles = (theme) =>
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: "#3f836d",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: '#3f836d',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     logoText: {
       fontSize: 40,
-      fontWeight: "bold",
-      color: "#ffffff",
+      fontWeight: 'bold',
+      color: '#ffffff',
     },
     mintTitle: {
       fontSize: 28,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[0],
     },
     actionButton: {
@@ -164,21 +162,21 @@ const createStyles = (theme) =>
       marginVertical: 4,
     },
     destructiveButton: {
-      backgroundColor: "#D32F2F", // Red color for destructive action
+      backgroundColor: '#D32F2F', // Red color for destructive action
       borderRadius: 8,
       marginVertical: 4,
     },
     actionText: {
       fontSize: 16,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
     destructiveText: {
       fontSize: 16,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
   });
 

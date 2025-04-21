@@ -1,29 +1,29 @@
-import { View } from "components/common/Themed";
-import { useSelector } from "react-redux";
-import { greys } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedRoute } from "helper/navigation";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { useState } from "react";
-import React from "react";
-import { Transactions } from "components/layout/Transactions";
-import Container from "components/layout/Container";
-import CurrencySelector from "components/layout/CurrencySelector";
-import Icon from "assets/icons";
+import { View } from 'components/common/Themed';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedRoute } from 'helper/navigation';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { useState } from 'react';
+import React from 'react';
+import { Transactions } from 'components/layout/Transactions';
+import Container from 'components/layout/Container';
+import CurrencySelector from 'components/layout/CurrencySelector';
+import Icon from 'assets/icons';
 
-import Modal from "components/layout/Modal";
-import { Tabs } from "./(drawer)/(tabs)/payments";
+import Modal from 'components/layout/Modal';
+import { Tabs } from './(drawer)/(tabs)/payments';
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const { account } = useTypedRoute<"transactions">() || {
-    account: { unit: "" },
+  const { account } = useTypedRoute<'transactions'>() || {
+    account: { unit: '' },
   };
   const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "incoming" | "outgoing">("all");
-  const [type, setType] = useState<string>("all");
-  const [at, setAt] = useState<string>("all");
-  const [tab, setTab] = useState("All");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
+  const [type, setType] = useState<string>('all');
+  const [at, setAt] = useState<string>('all');
+  const [tab, setTab] = useState('All');
 
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency.toLowerCase());
@@ -33,34 +33,29 @@ function ModalScreen() {
     setSearchQuery(text);
   };
 
-  const toggleFilter = (newFilter: "incoming" | "outgoing") => {
-    setFilter((prevFilter) => (prevFilter === newFilter ? "all" : newFilter));
+  const toggleFilter = (newFilter: 'incoming' | 'outgoing') => {
+    setFilter((prevFilter) => (prevFilter === newFilter ? 'all' : newFilter));
   };
 
   const toggleType = (newType) => {
-    setType((prevType) => (prevType === newType ? "all" : newType));
-    setAt("all");
+    setType((prevType) => (prevType === newType ? 'all' : newType));
+    setAt('all');
   };
 
   const toggleAt = (newAt) => {
-    setAt((prevAt) => (prevAt === newAt ? "all" : newAt));
-    setType("all");
+    setAt((prevAt) => (prevAt === newAt ? 'all' : newAt));
+    setType('all');
   };
 
   return (
     <Modal buttons={<></>}>
       <Container>
-        <Tabs
-          tabs={["All", "Confirmed", "Pending"]}
-          selectedTab={tab}
-          handleTabPress={setTab}
-        />
+        <Tabs tabs={['All', 'Confirmed', 'Pending']} selectedTab={tab} handleTabPress={setTab} />
 
         <View
           style={{
             height: 4,
-          }}
-        ></View>
+          }}></View>
 
         <CurrencySelector
           selectedCurrency={selectedCurrency.toUpperCase()}
@@ -68,31 +63,28 @@ function ModalScreen() {
         />
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "space-between", // Changed to space-between to fill the width
-            alignItems: "center",
+            flexDirection: 'row',
+            justifyContent: 'space-between', // Changed to space-between to fill the width
+            alignItems: 'center',
             marginVertical: 8,
-            width: "100%", // Set width to 100% to fill the page
-          }}
-        >
+            width: '100%', // Set width to 100% to fill the page
+          }}>
           <TouchableOpacity
-            onPress={() => toggleAt("at")}
+            onPress={() => toggleAt('at')}
             style={{
-              backgroundColor:
-                at === "at" ? greys(theme)[1500] : greys(theme)[2300],
+              backgroundColor: at === 'at' ? greys(theme)[1500] : greys(theme)[2300],
               padding: 8,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: greys(theme)[1500],
               flex: 1, // Allow the button to grow
               marginRight: 8, // Add margin to separate buttons
-              alignItems: "center", // Center the icon inside the container
-            }}
-          >
+              alignItems: 'center', // Center the icon inside the container
+            }}>
             <Icon
               name="mdi:at" // Assuming this is the lightning icon
               size={24}
-              color={at === "at" ? greys(theme)[0] : greys(theme)[1000]}
+              color={at === 'at' ? greys(theme)[0] : greys(theme)[1000]}
             />
           </TouchableOpacity>
           <View
@@ -104,45 +96,39 @@ function ModalScreen() {
             }}
           />
           <TouchableOpacity
-            onPress={() => toggleType("lightning")}
+            onPress={() => toggleType('lightning')}
             style={{
-              backgroundColor:
-                type === "lightning" ? greys(theme)[1500] : greys(theme)[2300],
+              backgroundColor: type === 'lightning' ? greys(theme)[1500] : greys(theme)[2300],
               padding: 8,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: greys(theme)[1500],
               flex: 1, // Allow the button to grow
               marginRight: 8, // Add margin to separate buttons
-              alignItems: "center", // Center the icon inside the container
-            }}
-          >
+              alignItems: 'center', // Center the icon inside the container
+            }}>
             <Icon
               name="mingcute:lightning-fill" // Assuming this is the lightning icon
               size={24}
-              color={
-                type === "lightning" ? greys(theme)[0] : greys(theme)[1000]
-              }
+              color={type === 'lightning' ? greys(theme)[0] : greys(theme)[1000]}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => toggleType("ecash")}
+            onPress={() => toggleType('ecash')}
             style={{
-              backgroundColor:
-                type === "ecash" ? greys(theme)[1500] : greys(theme)[2300],
+              backgroundColor: type === 'ecash' ? greys(theme)[1500] : greys(theme)[2300],
               padding: 8,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: greys(theme)[1500],
               flex: 1, // Allow the button to grow
               marginRight: 8, // Add margin to separate buttons
-              alignItems: "center", // Center the icon inside the container
-            }}
-          >
+              alignItems: 'center', // Center the icon inside the container
+            }}>
             <Icon
               name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
               size={24}
-              color={type === "ecash" ? greys(theme)[0] : greys(theme)[1000]}
+              color={type === 'ecash' ? greys(theme)[0] : greys(theme)[1000]}
             />
           </TouchableOpacity>
           <View
@@ -154,46 +140,38 @@ function ModalScreen() {
             }}
           />
           <TouchableOpacity
-            onPress={() => toggleFilter("incoming")}
+            onPress={() => toggleFilter('incoming')}
             style={{
-              backgroundColor:
-                filter === "incoming" ? greys(theme)[1500] : greys(theme)[2300],
+              backgroundColor: filter === 'incoming' ? greys(theme)[1500] : greys(theme)[2300],
               padding: 8,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: greys(theme)[1500],
               flex: 1, // Allow the button to grow
               marginRight: 8, // Add margin to separate buttons
-              alignItems: "center", // Center the icon inside the container
-            }}
-          >
+              alignItems: 'center', // Center the icon inside the container
+            }}>
             <Icon
               name="fluent:arrow-download-16-filled"
               size={24}
-              color={
-                filter === "incoming" ? greys(theme)[0] : greys(theme)[1000]
-              }
+              color={filter === 'incoming' ? greys(theme)[0] : greys(theme)[1000]}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => toggleFilter("outgoing")}
+            onPress={() => toggleFilter('outgoing')}
             style={{
-              backgroundColor:
-                filter === "outgoing" ? greys(theme)[1500] : greys(theme)[2300],
+              backgroundColor: filter === 'outgoing' ? greys(theme)[1500] : greys(theme)[2300],
               padding: 8,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: greys(theme)[1500],
               flex: 1, // Allow the button to grow
-              alignItems: "center", // Center the icon inside the container
-            }}
-          >
+              alignItems: 'center', // Center the icon inside the container
+            }}>
             <Icon
               name="fluent:arrow-upload-16-filled"
               size={24}
-              color={
-                filter === "outgoing" ? greys(theme)[0] : greys(theme)[1000]
-              }
+              color={filter === 'outgoing' ? greys(theme)[0] : greys(theme)[1000]}
             />
           </TouchableOpacity>
         </View>

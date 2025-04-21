@@ -1,41 +1,35 @@
-import "react-native-get-random-values";
-import { useInterval } from "usehooks-ts";
-import { UR, UREncoder } from "@gandlaf21/bc-ur";
-import { View } from "components/common/Themed";
-import { memo, useEffect, useState, useMemo } from "react";
-import { CurrencyIcon, FlagIcon } from "assets/icons";
-import { useQRCodeData } from "react-native-qrcode-styled";
-import { useWindowDimensions } from "react-native";
-import { greys, shades } from "helper/colors";
-import EQRCode from "react-native-qrcode-svg";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
+import 'react-native-get-random-values';
+import { useInterval } from 'usehooks-ts';
+import { UR, UREncoder } from '@gandlaf21/bc-ur';
+import { View } from 'components/common/Themed';
+import { memo, useEffect, useState, useMemo } from 'react';
+import { CurrencyIcon, FlagIcon } from 'assets/icons';
+import { useQRCodeData } from 'react-native-qrcode-styled';
+import { useWindowDimensions } from 'react-native';
+import { greys, shades } from 'helper/colors';
+import EQRCode from 'react-native-qrcode-svg';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export const Circle = memo(({}) => {
   const theme = useSelector(memoizedGetTheme);
   return (
     <View
       style={{
-        position: "absolute",
+        position: 'absolute',
         width: 100,
         height: 100,
         zIndex: 2,
         borderRadius: 9999,
         transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.6 }],
-        left: "50%",
-        top: "50%",
+        left: '50%',
+        top: '50%',
         backgroundColor: greys(theme)[1800],
-      }}
-    ></View>
+      }}></View>
   );
 });
 
-export const QRCode = memo(function QRCode({
-  padding = 0,
-  animate,
-  hasBackground,
-  ...props
-}) {
+export const QRCode = memo(function QRCode({ padding = 0, animate, hasBackground, ...props }) {
   const theme = useSelector(memoizedGetTheme);
   const data = useQRCodeData(props.data, {});
   const w = useWindowDimensions().width;
@@ -86,7 +80,7 @@ export const QRCode = memo(function QRCode({
 export const AnimatedQRCode = memo(function AnimatedQRCode({
   padding = 10,
   hasLogo = true,
-  variant = "primary",
+  variant = 'primary',
   unit,
   address,
   animate = false,
@@ -98,7 +92,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const [fragmentLength, setFragmentLength] = useState(0);
   const colors = useMemo(
     () =>
-      variant === "primary"
+      variant === 'primary'
         ? [shades[100], shades[200], shades[300], shades[400], shades[500]]
         : [greys(theme)[400], greys(theme)[100]],
     [variant, theme]
@@ -106,10 +100,10 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const containerStyle = useMemo(
     () => ({
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "transparent",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
     }),
     []
   );
@@ -118,12 +112,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     () => ({
       width: 72,
       height: 72,
-      position: "absolute",
-      top: "50%",
-      left: "50%",
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
       transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
       zIndex: 100,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     }),
     []
   );
@@ -173,8 +167,8 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     <View style={containerStyle}>
       {hasLogo && (
         <View style={logoStyle}>
-          {unit.startsWith("location") ? (
-            <FlagIcon country={unit.split("_")[1]} height={72} width={72} />
+          {unit.startsWith('location') ? (
+            <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
           ) : (
             <CurrencyIcon
               width="72"

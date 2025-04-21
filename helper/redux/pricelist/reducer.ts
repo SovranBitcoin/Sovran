@@ -1,4 +1,4 @@
-import { SET_PRICELIST } from "./actionTypes";
+import { SET_PRICELIST } from './actionTypes';
 
 const initialState = {};
 

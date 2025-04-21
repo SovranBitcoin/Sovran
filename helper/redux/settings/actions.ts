@@ -1,4 +1,4 @@
-import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME } from "./actionTypes";
+import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME } from './actionTypes';
 
 export const setLanguage = (lang: string) => ({
   type: SET_LANGUAGE,

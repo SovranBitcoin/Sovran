@@ -1,27 +1,18 @@
-import Svg, {
-  Circle,
-  Defs,
-  Ellipse,
-  G,
-  Path,
-  Rect,
-  Stop,
-  LinearGradient,
-} from "react-native-svg";
-import { greys, shades, white } from "helper/colors";
-import { useSelector } from "react-redux";
-import CachedImage from "components/common/Image";
-import { memoizedGetTheme } from "helper/redux/settings";
-import React from "react";
-import { Monicon as Icon } from "@monicon/native";
-export { FlagIcon } from "./flag";
+import Svg, { Circle, Defs, Ellipse, G, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
+import { greys, shades, white } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import CachedImage from 'components/common/Image';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import React from 'react';
+import { Monicon as Icon } from '@monicon/native';
+export { FlagIcon } from './flag';
 
 // todo: remove all these icons and use <Icon name={name} size={size} color={color || greys(theme)[0]} /> instead.
 
-import { useEffect, useRef } from "react";
-import { Animated } from "react-native";
-import { Easing } from "react-native-reanimated";
-import { View } from "components/common/Themed";
+import { useEffect, useRef } from 'react';
+import { Animated } from 'react-native';
+import { Easing } from 'react-native-reanimated';
+import { View } from 'components/common/Themed';
 
 export default ({
   name,
@@ -50,7 +41,7 @@ export default ({
         Animated.timing(spinValue, {
           toValue: 1,
           duration: spin?.duration, // Rotate 120 degrees in 1 second
-          easing: spin?.easing === "linear" ? Easing.linear : Easing.elastic(1),
+          easing: spin?.easing === 'linear' ? Easing.linear : Easing.elastic(1),
           useNativeDriver: true,
         }),
         Animated.delay(spin?.delay), // 4 second delay
@@ -65,28 +56,22 @@ export default ({
         inputRange: [0, 1],
         outputRange: spin?.outputRange, // Rotate 120 degrees
       })
-    : "0deg";
+    : '0deg';
 
   return (
     <Animated.View
       style={{
         transform: [{ rotate: spinAnimation }],
         ...style,
-      }}
-    >
+      }}>
       <Icon name={name} size={size} color={color || greys(theme)[0]} />
     </Animated.View>
   );
 };
 
-export function SovranTextIcon({ color = "black", size = 300 }) {
+export function SovranTextIcon({ color = 'black', size = 300 }) {
   return (
-    <Svg
-      width={size}
-      height={(size * 254) / 1204}
-      viewBox="0 0 1204 254"
-      fill="none"
-    >
+    <Svg width={size} height={(size * 254) / 1204} viewBox="0 0 1204 254" fill="none">
       <Defs>
         <LinearGradient
           id="paint0_linear_84_4"
@@ -94,8 +79,7 @@ export function SovranTextIcon({ color = "black", size = 300 }) {
           y1="338"
           x2="-19.4058"
           y2="619.663"
-          gradientUnits="userSpaceOnUse"
-        >
+          gradientUnits="userSpaceOnUse">
           <Stop stopColor="#850054" />
           <Stop offset="0.48" stopColor="#E2054B" />
           <Stop offset="1" stopColor="#FF7A50" />
@@ -110,15 +94,10 @@ export function SovranTextIcon({ color = "black", size = 300 }) {
   );
 }
 
-export function HomeIcon({ color = "black", size = 21 }) {
+export function HomeIcon({ color = 'black', size = 21 }) {
   const aspectRatio = 21 / 19;
   return (
-    <Svg
-      width={size}
-      height={size / aspectRatio}
-      viewBox="0 0 21 19"
-      fill="none"
-    >
+    <Svg width={size} height={size / aspectRatio} viewBox="0 0 21 19" fill="none">
       <Path
         d="M20.0317 1.76845L18.1668 2.12214C17.8239 2.18645 17.6524 2.41153 17.6524 2.79737V15.7553C17.6524 16.1197 17.8346 16.3341 18.199 16.3984L20.0317 16.7521V18.4241H11.3824V16.7521L12.6685 16.3984C13.033 16.2912 13.2152 16.0768 13.2152 15.7553V9.49069L6.81658 11.5003V15.7553C6.81658 16.1197 6.98807 16.3341 7.33104 16.3984L8.81011 16.7521V18.4241H0V16.7521L1.83276 16.3984C2.19717 16.3341 2.37937 16.1197 2.37937 15.7553V2.79737C2.37937 2.41153 2.19717 2.18645 1.83276 2.12214L0 1.76845V0H8.81011V1.76845L7.33104 2.12214C6.98807 2.20789 6.81658 2.43296 6.81658 2.79737V8.00626L13.2152 5.99666V2.79737C13.2152 2.4544 13.0437 2.22932 12.7007 2.12214L11.3502 1.76845V0H20.0317V1.76845Z"
         fill={color}
@@ -189,12 +168,7 @@ export function InfoIcon({ color }) {
 export function ActivityIcon({ color }) {
   const theme = useSelector(memoizedGetTheme);
   return (
-    <Svg
-      width="24"
-      height="24"
-      viewBox="0 0 48 48"
-      stroke={color || greys(theme)[0]}
-    >
+    <Svg width="24" height="24" viewBox="0 0 48 48" stroke={color || greys(theme)[0]}>
       <Path
         fill="none"
         stroke={color}
@@ -217,14 +191,8 @@ export function UserIcon() {
         borderRadius: 50, // Adjust this value to get the roundness you desire
         padding: 4, // Adjust padding to control the size of the background relative to the SVG
         marginLeft: 8, // Adjust margin to control the distance between the icon and the edge of the screen
-      }}
-    >
-      <Svg
-        fill={greys(theme)[200]}
-        height="24"
-        viewBox="0 -960 960 960"
-        width="24"
-      >
+      }}>
+      <Svg fill={greys(theme)[200]} height="24" viewBox="0 -960 960 960" width="24">
         <Path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z" />
       </Svg>
     </View>
@@ -245,23 +213,16 @@ export function LanguageIcon({ color }) {
 export function ThemeIcon({ color }) {
   return (
     <Svg width="24" height="24" viewBox="0 0 20 20">
-      <Path
-        fill={color}
-        d="M10 3.5a6.5 6.5 0 1 1 0 13zM10 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16"
-      />
+      <Path fill={color} d="M10 3.5a6.5 6.5 0 1 1 0 13zM10 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16" />
     </Svg>
   );
 }
 
-export function SovranIcon({
-  width = 32,
-  height = 32,
-  transform = [{ scale: 1.5 }],
-}) {
+export function SovranIcon({ width = 32, height = 32, transform = [{ scale: 1.5 }] }) {
   return (
     <CachedImage
       style={{ width, height, transform }}
-      source={require("assets/images/icon_t.png")}
+      source={require('assets/images/icon_t.png')}
     />
   );
 }
@@ -273,9 +234,8 @@ export function ArrowIcon({ color, rotate = 0, size = 24 }) {
         transform: Number(rotate) ? [{ rotate: `${rotate}deg` }] : [],
         marginRight: 8,
         marginLeft: 8,
-        backgroundColor: "transparent",
-      }}
-    >
+        backgroundColor: 'transparent',
+      }}>
       <Icon name="lucide:arrow-up-right" color={color} size={size} />
     </View>
   );
@@ -421,15 +381,14 @@ export function CloseIcon2({ color, width, height }) {
   );
 }
 
-export function LightningUnit({ color, width = "24", height = "24" }) {
+export function LightningUnit({ color, width = '24', height = '24' }) {
   return (
     <Svg
       viewBox="0 0 360 360"
       height={width}
       width={height}
       fill={color}
-      transform="translate(0,2)"
-    >
+      transform="translate(0,2)">
       <Rect x="166.06" y="2.83" width="27.89" height="47.65"></Rect>
       <Rect x="166.06" y="310.35" width="27.89" height="47.65"></Rect>
       <Rect
@@ -437,22 +396,19 @@ export function LightningUnit({ color, width = "24", height = "24" }) {
         y="6.84"
         width="27.89"
         height="198.86"
-        transform="translate(286.28 -73.74) rotate(90)"
-      ></Rect>
+        transform="translate(286.28 -73.74) rotate(90)"></Rect>
       <Rect
         x="166.06"
         y="80.5"
         width="27.89"
         height="198.86"
-        transform="translate(359.94 -0.08) rotate(90)"
-      ></Rect>
+        transform="translate(359.94 -0.08) rotate(90)"></Rect>
       <Rect
         x="166.06"
         y="152.08"
         width="27.89"
         height="198.86"
-        transform="translate(431.52 71.5) rotate(90)"
-      ></Rect>
+        transform="translate(431.52 71.5) rotate(90)"></Rect>
     </Svg>
   );
 }
@@ -467,21 +423,19 @@ export function ProfileIcon() {
 
 export function CurrencyIcon({ width = 36, currency }) {
   const theme = useSelector(memoizedGetTheme);
-  if (currency === "eur") {
+  if (currency === 'eur') {
     return (
       <View
         style={{
           width: width,
-        }}
-      >
+        }}>
         <Svg
           viewBox="0 0 33 33"
           fill="none"
           style={{
             transform: [{ scale: 0.875 }],
             zIndex: 1000,
-          }}
-        >
+          }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={shades[100]} />
@@ -502,21 +456,19 @@ export function CurrencyIcon({ width = 36, currency }) {
         </Svg>
       </View>
     );
-  } else if (currency === "usd") {
+  } else if (currency === 'usd') {
     return (
       <View
         style={{
           width: width,
-        }}
-      >
+        }}>
         <Svg
           viewBox="0 0 33 33"
           fill="none"
           style={{
             transform: [{ scale: 0.875 }],
             zIndex: 1000,
-          }}
-        >
+          }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={shades[100]} />
@@ -537,21 +489,19 @@ export function CurrencyIcon({ width = 36, currency }) {
         </Svg>
       </View>
     );
-  } else if (currency === "gbp") {
+  } else if (currency === 'gbp') {
     return (
       <View
         style={{
           width: width,
-        }}
-      >
+        }}>
         <Svg
           viewBox="0 0 33 33"
           fill="none"
           style={{
             transform: [{ scale: 0.875 }],
             zIndex: 1000,
-          }}
-        >
+          }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={shades[100]} />
@@ -572,21 +522,19 @@ export function CurrencyIcon({ width = 36, currency }) {
         </Svg>
       </View>
     );
-  } else if (currency === "sat") {
+  } else if (currency === 'sat') {
     return (
       <View
         style={{
           width: width,
           height: width,
-        }}
-      >
+        }}>
         <Svg
           viewBox="0 0 33 33"
           fill="none"
           style={{
             zIndex: 1000,
-          }}
-        >
+          }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={shades[100]} />
@@ -605,21 +553,19 @@ export function CurrencyIcon({ width = 36, currency }) {
         </Svg>
       </View>
     );
-  } else if (currency === "nostr") {
+  } else if (currency === 'nostr') {
     return (
       <View
         style={{
           width: width,
-        }}
-      >
+        }}>
         <Svg
           viewBox="0 0 33 33"
           fill="none"
           style={{
             transform: [{ scale: 0.875 }],
             zIndex: 1000,
-          }}
-        >
+          }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <Stop offset="0%" stopColor={shades[100]} />
@@ -639,7 +585,7 @@ export function CurrencyIcon({ width = 36, currency }) {
   }
 
   switch (currency) {
-    case "euro":
+    case 'euro':
       return (
         <Svg width="64" height="64" viewBox="0 0 48 48">
           <Defs>
@@ -666,7 +612,7 @@ export function CurrencyIcon({ width = 36, currency }) {
           />
         </Svg>
       );
-    case "eur":
+    case 'eur':
       return (
         <Svg width="64" height="64" viewBox="0 0 48 48">
           <Defs>
@@ -693,7 +639,7 @@ export function CurrencyIcon({ width = 36, currency }) {
           />
         </Svg>
       );
-    case "gbp":
+    case 'gbp':
       return (
         <Svg width="64" height="64" viewBox="0 0 48 48">
           <Defs>
@@ -720,7 +666,7 @@ export function CurrencyIcon({ width = 36, currency }) {
           />
         </Svg>
       );
-    case "usd":
+    case 'usd':
       return (
         <Svg width="64" height="64" viewBox="0 0 48 48">
           <Defs>
@@ -747,7 +693,7 @@ export function CurrencyIcon({ width = 36, currency }) {
           />
         </Svg>
       );
-    case "sat":
+    case 'sat':
       return (
         <Svg width="64" height="64" viewBox="0 0 48 48">
           <Defs>
@@ -783,14 +729,7 @@ export function VerifiedIcon({ style, fill }) {
   return (
     <Svg viewBox="0 0 24 24" style={style}>
       <Defs>
-        <LinearGradient
-          id="gradient"
-          x1="0"
-          y1="0"
-          x2="24"
-          y2="24"
-          gradientUnits="userSpaceOnUse"
-        >
+        <LinearGradient id="gradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
           <Stop offset="0" stopColor="#FF5841" />
           <Stop offset="0.25" stopColor="#FF353C" />
           <Stop offset="0.5" stopColor="#ED0C46" />
@@ -864,9 +803,9 @@ export function EcashIcon() {
 export function BtcIcon({ height = 34, width = 34, color, weight }) {
   const theme = useSelector(memoizedGetTheme);
   const iconName =
-    weight === "heavy"
-      ? "material-symbols:currency-bitcoin"
-      : "material-symbols-light:currency-bitcoin";
+    weight === 'heavy'
+      ? 'material-symbols:currency-bitcoin'
+      : 'material-symbols-light:currency-bitcoin';
   return <Icon name={iconName} color={color || greys(theme)[0]} size={width} />;
 }
 
@@ -1003,14 +942,9 @@ export function ImportIcon({ style }) {
 
 export function LightOff({ style, color }: { style?: any; color?: string }) {
   return (
-    <Svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-    >
+    <Svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
       <Path
-        fill={color || "currentColor"}
+        fill={color || 'currentColor'}
         fillRule="evenodd"
         d="M11.5 2C7.358 2 4 5.436 4 9.674c0 2.273.966 4.315 2.499 5.72c.51.467.889.814 1.157 1.066a15 15 0 0 1 .4.39l.033.036c.237.3.288.376.318.446s.053.16.112.54c.024.15.026.406.026 1.105v.03c0 .409 0 .762.026 1.051c.027.306.087.61.248.895c.18.319.438.583.75.767c.278.165.575.226.874.254c.283.026.628.026 1.028.026h.058c.4 0 .745 0 1.028-.026c.3-.028.595-.09.875-.254a2.07 2.07 0 0 0 .749-.767c.16-.285.22-.588.248-.895c.026-.29.026-.642.025-1.051v-.03c0-.699.003-.955.026-1.105c.06-.38.082-.47.113-.54c.03-.07.081-.147.318-.446l.008-.01l.025-.026l.088-.09q.112-.113.312-.3c.268-.252.647-.599 1.157-1.067A7.74 7.74 0 0 0 19 9.674C19 5.436 15.642 2 11.5 2m1.585 17.674h-3.17q.004.145.014.258c.019.21.05.286.071.324a.7.7 0 0 0 .25.255c.037.022.111.054.316.073c.214.02.497.02.934.02s.72 0 .934-.02c.205-.019.279-.05.316-.073a.7.7 0 0 0 .25-.255c.021-.038.052-.114.07-.324q.011-.113.015-.258M12.61 8.176c.307.224.378.66.159.974l-1.178 1.687h1.402a.68.68 0 0 1 .607.379a.71.71 0 0 1-.052.724L11.6 14.731a.67.67 0 0 1-.951.162a.71.71 0 0 1-.158-.973l1.178-1.687h-1.403a.68.68 0 0 1-.606-.379a.71.71 0 0 1 .051-.725l1.948-2.79a.67.67 0 0 1 .951-.163"
         clipRule="evenodd"
@@ -1021,18 +955,8 @@ export function LightOff({ style, color }: { style?: any; color?: string }) {
 
 export function LightOn({ style, color }: { style?: any; color?: string }) {
   return (
-    <Svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-    >
-      <G
-        fill="none"
-        stroke={color || "currentColor"}
-        strokeLinecap="round"
-        strokeWidth={1.5}
-      >
+    <Svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <G fill="none" stroke={color || 'currentColor'} strokeLinecap="round" strokeWidth={1.5}>
         <Path d="M14.5 19.5h-5m5 0c0-.713 0-1.07.038-1.307c.123-.763.144-.812.631-1.412c.151-.186.711-.688 1.832-1.692A7.48 7.48 0 0 0 19.5 9.5a7.5 7.5 0 0 0-.427-2.5M14.5 19.5c0 .935 0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549C13.402 22 12.935 22 12 22s-1.402 0-1.75-.201a1.5 1.5 0 0 1-.549-.549c-.201-.348-.201-.815-.201-1.75m0 0c0-.713 0-1.07-.038-1.307c-.123-.763-.144-.812-.631-1.412c-.151-.186-.712-.688-1.832-1.692A7.5 7.5 0 0 1 15.744 3" />
         <Path strokeLinejoin="round" d="m12.786 8.5l-2.143 3h3l-2.143 3" />
       </G>

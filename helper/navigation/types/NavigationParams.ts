@@ -1,4 +1,3 @@
-
 export type NavigationParams = {
   lightningSendConfirmation: {
     pr: string;
@@ -63,7 +62,7 @@ export type NavigationParams = {
     countries: string[];
     packageList: any; // TODO: Add more specific type when available
     type: 'vpn' | 'esim';
-  }
+  };
 
   // Add other endpoints here
   // exampleEndpoint: { param1: string; param2: number };

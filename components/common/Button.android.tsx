@@ -1,5 +1,5 @@
-import { LinearGradient } from "expo-linear-gradient"; // Install if not already
-import { ButtonBase } from "./ButtonBase";
+import { LinearGradient } from 'expo-linear-gradient'; // Install if not already
+import { ButtonBase } from './ButtonBase';
 
 export const Button = (props) => {
   const renderBackground = (colors, width) => (
@@ -8,12 +8,12 @@ export const Button = (props) => {
       start={[0, 0]}
       end={[1, 0]}
       style={{
-        width: "100%",
+        width: '100%',
         height: 100,
         flex: 1,
-        position: "absolute",
+        position: 'absolute',
         zIndex: -1,
-        overflow: "hidden",
+        overflow: 'hidden',
         opacity: props.camera ? 0.75 : 1,
       }}
     />

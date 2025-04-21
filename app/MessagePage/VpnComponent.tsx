@@ -1,9 +1,9 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { convertTime } from "helper/time";
-import { greys, shades } from "helper/colors";
-import lookup from "country-code-lookup";
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { convertTime } from 'helper/time';
+import { greys, shades } from 'helper/colors';
+import lookup from 'country-code-lookup';
 
 const VpnComponent = ({ esim, theme, isReceived }) => {
   const styles = createStyles(theme, isReceived);
@@ -12,22 +12,15 @@ const VpnComponent = ({ esim, theme, isReceived }) => {
     <View style={styles.transactionWrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={
-          isReceived
-            ? [greys(theme)[1000], greys(theme)[1200]]
-            : [shades[100], shades[300]]
-        }
-        style={styles.transactionContainer}
-      >
+        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        style={styles.transactionContainer}>
         <View style={styles.labelContainer}>
           <Text style={styles.labelText}>You received a VPN</Text>
         </View>
         <Text style={styles.transactionText}>
-          {lookup.byIso(esim.location).country + ", " + esim.duration + " plan"}
+          {lookup.byIso(esim.location).country + ', ' + esim.duration + ' plan'}
         </Text>
-        <Text style={styles.timestamp}>
-          {convertTime(new Date(esim?.created_at))}
-        </Text>
+        <Text style={styles.timestamp}>{convertTime(new Date(esim?.created_at))}</Text>
       </LinearGradient>
     </View>
   );
@@ -37,40 +30,40 @@ const createStyles = (theme, isReceived) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,
-      position: "relative",
-      backgroundColor: "transparent",
-      alignSelf: isReceived ? "flex-start" : "flex-end",
+      position: 'relative',
+      backgroundColor: 'transparent',
+      alignSelf: isReceived ? 'flex-start' : 'flex-end',
     },
     transactionContainer: {
       padding: 16,
       borderRadius: 16,
-      maxWidth: "75%",
+      maxWidth: '75%',
     },
     arrow: {
-      position: "absolute",
+      position: 'absolute',
       bottom: -4,
-      right: isReceived ? "auto" : 16,
-      left: isReceived ? 16 : "auto",
+      right: isReceived ? 'auto' : 16,
+      left: isReceived ? 16 : 'auto',
       width: 8,
       height: 8,
       backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
-      transform: [{ rotate: "45deg" }],
+      transform: [{ rotate: '45deg' }],
     },
     labelContainer: {
-      backgroundColor: "rgba(0,0,0,0.25)",
+      backgroundColor: 'rgba(0,0,0,0.25)',
       padding: 4,
       paddingHorizontal: 8,
       marginBottom: 4,
       borderRadius: 16,
     },
     labelText: {
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 14,
-      textAlign: "center",
+      textAlign: 'center',
       color: greys(theme)[0],
     },
     transactionText: {
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       fontSize: 16,
       color: greys(theme)[0],
       marginBottom: 8,
@@ -78,9 +71,9 @@ const createStyles = (theme, isReceived) =>
     timestamp: {
       color: greys(theme)[0],
       opacity: 0.75,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       fontSize: 12,
-      textAlign: "right",
+      textAlign: 'right',
     },
   });
 

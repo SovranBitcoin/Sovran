@@ -1,36 +1,31 @@
-import { View, ScrollView, Platform } from "react-native";
-import { useState } from "react";
-import { useSelector } from "react-redux";
-import { greys, shades } from "helper/colors";
-import { Text } from "components/common/Themed";
-import {
-  Easing,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import "react-native-gesture-handler";
-import { useNostr } from "helper/redux/nostr";
+import { View, ScrollView, Platform } from 'react-native';
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { greys, shades } from 'helper/colors';
+import { Text } from 'components/common/Themed';
+import { Easing, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import 'react-native-gesture-handler';
+import { useNostr } from 'helper/redux/nostr';
 
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import Animated from "react-native-reanimated";
-import { BlurView } from "expo-blur";
-import { EventKind } from "../../app/Profile";
-import { Cache } from "react-native-cache";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Posts } from "./posts";
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import Animated from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import { EventKind } from '../../app/Profile';
+import { Cache } from 'react-native-cache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Posts } from './posts';
 // import ndk from "components/ndk";
-import CachedImage from "components/common/Image";
-import ndk from "components/ndk";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useRoute } from "@react-navigation/native";
+import CachedImage from 'components/common/Image';
+import ndk from 'components/ndk';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useRoute } from '@react-navigation/native';
 dayjs.extend(relativeTime);
 
 const myCache = new Cache({
   // maxSize: 100,
-  namespace: "posts",
+  namespace: 'posts',
   policy: {
     maxEntries: 100,
     stdTTL: 60 * 5,
@@ -55,7 +50,7 @@ export async function getFollowedUsers(userPubkey, verbose = true) {
       }
     }
 
-    // 
+    //
     return follows;
   });
 }
@@ -81,7 +76,7 @@ export default function AboutPage(props) {
     } else {
       ndk
         .fetchEvents({
-          "#p": [p.pubkey],
+          '#p': [p.pubkey],
           kinds: [EventKind.ContactList],
         })
         .then((events) => {
@@ -107,7 +102,7 @@ export default function AboutPage(props) {
   const underscoreWidth = useSharedValue(0);
   const underscorePosition = useSharedValue(0);
 
-  const TABS = ["Posts", "Replies", "Media"];
+  const TABS = ['Posts', 'Replies', 'Media'];
   // Refs to store tab item positions and widths
   const tabWidths = useState(Array(TABS.length).fill(0))[0];
   const tabOffsets = useState(Array(TABS.length).fill(0))[0];
@@ -155,7 +150,7 @@ export default function AboutPage(props) {
 
   //   const { urls } = extractUrls(c.content);
 
-  //   
+  //
 
   //   if (!isComment && activeTab === 0) {
   //     return true;
@@ -184,14 +179,13 @@ export default function AboutPage(props) {
     <ScrollView
       style={{
         backgroundColor: greys(theme)[2300],
-        height: "100%",
+        height: '100%',
       }}
-      {...props}
-    >
+      {...props}>
       <CachedImage
         style={{
-          position: "absolute",
-          width: "100%",
+          position: 'absolute',
+          width: '100%',
           height: 120,
           borderColor: greys(theme)[1300],
           backgroundColor: greys(theme)[1800],
@@ -206,7 +200,7 @@ export default function AboutPage(props) {
 
       <CachedImage
         style={{
-          position: "absolute",
+          position: 'absolute',
           width: 72,
           height: 72,
           borderRadius: 1000,
@@ -222,20 +216,19 @@ export default function AboutPage(props) {
       />
       <BlurView
         tint="prominent"
-        intensity={Platform.OS === "ios" ? 50 : 5}
-        experimentalBlurMethod={"dimezisBlurView"}
+        intensity={Platform.OS === 'ios' ? 50 : 5}
+        experimentalBlurMethod={'dimezisBlurView'}
         style={{
-          position: "absolute",
-          width: "100%",
+          position: 'absolute',
+          width: '100%',
           height: 1000,
           marginBottom: 12,
           top: 120,
-        }}
-      ></BlurView>
+        }}></BlurView>
 
       <CachedImage
         style={{
-          width: "100%",
+          width: '100%',
           height: 120,
           backgroundColor: greys(theme)[1800],
           marginBottom: 12,
@@ -251,13 +244,12 @@ export default function AboutPage(props) {
           padding: 16,
           paddingTop: 8,
           marginTop: -64,
-          backgroundColor: "transparent",
+          backgroundColor: 'transparent',
           // alignItems: "center",
-        }}
-      >
+        }}>
         <CachedImage
           style={{
-            position: "relative",
+            position: 'relative',
             width: 72,
             height: 72,
             borderRadius: 1000,
@@ -270,13 +262,12 @@ export default function AboutPage(props) {
         />
         <Text
           style={{
-            fontFamily: "OverpassHeavy",
+            fontFamily: 'OverpassHeavy',
             fontSize: 20,
-            textAlign: "left",
+            textAlign: 'left',
             color: greys(theme)[0],
             marginBottom: 4,
-          }}
-        >
+          }}>
           {p?.displayName ||
             p?.profile?.displayName ||
             p?.display_name ||
@@ -286,77 +277,69 @@ export default function AboutPage(props) {
         </Text>
         <Text
           style={{
-            fontFamily: "OverpassRegular",
+            fontFamily: 'OverpassRegular',
             fontSize: 14,
-            textAlign: "left",
-            alignSelf: "left",
+            textAlign: 'left',
+            alignSelf: 'left',
             color: greys(theme)[400],
-          }}
-        >
+          }}>
           {p?.about || p?.profile?.about}
         </Text>
         <View
           style={{
-            flexDirection: "row",
+            flexDirection: 'row',
             marginTop: 4,
-          }}
-        >
+          }}>
           <View
             style={{
-              flexDirection: "row",
-            }}
-          >
+              flexDirection: 'row',
+            }}>
             <Text
               style={{
-                fontFamily: "OverpassRegular",
+                fontFamily: 'OverpassRegular',
                 fontSize: 14,
-                textAlign: "left",
-                alignSelf: "left",
+                textAlign: 'left',
+                alignSelf: 'left',
                 color: greys(theme)[400],
-              }}
-            >
+              }}>
               {followers}
             </Text>
             <Text
               style={{
-                fontFamily: "OverpassBold",
+                fontFamily: 'OverpassBold',
                 fontSize: 14,
-                textAlign: "left",
-                alignSelf: "left",
+                textAlign: 'left',
+                alignSelf: 'left',
                 color: greys(theme)[700],
                 marginLeft: 4,
-              }}
-            >
+              }}>
               Followers
             </Text>
           </View>
           <View
             style={{
-              flexDirection: "row",
+              flexDirection: 'row',
               marginLeft: 8,
-            }}
-          >
+            }}>
             <Text
               style={{
-                fontFamily: "OverpassRegular",
+                fontFamily: 'OverpassRegular',
                 fontSize: 14,
-                textAlign: "left",
-                alignSelf: "left",
+                textAlign: 'left',
+                alignSelf: 'left',
                 color: greys(theme)[400],
-              }}
-            >
+              }}>
               {followed}
             </Text>
             <Text
               style={{
-                fontFamily: "OverpassBold",
+                fontFamily: 'OverpassBold',
                 fontSize: 14,
-                textAlign: "left",
-                alignSelf: "left",
+                textAlign: 'left',
+                alignSelf: 'left',
                 color: greys(theme)[700],
                 marginLeft: 4,
-              }}
-            >
+              }}>
               Following
             </Text>
           </View>
@@ -366,25 +349,21 @@ export default function AboutPage(props) {
       {/* Tab bar */}
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: 'row',
           paddingHorizontal: 16,
-        }}
-      >
+        }}>
         {TABS.map((tab, index) => (
           <TouchableOpacity
             key={tab}
             onPress={() => handleTabPress(index)}
             onLayout={(event) => measureTab(event, index)}
-            style={{ marginRight: 16, paddingBottom: 16 }}
-          >
+            style={{ marginRight: 16, paddingBottom: 16 }}>
             <Text
               style={{
-                fontFamily: "OverpassBold",
+                fontFamily: 'OverpassBold',
                 fontSize: 16,
-                color:
-                  index === activeTab ? greys(theme)[0] : greys(theme)[700],
-              }}
-            >
+                color: index === activeTab ? greys(theme)[0] : greys(theme)[700],
+              }}>
               {tab}
             </Text>
           </TouchableOpacity>
@@ -413,13 +392,7 @@ export default function AboutPage(props) {
           30023, // Long-form content
         ]}
         type={
-          activeTab === 0
-            ? "posts"
-            : activeTab === 1
-            ? "replies"
-            : activeTab === 2
-            ? "media"
-            : null
+          activeTab === 0 ? 'posts' : activeTab === 1 ? 'replies' : activeTab === 2 ? 'media' : null
         }
         // filter={(c) => c.filter((v) => v.tags.some((t) => t[3] === "root"))}
       />

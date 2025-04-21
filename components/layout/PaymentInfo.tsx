@@ -1,23 +1,23 @@
-import React from "react";
-import { useState } from "react";
-import { Pressable } from "react-native";
-import ViewShot from "react-native-view-shot";
-import * as Clipboard from "expo-clipboard";
-import { AnimatedQRCode } from "components/common/QRCode";
-import { Text, View } from "components/common/Themed";
-import { Section } from "app/transaction";
-import { GradientSkeleton } from "../common/GradientSkeleton";
-import { greys, shades } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useSelector } from "react-redux";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
+import React from 'react';
+import { useState } from 'react';
+import { Pressable } from 'react-native';
+import ViewShot from 'react-native-view-shot';
+import * as Clipboard from 'expo-clipboard';
+import { AnimatedQRCode } from 'components/common/QRCode';
+import { Text, View } from 'components/common/Themed';
+import { Section } from 'app/transaction';
+import { GradientSkeleton } from '../common/GradientSkeleton';
+import { greys, shades } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector } from 'react-redux';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Animated, {
   Easing,
   useAnimatedStyle,
   withTiming,
   useSharedValue,
-} from "react-native-reanimated";
-import { showMessage } from "helper/popup/popups";
+} from 'react-native-reanimated';
+import { showMessage } from 'helper/popup/popups';
 
 export function PaymentInfo({
   unit,
@@ -26,7 +26,7 @@ export function PaymentInfo({
   popupMessage,
   setUri,
   animated = false,
-  variant = "primary",
+  variant = 'primary',
   showSection = true,
 }) {
   const theme = useSelector(memoizedGetTheme);
@@ -41,7 +41,7 @@ export function PaymentInfo({
   const TABS = hasTabs ? data.map((item) => item.name) : [];
 
   const [selectedValue, setSelectedValue] = useState(
-    hasTabs ? data[0].value : typeof data === "string" ? data : ""
+    hasTabs ? data[0].value : typeof data === 'string' ? data : ''
   );
 
   const animatedUnderscoreStyle = useAnimatedStyle(() => ({
@@ -79,10 +79,7 @@ export function PaymentInfo({
   const handleCopyPress = async () => {
     const textToCopy = link || selectedValue;
     await Clipboard.setStringAsync(textToCopy);
-    const message =
-      typeof popupMessage === "string"
-        ? popupMessage
-        : popupMessage[activeTab]?.name;
+    const message = typeof popupMessage === 'string' ? popupMessage : popupMessage[activeTab]?.name;
     showMessage(message);
   };
 
@@ -93,47 +90,39 @@ export function PaymentInfo({
           style={{
             marginHorizontal: 16,
             paddingHorizontal: 16,
-            backgroundColor: "transparent",
-          }}
-        >
+            backgroundColor: 'transparent',
+          }}>
           <View
             style={{
-              justifyContent: "center",
-              backgroundColor: "transparent",
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
               marginBottom: 0,
               flex: 1,
-            }}
-          >
+            }}>
             <View
               style={{
-                flexDirection: "row",
-                backgroundColor: "transparent",
+                flexDirection: 'row',
+                backgroundColor: 'transparent',
                 flex: 1,
-              }}
-            >
+              }}>
               {TABS.map((tab, index) => (
                 <TouchableOpacity
                   key={tab}
                   onPress={() => handleTabPress(index)}
                   style={{
-                    backgroundColor: "transparent",
+                    backgroundColor: 'transparent',
                     flex: 1,
-                    alignItems: "center",
-                    position: "relative",
+                    alignItems: 'center',
+                    position: 'relative',
                     paddingBottom: 8,
                   }}
-                  onLayout={(event) => measureTab(event, index)}
-                >
+                  onLayout={(event) => measureTab(event, index)}>
                   <Text
                     style={{
-                      fontFamily: "OverpassBold",
+                      fontFamily: 'OverpassBold',
                       fontSize: 14,
-                      color:
-                        index === activeTab
-                          ? greys(theme)[0]
-                          : greys(theme)[700],
-                    }}
-                  >
+                      color: index === activeTab ? greys(theme)[0] : greys(theme)[700],
+                    }}>
                     {tab}
                   </Text>
                   {index === 0 && (
@@ -141,10 +130,10 @@ export function PaymentInfo({
                       style={[
                         {
                           height: 2,
-                          width: "100%",
+                          width: '100%',
                           backgroundColor: shades[300],
                           marginTop: 8,
-                          position: "absolute",
+                          position: 'absolute',
                           bottom: 0,
                         },
                         animatedUnderscoreStyle,
@@ -159,15 +148,11 @@ export function PaymentInfo({
       )}
 
       {selectedValue ? (
-        <Pressable
-          style={{ backgroundColor: "transparent" }}
-          onPress={handleCopyPress}
-        >
+        <Pressable style={{ backgroundColor: 'transparent' }} onPress={handleCopyPress}>
           <ViewShot
-            style={{ backgroundColor: "transparent" }}
+            style={{ backgroundColor: 'transparent' }}
             captureMode="mount"
-            onCapture={setUri}
-          >
+            onCapture={setUri}>
             <AnimatedQRCode
               padding={32}
               unit={unit}
@@ -180,16 +165,12 @@ export function PaymentInfo({
       ) : (
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "transparent",
-          }}
-        >
-          <GradientSkeleton
-            startColor={greys(theme)[1800]}
-            endColor={greys(theme)[2300]}
-          />
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+          }}>
+          <GradientSkeleton startColor={greys(theme)[1800]} endColor={greys(theme)[2300]} />
         </View>
       )}
 
@@ -203,7 +184,7 @@ export function PaymentInfo({
           }}
           items={[
             {
-              title: "",
+              title: '',
               value: link || selectedValue,
             },
           ]}

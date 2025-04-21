@@ -1,6 +1,6 @@
-import { getWallet } from "./wallet";
-import { getMint } from "./mint";
-import { Proof, ProofState } from "@cashu/cashu-ts";
+import { getWallet } from './wallet';
+import { getMint } from './mint';
+import { Proof, ProofState } from '@cashu/cashu-ts';
 
 // https://github.com/cashubtc/cashu.me/blob/8cdb2b45d7353fac5b5d2af3388a5783ee9fae9b/src/stores/restore.ts
 export async function* restoreMint({
@@ -15,23 +15,21 @@ export async function* restoreMint({
   MAX_GAP?: number;
 }) {
   try {
-
     let response = {};
     const mint = await getMint({ mintUrl });
 
     const keysets = (await mint.getKeys()).keysets;
 
     const uniqueUnits = keysets.filter(
-      (keyset, index, self) =>
-        index === self.findIndex((k) => k.unit === keyset.unit)
+      (keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit)
     );
 
     yield {
-      label: "INIT",
+      label: 'INIT',
       progress: 0,
       totalUnits: uniqueUnits.length,
       currentUnit: 0,
-      message: "Starting restoration process",
+      message: 'Starting restoration process',
       mintUrl,
       response,
     };
@@ -40,7 +38,7 @@ export async function* restoreMint({
       const keyset = uniqueUnits[i];
 
       yield {
-        label: "RESTORING KEYSET",
+        label: 'RESTORING KEYSET',
         unit: keyset.unit,
         progress: i / uniqueUnits.length,
         currentUnit: i + 1,
@@ -57,9 +55,8 @@ export async function* restoreMint({
       let totalProofsProcessed = 0;
 
       while (emptyBatchCount < MAX_GAP) {
-
         yield {
-          label: "RESTORING BATCH",
+          label: 'RESTORING BATCH',
           unit: keyset.unit,
           batchStart: start,
           batchEnd: start + BATCH_SIZE,
@@ -84,7 +81,7 @@ export async function* restoreMint({
           // Process this batch immediately instead of waiting
           if (uncheckedProofs.length > 0) {
             yield {
-              label: "CHECKING BATCH",
+              label: 'CHECKING BATCH',
               unit: keyset.unit,
               batchStart: start,
               batchSize: uncheckedProofs.length,
@@ -96,20 +93,18 @@ export async function* restoreMint({
             };
 
             // Check states of this batch
-            const proofStates: ProofState[] = await wallet.checkProofsStates(
-              uncheckedProofs
-            );
+            const proofStates: ProofState[] = await wallet.checkProofsStates(uncheckedProofs);
 
             // Filter and keep only the unspent proofs
             const unspentProofs = uncheckedProofs.filter(
-              (p, index) => proofStates[index].state === "UNSPENT"
+              (p, index) => proofStates[index].state === 'UNSPENT'
             );
 
             // Add unspent proofs to our collection
             restoredProofs = restoredProofs.concat(unspentProofs);
 
             yield {
-              label: "BATCH_PROCESSED",
+              label: 'BATCH_PROCESSED',
               unit: keyset.unit,
               batchStart: start,
               unspentCount: unspentProofs.length,
@@ -136,7 +131,7 @@ export async function* restoreMint({
       };
 
       yield {
-        label: "KEYSET_COMPLETE",
+        label: 'KEYSET_COMPLETE',
         unit: keyset.unit,
         progress: (i + 1) / uniqueUnits.length,
         currentUnit: i + 1,
@@ -149,21 +144,19 @@ export async function* restoreMint({
     }
 
     yield {
-      label: "COMPLETE",
+      label: 'COMPLETE',
       progress: 1,
-      message: "Restoration complete",
+      message: 'Restoration complete',
       mintUrl,
       response,
     };
 
     return response;
-  }
-  catch (err) {
-    console.log(err)
+  } catch (err) {
+    console.log(err);
     return null;
   }
 }
-
 
 export async function restoreCounter({
   keyset,

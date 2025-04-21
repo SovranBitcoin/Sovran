@@ -1,4 +1,4 @@
-import { Event, EventTemplate } from "nostr-tools";
+import { Event, EventTemplate } from 'nostr-tools';
 
 declare global {
   interface Window {
@@ -26,9 +26,7 @@ export type TokenReponse =
   | { error: true; message: string }
   | { error: false; data: { token: string } };
 
-export type BalanceResponse =
-  | { error: true; message: string }
-  | { error: false; data: number };
+export type BalanceResponse = { error: true; message: string } | { error: false; data: number };
 
 export interface Signer {
   signEvent: (e: EventTemplate) => Promise<Event>;

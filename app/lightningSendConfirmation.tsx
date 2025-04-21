@@ -1,24 +1,24 @@
-import React, { useState } from "react";
-import { formatCurrency } from "helper/currency";
+import React, { useState } from 'react';
+import { formatCurrency } from 'helper/currency';
 import {
   getDescription,
   getExpiresIn,
   getExpiry,
   getTimestamp,
   sendLightning,
-} from "components/cashu";
-import { BalanceUpdate, Section } from "./transaction";
-import Modal from "components/layout/Modal";
-import withConfirmation from "components/layout/ConfirmationProvider";
-import { useSelector, useDispatch } from "react-redux";
-import { View } from "components/common/Themed";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation/index";
-import { handleBarcode } from "helper/payment-handler/handlers";
-import { setSelectedMint } from "helper/redux/cashu/actions";
-import SelectedMintDisplay from "components/layout/sheets/mints";
-import { truncateMiddle } from "helper/strings";
-import { showMessage } from "helper/popup/popups";
-import { ButtonHandler } from "./ecashSendConfirmation";
+} from 'components/cashu';
+import { BalanceUpdate, Section } from './transaction';
+import Modal from 'components/layout/Modal';
+import withConfirmation from 'components/layout/ConfirmationProvider';
+import { useSelector, useDispatch } from 'react-redux';
+import { View } from 'components/common/Themed';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
+import { handleBarcode } from 'helper/payment-handler/handlers';
+import { setSelectedMint } from 'helper/redux/cashu/actions';
+import SelectedMintDisplay from 'components/layout/sheets/mints';
+import { truncateMiddle } from 'helper/strings';
+import { showMessage } from 'helper/popup/popups';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 function ModalScreen() {
   const navigation = useTypedNavigation();
@@ -29,7 +29,7 @@ function ModalScreen() {
     pubkey,
     meltQuote: initialMeltQuote,
     redirect,
-  } = useTypedRoute<"lightningSendConfirmation">();
+  } = useTypedRoute<'lightningSendConfirmation'>();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -66,7 +66,7 @@ function ModalScreen() {
         }
       }
     } catch (error) {
-      showMessage("general_error", {}, { emoji: "🚨" });
+      showMessage('general_error', {}, { emoji: '🚨' });
 
       throw error;
     }
@@ -82,16 +82,16 @@ function ModalScreen() {
         meltQuote: parsedQuote,
       });
 
-      showMessage("funds_sent", { amount, unit }, { emoji: "🎉" }, () => {
+      showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
         navigation.navigate(
-          redirect || (pubkey ? "userMessages" : "index"),
+          redirect || (pubkey ? 'userMessages' : 'index'),
           { pubkey },
           { closeParents: true }
         );
       });
     } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : "Unknown error";
-      showMessage("payment_error", { error: errorMessage }, { emoji: "🚨" });
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      showMessage('payment_error', { error: errorMessage }, { emoji: '🚨' });
     } finally {
       setLoading(false);
     }
@@ -101,23 +101,19 @@ function ModalScreen() {
     navigation.goBack();
   };
 
-  const getCurrencyDisplay = () =>
-    unit === "sat" ? "BTC" : unit.toUpperCase();
+  const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
 
-  const formatAmount = (
-    value,
-    displayDenomination = unit === "sat" ? "btc" : unit
-  ) => {
+  const formatAmount = (value, displayDenomination = unit === 'sat' ? 'btc' : unit) => {
     return formatCurrency(
       {
         currency: getCurrencyDisplay(),
         value: value,
-        denomination: unit === "sat" ? "sats" : unit,
+        denomination: unit === 'sat' ? 'sats' : unit,
       },
       {
-        locale: "en-US",
-        precision: displayDenomination === "btc" ? 8 : 2,
-        currencyDisplay: "symbol",
+        locale: 'en-US',
+        precision: displayDenomination === 'btc' ? 8 : 2,
+        currencyDisplay: 'symbol',
         denomination: displayDenomination,
       }
     );
@@ -128,24 +124,24 @@ function ModalScreen() {
       showClose
       title="Send Lightning"
       children={
-        <View style={{ backgroundColor: "transparent" }}>
+        <View style={{ backgroundColor: 'transparent' }}>
           <BalanceUpdate
             pubkey={pubkey}
             transactionType="send"
             topAmount={formatCurrency(
               {
-                currency: unit === "sat" ? "BTC" : unit.toUpperCase(),
+                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
                 value: amount,
-                denomination: unit === "sat" ? "sats" : unit,
+                denomination: unit === 'sat' ? 'sats' : unit,
               },
               {
-                locale: "en-US",
-                precision: unit === "sat" ? 8 : 2,
-                currencyDisplay: "symbol",
-                denomination: unit === "sat" ? "btc" : unit,
+                locale: 'en-US',
+                precision: unit === 'sat' ? 8 : 2,
+                currencyDisplay: 'symbol',
+                denomination: unit === 'sat' ? 'btc' : unit,
               }
             )}
-            bottomAmount={formatAmount(amount, "usd")}
+            bottomAmount={formatAmount(amount, 'usd')}
             amount={amount}
             unit={unit}
             request={pr}
@@ -161,7 +157,7 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Note",
+                title: 'Note',
                 value: getDescription({ pr }),
               },
             ]}
@@ -170,26 +166,24 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: `Amount (${
-                  unit === "sat" ? "BTC" : unit.toUpperCase()
-                })`,
+                title: `Amount (${unit === 'sat' ? 'BTC' : unit.toUpperCase()})`,
                 value: formatCurrency(
                   {
-                    currency: unit === "sat" ? "BTC" : unit.toUpperCase(),
+                    currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
                     value: amount,
-                    denomination: unit === "sat" ? "sats" : unit,
+                    denomination: unit === 'sat' ? 'sats' : unit,
                   },
                   {
-                    locale: "en-US",
-                    precision: unit === "sat" ? 8 : 2,
-                    currencyDisplay: "symbol",
-                    denomination: unit === "sat" ? "btc" : unit,
+                    locale: 'en-US',
+                    precision: unit === 'sat' ? 8 : 2,
+                    currencyDisplay: 'symbol',
+                    denomination: unit === 'sat' ? 'btc' : unit,
                   }
                 ),
               },
               {
-                title: "Amount (USD)",
-                value: "≈" + formatAmount(amount, "usd"),
+                title: 'Amount (USD)',
+                value: '≈' + formatAmount(amount, 'usd'),
               },
             ]}
           />
@@ -201,8 +195,8 @@ function ModalScreen() {
                 value: formatAmount(feeReserve),
               },
               {
-                title: "Fee (USD)",
-                value: "≈" + formatAmount(feeReserve, "usd"),
+                title: 'Fee (USD)',
+                value: '≈' + formatAmount(feeReserve, 'usd'),
               },
             ]}
           />
@@ -210,15 +204,15 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Created at",
+                title: 'Created at',
                 value: getTimestamp({ pr }),
               },
               {
-                title: "Expires at",
+                title: 'Expires at',
                 value: getExpiry({ pr }),
               },
               {
-                title: "Expires in",
+                title: 'Expires in',
                 value: getExpiresIn({ pr }),
               },
             ]}
@@ -227,12 +221,12 @@ function ModalScreen() {
           <Section
             items={[
               {
-                title: "Type",
-                value: "Lightning",
+                title: 'Type',
+                value: 'Lightning',
               },
               {
-                title: "Transaction Type",
-                value: "Send",
+                title: 'Transaction Type',
+                value: 'Send',
               },
             ]}
           />
@@ -241,11 +235,11 @@ function ModalScreen() {
             special={false}
             items={[
               {
-                title: "Request",
+                title: 'Request',
                 value: truncateMiddle(pr, 5),
               },
               {
-                title: "Quote",
+                title: 'Quote',
                 value: truncateMiddle(quoteId, 7),
               },
             ]}
@@ -255,25 +249,24 @@ function ModalScreen() {
       buttons={
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "transparent",
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
             paddingBottom: 8,
-          }}
-        >
+          }}>
           <ButtonHandler
             buttons={[
               {
-                text: "Cancel",
-                icon: "ri:close-circle-line",
-                variant: "secondary",
+                text: 'Cancel',
+                icon: 'ri:close-circle-line',
+                variant: 'secondary',
                 onPress: handleCancel,
               },
               {
-                text: "Send",
-                icon: "ri:send-plane-2-fill",
-                variant: "primary",
+                text: 'Send',
+                icon: 'ri:send-plane-2-fill',
+                variant: 'primary',
                 onPress: handleLightningSend,
                 loading: loading,
               },

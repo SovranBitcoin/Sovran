@@ -1,10 +1,10 @@
-import { CashuWallet } from "@cashu/cashu-ts";
-import { store } from "helper/redux/store";
-import { HDKey } from "@scure/bip32";
-import * as bip39 from "@scure/bip39";
-import { getKeys } from "./keys";
-import { getMint } from "./mint";
-import { memoizedGetCurrentProfile } from "../redux/nostr";
+import { CashuWallet } from '@cashu/cashu-ts';
+import { store } from 'helper/redux/store';
+import { HDKey } from '@scure/bip32';
+import * as bip39 from '@scure/bip39';
+import { getKeys } from './keys';
+import { getMint } from './mint';
+import { memoizedGetCurrentProfile } from '../redux/nostr';
 interface GetWalletParams {
   unit: string;
   mintUrl: string;
@@ -18,7 +18,7 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
 
   if (!keys) {
     throw {
-      message: "unsupported_currency",
+      message: 'unsupported_currency',
       params: {
         unit,
         mintUrl,
@@ -28,9 +28,7 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
 
   const mint = await getMint({ mintUrl });
 
-  const currentProfile = profile?.pubkey
-    ? profile
-    : memoizedGetCurrentProfile(store.getState());
+  const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
 
   const root = getRoot(currentProfile);
 
@@ -54,9 +52,7 @@ function getRoot(currentProfile) {
     }
   }
 
-  const root = HDKey.fromMasterSeed(
-    bip39.mnemonicToSeedSync(currentProfile?.mnemonic)
-  );
+  const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(currentProfile?.mnemonic));
 
   return root;
 }

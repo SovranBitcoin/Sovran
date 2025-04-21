@@ -1,13 +1,13 @@
-import React, { useState } from "react";
-import { useSelector } from "react-redux";
-import { store } from "helper/redux/store";
-import { Button } from "components/common/Button";
-import { Text } from "components/common/Themed";
-import Container from "components/layout/Container";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { restoreCounter } from "helper/cashu/restore";
-import { increaseCounterV2 } from "helper/redux/cashu";
-import { runWithAnimationFrame } from "../onboard/new";
+import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { store } from 'helper/redux/store';
+import { Button } from 'components/common/Button';
+import { Text } from 'components/common/Themed';
+import Container from 'components/layout/Container';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { restoreCounter } from 'helper/cashu/restore';
+import { increaseCounterV2 } from 'helper/redux/cashu';
+import { runWithAnimationFrame } from '../onboard/new';
 
 export default function ModalScreen() {
   const [isLoading, setIsLoading] = useState(false);
@@ -32,8 +32,7 @@ export default function ModalScreen() {
   }
 
   const handleRestore = (keyset, mintUrl) => {
-    return () =>
-      runWithAnimationFrame(restore, setIsLoading)({ keyset, mintUrl });
+    return () => runWithAnimationFrame(restore, setIsLoading)({ keyset, mintUrl });
   };
 
   return (
@@ -47,7 +46,7 @@ export default function ModalScreen() {
               <Button
                 variant="primary"
                 onPress={handleRestore(keyset, mintUrl)}
-                text={isLoading ? "Restoring Keyset..." : "Restore"}
+                text={isLoading ? 'Restoring Keyset...' : 'Restore'}
                 loading={isLoading}
               />
             </React.Fragment>

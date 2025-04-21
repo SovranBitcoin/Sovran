@@ -1,10 +1,10 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import Svg, { Circle } from "react-native-svg";
-import { greys, shades } from "helper/colors";
-import { FlagIcon } from "assets/icons";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+import { greys, shades } from 'helper/colors';
+import { FlagIcon } from 'assets/icons';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 const CircularProgress = ({ progress, country }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -48,15 +48,15 @@ const CircularProgress = ({ progress, country }) => {
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   svg: {
-    position: "absolute",
+    position: 'absolute',
   },
   flagIconContainer: {
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

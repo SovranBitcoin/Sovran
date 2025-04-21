@@ -1,6 +1,6 @@
-import React from "react";
-import ActionSheet, { registerSheet } from "react-native-actions-sheet";
-import { sheetName, routes } from "./routes";
+import React from 'react';
+import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
+import { sheetName, routes } from './routes';
 
 function SheetWithRouter(props: any) {
   return (
@@ -8,7 +8,7 @@ function SheetWithRouter(props: any) {
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="route-a"
-      containerStyle={{ height: "90%" }}
+      containerStyle={{ height: '90%' }}
     />
   );
 }

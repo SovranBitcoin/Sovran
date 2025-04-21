@@ -1,13 +1,13 @@
-import { Button } from "components/common/Button";
-import { Dimensions } from "react-native";
-import { greys, shades } from "helper/colors";
-import { StyleSheet, Text, View } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import Container from "components/layout/Container";
-import React, { useState } from "react";
-import Checkbox from "expo-checkbox";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
+import { Button } from 'components/common/Button';
+import { Dimensions } from 'react-native';
+import { greys, shades } from 'helper/colors';
+import { StyleSheet, Text, View } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import Container from 'components/layout/Container';
+import React, { useState } from 'react';
+import Checkbox from 'expo-checkbox';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -140,18 +140,18 @@ Using ecash involves significant risks including legal, market, liquidity, count
 These Terms represent the entire agreement between you and Sovran.`;
 
 const createStyles = (theme) => {
-  const screenHeight = Dimensions.get("screen").height;
+  const screenHeight = Dimensions.get('screen').height;
 
   return StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[1900],
       // height: screenHeight,
-      flexDirection: "column",
+      flexDirection: 'column',
     },
     titleText: {
-      textAlign: "center",
+      textAlign: 'center',
       fontSize: 32,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       color: greys(theme)[100],
       marginBottom: 16,
       paddingVertical: 8,
@@ -167,20 +167,20 @@ const createStyles = (theme) => {
       paddingBottom: 100, // Add padding to ensure content doesn't overlap with buttons
     },
     termsText: {
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       fontSize: 14,
       color: greys(theme)[0],
       lineHeight: 22,
     },
     checkboxContainer: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 16,
       paddingHorizontal: 16,
     },
     checkboxText: {
       flex: 1,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
       fontSize: 14,
       color: greys(theme)[0],
       marginLeft: 8,
@@ -210,22 +210,16 @@ export default function TermsConditionsScreen({ onClose }) {
       <View
         style={{
           marginTop: 64,
-        }}
-      >
+        }}>
         <Button text="Next" onPress={onClose} disabled={!isChecked} />
 
-        <TouchableOpacity
-          style={styles.checkboxContainer}
-          onPress={toggleCheckbox}
-        >
+        <TouchableOpacity style={styles.checkboxContainer} onPress={toggleCheckbox}>
           <Checkbox
             value={isChecked}
             onValueChange={toggleCheckbox}
             color={isChecked ? shades[300] : undefined}
           />
-          <Text style={styles.checkboxText}>
-            I have read and agree to the Terms and Conditions
-          </Text>
+          <Text style={styles.checkboxText}>I have read and agree to the Terms and Conditions</Text>
         </TouchableOpacity>
       </View>
     </Container>

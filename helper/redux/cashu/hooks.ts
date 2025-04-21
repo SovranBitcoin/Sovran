@@ -1,7 +1,7 @@
-import { useDispatch, useSelector } from "react-redux";
-import { setSelectedMint } from "./actions";
-import { useQuery } from "@tanstack/react-query";
-import { getMint } from "helper/cashu";
+import { useDispatch, useSelector } from 'react-redux';
+import { setSelectedMint } from './actions';
+import { useQuery } from '@tanstack/react-query';
+import { getMint } from 'helper/cashu';
 
 export const useCashu = () => {
   const dispatch = useDispatch();
@@ -15,8 +15,7 @@ export const useCashu = () => {
 
   return {
     selectedMint,
-    setSelectedMint: ({ profileId, mintUrl }) =>
-      dispatch(setSelectedMint({ profileId, mintUrl })),
+    setSelectedMint: ({ profileId, mintUrl }) => dispatch(setSelectedMint({ profileId, mintUrl })),
     keysets: keysets || [],
     proofs: proofs || [],
     transactions: transactions || [],
@@ -25,7 +24,7 @@ export const useCashu = () => {
 
 export const useGetMintInfo = ({ mintUrl }: { mintUrl: string }) => {
   return useQuery({
-    queryKey: ["cashu-mint-info", mintUrl],
+    queryKey: ['cashu-mint-info', mintUrl],
     queryFn: async () => {
       return await (await getMint({ mintUrl: mintUrl })).getInfo();
     },

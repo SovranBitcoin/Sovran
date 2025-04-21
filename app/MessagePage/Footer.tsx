@@ -1,18 +1,11 @@
-import React from "react";
-import { StyleSheet } from "react-native";
-import { View } from "components/common/Themed";
-import Icon from "assets/icons";
-import TextInput from "components/common/TextInput";
-import { Button } from "components/common/Button";
+import React from 'react';
+import { StyleSheet } from 'react-native';
+import { View } from 'components/common/Themed';
+import Icon from 'assets/icons';
+import TextInput from 'components/common/TextInput';
+import { Button } from 'components/common/Button';
 
-const Footer = ({
-  theme,
-  message,
-  setMessage,
-  handleSendDM,
-  isFocused,
-  setIsFocused,
-}) => {
+const Footer = ({ theme, message, setMessage, handleSendDM, isFocused, setIsFocused }) => {
   const styles = createStyles(theme);
 
   return (
@@ -47,8 +40,7 @@ const Footer = ({
             paddingVertical: 0,
             marginBottom: 0,
           }}
-          noPadding
-        ></Button>
+          noPadding></Button>
       </View>
     </View>
   );
@@ -57,20 +49,20 @@ const Footer = ({
 const createStyles = (theme) =>
   StyleSheet.create({
     inputContainer: {
-      position: "relative",
-      backgroundColor: "transparent",
-      flexDirection: "row",
+      position: 'relative',
+      backgroundColor: 'transparent',
+      flexDirection: 'row',
     },
     sendButton: {
       // position: "absolute",
       // right: 0,
       // bottom: 16,
       // height: "100%",
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingLeft: 24,
       paddingRight: 8,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
   });
 

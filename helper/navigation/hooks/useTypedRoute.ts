@@ -1,5 +1,5 @@
-import { useRoute, RouteProp } from "@react-navigation/native";
-import { NavigationParams } from "../types/NavigationParams";
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { NavigationParams } from '../types/NavigationParams';
 
 export const useTypedRoute = <T extends keyof NavigationParams>() => {
   const route = useRoute<RouteProp<NavigationParams, T>>();

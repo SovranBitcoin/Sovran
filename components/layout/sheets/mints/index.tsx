@@ -1,20 +1,17 @@
-import React, { useRef } from "react";
-import { View, Image, StyleSheet } from "react-native";
-import { greys, shades } from "helper/colors";
-import { useSelector } from "react-redux";
-import {
-  memoizedGetBalance,
-  memoizedGetSelectedMint,
-} from "helper/redux/cashu/selectors";
-import Icon from "assets/icons";
-import { ActionSheetRef, registerSheet } from "react-native-actions-sheet";
-import { TouchableOpacity } from "components/common/TouchableOpacity";
-import { formatCurrency } from "helper/currency";
-import { Text } from "components/common/Themed";
-import { useGetMintInfo } from "helper/redux/cashu";
-import { Sheet } from "components/layout/sheets/mints/sheet";
-import { MintSelect } from "components/layout/sheets/mints/MintSelect";
-import MintAddMore from "components/layout/sheets/mints/MintAddMore";
+import React, { useRef } from 'react';
+import { View, Image, StyleSheet } from 'react-native';
+import { greys, shades } from 'helper/colors';
+import { useSelector } from 'react-redux';
+import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
+import Icon from 'assets/icons';
+import { ActionSheetRef, registerSheet } from 'react-native-actions-sheet';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { formatCurrency } from 'helper/currency';
+import { Text } from 'components/common/Themed';
+import { useGetMintInfo } from 'helper/redux/cashu';
+import { Sheet } from 'components/layout/sheets/mints/sheet';
+import { MintSelect } from 'components/layout/sheets/mints/MintSelect';
+import MintAddMore from 'components/layout/sheets/mints/MintAddMore';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -73,32 +70,28 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   };
 
   // Safely extract and process unit string
-  const mintUnitLower = unit ? unit.toLowerCase() : "";
-  const mintUnitUpper = unit ? unit.toUpperCase() : "";
-  const currencyValue =
-    mintUnitLower === "sat" ? "BTC" : (mintUnitUpper as "USD" | "EUR" | "GBP");
+  const mintUnitLower = unit ? unit.toLowerCase() : '';
+  const mintUnitUpper = unit ? unit.toUpperCase() : '';
+  const currencyValue = mintUnitLower === 'sat' ? 'BTC' : (mintUnitUpper as 'USD' | 'EUR' | 'GBP');
   const denominationValue =
-    mintUnitLower === "sat" ? "sats" : (mintUnitLower as "usd" | "eur" | "gbp");
-  const precision = mintUnitUpper === "SAT" ? 0 : 2;
-  const currencyDisplay = mintUnitUpper === "SAT" ? "name" : "symbol";
+    mintUnitLower === 'sat' ? 'sats' : (mintUnitLower as 'usd' | 'eur' | 'gbp');
+  const precision = mintUnitUpper === 'SAT' ? 0 : 2;
+  const currencyDisplay = mintUnitUpper === 'SAT' ? 'name' : 'symbol';
 
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
 
   return (
     <TouchableOpacity
-      style={[sovran.listItem, { alignSelf: "center" }]}
+      style={[sovran.listItem, { alignSelf: 'center' }]}
       onPress={handlePress}
       onPressIn={() => {}}
-      onPressOut={() => {}}
-    >
+      onPressOut={() => {}}>
       {mintInfo?.data?.icon_url ? (
         <Image source={{ uri: mintInfo?.data?.icon_url }} style={styles.icon} />
       ) : (
         <View style={styles.placeholderIcon} />
       )}
-      <Text style={styles.name}>
-        {selectedMint?.replace("https://", "")?.split("/")?.[0]}
-      </Text>
+      <Text style={styles.name}>{selectedMint?.replace('https://', '')?.split('/')?.[0]}</Text>
       <Text style={styles.dot}>•</Text>
       <Text style={styles.balance}>
         {formatCurrency(
@@ -108,7 +101,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
             denomination: denominationValue,
           },
           {
-            locale: "en-US",
+            locale: 'en-US',
             precision,
             currencyDisplay,
             denomination: denominationValue,
@@ -116,18 +109,14 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
         )}
       </Text>
       <View style={styles.chevronContainer}>
-        <Icon
-          name="fluent:chevron-down-12-filled"
-          size={12}
-          color={greys(theme)[700]}
-        />
+        <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
       </View>
     </TouchableOpacity>
   );
 };
 
-import { ViewStyle } from "react-native";
-import MintDetailPage from "./MintDetailsPage";
+import { ViewStyle } from 'react-native';
+import MintDetailPage from './MintDetailsPage';
 
 // Theme type definition
 interface Theme {
@@ -141,12 +130,12 @@ const opacity = (color: string, alpha: number) => {
     color.slice(0, 7) +
     Math.round(alpha * 255)
       .toString(16)
-      .padStart(2, "0")
+      .padStart(2, '0')
   );
 };
 
 // Current theme (would be dynamic in a real app)
-const currentTheme: Theme = "dark";
+const currentTheme: Theme = 'dark';
 
 // Base styles that can be composed together
 const baseStyles = {
@@ -289,17 +278,17 @@ const baseStyles = {
 
   // Layout variations
   row: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   } as ViewStyle,
 
   column: {
-    flexDirection: "column",
+    flexDirection: 'column',
   } as ViewStyle,
 
   // Utility styles
   overflowHidden: {
-    overflow: "hidden",
+    overflow: 'hidden',
   } as ViewStyle,
 };
 
@@ -390,7 +379,7 @@ const updateTheme = (isDark: boolean) => {
 
 export { sovran, updateTheme };
 
-registerSheet("mint", MintSheet);
+registerSheet('mint', MintSheet);
 
 const SelectedMintDisplay: React.FC<SelectedMintDisplayProps> = ({
   onMintSelected,
@@ -434,7 +423,7 @@ const MintSheet = ({
       actionSheetRef={actionSheetRef}
       routes={[
         {
-          name: "mintSelect",
+          name: 'mintSelect',
           component: () => (
             <MintSelect
               onMintSelected={onMintSelected}
@@ -442,29 +431,27 @@ const MintSheet = ({
               pr={pr}
               loading={loading}
               onUnitUpdate={onUnitUpdate}
-              onMintQuoteUpdate={onMintQuoteUpdate}
-            ></MintSelect>
+              onMintQuoteUpdate={onMintQuoteUpdate}></MintSelect>
           ),
         },
         {
-          name: "mintAddMore",
+          name: 'mintAddMore',
           component: () => <MintAddMore />,
         },
         {
-          name: "mintDetailsPage",
+          name: 'mintDetailsPage',
           component: () => <MintDetailPage />,
         },
       ]}
-      initialRoute={"mintSelect"}
-    ></Sheet>
+      initialRoute={'mintSelect'}></Sheet>
   );
 };
 
 export const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       paddingVertical: 6,
       paddingHorizontal: 6,
       borderRadius: 100000,
@@ -486,7 +473,7 @@ export const createStyles = (theme: string) =>
       color: greys(theme)[100],
       fontSize: 14,
       marginLeft: 8,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
     },
     dot: {
       color: greys(theme)[700],
@@ -496,7 +483,7 @@ export const createStyles = (theme: string) =>
     balance: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     chevronContainer: {
       padding: 4,
@@ -505,12 +492,12 @@ export const createStyles = (theme: string) =>
       marginRight: 0,
     },
     actionSheetContainer: {
-      height: "100%",
+      height: '100%',
       backgroundColor: greys(theme)[2300],
     },
     scrollContainer: {
       padding: 16,
-      height: "100%",
+      height: '100%',
     },
     buttonContainer: {
       padding: 16,
@@ -519,7 +506,7 @@ export const createStyles = (theme: string) =>
     sectionHeader: {
       color: greys(theme)[0],
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: '600',
       marginBottom: 12,
     },
     currencyScroll: {
@@ -533,9 +520,9 @@ export const createStyles = (theme: string) =>
       minWidth: 100,
     },
     currencyContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-start",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       gap: 8,
     },
     selectedCurrencyButton: {
@@ -544,14 +531,14 @@ export const createStyles = (theme: string) =>
     currencyText: {
       color: greys(theme)[0],
       fontSize: 14,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     mintScroll: {
       maxHeight: 300,
     },
     mintItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 12,
       borderRadius: 8,
       backgroundColor: greys(theme)[1800],
@@ -584,26 +571,26 @@ export const createStyles = (theme: string) =>
       backgroundColor: greys(theme)[1800],
       borderRadius: 8,
       marginTop: 16,
-      alignItems: "center",
+      alignItems: 'center',
     },
     buttonText: {
       color: greys(theme)[0],
       fontSize: 16,
     },
     checkIconContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginLeft: 8,
     },
     loadingMintItem: {
       opacity: 0.7,
     },
     loadingContainer: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginLeft: 8,
       width: 24,
       height: 24,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     disabledButtonText: {
       opacity: 0.5,

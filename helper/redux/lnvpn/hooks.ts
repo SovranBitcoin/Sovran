@@ -1,5 +1,5 @@
-import { useDispatch, useSelector } from "react-redux";
-import { setVpn, updateVpn } from "./actions";
+import { useDispatch, useSelector } from 'react-redux';
+import { setVpn, updateVpn } from './actions';
 
 export const useVpn = () => {
   const dispatch = useDispatch();

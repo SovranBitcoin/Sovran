@@ -1,5 +1,5 @@
 import _ from 'lodash/fp';
-import { SET_EVENTS, APPEND_EVENTS } from "./actionTypes";
+import { SET_EVENTS, APPEND_EVENTS } from './actionTypes';
 
 const initialState = {
   events: [],

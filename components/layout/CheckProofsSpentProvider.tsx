@@ -1,4 +1,4 @@
-import { useCashu } from "helper/redux/cashu";
+import { useCashu } from 'helper/redux/cashu';
 
 export const CheckProofsSpentProvider = ({ children }) => {
   const { transactions: cashuTransactions } = useCashu();

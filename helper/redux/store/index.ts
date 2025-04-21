@@ -1,18 +1,18 @@
-import { applyMiddleware, createStore } from "redux";
-import { createMigrate, persistStore, persistReducer } from "redux-persist";
-import rootReducer from "./reducer";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import _ from "lodash/fp";
+import { applyMiddleware, createStore } from 'redux';
+import { createMigrate, persistStore, persistReducer } from 'redux-persist';
+import rootReducer from './reducer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import _ from 'lodash/fp';
 
-import { HDKey } from "@scure/bip32";
-import * as bip39 from "@scure/bip39";
+import { HDKey } from '@scure/bip32';
+import * as bip39 from '@scure/bip39';
 
-const thunkMiddleware = require("redux-thunk").thunk;
+const thunkMiddleware = require('redux-thunk').thunk;
 
 const migrations = {
   0: (state: any) => {
     return _.update(
-      ["cashu", "profiles"],
+      ['cashu', 'profiles'],
       (profiles = []) =>
         profiles.map((profile: any) => {
           // Get mint URLs from proofs object keys
@@ -36,7 +36,7 @@ const migrations = {
   },
   5: (state: any) => {
     return _.update(
-      ["cashu", "profiles"],
+      ['cashu', 'profiles'],
       (profiles = []) =>
         profiles.map((profile: any) => {
           return {
@@ -49,16 +49,16 @@ const migrations = {
   },
   23: (state: any) => {
     return _.update(
-      ["settings", "settings", "theme"],
-      (theme = "dark") => {
-        return "dark";
+      ['settings', 'settings', 'theme'],
+      (theme = 'dark') => {
+        return 'dark';
       },
       state
     );
   },
   25: (state: any) => {
     return _.update(
-      ["nostr", "profiles"],
+      ['nostr', 'profiles'],
       (profiles = []) =>
         profiles.map((profile: any) => {
           // Skip if no mnemonic or root already exists
@@ -82,64 +82,54 @@ const migrations = {
               root,
             };
           } catch (error) {
-
             return profile;
           }
         }),
       state
     );
   },
-
 };
 
 const persistConfig = {
-  key: "SOVRAN",
+  key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
   version: 30,
   migrate: createMigrate(migrations, { debug: true }),
-
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
-export const store = createStore(
-  persistedReducer,
-  applyMiddleware(thunkMiddleware)
-);
+export const store = createStore(persistedReducer, applyMiddleware(thunkMiddleware));
 
 // log state
 store.subscribe(() => {
   const getStructure = (obj: any): any => {
-    if (typeof obj !== "object" || obj === null) {
+    if (typeof obj !== 'object' || obj === null) {
       return typeof obj;
     }
     if (Array.isArray(obj)) {
       const allKeys = obj.reduce((keys, item) => {
-        if (typeof item === "object" && item !== null) {
+        if (typeof item === 'object' && item !== null) {
           Object.keys(item).forEach((key) => keys.add(key));
         }
         return keys;
       }, new Set<string>());
 
-      const exampleItem = obj.find(
-        (item) => typeof item === "object" && item !== null
-      );
+      const exampleItem = obj.find((item) => typeof item === 'object' && item !== null);
 
       const structure: any = {};
       allKeys.forEach((key) => {
         structure[key] =
-          exampleItem && key in exampleItem
-            ? getStructure(exampleItem[key])
-            : "undefined";
+          exampleItem && key in exampleItem ? getStructure(exampleItem[key]) : 'undefined';
       });
 
       return [structure];
     }
     const structure: any = {};
     for (const key in obj) {
-      if (key.includes("https://")) {
-        structure["https://mint.example.com"] = getStructure(obj[key]);
+      if (key.includes('https://')) {
+        structure['https://mint.example.com'] = getStructure(obj[key]);
       } else {
         structure[key] = getStructure(obj[key]);
       }
@@ -147,7 +137,7 @@ store.subscribe(() => {
     return structure;
   };
 
-  console.log(JSON.stringify(store.getState(), null, 2))
+  console.log(JSON.stringify(store.getState(), null, 2));
 
   // State structure is now accessible via Redux DevTools
 });

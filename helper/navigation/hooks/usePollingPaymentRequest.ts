@@ -1,17 +1,15 @@
-import { useMemo, useEffect } from "react";
-import { useSubscribe } from "@nostr-dev-kit/ndk-mobile";
-import { NDKKind } from "@nostr-dev-kit/ndk";
-import { useSelector } from "react-redux";
-import { nip04 } from "nostr-tools";
-import { nip19 } from "nostr-tools";
-import { bytesToHex } from "@noble/hashes/utils";
-import { getEncodedToken, PaymentRequest } from "@cashu/cashu-ts";
-import { checkTokenSpent, receiveEcash } from "helper/cashu";
-import {
-  updateTransaction
-} from "helper/redux/cashu";
-import { store } from "helper/redux/store";
-import { showMessage } from "helper/popup/popups";
+import { useMemo, useEffect } from 'react';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { NDKKind } from '@nostr-dev-kit/ndk';
+import { useSelector } from 'react-redux';
+import { nip04 } from 'nostr-tools';
+import { nip19 } from 'nostr-tools';
+import { bytesToHex } from '@noble/hashes/utils';
+import { getEncodedToken, PaymentRequest } from '@cashu/cashu-ts';
+import { checkTokenSpent, receiveEcash } from 'helper/cashu';
+import { updateTransaction } from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { showMessage } from 'helper/popup/popups';
 
 interface PaymentRequestPayload {
   proofs: any[];
@@ -24,9 +22,7 @@ interface UsePollingPaymentRequestParams {
   paymentRequest: PaymentRequest;
 }
 
-export const usePollingPaymentRequest = ({
-  paymentRequest,
-}: UsePollingPaymentRequestParams) => {
+export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRequestParams) => {
   const currentProfile = useSelector(
     (state: { nostr: { currentProfile: any } }) => state.nostr.currentProfile
   );
@@ -35,7 +31,7 @@ export const usePollingPaymentRequest = ({
     () => [
       {
         kinds: [NDKKind.EncryptedDirectMessage],
-        "#p": [currentProfile?.pubkey],
+        '#p': [currentProfile?.pubkey],
       },
     ],
     [currentProfile?.pubkey]
@@ -67,17 +63,12 @@ export const usePollingPaymentRequest = ({
     const privKey = bytesToHex(privKeyBytes);
 
     const decryptMessages = async () => {
-
       for (const event of events) {
         try {
-          const decryptedMessage = await nip04.decrypt(
-            privKey,
-            event.pubkey,
-            event.content
-          );
+          const decryptedMessage = await nip04.decrypt(privKey, event.pubkey, event.content);
 
           const ecashMessage = await parseMessageForEcash(decryptedMessage);
-          if (ecashMessage && typeof ecashMessage !== "boolean") {
+          if (ecashMessage && typeof ecashMessage !== 'boolean') {
             if (ecashMessage.id === paymentRequest.id) {
               await redeemEcash({
                 mint: ecashMessage.mint,
@@ -88,9 +79,7 @@ export const usePollingPaymentRequest = ({
               break;
             }
           }
-        } catch (err) {
-
-        }
+        } catch (err) {}
       }
     };
 
@@ -108,13 +97,16 @@ export const usePollingPaymentRequest = ({
     unit: string;
     from: string;
   }) {
-    const encodedEcash = getEncodedToken({
-      proofs: proofs,
-      mint: mint,
-      unit: unit,
-    }, {
-      version: 4,
-    });
+    const encodedEcash = getEncodedToken(
+      {
+        proofs: proofs,
+        mint: mint,
+        unit: unit,
+      },
+      {
+        version: 4,
+      }
+    );
 
     const spent = await checkTokenSpent({
       token: encodedEcash,
@@ -142,14 +134,10 @@ export const usePollingPaymentRequest = ({
           nostr: {
             pubkey: from,
           },
-        })
+        }),
       })
     );
-    showMessage(
-      "funds_received",
-      { amount: "Payment", unit: "received" },
-      { emoji: "💰" }
-    );
+    showMessage('funds_received', { amount: 'Payment', unit: 'received' }, { emoji: '💰' });
 
     return received;
   }

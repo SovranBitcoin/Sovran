@@ -1,19 +1,19 @@
-import React from "react";
-import { Pressable, StyleSheet } from "react-native";
-import { greys, shades } from "helper/colors";
-import Modal from "components/layout/Modal";
-import { Button } from "components/common/Button";
-import { Text, View } from "components/common/Themed";
-import { FlagIcon } from "assets/icons";
-import { useEffect, useState } from "react";
-import { useNavigation } from "expo-router";
-import lookup from "country-code-lookup";
-import { useEsims } from "helper/redux/esim";
-import * as Localization from "expo-localization";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedRoute } from "helper/navigation";
-import { ButtonHandler } from "./ecashSendConfirmation";
+import React from 'react';
+import { Pressable, StyleSheet } from 'react-native';
+import { greys, shades } from 'helper/colors';
+import Modal from 'components/layout/Modal';
+import { Button } from 'components/common/Button';
+import { Text, View } from 'components/common/Themed';
+import { FlagIcon } from 'assets/icons';
+import { useEffect, useState } from 'react';
+import { useNavigation } from 'expo-router';
+import lookup from 'country-code-lookup';
+import { useEsims } from 'helper/redux/esim';
+import * as Localization from 'expo-localization';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedRoute } from 'helper/navigation';
+import { ButtonHandler } from './ecashSendConfirmation';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -29,7 +29,7 @@ export default function ModalScreen() {
     type,
   } = useTypedRoute();
 
-  const [country, setCountry] = useState(countryParam || "US");
+  const [country, setCountry] = useState(countryParam || 'US');
   const [packages, setPackages] = useState([]);
   const [countries, setCountries] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -71,12 +71,10 @@ export default function ModalScreen() {
 
   const handleContinue = () => {
     setLoading(true);
-    const currentPackage = packages.find(
-      (p) => p.packageCode === selectedPackage
-    );
+    const currentPackage = packages.find((p) => p.packageCode === selectedPackage);
 
     const path =
-      type === "TOPUP"
+      type === 'TOPUP'
         ? `https://esim.sovran.cash/api/quote?packageCode=${currentPackage.packageCode}&type=TOPUP&iccid=${iccid}`
         : `https://esim.sovran.cash/api/quote?packageCode=${currentPackage.packageCode}`;
 
@@ -111,7 +109,7 @@ export default function ModalScreen() {
 
         setEsims(esim);
 
-        navigation.navigate("esimCheckout", {
+        navigation.navigate('esimCheckout', {
           sats: esim.sats,
           request: esim.request,
           type: esim.type,
@@ -131,57 +129,46 @@ export default function ModalScreen() {
       onPress={() => setSelectedPackage(pkg.packageCode)}
       style={{
         backgroundColor:
-          selectedPackage === pkg.packageCode
-            ? greys(theme)[1500]
-            : greys(theme)[1800],
+          selectedPackage === pkg.packageCode ? greys(theme)[1500] : greys(theme)[1800],
         borderRadius: 16,
         padding: 8,
-      }}
-    >
+      }}>
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: "transparent",
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'transparent',
           borderRadius: 16,
-        }}
-      >
-        <View style={{ backgroundColor: "transparent", borderRadius: 16 }}>
+        }}>
+        <View style={{ backgroundColor: 'transparent', borderRadius: 16 }}>
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "transparent",
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: 'transparent',
               borderRadius: 16,
-            }}
-          >
+            }}>
             <View
               style={{
                 width: 16,
                 height: 16,
                 borderRadius: 16,
                 backgroundColor:
-                  selectedPackage === pkg.packageCode
-                    ? shades[200]
-                    : greys(theme)[1400],
-                borderColor:
-                  selectedPackage === pkg.packageCode
-                    ? shades[100]
-                    : greys(theme)[1000],
+                  selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[1400],
+                borderColor: selectedPackage === pkg.packageCode ? shades[100] : greys(theme)[1000],
                 borderWidth: 0.5,
               }}
             />
-            <View style={{ backgroundColor: "transparent" }}>
+            <View style={{ backgroundColor: 'transparent' }}>
               <Text
                 weight="bold"
                 size={16}
                 style={{
                   marginLeft: 8,
                   fontSize: 16,
-                  fontFamily: "OverpassBold",
-                }}
-              >
+                  fontFamily: 'OverpassBold',
+                }}>
                 {`${pkg.volume / 1073741824} GB`}
               </Text>
               <Text style={{ marginLeft: 8 }}>{`${pkg.duration} days`}</Text>
@@ -212,9 +199,9 @@ export default function ModalScreen() {
         <>
           <View
             style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
               margin: 8,
               padding: 8,
               marginBottom: 0,
@@ -222,8 +209,7 @@ export default function ModalScreen() {
               borderRadius: 12,
               borderColor: greys(theme)[1300],
               borderWidth: 0.2,
-            }}
-          >
+            }}>
             <FlagIcon width={32} height={32} country={country} />
             <Text
               size={20}
@@ -231,30 +217,28 @@ export default function ModalScreen() {
               style={{
                 marginLeft: 8,
                 fontSize: 20,
-                fontFamily: "OverpassHeavy",
+                fontFamily: 'OverpassHeavy',
                 flex: 1,
                 marginRight: 8,
               }}
               numberOfLines={1}
-              ellipsizeMode="tail"
-            >
+              ellipsizeMode="tail">
               {lookup.byIso(country).country}
             </Text>
-            {type === "BASE" && (
+            {type === 'BASE' && (
               <View
                 style={{
-                  alignItems: "flex-end",
-                  backgroundColor: "transparent",
+                  alignItems: 'flex-end',
+                  backgroundColor: 'transparent',
                   flex: 1,
-                }}
-              >
+                }}>
                 <Button
                   text="Change"
                   variant="primary"
                   position="center"
                   noPadding
                   onPress={() => {
-                    navigation.navigate("esimCountrySelection", {
+                    navigation.navigate('esimCountrySelection', {
                       countries,
                       type,
                       packageList: packages,
@@ -262,7 +246,7 @@ export default function ModalScreen() {
                   }}
                   disabled={loading}
                   style={{
-                    width: "100%",
+                    width: '100%',
                     padding: 16,
                   }}
                 />
@@ -278,9 +262,8 @@ export default function ModalScreen() {
               borderRadius: 16,
               borderColor: greys(theme)[1300],
               borderWidth: 0.2,
-              overflow: "hidden",
-            }}
-          >
+              overflow: 'hidden',
+            }}>
             {filteredPackages.map(renderPackageItem)}
           </View>
         </>
@@ -290,8 +273,8 @@ export default function ModalScreen() {
           context="modal"
           buttons={[
             {
-              text: "Continue",
-              variant: "primary",
+              text: 'Continue',
+              variant: 'primary',
               onPress: handleContinue,
               loading: loading,
               disabled: loading,

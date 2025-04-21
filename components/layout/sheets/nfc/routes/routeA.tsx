@@ -1,17 +1,17 @@
-import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, Animated, TouchableOpacity } from "react-native";
-import { RouteScreenProps } from "react-native-actions-sheet";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greys, shades } from "helper/colors";
-import Icon from "assets/icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { write } from "components/common/useNfc";
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { RouteScreenProps } from 'react-native-actions-sheet';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys, shades } from 'helper/colors';
+import Icon from 'assets/icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { write } from 'components/common/useNfc';
 
 const RouteA = ({
   router,
   payload,
-}: RouteScreenProps<"popup-sheet", "route-a"> & {
+}: RouteScreenProps<'popup-sheet', 'route-a'> & {
   payload: {
     variant?: string;
     emoji?: string;
@@ -30,7 +30,7 @@ const RouteA = ({
   const pulseAnim3 = useRef(new Animated.Value(1)).current;
 
   const startSearching = async () => {
-    write("test");
+    write('test');
 
     setIsSearching(true);
     startPulseAnimation();
@@ -106,18 +106,16 @@ const RouteA = ({
       style={{
         marginBottom: 0,
         borderRadius: 16,
-        overflow: "hidden",
+        overflow: 'hidden',
         height: 430,
-      }}
-    >
+      }}>
       <LinearGradient
         style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
         }}
-        colors={[shades[200], shades[300]]}
-      ></LinearGradient>
+        colors={[shades[200], shades[300]]}></LinearGradient>
 
       {/* <Text style={styles.headerText}>CONTACTLESS PAYMENT</Text> */}
 
@@ -168,14 +166,9 @@ const RouteA = ({
         <TouchableOpacity
           style={styles.iconButton}
           onPress={isSearching ? stopSearching : startSearching}
-          activeOpacity={0.7}
-        >
+          activeOpacity={0.7}>
           <View style={styles.iconBackground}>
-            <Icon
-              name="ph:contactless-payment-fill"
-              size={116}
-              color={shades[200]}
-            />
+            <Icon name="ph:contactless-payment-fill" size={116} color={shades[200]} />
           </View>
         </TouchableOpacity>
       </View>
@@ -186,29 +179,29 @@ const RouteA = ({
 const createStyles = (theme: string) =>
   StyleSheet.create({
     headerText: {
-      fontFamily: "OverpassBold",
-      textAlign: "center",
+      fontFamily: 'OverpassBold',
+      textAlign: 'center',
       marginTop: 16,
       color: shades[500],
       fontSize: 16,
     },
     contentContainer: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingBottom: 40,
-      position: "absolute",
+      position: 'absolute',
       left: 0,
       right: 0,
-      top: "50%",
+      top: '50%',
       transform: [
         {
-          translateY: "-150%",
+          translateY: '-150%',
         },
       ],
     },
     iconButton: {
-      position: "absolute",
+      position: 'absolute',
       top: 0,
       zIndex: 10,
     },
@@ -217,16 +210,16 @@ const createStyles = (theme: string) =>
       height: 100,
       borderRadius: 50,
       backgroundColor: shades[500],
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       elevation: 5,
-      shadowColor: "#000",
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 3.84,
     },
     pulseCircle: {
-      position: "absolute",
+      position: 'absolute',
       width: 100,
       height: 100,
       top: 0,
@@ -236,7 +229,7 @@ const createStyles = (theme: string) =>
     statusText: {
       marginTop: 24,
       color: greys(theme)[2300],
-      fontFamily: "OverpassMedium",
+      fontFamily: 'OverpassMedium',
       fontSize: 16,
     },
     cancelButton: {

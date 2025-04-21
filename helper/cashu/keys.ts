@@ -1,19 +1,14 @@
-import {
-  MintKeys
-} from "@cashu/cashu-ts";
-import { setKeysets } from "helper/redux/cashu";
-import { store } from "helper/redux/store";
-import { getMint } from "./mint";
+import { MintKeys } from '@cashu/cashu-ts';
+import { setKeysets } from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { getMint } from './mint';
 
 interface GetKeysParams {
   unit: string;
   mintUrl: string;
 }
 
-export async function getKeys({
-  unit,
-  mintUrl,
-}: GetKeysParams): Promise<MintKeys | undefined> {
+export async function getKeys({ unit, mintUrl }: GetKeysParams): Promise<MintKeys | undefined> {
   const mint = getMint({ mintUrl });
 
   const keysets = (await (await mint).getKeys()).keysets;

@@ -1,31 +1,31 @@
-import React, { useEffect, useState } from "react";
-import { Share, StyleSheet } from "react-native";
-import * as Clipboard from "expo-clipboard";
-import { Button } from "components/common/Button";
-import { BalanceUpdate } from "./transaction";
-import Modal from "components/layout/Modal";
-import Icon from "assets/icons";
-import { SheetManager } from "react-native-actions-sheet";
-import { View } from "components/common/Themed";
-import { PaymentInfo } from "components/layout/PaymentInfo";
-import { greys } from "helper/colors";
-import { formatCurrency } from "helper/currency";
-import { useSelector } from "react-redux";
-import { store } from "helper/redux/store";
-import { getDecodedToken, getEncodedTokenV4 } from "@cashu/cashu-ts";
-import _ from "lodash";
-import withConfirmation from "components/layout/ConfirmationProvider";
+import React, { useEffect, useState } from 'react';
+import { Share, StyleSheet } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { Button } from 'components/common/Button';
+import { BalanceUpdate } from './transaction';
+import Modal from 'components/layout/Modal';
+import Icon from 'assets/icons';
+import { SheetManager } from 'react-native-actions-sheet';
+import { View } from 'components/common/Themed';
+import { PaymentInfo } from 'components/layout/PaymentInfo';
+import { greys } from 'helper/colors';
+import { formatCurrency } from 'helper/currency';
+import { useSelector } from 'react-redux';
+import { store } from 'helper/redux/store';
+import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import _ from 'lodash';
+import withConfirmation from 'components/layout/ConfirmationProvider';
 import {
   memoizedGetTransactionByMatcher,
   memoizedGetTransactions,
   updateTransaction,
-} from "helper/redux/cashu";
-import { cancelEcashTransaction, getWallet } from "helper/cashu";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation";
-import { showMessage, showSuccess } from "helper/popup/popups";
-import { write } from "components/common/useNfc";
-import { runWithAnimationFrame } from "./onboard/new";
+} from 'helper/redux/cashu';
+import { cancelEcashTransaction, getWallet } from 'helper/cashu';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { showMessage, showSuccess } from 'helper/popup/popups';
+import { write } from 'components/common/useNfc';
+import { runWithAnimationFrame } from './onboard/new';
 
 // Standalone function to check if proofs are spent
 export const checkProofsSpent = async (token: string): Promise<boolean> => {
@@ -40,12 +40,12 @@ export const checkProofsSpent = async (token: string): Promise<boolean> => {
     });
 
     if (!wallet) {
-      throw new Error("Failed to initialize wallet");
+      throw new Error('Failed to initialize wallet');
     }
 
     const spentProofs = await wallet.checkProofsStates(proofs);
 
-    if (spentProofs.some((p) => p.state === "SPENT")) {
+    if (spentProofs.some((p) => p.state === 'SPENT')) {
       // Update transaction state
       const profileId = store.getState().nostr?.currentProfile?.id;
       await store.dispatch(
@@ -94,15 +94,10 @@ export const useCheckProofsSpent = (
           if (proofsSpent) {
             const decodedToken = getDecodedToken(token);
             const unit = decodedToken.unit;
-            const amount = _.sumBy(decodedToken.proofs, "amount");
+            const amount = _.sumBy(decodedToken.proofs, 'amount');
 
             if (callback) {
-              showMessage(
-                "funds_sent",
-                { amount, unit },
-                { emoji: "🎉" },
-                callback
-              );
+              showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, callback);
             }
 
             break;
@@ -126,8 +121,8 @@ export const useCheckProofsSpent = (
   return result;
 };
 
-import { LinearGradient } from "expo-linear-gradient";
-import opacity from "hex-color-opacity";
+import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
 
 export function ButtonHandler({ context, buttons, style = {} }) {
   const [loading, setLoading] = useState(false);
@@ -142,23 +137,21 @@ export function ButtonHandler({ context, buttons, style = {} }) {
         greys(theme)[2300],
       ]}
       style={{
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
         padding: 8,
         paddingBottom: 16,
-        marginBottom: context === "tab" ? 48 : 0,
+        marginBottom: context === 'tab' ? 48 : 0,
         ...style,
-      }}
-    >
+      }}>
       {buttons.slice(0, 2).map((button, index) => (
         <View
           key={index}
           style={{
             flex: 1,
-            backgroundColor: "transparent",
-          }}
-        >
+            backgroundColor: 'transparent',
+          }}>
           <Button
             position="center"
             onPress={() => {
@@ -174,14 +167,13 @@ export function ButtonHandler({ context, buttons, style = {} }) {
       {buttons.length > 2 && (
         <View
           style={{
-            backgroundColor: "transparent",
+            backgroundColor: 'transparent',
             width: 64,
-          }}
-        >
+          }}>
           <Button
-            icon={<Icon name={"tabler:dots"} />}
+            icon={<Icon name={'tabler:dots'} />}
             onPress={() => {
-              SheetManager.show("button-handler", {
+              SheetManager.show('button-handler', {
                 payload: { buttons },
               });
             }}
@@ -198,8 +190,8 @@ function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { unit, amount, token } = useTypedRoute<"ecashSendConfirmation">();
-  const [uri, setUri] = useState("");
+  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
+  const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   const currentProfile = useSelector((state) => state.nostr?.currentProfile);
@@ -211,7 +203,7 @@ function ModalScreen() {
           token,
           unit,
           amount,
-          transactionType: "send",
+          transactionType: 'send',
         }),
     })
   );
@@ -231,7 +223,7 @@ function ModalScreen() {
   };
 
   const handleCopy = async () => {
-    showSuccess("ecash_token_copied", {});
+    showSuccess('ecash_token_copied', {});
     await Clipboard.setStringAsync(token);
   };
 
@@ -244,13 +236,9 @@ function ModalScreen() {
 
   const handleCancelSend = async () => {
     const profileId = store.getState().nostr?.currentProfile?.id;
-    const transactions = memoizedGetTransactions({ id: profileId })(
-      store.getState()
-    );
+    const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
-    const transaction = transactions.find(
-      (t) => t.token === token && t.transactionType === "send"
-    );
+    const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
 
     await cancelEcashTransaction(transaction, navigation);
   };
@@ -264,11 +252,11 @@ function ModalScreen() {
 
       if (proofsSpent) {
         const decodedToken = getDecodedToken(token);
-        const amount = _.sumBy(decodedToken.proofs, "amount");
+        const amount = _.sumBy(decodedToken.proofs, 'amount');
 
-        showMessage("funds_sent", { amount, unit }, { emoji: "🎉" }, () => {
+        showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
           navigation.navigate(
-            "index",
+            'index',
             {},
             {
               closeParents: true,
@@ -276,14 +264,10 @@ function ModalScreen() {
           );
         });
       } else {
-        showMessage("ecash_transaction_pending", {}, { emoji: "❌" });
+        showMessage('ecash_transaction_pending', {}, { emoji: '❌' });
       }
     } catch (error) {
-      showMessage(
-        "error_checking_status",
-        { error: error.message },
-        { emoji: "⚠️" }
-      );
+      showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' });
     } finally {
       setIsCheckingStatus(false);
     }
@@ -301,28 +285,28 @@ function ModalScreen() {
             transactionType="send"
             topAmount={formatCurrency(
               {
-                currency: unit === "sat" ? "BTC" : unit.toUpperCase(),
+                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
                 value: amount,
-                denomination: unit === "sat" ? "sats" : unit,
+                denomination: unit === 'sat' ? 'sats' : unit,
               },
               {
-                locale: "en-US",
+                locale: 'en-US',
                 precision: 8,
-                currencyDisplay: "symbol",
-                denomination: "btc",
+                currencyDisplay: 'symbol',
+                denomination: 'btc',
               }
             )}
             bottomAmount={formatCurrency(
               {
-                currency: unit === "sat" ? "BTC" : unit.toUpperCase(),
+                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
                 value: amount,
-                denomination: unit === "sat" ? "sats" : unit,
+                denomination: unit === 'sat' ? 'sats' : unit,
               },
               {
-                locale: "en-US",
+                locale: 'en-US',
                 precision: 2,
-                currencyDisplay: "symbol",
-                denomination: unit === "sat" ? "usd" : unit,
+                currencyDisplay: 'symbol',
+                denomination: unit === 'sat' ? 'usd' : unit,
               }
             )}
           />
@@ -338,43 +322,42 @@ function ModalScreen() {
       buttons={
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "transparent",
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
             paddingBottom: 8,
-          }}
-        >
+          }}>
           <ButtonHandler
             buttons={[
               {
-                text: "Copy",
-                icon: "lets-icons:copy",
-                variant: "primary",
+                text: 'Copy',
+                icon: 'lets-icons:copy',
+                variant: 'primary',
                 onPress: handleCopy,
               },
               {
-                text: "Share",
-                icon: "ri:share-fill",
-                variant: "secondary",
+                text: 'Share',
+                icon: 'ri:share-fill',
+                variant: 'secondary',
                 onPress: handleShare,
               },
               {
-                text: "NFC",
-                icon: "ph:contactless-payment-fill",
-                variant: "secondary",
+                text: 'NFC',
+                icon: 'ph:contactless-payment-fill',
+                variant: 'secondary',
                 onPress: handleNFCSend,
               },
               {
-                text: "Check Status",
-                icon: "humbleicons:refresh",
-                variant: "secondary",
+                text: 'Check Status',
+                icon: 'humbleicons:refresh',
+                variant: 'secondary',
                 onPress: handleCheckStatus,
               },
               {
-                text: "Cancel Transaction",
-                icon: "mdi:cancel",
-                variant: "secondary",
+                text: 'Cancel Transaction',
+                icon: 'mdi:cancel',
+                variant: 'secondary',
                 onPress: handleCancelSend,
               },
             ]}
@@ -394,7 +377,7 @@ const createStyles = (theme) =>
     },
     title: {
       fontSize: 20,
-      fontWeight: "bold",
+      fontWeight: 'bold',
       color: greys(theme)[1000],
     },
   });

@@ -1,24 +1,24 @@
-import React from "react";
-import { useState, useEffect } from "react";
-import { Pressable, StyleSheet, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import lookup from "country-code-lookup";
-import { useSelector } from "react-redux";
-import Modal from "components/layout/Modal";
-import { Text, View } from "components/common/Themed";
-import CircularProgress from "components/common/CircleProgress";
-import { useEsims } from "helper/redux/esim";
-import { useCashu } from "helper/redux/cashu";
-import { convertDataUsage } from "../../../app/esim";
-import { greys } from "helper/colors";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { convertTimeData } from "helper/time";
-import { showMessage } from "helper/popup/popups";
-import { Tabs } from "app/(drawer)/(tabs)/payments"; // Importing Tabs component
-import { ButtonHandler } from "app/ecashSendConfirmation";
+import React from 'react';
+import { useState, useEffect } from 'react';
+import { Pressable, StyleSheet, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import lookup from 'country-code-lookup';
+import { useSelector } from 'react-redux';
+import Modal from 'components/layout/Modal';
+import { Text, View } from 'components/common/Themed';
+import CircularProgress from 'components/common/CircleProgress';
+import { useEsims } from 'helper/redux/esim';
+import { useCashu } from 'helper/redux/cashu';
+import { convertDataUsage } from '../../../app/esim';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { convertTimeData } from 'helper/time';
+import { showMessage } from 'helper/popup/popups';
+import { Tabs } from 'app/(drawer)/(tabs)/payments'; // Importing Tabs component
+import { ButtonHandler } from 'app/ecashSendConfirmation';
 
 // Constants
-const API_URL = "https://esim.sovran.cash/api/products";
+const API_URL = 'https://esim.sovran.cash/api/products';
 
 // Separate component for eSIM item
 const EsimItem = ({ esim, navigation }) => {
@@ -27,7 +27,7 @@ const EsimItem = ({ esim, navigation }) => {
 
   const handlePress = () => {
     const { package: p, order: o } = esim;
-    navigation.navigate("esim", {
+    navigation.navigate('esim', {
       ...p,
       ...esim,
       ...o,
@@ -38,7 +38,7 @@ const EsimItem = ({ esim, navigation }) => {
   const countryName = lookup.byIso(esim.package.location)?.country;
 
   const getDataRemaining = () => {
-    if (!esim?.order?.totalVolume) return "";
+    if (!esim?.order?.totalVolume) return '';
 
     const { remaining } = convertDataUsage({
       ...esim.order,
@@ -74,19 +74,14 @@ const EsimItem = ({ esim, navigation }) => {
   return (
     <Pressable style={styles.esimItem} onPress={handlePress}>
       <View style={styles.progressContainer}>
-        <CircularProgress
-          country={esim.package.location}
-          progress={getDataUsagePercentage()}
-        />
+        <CircularProgress country={esim.package.location} progress={getDataUsagePercentage()} />
       </View>
       <View style={styles.esimInfo}>
         <Text style={styles.countryText}>{countryName}</Text>
         <Text style={styles.remainingDataText}>
-          {remainingData ? `${remainingData} remaining` : "Not activated"}
+          {remainingData ? `${remainingData} remaining` : 'Not activated'}
         </Text>
-        <Text style={styles.expirationText}>
-          {remainingData ? `Expires ${expiresOn}` : "eSIM"}
-        </Text>
+        <Text style={styles.expirationText}>{remainingData ? `Expires ${expiresOn}` : 'eSIM'}</Text>
       </View>
     </Pressable>
   );
@@ -101,9 +96,7 @@ const EsimSection = ({ title, esims, navigation }) => {
     <>
       {/* <Text style={styles.sectionTitle}>{title}</Text> */}
       {esims.length > 0 ? (
-        esims.map((esim) => (
-          <EsimItem esim={esim} navigation={navigation} key={esim.request} />
-        ))
+        esims.map((esim) => <EsimItem esim={esim} navigation={navigation} key={esim.request} />)
       ) : (
         <Text style={styles.noItemsText}>No {title.toLowerCase()}</Text>
       )}
@@ -120,7 +113,7 @@ function EsimsScreen() {
   const { esims } = useEsims();
   const [fetchingPackages, setFetchingPackages] = useState(false);
   const [packageList, setPackageList] = useState(null);
-  const [selectedTab, setSelectedTab] = useState("New"); // State for selected tab
+  const [selectedTab, setSelectedTab] = useState('New'); // State for selected tab
 
   // Filter eSIMs by payment status
   const paidEsims = esims.filter((esim) =>
@@ -143,7 +136,7 @@ function EsimsScreen() {
       }
       return null;
     } catch (error) {
-      showMessage("esim_error", {}, { emoji: "🚨" });
+      showMessage('esim_error', {}, { emoji: '🚨' });
       return null;
     }
   };
@@ -170,32 +163,30 @@ function EsimsScreen() {
 
   // Navigation helper
   const navigateToPackageSelection = (packageList) => {
-    const countries = [
-      ...new Set(packageList.map((r) => r.slug.split("_")[0])),
-    ];
+    const countries = [...new Set(packageList.map((r) => r.slug.split('_')[0]))];
 
-    navigation.navigate("esimsDataPlan", {
-      type: "BASE",
+    navigation.navigate('esimsDataPlan', {
+      type: 'BASE',
       packageList,
       countries,
-      country: "US",
+      country: 'US',
     });
   };
 
   const amounts = [
     categorizedEsims.new.length
       ? categorizedEsims.new.length > 99
-        ? "99+"
+        ? '99+'
         : categorizedEsims.new.length
       : 0,
     categorizedEsims.active.length
       ? categorizedEsims.active.length > 99
-        ? "99+"
+        ? '99+'
         : categorizedEsims.active.length
       : 0,
     categorizedEsims.expired.length
       ? categorizedEsims.expired.length > 99
-        ? "99+"
+        ? '99+'
         : categorizedEsims.expired.length
       : 0,
   ];
@@ -207,57 +198,50 @@ function EsimsScreen() {
       childrenStyles={styles.modalContent}
       buttons={
         <ButtonHandler
-          context={"tab"}
+          context={'tab'}
           buttons={[
             {
-              text: "Get Data",
-              variant: "primary",
+              text: 'Get Data',
+              variant: 'primary',
               loading: fetchingPackages,
               onPress: handleGetDataPress,
             },
           ]}
         />
-      }
-    >
+      }>
       <Text
         size={32}
         style={{
-          fontFamily: "OverpassHeavy",
+          fontFamily: 'OverpassHeavy',
           marginLeft: 16,
           marginBottom: 4,
           marginTop: 4,
-        }}
-      >
+        }}>
         eSIMs
       </Text>
       <View
         style={{
           paddingHorizontal: 16,
-        }}
-      >
+        }}>
         <Tabs
-          tabs={["New", "Active", "Expired"]}
+          tabs={['New', 'Active', 'Expired']}
           amounts={amounts}
           selectedTab={selectedTab}
           handleTabPress={setSelectedTab}
         />
       </View>
       <ScrollView style={styles.scrollView}>
-        {selectedTab === "New" && (
-          <EsimSection
-            title="New eSIMs"
-            esims={categorizedEsims.new}
-            navigation={navigation}
-          />
+        {selectedTab === 'New' && (
+          <EsimSection title="New eSIMs" esims={categorizedEsims.new} navigation={navigation} />
         )}
-        {selectedTab === "Active" && (
+        {selectedTab === 'Active' && (
           <EsimSection
             title="Installed eSIMs"
             esims={categorizedEsims.active}
             navigation={navigation}
           />
         )}
-        {selectedTab === "Expired" && (
+        {selectedTab === 'Expired' && (
           <EsimSection
             title="Expired eSIMs"
             esims={categorizedEsims.expired}
@@ -275,7 +259,7 @@ function categorizeEsims(paidEsims, currentDate) {
     new: paidEsims.filter((esim) => !esim.order || !esim.order.activateTime),
     active: paidEsims.filter(
       (esim) =>
-        esim?.order?.esimStatus === "IN_USE" ||
+        esim?.order?.esimStatus === 'IN_USE' ||
         (esim?.order?.activateTime &&
           new Date(convertTimeData(esim.order).expiredTime) > currentDate)
     ),
@@ -299,8 +283,8 @@ const createStyles = (theme) =>
       flex: 1,
     },
     esimItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 16,
       padding: 12,
       borderRadius: 16,
@@ -309,13 +293,13 @@ const createStyles = (theme) =>
       borderWidth: 0.2,
     },
     progressContainer: {
-      alignItems: "center",
-      backgroundColor: "transparent",
-      flexDirection: "row",
-      justifyContent: "space-between",
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
     },
     esimInfo: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       marginLeft: 12,
       flex: 1,
     },
@@ -325,21 +309,21 @@ const createStyles = (theme) =>
     },
     remainingDataText: {
       fontSize: 18,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
     },
     expirationText: {
       marginTop: 12,
       fontSize: 14,
-      fontFamily: "OverpassRegular",
+      fontFamily: 'OverpassRegular',
     },
     buttonContainer: {
       margin: 16,
       marginBottom: 42,
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
     },
     sectionTitle: {
       fontSize: 16,
-      fontFamily: "OverpassHeavy",
+      fontFamily: 'OverpassHeavy',
       marginBottom: 8,
       color: greys(theme)[200],
     },

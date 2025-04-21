@@ -1,6 +1,6 @@
-import { useDispatch, useSelector } from "react-redux";
-import { setPricelist } from "./actions";
-import { memoizedPricelist } from "./selectors";
+import { useDispatch, useSelector } from 'react-redux';
+import { setPricelist } from './actions';
+import { memoizedPricelist } from './selectors';
 
 export const usePricelist = () => {
   const dispatch = useDispatch();

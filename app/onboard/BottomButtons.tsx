@@ -1,7 +1,7 @@
-import React from "react";
-import { StyleSheet, View, TouchableOpacity } from "react-native";
-import { Text } from "components/common/Themed";
-import { greys, shades } from "helper/colors";
+import React from 'react';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { Text } from 'components/common/Themed';
+import { greys, shades } from 'helper/colors';
 
 const BottomButtons = ({
   buttons,
@@ -32,8 +32,7 @@ const BottomButtons = ({
               button.buttonStyle,
             ]}
             onPress={button.onPress}
-            disabled={button.disabled}
-          >
+            disabled={button.disabled}>
             {button.leftIcon}
             <Text
               weight="bold"
@@ -44,8 +43,7 @@ const BottomButtons = ({
                 button.rightIcon && { marginRight: 8 },
                 textStyle,
                 button.textStyle,
-              ]}
-            >
+              ]}>
               {button.text}
             </Text>
             {button.rightIcon}
@@ -84,26 +82,26 @@ const getButtonStyle = (variant, theme) => {
 const createStyles = (theme) =>
   StyleSheet.create({
     bottomButtons: {
-      width: "100%",
+      width: '100%',
       padding: 16,
       backgroundColor: greys(theme)[2300],
     },
     horizontalButtons: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
     },
     verticalButtons: {
-      flexDirection: "column",
+      flexDirection: 'column',
     },
     button: {
       padding: 16,
       borderRadius: 16,
-      justifyContent: "center",
-      alignItems: "center",
-      flexDirection: "row",
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'row',
     },
     buttonText: {
-      textAlign: "center",
+      textAlign: 'center',
     },
     disabledButton: {
       opacity: 0.5,

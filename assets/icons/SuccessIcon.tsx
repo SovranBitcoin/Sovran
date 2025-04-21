@@ -1,14 +1,14 @@
-import { useEffect, useRef } from "react";
-import { StyleSheet, Animated, Easing } from "react-native";
-import { useSelector } from "react-redux";
+import { useEffect, useRef } from 'react';
+import { StyleSheet, Animated, Easing } from 'react-native';
+import { useSelector } from 'react-redux';
 
-import { View } from "components/common/Themed";
-import { greys } from "helper/colors";
-import { Circle, Path, Polyline, Svg } from "react-native-svg";
-import { useNavigation } from "@react-navigation/native";
-import Haptics from "components/common/Haptics";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { useTypedNavigation } from "helper/navigation";
+import { View } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { Circle, Path, Polyline, Svg } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
+import Haptics from 'components/common/Haptics';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation } from 'helper/navigation';
 
 export const SuccessAnimation = ({ params }) => {
   const navigation = useTypedNavigation();
@@ -73,7 +73,7 @@ export const SuccessAnimation = ({ params }) => {
         //   easing: Easing.out(Easing.cubic),
         //   useNativeDriver: true,
         // }).start();
-        // 
+        //
         // navigation.navigate(params.redirect, {
         //   ...params,
         // });
@@ -143,7 +143,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

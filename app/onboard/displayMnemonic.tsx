@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Alert, ScrollView } from "react-native";
-import { useSelector } from "react-redux";
-import { memoizedGetTheme } from "helper/redux/settings";
-import { greens, greys, reds } from "helper/colors";
-import Container from "components/layout/Container";
-import { Text } from "components/common/Themed";
-import { useTypedNavigation, useTypedRoute } from "helper/navigation";
-import BottomButtons from "./BottomButtons";
+import React, { useState } from 'react';
+import { StyleSheet, View, Alert, ScrollView } from 'react-native';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greens, greys, reds } from 'helper/colors';
+import Container from 'components/layout/Container';
+import { Text } from 'components/common/Themed';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -14,15 +14,15 @@ const MnemonicDisplayScreen = () => {
   const { mnemonic } = useTypedRoute();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 
-  const words = mnemonic.split(" ");
+  const words = mnemonic.split(' ');
 
   const handleContinue = () => {
     if (!hasConfirmedBackup) {
       Alert.alert(
-        "Backup Confirmation",
-        "Have you written down your recovery phrase in a safe place?",
+        'Backup Confirmation',
+        'Have you written down your recovery phrase in a safe place?',
         [
-          { text: "No, I'll do it now", style: "cancel" },
+          { text: "No, I'll do it now", style: 'cancel' },
           {
             text: "Yes, I've written it down",
             onPress: () => {
@@ -38,17 +38,17 @@ const MnemonicDisplayScreen = () => {
   };
 
   const navigateToVerification = () => {
-    navigation.navigate("onboard/mnemonic", {
-      type: "verify",
+    navigation.navigate('onboard/mnemonic', {
+      type: 'verify',
       mnemonic,
     });
   };
 
   const showInfoAlert = () => {
     Alert.alert(
-      "Recovery Phrase Information",
-      "Your recovery phrase (sometimes called a seed phrase) is a set of 12 words that store all the information needed to recover your wallet. Anyone with access to these words can access your funds, so keep them private and secure.",
-      [{ text: "Got it" }]
+      'Recovery Phrase Information',
+      'Your recovery phrase (sometimes called a seed phrase) is a set of 12 words that store all the information needed to recover your wallet. Anyone with access to these words can access your funds, so keep them private and secure.',
+      [{ text: 'Got it' }]
     );
   };
 
@@ -56,7 +56,7 @@ const MnemonicDisplayScreen = () => {
     <View key={index} style={styles.wordCell}>
       <Text style={styles.wordNumber}>{`${index + 1}.`}</Text>
       <Text style={styles.wordText} numberOfLines={1} ellipsizeMode="tail">
-        {words[index] || ""}
+        {words[index] || ''}
       </Text>
     </View>
   );
@@ -66,14 +66,13 @@ const MnemonicDisplayScreen = () => {
       <Container>
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
             <Text style={styles.title}>Your Recovery Phrase</Text>
 
             <Text style={styles.instructions}>
-              These 12 words are the only way to recover your wallet. Write them
-              down in order and keep them in a safe place.
+              These 12 words are the only way to recover your wallet. Write them down in order and
+              keep them in a safe place.
             </Text>
 
             <View style={styles.warningContainer}>
@@ -97,15 +96,9 @@ const MnemonicDisplayScreen = () => {
               <Text style={styles.securityTipText}>
                 • Write these words down on paper (not digitally)
               </Text>
-              <Text style={styles.securityTipText}>
-                • Store in a secure location
-              </Text>
-              <Text style={styles.securityTipText}>
-                • Never share with anyone
-              </Text>
-              <Text style={styles.securityTipText}>
-                • This phrase controls ALL your funds
-              </Text>
+              <Text style={styles.securityTipText}>• Store in a secure location</Text>
+              <Text style={styles.securityTipText}>• Never share with anyone</Text>
+              <Text style={styles.securityTipText}>• This phrase controls ALL your funds</Text>
             </View>
           </View>
         </ScrollView>
@@ -114,13 +107,13 @@ const MnemonicDisplayScreen = () => {
       <BottomButtons
         buttons={[
           {
-            text: "What is a recovery phrase?",
+            text: 'What is a recovery phrase?',
             onPress: showInfoAlert,
           },
           {
             text: "I've written it down",
             onPress: handleContinue,
-            variant: "primary",
+            variant: 'primary',
           },
         ]}
         theme={theme}
@@ -143,10 +136,10 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   // Convert RGB back to hex
   const rgbToHex = (r, g, b) => {
     return (
-      "#" +
-      Math.round(r).toString(16).padStart(2, "0") +
-      Math.round(g).toString(16).padStart(2, "0") +
-      Math.round(b).toString(16).padStart(2, "0")
+      '#' +
+      Math.round(r).toString(16).padStart(2, '0') +
+      Math.round(g).toString(16).padStart(2, '0') +
+      Math.round(b).toString(16).padStart(2, '0')
     );
   };
 
@@ -167,23 +160,23 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: greys("dark")[2300],
+    backgroundColor: greys('dark')[2300],
     paddingBottom: 16,
   },
   title: {
-    fontFamily: "OverpassBold",
+    fontFamily: 'OverpassBold',
     fontSize: 20,
-    color: greys("dark")[0],
+    color: greys('dark')[0],
     marginBottom: 16,
   },
   instructions: {
     fontSize: 16,
-    color: greys("dark")[200],
+    color: greys('dark')[200],
     marginBottom: 16,
     lineHeight: 22,
   },
   warningContainer: {
-    backgroundColor: infuseColors(greys("dark")[2300], reds[300]),
+    backgroundColor: infuseColors(greys('dark')[2300], reds[300]),
     borderRadius: 8,
     padding: 12,
     marginBottom: 20,
@@ -192,54 +185,54 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: reds[300],
-    fontWeight: "600",
+    fontWeight: '600',
   },
   gridContainer: {
     marginTop: 16,
     marginBottom: 24,
   },
   gridRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   wordCell: {
     flex: 1,
-    backgroundColor: greys("dark")[1800],
+    backgroundColor: greys('dark')[1800],
     borderRadius: 8,
     padding: 12,
     marginHorizontal: 4,
     minHeight: 60,
-    justifyContent: "center",
+    justifyContent: 'center',
     borderLeftWidth: 3,
     borderLeftColor: greens[300],
   },
   wordNumber: {
-    color: greys("dark")[600],
+    color: greys('dark')[600],
     fontSize: 12,
     marginBottom: 4,
-    textAlign: "left",
+    textAlign: 'left',
   },
   wordText: {
-    color: greys("dark")[200],
-    textAlign: "center",
+    color: greys('dark')[200],
+    textAlign: 'center',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   securityTipsContainer: {
-    backgroundColor: greys("dark")[1800],
+    backgroundColor: greys('dark')[1800],
     borderRadius: 8,
     padding: 16,
     marginTop: 8,
   },
   securityTipsTitle: {
-    color: greys("dark")[200],
+    color: greys('dark')[200],
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 8,
   },
   securityTipText: {
-    color: greys("dark")[400],
+    color: greys('dark')[400],
     fontSize: 14,
     marginVertical: 4,
   },
