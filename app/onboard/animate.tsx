@@ -234,46 +234,59 @@ const ChainLoadingAnimation = () => {
         };
 
       case 'mint-group':
-        const profile = steps.find((step) => step.type === 'profile')?.profile;
+        try {
+          const profile = steps.find((step) => step.type === 'profile')?.profile;
 
-        const mints = [];
-        for (const mint of message.payload.mints) {
-          const { mintUrl } = mint;
-          const generator = await restoreMint({ mintUrl, profile });
-          let result = await generator.next();
+          const mints = [];
+          for (const mint of message.payload.mints) {
+            const { mintUrl } = mint;
+            const generator = await restoreMint({ mintUrl, profile });
+            let result = await generator.next();
 
-          while (!result.done) {
-            result = await generator.next();
-            yield result.value;
+            while (!result.done) {
+              result = await generator.next();
+              yield result.value;
+            }
+
+            const { value: restoredMint } = result;
+            const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
+
+            mints.push({
+              profileId: mint.id,
+              mintUrl,
+              proofs,
+            });
           }
 
-          const { value: restoredMint } = result;
-          const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
-
-          mints.push({
-            profileId: mint.id,
-            mintUrl,
-            proofs,
-          });
+          setSteps(
+            steps.map((step) => {
+              if (step.type === 'mint-group' && step.id === message.payload.id) {
+                return {
+                  ...step,
+                  mints: step.mints.map((mint) => {
+                    const mintData = mints.find((m) => m.profileId === mint.id);
+                    return {
+                      ...mint,
+                      proofs: mintData?.proofs || [],
+                    };
+                  }),
+                };
+              }
+              return step;
+            })
+          );
+        } catch (err) {
+          setSteps(
+            ensureCompleteStep(
+              steps,
+              findAndInsertAfter(steps, message.payload, {
+                type: 'retry',
+                step: message.payload,
+              })
+            )
+          );
+          break;
         }
-
-        setSteps(
-          steps.map((step) => {
-            if (step.type === 'mint-group' && step.id === message.payload.id) {
-              return {
-                ...step,
-                mints: step.mints.map((mint) => {
-                  const mintData = mints.find((m) => m.profileId === mint.id);
-                  return {
-                    ...mint,
-                    proofs: mintData?.proofs || [],
-                  };
-                }),
-              };
-            }
-            return step;
-          })
-        );
 
         return { type: 'complete' };
     }
