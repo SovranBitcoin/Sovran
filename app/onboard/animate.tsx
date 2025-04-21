@@ -70,171 +70,170 @@ function findAndInsertAfter(array, itemToFind, itemToInsert) {
 // Main animation component for restoring wallet/mints
 const ChainLoadingAnimation = () => {
   async function* onMessage(message: { type: string }) {
-    // Alert.alert('onMessage', JSON.stringify(message));
-    switch (message.type) {
-      case 'processing': {
-        const accountIndexes = [0, 1, 2];
-        const profiles = [];
+    try {
+      switch (message.type) {
+        case 'processing': {
+          const accountIndexes = [0, 1, 2];
+          const profiles = [];
 
-        // Fetch profiles and yield progress
-        for (const index of accountIndexes) {
-          const profile = await getProfile({ mnemonic, accountIndex: index });
+          // Fetch profiles and yield progress
+          for (const index of accountIndexes) {
+            const profile = await getProfile({ mnemonic, accountIndex: index });
 
-          yield {
-            label: 'PROFILE_FOUND',
-            current: index + 1,
-            max: accountIndexes.length,
+            yield {
+              label: 'PROFILE_FOUND',
+              current: index + 1,
+              max: accountIndexes.length,
+            };
+
+            if (profile) {
+              profiles.push(profile);
+            }
+          }
+
+          if (profiles.length === 0) {
+            setSteps(
+              ensureCompleteStep(
+                steps,
+                findAndInsertAfter(steps, message.payload, {
+                  type: 'retry',
+                  step: message.payload,
+                })
+              )
+            );
+            break;
+          }
+
+          // Generate HD root key
+          const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+
+          // Transform profiles with additional data
+          const processedProfiles = profiles.map((profile) => ({
+            ...profile,
+            id: profile.id,
+            pubkey: profile.pubkey,
+            picture: profile.profile?.image,
+            npub: profile.npub,
+            nsec: profile.nsec,
+            mnemonic,
+            root: {
+              xpub: root.publicExtendedKey,
+              xpriv: root.privateExtendedKey,
+            },
+          }));
+
+          // Create and add profile steps
+          const profileSteps = processedProfiles.map((profile, index) => ({
+            type: 'profile',
+            label: 'Profile',
+            icon: 'person',
+            iconUrl: profile.profile?.image,
+            profile,
+            id: `profile-${index}`,
+          }));
+
+          setSteps(ensureCompleteStep(steps, [...steps, ...profileSteps]));
+
+          return { type: 'complete' };
+        }
+
+        case 'profile': {
+          // Extract profile data
+          const { id: profileId, mints: mintsToProcess } = message.payload.profile;
+
+          // Find the corresponding profile step
+          const currentProfileIndex = steps.findLastIndex(
+            (step) => step.type === 'profile' && step.profile?.id === profileId
+          );
+
+          if (currentProfileIndex === -1) return { type: 'complete' };
+
+          // Helper function to create add button step
+          const createAddButtonStep = () => ({
+            id: `add-mint-${profileId}`,
+            type: 'add-button',
+            label: 'Add Mint',
+            icon: 'add-circle',
+            forProfileId: profileId,
+          });
+
+          // Helper function to insert step after profile
+          const insertStepAfterProfile = (step) => {
+            const newSteps = ensureCompleteStep(steps, [
+              ...steps.slice(0, currentProfileIndex + 1),
+              step,
+              ...steps.slice(currentProfileIndex + 1),
+            ]);
+
+            setSteps(newSteps);
+            return { type: 'complete', payload: newSteps };
           };
 
-          if (profile) {
-            profiles.push(profile);
+          // Handle case when no mints are provided
+          if (!mintsToProcess?.length) {
+            return insertStepAfterProfile(createAddButtonStep());
           }
-        }
 
-        if (profiles.length === 0) {
-          setSteps(
-            ensureCompleteStep(
-              steps,
-              findAndInsertAfter(steps, message.payload, {
-                type: 'retry',
-                step: message.payload,
-              })
-            )
-          );
-          break;
-        }
+          // Process each mint
+          const mints = [];
+          for (let index = 0; index < mintsToProcess.length; index++) {
+            const mint = mintsToProcess[index];
+            try {
+              const mintInfo = await (await getMint({ mintUrl: mint })).getInfo();
+              const units = mintInfo.nuts[4].methods.map((method) => ({
+                name: method.unit,
+                weight: 0.5,
+              }));
 
-        // Generate HD root key
-        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+              mints.push({
+                id: `mint-${profileId}-${index}`,
+                label: mintInfo.name,
+                iconUrl: mintInfo.icon_url,
+                mintUrl: mint,
+                currencies: units,
+              });
 
-        // Transform profiles with additional data
-        const processedProfiles = profiles.map((profile) => ({
-          ...profile,
-          id: profile.id,
-          pubkey: profile.pubkey,
-          picture: profile.profile?.image,
-          npub: profile.npub,
-          nsec: profile.nsec,
-          mnemonic,
-          root: {
-            xpub: root.publicExtendedKey,
-            xpriv: root.privateExtendedKey,
-          },
-        }));
+              yield {
+                label: 'MINT_FOUND',
+                current: index + 1,
+                max: mintsToProcess.length,
+              };
+            } catch (error) {
+              // Silently handle mint processing errors
+            }
+          }
 
-        // Create and add profile steps
-        const profileSteps = processedProfiles.map((profile, index) => ({
-          type: 'profile',
-          label: 'Profile',
-          icon: 'person',
-          iconUrl: profile.profile?.image,
-          profile,
-          id: `profile-${index}`,
-        }));
+          // If we successfully processed any mints, create a mint group
+          if (mints.length > 0) {
+            const mintGroup = {
+              id: `mintgroup-${profileId}`,
+              type: 'mint-group',
+              label: 'Loading Mint',
+              icon: 'person',
+              mints,
+              forProfileId: profileId,
+            };
+            return insertStepAfterProfile(mintGroup);
+          }
 
-        setSteps(ensureCompleteStep(steps, [...steps, ...profileSteps]));
-
-        return { type: 'complete' };
-      }
-
-      case 'profile': {
-        // Extract profile data
-        const { id: profileId, mints: mintsToProcess } = message.payload.profile;
-
-        // Find the corresponding profile step
-        const currentProfileIndex = steps.findLastIndex(
-          (step) => step.type === 'profile' && step.profile?.id === profileId
-        );
-
-        if (currentProfileIndex === -1) return { type: 'complete' };
-
-        // Helper function to create add button step
-        const createAddButtonStep = () => ({
-          id: `add-mint-${profileId}`,
-          type: 'add-button',
-          label: 'Add Mint',
-          icon: 'add-circle',
-          forProfileId: profileId,
-        });
-
-        // Helper function to insert step after profile
-        const insertStepAfterProfile = (step) => {
-          const newSteps = ensureCompleteStep(steps, [
-            ...steps.slice(0, currentProfileIndex + 1),
-            step,
-            ...steps.slice(currentProfileIndex + 1),
-          ]);
-
-          setSteps(newSteps);
-          return { type: 'complete', payload: newSteps };
-        };
-
-        // Handle case when no mints are provided
-        if (!mintsToProcess?.length) {
+          // If no mints were successfully processed, add the button step
           return insertStepAfterProfile(createAddButtonStep());
         }
 
-        // Process each mint
-        const mints = [];
-        for (let index = 0; index < mintsToProcess.length; index++) {
-          const mint = mintsToProcess[index];
-          try {
-            const mintInfo = await (await getMint({ mintUrl: mint })).getInfo();
-            const units = mintInfo.nuts[4].methods.map((method) => ({
-              name: method.unit,
-              weight: 0.5,
-            }));
-
-            mints.push({
-              id: `mint-${profileId}-${index}`,
-              label: mintInfo.name,
-              iconUrl: mintInfo.icon_url,
-              mintUrl: mint,
-              currencies: units,
-            });
-
-            yield {
-              label: 'MINT_FOUND',
-              current: index + 1,
-              max: mintsToProcess.length,
-            };
-          } catch (error) {
-            // Silently handle mint processing errors
-          }
-        }
-
-        // If we successfully processed any mints, create a mint group
-        if (mints.length > 0) {
-          const mintGroup = {
-            id: `mintgroup-${profileId}`,
-            type: 'mint-group',
-            label: 'Loading Mint',
-            icon: 'person',
-            mints,
-            forProfileId: profileId,
+        case 'add-button':
+          // This case will handle the button click event
+          // For now, we'll just yield a complete message
+          // You would implement the actual functionality here
+          yield {
+            label: 'WAITING_FOR_INPUT',
+            message: "Sovran couldn't detect a mint. Please add the one your account was using.",
           };
-          return insertStepAfterProfile(mintGroup);
-        }
 
-        // If no mints were successfully processed, add the button step
-        return insertStepAfterProfile(createAddButtonStep());
-      }
+          return {
+            type: 'complete',
+          };
 
-      case 'add-button':
-        // This case will handle the button click event
-        // For now, we'll just yield a complete message
-        // You would implement the actual functionality here
-        yield {
-          label: 'WAITING_FOR_INPUT',
-          message: "Sovran couldn't detect a mint. Please add the one your account was using.",
-        };
-
-        return {
-          type: 'complete',
-        };
-
-      case 'mint-group':
-        try {
+        case 'mint-group':
           const profile = steps.find((step) => step.type === 'profile')?.profile;
 
           const mints = [];
@@ -275,21 +274,20 @@ const ChainLoadingAnimation = () => {
               return step;
             })
           );
-        } catch (err) {
-          setSteps(
-            ensureCompleteStep(
-              steps,
-              findAndInsertAfter(steps, message.payload, {
-                type: 'retry',
-                step: message.payload,
-              })
-            )
-          );
-          break;
-        }
-
-        return { type: 'complete' };
+          return { type: 'complete' };
+      }
+    } catch (err) {
+      setSteps(
+        ensureCompleteStep(
+          steps,
+          findAndInsertAfter(steps, message.payload, {
+            type: 'retry',
+            step: message.payload,
+          })
+        )
+      );
     }
+
   }
 
   const { mnemonic } = useTypedRoute();
