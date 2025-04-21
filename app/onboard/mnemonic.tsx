@@ -35,9 +35,7 @@ const RecoveryScreen: React.FC<{}> = () => {
   const inputRef = useRef<TextInput>(null);
 
   // State for managing word input
-  const [words, setWords] = useState(
-    'trial canoe short dust quantum false jewel wonder alter jelly crime entire'.split(' ')
-  );
+  const [words, setWords] = useState<string[]>(Array(TOTAL_WORDS).fill(""));
   const [verifyIndices, setVerifyIndices] = useState<number[]>([]);
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [invalidWords, setInvalidWords] = useState<number[]>([]);
@@ -343,11 +341,11 @@ const RecoveryScreen: React.FC<{}> = () => {
           ...(isVerifyMode
             ? []
             : [
-                {
-                  text: "I can't remember my seed phrase",
-                  onPress: () => {},
-                },
-              ]),
+              {
+                text: "I can't remember my seed phrase",
+                onPress: () => { },
+              },
+            ]),
           {
             text: isVerifyMode ? 'Verify' : 'Submit',
             onPress: handleSubmit,
