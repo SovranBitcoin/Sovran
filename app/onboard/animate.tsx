@@ -91,7 +91,7 @@ const ChainLoadingAnimation = () => {
           }
         }
 
-        if (Math.random() < 0.5) {
+        if (profiles.length === 0) {
           setSteps(
             ensureCompleteStep(
               steps,
