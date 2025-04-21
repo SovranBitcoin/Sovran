@@ -515,14 +515,15 @@ export function MintAddMore({ onClose, params }) {
 
   const filteredMints = useMemo(() => {
     if (selectedCurrency === 'All') {
-      return recommendedMints;
+      return recommendedMints.filter((mint) => !mints.includes(mint.id));
     }
 
+
     return recommendedMints.filter((mint) => {
-      const mintData = mintsData.get(mint.id);
+      const mintData = mintsData.get(mint.id)?.supportedUnits;
       if (!mintData) return false;
       if (mints.includes(mint.id)) return false;
-      return mintData.supportedUnits.includes(selectedCurrency);
+      return mintData.includes(selectedCurrency);
     });
   }, [recommendedMints, selectedCurrency, mintsData, mints]);
 
@@ -554,7 +555,7 @@ export function MintAddMore({ onClose, params }) {
                   ((option === 'BTC' && selectedCurrency === 'SAT') ||
                     (option === 'All' && selectedCurrency === 'All') ||
                     (option !== 'BTC' && option !== 'All' && selectedCurrency === option)) &&
-                    styles.selectedCurrencyButton,
+                  styles.selectedCurrencyButton,
                 ]}
                 onPress={() => {
                   setSelectedCurrency(option === 'BTC' ? 'SAT' : option);

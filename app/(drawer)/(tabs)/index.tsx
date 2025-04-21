@@ -52,7 +52,7 @@ async function getProfile(currentProfile) {
       "funds_received",
       { amount: balance, unit: "sat" },
       { emoji: "🎉" },
-      () => {}
+      () => { }
     );
   }
 }
@@ -194,7 +194,7 @@ function TabOneScreen({
   useTransactionStatusPolling();
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {}, []);
+  const onRefresh = useCallback(async () => { }, []);
 
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
