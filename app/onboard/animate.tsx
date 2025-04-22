@@ -234,6 +234,8 @@ const ChainLoadingAnimation = () => {
           };
 
         case 'mint-group':
+          if (type === 'new') return { type: 'complete' };
+
           const profile = steps.find((step) => step.type === 'profile')?.profile;
 
           const mints = [];
@@ -289,7 +291,7 @@ const ChainLoadingAnimation = () => {
     }
   }
 
-  const { mnemonic } = useTypedRoute();
+  const { mnemonic, type } = useTypedRoute();
 
   // Initialize with processing step
   const [steps, setSteps] = useState([

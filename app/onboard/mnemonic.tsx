@@ -168,7 +168,7 @@ const RecoveryScreen: React.FC<{}> = () => {
           {
             text: 'Continue',
             onPress: () => {
-              navigation.navigate('onboard/animate', { mnemonic });
+              navigation.navigate('onboard/animate', { mnemonic, type: 'new' });
             },
           },
         ]);
