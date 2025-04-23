@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "experiments": {
       "tsconfigPaths": true
     },
@@ -15,11 +15,14 @@
       "resizeMode": "contain"
     },
     "icon": "./assets/images/icon_.png",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "buildNumber": "182",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments."
+        "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.sovran.money",
       "supportsTablet": false
@@ -29,8 +32,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO"],
-      "package": "com.sovranbitcoin"
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.NFC"
+      ],
+      "package": "com.sovran.money"
     },
     "web": {
       "bundler": "metro",
