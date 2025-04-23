@@ -793,15 +793,17 @@ function ModalScreen() {
           <ButtonHandler
             context="transactionButtons"
             buttons={[
-              transaction?.nostr?.pubkey && {
-                text: 'View Chat',
-                onPress: () => {
-                  navigation.goBack();
-                  navigation.navigate('userMessages', {
-                    pubkey: transaction.nostr.pubkey,
-                  });
-                },
-              },
+              transaction?.nostr?.pubkey !== 'Unknown'
+                ? {
+                    text: 'View Chat',
+                    onPress: () => {
+                      navigation.goBack();
+                      navigation.navigate('userMessages', {
+                        pubkey: transaction.nostr.pubkey,
+                      });
+                    },
+                  }
+                : null,
               transaction.request &&
                 !transaction.paid && {
                   text: 'Open Invoice',

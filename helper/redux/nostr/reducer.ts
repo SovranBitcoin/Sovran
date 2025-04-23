@@ -56,6 +56,7 @@ export const nostrReducer = (state = initialState, action) => {
       const uniqueSearch = [];
       const pubkeyMap = new Map();
       for (const item of action.payload) {
+        if (!item.pubkey) continue;
         pubkeyMap.set(item.pubkey, item);
       }
       for (const item of state.search) {

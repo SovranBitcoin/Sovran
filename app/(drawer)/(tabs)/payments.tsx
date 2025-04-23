@@ -42,6 +42,7 @@ const Section = () => {
   const combinedSearchAndProfiles = [
     ...filteredProfiles,
     ...filteredSearch
+      .filter((group) => group.pubkey)
       .map((f) => ({ pubkey: f.pubkey, ...f.profile }))
       .filter(
         (profile) =>
@@ -84,8 +85,12 @@ const Section = () => {
       const dateB = new Date(b.transactions[0]?.date || b.messages[0]?.created_at);
       return dateB - dateA;
     });
+
   combinedSearchAndProfiles
     .filter((p) => !enrichedContacts.some((ec) => ec.pubkey === p.pubkey))
+    .filter((profile) => {
+      return profile.pubkey !== 'Unknown';
+    })
     .forEach((profile) => {
       enrichedContacts.push({
         pubkey: profile.pubkey,
