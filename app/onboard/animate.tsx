@@ -723,6 +723,9 @@ const ChainLoadingAnimation = () => {
             <TouchableOpacity
               onPress={() => {
                 SheetManager.show('mint-adder', {
+                  payload: {
+                    currencies: ['SAT'],
+                  },
                   async onClose(data) {
                     // data.mints
 

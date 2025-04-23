@@ -393,16 +393,29 @@ function AddMintItem({
   );
 }
 
-export function MintAddMore({ onClose, params }) {
+export function MintAddMore({ onClose, payload }) {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
-  const [selectedCurrency, setSelectedCurrency] = useState<string>('All');
+  // Set default selected currency based on allowed currencies
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(() => {
+    // If SAT is the only currency, select it by default
+    if (payload?.currencies?.length === 1 && payload.currencies[0].toUpperCase() === 'SAT') {
+      return 'SAT';
+    }
+    return 'All';
+  });
   const [mintsData, setMintsData] = useState<Map<string, ProcessedMintData>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadedMintIds, setLoadedMintIds] = useState<Set<string>>(new Set());
   const router = useSheetRouter('mint');
   const { mintCounts } = useRecommendedMints();
+
+  // Extract allowed currencies from payload
+  const allowedCurrencies = useMemo(
+    () => new Set((payload?.currencies || ['SAT']).map((curr) => curr.toUpperCase())),
+    [payload]
+  );
 
   const recommendedMints = useMemo(
     () => [
@@ -514,17 +527,36 @@ export function MintAddMore({ onClose, params }) {
   const mints = useSelector(memoizedGetMints);
 
   const filteredMints = useMemo(() => {
+    // Base filter function that excludes existing mints and checks allowed currencies
+    const baseFilter = (mint) => {
+      // Skip mints that are already added
+      if (mints.includes(mint.id)) return false;
+
+      const mintData = mintsData.get(mint.id);
+      if (!mintData) return false;
+
+      // If mint has no supported units yet, keep it (still loading)
+      if (mintData.supportedUnits.length === 0) return true;
+
+      // Only include mints that ONLY support currencies from the payload
+      // This means every supported unit must be in the allowed currencies
+      return mintData.supportedUnits.every((unit) => allowedCurrencies.has(unit));
+    };
+
     if (selectedCurrency === 'All') {
-      return recommendedMints.filter((mint) => !mints.includes(mint.id));
+      // Just apply the base filter for "All" selection
+      return recommendedMints.filter(baseFilter);
     }
 
+    // For specific currency selection, filter by both the selected currency and the payload currencies
     return recommendedMints.filter((mint) => {
-      const mintData = mintsData.get(mint.id)?.supportedUnits;
-      if (!mintData) return false;
-      if (mints.includes(mint.id)) return false;
-      return mintData.includes(selectedCurrency);
+      if (!baseFilter(mint)) return false;
+
+      const mintData = mintsData.get(mint.id);
+      // Check if mint supports the selected currency
+      return mintData.supportedUnits.includes(selectedCurrency);
     });
-  }, [recommendedMints, selectedCurrency, mintsData, mints]);
+  }, [recommendedMints, selectedCurrency, mintsData, mints, allowedCurrencies]);
 
   // Get loaded mints that match the currency filter
   const loadedMints = useMemo(() => {
@@ -533,6 +565,24 @@ export function MintAddMore({ onClose, params }) {
 
   // Determine if there are still mints to load
   const hasMoreMintsToLoad = loadedMintIds.size < recommendedMints.length;
+
+  // Filter currency options to only show allowed currencies
+  const currencyOptions = useMemo(() => {
+    const options = [];
+
+    // Only include currency options that are in the allowed currencies
+    if (allowedCurrencies.has('SAT')) options.push('BTC');
+    if (allowedCurrencies.has('USD')) options.push('USD');
+    if (allowedCurrencies.has('EUR')) options.push('EUR');
+    if (allowedCurrencies.has('GBP')) options.push('GBP');
+
+    // Only add the 'All' option if we have more than one currency
+    if (options.length > 1) {
+      options.unshift('All');
+    }
+
+    return options;
+  }, [allowedCurrencies]);
 
   return (
     <Wrapper
@@ -545,7 +595,7 @@ export function MintAddMore({ onClose, params }) {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.currencyScroll}>
-            {['All', 'BTC', 'USD', 'EUR', 'GBP'].map((option) => (
+            {currencyOptions.map((option) => (
               <TouchableOpacity
                 key={option}
                 style={[
@@ -580,6 +630,7 @@ export function MintAddMore({ onClose, params }) {
           </Text>
           <Text style={[{ marginBottom: 12, color: greys(theme)[700] }]}>
             Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
+            {allowedCurrencies.size === 1 ? ' supporting only SAT' : ''}
           </Text>
 
           <ScrollView style={styles.mintsContainer}>
@@ -601,7 +652,7 @@ export function MintAddMore({ onClose, params }) {
               })
             ) : !hasMoreMintsToLoad ? (
               <Text style={[styles.noResults, { marginTop: 20, textAlign: 'center' }]}>
-                No mints found for the selected currency
+                No mints found for the selected criteria
               </Text>
             ) : null}
 
