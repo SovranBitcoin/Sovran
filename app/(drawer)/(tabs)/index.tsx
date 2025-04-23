@@ -100,7 +100,7 @@ export const useTransactionStatusPolling = () => {
         // Error handling removed
       }
 
-      await timeout(2000);
+      await timeout(5000);
 
       try {
         if (newestEcashTx?.token) {
@@ -115,7 +115,7 @@ export const useTransactionStatusPolling = () => {
         // Error handling removed
       }
 
-      await timeout(2000);
+      await timeout(5000);
 
       try {
         if (newestLightningTx) {
@@ -126,7 +126,7 @@ export const useTransactionStatusPolling = () => {
       }
 
       if (isMounted) {
-        setTimeout(pollTransactionStatuses, 5000);
+        setTimeout(pollTransactionStatuses, 10000);
       }
     };
 
