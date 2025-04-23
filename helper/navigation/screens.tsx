@@ -342,6 +342,10 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Restore Counter',
   },
   {
+    name: 'settings/proofs',
+    title: 'Check Proofs',
+  },
+  {
     name: 'settings/terms',
     title: 'Terms & Conditions',
   },

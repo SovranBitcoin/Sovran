@@ -286,6 +286,12 @@ const ModalScreen: React.FC<{}> = () => {
             navigation.navigate('settings/restoreCounter');
           }}
         />
+        <RowButton
+          label="Check Proofs"
+          onPress={() => {
+            navigation.navigate('settings/proofs');
+          }}
+        />
       </Section>
       <TouchableOpacity
         onPress={() => {
