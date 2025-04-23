@@ -18,24 +18,3 @@ export function AnonIcon() {
     />
   );
 }
-
-export function CloudWallet() {
-  return (
-    <CachedImage
-      style={{ width: 48, height: 48 }}
-      source={require('assets/images/cloud_wallet.png')}
-    />
-  );
-}
-
-export function Wallet() {
-  return (
-    <CachedImage style={{ width: 48, height: 48 }} source={require('assets/images/wallet.png')} />
-  );
-}
-
-export function Vault() {
-  return (
-    <CachedImage style={{ width: 48, height: 48 }} source={require('assets/images/vault.png')} />
-  );
-}

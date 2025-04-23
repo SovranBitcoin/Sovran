@@ -209,7 +209,6 @@ function TabOneScreen({
 
   return (
     <ImageBackground
-      source={require('assets/images/lights.png')}
       style={{
         flex: 1,
         width: '100%',
