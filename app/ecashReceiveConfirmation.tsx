@@ -146,7 +146,14 @@ function ModalScreen({
     if (isMintTrusted) {
       await handleRedeem();
     } else {
-      SheetManager.show('mint-accepter', { payload: { mint: mintUrl } });
+      SheetManager.show('mint-accepter', {
+        payload: { mint: mintUrl },
+        onClose: async ({ trusted }) => {
+          if (trusted) {
+            await handleRedeem();
+          }
+        },
+      });
     }
   };
 

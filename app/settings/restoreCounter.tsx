@@ -35,6 +35,10 @@ export default function ModalScreen() {
     return () => runWithAnimationFrame(restore, setIsLoading)({ keyset, mintUrl });
   };
 
+  if (!keysets || !profileId) {
+    return null;
+  }
+
   return (
     <Container>
       {Object.entries(keysets).map(([mintUrl, keysetArray]) => (

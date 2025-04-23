@@ -124,18 +124,20 @@ export const useCheckProofsSpent = (
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
-export function ButtonHandler({ context, buttons, style = {} }) {
+export function ButtonHandler({ context, buttons, style = {}, colors }) {
   const [loading, setLoading] = useState(false);
   const theme = useSelector(memoizedGetTheme);
 
   return (
     <LinearGradient
-      colors={[
-        opacity(greys(theme)[2300], 0),
-        opacity(greys(theme)[2300], 0.75),
-        opacity(greys(theme)[2300], 0.9),
-        greys(theme)[2300],
-      ]}
+      colors={
+        colors || [
+          opacity(greys(theme)[2300], 0),
+          opacity(greys(theme)[2300], 0.75),
+          opacity(greys(theme)[2300], 0.9),
+          greys(theme)[2300],
+        ]
+      }
       style={{
         flexDirection: 'row',
         justifyContent: 'center',

@@ -1,17 +1,21 @@
 import React from 'react';
 
 import { Button } from 'components/common/Button';
+import { ButtonHandler } from 'app/ecashSendConfirmation';
 import { StyledText, Text, View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { addMintsAction } from 'helper/redux/cashu';
-import { useSheetRouter } from 'react-native-actions-sheet';
+import { useSheetRef, useSheetRouter } from 'react-native-actions-sheet';
+import opacity from 'hex-color-opacity';
 
 export function RouteA({ payload }) {
   const theme = useSelector(memoizedGetTheme);
   const router = useSheetRouter('mint-accepter');
+  const ref = useSheetRef('mint-accepter');
+
   return (
     <View
       style={{
@@ -21,7 +25,7 @@ export function RouteA({ payload }) {
         overflow: 'hidden',
         backgroundColor: greys(theme)[1800],
         padding: 8,
-        paddingVertical: 32,
+        paddingTop: 24,
       }}>
       <Text
         size={24}
@@ -47,34 +51,46 @@ export function RouteA({ payload }) {
         </View>
         ?
       </Text>
-      <Button
-        text="Don't trust"
-        variant="secondary"
-        icon={null}
-        style={{}}
-        camera={false}
-        noPadding={false}
-        onPress={() => {
-          router?.close();
-        }}
-      />
-      <Button
-        text="Trust"
-        variant="primary"
-        icon={null}
-        style={{}}
-        camera={false}
-        noPadding={false}
-        onPress={() => {
-          store.dispatch(
-            addMintsAction({
-              profileId: store.getState().nostr?.currentProfile?.id,
-              mintUrls: [payload.mint],
-            })
-          );
-
-          router?.close();
-        }}
+      <ButtonHandler
+        colors={[
+          opacity(greys(theme)[1800], 0),
+          opacity(greys(theme)[1800], 0.75),
+          opacity(greys(theme)[1800], 0.9),
+          greys(theme)[1800],
+        ]}
+        buttons={[
+          {
+            text: "Don't trust",
+            variant: 'secondary',
+            icon: null,
+            onPress: () => {
+              ref.current.hide({
+                action: 'reject',
+                mint: [payload.mint],
+                trusted: false,
+              });
+            },
+          },
+          {
+            text: 'Trust',
+            variant: 'primary',
+            icon: null,
+            onPress: () => {
+              store.dispatch(
+                addMintsAction({
+                  profileId: store.getState().nostr?.currentProfile?.id,
+                  mintUrls: [payload.mint],
+                })
+              );
+              ref.current.hide({
+                action: 'trust',
+                mint: [payload.mint],
+                trusted: true,
+              });
+            },
+          },
+        ]}
+        style={{ marginTop: 16 }}
       />
     </View>
   );
