@@ -16,6 +16,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { LNVPN_PUBKEY } from '../../vpnCheckout';
 import { sovran } from 'components/layout/sheets/mints';
+import { Tabs } from 'components/common/Tabs';
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -486,67 +487,5 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[1300],
     },
   });
-
-export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
-  return (
-    <ScrollView
-      style={{
-        backgroundColor: 'transparent',
-        marginBottom: 0,
-        marginTop: 0,
-        overflow: 'visible',
-      }}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.tabContainer}>
-      <View
-        style={[
-          {
-            flexDirection: 'row',
-            width: '100%',
-          },
-          sovran.listItem,
-          {
-            padding: 2,
-            borderRadius: 24,
-          },
-        ]}>
-        {tabs.map((tab, index) => (
-          <TouchableOpacity
-            key={tab}
-            style={[
-              styles.tabButton,
-              {
-                flex: 1,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-              },
-              selectedTab === tab && styles.selectedTabButton,
-            ]}
-            onPress={() => handleTabPress(tab, index)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.selectedTabText]}>
-              {tab}
-            </Text>
-            {amounts && amounts[index] ? (
-              <Text
-                style={{
-                  marginLeft: 4,
-                  fontSize: 12,
-                  fontFamily: 'OverpassBold',
-                  color: greys(theme)[600],
-                }}>
-                {`(${amounts[index]})`}
-              </Text>
-            ) : null}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </ScrollView>
-  );
-}
 
 export default TabOneScreen;

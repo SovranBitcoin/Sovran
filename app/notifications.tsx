@@ -7,8 +7,8 @@ import emoji from 'emoji-dictionary'; // Import the emoji dictionary package
 import { EventKind } from './Profile';
 import { FlashList } from '@shopify/flash-list';
 import Image from 'components/common/Image';
-import { Tabs } from './(drawer)/(tabs)/payments';
 import PagerView from 'react-native-pager-view';
+import { Tabs } from 'components/common/Tabs';
 
 export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
   const filters = useMemo(

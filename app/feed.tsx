@@ -8,8 +8,8 @@ import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
 import { EventKind } from './Profile';
 import { useNostr } from 'helper/redux/nostr';
-import { Tabs } from 'app/(drawer)/(tabs)/payments';
 import { View } from 'components/common/Themed';
+import { Tabs } from 'components/common/Tabs';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });

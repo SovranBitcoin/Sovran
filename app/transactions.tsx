@@ -12,7 +12,8 @@ import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
 
 import Modal from 'components/layout/Modal';
-import { Tabs } from './(drawer)/(tabs)/payments';
+import { Tabs } from 'components/common/Tabs';
+
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const { account } = useTypedRoute<'transactions'>() || {

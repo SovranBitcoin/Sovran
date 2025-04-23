@@ -14,8 +14,8 @@ import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
-import { Tabs } from 'app/(drawer)/(tabs)/payments'; // Importing Tabs component
 import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { Tabs } from 'components/common/Tabs';
 
 // Constants
 const API_URL = 'https://esim.sovran.cash/api/products';

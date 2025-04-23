@@ -7,7 +7,7 @@ import { Section as TableSection } from '../transaction';
 import { RowButton, Section } from '../settings';
 import { ButtonHandler } from '../ecashSendConfirmation';
 import { View } from 'components/common/Themed';
-import { Tabs } from 'app/(drawer)/(tabs)/payments';
+import { Tabs } from 'components/common/Tabs';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
