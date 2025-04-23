@@ -498,7 +498,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
         marginBottom: 0,
         marginTop: 0,
         overflow: 'visible',
-        // paddingHorizontal: 12,
       }}
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -525,14 +524,14 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
                 flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
-              }, // Make each tab equal sized and align items
+              },
               selectedTab === tab && styles.selectedTabButton,
             ]}
             onPress={() => handleTabPress(tab, index)}>
             <Text style={[styles.tabText, selectedTab === tab && styles.selectedTabText]}>
               {tab}
             </Text>
-            {amounts && amounts[index] && (
+            {amounts && amounts[index] ? (
               <Text
                 style={{
                   marginLeft: 4,
@@ -540,9 +539,9 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
                   fontFamily: 'OverpassBold',
                   color: greys(theme)[600],
                 }}>
-                {amounts[index] ? `(${amounts[index]})` : ''}
+                {`(${amounts[index]})`}
               </Text>
-            )}
+            ) : null}
           </TouchableOpacity>
         ))}
       </View>
