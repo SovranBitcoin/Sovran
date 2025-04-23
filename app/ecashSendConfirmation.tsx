@@ -157,11 +157,16 @@ export function ButtonHandler({ context, buttons, style = {}, colors }) {
           <Button
             position="center"
             onPress={() => {
-              runWithAnimationFrame(button.onPress, setLoading)();
+              // Only run the onPress if the button is not disabled
+              if (!button.disabled) {
+                runWithAnimationFrame(button.onPress, setLoading)();
+              }
             }}
             text={button.text}
             variant={button.variant}
             loading={loading || button.loading}
+            disabled={button.disabled} // Pass the disabled prop to Button
+            icon={button.icon}
           />
         </View>
       ))}

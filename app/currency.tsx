@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
@@ -33,9 +33,16 @@ function ModalScreen() {
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
+  const [isValidAmount, setIsValidAmount] = useState(false);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+
+  // Validate the amount whenever it changes
+  useEffect(() => {
+    // Amount must be greater than 0 to be valid
+    setIsValidAmount(amount > 0);
+  }, [amount]);
 
   const handleMintSelected = async (mint, balance) => {
     try {
@@ -113,6 +120,9 @@ function ModalScreen() {
   };
 
   const handleNext = async () => {
+    // Don't proceed if amount is invalid
+    if (!isValidAmount) return;
+
     let error = false;
     setLoading(true);
 
@@ -175,6 +185,7 @@ function ModalScreen() {
                 icon: 'lucide:arrow-right',
                 variant: 'primary',
                 onPress: handleNext,
+                disabled: !isValidAmount, // Disable the button when amount is invalid
               },
               {
                 text: 'Scan QR',
@@ -203,6 +214,7 @@ function ModalScreen() {
               variant: 'primary',
               loading: loading,
               onPress: handleNext,
+              disabled: !isValidAmount, // Disable the button when amount is invalid
             },
           ]}
         />
