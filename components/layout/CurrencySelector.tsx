@@ -18,7 +18,7 @@ const CurrencySelector = ({
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
-  const currencies = multipleBalances.map((b) => b.unit?.toUpperCase());
+  const currencies = [...new Set(multipleBalances.map((b) => b.unit?.toUpperCase()))];
 
   return (
     <View>
