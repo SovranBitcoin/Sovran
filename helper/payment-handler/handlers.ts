@@ -8,6 +8,7 @@ import { nip19 } from 'nostr-tools';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
 import { isLnurl, lnTrim } from 'helper/third-party/lnurl';
+import { isLightningAddress, isLnurl, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
 import { showMessage } from '../popup/popups';
 
@@ -168,7 +169,7 @@ const handleLightning = async ({
   setLoading: (loading: boolean) => void;
 }): Promise<NavigationResult | null> => {
   const lnurl = lnTrim(data);
-  if (isLnurl(lnurl)) {
+  if (isLightningAddress(lnurl)) {
     return {
       screen: 'currency',
       params: {
