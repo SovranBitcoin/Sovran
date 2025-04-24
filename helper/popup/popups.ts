@@ -234,6 +234,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: '',
     type: MESSAGE_TYPES.WARNING,
   },
+  'Insufficient funds': {
+    title: 'Insufficient Funds',
+    text: 'You do not have enough funds to complete this transaction.',
+    type: MESSAGE_TYPES.ERROR,
+  }
 };
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;

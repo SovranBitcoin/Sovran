@@ -91,7 +91,7 @@ function ModalScreen() {
       });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      showMessage('payment_error', { error: errorMessage }, { emoji: '🚨' });
+      showMessage(errorMessage, { error: errorMessage }, { emoji: '🚨' });
     } finally {
       setLoading(false);
     }
