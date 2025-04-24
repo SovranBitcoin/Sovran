@@ -37,12 +37,12 @@ const SERVICE_MENU_ITEMS = [
     label: 'Giftcards',
     navigateTo: 'giftcards/welcome',
   },
-  {
-    id: 'donate',
-    icon: 'mdi:charity',
-    label: 'Donate',
-    navigateTo: 'donate/donate',
-  },
+  // {
+  //   id: 'donate',
+  //   icon: 'mdi:charity',
+  //   label: 'Donate',
+  //   navigateTo: 'donate/donate',
+  // },
   {
     id: 'support',
     icon: 'mdi:help-circle',
