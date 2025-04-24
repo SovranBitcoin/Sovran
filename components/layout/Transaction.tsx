@@ -134,7 +134,13 @@ export function Transaction({ tx, transactions, account }) {
     );
 
     const StatusIndicator = ({ isCancel }) => (
-      <View className="absolute bottom-[-4] right-[-4] z-30 z-30 h-4 w-4 rounded-full border border-gray-600 bg-gray-800 p-0.5">
+      <View
+        style={{
+          borderColor: greys(theme)[1000],
+          borderWidth: 0.2,
+          backgroundColor: greys(theme)[1800],
+        }}
+        className="absolute bottom-[-4] right-[-4] z-30 z-30 rounded-full p-0.5">
         {isCancel ? (
           <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
         ) : (
@@ -153,8 +159,8 @@ export function Transaction({ tx, transactions, account }) {
           width: 28,
           height: 28,
           borderRadius: 1000,
-          borderColor: greys(theme)[1300],
-          borderWidth: 0.2,
+          borderColor: greys(theme)[1000],
+          borderWidth: 0.5,
         }}
         source={{ uri: profilePicture }}
       />
