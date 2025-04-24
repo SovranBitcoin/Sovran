@@ -1,289 +1,355 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, ScrollView, ActivityIndicator, Keyboard } from 'react-native'; // Added Keyboard import
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useRef, useState, useEffect } from 'react';
+import { Image, ScrollView, Keyboard } from 'react-native';
+import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
-import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
-import Icon from 'assets/icons';
-
-export function useNDK() {
-  const [ndk, setNDK] = useState<NDK | null>(null);
-  const { signer } = useSigner();
-
-  useEffect(() => {
-    const initNDK = async () => {
-      const newNDK = new NDK({
-        explicitRelayUrls: [
-          'wss://relay.damus.io',
-          'wss://relay.snort.social',
-          'wss://nos.lol',
-          'wss://relay.nostr.band',
-        ],
-        signer,
-      });
-
-      await newNDK.connect();
-      setNDK(newNDK);
-    };
-
-    if (signer) {
-      initNDK();
-    }
-  }, [signer]);
-
-  return { ndk };
-}
-
-import { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
-import { appendQuery, setSearch } from 'helper/redux/nostr';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Container from 'components/layout/Container';
-
-export function useSigner() {
-  const [signer, setSigner] = useState<NDKPrivateKeySigner | null>(null);
-
-  useEffect(() => {
-    setSigner(
-    );
-  }, []);
-
-  return { signer };
-}
+import Icon from 'assets/icons';
+import { NDKUser, NDKUserProfile } from '@nostr-dev-kit/ndk';
+import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
+import { View, Text } from 'components/common/Themed';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const ref = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const { ndk } = useNDK();
   const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false); // Loading state
+  const [loading, setLoading] = useState(false);
   const navigation = useTypedNavigation();
 
-  const dvmRelaySet = useCallback(() => {
-    if (!ndk) return null;
-    return NDKRelaySet.fromRelayUrls(['wss://relay.vertexlab.io'], ndk);
-  }, [ndk]);
+  const debounceTimeoutRef = useRef(null);
 
-  const dispatch = useDispatch();
-  const dvmSearch = useCallback(
-    async (input: string) => {
-      if (!ndk) return;
+  // Generate placeholder results for the loading state
+  const placeholderResults = Array(20)
+    .fill(null)
+    .map((_, index) => ({
+      pubkey: index,
+    }));
 
-      const relaySet = dvmRelaySet();
-      if (!relaySet) return;
+  // New function to search using the API instead of DVM
+  const searchUsers = async (query) => {
+    if (!query.trim()) return;
 
-      const req = new NDKEvent(ndk, {
-        kind: 5315,
-        tags: [['param', 'search', input]],
-      });
-      await req.sign();
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://esim.sovran.cash/search?query=${encodeURIComponent(query)}&limit=10`
+      );
+      const data = await response.json();
 
-      setLoading(true); // Set loading to true when search starts
+      if (data.results && Array.isArray(data.results)) {
+        const formattedResults = data.results.map((result: NDKUserProfile) => {
+          const user = new NDKUser({
+            pubkey: result.pubkey,
+          });
+          user.profile = result;
+          return {
+            pubkey: user.profile.pubkey,
+            profile: user.profile,
+          };
+        });
 
-      try {
-        const sub = ndk.subscribe(
-          [{ kinds: [6315, 7000], ...req.filter() }],
-          { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY },
-          relaySet,
-          {
-            onEvent: async (event) => {
-              if (event.kind === 7000) {
-                const statusTag = event.getMatchingTags('status')?.[0];
-                const status = statusTag?.[2] ?? statusTag?.[1];
-                if (status) {
-                }
-              }
-
-              sub.stop();
-
-              try {
-                const records = JSON.parse(event.content);
-
-                dispatch(
-                  appendQuery({
-                    query: input,
-                    records,
-                  })
-                );
-
-                const profilePromises = records
-                  .filter((record: any) => record.pubkey)
-                  .map(async (record: any) => {
-                    try {
-                      const user = ndk.getUser({ pubkey: record.pubkey });
-                      const profile = await user.fetchProfile();
-
-                      const newResults = [{ pubkey: profile?.pubkey, profile: profile }];
-                      const uniqueResults = [
-                        ...new Map(newResults.map((item) => [item.pubkey, item])).values(),
-                      ];
-                      dispatch(setSearch(uniqueResults));
-
-                      return {
-                        pubkey: record.pubkey,
-                        profile,
-                      };
-                    } catch (e) {
-                      console.error('Failed to fetch profile:', e);
-                      return {
-                        pubkey: record.pubkey,
-                        profile: {
-                          name: 'Anonymous',
-                          about: '',
-                        },
-                      };
-                    }
-                  });
-
-                const results = await Promise.all(profilePromises);
-                setSearchResults(results.sort((a, b) => (b.rank || 0) - (a.rank || 0)));
-              } catch (e) {
-                console.log('Failed to parse results:', e);
-              } finally {
-                setLoading(false); // Set loading to false after processing results
-              }
-            },
-            onEose: () => {
-              req.publish(relaySet);
-            },
-          }
-        );
-        sub.start();
-      } catch (e) {
-        console.error(e);
-        setLoading(false); // Set loading to false on error
+        setSearchResults(formattedResults);
+      } else {
+        setSearchResults([]);
       }
-    },
-    [ndk, setSearchResults]
-  );
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+    }
+  };
 
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleSearchQueryChange = (input: string) => {
+  const handleSearchQueryChange = (input) => {
     setSearchQuery(input);
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
+
     debounceTimeoutRef.current = setTimeout(() => {
       if (input.trim()) {
+        searchUsers(input);
+      } else {
         setSearchResults([]);
-
-        dvmSearch(input);
       }
-    }, 2000);
+    }, 800); // Reduced timeout to 800ms for better UX
   };
 
   const handleScroll = () => {
-    Keyboard.dismiss(); // Dismiss the keyboard when scrolling
+    Keyboard.dismiss();
   };
 
+  // New function to clear the search input
+  const clearSearchInput = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const navigateToUserMessages = (pubkey) => {
+    navigation.navigate('userMessages', {
+      pubkey: pubkey,
+    });
+  };
+
+  // Display the search results or loading placeholders
+  const displayResults = loading ? placeholderResults : searchResults;
+  const showResults = loading || searchResults.length > 0;
+
   return (
-    <Container scroll={false} contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
-      <ScrollView
-        style={{
-          backgroundColor: greys(theme)[2300],
-        }}
-        onScrollBeginDrag={handleScroll} // Dismiss keyboard on scroll
-        scrollEventThrottle={16}>
-        {/* Added ScrollView with onScroll */}
-        <View
+    <SkeletonContainer
+      backgroundColor={greys(theme)[1800]}
+      highlightColor={greys(theme)[1300]}
+      speed={800}
+      animation={loading ? 'pulse' : 'none'}>
+      <Container scroll={false} contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
+        <ScrollView
           style={{
             backgroundColor: greys(theme)[2300],
-            paddingHorizontal: 16,
-          }}>
+          }}
+          onScrollBeginDrag={handleScroll}
+          scrollEventThrottle={16}>
           <View
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
+              backgroundColor: greys(theme)[2300],
+              paddingHorizontal: 16,
             }}>
-            <TextInput
-              ref={ref}
-              autoFocus={true}
-              value={searchQuery}
-              onChangeText={handleSearchQueryChange}
-              placeholder=""
-              placeholderTextColor={greys(theme)[1000]}
+            <View
               style={{
-                flex: 1,
-              }}
-            />
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Text
-                style={{
-                  color: greys(theme)[100],
-                  marginLeft: 12,
-                  fontSize: 16,
-                }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {loading && ( // Show loading indicator when loading
-            <ActivityIndicator size="large" color={shades[300]} style={{ marginTop: 16 }} />
-          )}
-          {searchResults.length > 0 &&
-            !loading && ( // Only show results if not loading
-              <View style={{ marginTop: 16 }}>
-                {searchResults.map((result) => (
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}>
+              {/* Wrapper View for TextInput with relative positioning */}
+              <View style={{ flex: 1, position: 'relative' }}>
+                <TextInput
+                  ref={ref}
+                  autoFocus={true}
+                  value={searchQuery}
+                  onChangeText={handleSearchQueryChange}
+                  placeholder="Search users..."
+                  placeholderTextColor={greys(theme)[1000]}
+                  style={{
+                    flex: 1,
+                    paddingRight: 30, // Add padding to make room for the clear button
+                  }}
+                />
+                {/* Clear button with absolute positioning */}
+                {searchQuery.length > 0 && (
                   <TouchableOpacity
-                    onPress={() => {
-                      navigation.navigate('userMessages', {
-                        pubkey: result.pubkey,
-                      });
-                    }}
-                    key={result?.pubkey}
+                    onPress={clearSearchInput}
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      padding: 8,
-                      backgroundColor: greys(theme)[1800],
-                      borderRadius: 8,
-                      marginBottom: 8,
+                      position: 'absolute',
+                      right: 0,
+                      zIndex: 1,
+                      padding: 10,
                     }}>
-                    <View style={{ marginRight: 8 }}>
-                      {result?.profile?.picture ? (
-                        <Image
-                          source={{ uri: result?.profile?.picture }}
-                          style={{ width: 48, height: 48, borderRadius: 24 }}
-                          onError={(e) => {
-                            e.currentTarget.src = '';
-                          }}
-                        />
-                      ) : (
-                        <View
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 24,
-                            backgroundColor: greys(theme)[2300],
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                          <Icon
-                            name="mdi:user"
-                            className="h-6 w-6 text-purple-600 dark:text-purple-300"
-                          />
-                        </View>
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', color: greys(theme)[100] }}>
-                        {result?.profile?.displayName || result?.profile?.name}
-                      </Text>
-                      {result?.profile?.nip05 && (
-                        <Text style={{ color: shades[200], fontSize: 12 }}>
-                          ✓ {result?.profile?.nip05}
-                        </Text>
-                      )}
-                    </View>
+                    <Icon name="simple-line-icons:close" size={20} color={greys(theme)[100]} />
                   </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text
+                  style={{
+                    color: greys(theme)[100],
+                    marginLeft: 12,
+                    fontSize: 16,
+                  }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showResults && (
+              <View style={{ marginTop: 8 }}>
+                {/* Results count text - only shown when not loading */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    loading={loading}
+                    style={{
+                      color: greys(theme)[700],
+                      fontSize: 14,
+                      fontFamily: 'OverpassBold',
+                    }}>
+                    Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
+                  </Text>
+                </View>
+
+                {/* Map over actual results or placeholder results */}
+                {displayResults.map((result, index) => (
+                  <SearchResult
+                    key={index}
+                    loading={loading}
+                    key={result?.pubkey}
+                    result={result}
+                    onPress={() => !loading && navigateToUserMessages(result.pubkey)}
+                  />
                 ))}
               </View>
             )}
+
+            {/* New Empty State View - shown when there's no search query */}
+            {(!showResults || !loading) && <EmptyStateView theme={theme} />}
+          </View>
+        </ScrollView>
+      </Container>
+    </SkeletonContainer>
+  );
+}
+
+// New Component for Empty State
+function EmptyStateView({ theme }) {
+  return (
+    <View
+      style={{
+        marginTop: 40,
+        alignItems: 'center',
+        paddingHorizontal: 24,
+      }}>
+      <View
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: greys(theme)[1800],
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 24,
+        }}>
+        <Icon name="majesticons:search-line" size={40} color={greys(theme)[700]} />
+      </View>
+
+      <Text
+        style={{
+          color: greys(theme)[100],
+          fontSize: 20,
+          fontFamily: 'OverpassBold',
+          marginBottom: 12,
+          textAlign: 'center',
+        }}>
+        Search for Users
+      </Text>
+
+      <Text
+        style={{
+          color: greys(theme)[700],
+          fontSize: 16,
+          textAlign: 'center',
+          marginBottom: 28,
+        }}>
+        Type a name, public key, or NIP-05 identifier to find users on the network
+      </Text>
+
+      <View
+        style={{
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 12,
+          padding: 16,
+          width: '100%',
+          marginBottom: 16,
+        }}>
+        <Text
+          style={{
+            color: greys(theme)[200],
+            fontSize: 16,
+            fontFamily: 'OverpassBold',
+            marginBottom: 4,
+          }}>
+          Search Tips:
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+          <Icon name="ph:user-bold" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Search by username or display name
+          </Text>
         </View>
-      </ScrollView>
-    </Container>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+          <Icon name="solar:key-bold" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Search by public key
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+          <Icon name="mdi:at" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Search by NIP-05 identifier
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SearchResult({ result, onPress, loading }) {
+  const theme = useSelector(memoizedGetTheme);
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        backgroundColor: greys(theme)[1800],
+        borderRadius: 8,
+        marginBottom: 8,
+      }}>
+      <View style={{ marginRight: 8 }}>
+        <ProfileImage loading={loading} profile={result?.profile} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text loading={loading} style={{ fontWeight: 'bold', color: greys(theme)[100] }}>
+          {result?.profile?.displayName || result?.profile?.name}
+        </Text>
+        {result?.profile?.nip05 && (
+          <Text loading={loading} style={{ color: shades[200], fontSize: 12 }}>
+            ✓ {result?.profile?.nip05}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function ProfileImage({ profile, loading }: { profile: NDKUserProfile; loading?: boolean }) {
+  const theme = useSelector(memoizedGetTheme);
+  const [imageError, setImageError] = useState(false);
+
+  return (
+    <Skeleton style={{ width: 48, height: 48, borderRadius: 24 }}>
+      {!loading && (
+        <>
+          {profile?.picture && !imageError ? (
+            <Image
+              source={{ uri: profile?.picture }}
+              onError={(e) => {
+                setImageError(true);
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: 1000,
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: greys(theme)[2300],
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Icon name="ph:user-bold" size={24} color={greys(theme)[700]} />
+            </View>
+          )}
+        </>
+      )}
+    </Skeleton>
   );
 }

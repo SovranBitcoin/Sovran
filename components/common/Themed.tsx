@@ -12,6 +12,7 @@ import { TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { greens } from 'helper/colors';
+import { Skeleton } from 'react-native-skeleton-component';
 
 interface GradientTextProps extends TextProps {
   children: React.ReactNode;
@@ -225,6 +226,7 @@ export function UntranslatedText({
 }
 
 export function Text({
+  loading = false,
   weight = 'regular',
   size = 14,
   family = 'Overpass',
@@ -236,6 +238,17 @@ export function Text({
   const displayText = translateText({ id, children, lang });
 
   // Translation debugging removed
+  if (loading) {
+    return (
+      <Skeleton
+        style={{
+          width: 120,
+          height: size + 2,
+          marginBottom: 2,
+          borderRadius: 2,
+        }}></Skeleton>
+    );
+  }
 
   return (
     <UntranslatedText weight={weight} size={size} family={family} {...otherProps}>
