@@ -99,9 +99,8 @@ function ModalScreen() {
       mintUrl: selectedMint,
     });
 
-    const totalAmount = amount + meltQuote.fee_reserve;
-    const isBalanceSufficient =
-      unit === 'sat' ? balance >= totalAmount / 100_000_000 : balance >= totalAmount;
+    const totalAmount = Number(amount) + Number(meltQuote.fee_reserve);
+    const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
 
     if (!isBalanceSufficient) {
       showMessage(
