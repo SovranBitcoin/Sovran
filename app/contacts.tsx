@@ -18,6 +18,7 @@ export default function ModalScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const navigation = useTypedNavigation();
 
   const debounceTimeoutRef = useRef(null);
@@ -34,6 +35,8 @@ export default function ModalScreen() {
     if (!query.trim()) return;
 
     setLoading(true);
+    setHasSearched(true); // Set this to true when search is initiated
+
     try {
       const response = await fetch(
         `https://esim.sovran.cash/search?query=${encodeURIComponent(query)}&limit=10`
@@ -68,8 +71,15 @@ export default function ModalScreen() {
 
   const handleSearchQueryChange = (input) => {
     setSearchQuery(input);
+
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // If search query is cleared, reset hasSearched state
+    if (!input.trim()) {
+      setHasSearched(false);
+      setSearchResults([]);
     }
 
     debounceTimeoutRef.current = setTimeout(() => {
@@ -77,6 +87,7 @@ export default function ModalScreen() {
         searchUsers(input);
       } else {
         setSearchResults([]);
+        setHasSearched(false);
       }
     }, 800); // Reduced timeout to 800ms for better UX
   };
@@ -89,6 +100,7 @@ export default function ModalScreen() {
   const clearSearchInput = () => {
     setSearchQuery('');
     setSearchResults([]);
+    setHasSearched(false); // Reset hasSearched when search is cleared
   };
 
   const navigateToUserMessages = (pubkey) => {
@@ -100,6 +112,9 @@ export default function ModalScreen() {
   // Display the search results or loading placeholders
   const displayResults = loading ? placeholderResults : searchResults;
   const showResults = loading || searchResults.length > 0;
+
+  const showEmptyState = !hasSearched && !loading;
+  const showNoResults = hasSearched && !loading && searchResults.length === 0;
 
   return (
     <SkeletonContainer
@@ -128,7 +143,7 @@ export default function ModalScreen() {
               <View style={{ flex: 1, position: 'relative' }}>
                 <TextInput
                   ref={ref}
-                  autoFocus={true}
+                  // autoFocus={true}
                   value={searchQuery}
                   onChangeText={handleSearchQueryChange}
                   placeholder="Search users..."
@@ -192,12 +207,97 @@ export default function ModalScreen() {
               </View>
             )}
 
-            {/* New Empty State View - shown when there's no search query */}
-            {(!showResults || !loading) && <EmptyStateView theme={theme} />}
+            {/* Show EmptyStateView when no search has been attempted */}
+            {showEmptyState && <EmptyStateView theme={theme} />}
+
+            {/* Show NoResultsFound when search completed with no results */}
+            {showNoResults && <NoResultsFound theme={theme} />}
           </View>
         </ScrollView>
       </Container>
     </SkeletonContainer>
+  );
+}
+
+function NoResultsFound({ theme }) {
+  return (
+    <View
+      style={{
+        marginTop: 40,
+        alignItems: 'center',
+        paddingHorizontal: 24,
+      }}>
+      <View
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: greys(theme)[1800],
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 24,
+        }}>
+        <Icon name="nonicons:error-16" size={40} color={greys(theme)[700]} />
+      </View>
+
+      <Text
+        style={{
+          color: greys(theme)[100],
+          fontSize: 20,
+          fontFamily: 'OverpassBold',
+          marginBottom: 12,
+          textAlign: 'center',
+        }}>
+        No Results Found
+      </Text>
+
+      <Text
+        style={{
+          color: greys(theme)[700],
+          fontSize: 16,
+          textAlign: 'center',
+          marginBottom: 28,
+        }}>
+        We couldn't find any users matching your search
+      </Text>
+
+      <View
+        style={{
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 12,
+          padding: 16,
+          width: '100%',
+          marginBottom: 16,
+        }}>
+        <Text
+          style={{
+            color: greys(theme)[200],
+            fontSize: 16,
+            fontFamily: 'OverpassBold',
+            marginBottom: 12,
+          }}>
+          Try adjusting your search:
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+          <Icon name="lucide:pencil-line" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Check your spelling
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+          <Icon name="solar:key-bold" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Try using a complete public key
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+          <Icon name="mdi:at" size={20} color={greys(theme)[600]} />
+          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+            Use a different NIP-05 identifier
+          </Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
