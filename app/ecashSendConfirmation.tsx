@@ -298,9 +298,9 @@ function ModalScreen() {
               },
               {
                 locale: 'en-US',
-                precision: 8,
+                precision: unit === 'sat' ? 8 : 2,
                 currencyDisplay: 'symbol',
-                denomination: 'btc',
+                denomination: unit === 'sat' ? 'btc' : unit,
               }
             )}
             bottomAmount={formatCurrency(
