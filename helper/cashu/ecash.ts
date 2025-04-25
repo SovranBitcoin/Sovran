@@ -118,6 +118,7 @@ export async function sendEcash({
       proofs: send,
       mint: wallet.mint.mintUrl,
       unit,
+      memo: note,
     };
 
     store.dispatch(

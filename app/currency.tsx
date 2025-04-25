@@ -19,6 +19,7 @@ import { isValidPaymentRequest } from 'helper/cashu/helper';
 import { handlePaymentRequest } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
+import { SheetManager } from 'react-native-actions-sheet';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -75,10 +76,11 @@ function ModalScreen() {
     });
   };
 
-  const handleEcashSend = async () => {
+  const handleEcashSend = async ({ message }) => {
     const token = await sendEcash({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
+      note: message,
     });
 
     navigation.goBack();
@@ -131,7 +133,15 @@ function ModalScreen() {
           await handleLightningReceive();
           break;
         case 'ecashSendConfirmation':
-          await handleEcashSend();
+          SheetManager.show('transaction-message', {
+            onClose: async (data) => {
+              if (data?.action === 'confirm') {
+                await handleEcashSend({ message: data.message });
+              } else if (data?.action === 'skip') {
+                await handleEcashSend();
+              }
+            },
+          });
           break;
         default:
           await handleDefaultSend();

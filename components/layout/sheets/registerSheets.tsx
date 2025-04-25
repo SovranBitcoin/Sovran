@@ -8,3 +8,4 @@ import 'components/layout/sheets/nfc';
 import 'components/layout/sheets/buttonHandler';
 import 'components/layout/sheets/delete';
 import 'components/layout/sheets/mint-adder';
+import 'components/layout/sheets/transaction-message';
