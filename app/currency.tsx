@@ -133,12 +133,18 @@ function ModalScreen() {
           await handleLightningReceive();
           break;
         case 'ecashSendConfirmation':
+          // check balance
+          if (unit === 'sat' ? balance < amount : balance < amount) {
+            showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
+            return;
+          }
+
           SheetManager.show('transaction-message', {
             onClose: async (data) => {
               if (data?.action === 'confirm') {
                 await handleEcashSend({ message: data.message });
               } else if (data?.action === 'skip') {
-                await handleEcashSend();
+                await handleEcashSend({ message: undefined });
               }
             },
           });
