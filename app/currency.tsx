@@ -58,10 +58,11 @@ function ModalScreen() {
     }
   };
 
-  const handleLightningReceive = async () => {
+  const handleLightningReceive = async ({ memo }) => {
     const response = await receiveLightning({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
+      memo,
     });
 
     navigation.goBack();
@@ -130,7 +131,15 @@ function ModalScreen() {
     try {
       switch (params.to) {
         case 'lightningReceiveConfirmation':
-          await handleLightningReceive();
+          SheetManager.show('transaction-message', {
+            onClose: async (data) => {
+              if (data?.action === 'confirm') {
+                await handleLightningReceive({ memo: data.message });
+              } else if (data?.action === 'skip') {
+                await handleLightningReceive({ memo: undefined });
+              }
+            },
+          });
           break;
         case 'ecashSendConfirmation':
           // check balance
