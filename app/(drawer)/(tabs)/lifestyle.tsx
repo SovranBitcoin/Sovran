@@ -89,6 +89,16 @@ const ServicesSection = () => {
 
   return (
     <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}>
+      <Text
+        size={32}
+        style={{
+          fontFamily: 'OverpassHeavy',
+          marginLeft: 16,
+          marginBottom: 4,
+          marginTop: 4,
+        }}>
+        Lifestyle
+      </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.map((item) => (
           <MenuItem
@@ -129,6 +139,7 @@ const createStyles = (theme) =>
       flexWrap: 'wrap',
       justifyContent: 'space-between',
       padding: 16,
+      paddingTop: 4,
       width: '100%',
     },
     iconContainer: {
