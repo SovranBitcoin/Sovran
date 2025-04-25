@@ -47,7 +47,7 @@ export const TAB_SCREENS: TabConfig[] = [
   {
     name: 'lifestyle',
     component: LifestyleView,
-    title: 'Products & Services',
+    title: '',
     icon: ({ color }) => (
       <Icon
         name="clarity:internet-of-things-solid"
