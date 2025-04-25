@@ -16,6 +16,10 @@ import { products } from './products';
 import { TextContent } from '../ProfilePage/TextContent';
 import { Card } from 'components/common/Card';
 import lookup from 'country-code-lookup';
+import RenderHtml from 'react-native-render-html';
+import { Dimensions } from 'react-native';
+
+const width = Dimensions.get('window').width;
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -204,21 +208,64 @@ export default function ModalScreen() {
 
           <SectionTitle title="Details" />
           <View style={styles.productDetails}>
-            <TextContent content={selectedProduct?.descriptions?.en} />
+            <RenderHtml
+              tagsStyles={{
+                div: {
+                  width: width - 48 - 16,
+                  color: greys(theme)[200],
+                },
+                p: {
+                  margin: 0,
+                  marginBottom: 8,
+                },
+                a: {
+                  color: shades[300],
+                  textDecorationLine: 'none',
+                },
+                ul: {
+                  margin: 0,
+                  paddingLeft: 10,
+                },
+              }}
+              source={{ html: '<div>' + selectedProduct?.descriptions?.en + '</div>' }}
+            />
           </View>
 
           <SectionTitle title="How to Redeem" />
           <View style={styles.productDetails}>
-            <TextContent content={selectedProduct?.instructions?.en} />
+            <RenderHtml
+              tagsStyles={{
+                div: {
+                  width: width - 48 - 16,
+                  color: greys(theme)[200],
+                },
+                p: {
+                  margin: 0,
+                },
+                a: {
+                  color: shades[300],
+                  textDecorationLine: 'none',
+                },
+                ul: {
+                  margin: 0,
+                  paddingLeft: 10,
+                },
+              }}
+              source={{
+                html: '<div>' + selectedProduct?.instructions?.en + '</div>',
+              }}
+            />
           </View>
 
           {selectedProduct?.specialNote?.en && (
             <Card message={selectedProduct?.specialNote?.en} variant="warning" theme={theme} />
           )}
 
-          <Text weight="regular" size={14} style={{ marginTop: 16, marginBottom: 16 }}>
-            Gift cards are provided through a third party.
-          </Text>
+          <Card
+            message="Gift cards are provided through a third party."
+            variant="info"
+            theme={theme}
+          />
 
           <Button
             onPress={() =>
