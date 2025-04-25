@@ -677,6 +677,7 @@ export function MintAddMore({ onClose, payload }) {
                 await onClose({
                   mints: Array.from(selectedMints),
                 });
+                router?.goBack();
               },
             },
             {

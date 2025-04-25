@@ -4,14 +4,20 @@ import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import Icon from 'assets/icons';
-import { ActionSheetRef, registerSheet } from 'react-native-actions-sheet';
+import {
+  ActionSheetRef,
+  registerSheet,
+  useSheetRef,
+  useSheetRouter,
+} from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { formatCurrency } from 'helper/currency';
 import { Text } from 'components/common/Themed';
-import { useGetMintInfo } from 'helper/redux/cashu';
+import { addMints, useGetMintInfo } from 'helper/redux/cashu';
 import { Sheet } from 'components/layout/sheets/mints/sheet';
 import { MintSelect } from 'components/layout/sheets/mints/MintSelect';
 import MintAddMore from 'components/layout/sheets/mints/MintAddMore';
+import { store } from 'helper/redux/store';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -117,6 +123,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
 
 import { ViewStyle } from 'react-native';
 import MintDetailPage from './MintDetailsPage';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 // Theme type definition
 interface Theme {
@@ -418,6 +425,7 @@ const MintSheet = ({
   unit,
   loading,
 }) => {
+  const router = useSheetRouter('mint');
   return (
     <Sheet
       actionSheetRef={actionSheetRef}
@@ -436,7 +444,18 @@ const MintSheet = ({
         },
         {
           name: 'mintAddMore',
-          component: () => <MintAddMore />,
+          component: () => (
+            <MintAddMore
+              onClose={(data) => {
+                store.dispatch(
+                  addMints({
+                    profileId: memoizedGetCurrentProfile(store.getState()).id,
+                    mints: data.mints,
+                  })
+                );
+              }}
+            />
+          ),
         },
         {
           name: 'mintDetailsPage',
