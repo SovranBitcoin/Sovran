@@ -35,7 +35,7 @@ export default function ModalScreen() {
     return () => runWithAnimationFrame(restore, setIsLoading)({ keyset, mintUrl });
   };
 
-  if (!keysets || !profileId) {
+  if (!!keysets && !!profileId) {
     return null;
   }
 
