@@ -241,7 +241,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
 
   const currencies: SupportedCurrency[] = _.uniq(
     multipleBalances.map((b) => b.unit?.toUpperCase())
-  );
+  ).filter((c) => ['SAT', 'EUR', 'GBP', 'USD'].includes(c));
 
   const handleMintSelection = async (
     mint: {
