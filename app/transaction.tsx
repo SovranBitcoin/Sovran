@@ -803,7 +803,7 @@ function ModalScreen() {
           <ButtonHandler
             context="transactionButtons"
             buttons={[
-              transaction?.nostr?.pubkey !== 'Unknown'
+              transaction?.nostr?.pubkey
                 ? {
                     text: 'View Chat',
                     onPress: () => {
