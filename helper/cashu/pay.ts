@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { AppError } from 'components/cashu';
 import { getKeys, getWallet } from '.';
 import {
@@ -271,6 +272,17 @@ export async function receiveLightning({
   return transaction;
 }
 
+export function maybeConvertNpub(key: string) {
+  // Check and convert npub to P2PK
+  if (key && key.startsWith('npub1')) {
+    const { type, data } = nip19.decode(key);
+    if (type === 'npub' && data.length === 64) {
+      key = '02' + data;
+    }
+  }
+  return key;
+}
+
 export async function sendEcash({
   amount,
   unit,
@@ -282,7 +294,7 @@ export async function sendEcash({
   unit: string;
   memo?: string;
   to?: string;
-  p2pk?: { pubkey: string; privkey: string };
+  p2pk?: { pubkey?: string; privkey?: string };
 }): Promise<EcashSendTransaction> {
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
@@ -311,7 +323,7 @@ export async function sendEcash({
   })(state);
 
   const { keep, send } = await wallet.send(Number(amount), proofs, {
-    ...(p2pk ? { pubkey: p2pk.pubkey } : {}),
+    ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
     counter,
   });
 
@@ -562,6 +574,7 @@ export async function cancelEcashTransaction(
   navigation: any
 ): Promise<void> {
   try {
+    console.log('[cancelEcashTransaction]', transaction);
     await receiveEcash({
       token: transaction.token as string,
       unit: transaction.unit,
