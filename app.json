@@ -19,7 +19,7 @@
       "**/*"
     ],
     "ios": {
-      "buildNumber": "2",
+      "buildNumber": "4",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
         "ITSAppUsesNonExemptEncryption": false
@@ -66,5 +66,8 @@
         "projectId": "09112d75-3a3a-49ba-bec6-ab881c5a2fa6"
       }
     }
+  },
+  "experiments": {
+    "reactCompiler": true
   }
 }

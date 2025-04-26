@@ -8,6 +8,13 @@ const config = getDefaultConfig(__dirname);
 // I guess I hate working within a specific icon library...
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'solar:card-bold',
+    'nonicons:error-16',
+    'lucide:pencil-line',
+    'majesticons:search-line',
+    'solar:key-bold',
+    'simple-line-icons:close',
+    'ph:user-bold',
     'iconamoon:send-fill',
     'lucide:twitter',
     'mdi:contact',
