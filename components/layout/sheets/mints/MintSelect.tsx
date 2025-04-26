@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector } from 'react-redux';
 import {
@@ -20,6 +20,7 @@ import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import _ from 'lodash';
 import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { store } from 'helper/redux/store';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -227,21 +228,18 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>(
     (unit?.toUpperCase() || 'SAT') as SupportedCurrency
   );
-  const [mints, setMints] = useState<
-    Array<{
-      id: string;
-      name: string;
-      balances: Array<{ amount: number; unit: string }>;
-      iconUrl: string | null;
-      supportedUnits: string[];
-    }>
-  >([]);
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
+  // limit to specified currencies: sat, eur, gbp, usd
   const currencies: SupportedCurrency[] = _.uniq(
     multipleBalances.map((b) => b.unit?.toUpperCase())
   ).filter((c) => ['SAT', 'EUR', 'GBP', 'USD'].includes(c));
+
+  // Filter mints based on the selected currency
+  const filteredMints = useMemo(() => {
+    return multipleBalances.filter((mint) => mint.unit?.toUpperCase() === selectedCurrency);
+  }, [multipleBalances, selectedCurrency]);
 
   const handleMintSelection = async (
     mint: {
@@ -290,103 +288,51 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
     router?.goBack();
   };
 
-  useEffect(() => {
-    const fetchSelectedMintInfo = async () => {
-      const selectedBalance = multipleBalances.find(
-        (b) => b.mintUrl === selectedMintUrl && b.unit === unit
-      );
-      if (!selectedBalance) return;
+  const selectedMint = memoizedGetSelectedMint(store.getState());
 
-      try {
-        const mintData = await getMint({ mintUrl: selectedBalance.mintUrl });
-        const info = await mintData.getInfo();
-        setMintState((prev) => ({
-          ...prev,
-          selected: {
-            id: selectedBalance.mintUrl,
-            name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
-            balance: selectedBalance.amount,
-            iconUrl: info?.icon_url || null,
-            unit: selectedBalance.unit,
-          },
-        }));
-      } catch (error) {
-        console.error(`Error fetching info for mint ${selectedBalance.mintUrl}:`, error);
-        setMintState((prev) => ({
-          ...prev,
-          selected: {
-            id: selectedBalance.mintUrl,
-            name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
-            balance: selectedBalance.amount,
-            iconUrl: null,
-            unit: selectedBalance.unit,
-          },
-        }));
-      }
-    };
+  // useEffect(() => {
+  //   const fetchSelectedMintInfo = async () => {
+  //     const selectedBalance = multipleBalances.find(
+  //       (b) => b.mintUrl === selectedMintUrl && b.unit === unit
+  //     );
+  //     if (!selectedBalance) return;
 
-    if (selectedMintUrl) {
-      fetchSelectedMintInfo();
-    }
-  }, [selectedMintUrl, multipleBalances]);
+  //     try {
+  //       const mintData = await getMint({ mintUrl: selectedBalance.mintUrl });
+  //       const info = await mintData.getInfo();
+  //       setMintState((prev) => ({
+  //         ...prev,
+  //         selected: {
+  //           id: selectedBalance.mintUrl,
+  //           name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
+  //           balance: selectedBalance.amount,
+  //           iconUrl: info?.icon_url || null,
+  //           unit: selectedBalance.unit,
+  //         },
+  //       }));
+  //     } catch (error) {
+  //       console.error(`Error fetching info for mint ${selectedBalance.mintUrl}:`, error);
+  //       setMintState((prev) => ({
+  //         ...prev,
+  //         selected: {
+  //           id: selectedBalance.mintUrl,
+  //           name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
+  //           balance: selectedBalance.amount,
+  //           iconUrl: null,
+  //           unit: selectedBalance.unit,
+  //         },
+  //       }));
+  //     }
+  //   };
+
+  //   if (selectedMintUrl) {
+  //     fetchSelectedMintInfo();
+  //   }
+  // }, [selectedMintUrl, multipleBalances]);
 
   const displayCurrency = (currency: string) => {
     return currency === 'SAT' ? 'BTC' : currency;
   };
-
-  const fetchMintsWithIcons = async () => {
-    const balancesByMint: Record<string, Array<{ amount: number; unit: string }>> = {};
-    multipleBalances.forEach((balance) => {
-      if (!balancesByMint[balance.mintUrl]) {
-        balancesByMint[balance.mintUrl] = [];
-      }
-      balancesByMint[balance.mintUrl].push({
-        amount: balance.amount,
-        unit: balance.unit.toUpperCase() === 'BTC' ? 'SAT' : balance.unit.toUpperCase(),
-      });
-    });
-
-    const updatedMints = await Promise.all(
-      Object.keys(balancesByMint).map(async (mintUrl) => {
-        try {
-          const mintData = await getMint({ mintUrl });
-          const info = await mintData.getInfo();
-          const supportedUnits: string[] = [];
-          if (info?.nuts?.[4]?.methods) {
-            info.nuts[4].methods.forEach((method) => {
-              const unit = method.unit.toUpperCase() === 'BTC' ? 'SAT' : method.unit.toUpperCase();
-              if (!supportedUnits.includes(unit)) {
-                supportedUnits.push(unit);
-              }
-            });
-          }
-
-          return {
-            id: mintUrl,
-            name: mintUrl.replace('https://', '')?.split('/')?.[0],
-            balances: balancesByMint[mintUrl],
-            iconUrl: info?.icon_url,
-            supportedUnits,
-          };
-        } catch (error) {
-          return {
-            id: mintUrl,
-            name: mintUrl.replace('https://', '')?.split('/')?.[0],
-            balances: balancesByMint[mintUrl],
-            iconUrl: null,
-            supportedUnits: ['SAT'],
-          };
-        }
-      })
-    );
-    setMints(updatedMints);
-  };
-
-  useEffect(() => {
-    fetchMintsWithIcons();
-  }, [multipleBalances]);
-
-  const filteredMints = mints.filter((mint) => mint.supportedUnits.includes(selectedCurrency));
 
   const router = useSheetRouter('mint');
   return (
@@ -402,6 +348,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
             style={styles.currencyScroll}>
             {currencies.map((currency) => (
               <LinearGradient
+                key={currency}
                 colors={
                   selectedCurrency === currency
                     ? ([
@@ -426,7 +373,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
                   },
                 ]}>
                 <TouchableOpacity
-                  key={currency}
                   style={[
                     styles.currencyButton,
                     selectedCurrency === currency && styles.selectedCurrencyButton,
@@ -457,21 +403,30 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           </Text>
           <View style={styles.mintScroll}>
             {filteredMints.map((mint) => {
-              const balance = mint.balances.find((b) => b.unit.toUpperCase() === selectedCurrency);
               return (
                 <MintItem
-                  key={mint.id}
-                  mint={mint}
-                  balance={balance}
-                  isSelected={
-                    mintState.selected?.id === mint.id &&
-                    mintState.selected?.unit.toUpperCase() === selectedCurrency
-                  }
-                  isLoading={mintState.loadingId === mint.id}
+                  key={mint.mintUrl}
+                  mint={{
+                    id: mint.mintUrl,
+                    name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
+                    iconUrl: null, // We'll get this from the mint info if needed
+                  }}
+                  balance={{ amount: mint.amount, unit: mint.unit }}
+                  isSelected={selectedMint === mint.mintUrl}
+                  isLoading={mintState.loadingId === mint.mintUrl}
                   globalLoading={mintState.loadingId !== null}
                   selectedCurrency={selectedCurrency}
                   theme={theme}
-                  onPress={() => handleMintSelection(mint, balance)}
+                  onPress={() =>
+                    handleMintSelection(
+                      {
+                        id: mint.mintUrl,
+                        name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
+                        iconUrl: null,
+                      },
+                      { amount: mint.amount, unit: mint.unit }
+                    )
+                  }
                 />
               );
             })}
