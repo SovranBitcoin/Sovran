@@ -106,31 +106,6 @@ export default function ModalScreen() {
   const paddingAnim = useRef(new Animated.Value(1)).current;
   const paddingAnim2 = useRef(new Animated.Value(8)).current;
 
-  // Create styles based on theme
-
-  // Fetch profile on mount
-  // useEffect(() => {
-  //   (async () => {
-  //     const profile = await fetchNostrProfile(params.pubkey);
-  //     // Update search with profile data
-  //     if (search.find((p) => p.pubkey === params.pubkey)) {
-  //       setSearch(
-  //         search.map((p) => {
-  //           if (p.pubkey === params.pubkey) {
-  //             return {
-  //               pubkey: p.pubkey,
-  //               profile: { ...p.profile, ...profile },
-  //             };
-  //           }
-  //           return p;
-  //         })
-  //       );
-  //     } else {
-  //       setSearch([...search, { pubkey: params.pubkey, profile }]);
-  //     }
-  //   })();
-  // }, []);
-
   // Handle animation effects
   useEffect(() => {
     Animated.timing(scaleAnim, {
@@ -392,6 +367,7 @@ export default function ModalScreen() {
                                 unit: 'sat',
                                 lud16: currentUserProfile?.lud16,
                                 pubkey: currentUserProfile?.pubkey,
+                                profile: currentUserProfile,
                               });
                             },
                           },
@@ -403,9 +379,7 @@ export default function ModalScreen() {
                               navigation.navigate('currency', {
                                 to: 'ecashSendConfirmation',
                                 unit: 'sat',
-                                p2pk: {
-                                  pubkey: currentUserProfile?.pubkey,
-                                },
+                                profile: currentUserProfile,
                               });
                             },
                           },

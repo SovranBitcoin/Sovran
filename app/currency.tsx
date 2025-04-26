@@ -11,10 +11,10 @@ import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
-import SelectedMintDisplay from 'components/layout/sheets/mints';
+import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from './ecashSendConfirmation';
-import { View } from 'components/common/Themed';
+import { View, Text } from 'components/common/Themed';
 import { isValidPaymentRequest } from 'helper/cashu/helper';
 import { handlePaymentRequest } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
@@ -22,6 +22,10 @@ import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { greys } from 'helper/colors';
+import { maybeConvertNpub } from 'helper/cashu/pay';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import Image from 'components/common/Image';
+import Icon from 'assets/icons';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -81,10 +85,17 @@ function ModalScreen() {
   const handleEcashSend = async ({ message }) => {
     console.log('[handleEcashSend]', unit === 'sat' ? amount : amount * 100, unit, message, params);
     const transaction = await sendEcash({
+      to: params?.profile?.npub,
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,
-      p2pk: params.p2pk,
+      ...(params?.profile?.npub
+        ? {
+            p2pk: {
+              pubkey: maybeConvertNpub(params?.profile?.npub),
+            },
+          }
+        : {}),
     });
 
     navigation.replace(params.to, {
@@ -162,7 +173,6 @@ function ModalScreen() {
           break;
         case 'ecashSendConfirmation':
           // check balance
-          console.log('[handleNext] balance', balance, amount, unit);
           if (unit === 'sat' ? balance < amount : balance < amount) {
             showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
             return;
@@ -213,17 +223,22 @@ function ModalScreen() {
   };
 
   const renderButtons = () => {
+    const isP2PK = params?.profile && params.to === 'ecashSendConfirmation';
     if (params.to === 'ecashSendConfirmation') {
       return (
         <View style={styles.buttonContainer}>
           <ButtonHandler
             buttons={[
-              {
-                text: 'Paste',
-                icon: 'lets-icons:copy',
-                variant: 'secondary',
-                onPress: handlePastePress,
-              },
+              ...(isP2PK
+                ? []
+                : [
+                    {
+                      text: 'Paste',
+                      icon: 'lets-icons:copy',
+                      variant: 'secondary',
+                      onPress: handlePastePress,
+                    },
+                  ]),
               {
                 text: 'Next',
                 icon: 'lucide:arrow-right',
@@ -231,18 +246,22 @@ function ModalScreen() {
                 onPress: handleNext,
                 disabled: !isValidAmount, // Disable the button when amount is invalid
               },
-              {
-                text: 'Scan QR',
-                icon: 'stash:qr-code',
-                variant: 'secondary',
-                onPress: () => navigation.navigate('camera', { unit }),
-              },
-              {
-                text: 'Contacts',
-                icon: 'mdi:contact',
-                variant: 'secondary',
-                onPress: () => navigation.navigate('contacts'),
-              },
+              ...(isP2PK
+                ? []
+                : [
+                    {
+                      text: 'Scan QR',
+                      icon: 'stash:qr-code',
+                      variant: 'secondary',
+                      onPress: () => navigation.navigate('camera', { unit }),
+                    },
+                    {
+                      text: 'Contacts',
+                      icon: 'mdi:contact',
+                      variant: 'secondary',
+                      onPress: () => navigation.navigate('contacts'),
+                    },
+                  ]),
             ]}
           />
         </View>
@@ -292,6 +311,32 @@ function ModalScreen() {
               unit={unit}
               loading={loading}
             />
+            {params.to === 'ecashSendConfirmation' && params?.profile && (
+              <TouchableOpacity style={[sovran.listItem, { alignSelf: 'center' }]}>
+                <Icon
+                  name="solar:key-bold"
+                  size={16}
+                  style={{
+                    backgroundColor: greys(theme)[1200],
+                    borderRadius: 100,
+                    padding: 8,
+                  }}
+                />
+                <Text>{'  →  '}</Text>
+                {params?.profile?.picture ? (
+                  <Image
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 1000,
+                    }}
+                    source={{ uri: params.profile.picture }}
+                  />
+                ) : (
+                  <View />
+                )}
+              </TouchableOpacity>
+            )}
           </>
         }
         buttons={
