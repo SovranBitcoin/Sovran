@@ -88,8 +88,8 @@ export function Transaction({ tx, transactions, account }) {
         request: tx.request,
         amount: tx.amount,
         transaction: JSON.stringify(tx),
-        unified_request: tx.unified_request,
-        payment_request: tx.payment_request,
+        unifiedRequest: tx.unifiedRequest,
+        paymentRequest: tx.paymentRequest,
       });
     } else if (tx.type === 'ecash' && !isPaid && isSend) {
       navigation.navigate('ecashSendConfirmation', {

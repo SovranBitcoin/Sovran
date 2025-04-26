@@ -3,23 +3,6 @@ import _ from 'lodash';
 import { getWallet } from 'helper/cashu';
 
 /**
- * Validates if a mint meets the required nuts specifications
- */
-export async function isValidMint(mint) {
-  const requiredNuts = {
-    nuts: {
-      '15': [
-        { unit: 'sat', mpp: true },
-        { unit: 'usd', mpp: true },
-      ],
-    },
-  };
-
-  const mintInfo = await mint.getInfo();
-  return _.isMatch(mintInfo, requiredNuts);
-}
-
-/**
  * Checks if a token has been spent
  */
 export async function checkTokenSpent({ token }) {
@@ -51,23 +34,4 @@ export function isValidPaymentRequest(paymentRequest: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Creates a CashuMint instance from a token
- */
-export async function getMintFromToken(token) {
-  // Parse token if it's a string
-  const tokenData = typeof token === 'string' ? JSON.parse(token) : token;
-
-  if (typeof tokenData !== 'object') {
-    throw new Error('Invalid token format. Token should be a JSON string or a Token object.');
-  }
-
-  const { mintUrl } = tokenData;
-  if (!mintUrl) {
-    throw new Error('Mint URL not found in the token.');
-  }
-
-  return new CashuMint(mintUrl);
 }

@@ -44,9 +44,8 @@ expo-env.d.ts
 # @end expo-cli
 .env.local
 
-ios/
 android/
 
 .monicon
 .vscode
-helper/cashu/secrets.ts
+# helper/cashu/secrets.ts

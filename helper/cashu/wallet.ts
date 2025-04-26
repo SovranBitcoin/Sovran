@@ -5,6 +5,7 @@ import * as bip39 from '@scure/bip39';
 import { getKeys } from './keys';
 import { getMint } from './mint';
 import { memoizedGetCurrentProfile } from '../redux/nostr';
+
 interface GetWalletParams {
   unit: string;
   mintUrl: string;

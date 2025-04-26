@@ -65,6 +65,7 @@ const createStyles = (theme: string, buttonHeight: number) =>
     scrollContainer: {
       padding: 16,
       height: '100%',
+      marginBottom: buttonHeight,
     },
     buttonContainer: {
       padding: 0,

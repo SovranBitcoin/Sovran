@@ -1,7 +1,12 @@
-export { cancelEcashTransaction, receiveEcash, sendEcash } from './ecash';
 export { getKeys } from './keys';
-export { receiveLightning, sendLightning } from './lightning';
+export {
+  cancelEcashTransaction,
+  receiveEcash,
+  sendEcash,
+  receiveLightning,
+  sendLightning,
+} from './pay';
 export { getMint } from './mint';
 export { restoreMint } from './restore';
 export { getWallet } from './wallet';
-export { checkTokenSpent, getMintFromToken, isValidEcashToken, isValidMint } from './helper';
+export { checkTokenSpent, isValidEcashToken } from './helper';

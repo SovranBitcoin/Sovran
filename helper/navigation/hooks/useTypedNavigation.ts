@@ -7,6 +7,7 @@ type AppNavigationProp = NavigationProp<NavigationParams>;
 
 export const useTypedNavigation = <T extends keyof NavigationParams>() => {
   const navigation = useNavigation<AppNavigationProp>();
+
   const navigate = (
     target: T,
     params: NavigationParams[T],

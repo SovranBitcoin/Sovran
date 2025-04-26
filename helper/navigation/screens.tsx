@@ -84,6 +84,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
+    name: 'cards',
+    options: {
+      presentation: 'modal',
+    },
+  },
+  {
     name: 'feed',
     options: {
       presentation: 'modal',

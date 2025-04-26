@@ -633,7 +633,7 @@ export function MintAddMore({ onClose, payload }) {
             {allowedCurrencies.size === 1 ? ' supporting only SAT' : ''}
           </Text>
 
-          <ScrollView style={styles.mintsContainer}>
+          <View>
             {loadedMints.length > 0 ? (
               loadedMints.map((mint) => {
                 const mintData = mintsData.get(mint.id);
@@ -663,7 +663,7 @@ export function MintAddMore({ onClose, payload }) {
                 <Text style={styles.loadingText}>Loading more mints...</Text>
               </View>
             )}
-          </ScrollView>
+          </View>
         </>
       }
       buttons={
@@ -750,9 +750,6 @@ const createStyles = (theme: string) =>
     mintName: {
       color: greys(theme)[0],
       fontSize: 16,
-    },
-    mintsContainer: {
-      maxHeight: 400, // Limit height to make it scrollable if needed
     },
     loadingContainer: {
       flexDirection: 'row',

@@ -18,7 +18,7 @@ function ModalScreen() {
   const navigation = useNavigation();
   const {
     request,
-    payment_request = '',
+    paymentRequest = '',
     unit,
     amount,
   } = useTypedRoute<'lightningReceiveConfirmation'>();
@@ -97,7 +97,7 @@ function ModalScreen() {
             setUri={setUri}
             data={[
               { name: 'Lightning', value: request },
-              { name: 'Ecash', value: payment_request },
+              { name: 'Ecash', value: paymentRequest },
             ]}
             unit={unit}
             popupMessage={[
@@ -107,7 +107,7 @@ function ModalScreen() {
               },
               {
                 name: 'payment_request_copied',
-                value: payment_request,
+                value: paymentRequest,
               },
             ]}
           />
