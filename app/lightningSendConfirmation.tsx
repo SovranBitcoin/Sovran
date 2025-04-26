@@ -43,13 +43,14 @@ function ModalScreen() {
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
   const handleMintSelected = async (mint, balance) => {
+    console.log(129873897, { mint }, { balance });
     try {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
 
       if (pr) {
         // Avoid UI bugs with setTimeout
         await new Promise((resolve) => setTimeout(resolve, 0));
-
+        console.log(12087387, { pr });
         const result = await handleBarcode({
           scanning: { data: pr },
           selectedMint: mint.id,
@@ -59,6 +60,8 @@ function ModalScreen() {
           setScanned: () => {},
           urDecoder: null,
         });
+
+        console.log(1928739872378, { result });
 
         if (result?.params?.meltQuote) {
           setMeltQuote(result.params.meltQuote);
@@ -91,6 +94,7 @@ function ModalScreen() {
       });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      console.log(e, errorMessage);
       showMessage(errorMessage, { error: errorMessage }, { emoji: '🚨' });
     } finally {
       setLoading(false);

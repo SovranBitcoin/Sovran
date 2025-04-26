@@ -37,6 +37,7 @@ import { Button } from 'components/common/Button';
 import ndk from 'components/ndk';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from '../ecashSendConfirmation';
+import { SheetManager } from 'react-native-actions-sheet';
 
 // Function to fetch Nostr profile
 export const fetchNostrProfile = async (npub) => {
@@ -107,27 +108,27 @@ export default function ModalScreen() {
   // Create styles based on theme
 
   // Fetch profile on mount
-  useEffect(() => {
-    (async () => {
-      const profile = await fetchNostrProfile(params.pubkey);
-      // Update search with profile data
-      if (search.find((p) => p.pubkey === params.pubkey)) {
-        setSearch(
-          search.map((p) => {
-            if (p.pubkey === params.pubkey) {
-              return {
-                pubkey: p.pubkey,
-                profile: { ...p.profile, ...profile },
-              };
-            }
-            return p;
-          })
-        );
-      } else {
-        setSearch([...search, { pubkey: params.pubkey, profile }]);
-      }
-    })();
-  }, []);
+  // useEffect(() => {
+  //   (async () => {
+  //     const profile = await fetchNostrProfile(params.pubkey);
+  //     // Update search with profile data
+  //     if (search.find((p) => p.pubkey === params.pubkey)) {
+  //       setSearch(
+  //         search.map((p) => {
+  //           if (p.pubkey === params.pubkey) {
+  //             return {
+  //               pubkey: p.pubkey,
+  //               profile: { ...p.profile, ...profile },
+  //             };
+  //           }
+  //           return p;
+  //         })
+  //       );
+  //     } else {
+  //       setSearch([...search, { pubkey: params.pubkey, profile }]);
+  //     }
+  //   })();
+  // }, []);
 
   // Handle animation effects
   useEffect(() => {
@@ -162,8 +163,9 @@ export default function ModalScreen() {
 
   // Combine profiles and search results
   const combinedSearchAndProfiles = [
-    ...profiles,
-    ...search.map((s) => ({ pubkey: s.pubkey, ...s.profile })),
+    params.profile,
+    // ...profiles,
+    // ...search.map((s) => ({ pubkey: s.pubkey, ...s.profile })),
   ];
 
   // Filter and organize transactions
@@ -377,11 +379,38 @@ export default function ModalScreen() {
                   text: 'Send Money',
                   variant: 'primary',
                   onPress: () => {
-                    navigation.navigate('currency', {
-                      to: 'lightningSendConfirmation',
-                      unit: 'sat',
-                      lud16: currentUserProfile?.lud16,
-                      pubkey: currentUserProfile?.pubkey,
+                    SheetManager.show('button-handler', {
+                      payload: {
+                        buttons: [
+                          {
+                            text: 'Lightning',
+                            icon: 'mingcute:lightning-fill',
+                            variant: 'primary',
+                            onPress: () => {
+                              navigation.navigate('currency', {
+                                to: 'lightningSendConfirmation',
+                                unit: 'sat',
+                                lud16: currentUserProfile?.lud16,
+                                pubkey: currentUserProfile?.pubkey,
+                              });
+                            },
+                          },
+                          {
+                            text: 'Lock Ecash',
+                            icon: 'solar:key-bold',
+                            variant: 'primary',
+                            onPress: () => {
+                              navigation.navigate('currency', {
+                                to: 'ecashSendConfirmation',
+                                unit: 'sat',
+                                p2pk: {
+                                  pubkey: currentUserProfile?.pubkey,
+                                },
+                              });
+                            },
+                          },
+                        ],
+                      },
                     });
                   },
                 },

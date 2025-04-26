@@ -1,0 +1,589 @@
+import { AppError } from 'components/cashu';
+import { getKeys, getWallet } from '.';
+import {
+  appendProofsV2,
+  appendTransaction,
+  increaseCounterV2,
+  memoizedGetCounterV2,
+  memoizedGetSelectedMint,
+  removeProofs,
+} from 'helper/redux/cashu';
+import { store } from 'helper/redux/store';
+import { MeltQuoteResponse, MintQuoteResponse, Proof, Token } from '@cashu/cashu-ts';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import {
+  getDecodedToken,
+  getEncodedToken,
+  PaymentRequest,
+  PaymentRequestTransport,
+  PaymentRequestTransportType,
+} from '@cashu/cashu-ts';
+import { memoizedGetBalance, memoizedGetProofs, updateTransaction } from 'helper/redux/cashu';
+import { giveaways } from './secrets';
+import { publishWalletEvent } from '../nostr/cashu';
+import { nip19 } from 'nostr-tools';
+import { v4 as uuidv4 } from 'uuid';
+import { showMessage } from '../popup/popups';
+import { SheetManager } from 'react-native-actions-sheet';
+
+interface BaseTransaction {
+  amount: number;
+  date: string;
+  type: 'ecash' | 'lightning';
+  transactionType: 'send' | 'receive';
+  unit: 'sat' | 'usd' | 'eur' | 'gbp' | string;
+  mintUrl: string;
+  paid: boolean;
+  memo?: string;
+
+  counter?: number;
+  nostr?: {
+    pubkey: string;
+  };
+}
+
+interface BaseLightningTransaction extends BaseTransaction {
+  type: 'lightning';
+  request: string;
+}
+
+interface LightningSendTransaction extends BaseLightningTransaction {
+  transactionType: 'send';
+  meltQuote: MeltQuoteResponse;
+  proofs: {
+    keep: Proof[];
+    send: Proof[];
+    change: Proof[];
+  };
+}
+
+interface LightningReceiveTransaction extends BaseLightningTransaction {
+  transactionType: 'receive';
+  mintQuote: MintQuoteResponse;
+  paymentRequest: string;
+  unifiedRequest: string;
+}
+
+interface BaseEcashTransaction extends BaseTransaction {
+  type: 'ecash';
+  token: string;
+}
+
+interface EcashSendTransaction extends BaseEcashTransaction {
+  transactionType: 'send';
+  proofs: {
+    keep: Proof[];
+    send: Proof[];
+  };
+}
+
+interface EcashReceiveTransaction extends BaseEcashTransaction {
+  transactionType: 'receive';
+  fromNIP05?: string; // Used for when we redeem from npub.cash or other lightning servers
+  proofs: {
+    keep: Proof[];
+  };
+}
+
+type Transaction =
+  | EcashReceiveTransaction
+  | EcashSendTransaction
+  | LightningReceiveTransaction
+  | LightningSendTransaction;
+
+export async function sendLightning({
+  mintUrl = memoizedGetSelectedMint(store.getState()),
+  pr,
+  unit,
+  pubkey,
+  meltQuote,
+}: {
+  mintUrl: string;
+  pr: string;
+  unit: string;
+  pubkey?: string;
+  meltQuote: MeltQuoteResponse;
+}): Promise<LightningSendTransaction> {
+  const keys = await getKeys({ unit, mintUrl });
+
+  const profile = memoizedGetCurrentProfile(store.getState());
+  const allProofs = store.getState().cashu?.profiles[profile.id]?.proofs?.[mintUrl];
+  const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
+
+  const wallet = await getWallet({ unit, mintUrl, profile: null });
+
+  if (!meltQuote.amount) {
+    throw new AppError('invalid_invoice', 'No amount specified in payment request');
+  }
+
+  const balance = currentProofs
+    .map((p: { amount: number }) => p.amount)
+    .reduce((a: number, b: number) => a + b, 0);
+  if (meltQuote.amount + meltQuote.fee_reserve > balance) {
+    throw new AppError('insufficient_funds', 'Insufficient funds');
+  }
+
+  const profileId = store.getState().nostr?.currentProfile?.id;
+
+  const counter = memoizedGetCounterV2({
+    profileId,
+    mintUrl,
+    keysetId: wallet.keysetId,
+  })(store.getState());
+
+  const { keep: proofsToKeep, send: proofsToSend } = await wallet.send(
+    meltQuote.amount + meltQuote.fee_reserve,
+    currentProofs,
+    {
+      counter: counter, // it's going up forever, laura
+    }
+  );
+
+  store.dispatch(
+    increaseCounterV2({
+      profileId,
+      mintUrl: mintUrl,
+      keysetId: wallet.keysetId,
+      amount: proofsToKeep.length + proofsToSend.length,
+    })
+  );
+
+  const counter2 = memoizedGetCounterV2({
+    profileId,
+    mintUrl,
+    keysetId: wallet.keysetId,
+  })(store.getState());
+
+  const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
+    counter: counter2, // it's going up forever, laura
+  });
+
+  store.dispatch(
+    increaseCounterV2({
+      profileId,
+      mintUrl: mintUrl,
+      keysetId: wallet.keysetId,
+      amount: change.length,
+    })
+  );
+
+  store.dispatch(
+    removeProofs({
+      profileId,
+      mintUrl,
+      proofs: proofsToSend,
+    })
+  );
+
+  store.dispatch(
+    appendProofsV2({
+      profileId,
+      mintUrl,
+      proofs: [...proofsToKeep, ...change],
+    })
+  );
+
+  const transaction: LightningSendTransaction = {
+    request: pr,
+    amount: meltQuote.amount,
+    date: new Date().toISOString(),
+    type: 'lightning',
+    transactionType: 'send',
+    unit,
+    paid: true,
+    meltQuote,
+    mintUrl,
+    nostr: {
+      pubkey: pubkey || '',
+    },
+    counter,
+    proofs: {
+      change,
+      keep: proofsToKeep,
+      send: proofsToSend,
+    },
+  };
+
+  store.dispatch(
+    appendTransaction({
+      profileId: profile.id,
+      transaction,
+    })
+  );
+
+  return transaction;
+}
+
+export async function receiveLightning({
+  amount,
+  unit,
+  memo,
+}: {
+  amount: number;
+  unit: string;
+  memo?: string;
+}): Promise<LightningReceiveTransaction> {
+  const selectedMint = memoizedGetSelectedMint(store.getState());
+  const profile = memoizedGetCurrentProfile(store.getState());
+
+  const wallet = await getWallet({
+    unit,
+    mintUrl: selectedMint,
+    profile: null,
+  });
+
+  const mintQuote = await wallet.createMintQuote(amount, memo);
+
+  if (mintQuote.error) {
+    throw new AppError('quote_error', 'Error getting mint quote');
+  }
+
+  const paymentRequest = await getPaymentRequest({
+    amount: amount,
+    unit: unit,
+    description: memo || '',
+  });
+
+  const unifiedRequest = paymentRequest;
+  unifiedRequest.description = mintQuote.request;
+
+  const transaction: LightningReceiveTransaction = {
+    request: mintQuote.request,
+    amount,
+    mintQuote,
+    date: new Date().toISOString(),
+    type: 'lightning',
+    paid: false,
+    transactionType: 'receive',
+    unit,
+    mintUrl: wallet.mint.mintUrl,
+    paymentRequest: paymentRequest.toEncodedRequest(),
+    unifiedRequest: unifiedRequest.toEncodedRequest(),
+  };
+
+  store.dispatch(
+    appendTransaction({
+      profileId: profile.id,
+      transaction,
+    })
+  );
+
+  return transaction;
+}
+
+export async function sendEcash({
+  amount,
+  unit,
+  memo,
+  to,
+  p2pk,
+}: {
+  amount: number;
+  unit: string;
+  memo?: string;
+  to?: string;
+  p2pk?: { pubkey: string; privkey: string };
+}): Promise<EcashSendTransaction> {
+  const state = store.getState();
+  const selectedMint = memoizedGetSelectedMint(state);
+  const proofs = memoizedGetProofs(unit)(state);
+  const balance = memoizedGetBalance(unit)(state);
+  const profile = memoizedGetCurrentProfile(state);
+
+  if (amount > balance) {
+    throw new AppError('insufficient_funds', 'Insufficient funds');
+  }
+
+  const wallet = await getWallet({
+    unit,
+    mintUrl: selectedMint,
+    profile: null,
+  });
+
+  if (!wallet) {
+    throw new AppError('wallet_not_found', 'Wallet not found');
+  }
+
+  const counter = memoizedGetCounterV2({
+    profileId: profile.id,
+    mintUrl: wallet.mint.mintUrl,
+    keysetId: wallet.keysetId,
+  })(state);
+
+  const { keep, send } = await wallet.send(Number(amount), proofs, {
+    ...(p2pk ? { pubkey: p2pk.pubkey } : {}),
+    counter,
+  });
+
+  await store.dispatch(
+    removeProofs({
+      profileId: profile.id,
+      mintUrl: wallet.mint.mintUrl,
+      proofs: send,
+    })
+  );
+
+  await store.dispatch(
+    appendProofsV2({
+      profileId: profile.id,
+      mintUrl: wallet.mint.mintUrl,
+      proofs: keep,
+    })
+  );
+
+  const token: Token = {
+    proofs: send,
+    mint: wallet.mint.mintUrl,
+    unit,
+    memo,
+  };
+
+  store.dispatch(
+    increaseCounterV2({
+      profileId: profile.id,
+      mintUrl: wallet.mint.mintUrl,
+      keysetId: wallet.keysetId,
+      amount: send.length + keep.length,
+    })
+  );
+
+  const encodedToken = getEncodedToken(token, {
+    version: 4,
+  });
+
+  const transaction: EcashSendTransaction = {
+    amount,
+    date: new Date().toISOString(),
+    type: 'ecash',
+    token: encodedToken,
+    memo,
+    transactionType: 'send',
+    unit,
+    paid: false,
+    nostr: {
+      pubkey: to,
+    },
+    mintUrl: wallet.mint.mintUrl,
+    counter,
+    proofs: {
+      send,
+      keep,
+    },
+    ...(p2pk ? { p2pk: { pubkey: p2pk.pubkey, privkey: p2pk.privkey } } : {}),
+  };
+
+  store.dispatch(
+    appendTransaction({
+      profileId: profile.id,
+      transaction,
+    })
+  );
+
+  return transaction;
+}
+
+export async function receiveEcash({
+  token,
+  unit,
+  from,
+  memo,
+  fromNIP05,
+  refund,
+}: {
+  token: string;
+  unit: string;
+  from?: string;
+  memo?: string;
+  fromNIP05?: string;
+  refund?: boolean;
+}): Promise<EcashReceiveTransaction> {
+  console.log('[receiveEcash]', {
+    token,
+    unit,
+    from,
+    memo,
+    fromNIP05,
+    refund,
+  });
+  const state = store.getState();
+  console.log('[receiveEcash] state', state);
+
+  const profile = memoizedGetCurrentProfile(state);
+  console.log('[receiveEcash] profile', profile);
+
+  const decodedToken = getDecodedToken(token);
+  console.log('[receiveEcash] decodedToken', decodedToken);
+  const receiveMintUrl = decodedToken.mint;
+  console.log('[receiveEcash] receiveMintUrl', receiveMintUrl);
+
+  const getPubkeyFromToken = (token: string) => {
+    const decodedToken = getDecodedToken(token);
+
+    try {
+      return JSON.parse(decodedToken.proofs[0].secret)[0] === 'P2PK'
+        ? JSON.parse(decodedToken.proofs[0].secret)[1].data
+        : null;
+    } catch (error) {
+      // this means the secret is not JSON and is not a P2PK
+      console.error('Error parsing token secret:', error);
+      return null;
+    }
+  };
+  console.log('[receiveEcash] getPubkeyFromToken', getPubkeyFromToken(token));
+
+  const giveaway = Object.values(giveaways).find(({ public_key }) => {
+    return getPubkeyFromToken(token) === public_key;
+  });
+  console.log('[receiveEcash] giveaway', giveaway);
+
+  const wallet = await getWallet({
+    unit,
+    mintUrl: receiveMintUrl,
+    profile: null,
+  });
+  console.log('[receiveEcash] wallet', wallet);
+
+  if (!wallet) {
+    throw new AppError('wallet_not_found', 'Wallet not found');
+  }
+
+  const counter = memoizedGetCounterV2({
+    profileId: profile.id,
+    mintUrl: receiveMintUrl,
+    keysetId: wallet.keysetId,
+  })(state);
+  console.log('[receiveEcash] counter', counter);
+
+  const response = await wallet.receive(token, {
+    counter,
+    ...(giveaway ? { privkey: giveaway.private_key } : {}),
+  });
+  console.log('[receiveEcash] response', response);
+
+  if (!response) {
+    throw new AppError('invalid_token', 'Invalid token');
+  }
+
+  const newProofs = [...response];
+
+  store.dispatch(
+    increaseCounterV2({
+      profileId: profile.id,
+      mintUrl: receiveMintUrl,
+      keysetId: wallet.keysetId,
+      amount: newProofs.length,
+    })
+  );
+
+  await store.dispatch(
+    appendProofsV2({ profileId: profile.id, mintUrl: receiveMintUrl, proofs: newProofs })
+  );
+
+  const totalAmount = decodedToken.proofs.map((p) => p.amount).reduce((a, b) => a + b, 0);
+  console.log('[receiveEcash] totalAmount', totalAmount);
+
+  const transaction: EcashReceiveTransaction = {
+    amount: totalAmount,
+    date: new Date().toISOString(),
+    type: 'ecash',
+    token,
+    transactionType: 'receive',
+    unit,
+    memo,
+    mintUrl: receiveMintUrl,
+    paid: true,
+    counter,
+    ...(from ? { nostr: { pubkey: from } } : {}),
+    proofs: {
+      keep: newProofs,
+    },
+    refund,
+    fromNIP05,
+    ...(giveaway
+      ? {
+          p2pk: {
+            pubkey: giveaway.public_key,
+            privkey: giveaway.private_key,
+          },
+        }
+      : {}),
+  };
+  console.log('[receiveEcash] transaction', transaction);
+
+  store.dispatch(
+    appendTransaction({
+      profileId: profile.id,
+      transaction,
+    })
+  );
+
+  await publishWalletEvent([
+    ...new Set([
+      ...store.getState().cashu?.profiles?.[profile.id]?.transactions.map((t) => t.mintUrl),
+      receiveMintUrl,
+    ]),
+  ]);
+
+  return transaction;
+}
+
+export async function getPaymentRequest({
+  amount,
+  unit,
+  description,
+  singleUse = true,
+}): Promise<PaymentRequest> {
+  const state = store.getState();
+  const mint = memoizedGetSelectedMint(state);
+  const currentProfile = state.nostr?.currentProfile;
+  const nprofile = nip19.nprofileEncode({
+    pubkey: currentProfile?.pubkey,
+  });
+
+  return new PaymentRequest(
+    [
+      {
+        type: PaymentRequestTransportType.NOSTR,
+        target: nprofile,
+        tags: [['n', '17']],
+      } as PaymentRequestTransport,
+    ],
+    uuidv4(),
+    amount,
+    unit,
+    [mint],
+    description,
+    singleUse
+  );
+}
+
+export async function cancelEcashTransaction(
+  transaction: Transaction,
+  navigation: any
+): Promise<void> {
+  try {
+    await receiveEcash({
+      token: transaction.token as string,
+      unit: transaction.unit,
+      refund: true,
+    });
+
+    const profileId = store.getState().nostr?.currentProfile?.id;
+    store.dispatch(
+      updateTransaction({
+        profileId,
+        matcher: (t: Transaction) => t.token === transaction.token,
+        updateFn: (t: Transaction) => ({
+          ...t,
+          paid: true,
+          isCancel: true,
+        }),
+      })
+    );
+
+    SheetManager.hide('button-handler');
+    navigation.navigate('', {}, { closeParents: true });
+  } catch (error) {
+    showMessage(error.message, {}, { emoji: '🚨' });
+  }
+}

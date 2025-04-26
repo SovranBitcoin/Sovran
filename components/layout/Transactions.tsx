@@ -87,7 +87,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
     filtered = filtered.filter((tx) => {
       if (at === 'all') return true;
-      return at === 'at' && tx?.lnurl;
+      return at === 'at' && tx?.fromNIP05;
     });
 
     return filtered;

@@ -7,8 +7,7 @@ import { memoizedGetBalance } from '../redux/cashu';
 import { nip19 } from 'nostr-tools';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
-import { isLnurl, lnTrim } from 'helper/third-party/lnurl';
-import { isLightningAddress, isLnurl, lnTrim } from 'helper/third-party/lnurl';
+import { isLightningAddress, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
 import { showMessage } from '../popup/popups';
 
@@ -169,6 +168,16 @@ const handleLightning = async ({
   setLoading: (loading: boolean) => void;
 }): Promise<NavigationResult | null> => {
   const lnurl = lnTrim(data);
+  console.log(
+    '[handleLightning]2222',
+    data,
+    unit,
+    balance,
+    setLoading,
+    selectedMint,
+    lnurl,
+    isLightningAddress(lnurl)
+  );
   if (isLightningAddress(lnurl)) {
     return {
       screen: 'currency',
@@ -179,38 +188,32 @@ const handleLightning = async ({
       },
     };
   }
-  try {
-    const amount = getLightningAmount({ pr: lnurl });
-    if (amount) {
-      const meltQuote = await getMeltQuote({
-        pr: lnurl,
-        unit,
-        mintUrl: selectedMint,
-      });
-      const totalAmount = amount + meltQuote.fee_reserve;
-      const isBalanceSufficient = balance >= totalAmount;
-      if (!isBalanceSufficient) {
-        showMessage(
-          'insufficient_balance',
-          { amount, unit, fee: meltQuote.fee_reserve },
-          { emoji: '🚨' }
-        );
-        return null;
-      }
-      return {
-        screen: 'lightningSendConfirmation',
-        params: {
-          pr: lnurl,
-          amount: unit === 'sat' ? amount : amount * 100,
-          meltQuote: JSON.stringify(meltQuote),
-          unit,
-        },
-      };
+  const amount = getLightningAmount({ pr: lnurl });
+  if (amount) {
+    const meltQuote = await getMeltQuote({
+      pr: lnurl,
+      unit,
+      mintUrl: selectedMint,
+    });
+    const totalAmount = amount + meltQuote.fee_reserve;
+    const isBalanceSufficient = balance >= totalAmount;
+    if (!isBalanceSufficient) {
+      showMessage(
+        'insufficient_balance',
+        { amount, unit, fee: meltQuote.fee_reserve },
+        { emoji: '🚨' }
+      );
+      return null;
     }
-  } catch (error) {
-    showMessage('general_error', {}, { emoji: '🚨' });
-  } finally {
-    setLoading(false);
+    return {
+      screen: 'lightningSendConfirmation',
+      params: {
+        pr: lnurl,
+        amount: unit === 'sat' ? amount : amount * 100,
+        meltQuote: JSON.stringify(meltQuote),
+        unit,
+      },
+    };
   }
   return null;
 };
@@ -224,6 +227,15 @@ export const handleBarcode = async ({
   setLoading,
   setScanned,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
+  console.log(129873222897, {
+    scanning,
+    urDecoder,
+    unit,
+    selectedMint,
+    setProgress,
+    setLoading,
+    setScanned,
+  });
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
   if (!scanning.data.startsWith('ur:')) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -240,6 +252,8 @@ export const handleBarcode = async ({
   } else {
     type = 'lightning';
   }
+
+  console.log(12229873222897, { type });
 
   switch (type) {
     case 'ur':

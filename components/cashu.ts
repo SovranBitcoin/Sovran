@@ -113,7 +113,8 @@ async function updateStateAfterPayment(profileId, proofs, quote, mintUrl) {
   await store.dispatch(
     updateTransaction({
       profileId,
-      matcher: (tx) => tx.quote === quote || (!tx.paid && tx.npubcash && tx.type === 'ecash'),
+      matcher: (tx) =>
+        tx.mintQuote.quote === quote || (!tx.paid && tx.fromNIP05 && tx.type === 'ecash'),
       updateFn: (tx) => ({ ...tx, paid: true }),
     })
   );
@@ -135,16 +136,17 @@ export async function loopOverCheckLnPaymentComplete({
 
 export async function checkLNPaymentComplete({ transaction, callback = () => {} }) {
   const profileId = store.getState().nostr?.currentProfile?.id;
+  console.log('[checkLNPaymentComplete.profileId]', profileId);
   const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+  console.log('[checkLNPaymentComplete.transactions]', transactions);
   const sortedTransactions = transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-
+  console.log('[checkLNPaymentComplete.sortedTransactions]', sortedTransactions);
   const transactionsToCheck = transaction.quote
-    ? [transactions.find((t) => t.quote === transaction.quote)]
+    ? [transactions.find((t) => t.mintQuote.quote === transaction.mintQuote.quote)]
     : sortedTransactions;
-
+  console.log('[checkLNPaymentComplete.transactionsToCheck]', transactionsToCheck);
   for (const tx of transactionsToCheck) {
     if (!tx || tx.paid || new Date() > getRawExpiry({ pr: tx.request })) continue;
-
     // Skip if another transaction with the same sweepId is already paid
     if (
       tx.isSweep &&
@@ -152,13 +154,13 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
     ) {
       continue;
     }
-
-    const { quote, amount, unit, mintUrl } = tx;
+    console.log('[checkLNPaymentComplete.transaction]', tx);
+    const { mintQuote, amount, unit, mintUrl } = tx;
     const keyset = await getKeys({ unit, mintUrl });
-
     try {
       const wallet = await getWallet({ unit, mintUrl, profile: null });
-      const isUnpaid = (await wallet.checkMintQuote(quote)).state === 'UNPAID';
+      const isUnpaid = (await wallet.checkMintQuote(mintQuote.quote)).state === 'UNPAID';
+
       if (isUnpaid) continue;
 
       const counter = memoizedGetCounterV2({
@@ -167,10 +169,11 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
         keysetId: wallet.keysetId,
       })(store.getState());
 
-      const proofs = await wallet.mintProofs(amount, quote, {
+      const proofs = await wallet.mintProofs(amount, mintQuote.quote, {
         counter,
         keysetId: wallet.keysetId,
       });
+      console.log('[checkLNPaymentComplete.proofs]', proofs);
 
       store.dispatch(
         increaseCounterV2({
@@ -180,16 +183,13 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
           amount: proofs.length,
         })
       );
-
       const balance = proofs.reduce((total, proof) => total + proof.amount, 0);
-
       if (balance > 0) {
         showMessage('funds_received', { amount: balance, unit: keyset.unit }, { emoji: '🎉' }, () =>
           callback()
         );
       }
-
-      await updateStateAfterPayment(profileId, proofs, quote, mintUrl);
+      await updateStateAfterPayment(profileId, proofs, mintQuote.quote, mintUrl);
       publishWalletEvent([
         ...new Set([
           ...store.getState().cashu?.profiles?.[profileId]?.transactions.map((t) => t.mintUrl),
@@ -197,6 +197,7 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
         ]),
       ]);
     } catch (err) {
+      console.log('[checkLNPaymentComplete.error]', err);
       Alert.alert('error', JSON.stringify(err));
     }
   }

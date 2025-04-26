@@ -392,7 +392,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   return (
     <Wrapper
       children={
-        <>
+        <View>
           <Text weight="bold" style={styles.sectionHeader}>
             Send payment in
           </Text>
@@ -476,7 +476,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
               );
             })}
           </View>
-        </>
+        </View>
       }
       buttons={
         <ButtonHandler

@@ -19,7 +19,9 @@ import { isValidPaymentRequest } from 'helper/cashu/helper';
 import { handlePaymentRequest } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
-import { SheetManager } from 'react-native-actions-sheet';
+import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { greys } from 'helper/colors';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -69,8 +71,8 @@ function ModalScreen() {
     navigation.goBack();
     navigation.navigate(params.to, {
       ...params,
-      unified_request: response.unified_request,
-      payment_request: response.payment_request,
+      unifiedRequest: response.unifiedRequest,
+      paymentRequest: response.paymentRequest,
       request: response.request,
       amount: unit === 'sat' ? amount : amount * 100,
       transaction: JSON.stringify(response),
@@ -78,32 +80,45 @@ function ModalScreen() {
   };
 
   const handleEcashSend = async ({ message }) => {
-    const token = await sendEcash({
+    console.log('[handleEcashSend]', unit === 'sat' ? amount : amount * 100, unit, message, params);
+    const transaction = await sendEcash({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
-      note: message,
+      memo: message,
+      p2pk: params.p2pk,
     });
 
     navigation.goBack();
     navigation.goBack();
     navigation.navigate(params.to, {
       ...params,
-      token,
+      token: transaction.token,
       amount: unit === 'sat' ? amount : amount * 100,
     });
   };
 
   const handleDefaultSend = async () => {
+    console.log('[handleDefaultSend]');
     const { pr } = await getInvoiceFromLnurl(params.lud16, unit === 'sat' ? amount : amount * 100);
+    console.log('[handleDefaultSend] pr', pr);
 
     const meltQuote = await getMeltQuote({
       pr: pr,
       unit: unit,
       mintUrl: selectedMint,
     });
+    console.log('[handleDefaultSend] meltQuote', meltQuote);
 
     const totalAmount = Number(amount) + Number(meltQuote.fee_reserve);
+    console.log('[handleDefaultSend] totalAmount', totalAmount);
+
     const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
+    console.log(
+      '[handleDefaultSend] isBalanceSufficient',
+      balance,
+      totalAmount,
+      isBalanceSufficient
+    );
 
     if (!isBalanceSufficient) {
       showMessage(
@@ -112,6 +127,13 @@ function ModalScreen() {
         { emoji: '🚨' }
       );
     } else {
+      console.log(
+        '[handleDefaultSend] navigate',
+        params.to,
+        pr,
+        unit === 'sat' ? amount : amount * 100,
+        meltQuote
+      );
       navigation.navigate(params.to, {
         ...params,
         pr,
@@ -143,11 +165,12 @@ function ModalScreen() {
           break;
         case 'ecashSendConfirmation':
           // check balance
+          console.log('[handleNext] balance', balance, amount, unit);
           if (unit === 'sat' ? balance < amount : balance < amount) {
             showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
             return;
           }
-
+          console.log('[handleNext] balance passed', balance, amount, unit);
           SheetManager.show('transaction-message', {
             onClose: async (data) => {
               if (data?.action === 'confirm') {
@@ -247,7 +270,11 @@ function ModalScreen() {
   };
 
   return (
-    <>
+    <SafeAreaView
+      style={{
+        backgroundColor: greys(theme)[2300],
+        flex: 1,
+      }}>
       <Modal
         showBack
         title="Select Amount"
@@ -278,7 +305,7 @@ function ModalScreen() {
         }
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} />
-    </>
+    </SafeAreaView>
   );
 }
 

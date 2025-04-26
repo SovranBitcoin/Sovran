@@ -127,7 +127,7 @@ export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRe
     await store.dispatch(
       updateTransaction({
         profileId,
-        matcher: (t) => t.payment_request === paymentRequest.toEncodedRequest(),
+        matcher: (t) => t.paymentRequest === paymentRequest.toEncodedRequest(),
         updateFn: (t) => ({
           ...t,
           paid: true,

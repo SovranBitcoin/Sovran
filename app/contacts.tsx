@@ -11,6 +11,7 @@ import Icon from 'assets/icons';
 import { NDKUser, NDKUserProfile } from '@nostr-dev-kit/ndk';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
 import { View, Text } from 'components/common/Themed';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -20,6 +21,8 @@ export default function ModalScreen() {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const navigation = useTypedNavigation();
+
+  console.log(192873, JSON.stringify(navigation));
 
   const debounceTimeoutRef = useRef(null);
 
@@ -103,9 +106,11 @@ export default function ModalScreen() {
     setHasSearched(false); // Reset hasSearched when search is cleared
   };
 
-  const navigateToUserMessages = (pubkey) => {
+  const navigateToUserMessages = ({ pubkey, profile }) => {
+    console.log(129837, profile);
     navigation.navigate('userMessages', {
       pubkey: pubkey,
+      profile,
     });
   };
 
@@ -117,105 +122,115 @@ export default function ModalScreen() {
   const showNoResults = hasSearched && !loading && searchResults.length === 0;
 
   return (
-    <SkeletonContainer
-      backgroundColor={greys(theme)[1800]}
-      highlightColor={greys(theme)[1300]}
-      speed={800}
-      animation={loading ? 'pulse' : 'none'}>
-      <Container scroll={false} contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
-        <ScrollView
-          style={{
-            backgroundColor: greys(theme)[2300],
-          }}
-          onScrollBeginDrag={handleScroll}
-          scrollEventThrottle={16}>
-          <View
+    <SafeAreaView
+      style={{
+        backgroundColor: greys(theme)[2300],
+        flex: 1,
+      }}>
+      <SkeletonContainer
+        backgroundColor={greys(theme)[1800]}
+        highlightColor={greys(theme)[1300]}
+        speed={800}
+        animation={loading ? 'pulse' : 'none'}>
+        <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
+          <ScrollView
             style={{
               backgroundColor: greys(theme)[2300],
-              paddingHorizontal: 16,
-            }}>
+            }}
+            onScrollBeginDrag={handleScroll}
+            scrollEventThrottle={16}>
             <View
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
+                backgroundColor: greys(theme)[2300],
+                paddingHorizontal: 16,
               }}>
-              {/* Wrapper View for TextInput with relative positioning */}
-              <View style={{ flex: 1, position: 'relative' }}>
-                <TextInput
-                  ref={ref}
-                  // autoFocus={true}
-                  value={searchQuery}
-                  onChangeText={handleSearchQueryChange}
-                  placeholder="Search users..."
-                  placeholderTextColor={greys(theme)[1000]}
-                  style={{
-                    flex: 1,
-                    paddingRight: 30, // Add padding to make room for the clear button
-                  }}
-                />
-                {/* Clear button with absolute positioning */}
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={clearSearchInput}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}>
+                {/* Wrapper View for TextInput with relative positioning */}
+                <View style={{ flex: 1, position: 'relative' }}>
+                  <TextInput
+                    ref={ref}
+                    // autoFocus={true}
+                    value={searchQuery}
+                    onChangeText={handleSearchQueryChange}
+                    placeholder="Search users..."
+                    placeholderTextColor={greys(theme)[1000]}
                     style={{
-                      position: 'absolute',
-                      right: 0,
-                      zIndex: 1,
-                      padding: 10,
-                    }}>
-                    <Icon name="simple-line-icons:close" size={20} color={greys(theme)[100]} />
-                  </TouchableOpacity>
-                )}
-              </View>
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text
-                  style={{
-                    color: greys(theme)[100],
-                    marginLeft: 12,
-                    fontSize: 16,
-                  }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {showResults && (
-              <View style={{ marginTop: 8 }}>
-                {/* Results count text - only shown when not loading */}
-                <View style={{ marginBottom: 12 }}>
-                  <Text
-                    loading={loading}
-                    style={{
-                      color: greys(theme)[700],
-                      fontSize: 14,
-                      fontFamily: 'OverpassBold',
-                    }}>
-                    Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
-                  </Text>
-                </View>
-
-                {/* Map over actual results or placeholder results */}
-                {displayResults.map((result, index) => (
-                  <SearchResult
-                    key={index}
-                    loading={loading}
-                    key={result?.pubkey}
-                    result={result}
-                    onPress={() => !loading && navigateToUserMessages(result.pubkey)}
+                      flex: 1,
+                      paddingRight: 30, // Add padding to make room for the clear button
+                    }}
                   />
-                ))}
+                  {/* Clear button with absolute positioning */}
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={clearSearchInput}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        zIndex: 1,
+                        padding: 10,
+                      }}>
+                      <Icon name="simple-line-icons:close" size={20} color={greys(theme)[100]} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                  <Text
+                    style={{
+                      color: greys(theme)[100],
+                      marginLeft: 12,
+                      fontSize: 16,
+                    }}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
               </View>
-            )}
 
-            {/* Show EmptyStateView when no search has been attempted */}
-            {showEmptyState && <EmptyStateView theme={theme} />}
+              {showResults && (
+                <View style={{ marginTop: 8 }}>
+                  {/* Results count text - only shown when not loading */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      loading={loading}
+                      style={{
+                        color: greys(theme)[700],
+                        fontSize: 14,
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      Found {searchResults.length}{' '}
+                      {searchResults.length === 1 ? 'result' : 'results'}
+                    </Text>
+                  </View>
 
-            {/* Show NoResultsFound when search completed with no results */}
-            {showNoResults && <NoResultsFound theme={theme} />}
-          </View>
-        </ScrollView>
-      </Container>
-    </SkeletonContainer>
+                  {/* Map over actual results or placeholder results */}
+                  {displayResults.map((result, index) => (
+                    <SearchResult
+                      key={index}
+                      loading={loading}
+                      key={result?.pubkey}
+                      result={result}
+                      onPress={() =>
+                        !loading &&
+                        navigateToUserMessages({ pubkey: result.pubkey, profile: result.profile })
+                      }
+                    />
+                  ))}
+                </View>
+              )}
+
+              {/* Show EmptyStateView when no search has been attempted */}
+              {showEmptyState && <EmptyStateView theme={theme} />}
+
+              {/* Show NoResultsFound when search completed with no results */}
+              {showNoResults && <NoResultsFound theme={theme} />}
+            </View>
+          </ScrollView>
+        </Container>
+      </SkeletonContainer>
+    </SafeAreaView>
   );
 }
 

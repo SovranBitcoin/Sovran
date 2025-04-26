@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
 import _ from 'lodash';
-
+import { Alert } from 'react-native';
 import { View } from 'components/common/Themed';
 import { Transactions } from 'components/layout/Transactions';
 import { checkLNPaymentComplete, getRawExpiry, receiveEcash } from 'components/cashu';
@@ -42,7 +42,7 @@ async function getProfile(currentProfile) {
     await receiveEcash({
       token,
       unit: 'sat',
-      lnurl: `${currentProfile?.npub}@npub.cash`,
+      fromNIP05: `${currentProfile?.npub}@npub.cash`,
     });
     showMessage('funds_received', { amount: balance, unit: 'sat' }, { emoji: '🎉' }, () => {});
   }
@@ -84,8 +84,7 @@ export const useTransactionStatusPolling = () => {
 
   usePollingPaymentRequest({
     paymentRequest:
-      newestLightningTx?.payment_request &&
-      decodePaymentRequest(newestLightningTx?.payment_request),
+      newestLightningTx?.paymentRequest && decodePaymentRequest(newestLightningTx?.paymentRequest),
   });
 
   const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -97,7 +96,7 @@ export const useTransactionStatusPolling = () => {
       try {
         await getProfile(currentProfile);
       } catch (error) {
-        // Error handling removed
+        Alert.alert('error', JSON.stringify(error));
       }
 
       await timeout(5000);

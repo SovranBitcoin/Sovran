@@ -350,6 +350,16 @@ const transactionConfig = {
       {
         keys: [
           {
+            label: 'To',
+            output: (tx, value) => {
+              return tx?.fromNIP05;
+            },
+          },
+        ],
+      },
+      {
+        keys: [
+          {
             label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
             output: (tx, value) => {
               return (
@@ -630,7 +640,7 @@ const transactionConfig = {
           {
             label: 'quote',
             output: (tx, value) => {
-              return truncateMiddle(value, 5);
+              return truncateMiddle(tx.mintQuote.quote, 5);
             },
           },
           {
@@ -813,8 +823,8 @@ function ModalScreen() {
                       request: transaction.request,
                       amount: transaction.amount,
                       transaction: JSON.stringify(transaction),
-                      unified_request: transaction.unified_request,
-                      payment_request: transaction.payment_request,
+                      unifiedRequest: transaction.unifiedRequest,
+                      paymentRequest: transaction.paymentRequest,
                     });
                   },
                 },

@@ -118,13 +118,129 @@ const migrations = {
     console.log(293892873, newState);
     return newState;
   },
+  40: (state: any) => {
+    return _.update(
+      ['cashu', 'profiles'],
+      (profiles = []) =>
+        profiles.map((profile: any) => {
+          return {
+            ...profile,
+            transactions: profile.transactions.map((oldTx) => {
+              // Convert amount to number for consistency
+              const amount =
+                typeof oldTx.amount === 'string' ? parseFloat(oldTx.amount) : oldTx.amount;
+
+              // Define base transaction properties common to all transaction types
+              const baseTx = {
+                amount,
+                date: oldTx.date,
+                type: oldTx.type,
+                transactionType: oldTx.transactionType,
+                unit: oldTx.unit,
+                mintUrl: oldTx.mintUrl,
+                paid: oldTx.paid,
+
+                counter: oldTx.counter,
+                ...(oldTx?.nostr?.pubkey !== 'Unknown' && oldTx?.nostr?.pubkey
+                  ? { nostr: oldTx.nostr }
+                  : null),
+              };
+
+              // Add memo if note exists
+              if (oldTx.note) {
+                baseTx.memo = oldTx.note;
+              }
+
+              // Ecash Receive transaction
+              if (oldTx.type === 'ecash' && oldTx.transactionType === 'receive') {
+                const ecashReceiveTx = {
+                  ...baseTx,
+                  ...(oldTx.lnurl ? { fromNIP05: oldTx.lnurl } : null),
+                  type: 'ecash',
+                  transactionType: 'receive',
+                  token: oldTx.token,
+                  proofs: {
+                    keep: oldTx.proofs?.keep || [],
+                  },
+                  ...(oldTx.privkey
+                    ? {
+                        p2pk: {
+                          privkey: oldTx.privkey,
+                        },
+                      }
+                    : null),
+                };
+                return ecashReceiveTx;
+              }
+
+              // Ecash Send transaction
+              else if (oldTx.type === 'ecash' && oldTx.transactionType === 'send') {
+                const ecashSendTx = {
+                  ...baseTx,
+                  type: 'ecash',
+                  transactionType: 'send',
+                  token: oldTx.token,
+                  proofs: {
+                    keep: oldTx.proofs?.keep || [],
+                    send: oldTx.proofs?.send || [],
+                  },
+                };
+                return ecashSendTx;
+              }
+
+              // Lightning Send transaction
+              else if (oldTx.type === 'lightning' && oldTx.transactionType === 'send') {
+                const lightningSendTx = {
+                  ...baseTx,
+                  type: 'lightning',
+                  transactionType: 'send',
+                  request: oldTx.request,
+                  meltQuote: oldTx?.meltQuote,
+                  proofs: {
+                    keep: oldTx.proofs?.keep || [],
+                    send: oldTx.proofs?.send || [],
+                    change: oldTx.proofs?.change || [],
+                  },
+                };
+                return lightningSendTx;
+              }
+
+              // Lightning Receive transaction
+              else if (oldTx.type === 'lightning' && oldTx.transactionType === 'receive') {
+                const lightningReceiveTx = {
+                  ...baseTx,
+                  type: 'lightning',
+                  transactionType: 'receive',
+                  request: oldTx.request,
+                  // Handle the different property names that appear in your data
+                  mintQuote: oldTx?.mintQuote || {
+                    quote: oldTx?.quote,
+                    request: oldTx?.request,
+                  },
+                  paymentRequest: oldTx.paymentRequest || oldTx.payment_request || '',
+                  unifiedRequest: oldTx.unifiedRequest || oldTx.unified_request || '',
+                };
+                return lightningReceiveTx;
+              }
+
+              // Fallback, just in case there's an unknown transaction type
+              else {
+                console.warn(`Unknown transaction type: ${oldTx.type}-${oldTx.transactionType}`);
+                return baseTx;
+              }
+            }),
+          };
+        }),
+      state
+    );
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 37,
+  version: 40,
   migrate: createMigrate(migrations, { debug: true }),
 };
 

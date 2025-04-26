@@ -24,12 +24,11 @@ const RouteA = ({ payload }) => {
     if (result && typeof result.then === 'function') {
       result.finally(() => {
         setProcessingButtonIndex(null);
+        router?.close();
       });
     } else {
-      // If it's not a promise, reset the state after a short delay
-      setTimeout(() => {
-        setProcessingButtonIndex(null);
-      }, 300);
+      setProcessingButtonIndex(null);
+      router?.close();
     }
   };
 
