@@ -88,6 +88,7 @@ export default function ModalScreen() {
   const styles = createStyles(theme);
 
   const { params } = useRoute();
+
   const navigation = useNavigation();
   const { profiles, search, setSearch, messages, addMessage, currentProfile } = useNostr();
   const { transactions } = useCashu();
@@ -344,8 +345,7 @@ export default function ModalScreen() {
   };
 
   // Get user profile for Lightning payment
-  const currentUserProfile = combinedSearchAndProfiles.find((p) => p.pubkey === params.pubkey);
-
+  const currentUserProfile = combinedSearchAndProfiles.find((p) => p.pubkey === params?.pubkey);
   // return <KeyboardAvoidingComponent />;
 
   return (

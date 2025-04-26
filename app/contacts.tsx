@@ -48,13 +48,17 @@ export default function ModalScreen() {
 
       if (data.results && Array.isArray(data.results)) {
         const formattedResults = data.results.map((result: NDKUserProfile) => {
+          const pubkey = JSON.parse(result.profileEvent).pubkey;
           const user = new NDKUser({
-            pubkey: result.pubkey,
+            pubkey: pubkey,
           });
           user.profile = result;
           return {
-            pubkey: user.profile.pubkey,
-            profile: user.profile,
+            pubkey: user.pubkey,
+            profile: {
+              ...user.profile,
+              pubkey,
+            },
           };
         });
 
