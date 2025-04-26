@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Image, ScrollView, Keyboard } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greys, shades } from 'helper/colors';
+import { greens, greys, reds, shades } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
@@ -425,8 +425,14 @@ function SearchResult({ result, onPress, loading }) {
           {result?.profile?.displayName || result?.profile?.name}
         </Text>
         {result?.profile?.nip05 && (
-          <Text loading={loading} style={{ color: shades[200], fontSize: 12 }}>
-            ✓ {result?.profile?.nip05}
+          <Text
+            loading={loading}
+            style={{
+              color: result?.profile?.nip05Valid ? greens[300] : reds[300],
+              fontSize: 12,
+            }}>
+            {result?.profile?.nip05Valid ? '✓ ' : '✗ '}
+            {result?.profile?.nip05}
           </Text>
         )}
       </View>
