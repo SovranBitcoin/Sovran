@@ -272,7 +272,7 @@ const ContactItem = ({ contact, isVerified, theme, navigation }) => {
       style={styles.contactItem}
       onPress={() => {
         if (contact.profile) {
-          navigation.navigate('userMessages', { pubkey: contact.pubkey });
+          navigation.navigate('userMessages', { pubkey: contact.pubkey, profile: contact.profile });
         } else {
         }
       }}>
