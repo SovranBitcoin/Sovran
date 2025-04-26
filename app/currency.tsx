@@ -68,8 +68,7 @@ function ModalScreen() {
     });
 
     navigation.goBack();
-    navigation.goBack();
-    navigation.navigate(params.to, {
+    navigation.replace(params.to, {
       ...params,
       unifiedRequest: response.unifiedRequest,
       paymentRequest: response.paymentRequest,
@@ -88,9 +87,7 @@ function ModalScreen() {
       p2pk: params.p2pk,
     });
 
-    navigation.goBack();
-    navigation.goBack();
-    navigation.navigate(params.to, {
+    navigation.replace(params.to, {
       ...params,
       token: transaction.token,
       amount: unit === 'sat' ? amount : amount * 100,
