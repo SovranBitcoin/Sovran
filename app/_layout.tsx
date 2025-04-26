@@ -58,8 +58,6 @@ const RELAY_URLS = [
 const SENTRY_DSN =
   'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
 
-// Initialize global configurations
-LogBox.ignoreAllLogs();
 dayjs.extend(relativeTime);
 
 // Initialize Sentry
