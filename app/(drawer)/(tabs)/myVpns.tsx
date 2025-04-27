@@ -12,7 +12,7 @@ import { useCashu } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 
 function TabTwoScreen() {

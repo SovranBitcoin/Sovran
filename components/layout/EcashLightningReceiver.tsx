@@ -12,7 +12,7 @@ import { useCameraPermissions } from 'expo-camera';
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { checkIfAlreadyRedeemed } from 'helper/payment-handler/handlers';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { useTypedNavigation } from 'helper/navigation';
 
 export const pool = new SimplePool();

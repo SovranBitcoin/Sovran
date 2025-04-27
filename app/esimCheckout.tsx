@@ -18,7 +18,7 @@ import { showMessage } from 'helper/popup/popups';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { Card } from 'components/common/Card';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

@@ -6,7 +6,7 @@ import { Section } from './transaction';
 import { useTypedRoute } from 'helper/navigation';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
 
 function ModalScreen() {

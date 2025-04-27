@@ -19,7 +19,7 @@ import { sovran } from '.';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import _ from 'lodash';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { store } from 'helper/redux/store';
 
 interface SelectedMintDisplayProps {

@@ -18,7 +18,7 @@ import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 function ModalScreen() {
   const navigation = useTypedNavigation();

@@ -13,7 +13,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+
 import { View, Text } from 'components/common/Themed';
 import { isValidPaymentRequest } from 'helper/cashu/helper';
 import { handlePaymentRequest } from 'helper/payment-handler/handlers';
@@ -26,6 +26,7 @@ import { maybeConvertNpub } from 'helper/cashu/pay';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

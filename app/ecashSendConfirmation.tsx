@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
 import { Share, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
-import { BalanceUpdate } from './transaction';
+import { BalanceUpdate, Section } from './transaction';
 import Modal from 'components/layout/Modal';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View } from 'components/common/Themed';
+import { View, Text } from 'components/common/Themed';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import {
+  CashuMint,
+  CashuWallet,
+  getDecodedToken,
+  getEncodedTokenV4,
+  injectWebSocketImpl,
+} from '@cashu/cashu-ts';
 import _ from 'lodash';
 import withConfirmation from 'components/layout/ConfirmationProvider';
 import {
@@ -26,172 +32,17 @@ import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'components/common/useNfc';
 import { runWithAnimationFrame } from './onboard/new';
-
-// Standalone function to check if proofs are spent
-export const checkProofsSpent = async (token: string): Promise<boolean> => {
-  try {
-    const decodedToken = getDecodedToken(token);
-    const { unit, mint: mintUrl, proofs } = decodedToken;
-
-    const wallet = await getWallet({
-      unit,
-      mintUrl,
-      profile: null,
-    });
-
-    if (!wallet) {
-      throw new Error('Failed to initialize wallet');
-    }
-
-    const spentProofs = await wallet.checkProofsStates(proofs);
-
-    if (spentProofs.some((p) => p.state === 'SPENT')) {
-      // Update transaction state
-      const profileId = store.getState().nostr?.currentProfile?.id;
-      await store.dispatch(
-        updateTransaction({
-          profileId,
-          matcher: (tx) => tx.token === token,
-          updateFn: (tx) => ({
-            ...tx,
-            paid: true,
-          }),
-        })
-      );
-
-      return true; // Proofs are spent
-    }
-
-    return false; // Proofs are not spent
-  } catch (error) {
-    throw error;
-  }
-};
-
-interface ProofCheckResult {
-  spentProofs: any[];
-  error?: Error;
-}
-
-export const useCheckProofsSpent = (
-  tokens: string[],
-  delayMs = 3000,
-  callback: () => void
-): ProofCheckResult => {
-  const [result, setResult] = useState<ProofCheckResult>({ spentProofs: [] });
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    const signal = abortController.signal;
-
-    const poll = async () => {
-      for (const token of tokens) {
-        if (signal.aborted) break;
-
-        try {
-          const proofsSpent = await checkProofsSpent(token);
-
-          if (proofsSpent) {
-            const decodedToken = getDecodedToken(token);
-            const unit = decodedToken.unit;
-            const amount = _.sumBy(decodedToken.proofs, 'amount');
-
-            if (callback) {
-              showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, callback);
-            }
-
-            break;
-          }
-        } catch (error) {
-          setResult({ spentProofs: [], error: error as Error });
-          break;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    };
-
-    poll();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [tokens, delayMs, callback]);
-
-  return result;
-};
-
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-
-export function ButtonHandler({ context, buttons, style = {}, colors }) {
-  const [loading, setLoading] = useState(false);
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <LinearGradient
-      colors={
-        colors || [
-          opacity(greys(theme)[2300], 0),
-          opacity(greys(theme)[2300], 0.75),
-          opacity(greys(theme)[2300], 0.9),
-          greys(theme)[2300],
-        ]
-      }
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 8,
-        paddingBottom: 16,
-        marginBottom: context === 'tab' ? 48 : 0,
-        ...style,
-      }}>
-      {buttons.slice(0, 2).map((button, index) => (
-        <View
-          key={index}
-          style={{
-            flex: 1,
-            backgroundColor: 'transparent',
-          }}>
-          <Button
-            position="center"
-            onPress={() => {
-              // Only run the onPress if the button is not disabled
-              if (!button.disabled) {
-                runWithAnimationFrame(button.onPress, setLoading)();
-              }
-            }}
-            text={button.text}
-            variant={button.variant}
-            loading={loading || button.loading}
-            disabled={button.disabled} // Pass the disabled prop to Button
-            icon={button.icon}
-          />
-        </View>
-      ))}
-
-      {buttons.length > 2 && (
-        <View
-          style={{
-            backgroundColor: 'transparent',
-            width: 64,
-          }}>
-          <Button
-            icon={<Icon name={'tabler:dots'} />}
-            onPress={() => {
-              SheetManager.show('button-handler', {
-                payload: { buttons },
-              });
-            }}
-            variant="secondary"
-            loading={loading}
-          />
-        </View>
-      )}
-    </LinearGradient>
-  );
-}
+import ErrorBoundary from 'components/layout/ErrorBoundary';
+import Checkbox from 'expo-checkbox';
+import {
+  GestureHandlerRootView,
+  NativeViewGestureHandler,
+  Switch,
+} from 'react-native-gesture-handler';
+import { useTransactions } from 'components/providers/TransactionsProvider';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -202,6 +53,7 @@ function ModalScreen() {
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   const currentProfile = useSelector((state) => state.nostr?.currentProfile);
+
   const getCurrentTransaction = useSelector(
     memoizedGetTransactionByMatcher({
       profileId: currentProfile.id,
@@ -215,15 +67,19 @@ function ModalScreen() {
     })
   );
 
-  // Auto-navigate when transaction is paid
+  const {
+    transactions,
+    listenToTransaction,
+    stopListening,
+    getActiveConnections,
+    activeConnections,
+  } = useTransactions();
+
   useEffect(() => {
-    if (getCurrentTransaction?.[0]?.paid) {
-      const timer = setTimeout(() => {
-        navigation.goBack();
-      }, 3000);
-      return () => clearTimeout(timer);
+    if (getCurrentTransaction?.[0]) {
+      listenToTransaction(getCurrentTransaction?.[0]);
     }
-  }, [getCurrentTransaction, navigation]);
+  }, [getCurrentTransaction?.[0]]);
 
   const handleNFCSend = async () => {
     await write(token);
@@ -248,6 +104,59 @@ function ModalScreen() {
     const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
 
     await cancelEcashTransaction(transaction, navigation);
+  };
+
+  const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
+  const isLongToken = formattedToken.length >= 500;
+
+  const isListening = activeConnections?.some(
+    (connection) =>
+      connection.id ===
+      getCurrentTransaction[0].type +
+        '_' +
+        getCurrentTransaction[0].token +
+        '_' +
+        getCurrentTransaction[0].transactionType
+  );
+
+  const checkProofsSpent = async (token: string): Promise<boolean> => {
+    try {
+      const decodedToken = getDecodedToken(token);
+      const { unit, mint: mintUrl, proofs } = decodedToken;
+
+      const wallet = await getWallet({
+        unit,
+        mintUrl,
+        profile: null,
+      });
+
+      if (!wallet) {
+        throw new Error('Failed to initialize wallet');
+      }
+
+      const spentProofs = await wallet.checkProofsStates(proofs);
+
+      if (spentProofs.some((p) => p.state === 'SPENT')) {
+        // Update transaction state
+        const profileId = store.getState().nostr?.currentProfile?.id;
+        await store.dispatch(
+          updateTransaction({
+            profileId,
+            matcher: (tx) => tx.token === token,
+            updateFn: (tx) => ({
+              ...tx,
+              paid: true,
+            }),
+          })
+        );
+
+        return true; // Proofs are spent
+      }
+
+      return false; // Proofs are not spent
+    } catch (error) {
+      throw error;
+    }
   };
 
   const handleCheckStatus = async () => {
@@ -279,9 +188,6 @@ function ModalScreen() {
       setIsCheckingStatus(false);
     }
   };
-
-  const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
-  const isLongToken = formattedToken.length >= 500;
 
   return (
     <Modal
@@ -324,6 +230,15 @@ function ModalScreen() {
             data={formattedToken}
             animated={isLongToken}
           />
+          <Section
+            items={[
+              {
+                title: 'Listening',
+                value: String(isListening),
+              },
+            ]}
+          />
+          <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text>
         </>
       }
       buttons={

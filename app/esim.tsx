@@ -15,7 +15,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import DonutChartContainer from 'components/layout/Donut';
 import { truncateMiddle } from 'helper/strings';
 import React from 'react';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {

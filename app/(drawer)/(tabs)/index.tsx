@@ -48,95 +48,6 @@ async function getProfile(currentProfile) {
   }
 }
 
-export const useTransactionStatusPolling = () => {
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
-
-  const newestEcashTx = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) => {
-        const ecashTransactions = txs.filter(
-          (tx) => tx.transactionType === 'send' && tx.type === 'ecash' && !tx.paid
-        );
-        return _.maxBy(ecashTransactions, 'date');
-      },
-    })
-  );
-
-  const newestLightningTx = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) =>
-        _.maxBy(
-          _.filter(
-            txs,
-            (tx) =>
-              tx.type === 'lightning' &&
-              !tx.paid &&
-              tx.transactionType === 'receive' &&
-              tx.request &&
-              new Date() < getRawExpiry({ pr: tx.request }) // Check if not expired
-          ),
-          'date'
-        ),
-    })
-  );
-
-  usePollingPaymentRequest({
-    paymentRequest:
-      newestLightningTx?.paymentRequest && decodePaymentRequest(newestLightningTx?.paymentRequest),
-  });
-
-  const timeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const pollTransactionStatuses = async () => {
-      try {
-        await getProfile(currentProfile);
-      } catch (error) {
-        Alert.alert('error', JSON.stringify(error));
-      }
-
-      await timeout(5000);
-
-      try {
-        if (newestEcashTx?.token) {
-          const proofsSpent = await checkProofsSpent(newestEcashTx.token);
-          if (proofsSpent) {
-            const decodedToken = getDecodedToken(newestEcashTx.token);
-            const amount = _.sumBy(decodedToken.proofs, 'amount');
-            showMessage('funds_sent', { amount, unit: decodedToken.unit }, { emoji: '🎉' });
-          }
-        }
-      } catch (error) {
-        // Error handling removed
-      }
-
-      await timeout(5000);
-
-      try {
-        if (newestLightningTx) {
-          await checkLNPaymentComplete({ transaction: newestLightningTx });
-        }
-      } catch (error) {
-        // Error handling removed
-      }
-
-      if (isMounted) {
-        setTimeout(pollTransactionStatuses, 10000);
-      }
-    };
-
-    runWithAnimationFrame(pollTransactionStatuses)();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentProfile.id, newestEcashTx?.token, newestLightningTx]);
-};
-
 function TabOneScreen({
   currencies = [
     {
@@ -175,8 +86,6 @@ function TabOneScreen({
     ...currencies.filter((u) => supportedUnits.includes(u.unit)),
   ]);
   const [account, setAccount] = useState(accounts[0]);
-
-  useTransactionStatusPolling();
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {}, []);

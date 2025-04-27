@@ -15,7 +15,7 @@ import * as Sharing from 'expo-sharing';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes

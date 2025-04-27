@@ -38,6 +38,7 @@ import ndk from 'components/ndk';
 import 'components/layout/sheets/registerSheets';
 import { CheckProofsSpentProvider } from 'components/layout/CheckProofsSpentProvider';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
+import { TransactionProvider } from 'components/providers/TransactionsProvider';
 
 // Configure constants
 const RELAY_URLS = [
@@ -58,6 +59,8 @@ const RELAY_URLS = [
 const SENTRY_DSN =
   'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
 
+// Initialize global configurations
+LogBox.ignoreAllLogs();
 dayjs.extend(relativeTime);
 
 // Initialize Sentry
@@ -311,7 +314,9 @@ export default function RootLayout() {
                 <SheetProvider context="global">
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
                     <CheckProofsSpentProvider>
-                      <MainStack />
+                      <TransactionProvider>
+                        <MainStack />
+                      </TransactionProvider>
                     </CheckProofsSpentProvider>
                   </View>
                 </SheetProvider>

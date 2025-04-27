@@ -13,7 +13,7 @@ import * as Localization from 'expo-localization';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

@@ -11,7 +11,7 @@ import { useSelector } from 'react-redux';
 import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

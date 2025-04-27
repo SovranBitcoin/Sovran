@@ -1,4 +1,4 @@
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import React, { useState } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 import { RouteScreenProps, useSheetRef, ScrollView } from 'react-native-actions-sheet';

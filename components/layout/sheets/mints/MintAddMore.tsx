@@ -15,7 +15,7 @@ import Wrapper, { SheetButton } from '../wrapper';
 import { sovran } from '.';
 import { ScrollView } from 'react-native-actions-sheet';
 import { getMint } from 'components/cashu';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 interface MintCount {
   mintUrl: string;

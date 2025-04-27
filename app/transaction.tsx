@@ -26,7 +26,7 @@ import { truncateMiddle } from 'helper/strings';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 export function BalanceUpdate({
   topAmount,
@@ -37,6 +37,7 @@ export function BalanceUpdate({
   pubkey,
   request,
   transaction,
+  percentageDone,
 }) {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles, currentProfile } = useNostr();

@@ -2,17 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Share, Text } from 'react-native';
 import { View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
-import { BalanceUpdate } from './transaction';
+import { BalanceUpdate, Section } from './transaction';
 import Modal from 'components/layout/Modal';
 import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { useTypedRoute } from 'helper/navigation';
 import { useSelector } from 'react-redux';
-import { showSuccess } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { showMessage, showSuccess } from 'helper/popup/popups';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import _ from 'lodash';
-import { memoizedGetTransactionByMatcher } from 'helper/redux/cashu';
+import { memoizedGetTransactionByMatcher, updateTransaction } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
+import { useTransactions } from 'components/providers/TransactionsProvider';
+import { getMint, getWallet } from 'helper/cashu';
+import { store } from 'helper/redux/store';
 
 function ModalScreen() {
   const navigation = useNavigation();
@@ -79,6 +82,62 @@ function ModalScreen() {
 
   const isBitcoin = unit === 'sat';
 
+  const {
+    transactions,
+    listenToTransaction,
+    stopListening,
+    getActiveConnections,
+    activeConnections,
+  } = useTransactions();
+
+  useEffect(() => {
+    if (getCurrentTransaction?.[0]) {
+      listenToTransaction(getCurrentTransaction?.[0]);
+    }
+  }, [getCurrentTransaction?.[0]]);
+
+  const isListening = activeConnections?.some(
+    (connection) =>
+      connection.id ===
+      getCurrentTransaction[0].type +
+        '_' +
+        getCurrentTransaction[0].request +
+        '_' +
+        getCurrentTransaction[0].transactionType
+  );
+
+  const handleCheckStatus = async () => {
+    const currentTx = getCurrentTransaction[0];
+    const wallet = await getWallet({
+      unit: currentTx.unit,
+      mintUrl: currentTx.mintUrl,
+      profile: null,
+    });
+    const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
+
+    if (status.state === 'PAID') {
+      const profileId = store.getState().nostr?.currentProfile?.id;
+      await store.dispatch(
+        updateTransaction({
+          profileId,
+          matcher: (tx) => tx.request === currentTx.request,
+          updateFn: (tx) => ({
+            ...tx,
+            paid: true,
+          }),
+        })
+      );
+
+      showMessage(
+        'funds_received',
+        { amount: currentTx.amount, unit: currentTx.unit },
+        { emoji: '🎉' }
+      );
+    } else {
+      showMessage('', { amount: currentTx.amount, unit: currentTx.unit }, { emoji: '😢' });
+    }
+  };
+
   return (
     <Modal
       showClose
@@ -95,19 +154,29 @@ function ModalScreen() {
           />
           <PaymentInfo
             setUri={setUri}
-            data={[
-              { name: 'Lightning', value: request },
-              { name: 'Ecash', value: paymentRequest },
-            ]}
+            data={
+              [
+                // { name: 'Lightning', value: request },
+                // { name: 'Ecash', value: paymentRequest },
+              ]
+            }
             unit={unit}
             popupMessage={[
               {
                 name: 'lightning_address_copied',
                 value: request,
               },
+              // {
+              //   name: 'payment_request_copied',
+              //   value: paymentRequest,
+              // },
+            ]}
+          />
+          <Section
+            items={[
               {
-                name: 'payment_request_copied',
-                value: paymentRequest,
+                title: 'Listening',
+                value: String(isListening),
               },
             ]}
           />
@@ -140,7 +209,7 @@ function ModalScreen() {
                 text: 'Check Status',
                 icon: 'humbleicons:refresh',
                 variant: 'secondary',
-                onPress: () => {},
+                onPress: handleCheckStatus,
               },
             ]}
           />

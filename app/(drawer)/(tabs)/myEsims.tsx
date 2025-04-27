@@ -14,7 +14,7 @@ import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 
 // Constants

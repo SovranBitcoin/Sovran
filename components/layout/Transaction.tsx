@@ -17,6 +17,7 @@ import { truncateMiddle } from 'helper/strings';
 import { memoizedGetTransactionByMatcher } from 'helper/redux/cashu';
 import _ from 'lodash';
 import { getRawExpiry } from '../cashu';
+import { useTransactions } from 'components/providers/TransactionsProvider';
 
 export function Transaction({ tx, transactions, account }) {
   const theme = useSelector(memoizedGetTheme);
@@ -37,39 +38,17 @@ export function Transaction({ tx, transactions, account }) {
   const isSend = tx.transactionType === 'send';
   const isReceive = tx.transactionType === 'receive';
 
-  // Find if this is a newest transaction (to show loading)
-  const newestEcashTx = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) => {
-        const ecashTransactions = txs.filter(
-          (tx) => tx.transactionType === 'send' && tx.type === 'ecash' && !tx.paid
-        );
-        return _.maxBy(ecashTransactions, 'date');
-      },
-    })
+  const { activeConnections } = useTransactions();
+
+  const isListening = activeConnections?.some(
+    (connection) =>
+      connection.id ===
+      (tx.type === 'ecash'
+        ? tx.type + '_' + tx.token + '_' + tx.transactionType
+        : tx.type + '_' + tx.request + '_' + tx.transactionType)
   );
 
-  const newestLightningTx = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) =>
-        _.maxBy(
-          _.filter(
-            txs,
-            (tx) =>
-              tx.type === 'lightning' &&
-              !tx.paid &&
-              tx.transactionType === 'receive' &&
-              tx.request &&
-              new Date() < getRawExpiry({ pr: tx.request }) // Check if not expired
-          ),
-          'date'
-        ),
-    })
-  );
-
-  const showLoading = _.isEqual(tx, newestEcashTx) || _.isEqual(tx, newestLightningTx);
+  const showLoading = isListening;
 
   // Get profile picture from nostr data
   const profilePicture =

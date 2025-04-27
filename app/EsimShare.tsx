@@ -4,7 +4,7 @@ import { PaymentInfo } from 'components/layout/PaymentInfo';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedRoute } from 'helper/navigation';
 import { showMessage } from 'helper/popup/popups';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
 
 function ModalScreen() {

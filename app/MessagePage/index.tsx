@@ -36,7 +36,7 @@ import TimelineItem from './TimeLine';
 import { Button } from 'components/common/Button';
 import ndk from 'components/ndk';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
-import { ButtonHandler } from '../ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 
 // Function to fetch Nostr profile

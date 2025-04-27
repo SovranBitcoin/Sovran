@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { Button } from 'components/common/Button';
-import { ButtonHandler } from 'app/ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { StyledText, Text, View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';

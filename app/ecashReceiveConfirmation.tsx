@@ -17,7 +17,7 @@ import { useRoute } from '@react-navigation/native';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetMints } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
-import { ButtonHandler } from './ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 // Types
 interface TokenProps {
@@ -129,7 +129,10 @@ function ModalScreen({
   const handleRedeem = async () => {
     try {
       setLoading(true);
-      await receiveEcash({ token, unit });
+      await receiveEcash({
+        token: token as string,
+        unit: unit as string,
+      });
 
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
         navigation.navigate('index', {}, { closeParents: true });
