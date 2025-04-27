@@ -18,7 +18,9 @@ const CurrencySelector = ({
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
-  const currencies = [...new Set(multipleBalances.map((b) => b.unit?.toUpperCase()))];
+  const currencies = [...new Set(multipleBalances.map((b) => b.unit?.toUpperCase()))].filter((c) =>
+    ['SAT', 'USD', 'EUR', 'GBP'].includes(c)
+  );
 
   return (
     <View>
