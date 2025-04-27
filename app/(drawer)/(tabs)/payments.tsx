@@ -17,6 +17,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { LNVPN_PUBKEY } from '../../vpnCheckout';
 import { sovran } from 'components/layout/sheets/mints';
 import { Tabs } from 'components/common/Tabs';
+import { maybeConvertNpub } from 'helper/cashu/pay';
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -30,11 +31,16 @@ const Section = () => {
   const filteredProfiles = profiles.filter((p) => p.pubkey !== currentProfile?.pubkey);
   const filteredSearch = search.filter((s) => s.pubkey !== currentProfile?.pubkey);
 
+  function convertNpub(pubkey: string) {
+    if (!pubkey) return undefined;
+    return maybeConvertNpub(pubkey)?.slice(2);
+  }
+
   const groupedTransactions = transactions
     .filter((t) => t?.nostr?.pubkey)
     .reduce((acc, transaction) => {
-      const { pubkey } = transaction.nostr;
-      acc[pubkey] = acc[pubkey] || { pubkey, transactions: [] };
+      const pubkey = convertNpub(transaction.nostr?.pubkey);
+      acc[pubkey] = acc[pubkey] || { pubkey: pubkey, transactions: [] };
       acc[pubkey].transactions.push(transaction);
       return acc;
     }, {});
@@ -47,7 +53,7 @@ const Section = () => {
       .filter(
         (profile) =>
           messages.some((m) => m.pubkey === profile.pubkey) ||
-          transactions.some((t) => t.nostr?.pubkey === profile.pubkey) ||
+          transactions.some((t) => convertNpub(t.nostr?.pubkey) === profile.pubkey) ||
           profile.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
           profile.pubkey === LNVPN_PUBKEY
       )
@@ -272,7 +278,10 @@ const ContactItem = ({ contact, isVerified, theme, navigation }) => {
       style={styles.contactItem}
       onPress={() => {
         if (contact.profile) {
-          navigation.navigate('userMessages', { pubkey: contact.pubkey, profile: contact.profile });
+          navigation.navigate('userMessages', {
+            pubkey: contact.profile?.pubkey,
+            profile: contact.profile,
+          });
         } else {
         }
       }}>

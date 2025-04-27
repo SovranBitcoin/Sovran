@@ -12,6 +12,8 @@ import { NDKUser, NDKUserProfile } from '@nostr-dev-kit/ndk';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
 import { View, Text } from 'components/common/Themed';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { store } from 'helper/redux/store';
+import { setSearch } from 'helper/redux/nostr';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -62,6 +64,14 @@ export default function ModalScreen() {
           };
         });
 
+        for (const result of formattedResults) {
+          const newResults = [{ pubkey: result?.pubkey, profile: result }];
+          const uniqueResults = [
+            ...new Map(newResults.map((item) => [item.pubkey, item.profile])).values(),
+          ];
+          store.dispatch(setSearch(uniqueResults));
+        }
+
         setSearchResults(formattedResults);
       } else {
         setSearchResults([]);
@@ -111,7 +121,8 @@ export default function ModalScreen() {
   };
 
   const navigateToUserMessages = ({ pubkey, profile }) => {
-    console.log(129837, profile);
+    navigation.goBack();
+    navigation.goBack();
     navigation.navigate('userMessages', {
       pubkey: pubkey,
       profile,
