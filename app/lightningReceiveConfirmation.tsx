@@ -134,7 +134,7 @@ function ModalScreen() {
         { emoji: '🎉' }
       );
     } else {
-      showMessage('', { amount: currentTx.amount, unit: currentTx.unit }, { emoji: '😢' });
+      showMessage('lightning_transaction_pending', {}, { emoji: '❌' });
     }
   };
 

@@ -114,6 +114,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'Your transaction is pending. Please wait for the receiver to redeem the ecash token.',
     type: MESSAGE_TYPES.INFO,
   },
+  lightning_transaction_pending: {
+    title: 'Transaction Pending',
+    text: 'Your transaction is pending. Please wait for the receiver to send the payment.',
+    type: MESSAGE_TYPES.INFO,
+  },
   no_initial_balance: {
     title: 'Deposit Required',
     text: ({ unit }: { unit: string }) =>
@@ -238,7 +243,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     title: 'Insufficient Funds',
     text: 'You do not have enough funds to complete this transaction.',
     type: MESSAGE_TYPES.ERROR,
-  }
+  },
 };
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
