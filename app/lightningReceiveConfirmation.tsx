@@ -154,12 +154,10 @@ function ModalScreen() {
           />
           <PaymentInfo
             setUri={setUri}
-            data={
-              [
-                // { name: 'Lightning', value: request },
-                // { name: 'Ecash', value: paymentRequest },
-              ]
-            }
+            data={[
+              { name: 'Lightning', value: request },
+              // { name: 'Ecash', value: paymentRequest },
+            ]}
             unit={unit}
             popupMessage={[
               {
