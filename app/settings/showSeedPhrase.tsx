@@ -6,7 +6,6 @@ import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
-import SettingsButton from 'components/common/SettingsButton';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 
 const ShowSeedPhrase: React.FC = () => {
