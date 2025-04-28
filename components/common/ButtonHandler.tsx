@@ -10,40 +10,45 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { runWithAnimationFrame } from 'app/onboard/new';
 
-export function ButtonHandler({ context, buttons, style = {}, colors }) {
+interface ButtonHandlerProps {
+  context?: 'tab';
+  buttons: {
+    disabled?: boolean;
+    loading?: boolean;
+    variant: 'primary' | 'secondary';
+    icon?: string;
+    text: string;
+    onPress: any;
+  }[];
+  style?: StyleSheet;
+  colors?: readonly [string, string, ...string[]];
+}
+
+export function ButtonHandler({ context, buttons, style, colors }: ButtonHandlerProps) {
   const [loading, setLoading] = useState(false);
   const theme = useSelector(memoizedGetTheme);
 
+  const defaultColors: readonly [string, string, ...string[]] = [
+    opacity(greys(theme)[2300], 0),
+    opacity(greys(theme)[2300], 0.75),
+    opacity(greys(theme)[2300], 0.9),
+    greys(theme)[2300],
+  ] as const;
+
   return (
     <LinearGradient
-      colors={
-        colors || [
-          opacity(greys(theme)[2300], 0),
-          opacity(greys(theme)[2300], 0.75),
-          opacity(greys(theme)[2300], 0.9),
-          greys(theme)[2300],
-        ]
-      }
+      colors={colors || defaultColors}
       style={{
         flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
         padding: 8,
         paddingBottom: 16,
         marginBottom: context === 'tab' ? 48 : 0,
         ...style,
       }}>
       {buttons.slice(0, 2).map((button, index) => (
-        <View
-          key={index}
-          style={{
-            flex: 1,
-            backgroundColor: 'transparent',
-          }}>
+        <View key={index} className="flex-1 bg-transparent">
           <Button
-            position="center"
             onPress={() => {
-              // Only run the onPress if the button is not disabled
               if (!button.disabled) {
                 runWithAnimationFrame(button.onPress, setLoading)();
               }
@@ -51,18 +56,13 @@ export function ButtonHandler({ context, buttons, style = {}, colors }) {
             text={button.text}
             variant={button.variant}
             loading={loading || button.loading}
-            disabled={button.disabled} // Pass the disabled prop to Button
-            // icon={button.icon}
+            disabled={button.disabled}
           />
         </View>
       ))}
 
       {buttons.length > 2 && (
-        <View
-          style={{
-            backgroundColor: 'transparent',
-            width: 64,
-          }}>
+        <View className="w-16 bg-transparent">
           <Button
             icon={<Icon name={'tabler:dots'} />}
             onPress={() => {
