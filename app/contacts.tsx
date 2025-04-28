@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Image, ScrollView, Keyboard } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greens, greys, reds, shades } from 'helper/colors';
-import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -14,17 +13,17 @@ import { View, Text } from 'components/common/Themed';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
+// Import the base TextInput from React Native instead
+import { TextInput as RNTextInput } from 'react-native';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const ref = useRef(null);
+  const inputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const navigation = useTypedNavigation();
-
-  console.log(192873, JSON.stringify(navigation));
 
   const debounceTimeoutRef = useRef(null);
 
@@ -49,7 +48,7 @@ export default function ModalScreen() {
       const data = await response.json();
 
       if (data.results && Array.isArray(data.results)) {
-        const formattedResults = data.results.map((result: NDKUserProfile) => {
+        const formattedResults = data.results.map((result) => {
           const pubkey = JSON.parse(result.profileEvent).pubkey;
           const user = new NDKUser({
             pubkey: pubkey,
@@ -136,6 +135,12 @@ export default function ModalScreen() {
   const showEmptyState = !hasSearched && !loading;
   const showNoResults = hasSearched && !loading && searchResults.length === 0;
 
+  // Set default values for SkeletonContainer props to avoid using defaultProps
+  const skeletonBgColor = greys(theme)[1800];
+  const skeletonHighlightColor = greys(theme)[1300];
+  const skeletonSpeed = 800;
+  const skeletonAnimation = loading ? 'pulse' : 'none';
+
   return (
     <SafeAreaView
       style={{
@@ -143,10 +148,10 @@ export default function ModalScreen() {
         flex: 1,
       }}>
       <SkeletonContainer
-        backgroundColor={greys(theme)[1800]}
-        highlightColor={greys(theme)[1300]}
-        speed={800}
-        animation={loading ? 'pulse' : 'none'}>
+        backgroundColor={skeletonBgColor}
+        highlightColor={skeletonHighlightColor}
+        speed={skeletonSpeed}
+        animation={skeletonAnimation}>
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
             style={{
@@ -166,8 +171,9 @@ export default function ModalScreen() {
                 }}>
                 {/* Wrapper View for TextInput with relative positioning */}
                 <View style={{ flex: 1, position: 'relative' }}>
-                  <TextInput
-                    ref={ref}
+                  {/* Use React Native's TextInput directly instead of the custom component */}
+                  <RNTextInput
+                    ref={inputRef}
                     // autoFocus={true}
                     value={searchQuery}
                     onChangeText={handleSearchQueryChange}
@@ -175,7 +181,11 @@ export default function ModalScreen() {
                     placeholderTextColor={greys(theme)[1000]}
                     style={{
                       flex: 1,
-                      paddingRight: 30, // Add padding to make room for the clear button
+                      paddingRight: 30,
+                      color: greys(theme)[100], // Add text color
+                      backgroundColor: greys(theme)[1800], // Add background color
+                      borderRadius: 8, // Add border radius for styling
+                      padding: 12, // Add padding
                     }}
                   />
                   {/* Clear button with absolute positioning */}
@@ -223,9 +233,8 @@ export default function ModalScreen() {
                   {/* Map over actual results or placeholder results */}
                   {displayResults.map((result, index) => (
                     <SearchResult
-                      key={index}
+                      key={`result-${index}`}
                       loading={loading}
-                      key={result?.pubkey}
                       result={result}
                       onPress={() =>
                         !loading &&
@@ -451,7 +460,7 @@ function SearchResult({ result, onPress, loading }) {
   );
 }
 
-function ProfileImage({ profile, loading }: { profile: NDKUserProfile; loading?: boolean }) {
+function ProfileImage({ profile, loading }) {
   const theme = useSelector(memoizedGetTheme);
   const [imageError, setImageError] = useState(false);
 
