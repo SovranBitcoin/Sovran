@@ -5,15 +5,18 @@ import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
 import { Section as TableSection } from '../transaction';
 import { RowButton, Section } from '../settings';
-import { ButtonHandler } from '../ecashSendConfirmation';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
 import { Tabs } from 'components/common/Tabs';
+import CreditCardComponent from 'components/common/NFCCard';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
 
   return (
     <Container>
+      <CreditCardComponent />
+
       {/* info message */}
       <Card
         message="Message"
