@@ -18,15 +18,22 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
         marginBottom: 0,
         marginTop: 0,
         overflow: 'visible',
+        width: '100%',
       }}
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.tabContainer}>
+      contentContainerStyle={[
+        styles.tabContainer,
+        {
+          width: '100%',
+        },
+      ]}>
       <View
         style={[
           {
             flexDirection: 'row',
             width: '100%',
+            minWidth: '100%',
           },
           sovran.listItem,
           {
