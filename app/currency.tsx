@@ -287,68 +287,58 @@ function ModalScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={{
-        backgroundColor: greys(theme)[2300],
-        flex: 1,
-      }}>
-      <Modal
-        showBack
-        title="Select Amount"
-        children={
-          <>
-            <NumberInput
-              currency={unit}
-              value={amount}
-              type={
-                params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
-                  ? 'send'
-                  : 'receive'
-              }
-              onChange={setAmount}
-            />
-            <SelectedMintDisplay
-              onMintSelected={handleMintSelected}
-              unit={unit}
-              loading={loading}
-            />
-            {params.to === 'ecashSendConfirmation' && params?.profile && (
-              <TouchableOpacity style={[sovran.listItem, { alignSelf: 'center' }]}>
-                <Icon
-                  name="solar:key-bold"
-                  size={16}
+    <Modal
+      showBack
+      title="Select Amount"
+      children={
+        <>
+          <NumberInput
+            currency={unit}
+            value={amount}
+            type={
+              params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
+                ? 'send'
+                : 'receive'
+            }
+            onChange={setAmount}
+          />
+          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+          {params.to === 'ecashSendConfirmation' && params?.profile && (
+            <TouchableOpacity style={[sovran.listItem, { alignSelf: 'center' }]}>
+              <Icon
+                name="solar:key-bold"
+                size={16}
+                style={{
+                  backgroundColor: greys(theme)[1200],
+                  borderRadius: 100,
+                  padding: 8,
+                }}
+              />
+              <Text>{'  →  '}</Text>
+              {params?.profile?.picture ? (
+                <Image
                   style={{
-                    backgroundColor: greys(theme)[1200],
-                    borderRadius: 100,
-                    padding: 8,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 1000,
                   }}
+                  source={{ uri: params.profile.picture }}
                 />
-                <Text>{'  →  '}</Text>
-                {params?.profile?.picture ? (
-                  <Image
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 1000,
-                    }}
-                    source={{ uri: params.profile.picture }}
-                  />
-                ) : (
-                  <View />
-                )}
-              </TouchableOpacity>
-            )}
-          </>
-        }
-        buttons={
-          <>
-            <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
-            {renderButtons()}
-          </>
-        }
-      />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} />
-    </SafeAreaView>
+              ) : (
+                <View />
+              )}
+            </TouchableOpacity>
+          )}
+        </>
+      }
+      buttons={
+        <>
+          <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
+          {renderButtons()}
+        </>
+      }
+    />
+    // <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} />
   );
 }
 
