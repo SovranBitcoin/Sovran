@@ -13,6 +13,7 @@ import { Alert } from 'react-native';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { convertTime } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
+import dayjs from 'dayjs';
 
 // Lightning invoice parsing utilities
 export function getLightningAmount({ pr }) {
@@ -39,10 +40,8 @@ export function getExpiry({ pr }) {
 }
 
 export function getExpiresIn({ pr }) {
-  const decodedPR = decode(pr as string);
-  const expiresInHours =
-    (decodedPR.sections.find((route) => route.name === 'expiry')?.value || 3600) / 60 / 60;
-  return expiresInHours > 1 ? `${expiresInHours} hours` : `${expiresInHours} mins`;
+  const expiry = getRawExpiry({ pr });
+  return dayjs(expiry).fromNow();
 }
 
 export function getDescription({ pr }) {
