@@ -180,7 +180,7 @@ const Screen = () => {
     return dn;
   }
 
-  const profileIcons = profiles.map((profile, i) => (
+  const profileIcons = profiles.slice(0).map((profile, i) => (
     <TouchableOpacity
       key={profile.pubkey}
       onPress={() => {
