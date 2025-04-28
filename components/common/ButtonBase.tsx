@@ -1,6 +1,6 @@
 import { StyleSheet, View, Pressable, Animated, useWindowDimensions } from 'react-native';
 import { useRef, useEffect, useState } from 'react';
-import { greys, shades, white } from 'helper/colors';
+import { greys, shades, black } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -26,7 +26,7 @@ export const ButtonBase = ({
   const scaleRef = useRef(new Animated.Value(1));
   const spinValue = useRef(new Animated.Value(0)).current;
   const colorsMap = {
-    primary: [shades[200], shades[300], shades[500]],
+    primary: [greys(theme)[0], greys(theme)[0]],
     secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
     transparent: ['transparent', 'transparent'],
   };
@@ -87,7 +87,7 @@ export const ButtonBase = ({
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 0.33,
-            borderColor: variant === 'primary' ? shades[100] : greys(theme)[1000],
+            borderColor: variant === 'primary' ? greys(theme)[100] : greys(theme)[1000],
             ...style,
           },
         ]}
@@ -122,12 +122,14 @@ export const ButtonBase = ({
               {/* Replace this icon with your loading icon */}
             </Animated.View>
           ) : (
-            <View style={{ marginRight: icon ? (text ? 8 : 0) : 0 }}>{icon}</View>
+            <View style={{ marginRight: icon ? (text ? 8 : 0) : 0 }}>
+              <Text>{icon}</Text>
+            </View>
           )}
           <Text
             style={{
               backgroundColor: 'transparent',
-              color: variant === 'transparent' ? shades[100] : white,
+              color: variant === 'primary' ? black : greys(theme)[100],
               textAlign: 'center',
               paddingTop: 12,
               paddingBottom: 12,
