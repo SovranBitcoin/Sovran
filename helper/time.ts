@@ -1,36 +1,78 @@
-export function convertTime(date: Date) {
+/**
+ * Time utility functions for formatting and calculating time-related data
+ */
+
+/**
+ * Represents time data with activation and expiration information
+ */
+interface TimeData {
+  activateTime: string;
+  expiredTime: string;
+}
+
+/**
+ * Represents processed time information with formatted times and remaining duration
+ */
+interface ProcessedTimeInfo {
+  activateTime: string;
+  expiredTime: string;
+  daysLeft: number;
+  hoursLeft: number;
+  percentageTimeUsed: string;
+  isExpired: boolean;
+}
+
+/**
+ * Converts a Date object to a formatted date-time string
+ */
+export function convertTime(date: Date): string {
   const dateFormat = {
     year: 'numeric' as const,
     month: '2-digit' as const,
     day: '2-digit' as const,
-  };
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    ...dateFormat,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    hour: '2-digit' as const,
+    minute: '2-digit' as const,
+    second: '2-digit' as const,
     hour12: false, // Use 24-hour time format
-  });
-  const formattedDate = formatter.format(date);
-  return formattedDate;
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-US', dateFormat);
+  return formatter.format(date);
 }
 
-export function convertTimeData(data: { activateTime: string; expiredTime: string }) {
+/**
+ * Formats a date to YYYY-MM-DD HH:MM format
+ */
+export function formatToDateTime(date: Date): string {
+  return date.toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/**
+ * Processes time data to calculate remaining time and usage percentage
+ */
+export function convertTimeData(data: TimeData): ProcessedTimeInfo {
+  if (!data?.activateTime || !data?.expiredTime) {
+    throw new Error('Invalid time data: activation and expiration times are required');
+  }
+
   const activateTime = new Date(data.activateTime);
   const expiredTime = new Date(data.expiredTime);
   const now = new Date();
-  const timeLeft = expiredTime.getTime() - now.getTime();
+
+  const timeLeft = Math.max(0, expiredTime.getTime() - now.getTime());
   const totalTime = expiredTime.getTime() - activateTime.getTime();
+
   const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
   const hoursLeft = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const percentageTimeUsed = ((totalTime - timeLeft) / totalTime) * 100;
-  const activateTimeFormatted = activateTime.toISOString().slice(0, 16).replace('T', ' ');
-  const expiredTimeFormatted = expiredTime.toISOString().slice(0, 16).replace('T', ' ');
+
+  const percentageTimeUsed = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 100;
+
   return {
-    activateTime: activateTimeFormatted,
-    expiredTime: expiredTimeFormatted,
-    daysLeft: daysLeft,
-    hoursLeft: hoursLeft,
-    percentageTimeUsed: percentageTimeUsed.toFixed(2) + '%',
+    activateTime: formatToDateTime(activateTime),
+    expiredTime: formatToDateTime(expiredTime),
+    daysLeft,
+    hoursLeft,
+    percentageTimeUsed: `${percentageTimeUsed.toFixed(2)}%`,
+    isExpired: now > expiredTime,
   };
 }
