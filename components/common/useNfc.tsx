@@ -1,54 +1,54 @@
-import { Alert } from 'react-native';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import NfcManager, { NfcError, NfcTech, Ndef } from 'react-native-nfc-manager';
 
-const handleException = (ex) => {
-  const NfcManager = require('react-native-nfc-manager').default;
-  const NfcError = require('react-native-nfc-manager').NfcError;
+/**
+ * Handles exceptions that may occur during NFC operations
+ */
+const handleException = (error: Error): void => {
+  if (error instanceof NfcError.UserCancel) {
+    // User canceled operation - no action needed
+    return;
+  }
 
-  if (ex instanceof NfcError.UserCancel) {
-    // bypass
-  } else if (ex instanceof NfcError.Timeout) {
+  if (error instanceof NfcError.Timeout) {
     Alert.alert('NFC Session Timeout');
+    return;
+  }
+
+  // Handle other errors based on platform
+  if (Platform.OS === 'ios') {
+    NfcManager.invalidateSessionWithErrorIOS(`${error}`);
   } else {
-    if (Platform.OS === 'ios') {
-      NfcManager.invalidateSessionWithErrorIOS(`${ex}`);
-    } else {
-      Alert.alert('NFC Error', `${ex}`);
-    }
+    Alert.alert('NFC Error', `${error}`);
   }
 };
 
-export async function write(value) {
-  let result = false;
-
+/**
+ * Writes text data to an NFC tag
+ */
+export async function write(value: string): Promise<boolean> {
   try {
-    // Lazy load the NFC Manager and related components
-    const NfcManager = require('react-native-nfc-manager').default;
-    const NfcTech = require('react-native-nfc-manager').NfcTech;
-    const Ndef = require('react-native-nfc-manager').Ndef;
-
     await NfcManager.requestTechnology(NfcTech.Ndef, {
       alertMessage: 'Ready to write some NDEF',
     });
 
-    let bytes = null;
-    bytes = Ndef.encodeMessage([Ndef.textRecord(value)]);
+    const bytes = Ndef.encodeMessage([Ndef.textRecord(value)]);
 
-    if (bytes) {
-      await NfcManager.ndefHandler.writeNdefMessage(bytes);
-
-      if (Platform.OS === 'ios') {
-        await NfcManager.setAlertMessageIOS('Success');
-      }
-
-      result = true;
+    if (!bytes) {
+      return false;
     }
-  } catch (ex) {
-    handleException(ex);
+
+    await NfcManager.ndefHandler.writeNdefMessage(bytes);
+
+    if (Platform.OS === 'ios') {
+      await NfcManager.setAlertMessageIOS('Success');
+    }
+
+    return true;
+  } catch (error) {
+    handleException(error instanceof Error ? error : new Error(String(error)));
+    return false;
   } finally {
-    const NfcManager = require('react-native-nfc-manager').default;
     NfcManager.cancelTechnologyRequest();
   }
-
-  return result;
 }

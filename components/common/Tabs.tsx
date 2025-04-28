@@ -1,42 +1,52 @@
+import React, { useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { StyleSheet, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
-import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { sovran } from 'components/layout/sheets/mints';
 
-export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
+interface TabsProps {
+  tabs: string[];
+  amounts?: number[];
+  selectedTab: string;
+  handleTabPress: (tab: string, index: number) => void;
+}
+
+export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+
+  const onTabPress = useCallback(
+    (tab: string, index: number) => {
+      handleTabPress(tab, index);
+    },
+    [handleTabPress]
+  );
 
   return (
     <ScrollView
+      className="w-full"
       style={{
         backgroundColor: 'transparent',
         marginBottom: 0,
         marginTop: 0,
         overflow: 'visible',
-        width: '100%',
       }}
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[
-        styles.tabContainer,
-        {
-          width: '100%',
-        },
-      ]}>
+      contentContainerStyle={{
+        flexDirection: 'row',
+        backgroundColor: 'transparent',
+        width: '100%',
+      }}>
       <View
         style={[
+          sovran.listItem,
           {
             flexDirection: 'row',
             width: '100%',
             minWidth: '100%',
-          },
-          sovran.listItem,
-          {
             padding: 2,
             borderRadius: 24,
           },
@@ -44,21 +54,31 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
         {tabs.map((tab, index) => (
           <TouchableOpacity
             key={tab}
-            style={[
-              styles.tabButton,
-              {
-                flex: 1,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-              },
-              selectedTab === tab && styles.selectedTabButton,
-            ]}
-            onPress={() => handleTabPress(tab, index)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.selectedTabText]}>
+            style={{
+              padding: 10,
+              borderRadius: 24,
+              flex: 1,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              ...(selectedTab === tab && {
+                backgroundColor: greys(theme)[1300],
+                borderWidth: 0,
+                borderRadius: 1000,
+                borderColor: greys(theme)[1300],
+              }),
+            }}
+            onPress={() => onTabPress(tab, index)}>
+            <Text
+              style={{
+                color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
+                fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
+                fontSize: 14,
+                textAlign: 'center',
+              }}>
               {tab}
             </Text>
-            {amounts && amounts[index] ? (
+            {amounts?.[index] ? (
               <Text
                 style={{
                   marginLeft: 4,
@@ -75,38 +95,3 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }) {
     </ScrollView>
   );
 }
-
-const createStyles = (theme) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: 'black',
-      flexDirection: 'column',
-      margin: 0,
-      flex: 1,
-    },
-    tabContainer: {
-      flexDirection: 'row',
-      backgroundColor: 'transparent',
-    },
-    tabButton: {
-      padding: 10,
-      fontFamily: 'OverpassHeavy',
-      borderRadius: 24,
-    },
-    selectedTabButton: {
-      backgroundColor: greys(theme)[1300],
-      borderWidth: 0,
-      borderRadius: 1000,
-      borderColor: greys(theme)[1300],
-    },
-    tabText: {
-      color: greys(theme)[200],
-      fontFamily: 'OverpassSemibold',
-      fontSize: 14,
-      textAlign: 'center',
-    },
-    selectedTabText: {
-      color: greys(theme)[0],
-      fontFamily: 'OverpassHeavy',
-    },
-  });

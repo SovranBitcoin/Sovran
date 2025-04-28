@@ -33,7 +33,7 @@ import { HDKey } from '@scure/bip32';
  * Executes an async function within a requestAnimationFrame to improve UI responsiveness
  */
 export const runWithAnimationFrame = <T extends any[]>(
-  asyncFunction: (...args: T) => Promise<void>,
+  callback: Function,
   setIsSubmitting?: React.Dispatch<React.SetStateAction<boolean>>
 ) => {
   return async (...args: T) => {
@@ -43,7 +43,7 @@ export const runWithAnimationFrame = <T extends any[]>(
 
     requestAnimationFrame(async () => {
       try {
-        await asyncFunction(...args);
+        await callback(...args);
       } catch (error) {
       } finally {
         if (setIsSubmitting) {

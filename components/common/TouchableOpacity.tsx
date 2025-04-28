@@ -1,36 +1,66 @@
 import { runWithAnimationFrame } from 'app/onboard/new';
-import { useRef } from 'react';
-import { TouchableOpacity as TO } from 'react-native';
+import { useRef, FC } from 'react';
+import {
+  TouchableOpacity as RNTouchableOpacity,
+  TouchableOpacityProps,
+  GestureResponderEvent,
+} from 'react-native';
 
-export const TouchableOpacity = ({ onPress, onPressIn, onPressOut, ...props }) => {
-  const _touchActivatePositionRef = useRef(null);
+interface TouchPosition {
+  pageX: number;
+  pageY: number;
+}
 
-  function _onPressIn(e) {
+/**
+ * Enhanced TouchableOpacity that prevents press events when dragged.
+ * This component tracks the touch position to determine if the user has
+ * dragged their finger before releasing, preventing accidental presses.
+ */
+export const TouchableOpacity: FC<TouchableOpacityProps> = ({
+  onPress,
+  onPressIn,
+  onPressOut,
+  ...props
+}) => {
+  const touchActivatePositionRef = useRef<TouchPosition | null>(null);
+
+  const handlePressIn = (e: GestureResponderEvent): void => {
     const { pageX, pageY } = e.nativeEvent;
 
-    _touchActivatePositionRef.current = {
+    touchActivatePositionRef.current = {
       pageX,
       pageY,
     };
 
     onPressIn?.(e);
-  }
+  };
 
-  function _onPress(e) {
+  const handlePress = (e: GestureResponderEvent): void => {
+    // Skip if no initial position was recorded or no onPress handler
+    if (!touchActivatePositionRef.current || !onPress) return;
+
     const { pageX, pageY } = e.nativeEvent;
+    const initialPosition = touchActivatePositionRef.current;
 
-    const absX = Math.abs(_touchActivatePositionRef.current.pageX - pageX);
-    const absY = Math.abs(_touchActivatePositionRef.current.pageY - pageY);
+    const absX = Math.abs(initialPosition.pageX - pageX);
+    const absY = Math.abs(initialPosition.pageY - pageY);
 
-    const dragged = absX > 1 || absY > 1;
-    if (!dragged) {
+    // Define a threshold for what constitutes a drag - currently set to 1px
+    const DRAG_THRESHOLD = 1;
+    const isDragged = absX > DRAG_THRESHOLD || absY > DRAG_THRESHOLD;
+
+    if (!isDragged) {
       runWithAnimationFrame(onPress, () => {})(e);
     }
-  }
+  };
 
   return (
-    <TO onPressIn={_onPressIn} onPress={_onPress} onPressOut={onPressOut} {...props}>
+    <RNTouchableOpacity
+      onPressIn={handlePressIn}
+      onPress={handlePress}
+      onPressOut={onPressOut}
+      {...props}>
       {props.children}
-    </TO>
+    </RNTouchableOpacity>
   );
 };

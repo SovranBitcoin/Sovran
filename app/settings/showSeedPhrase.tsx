@@ -7,6 +7,7 @@ import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
 import SettingsButton from 'components/common/SettingsButton';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 const ShowSeedPhrase: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -25,11 +26,14 @@ const ShowSeedPhrase: React.FC = () => {
           editable={false}
           multiline
         />
-        <SettingsButton
-          style={styles.toggleButton}
-          variant="primary"
-          onPress={() => setIsVisible(!isVisible)}
-          text={isVisible ? 'Hide Mnemonic' : 'Show Mnemonic'}
+        <ButtonHandler
+          buttons={[
+            {
+              variant: 'primary',
+              onPress: () => setIsVisible(!isVisible),
+              text: isVisible ? 'Hide Mnemonic' : 'Show Mnemonic',
+            },
+          ]}
         />
       </View>
     </Container>

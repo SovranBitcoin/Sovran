@@ -75,7 +75,12 @@ export default function ModalScreen() {
           ]}></ButtonHandler>
       </View>
 
-      <Tabs tabs={['Confirmed', 'Pending']} selectedTab={'Confirmed'} handleTabPress={() => {}} />
+      <Tabs
+        amounts={[0, 1, 200]}
+        tabs={['Confirmed', 'Pending', 'Failed']}
+        selectedTab={'Confirmed'}
+        handleTabPress={() => {}}
+      />
     </Container>
   );
 }

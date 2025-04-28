@@ -135,12 +135,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'send',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'camera',
     options: {},
   },

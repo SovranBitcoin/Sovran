@@ -1,84 +1,89 @@
-import { Animated, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated } from 'react-native';
+import { useSelector } from 'react-redux';
 
 import { StyledText, View } from 'components/common/Themed';
-
-import { useEffect, useRef } from 'react';
 import { greens, greys, shades } from 'helper/colors';
-import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { LightningUnit } from 'assets/icons';
-import React from 'react';
 
-export function NumberInput({ type = 'send', currency = '£', value, onChange }) {
+type CurrencySymbol = '$' | '€' | '£' | 'sat' | string;
+type TransactionType = 'send' | 'receive';
+
+interface NumberInputProps {
+  type?: TransactionType;
+  currency?: string;
+  value: number | string;
+  onChange?: (value: string) => void;
+}
+
+export function NumberInput({
+  type = 'send',
+  currency = '£',
+  value,
+  onChange,
+}: NumberInputProps): JSX.Element {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const theme = useSelector(memoizedGetTheme);
 
   // Mapping currency to symbol
-  const currencySymbols = {
+  const currencySymbols: Record<string, CurrencySymbol> = {
     usd: '$',
     eur: '€',
     gbp: '£',
-    sat: 'lu',
+    sat: 'sat',
   };
 
-  const currencySymbol = currencySymbols[currency.toLowerCase()] || currency;
-
-  const precision = currencySymbol === 'sat' ? 0 : 2;
+  const currencySymbol: CurrencySymbol = currencySymbols[currency.toLowerCase()] || currency;
+  const isLightningUnit = currencySymbol === 'sat';
+  const isSingleCharSymbol = currencySymbol.length === 1;
 
   useEffect(() => {
     const length = value.toString().length;
     const newScale = length > 3 ? 1 - (length - 3) * 0.075 : 1;
 
-    // Animated.spring(scaleAnim, {
-    //   toValue: newScale, // Set minimum scale to 0.5
-    //   friction: 5,
-    //   useNativeDriver: true,
-    // }).start();
-  }, [value]);
+    Animated.timing(scaleAnim, {
+      toValue: newScale,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [value, scaleAnim]);
 
-  const theme = useSelector(memoizedGetTheme);
+  const calculateFontSize = (text: string | number): number => {
+    const maxFontSize = 64;
+    const minFontSize = 36;
+    const shrinkStartLength = 3;
+    const shrinkEndLength = 9;
 
-  const calculateFontSize = (text) => {
-    const maxFontSize = 64; // Set your maximum font size
-    const minFontSize = 36; // Set a minimum font size for readability
-    const maxTextLength = 3; // Set a threshold for when the font size starts shrinking
-    const shrinkStartLength = maxTextLength;
-    const shrinkEndLength = 9; // When font size should be the smallest
-
-    // Calculate font size proportionally based on text length
     const textLength = String(text).length;
 
-    // If text length is short, return maxFontSize
-    if (textLength <= maxTextLength) {
+    if (textLength <= shrinkStartLength) {
       return maxFontSize;
     }
 
-    // If text length exceeds shrinkEndLength, return minFontSize
     if (textLength >= shrinkEndLength) {
       return minFontSize;
     }
 
-    // Calculate proportional reduction in font size based on text length
     const shrinkRange = shrinkEndLength - shrinkStartLength;
     const fontSize =
       maxFontSize - ((textLength - shrinkStartLength) * (maxFontSize - minFontSize)) / shrinkRange;
 
-    // Ensure the font size is not less than the minimum
     return Math.max(minFontSize, fontSize);
   };
 
-  const formatNumberWithSpaces = (number) => {
-    // Convert the number to a string
+  const formatNumberWithSpaces = (number: string | number): string => {
     const numberString = String(number);
-
-    // Use regular expression to insert a space every three digits from the end
     return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   };
 
+  const getColorForType = (): string => {
+    if (!value) return greys(theme)[700];
+    return type === 'receive' ? greens[300] : shades[300];
+  };
+
   return (
-    <View
-      style={{
-        backgroundColor: 'transparent',
-      }}>
+    <View className="bg-transparent">
       <Animated.View
         style={{
           display: 'flex',
@@ -90,9 +95,9 @@ export function NumberInput({ type = 'send', currency = '£', value, onChange })
           padding: 0,
           overflow: 'visible',
           transform: [{ scale: scaleAnim }],
-          marginLeft: currencySymbol.length === 1 ? -22 : 22,
+          marginLeft: isSingleCharSymbol ? -22 : 22,
         }}>
-        {currencySymbol.length === 1 && (
+        {isSingleCharSymbol && (
           <StyledText
             style={{
               fontFamily: 'OverpassRegular',
@@ -102,24 +107,15 @@ export function NumberInput({ type = 'send', currency = '£', value, onChange })
               marginTop: 12,
               flexShrink: 0,
               overflow: 'hidden',
-              numberOfLines: 1,
             }}
             secondary={!value}
-            primary={type === 'send' && value}
-            negative={type === 'receive' && value}>
+            primary={type === 'send' && Boolean(value)}
+            negative={type === 'receive' && Boolean(value)}>
             {currencySymbol}
           </StyledText>
         )}
-        <View
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'visible',
-            height: 100,
-            backgroundColor: 'transparent',
-          }}>
+
+        <View className="flex h-[100px] flex-row items-center justify-center overflow-visible bg-transparent">
           <StyledText
             style={{
               fontFamily: 'OverpassHeavy',
@@ -131,32 +127,22 @@ export function NumberInput({ type = 'send', currency = '£', value, onChange })
               overflow: 'visible',
             }}
             secondary={!value}
-            primary={type === 'send' && value}
-            negative={type === 'receive' && value}
-            children={value ? formatNumberWithSpaces(String(value)) : '0'}
-          />
+            primary={type === 'send' && Boolean(value)}
+            negative={type === 'receive' && Boolean(value)}>
+            {value ? formatNumberWithSpaces(value) : '0'}
+          </StyledText>
         </View>
 
-        {currencySymbol === 'lu' ? (
-          <View
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'transparent',
-            }}>
-            {type === 'send' && <LightningUnit color={value ? shades[300] : greys(theme)[700]} />}
-            {type === 'receive' && (
-              <LightningUnit color={value ? greens[300] : greys(theme)[700]} />
-            )}
+        {isLightningUnit ? (
+          <View className="flex flex-row items-center justify-center bg-transparent">
+            <LightningUnit color={getColorForType()} />
           </View>
         ) : (
-          currencySymbol.length >= 2 && (
+          !isSingleCharSymbol && (
             <StyledText
               secondary={!value}
-              primary={type === 'send' && value}
-              negative={type === 'receive' && value}
+              primary={type === 'send' && Boolean(value)}
+              negative={type === 'receive' && Boolean(value)}
               style={{
                 fontFamily: 'OverpassRegular',
                 fontSize: 28,
@@ -164,7 +150,6 @@ export function NumberInput({ type = 'send', currency = '£', value, onChange })
                 marginTop: 12,
                 flexShrink: 0,
                 overflow: 'hidden',
-                numberOfLines: 1,
               }}>
               {currencySymbol}
             </StyledText>
@@ -174,49 +159,3 @@ export function NumberInput({ type = 'send', currency = '£', value, onChange })
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  transactionsLabel: {
-    fontFamily: 'OverpassHeavy',
-    fontSize: 16,
-    color: '#6E6E6E',
-    margin: 0,
-    padding: 0,
-  },
-  minus: {
-    fontFamily: 'OverpassBold',
-    fontSize: 32,
-    color: '#9A4141',
-    marginRight: 4,
-  },
-  plus: {
-    fontFamily: 'OverpassBold',
-    fontSize: 32,
-    color: '#499A41',
-    marginRight: 4,
-  },
-  fullScreen: {
-    flex: 1,
-    backgroundColor: greys()[2300],
-  },
-  fullHeightView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: greys()[2300],
-    // padding: 16,
-  },
-  container: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: greys()[1000],
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});

@@ -8,9 +8,9 @@ import Icon from 'assets/icons';
 import { Text } from 'components/common/Themed';
 import { useNostr } from 'helper/redux/nostr';
 import { CheckIcon } from 'assets/icons';
-import SettingsButton from 'components/common/SettingsButton';
 import { Card } from 'components/common/Card';
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 const createStyles = (theme: any) =>
   StyleSheet.create({
@@ -274,12 +274,15 @@ const NpubSelector = ({
           style={styles.input}
           placeholderTextColor={greys(theme)[100]}
         />
-        <SettingsButton
-          variant="primary"
-          onPress={handleDomainPress}
-          text={selectedDomain}
-          style={styles.buttonContainer}
-          iconRight={<Icon name="fluent:chevron-down-12-filled" size={12} color={white} />}
+        <ButtonHandler
+          buttons={[
+            {
+              variant: 'primary',
+              onPress: handleDomainPress,
+              text: selectedDomain,
+              icon: 'fluent:chevron-down-12-filled',
+            },
+          ]}
         />
       </View>
       <Text style={styles.costText}>Available domains</Text>
@@ -323,8 +326,16 @@ export default function ModalScreen() {
           selectedDomain={selectedDomain}
           setSelectedDomain={setSelectedDomain}
         />
-        <Card message="Cost: 5000 sats (subject to change)" theme={theme} variant="info" />
-        <SettingsButton variant="primary" onPress={handleBuy} text="Buy" style={styles.buyButton} />
+        <Card message="Cost: 5000 sats (subject to change)" variant="info" />
+        <ButtonHandler
+          buttons={[
+            {
+              variant: 'primary',
+              onPress: handleBuy,
+              text: 'Buy',
+            },
+          ]}
+        />
       </View>
     </Container>
   );

@@ -14,7 +14,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
-import SettingsButton from 'components/common/SettingsButton';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 
 const VerifySeedPhrase = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -77,17 +77,19 @@ const VerifySeedPhrase = () => {
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.wordContainer}
         />
-        <SettingsButton
-          variant="primary"
-          style={styles.button}
-          onPress={handleDeleteLastWord}
-          text="Delete"
-        />
-        <SettingsButton
-          variant="secondary"
-          onPress={handleVerify}
-          text="Verify"
-          style={styles.button}
+        <ButtonHandler
+          buttons={[
+            {
+              variant: 'secondary',
+              onPress: handleVerify,
+              text: 'Verify',
+            },
+            {
+              variant: 'primary',
+              onPress: handleDeleteLastWord,
+              text: 'Delete',
+            },
+          ]}
         />
       </View>
     </SafeAreaView>

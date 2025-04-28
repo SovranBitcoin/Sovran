@@ -1,15 +1,31 @@
-import { Image } from 'expo-image';
+import React from 'react';
+import { Image, ImageSource, ImageStyle } from 'expo-image';
+import { StyleProp } from 'react-native';
 
-const blurhash = '000000';
+const BLUR_HASH = '000000';
 
-export default function App({ style, source }) {
+interface AppProps {
+  style?: StyleProp<ImageStyle>;
+  source: ImageSource;
+  transitionDuration?: number;
+}
+
+/**
+ * Image component that displays an image with a blur hash placeholder
+ * while the image is loading.
+ */
+export default function App({
+  style,
+  source,
+  transitionDuration = 1000,
+}: AppProps): React.ReactElement {
   return (
     <Image
       style={style}
       source={source}
-      placeholder={{ blurhash }}
+      placeholder={{ blurhash: BLUR_HASH }}
       contentFit="cover"
-      transition={1000}
+      transition={transitionDuration}
     />
   );
 }
