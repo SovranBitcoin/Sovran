@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.2",
+    "version": "0.0.1",
     "experiments": {
       "tsconfigPaths": true
     },
@@ -19,7 +19,7 @@
       "**/*"
     ],
     "ios": {
-      "buildNumber": "4",
+      "buildNumber": "205",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
         "ITSAppUsesNonExemptEncryption": false

@@ -38,6 +38,7 @@ import ndk from 'components/ndk';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
+import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 
 // Function to fetch Nostr profile
 export const fetchNostrProfile = async (npub) => {
@@ -139,9 +140,9 @@ export default function ModalScreen() {
 
   // Combine profiles and search results
   const combinedSearchAndProfiles = [
-    params.profile,
+    // { pubkey: params.pubkey, ...params.profile },
     // ...profiles,
-    // ...search.map((s) => ({ pubkey: s.pubkey, ...s.profile })),
+    ...search.map((s) => ({ pubkey: convertNpub(s.pubkey), ...s.profile })),
   ];
 
   // Filter and organize transactions
@@ -149,7 +150,7 @@ export default function ModalScreen() {
 
   // Group transactions by pubkey
   const groupedTransactions = filteredTransactions.reduce((acc, transaction) => {
-    const pubkey = transaction.nostr.pubkey;
+    const pubkey = convertNpub(transaction.nostr.pubkey);
     if (!acc[pubkey]) {
       acc[pubkey] = { pubkey, transactions: [] };
     }
@@ -158,15 +159,17 @@ export default function ModalScreen() {
   }, {});
 
   const enrichedTransactions = Object.values(groupedTransactions).map((group) => {
-    const profile = combinedSearchAndProfiles.find((p) => p.pubkey === group.pubkey);
+    const profile = combinedSearchAndProfiles.find((p) => convertNpub(p.pubkey) === group.pubkey);
     return {
-      pubkey: group.pubkey,
+      pubkey: convertNpub(group.pubkey),
       profile: profile || null,
       transactions: group.transactions,
     };
   });
 
-  const currentTransactions = enrichedTransactions.find((t) => t.pubkey === params.pubkey);
+  const currentTransactions = enrichedTransactions.find(
+    (t) => convertNpub(t.pubkey) === convertNpub(params.pubkey)
+  );
 
   // Filter esims with matching requests
   const esimsWithRequest = esims.filter((esim) =>
@@ -184,7 +187,7 @@ export default function ModalScreen() {
 
   // Filter and deduplicate messages
   const filteredMessages = messages
-    .filter((msg) => (msg.pubkey || msg.sender) === params.pubkey)
+    .filter((msg) => (msg.pubkey || msg.sender) === convertNpub(params.pubkey))
     .reduce((unique, msg) => {
       return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
     }, []);
@@ -195,7 +198,7 @@ export default function ModalScreen() {
     ...vpnsWithRequest,
     ...(currentTransactions?.transactions || []),
     ...filteredMessages,
-    ...events.filter((event) => params.pubkey === BITREFILL_NOSTR_PUBKEY),
+    ...events.filter((event) => convertNpub(event.pubkey) === convertNpub(BITREFILL_NOSTR_PUBKEY)),
   ].sort((a, b) => {
     const getDate = (item) => {
       const vpnDate = item?.cc ? item.created_at : null;
@@ -264,10 +267,10 @@ export default function ModalScreen() {
   // Send DM handler
   const handleSendDM = async () => {
     try {
-      const recipientPubKey = params.pubkey;
+      const recipientPubKey = convertNpub(params.pubkey);
       const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
       const privKey = bytesToHex(privKeyBytes);
-      const pubKey = currentProfile.pubkey;
+      const pubKey = convertNpub(currentProfile.pubkey);
 
       // Common relays
       const relays = [
@@ -320,7 +323,9 @@ export default function ModalScreen() {
   };
 
   // Get user profile for Lightning payment
-  const currentUserProfile = combinedSearchAndProfiles.find((p) => p.pubkey === params?.pubkey);
+  const currentUserProfile = combinedSearchAndProfiles.find(
+    (p) => convertNpub(p.pubkey) === convertNpub(params?.pubkey)
+  );
   // return <KeyboardAvoidingComponent />;
 
   return (

@@ -30,7 +30,7 @@ export function getRawExpiry({ pr }) {
   if (!pr) return null;
   const decodedPR = decode(pr as string);
   const timestamp = decodedPR.sections.find((route) => route.name === 'timestamp')?.value;
-  const expiry = decodedPR.sections.find((route) => route.name === 'expiry')?.value;
+  const expiry = decodedPR.sections.find((route) => route.name === 'expiry')?.value || 3600;
   return new Date((timestamp + expiry) * 1000);
 }
 
@@ -41,7 +41,7 @@ export function getExpiry({ pr }) {
 export function getExpiresIn({ pr }) {
   const decodedPR = decode(pr as string);
   const expiresInHours =
-    decodedPR.sections.find((route) => route.name === 'expiry')?.value / 60 / 60;
+    (decodedPR.sections.find((route) => route.name === 'expiry')?.value || 3600) / 60 / 60;
   return expiresInHours > 1 ? `${expiresInHours} hours` : `${expiresInHours} mins`;
 }
 

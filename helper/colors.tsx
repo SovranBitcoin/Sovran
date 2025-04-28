@@ -679,3 +679,5 @@ export const greys = (t = 'dark') => {
 export const background = '#FFFFFF';
 
 export const white = '#FFFFFF';
+
+export const black = '#181412'; // off black

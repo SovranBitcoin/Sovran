@@ -43,7 +43,6 @@ function ModalScreen() {
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
   const handleMintSelected = async (mint, balance) => {
-    console.log(129873897, { mint }, { balance });
     try {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
 

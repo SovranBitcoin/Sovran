@@ -18,6 +18,17 @@ import { LNVPN_PUBKEY } from '../../vpnCheckout';
 import { sovran } from 'components/layout/sheets/mints';
 import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashu/pay';
+import { nip19 } from 'nostr-tools';
+
+export function convertNpub(pubkey: string) {
+  try {
+    const npub = nip19.decode(pubkey);
+    if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
+  } catch (error) {
+    return pubkey;
+  }
+  return maybeConvertNpub(pubkey)?.slice(2);
+}
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -30,11 +41,6 @@ const Section = () => {
 
   const filteredProfiles = profiles.filter((p) => p.pubkey !== currentProfile?.pubkey);
   const filteredSearch = search.filter((s) => s.pubkey !== currentProfile?.pubkey);
-
-  function convertNpub(pubkey: string) {
-    if (!pubkey) return undefined;
-    return maybeConvertNpub(pubkey)?.slice(2);
-  }
 
   const groupedTransactions = transactions
     .filter((t) => t?.nostr?.pubkey)

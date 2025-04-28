@@ -873,13 +873,13 @@ export function Section({ items, style, camera, special = true }) {
           backgroundColor: camera ? opacity(greys(theme)[1800], 0.75) : greys(theme)[1800],
           padding: 8,
         }}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const title_id = item?.title?.id;
           const title = item?.title || item?.title.children;
 
           return (
             <View
-              key={title}
+              key={index}
               style={{
                 display: 'flex',
                 flexDirection: item.direction || 'row',

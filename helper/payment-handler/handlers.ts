@@ -227,15 +227,6 @@ export const handleBarcode = async ({
   setLoading,
   setScanned,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
-  console.log(129873222897, {
-    scanning,
-    urDecoder,
-    unit,
-    selectedMint,
-    setProgress,
-    setLoading,
-    setScanned,
-  });
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
   if (!scanning.data.startsWith('ur:')) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -252,8 +243,6 @@ export const handleBarcode = async ({
   } else {
     type = 'lightning';
   }
-
-  console.log(12229873222897, { type });
 
   switch (type) {
     case 'ur':
