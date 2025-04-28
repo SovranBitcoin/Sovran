@@ -1,9 +1,34 @@
-import { StyleSheet, View, Pressable, Animated, useWindowDimensions } from 'react-native';
-import { useRef, useEffect, useState } from 'react';
-import { greys, shades, black } from 'helper/colors';
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  Animated,
+  useWindowDimensions,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
+import { useRef, useEffect, useState, ReactNode } from 'react';
+import { greys, black } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import Icon from 'assets/icons';
+import { FontWeight } from '@shopify/react-native-skia';
+import { TouchableOpacity } from './TouchableOpacity';
+
+type ButtonVariant = 'primary' | 'secondary';
+
+export interface ButtonBaseProps {
+  disabled?: boolean;
+  loading?: boolean;
+  variant: ButtonVariant;
+  text?: string;
+  onPress: (event: any) => Promise<void> | void;
+  icon?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  noPadding?: boolean;
+  renderBackground?: (colors: string[], width: number) => ReactNode;
+}
 
 export const ButtonBase = ({
   disabled = false,
@@ -12,146 +37,133 @@ export const ButtonBase = ({
   text,
   onPress,
   icon,
-  position = 'center',
   style,
   noPadding = false,
-  useGradientBackground = false, // New prop to control gradient rendering in specific implementations
-  renderBackground, // Pass platform-specific background rendering logic as a function
-  circle = false,
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
+  renderBackground,
+}: ButtonBaseProps): JSX.Element => {
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showLoading, setShowLoading] = useState<boolean>(false);
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
   const scaleRef = useRef(new Animated.Value(1));
-  const spinValue = useRef(new Animated.Value(0)).current;
-  const colorsMap = {
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const colorsMap: Record<string, string[]> = {
     primary: [greys(theme)[0], greys(theme)[0]],
     secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
     transparent: ['transparent', 'transparent'],
   };
 
   const { width } = useWindowDimensions();
-  const [colors, setColors] = useState(colorsMap[variant]);
+  const [colors, setColors] = useState<string[]>(colorsMap[variant]);
 
   useEffect(() => {
     setColors(colorsMap[variant]);
-  }, [variant]);
+  }, [variant, theme]);
 
   useEffect(() => {
-    const spinAnimation = Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 1250,
-        useNativeDriver: true,
-      })
-    );
-    if (isLoading) {
-      spinAnimation.start();
-    } else {
-      spinAnimation.stop();
-      spinValue.setValue(0);
-    }
-  }, [spinValue, isLoading]);
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, []);
 
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  const handlePress = async (e: any): Promise<void> => {
+    setIsLoading(true);
+
+    loadingTimerRef.current = setTimeout(() => {
+      if (isLoading) {
+        setShowLoading(true);
+      }
+    }, 100);
+
+    try {
+      await onPress(e);
+    } finally {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
+      setIsLoading(false);
+      setShowLoading(false);
+    }
+  };
+
+  const handlePressIn = (): void => {
+    Animated.spring(scaleRef.current, {
+      toValue: 0.95,
+      friction: 30,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = (): void => {
+    Animated.spring(scaleRef.current, {
+      toValue: 1,
+      friction: 30,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const isDisabled = disabled || isLoading || loading;
+  const shouldShowLoading = showLoading || loading;
 
   return (
     <Animated.View
       style={[
         {
           transform: [{ scale: scaleRef.current }],
-          opacity: disabled || loading ? 0.5 : 1,
+          opacity: isDisabled ? 0.5 : 1,
         },
       ]}>
-      <Pressable
-        disabled={disabled || isLoading || loading}
+      <TouchableOpacity
+        disabled={isDisabled}
+        className="m-1 mb-2 items-center justify-center overflow-hidden rounded-full border border-[0.33px] py-1"
         style={[
           {
-            paddingVertical: 4,
-            overflow: 'hidden',
-            margin: 3,
-            borderRadius: 32,
-            // margin: position === "center" ? 16 : 0,
-            // marginLeft: position === "right" ? 4 : 16,
-            // marginRight: position === "left" ? 4 : 16,
-            // marginTop: 8,
-            marginBottom: 8,
-            ...(variant === 'transparent' || noPadding ? { margin: 0 } : {}),
+            ...(noPadding ? { margin: 0 } : {}),
             opacity: disabled || isLoading ? 0.5 : 1,
-            width: circle ? 48 : 'auto',
-            height: circle ? 48 : 'auto',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 0.33,
             borderColor: variant === 'primary' ? greys(theme)[100] : greys(theme)[1000],
-            ...style,
           },
+          style,
         ]}
-        onPress={async (e) => {
-          setIsLoading(true);
-          setTimeout(() => {
-            requestAnimationFrame(async () => {
-              await onPress(e);
-              setIsLoading(false);
-            });
-          }, 100);
-        }}
-        onPressIn={() => {
-          Animated.spring(scaleRef.current, {
-            toValue: 0.95,
-            friction: 30,
-            tension: 90,
-            useNativeDriver: true,
-          }).start();
-        }}
-        onPressOut={() => {
-          Animated.spring(scaleRef.current, {
-            toValue: 1,
-            friction: 30,
-            tension: 90,
-            useNativeDriver: true,
-          }).start();
-        }}>
-        <View style={styles.buttonContent}>
-          {isLoading ? (
-            <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              {/* Replace this icon with your loading icon */}
-            </Animated.View>
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}>
+        <View className="flex flex-row items-center justify-center">
+          {shouldShowLoading ? (
+            <Icon
+              size={16}
+              name="ant-design:loading-outlined"
+              color={greys(theme)[100]}
+              spin={{
+                delay: 0,
+                duration: 1000,
+                outputRange: ['0deg', '360deg'],
+                easing: 'linear',
+              }}
+            />
           ) : (
-            <View style={{ marginRight: icon ? (text ? 8 : 0) : 0 }}>
-              <Text>{icon}</Text>
-            </View>
+            icon && (
+              <View style={{ marginRight: text ? 8 : 0 }}>
+                <Text>{icon}</Text>
+              </View>
+            )
           )}
           <Text
+            className="py-3 text-center text-base"
             style={{
-              backgroundColor: 'transparent',
               color: variant === 'primary' ? black : greys(theme)[100],
-              textAlign: 'center',
-              paddingTop: 12,
-              paddingBottom: 12,
               fontFamily: 'OverpassBold',
-              fontSize: 16,
-              width: text ? 'auto' : 0,
+              width: !shouldShowLoading && text ? 'auto' : 0,
             }}>
             {text}
           </Text>
         </View>
         {renderBackground && renderBackground(colors, width)}
-      </Pressable>
+      </TouchableOpacity>
     </Animated.View>
   );
 };
-
-const createStyles = (theme) =>
-  StyleSheet.create({
-    buttonContent: {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
