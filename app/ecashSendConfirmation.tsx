@@ -238,7 +238,7 @@ function ModalScreen() {
               },
             ]}
           />
-          <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text>
+          {/* <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text> */}
         </>
       }
       buttons={
