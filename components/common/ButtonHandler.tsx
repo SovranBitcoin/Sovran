@@ -52,7 +52,7 @@ export function ButtonHandler({ context, buttons, style = {}, colors }) {
             variant={button.variant}
             loading={loading || button.loading}
             disabled={button.disabled} // Pass the disabled prop to Button
-            icon={button.icon}
+            // icon={button.icon}
           />
         </View>
       ))}
