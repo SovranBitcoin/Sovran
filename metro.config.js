@@ -8,6 +8,14 @@ const config = getDefaultConfig(__dirname);
 // I guess I hate working within a specific icon library...
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'mdi:lightbulb-on-outline',
+    'mdi:lightbulb-on',
+    'majesticons:lightbulb-shine',
+    'majesticons:lightbulb-shine-line',
+    'material-symbols:close-rounded',
+    'proicons:photo',
+    'tabler:bulb-filled',
+    'tabler:bulb',
     'solar:card-bold',
     'nonicons:error-16',
     'lucide:pencil-line',

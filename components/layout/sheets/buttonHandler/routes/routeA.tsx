@@ -36,59 +36,58 @@ const RouteA = ({ payload }) => {
   ];
 
   return (
-    <SheetProvider context="error">
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginBottom: 0,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: greys(theme)[1800],
+      }}>
       <View
         style={{
-          borderRadius: 16,
-          overflow: 'hidden',
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[1500],
           padding: 16,
+          borderRadius: 16,
         }}>
-        <View
-          style={{
-            backgroundColor: greys(theme)[1500],
-            padding: 16,
-            borderRadius: 16,
-          }}>
-          {reorderedButtons.map((button, i) => {
-            const isProcessing = processingButtonIndex !== null;
-            const isDisabled = isProcessing && processingButtonIndex !== i;
+        {reorderedButtons.map((button, i) => {
+          const isProcessing = processingButtonIndex !== null;
+          const isDisabled = isProcessing && processingButtonIndex !== i;
 
-            return (
-              <TouchableOpacity
-                key={i}
+          return (
+            <TouchableOpacity
+              key={i}
+              style={{
+                justifyContent: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: i === payload.buttons.length - 1 ? 0 : 32,
+                opacity: isDisabled ? 0.5 : 1,
+              }}
+              onPress={() => handleButtonPress(button.onPress, i)}
+              disabled={isDisabled}>
+              <View
                 style={{
-                  justifyContent: 'flex-start',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: i === payload.buttons.length - 1 ? 0 : 32,
-                  opacity: isDisabled ? 0.5 : 1,
+                  backgroundColor: opacity(greys(theme)[700], 0.25),
+                  borderRadius: 1000,
+                  padding: 4,
+                }}>
+                <Icon color={greys(theme)[0]} name={button.icon} size={32} />
+              </View>
+              <Text
+                style={{
+                  marginLeft: 16,
+                  color: greys(theme)[0],
                 }}
-                onPress={() => handleButtonPress(button.onPress, i)}
-                disabled={isDisabled}>
-                <View
-                  style={{
-                    backgroundColor: opacity(shades[200], 0.25),
-                    borderRadius: 1000,
-                    padding: 4,
-                  }}>
-                  <Icon color={shades[200]} name={button.icon} size={32} />
-                </View>
-                <Text
-                  style={{
-                    marginLeft: 16,
-                    color: shades[200],
-                  }}
-                  size={18}
-                  weight="bold">
-                  {button.text}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                size={18}
+                weight="bold">
+                {button.text}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-    </SheetProvider>
+    </View>
   );
 };
 

@@ -1,9 +1,5 @@
-import React from 'react';
 import { Pressable, View, StyleSheet, Platform, Dimensions } from 'react-native';
-import {
-  createBottomTabNavigator,
-  BottomTabNavigationOptions,
-} from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +9,7 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { Text, translateText } from 'components/common/Themed';
+import { translateText } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetTheme } from 'helper/redux/settings';

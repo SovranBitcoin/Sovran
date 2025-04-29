@@ -10,12 +10,12 @@ import Modal from 'components/layout/Modal';
 import { Text, View } from 'components/common/Themed';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import { useEsims } from 'helper/redux/esim';
-import { Section } from './transaction';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import DonutChartContainer from 'components/layout/Donut';
 import { truncateMiddle } from 'helper/strings';
 import React from 'react';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {

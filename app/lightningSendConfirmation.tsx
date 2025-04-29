@@ -7,9 +7,8 @@ import {
   getTimestamp,
   sendLightning,
 } from 'components/cashu';
-import { BalanceUpdate, Section } from './transaction';
+import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
-import withConfirmation from 'components/layout/ConfirmationProvider';
 import { useSelector, useDispatch } from 'react-redux';
 import { View } from 'components/common/Themed';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
@@ -19,6 +18,7 @@ import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const navigation = useTypedNavigation();
@@ -281,4 +281,4 @@ function ModalScreen() {
   );
 }
 
-export default withConfirmation(ModalScreen);
+export default ModalScreen;

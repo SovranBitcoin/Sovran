@@ -3,11 +3,10 @@ import { StyleSheet } from 'react-native';
 import { formatCurrency } from 'helper/currency';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash } from 'components/cashu';
-import { BalanceUpdate, Section } from './transaction';
+import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import withConfirmation from 'components/layout/ConfirmationProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
@@ -18,6 +17,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetMints } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 // Types
 interface TokenProps {
@@ -275,4 +275,4 @@ const createStyles = (theme: any) =>
     },
   });
 
-export default withConfirmation(ModalScreen);
+export default ModalScreen;

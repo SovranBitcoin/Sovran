@@ -36,7 +36,6 @@ import { useNostr } from 'helper/redux/nostr';
 import { getFollowedUsers } from './ProfilePage';
 import ndk from 'components/ndk';
 import 'components/layout/sheets/registerSheets';
-import { CheckProofsSpentProvider } from 'components/layout/CheckProofsSpentProvider';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
 
@@ -313,11 +312,9 @@ export default function RootLayout() {
               <ActionSheetProvider>
                 <SheetProvider context="global">
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <CheckProofsSpentProvider>
-                      <TransactionProvider>
-                        <MainStack />
-                      </TransactionProvider>
-                    </CheckProofsSpentProvider>
+                    <TransactionProvider>
+                      <MainStack />
+                    </TransactionProvider>
                   </View>
                 </SheetProvider>
               </ActionSheetProvider>

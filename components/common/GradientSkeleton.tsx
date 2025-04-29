@@ -1,33 +1,50 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Skeleton, SkeletonContainer } from 'react-native-skeleton-component';
 
-// Memoize the Skeleton component to prevent unnecessary re-renders
-const MemoizedSkeleton = memo(({ width, height, endColor, startColor, style, ...props }) => (
+interface SkeletonProps {
+  width?: number;
+  height?: number;
+  startColor: string;
+  endColor: string;
+  style?: StyleSheet;
+}
+
+/**
+ * Memoized Skeleton component to prevent unnecessary re-renders
+ */
+const MemoizedSkeleton = memo(({ width, height, endColor, startColor, style }: SkeletonProps) => (
   <SkeletonContainer
     backgroundColor={endColor}
     highlightColor={startColor}
     speed={800}
     animation="pulse">
-    <Skeleton style={{ width, height, ...style, ...props }} />
+    <Skeleton style={{ width, height, ...style }} />
   </SkeletonContainer>
 ));
 
-// Use useWindowDimensions to get responsive dimensions
-export const GradientSkeleton = ({ startColor, endColor, width, height, style, ...props }) => {
-  const { width: w } = useWindowDimensions();
-  const size = w - 32;
+MemoizedSkeleton.displayName = 'MemoizedSkeleton';
+
+/**
+ * GradientSkeleton component that provides a responsive skeleton with gradient colors
+ */
+export const GradientSkeleton: React.FC<SkeletonProps> = ({
+  startColor,
+  endColor,
+  width,
+  height,
+  style,
+}) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const defaultSize = windowWidth - 32;
 
   return (
     <MemoizedSkeleton
-      width={width || size}
-      height={height || size}
+      width={width ?? defaultSize}
+      height={height ?? defaultSize}
       endColor={endColor}
       startColor={startColor}
-      style={{
-        ...style,
-        ...props,
-      }}
+      style={style}
     />
   );
 };

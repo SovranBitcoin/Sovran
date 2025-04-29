@@ -1,6 +1,5 @@
 import React, { useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigation } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import 'react-native-get-random-values';
 import { Platform, StyleSheet } from 'react-native';
@@ -9,7 +8,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Text, View } from 'components/common/Themed';
 import Icon, { ArrowIcon } from 'assets/icons';
-
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Haptics from 'components/common/Haptics';
 
@@ -17,49 +15,133 @@ import {
   memoizedGetAllBalancesMultipleCurrencies,
   memoizedGetBalance,
   memoizedGetSelectedMint,
-  useCashu,
 } from 'helper/redux/cashu';
 import { greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import { Account } from './Account';
+import { useTypedNavigation } from 'helper/navigation';
 
-export function AccountPagerView({ accounts, setAccount, account }) {
-  const { proofs, keysets } = useCashu();
+interface ActionButton {
+  page: 'receive' | 'camera' | 'currency';
+  text: {
+    id: string;
+    children: string;
+  };
+  icon: React.ReactNode;
+}
 
+interface AccountType {
+  unit: string;
+  type: string;
+  accountIndex: number;
+  key: string;
+}
+
+interface AccountPagerViewProps {
+  accounts: AccountType[];
+  setAccount: (account: AccountType) => void;
+  account: AccountType;
+}
+
+export function AccountPagerView({
+  accounts,
+  setAccount,
+  account,
+}: AccountPagerViewProps): React.ReactElement {
   const [hasPermission, requestPermission] = useCameraPermissions();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  const loopedAccounts = accounts.filter((account) => {
-    return multipleBalances.some(
-      (balance) => balance.unit === account.unit && balance.mintUrl === selectedMintUrl
-    );
-  });
 
-  const swiperRef = useRef(null);
-
-  const onPageSelected = useCallback(
-    (index) => {
-      const position = index;
-      setAccount(accounts[position]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    },
-    [accounts]
+  // Filter accounts that have a matching balance entry
+  const loopedAccounts = accounts.filter((acc) =>
+    multipleBalances.some(
+      (balance: any) => balance.unit === acc.unit && balance.mintUrl === selectedMintUrl
+    )
   );
 
-  function goToIndex(index) {
-    swiperRef.current.goTo(index);
-  }
+  const swiperRef = useRef<any>(null);
+
+  const onPageSelected = useCallback(
+    (index: number): void => {
+      setAccount(accounts[index]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [accounts, setAccount]
+  );
+
+  const goToIndex = (index: number): void => {
+    swiperRef.current?.goTo(index);
+  };
+
+  const handleButtonPress = async (page: string, accountUnit: string) => {
+    const balance = memoizedGetBalance(accountUnit)(store.getState());
+
+    if (page === 'currency' && balance <= 0) {
+      showMessage(
+        'insufficient_balance',
+        {
+          amount: balance,
+          unit: accountUnit,
+          fee: 0,
+        },
+        { emoji: '🚨' }
+      );
+      return;
+    }
+
+    if (page === 'camera' && !hasPermission?.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        showMessage('camera_permission_denied', {}, { emoji: '🚨' });
+        return;
+      }
+    }
+
+    navigation.navigate(page, {
+      to: 'ecashSendConfirmation',
+      unit: accountUnit,
+      type: account.type,
+      accountIndex: account.accountIndex,
+    });
+  };
+
+  // Define action buttons
+  const actionButtons: ActionButton[] = [
+    {
+      page: 'receive',
+      text: {
+        id: 'onchain_receive_button',
+        children: 'Receive',
+      },
+      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
+    },
+    {
+      page: 'camera',
+      text: {
+        id: 'scan_button',
+        children: 'Scan',
+      },
+      icon: <Icon name="stash:qr-code" size={24} color={greys(theme)[0]} />,
+    },
+    {
+      page: 'currency',
+      text: {
+        id: 'onchain_send_button',
+        children: 'Send',
+      },
+      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
+    },
+  ];
 
   return (
-    <View style={styles.transparentBackground}>
-      <View style={styles.accountPagerView}>
+    <View className="bg-transparent">
+      <View className="flex h-[300px] w-full">
         <Swiper
           controlsEnabled={false}
           loop
@@ -73,100 +155,64 @@ export function AccountPagerView({ accounts, setAccount, account }) {
             dotsPos: 'top',
           }}>
           {loopedAccounts.map((acc, index) => (
-            <View key={acc.key + index} style={styles.swiperView}>
-              <Account
-                accounts={loopedAccounts}
-                account={acc}
-                proofs={proofs}
-                keysets={keysets}
-                goToIndex={goToIndex}
-              />
+            <View
+              key={`${acc.key}-${index}`}
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: greys(theme)[2300],
+              }}>
+              <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </View>
           ))}
         </Swiper>
       </View>
-      <View style={styles.absoluteTop}>
-        {[
-          {
-            page: 'receive',
-            text: {
-              id: 'onchain_receive_button',
-              children: 'Receive',
-            },
-            icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
-          },
-          {
-            page: 'camera',
-            text: {
-              id: 'scan_button',
-              children: 'Scan',
-            },
-            icon: <Icon name="stash:qr-code" size={24} color={greys(theme)[0]} />,
-          },
-          {
-            page: 'currency',
-            text: {
-              id: 'onchain_send_button',
-              children: 'Send',
-            },
-            icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
-          },
-        ].map(({ page, text, icon }) => {
+      <View
+        style={{
+          position: 'absolute',
+          width: '100%',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          top: Platform.OS === 'web' ? 223 : 159,
+          padding: 0,
+          margin: 0,
+          zIndex: 3,
+          height: 130,
+          backgroundColor: 'transparent',
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}>
+        {actionButtons.map(({ page, text, icon }) => {
+          const isCamera = page === 'camera';
+          const isReceive = page === 'receive';
+          const isSend = page === 'currency';
+
           return (
             <TouchableOpacity
               key={page}
               style={[
                 styles.touchableOpacity,
-                page === 'camera' && styles.cameraButton,
-                page === 'receive' && styles.receiveButton,
-                page === 'currency' && styles.sendButton,
+                isCamera && styles.cameraButton,
+                isReceive && styles.receiveButton,
+                isSend && styles.sendButton,
               ]}
-              onPress={async () => {
-                const balance = memoizedGetBalance(account.unit)(store.getState());
-                if (page === 'currency' && balance <= 0) {
-                  showMessage(
-                    'insufficient_balance',
-                    {
-                      amount: balance,
-                      unit: account.unit,
-                      fee: 0,
-                    },
-                    { emoji: '🚨' }
-                  );
-                } else {
-                  if (page === 'camera' && !hasPermission?.granted) {
-                    const res = await requestPermission();
-                    if (!res.granted) {
-                      showMessage('camera_permission_denied', {}, { emoji: '🚨' });
-                      return;
-                    }
-                  }
-                  navigation.navigate(page, {
-                    to: 'ecashSendConfirmation',
-                    unit: account.unit,
-                    type: account.type,
-                    accountIndex: account.accountIndex,
-                  });
-                }
-              }}>
+              onPress={() => handleButtonPress(page, account.unit)}>
               <LinearGradient
-                style={[page === 'camera' && styles.cameraGradient]}
-                colors={
-                  page === 'camera'
-                    ? [shades[200], shades[400]]
-                    : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
-                }>
+                style={[isCamera && styles.cameraGradient]}
+                colors={isCamera ? [shades[200], shades[400]] : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
                 <View style={styles.iconContainer}>
                   <View
                     style={[
                       styles.iconView,
-                      page === 'camera' && styles.cameraIconView,
-                      page === 'receive' && styles.receiveIconView,
-                      page === 'currency' && styles.sendIconView,
+                      isCamera && styles.cameraIconView,
+                      isReceive && styles.receiveIconView,
+                      isSend && styles.sendIconView,
                     ]}>
-                    <View style={styles.transparentBackground}>{icon}</View>
-                    {page !== 'camera' && (
-                      <Text weight="bold" size={14} style={styles.iconText}>
+                    <View className="bg-transparent">{icon}</View>
+                    {!isCamera && (
+                      <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
                         {text.children}
                       </Text>
                     )}
@@ -181,37 +227,8 @@ export function AccountPagerView({ accounts, setAccount, account }) {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
-    transparentBackground: {
-      backgroundColor: 'transparent',
-    },
-    accountPagerView: {
-      display: 'flex',
-      height: 300,
-      width: '100%',
-    },
-    swiperView: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: greys(theme)[2300],
-    },
-    absoluteTop: {
-      position: 'absolute',
-      width: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      top: Platform.OS === 'web' ? 159 + 64 : 159,
-      padding: 0,
-      margin: 0,
-      zIndex: 3,
-      height: 130,
-      backgroundColor: 'transparent',
-      paddingLeft: 16,
-      paddingRight: 16,
-    },
     touchableOpacity: {
       flex: 1,
       maxWidth: 'auto',
@@ -272,8 +289,5 @@ const createStyles = (theme) =>
       borderTopRightRadius: 1000,
       borderWidth: 0.5,
       borderColor: greys(theme)[1400],
-    },
-    iconText: {
-      color: greys(theme)[0],
     },
   });

@@ -206,8 +206,8 @@ export const CreditCardComponent = ({
 };
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 40;
-const CARD_HEIGHT = CARD_WIDTH * 0.6; // Maintain credit card aspect ratio
+export const CARD_WIDTH = width - 40;
+export const CARD_HEIGHT = CARD_WIDTH * 0.6; // Maintain credit card aspect ratio
 
 const styles = StyleSheet.create({
   container: {

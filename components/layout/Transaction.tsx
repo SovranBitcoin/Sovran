@@ -1,7 +1,5 @@
-import React from 'react';
-import { Text, UntranslatedText, View } from 'components/common/Themed';
+import { UntranslatedText, View } from 'components/common/Themed';
 import { useMemo } from 'react';
-import { useNavigation } from 'expo-router';
 import { formatCurrency } from 'helper/currency';
 import Icon, { LightningUnit } from 'assets/icons';
 import { convertTime } from 'helper/time';
@@ -14,17 +12,78 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import CachedImage from 'components/common/Image';
 import { truncateMiddle } from 'helper/strings';
-import { memoizedGetTransactionByMatcher } from 'helper/redux/cashu';
-import _ from 'lodash';
-import { getRawExpiry } from '../cashu';
 import { useTransactions } from 'components/providers/TransactionsProvider';
+import { useTypedNavigation } from 'helper/navigation';
 
-export function Transaction({ tx, transactions, account }) {
+interface TransactionStatus {
+  block_time: number;
+  [key: string]: any;
+}
+
+interface NostrData {
+  pubkey: string;
+  [key: string]: any;
+}
+
+interface TransactionData {
+  id?: string;
+  txid?: string;
+  request?: string;
+  token?: string;
+  unit: string;
+  amount: number;
+  date?: string;
+  transactionType: 'send' | 'receive' | string;
+  type?: string;
+  isBuy?: string;
+  isSell?: boolean;
+  paid?: boolean;
+  isCancel?: boolean;
+  unifiedRequest?: string;
+  paymentRequest?: string;
+  from?: string;
+  to?: string;
+  status?: TransactionStatus;
+  nostr?: NostrData;
+}
+
+interface AccountData {
+  accountIndex: number;
+  [key: string]: any;
+}
+
+interface ConnectionData {
+  id: string;
+  [key: string]: any;
+}
+
+interface ProfileData {
+  pubkey: string;
+  picture?: string;
+  image?: string;
+  profile?: {
+    picture?: string;
+    image?: string;
+  };
+  [key: string]: any;
+}
+
+interface TransactionProps {
+  tx: TransactionData;
+  transactions: TransactionData[];
+  account?: AccountData;
+}
+
+/**
+ * Transaction component displays transaction details with appropriate formatting
+ */
+export function Transaction({ tx, transactions, account }: TransactionProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const { currentProfile, profiles, search } = useNostr();
   const { esims } = useEsims();
   const { settings } = useSettings();
+  const { activeConnections } = useTransactions();
 
   // Find related transaction for buys/sells
   const relatedTransaction = useMemo(() => {
@@ -38,27 +97,27 @@ export function Transaction({ tx, transactions, account }) {
   const isSend = tx.transactionType === 'send';
   const isReceive = tx.transactionType === 'receive';
 
-  const { activeConnections } = useTransactions();
-
   const isListening = activeConnections?.some(
-    (connection) =>
+    (connection: ConnectionData) =>
       connection.id ===
       (tx.type === 'ecash'
-        ? tx.type + '_' + tx.token + '_' + tx.transactionType
-        : tx.type + '_' + tx.request + '_' + tx.transactionType)
+        ? `${tx.type}_${tx.token}_${tx.transactionType}`
+        : `${tx.type}_${tx.request}_${tx.transactionType}`)
   );
 
   const showLoading = isListening;
 
   // Get profile picture from nostr data
   const profilePicture =
-    search?.find((s) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.picture ||
-    profiles?.find((p) => p?.pubkey === tx?.nostr?.pubkey)?.picture ||
-    search?.find((s) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.image ||
-    profiles?.find((p) => p?.pubkey === tx?.nostr?.pubkey)?.image;
+    search?.find((s: ProfileData) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.picture ||
+    profiles?.find((p: ProfileData) => p?.pubkey === tx?.nostr?.pubkey)?.picture ||
+    search?.find((s: ProfileData) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.image ||
+    profiles?.find((p: ProfileData) => p?.pubkey === tx?.nostr?.pubkey)?.image;
 
-  // Handle navigation when transaction is pressed
-  const handlePress = () => {
+  /**
+   * Handle navigation when transaction is pressed
+   */
+  const handlePress = (): void => {
     const isPaid = tx.paid;
 
     if (tx.request && !isPaid) {
@@ -85,14 +144,16 @@ export function Transaction({ tx, transactions, account }) {
     }
   };
 
-  // Format transaction direction text
-  const getTransactionDirection = () => {
-    if (isBuyTransaction) {
+  /**
+   * Format transaction direction text based on transaction type
+   */
+  const getTransactionDirection = (): string => {
+    if (isBuyTransaction && relatedTransaction) {
       const from =
         relatedTransaction.unit === 'sat' ? 'BTC' : relatedTransaction.unit.toUpperCase();
       const to = tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase();
       return `${from} → ${to}`.toUpperCase();
-    } else if (isSellTransaction) {
+    } else if (isSellTransaction && relatedTransaction) {
       const from = tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase();
       const to = relatedTransaction.unit === 'sat' ? 'BTC' : relatedTransaction.unit.toUpperCase();
       return `${from} → ${to}`.toUpperCase();
@@ -101,50 +162,91 @@ export function Transaction({ tx, transactions, account }) {
       tx.transactionType[0].toUpperCase() + tx.transactionType.slice(1) ||
       tx?.from ||
       tx?.to ||
-      truncateMiddle(tx.txid || tx.request || tx.token, 3) ||
+      truncateMiddle(tx.txid || tx.request || tx.token || '', 3) ||
       'Unknown'
     );
   };
 
-  // Render transaction icon with appropriate indicators
-  const renderExchangeIcon = () => {
-    const IconContainer = ({ children }) => (
-      <View className="relative h-7 w-7 bg-transparent">{children}</View>
-    );
+  /**
+   * Format currency amount with appropriate display options
+   */
+  const formatAmount = (
+    transaction: TransactionData,
+    options: {
+      precision?: number;
+      currencyDisplay?: string;
+      denomination?: string;
+    } = {}
+  ): string | null => {
+    if (!transaction?.amount) return null;
 
-    const StatusIndicator = ({ isCancel }) => (
-      <View
-        style={{
-          borderColor: greys(theme)[1000],
-          borderWidth: 0.2,
-          backgroundColor: greys(theme)[1800],
-        }}
-        className="absolute bottom-[-4] right-[-4] z-30 z-30 rounded-full p-0.5">
-        {isCancel ? (
-          <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
-        ) : (
-          <Icon
-            name={isReceive ? 'fluent:arrow-download-16-filled' : 'fluent:arrow-upload-16-filled'}
-            color={greys(theme)[100]}
-            size={10}
-          />
-        )}
-      </View>
+    return formatCurrency(
+      {
+        currency: transaction.unit === 'sat' ? 'BTC' : (transaction.unit.toUpperCase() as any),
+        value: Math.abs(transaction.amount),
+        denomination: transaction.unit === 'sat' ? 'sats' : (transaction.unit as any),
+      },
+      {
+        locale: 'en-US',
+        precision:
+          options.precision !== undefined ? options.precision : transaction.unit === 'sat' ? 0 : 2,
+        currencyDisplay: options.currencyDisplay || ('name' as any),
+        denomination:
+          options.denomination || (transaction.unit === 'sat' ? 'sats' : (transaction.unit as any)),
+      }
     );
+  };
 
-    const ProfileImage = () => (
-      <CachedImage
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 1000,
-          borderColor: greys(theme)[1000],
-          borderWidth: 0.5,
-        }}
-        source={{ uri: profilePicture }}
-      />
-    );
+  /**
+   * Component to display transaction icon with status indicator
+   */
+  const IconContainer = ({ children }: { children: React.ReactNode }): JSX.Element => (
+    <View className="relative h-7 w-7 bg-transparent">{children}</View>
+  );
 
+  /**
+   * Status indicator for transaction icons
+   */
+  const StatusIndicator = ({ isCancel }: { isCancel?: boolean }): JSX.Element => (
+    <View
+      style={{
+        borderColor: greys(theme)[1000],
+        borderWidth: 0.2,
+        backgroundColor: greys(theme)[1800],
+      }}
+      className="absolute bottom-[-4] right-[-4] z-30 rounded-full p-0.5">
+      {isCancel ? (
+        <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
+      ) : (
+        <Icon
+          name={isReceive ? 'fluent:arrow-download-16-filled' : 'fluent:arrow-upload-16-filled'}
+          color={greys(theme)[100]}
+          size={10}
+        />
+      )}
+    </View>
+  );
+
+  /**
+   * Profile image component for transaction
+   */
+  const ProfileImage = (): JSX.Element => (
+    <CachedImage
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 1000,
+        borderColor: greys(theme)[1000],
+        borderWidth: 0.5,
+      }}
+      source={{ uri: profilePicture }}
+    />
+  );
+
+  /**
+   * Render transaction icon with appropriate indicators
+   */
+  const renderExchangeIcon = (): JSX.Element => {
     // For receive transactions
     if (isReceive) {
       if (profilePicture) {
@@ -173,8 +275,8 @@ export function Transaction({ tx, transactions, account }) {
         );
       } else if (
         esims
-          .map((e) => e.request)
-          .filter((a) => a)
+          .map((e: { request: string }) => e.request)
+          .filter(Boolean)
           .includes(tx.request)
       ) {
         return (
@@ -199,39 +301,15 @@ export function Transaction({ tx, transactions, account }) {
     }
   };
 
-  // Format amount display with appropriate currency formatting
-  const renderAmountDetails = () => {
+  /**
+   * Render the amount display with appropriate formatting
+   */
+  const renderAmountDetails = (): JSX.Element => {
     const sign = isSend ? '-' : isReceive ? '+' : '';
     const precision = tx.unit === 'sat' ? (settings.display_btc === 0 ? 8 : 0) : 2;
-
     const currencyDisplay = settings.display_btc === 1 && tx.unit === 'sat' ? 'none' : 'name';
-
     const denomination =
       tx.unit === 'sat' ? (settings.display_btc === 0 ? 'btc' : 'sats') : tx.unit;
-
-    const formatAmount = (transaction, options = {}) => {
-      if (!transaction?.amount) return null;
-
-      return formatCurrency(
-        {
-          currency: transaction.unit === 'sat' ? 'BTC' : transaction.unit.toUpperCase(),
-          value: Math.abs(transaction.amount),
-          denomination: transaction.unit === 'sat' ? 'sats' : transaction.unit,
-        },
-        {
-          locale: 'en-US',
-          precision:
-            options.precision !== undefined
-              ? options.precision
-              : transaction.unit === 'sat'
-                ? 0
-                : 2,
-          currencyDisplay: options.currencyDisplay || 'name',
-          denomination:
-            options.denomination || (transaction.unit === 'sat' ? 'sats' : transaction.unit),
-        }
-      );
-    };
 
     const amount = formatAmount(tx, {
       precision,
@@ -268,22 +346,17 @@ export function Transaction({ tx, transactions, account }) {
             </UntranslatedText>
           )}
           <UntranslatedText
-            style={[
-              {
-                fontFamily: 'OverpassBold',
-                fontSize: 14,
-                color: greys(theme)[0],
-                margin: 0,
-                fontWeight: 'bold',
-                alignSelf: 'flex-end',
-                textShadowColor: opacity(greys(theme)[0], 0.5),
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 1,
-              },
-              {
-                color: isSend ? reds[300] : greens[300],
-              },
-            ]}>
+            style={{
+              fontFamily: 'OverpassBold',
+              fontSize: 14,
+              color: isSend ? reds[300] : greens[300],
+              margin: 0,
+              fontWeight: 'bold',
+              alignSelf: 'flex-end',
+              textShadowColor: opacity(greys(theme)[0], 0.5),
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 1,
+            }}>
             {amount}
           </UntranslatedText>
 
@@ -294,28 +367,18 @@ export function Transaction({ tx, transactions, account }) {
         {relatedAmount && (
           <View className="flex flex-row items-center bg-transparent">
             <UntranslatedText
-              style={[
-                !isSend
-                  ? {
-                      fontFamily: 'OverpassBold',
-                      fontSize: 16,
-                      color: shades[300],
-                      marginRight: 4,
-                    }
-                  : {
-                      fontFamily: 'OverpassBold',
-                      fontSize: 16,
-                      color: greens[300],
-                      marginRight: 4,
-                      marginBottom: -1,
-                      textShadowColor: opacity(greys(theme)[0], 0.5),
-                      textShadowOffset: { width: 0, height: 0 },
-                      textShadowRadius: 1,
-                    },
-                {
-                  fontSize: 12,
-                },
-              ]}>
+              style={{
+                fontFamily: 'OverpassBold',
+                fontSize: 12,
+                color: !isSend ? shades[300] : greens[300],
+                marginRight: 4,
+                ...(isSend && {
+                  marginBottom: -1,
+                  textShadowColor: opacity(greys(theme)[0], 0.5),
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 1,
+                }),
+              }}>
               {isSend ? '+' : '-'}
             </UntranslatedText>
             <UntranslatedText
@@ -334,7 +397,10 @@ export function Transaction({ tx, transactions, account }) {
     );
   };
 
-  const getFormattedDate = () => {
+  /**
+   * Get formatted date string from transaction timestamp
+   */
+  const getFormattedDate = (): string => {
     if (tx.date || tx?.status?.block_time) {
       return convertTime(new Date(tx.date || tx?.status.block_time * 1000));
     }
@@ -396,9 +462,9 @@ export function Transaction({ tx, transactions, account }) {
                 }}>
                 {formatCurrency(
                   {
-                    currency: tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase(),
+                    currency: tx.unit === 'sat' ? 'BTC' : (tx.unit.toUpperCase() as any),
                     value: Math.abs(tx.amount),
-                    denomination: tx.unit === 'sat' ? 'sats' : tx.unit,
+                    denomination: tx.unit === 'sat' ? 'sats' : (tx.unit as any),
                   },
                   {
                     locale: 'en-US',

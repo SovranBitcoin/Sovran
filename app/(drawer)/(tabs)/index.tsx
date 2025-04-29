@@ -1,30 +1,23 @@
 import 'app/global';
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
-import _ from 'lodash';
-import { Alert } from 'react-native';
 import { View } from 'components/common/Themed';
 import { Transactions } from 'components/layout/Transactions';
-import { checkLNPaymentComplete, getRawExpiry, receiveEcash } from 'components/cashu';
+import { receiveEcash } from 'components/cashu';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import { memoizedGetTransactionByMatcher } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
-import { checkProofsSpent } from 'app/ecashSendConfirmation';
-import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
-import { runWithAnimationFrame } from 'app/onboard/new';
 import TermsConditionsScreen from 'app/settings/terms';
 import { AccountPagerView } from '../../../components/layout/AccountPagerView';
-import { usePollingPaymentRequest } from 'helper/navigation/hooks/usePollingPaymentRequest';
 
 async function getProfile(currentProfile) {
   const sk = nip19.decode(currentProfile?.nsec).data;
@@ -88,7 +81,11 @@ function TabOneScreen({
   const [account, setAccount] = useState(accounts[0]);
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {}, []);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await getProfile(currentProfile);
+    setRefreshing(false);
+  }, []);
 
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);

@@ -1,5 +1,4 @@
 import 'components/layout/sheets/example';
-import 'components/layout/sheets/currency';
 import 'components/layout/sheets/popup';
 import 'components/layout/sheets/npubcashSelector';
 import 'components/layout/sheets/filterProfiles';

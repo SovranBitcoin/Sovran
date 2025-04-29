@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
-import { Section as TableSection } from '../transaction';
+import { Section as TableSection } from 'components/common/Section';
 import { RowButton, Section } from '../settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
@@ -21,13 +21,12 @@ export default function ModalScreen() {
       <Card
         message="Message"
         variant="info"
-        theme={theme}
         onPress={() => {
           // this triggers onPress
         }}
       />
       {/* warning message */}
-      <Card message="Message" variant="warning" theme={theme} />
+      <Card message="Message" variant="warning" />
       {/* this is a table view with two columns one for title and one for value */}
       <TableSection
         items={[

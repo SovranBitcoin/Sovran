@@ -230,6 +230,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   );
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  console.log(19827398723, multipleBalances);
 
   // limit to specified currencies: sat, eur, gbp, usd
   const currencies: SupportedCurrency[] = _.uniq(
@@ -289,46 +290,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   };
 
   const selectedMint = memoizedGetSelectedMint(store.getState());
-
-  // useEffect(() => {
-  //   const fetchSelectedMintInfo = async () => {
-  //     const selectedBalance = multipleBalances.find(
-  //       (b) => b.mintUrl === selectedMintUrl && b.unit === unit
-  //     );
-  //     if (!selectedBalance) return;
-
-  //     try {
-  //       const mintData = await getMint({ mintUrl: selectedBalance.mintUrl });
-  //       const info = await mintData.getInfo();
-  //       setMintState((prev) => ({
-  //         ...prev,
-  //         selected: {
-  //           id: selectedBalance.mintUrl,
-  //           name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
-  //           balance: selectedBalance.amount,
-  //           iconUrl: info?.icon_url || null,
-  //           unit: selectedBalance.unit,
-  //         },
-  //       }));
-  //     } catch (error) {
-  //       console.error(`Error fetching info for mint ${selectedBalance.mintUrl}:`, error);
-  //       setMintState((prev) => ({
-  //         ...prev,
-  //         selected: {
-  //           id: selectedBalance.mintUrl,
-  //           name: selectedBalance.mintUrl.replace('https://', '')?.split('/')?.[0],
-  //           balance: selectedBalance.amount,
-  //           iconUrl: null,
-  //           unit: selectedBalance.unit,
-  //         },
-  //       }));
-  //     }
-  //   };
-
-  //   if (selectedMintUrl) {
-  //     fetchSelectedMintInfo();
-  //   }
-  // }, [selectedMintUrl, multipleBalances]);
 
   const displayCurrency = (currency: string) => {
     return currency === 'SAT' ? 'BTC' : currency;
@@ -403,13 +364,14 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           </Text>
           <View style={styles.mintScroll}>
             {filteredMints.map((mint) => {
+              console.log(1982739872, mint.iconUrl);
               return (
                 <MintItem
                   key={mint.mintUrl}
                   mint={{
                     id: mint.mintUrl,
                     name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
-                    iconUrl: null, // We'll get this from the mint info if needed
+                    iconUrl: mint.iconUrl,
                   }}
                   balance={{ amount: mint.amount, unit: mint.unit }}
                   isSelected={selectedMint === mint.mintUrl}
@@ -435,7 +397,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
       }
       buttons={
         <ButtonHandler
-          context="sheet"
           buttons={[
             {
               text: 'Add mints',

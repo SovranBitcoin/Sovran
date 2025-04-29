@@ -94,8 +94,9 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
     (state) => memoizedGetMints(state),
     (state) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs || {},
     (state) => state.cashu?.keysets || {},
+    (state) => state.cashu?.info || {},
   ],
-  (mints, proofsByMint, keysets) => {
+  (mints, proofsByMint, keysets, info) => {
     // Start with all mints the user has
     const allMints = mints || [];
 
@@ -110,6 +111,7 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
       .map((mint) => {
         // Get all unique units from keysets for this mint
         const mintKeysets = keysets[mint] || [];
+        const mintInfo = info[mint] || {};
         const uniqueUnits = [...new Set(mintKeysets.map((ks) => ks.unit))];
 
         // If no units found, default to "sat"
@@ -128,6 +130,7 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
               mintUrl: mint,
               amount: 0,
               unit: unit,
+              iconUrl: mintInfo?.icon_url || null,
             };
           }
 
@@ -142,6 +145,7 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
             mintUrl: mint,
             amount: _.sumBy(filteredProofs, 'amount') || 0,
             unit: unit,
+            iconUrl: mintInfo?.icon_url || null,
           };
         });
       })

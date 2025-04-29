@@ -27,6 +27,7 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { runWithAnimationFrame } from './onboard/new';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -169,6 +170,7 @@ function ModalScreen() {
               } else if (data?.action === 'skip') {
                 await handleLightningReceive({ memo: undefined });
               }
+              setLoading(false);
             },
           });
           break;
@@ -186,18 +188,20 @@ function ModalScreen() {
               } else if (data?.action === 'skip') {
                 await handleEcashSend({ message: undefined });
               }
+              setLoading(false);
             },
           });
           break;
         default:
           await handleDefaultSend();
+          setLoading(false);
           break;
       }
     } catch (e) {
       showMessage(e?.message, { ...e?.params }, { emoji: '🚨' });
       error = true;
-    } finally {
       setLoading(false);
+    } finally {
     }
   };
 
@@ -245,6 +249,7 @@ function ModalScreen() {
                 icon: 'lucide:arrow-right',
                 variant: 'primary',
                 onPress: handleNext,
+                loading: loading,
                 disabled: !isValidAmount, // Disable the button when amount is invalid
               },
               ...(isP2PK

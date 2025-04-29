@@ -11,7 +11,6 @@ import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Text, View } from 'components/common/Themed';
 import { FlagIcon } from 'assets/icons';
-import { Section } from './transaction';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
 import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
@@ -19,6 +18,7 @@ import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { Card } from 'components/common/Card';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

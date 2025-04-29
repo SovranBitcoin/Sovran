@@ -2,12 +2,12 @@ import Modal from 'components/layout/Modal';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Section } from './transaction';
 import { useTypedRoute } from 'helper/navigation';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const { vpnCode, location, config, hash } = useTypedRoute<'vpnShare'>();

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Share, Text } from 'react-native';
 import { View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
-import { BalanceUpdate, Section } from './transaction';
+import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
@@ -16,6 +16,7 @@ import { useNavigation } from 'expo-router';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { getMint, getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const navigation = useNavigation();

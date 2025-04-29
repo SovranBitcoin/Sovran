@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import 'react-native-get-random-values';
-import { Animated, Platform, StyleSheet } from 'react-native';
+import { Animated, Platform, StyleSheet, Text as RNText } from 'react-native';
 
 import { Text, View } from 'components/common/Themed';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
@@ -13,15 +13,45 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { useTypedNavigation } from 'helper/navigation/hooks/useTypedNavigation';
 import { NonGestureView } from './NonGestureView';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
-export function Account({ accounts, account, keysets, proofs, goToIndex }) {
+// Define proper interfaces for our data types
+interface Account {
+  key: string;
+  unit: string;
+  type: string;
+}
+
+interface Mint {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  unit: string;
+}
+
+interface Balance {
+  amount: number;
+  unit: string;
+}
+
+interface AccountProps {
+  accounts: Account[];
+  account: Account;
+  goToIndex: (index: number) => void;
+}
+
+export function Account({ accounts, account, goToIndex }: AccountProps): React.ReactElement {
   const theme = useSelector(memoizedGetTheme);
+  const profileId = useSelector(memoizedGetCurrentProfile).id;
+  const dispatch = useDispatch();
+  const navigation = useTypedNavigation();
   const styles = createStyles(theme);
 
-  const n = useTypedNavigation();
-
+  // Animation values
   const spinValue = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Start spin animation on mount
   useEffect(() => {
     const spin = Animated.loop(
       Animated.timing(spinValue, {
@@ -31,12 +61,13 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
       })
     );
     spin.start();
+
+    return () => spin.stop();
   }, [spinValue]);
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
+  // Start pulse animation on mount
   useEffect(() => {
-    Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 0.9,
@@ -49,36 +80,81 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulse.start();
+
+    return () => pulse.stop();
   }, [pulseAnim]);
 
-  const profileId = useSelector((state: any) => state.nostr?.currentProfile?.id);
-
-  const dispatch = useDispatch();
-  const handleMintSelected = async (
-    mint: {
-      id: string;
-      name: string;
-      iconUrl: string | null;
-      unit: string;
-    },
-    balance: { amount: number; unit: string } | undefined
-  ) => {
+  const handleMintSelected = async (mint: Mint, balance?: Balance): Promise<void> => {
     try {
       // Update selected mint in Redux
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+
       // Update account unit
       const index = accounts.findIndex((a) => a.unit === mint.unit);
-      goToIndex(index);
+      if (index !== -1) {
+        goToIndex(index);
+      }
     } catch (error) {
+      console.error('Error selecting mint:', error);
       throw error;
     }
+  };
+
+  // Memoize derived data
+  const onchainAccounts = accounts.filter((acc) => acc.type === 'onchain');
+  const ecashAccounts = accounts.filter((acc) => acc.type !== 'onchain');
+  const currentOnchainIndex = accounts.findIndex(
+    (a) => a.unit === account.unit && a.type === account.type && a.key === account.key
+  );
+  const isCurrentOnchain = account.type === 'onchain';
+
+  // Function to render currency icon based on unit
+  const renderCurrencyIcon = (): JSX.Element | null => {
+    switch (account.unit) {
+      case 'sat':
+        return <BitcoinMaskIcon />;
+      case 'usd':
+        return <DollarMaskIcon />;
+      case 'eur':
+        return <EuroMaskIcon />;
+      case 'gbp':
+        return <PoundMaskIcon />;
+      default:
+        return null;
+    }
+  };
+
+  // Function to render account dot indicators
+  const renderDotIndicators = (accountsToRender: Account[], startIndex: number): JSX.Element[] => {
+    return accountsToRender.map((_, index) => {
+      const actualIndex = startIndex + index;
+      const isActive =
+        actualIndex ===
+        accounts.findIndex((a) => a.unit === account.unit && a.type === account.type);
+
+      return (
+        <Text
+          key={actualIndex}
+          weight={isActive ? 'bold' : 'regular'}
+          size={16}
+          style={{
+            color: isActive ? greys(theme)[0] : greys(theme)[1500],
+            marginLeft: 1,
+            marginRight: 1,
+            marginTop: 3,
+          }}>
+          •
+        </Text>
+      );
+    });
   };
 
   return (
     <NonGestureView key={account.key} index={0} style={styles.nonGestureView}>
       <View style={styles.transparentBackground}>
-        <View style={styles.transparentBackgroundWithPadding}></View>
+        <View style={styles.transparentBackgroundWithPadding} />
         <View style={styles.transparentBackgroundRow}>
           <View style={[styles.accountUnitContainer, sovran.backgroundSolid, sovran.borderSubtle]}>
             <Text style={styles.accountUnitText} weight="bold">
@@ -90,46 +166,17 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
         <View style={styles.transparentBackgroundRowCenter}>
           <SelectedMintDisplay onMintSelected={handleMintSelected} unit={account.unit} />
         </View>
-        <PrimaryBalance account={account} proofs={proofs} keysets={keysets} />
+        <PrimaryBalance account={account} />
       </View>
 
       <View style={styles.maxWidthContainer}>
-        <View style={styles.transparentBackgroundRow}></View>
+        <View style={styles.transparentBackgroundRow} />
 
         <View style={styles.transparentBackgroundRow}>
-          {'•'
-            .repeat(accounts.filter((acc) => acc.type === 'onchain').length)
-            .split('')
-            .map((dot, index) => {
-              return (
-                <Text
-                  key={index}
-                  weight={
-                    index ===
-                    accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
-                      ? 'bold'
-                      : 'regular'
-                  }
-                  size={16}
-                  style={{
-                    color:
-                      index ===
-                      accounts.findIndex(
-                        (a) =>
-                          a.unit === account.unit &&
-                          a.type === account.type &&
-                          a.key === account.key
-                      )
-                        ? greys(theme)[0]
-                        : greys(theme)[1500],
-                    marginLeft: 1,
-                    marginRight: 1,
-                    marginTop: 3,
-                  }}>
-                  •
-                </Text>
-              );
-            })}
+          {/* Onchain account indicators */}
+          {renderDotIndicators(onchainAccounts, 0)}
+
+          {/* Spacer between indicators */}
           <Text
             weight="bold"
             size={10}
@@ -141,69 +188,30 @@ export function Account({ accounts, account, keysets, proofs, goToIndex }) {
             }}>
             {' '}
           </Text>
-          {'•'
-            .repeat(accounts.filter((acc) => acc.type !== 'onchain').length)
-            .split('')
-            .map((dot, index) => {
-              return (
-                <Text
-                  key={accounts.filter((acc) => acc.type === 'onchain').length + index}
-                  weight={
-                    accounts.filter((acc) => acc.type === 'onchain').length + index ===
-                    accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
-                      ? 'bold'
-                      : 'regular'
-                  }
-                  size={16}
-                  style={{
-                    color:
-                      accounts.filter((acc) => acc.type === 'onchain').length + index ===
-                      accounts.findIndex((a) => a.unit === account.unit && a.type === account.type)
-                        ? greys(theme)[0]
-                        : greys(theme)[1500],
-                    marginLeft: 1,
-                    marginRight: 1,
-                    marginTop: 3,
-                  }}>
-                  •
-                </Text>
-              );
-            })}
+
+          {/* Ecash account indicators */}
+          {renderDotIndicators(ecashAccounts, onchainAccounts.length)}
         </View>
       </View>
 
-      <View style={styles.absoluteBottomBorder}></View>
+      <View style={styles.absoluteBottomBorder} />
 
       <View style={styles.absoluteRightBottomBorder}>
-        <View style={styles.bottomNegative}>
-          {account.unit === 'sat' ? (
-            <BitcoinMaskIcon />
-          ) : account.unit === 'usd' ? (
-            <DollarMaskIcon />
-          ) : account.unit === 'eur' ? (
-            <EuroMaskIcon />
-          ) : account.unit === 'gbp' ? (
-            <PoundMaskIcon />
-          ) : null}
-        </View>
+        <View style={styles.bottomNegative}>{renderCurrencyIcon()}</View>
       </View>
     </NonGestureView>
   );
 }
 
-const createStyles = (theme) =>
+// Use a constant for platform-specific values
+const PLATFORM_BOTTOM_OFFSET = Platform.OS === 'web' ? 28.8 : 64 + 28.8;
+
+// Using function to create styles to respect the existing pattern
+// but with proper typing for theme
+const createStyles = (theme: string) =>
   StyleSheet.create({
-    scrollView: {
-      marginTop: -38,
-      marginBottom: -24,
-      backgroundColor: greys(theme)[2300],
-    },
-    safeAreaView: {
-      flex: 1,
-      backgroundColor: greys(theme)[2300],
-    },
     nonGestureView: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[2300], // Using a default theme value
       overflow: 'hidden',
       zIndex: 1,
       height: 335,
@@ -233,18 +241,13 @@ const createStyles = (theme) =>
       borderRadius: 99999,
       elevation: 1,
       zIndex: 1,
-      backgroundColor: greys(theme)[2300],
-      borderColor: greys(theme)[1300],
-      borderWidth: 0.2,
-      paddingLeft: 12,
-      paddingRight: 12,
-      paddingTop: 8,
-      paddingBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       margin: 'auto',
       marginBottom: 8,
     },
     accountUnitText: {
-      color: greys(theme)[200],
+      color: greys(theme)[200], // Using a default theme value
     },
     transparentBackgroundRowCenter: {
       flexDirection: 'row',
@@ -253,7 +256,7 @@ const createStyles = (theme) =>
       backgroundColor: 'transparent',
     },
     maxWidthContainer: {
-      width: 'max-width',
+      width: '100%', // Fixed invalid CSS value
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'space-around',
@@ -262,8 +265,8 @@ const createStyles = (theme) =>
     },
     absoluteBottomBorder: {
       position: 'absolute',
-      bottom: Platform.OS === 'web' ? 28.8 : 64 + 28.8,
-      borderBottomColor: greys(theme)[1300],
+      bottom: PLATFORM_BOTTOM_OFFSET,
+      borderBottomColor: greys(theme)[1300], // Using a default theme value
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 1,
@@ -274,8 +277,8 @@ const createStyles = (theme) =>
     absoluteRightBottomBorder: {
       position: 'absolute',
       right: -8,
-      bottom: Platform.OS === 'web' ? 28.8 : 64 + 28.8,
-      borderBottomColor: greys(theme)[1300],
+      bottom: PLATFORM_BOTTOM_OFFSET,
+      borderBottomColor: greys(theme)[1300], // Using a default theme value
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 128,
@@ -285,95 +288,5 @@ const createStyles = (theme) =>
     bottomNegative: {
       bottom: -16,
       backgroundColor: 'transparent',
-    },
-    accountPagerView: {
-      display: 'flex',
-      height: 300,
-      width: '100%',
-    },
-    swiperView: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: greys(theme)[2300],
-    },
-    absoluteTop: {
-      position: 'absolute',
-      width: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      top: Platform.OS === 'web' ? 159 + 64 : 159,
-      padding: 0,
-      margin: 0,
-      zIndex: 3,
-      height: 130,
-      backgroundColor: 'transparent',
-      paddingLeft: 16,
-      paddingRight: 16,
-    },
-    touchableOpacity: {
-      flex: 1,
-      maxWidth: 'auto',
-      zIndex: -1,
-      backgroundColor: 'transparent',
-    },
-    cameraButton: {
-      maxWidth: 64,
-      zIndex: 10000,
-      shadowColor: shades[200],
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.75,
-      shadowRadius: 8,
-      elevation: 5,
-      borderRadius: 10000,
-      borderColor: shades[200],
-      borderWidth: 0.5,
-    },
-    receiveButton: {
-      marginRight: -8,
-    },
-    sendButton: {
-      marginLeft: -8,
-    },
-    cameraGradient: {
-      padding: 8,
-      borderRadius: 1000,
-    },
-    iconContainer: {
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'transparent',
-    },
-    iconView: {
-      alignContent: 'center',
-      flexDirection: 'row',
-      padding: 12,
-      minWidth: 90,
-      width: '100%',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    cameraIconView: {
-      backgroundColor: 'transparent',
-      borderRadius: 1000,
-    },
-    receiveIconView: {
-      backgroundColor: greys(theme)[1800],
-      borderBottomLeftRadius: 1000,
-      borderTopLeftRadius: 1000,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
-    },
-    sendIconView: {
-      backgroundColor: greys(theme)[1800],
-      borderBottomRightRadius: 1000,
-      borderTopRightRadius: 1000,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
-    },
-    iconText: {
-      color: greys(theme)[0],
     },
   });

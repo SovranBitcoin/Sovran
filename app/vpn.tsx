@@ -6,7 +6,6 @@ import { Text, View } from 'components/common/Themed';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import { useEffect, useState } from 'react';
 import lookup from 'country-code-lookup';
-import { Section } from './transaction';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useVpn } from 'helper/redux/lnvpn';
@@ -16,6 +15,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes

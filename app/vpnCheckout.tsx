@@ -6,7 +6,6 @@ import { Text, View } from 'components/common/Themed';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { FlagIcon } from 'assets/icons';
-import { Section } from './transaction';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
 import {
   memoizedGetBalance,

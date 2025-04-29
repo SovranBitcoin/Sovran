@@ -1,19 +1,19 @@
 import React from 'react';
 import { useState } from 'react';
 import { formatCurrency } from 'helper/currency';
-import { BalanceUpdate, Section } from './transaction';
+import { BalanceUpdate } from './transaction';
 import { useNavigation } from 'expo-router';
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { Button } from 'components/common/Button';
 import { ArrowIcon, CancelSendIcon } from 'assets/icons';
-import withConfirmation from 'components/layout/ConfirmationProvider';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View } from 'components/common/Themed';
 import { useTypedRoute } from 'helper/navigation/index';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -132,4 +132,4 @@ function ModalScreen() {
   );
 }
 
-export default withConfirmation(ModalScreen);
+export default ModalScreen;

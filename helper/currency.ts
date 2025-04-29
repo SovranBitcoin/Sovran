@@ -1,70 +1,124 @@
 import { store } from 'helper/redux/store';
 import { memoizedPricelist } from 'helper/redux/pricelist';
 
+/**
+ * Supported currency codes
+ */
+type CurrencyCode = 'BTC' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW';
+
+/**
+ * Supported denominations for currency display
+ */
+type Denomination =
+  | 'btc'
+  | 'sats'
+  | 'sat'
+  | 'bits'
+  | 'finneys'
+  | 'usd'
+  | 'eur'
+  | 'gbp'
+  | 'aud'
+  | 'cad'
+  | 'nzd'
+  | 'krw';
+
+/**
+ * Currency display options
+ */
+type CurrencyDisplayOption = 'symbol' | 'code' | 'name' | 'none';
+
+/**
+ * Currency info with value and denomination
+ */
 interface Currency {
-  currency: 'BTC' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW';
+  currency: CurrencyCode;
   value: number;
-  denomination:
-    | 'btc'
-    | 'sats'
-    | 'sat'
-    | 'bits'
-    | 'finneys'
-    | 'usd'
-    | 'eur'
-    | 'gbp'
-    | 'aud'
-    | 'cad'
-    | 'nzd'
-    | 'krw';
+  denomination: Denomination;
 }
 
-interface Options {
+/**
+ * Formatting options for currency display
+ */
+interface FormatOptions {
   locale: string;
   precision: number;
-  currencyDisplay: 'symbol' | 'code' | 'name' | 'none';
-  denomination:
-    | 'btc'
-    | 'sats'
-    | 'bits'
-    | 'finneys'
-    | 'usd'
-    | 'eur'
-    | 'gbp'
-    | 'aud'
-    | 'cad'
-    | 'nzd'
-    | 'krw';
-  pricelist?: { [key: string]: number };
+  currencyDisplay: CurrencyDisplayOption;
+  denomination: Denomination;
+  pricelist?: Record<string, number>;
 }
 
-export function formatCurrency(currency: Currency, options: Options): string {
+/**
+ * Currency symbols mapping
+ */
+const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
+  usd: '$',
+  eur: '€',
+  gbp: '£',
+  btc: '₿',
+  aud: 'A$',
+  cad: 'C$',
+  nzd: 'NZ$',
+  krw: '₩',
+  sat: 'ṩ',
+  sats: 'ṩ',
+};
+
+/**
+ * Currency names mapping
+ */
+const CURRENCY_NAMES: Readonly<Record<string, string>> = {
+  usd: 'US Dollar',
+  eur: 'Euro',
+  gbp: 'British Pound',
+  btc: 'Bitcoin',
+  aud: 'Australian Dollar',
+  cad: 'Canadian Dollar',
+  nzd: 'New Zealand Dollar',
+  krw: 'Korean Won',
+  sat: 'Satoshi',
+  sats: 'Satoshis',
+  bits: 'Bits',
+  finneys: 'Finneys',
+};
+
+/**
+ * List of fiat currencies
+ */
+const FIAT_CURRENCIES = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'krw', 'mstr', 'tsla'];
+
+/**
+ * Formats a currency value based on provided options
+ * @param currency - The currency to format
+ * @param options - Formatting options
+ * @returns Formatted currency string
+ */
+export function formatCurrency(currency: Currency, options: FormatOptions): string {
+  // Get current prices from store or fallback to provided pricelist or defaults
+  const currentPricelist = memoizedPricelist(store.getState());
+
   // Conversion rates
-  const conversionRates: { [key: string]: number } = {
+  const conversionRates: Record<string, number> = {
     btc: 1,
     sats: 100_000_000,
+    sat: 100_000_000,
     bits: 1_000_000,
     finneys: 100_000,
-    usd: memoizedPricelist(store.getState())?.usd?.btc || options.pricelist?.USDT || 63_900,
-    eur: options.pricelist?.EUR || 53_500,
-    gbp: options.pricelist?.GBP || 47_800,
-    aud: 45_000, // Example rate
-    cad: 50_000, // Example rate
-    nzd: 43_000, // Example rate
-    krw: 75_000_000, // Example rate
-    mstr: 1, // Example rate
+    usd: currentPricelist?.usd?.btc ?? options.pricelist?.USDT ?? 63_900,
+    eur: options.pricelist?.EUR ?? 53_500,
+    gbp: options.pricelist?.GBP ?? 47_800,
+    aud: options.pricelist?.AUD ?? 45_000,
+    cad: options.pricelist?.CAD ?? 50_000,
+    nzd: options.pricelist?.NZD ?? 43_000,
+    krw: options.pricelist?.KRW ?? 75_000_000,
+    mstr: 1,
     tsla: 1,
   };
 
   // Adjust the currency value if the denomination is a fiat currency
-  let adjustedCurrencyValue = currency.value;
-  if (
-    ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'krw', 'mstr', 'tsla'].includes(
-      currency.denomination
-    )
-  ) {
-    adjustedCurrencyValue = currency.value / 100;
-  }
+  const adjustedCurrencyValue = FIAT_CURRENCIES.includes(currency.denomination)
+    ? currency.value / 100
+    : currency.value;
 
   // Convert the value to BTC for easier conversion later
   const valueInBTC = adjustedCurrencyValue / conversionRates[currency.denomination];
@@ -72,45 +126,20 @@ export function formatCurrency(currency: Currency, options: Options): string {
   // Convert the BTC value to the target denomination
   const valueInTargetDenomination = valueInBTC * conversionRates[options.denomination];
 
-  // Determine the currency display symbol, code, or name
-  let currencyDisplay;
-  const currencySymbols: { [key: string]: string } = {
-    usd: '$',
-    eur: '€',
-    gbp: '£',
-    btc: '₿',
-    aud: 'A$', // Example symbol
-    cad: 'C$', // Example symbol
-    nzd: 'NZ$', // Example symbol
-    krw: '₩', // Example symbol
-    sat: 'ṩ',
-  };
-  const currencyNames: { [key: string]: string } = {
-    usd: 'US Dollar',
-    eur: 'Euro',
-    gbp: 'British Pound',
-    btc: 'Bitcoin',
-    aud: 'Australian Dollar', // Added currency name
-    cad: 'Canadian Dollar', // Added currency name
-    nzd: 'New Zealand Dollar', // Added currency name
-    krw: 'Korean Won', // Added currency name
-  };
+  // Determine the currency display (symbol, code, name, or none)
+  let currencyDisplay = '';
 
   switch (options.currencyDisplay) {
     case 'symbol':
-      currencyDisplay = currencySymbols[options.denomination] || '';
+      currencyDisplay = CURRENCY_SYMBOLS[options.denomination] ?? '';
       break;
     case 'code':
       currencyDisplay = currency.currency;
       break;
     case 'name':
-      currencyDisplay = currencyNames[options.denomination] || '';
+      currencyDisplay = CURRENCY_NAMES[options.denomination] ?? '';
       break;
-    case 'none':
-      currencyDisplay = '';
-      break;
-    default:
-      currencyDisplay = ''; // Fallback case, though not expected
+    // No need for default as currencyDisplay is already initialized to empty string
   }
 
   // Format the number according to locale and precision
@@ -120,20 +149,32 @@ export function formatCurrency(currency: Currency, options: Options): string {
   }).format(valueInTargetDenomination);
 
   // Construct the final string
-  const finalString =
-    options.currencyDisplay === 'name'
-      ? `${formattedNumber} ${options.denomination.toUpperCase() !== 'SATS' ? options.denomination.toUpperCase() : options.denomination}`
-      : `${currencyDisplay}${formattedNumber}`;
+  if (options.currencyDisplay === 'name') {
+    const denomDisplay =
+      options.denomination.toUpperCase() !== 'SATS'
+        ? options.denomination.toUpperCase()
+        : options.denomination;
+    return `${formattedNumber} ${denomDisplay}`;
+  }
 
-  return finalString;
+  return `${currencyDisplay}${formattedNumber}`;
 }
 
-export const formatCurrencyWrapper = (amount, unit, display = 1) => {
+/**
+ * Simplified wrapper for formatCurrency with sensible defaults
+ * @param amount - Amount to format
+ * @param unit - Currency unit (e.g., 'sat', 'usd')
+ * @param display - Display style: 0 (BTC value), 1 (default - sats with no symbol), 2 (sats with name)
+ * @returns Formatted currency string
+ */
+export const formatCurrencyWrapper = (amount: number, unit: string, display = 1): string => {
   const display_btc = display ?? 1;
-  const currency = unit === 'sat' ? 'BTC' : unit.toUpperCase();
+  const currency = unit === 'sat' ? 'BTC' : (unit.toUpperCase() as CurrencyCode);
   const precision = unit === 'sat' ? (display_btc === 0 ? 8 : 0) : 2;
-  const currencyDisplay = unit === 'sat' ? (display_btc === 2 ? 'name' : 'none') : 'symbol';
-  const denomination = unit === 'sat' ? (display_btc === 0 ? 'btc' : 'sats') : unit;
+  const currencyDisplay =
+    unit === 'sat' ? (display_btc === 2 ? 'name' : 'none') : ('symbol' as CurrencyDisplayOption);
+  const denomination =
+    unit === 'sat' ? (display_btc === 0 ? 'btc' : 'sats') : (unit as Denomination);
   const value = display_btc === 0 && unit === 'sat' ? amount / 100_000_000 : amount;
 
   return formatCurrency(

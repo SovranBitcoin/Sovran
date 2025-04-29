@@ -126,6 +126,8 @@ export const ButtonBase = ({
             ...(noPadding ? { margin: 0 } : {}),
             opacity: disabled || isLoading ? 0.5 : 1,
             borderColor: variant === 'primary' ? greys(theme)[100] : greys(theme)[1000],
+            width: !text ? 48 : undefined,
+            height: !text ? 48 : undefined,
           },
           style,
         ]}

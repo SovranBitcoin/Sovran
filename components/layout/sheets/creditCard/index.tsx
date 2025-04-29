@@ -1,20 +1,30 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { View, Text } from 'react-native';
+import { View, Text, Dimensions } from 'react-native';
+import { CARD_HEIGHT } from 'components/common/NFCCard';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+
+const height = Dimensions.get('window').height;
 
 function CreditCardSheet(props: any) {
+  const theme = useSelector(memoizedGetTheme);
   return (
     <ActionSheet
-      // Enable back navigation with device back button
+      onChange={(position, height) => {
+        console.log(position, height);
+      }}
+      backgroundInteractionEnabled
       enableRouterBackNavigation={true}
-      // Pass the routes array defined in routes/index.tsx
       routes={routes}
-      // Set the initial route to display
       initialRoute="main"
-      // Configure styling - 50% height as requested
-      containerStyle={{ height: '50%' }}
-      // Additional props as needed
+      containerStyle={{
+        height: height - CARD_HEIGHT - 100 - 32,
+        backgroundColor: greys(theme)[1800],
+      }}
+      gestureEnabled={true}
       {...props}
     />
   );

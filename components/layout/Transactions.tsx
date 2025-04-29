@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import { TouchableOpacity } from 'react-native';
 import { useNavigation } from 'expo-router';
@@ -11,7 +11,7 @@ import { Text } from 'components/common/Themed';
 import { store } from 'helper/redux/store';
 import Icon from 'assets/icons';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { getRawExpiry } from '../cashu'; // Importing the function to check expiry
+import { getRawExpiry } from '../cashu';
 
 // Helper function to format the date as needed
 const formatDate = (date: string): string => {

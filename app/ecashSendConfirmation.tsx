@@ -2,7 +2,7 @@ import React, { useEffect, useState, createContext, useContext, useRef, useCallb
 import { Share, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
-import { BalanceUpdate, Section } from './transaction';
+import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -20,7 +20,6 @@ import {
   injectWebSocketImpl,
 } from '@cashu/cashu-ts';
 import _ from 'lodash';
-import withConfirmation from 'components/layout/ConfirmationProvider';
 import {
   memoizedGetTransactionByMatcher,
   memoizedGetTransactions,
@@ -34,7 +33,6 @@ import { write } from 'components/common/useNfc';
 import { runWithAnimationFrame } from './onboard/new';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import ErrorBoundary from 'components/layout/ErrorBoundary';
 import Checkbox from 'expo-checkbox';
 import {
   GestureHandlerRootView,
@@ -43,6 +41,7 @@ import {
 } from 'react-native-gesture-handler';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Section } from 'components/common/Section';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -290,7 +289,7 @@ function ModalScreen() {
   );
 }
 
-export default withConfirmation(ModalScreen);
+export default ModalScreen;
 
 const createStyles = (theme) =>
   StyleSheet.create({

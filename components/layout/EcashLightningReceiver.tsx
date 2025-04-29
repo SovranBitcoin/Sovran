@@ -20,23 +20,40 @@ export const pool = new SimplePool();
 const screenWidth = Dimensions.get('window').width;
 const boxSize = (screenWidth - 128) / 4;
 
-const EcashLightningReceiver = ({ unit, type }) => {
+type UnitType = 'sat' | string;
+
+interface EcashLightningReceiverProps {
+  unit: UnitType;
+  type?: string;
+}
+
+interface TokenHandlerParams {
+  token: string;
+}
+
+/**
+ * Component for receiving Bitcoin or other cryptocurrency via Lightning or Ecash
+ */
+const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, type }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const { currentProfile } = useNostr();
   const [hasPermission, requestPermission] = useCameraPermissions();
 
-  const handleEcashToken = ({ token }) => {
-    const giveaway = getGiveaway({ token: token });
+  /**
+   * Handles ecash token processing and navigation
+   */
+  const handleEcashToken = ({ token }: TokenHandlerParams): void => {
+    const giveaway = getGiveaway({ token });
+
     if (giveaway?.id) {
       // Check if already redeemed
       if (checkIfAlreadyRedeemed(token)) {
         showMessage('already_redeemed', {}, { emoji: '🚨' });
         return;
       }
-      if (giveaway.condition()) {
-      } else {
+
+      if (!giveaway.condition()) {
         const e = giveaway.error();
         showMessage('general_error', {}, { emoji: '🚨' });
         return;
@@ -44,12 +61,15 @@ const EcashLightningReceiver = ({ unit, type }) => {
     }
 
     navigation.navigate('ecashReceiveConfirmation', {
-      token: token,
+      token,
       unit,
     });
   };
 
-  async function handleEcashPaste() {
+  /**
+   * Handles pasting ecash tokens from clipboard
+   */
+  const handleEcashPaste = async (): Promise<void> => {
     const hasReadPermission = await Clipboard.hasStringAsync();
 
     if (!hasReadPermission) {
@@ -59,50 +79,57 @@ const EcashLightningReceiver = ({ unit, type }) => {
 
     const text = await Clipboard.getStringAsync();
 
-    if (!isValidEcashToken(text)) {
-      if (text) {
-        showMessage('invalid_address', { address: text }, { emoji: '🚨' });
-        return;
-      } else {
-        showMessage('no_clipboard_address', {}, { emoji: '🚨' });
-        return;
-      }
-    } else {
-      if (text) {
-        handleEcashToken({ token: text });
-      }
+    if (!text) {
+      showMessage('no_clipboard_address', {}, { emoji: '🚨' });
+      return;
     }
-  }
+
+    if (!isValidEcashToken(text)) {
+      showMessage('invalid_address', { address: text }, { emoji: '🚨' });
+      return;
+    }
+
+    handleEcashToken({ token: text });
+  };
+
+  /**
+   * Handles scan QR button press and permissions
+   */
+  const handleScanQR = (): void => {
+    if (!hasPermission?.granted) {
+      requestPermission();
+      return;
+    }
+
+    navigation.navigate('camera', { unit });
+  };
+
+  /**
+   * Handles fixed amount button press
+   */
+  const handleFixedAmount = (): void => {
+    navigation.navigate('currency', {
+      to: 'lightningReceiveConfirmation',
+      unit,
+    });
+  };
+
+  const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;
+  const showLightningAddress = Boolean(currentProfile?.npub && unit === 'sat');
 
   return (
     <Modal
       showClose
-      title={`Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`}
+      title={formattedTitle}
       buttons={
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transrparent',
-            paddingBottom: 8,
-          }}>
+        <View className="flex-row items-center justify-center bg-transparent pb-2">
           <ButtonHandler
             buttons={[
               {
                 text: 'Scan QR',
                 icon: 'stash:qr-code',
                 variant: 'secondary',
-                onPress: () => {
-                  if (!hasPermission?.granted) {
-                    requestPermission();
-                    return;
-                  }
-
-                  navigation.navigate('camera', {
-                    unit,
-                  });
-                },
+                onPress: handleScanQR,
               },
               {
                 text: 'Paste',
@@ -114,12 +141,7 @@ const EcashLightningReceiver = ({ unit, type }) => {
                 text: 'Fixed Amount',
                 icon: 'mdi:decimal',
                 variant: 'secondary',
-                onPress: () => {
-                  navigation.navigate('currency', {
-                    to: 'lightningReceiveConfirmation',
-                    unit,
-                  });
-                },
+                onPress: handleFixedAmount,
               },
               // {
               //   text: "Customize Lightning Address",
@@ -129,88 +151,27 @@ const EcashLightningReceiver = ({ unit, type }) => {
               //     navigation.navigate("settings/customNpub");
               //   },
               // },
-            ]}></ButtonHandler>
+            ]}
+          />
         </View>
-
-        // <>
-        //   <View
-        //     style={{
-        //       flexDirection: "row",
-        //       justifyContent: "center",
-        //       alignItems: "center",
-        //       marginTop: 8,
-        //     }}
-        //   >
-        //     <View
-        //       style={{
-        //         flex: 1,
-        //       }}
-        //     >
-        //       {hasPermission?.granted ? (
-        //         <Button
-        //           variant={"secondary"}
-        //           icon={<QRCodeIcon />}
-        //           text={"Scan QR"}
-        //           onPress={() =>
-        //             navigation.navigate("camera", {
-        //               unit,
-        //             })
-        //           }
-        //           position="left"
-        //         ></Button>
-        //       ) : (
-        //         <PermissionsButton
-        //           description={`There was a problem accessing your camera. Please check the App permissions and try again.`}
-        //           icon={<QRCodeIcon />}
-        //           text="Scan QR"
-        //           position="left"
-        //         />
-        //       )}
-        //     </View>
-        //     <View
-        //       style={{
-        //         flex: 1,
-        //       }}
-        //     >
-        //       <Button
-        //         variant={"secondary"}
-        //         position={"right"}
-        //         onPress={() => {
-        //           navigation.navigate("currency", {
-        //             to: "lightningReceiveConfirmation",
-        //             unit,
-        //           });
-        //         }}
-        //         icon={<FixedAmountIcon />}
-        //         text={"Fixed Amount"}
-        //       />
-        //     </View>
-        //   </View>
-        //   <Button
-        //     text={"Paste ecash token"}
-        //     variant="primary"
-        //     onPress={handleEcashPaste}
-        //   ></Button>
-        // </>
-      }
-      children={
-        <View>
-          {currentProfile?.npub && unit === 'sat' && (
-            <PaymentInfo
-              data={`${currentProfile?.npub}@npub.cash`}
-              popupMessage={'lightning_address_copied'}
-              unit="sat"
-            />
-          )}
-        </View>
-      }
-    />
+      }>
+      <View>
+        {showLightningAddress && (
+          <PaymentInfo
+            data={`${currentProfile.npub}@npub.cash`}
+            popupMessage="lightning_address_copied"
+            unit="sat"
+          />
+        )}
+      </View>
+    </Modal>
   );
 };
 
 export default EcashLightningReceiver;
 
-const createStyles = (theme) =>
+// Keeping styles for backward compatibility
+const createStyles = (theme: any) =>
   StyleSheet.create({
     cornerBox: {
       position: 'absolute',
