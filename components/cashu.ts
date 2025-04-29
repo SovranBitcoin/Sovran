@@ -113,7 +113,7 @@ export async function updateStateAfterPayment(profileId, proofs, quote, mintUrl)
     updateTransaction({
       profileId,
       matcher: (tx) =>
-        tx.mintQuote.quote === quote || (!tx.paid && tx.fromNIP05 && tx.type === 'ecash'),
+        tx?.mintQuote?.quote === quote || (!tx.paid && tx.fromNIP05 && tx.type === 'ecash'),
       updateFn: (tx) => ({ ...tx, paid: true }),
     })
   );
