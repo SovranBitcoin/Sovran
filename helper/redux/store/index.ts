@@ -1,6 +1,6 @@
 import { applyMiddleware, createStore } from 'redux';
-import { createMigrate, persistStore, persistReducer } from 'redux-persist';
-import rootReducer from './reducer';
+import { createMigrate, persistStore, persistReducer, MigrationManifest } from 'redux-persist';
+import rootReducer, { RootState } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import _ from 'lodash/fp';
 
@@ -10,7 +10,7 @@ import * as bip39 from '@scure/bip39';
 const thunkMiddleware = require('redux-thunk').thunk;
 
 const migrations = {
-  0: (state: any) => {
+  0: (state: RootState) => {
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
@@ -34,7 +34,7 @@ const migrations = {
       state
     );
   },
-  5: (state: any) => {
+  5: (state: RootState) => {
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
@@ -47,7 +47,7 @@ const migrations = {
       state
     );
   },
-  23: (state: any) => {
+  23: (state: RootState) => {
     return _.update(
       ['settings', 'settings', 'theme'],
       (theme = 'dark') => {
@@ -56,7 +56,7 @@ const migrations = {
       state
     );
   },
-  25: (state: any) => {
+  25: (state: RootState) => {
     return _.update(
       ['nostr', 'profiles'],
       (profiles = []) =>
@@ -88,7 +88,7 @@ const migrations = {
       state
     );
   },
-  37: (state: any) => {
+  37: (state: RootState) => {
     const newState = _.update(
       ['nostr', 'search'],
       (search = []) => {
@@ -118,7 +118,7 @@ const migrations = {
     console.log(293892873, newState);
     return newState;
   },
-  40: (state: any) => {
+  40: (state: RootState) => {
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
@@ -283,9 +283,7 @@ store.subscribe(() => {
     return structure;
   };
 
-  console.log(JSON.stringify(store.getState(), null, 2));
-
-  // State structure is now accessible via Redux DevTools
+  // console.log(JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

@@ -100,7 +100,7 @@ export async function checkSpecificTransaction({ quoteToCheck }) {
 }
 
 // Helper to update state after successful payment
-async function updateStateAfterPayment(profileId, proofs, quote, mintUrl) {
+export async function updateStateAfterPayment(profileId, proofs, quote, mintUrl) {
   await store.dispatch(
     appendProofsV2({
       profileId,

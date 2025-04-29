@@ -2,8 +2,15 @@ import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { CashuMint, CashuWallet, getDecodedToken, injectWebSocketImpl } from '@cashu/cashu-ts';
-import { memoizedGetTransactions, updateTransaction } from 'helper/redux/cashu';
+import {
+  increaseCounterV2,
+  memoizedGetCounterV2,
+  memoizedGetTransactions,
+  updateTransaction,
+} from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
+import { publishWalletEvent } from 'helper/nostr/cashu';
+import { getWallet, updateStateAfterPayment } from 'components/cashu';
 
 const TransactionContext = createContext(null);
 
@@ -103,7 +110,6 @@ export const TransactionProvider = ({ children }) => {
       const mintUrl = transaction.mintUrl;
       const mint = new CashuMint(mintUrl);
       const wallet = new CashuWallet(mint);
-      await wallet.loadMint();
 
       injectWebSocketImpl(WebSocket);
 
@@ -173,6 +179,50 @@ export const TransactionProvider = ({ children }) => {
             const isPaid = update.state === 'PAID';
 
             if (isPaid) {
+              // todo: i want to make a provider for wallets/mints
+              const w = await getWallet({
+                mintUrl,
+                unit: transaction.unit,
+              });
+
+              const counter = memoizedGetCounterV2({
+                profileId: store.getState().nostr.currentProfile.id,
+                mintUrl,
+                keysetId: w.keysetId,
+              })(store.getState());
+
+              const proofs = await w.mintProofs(transaction.amount, mintQuote.quote, {
+                counter,
+                keysetId: w.keysetId,
+              });
+
+              store.dispatch(
+                increaseCounterV2({
+                  profileId: store.getState().nostr.currentProfile.id,
+                  mintUrl,
+                  keysetId: w.keysetId,
+                  amount: proofs.length,
+                })
+              );
+
+              await updateStateAfterPayment(
+                store.getState().nostr.currentProfile.id,
+                proofs,
+                mintQuote.quote,
+                mintUrl
+              );
+
+              publishWalletEvent([
+                ...new Set([
+                  ...store
+                    .getState()
+                    .cashu?.profiles?.[
+                      store.getState().nostr.currentProfile.id
+                    ]?.transactions.map((t) => t.mintUrl),
+                  mintUrl,
+                ]),
+              ]);
+
               // Update transaction status to paid
               showMessage('funds_sent', { amount: transaction.amount, unit: transaction.unit });
 

@@ -428,6 +428,9 @@ export async function receiveEcash({
   const receiveMintUrl = decodedToken.mint;
   console.log('[receiveEcash] receiveMintUrl', receiveMintUrl);
 
+  const proofsWeHave = memoizedGetProofs(unit)(state);
+  console.log('[receiveEcash] proofsWeHave', proofsWeHave);
+
   const getPubkeyFromToken = (token: string) => {
     const decodedToken = getDecodedToken(token);
 
@@ -468,6 +471,8 @@ export async function receiveEcash({
 
   const response = await wallet.receive(token, {
     counter,
+    keysetId: wallet.keysetId,
+    proofsWeHave,
     ...(giveaway ? { privkey: giveaway.private_key } : {}),
   });
   console.log('[receiveEcash] response', response);

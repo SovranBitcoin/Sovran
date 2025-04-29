@@ -1,6 +1,7 @@
 import { createSelector } from 'reselect';
+import { RootState } from '../store/reducer';
 
-export const selectSettings = (state) => state.settings.settings;
+export const selectSettings = (state: RootState) => state.settings.settings;
 
 export const selectTheme = createSelector([selectSettings], (settings) => settings.theme);
 
@@ -13,11 +14,11 @@ export const selectDisplayBitcoin = createSelector(
 
 export const memoizedGetTheme = createSelector(
   [
-    (state) => {
+    (state: RootState) => {
       return state.settings.settings.theme;
     },
   ],
-  (theme) => {
+  (theme: RootState) => {
     return theme;
   }
 );
