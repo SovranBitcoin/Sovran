@@ -6,9 +6,19 @@ import Container from 'components/layout/Container';
 import { Section as TableSection } from 'components/common/Section';
 import { RowButton, Section } from '../settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { View } from 'components/common/Themed';
+import { Text, View } from 'components/common/Themed';
 import { Tabs } from 'components/common/Tabs';
 import CreditCardComponent from 'components/common/NFCCard';
+import Icon, { icons } from 'assets/icons';
+import { greys } from 'helper/colors';
+
+function chunkArray(array: any[], size: number) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -80,6 +90,27 @@ export default function ModalScreen() {
         selectedTab={'Confirmed'}
         handleTabPress={() => {}}
       />
+
+      <View>
+        {chunkArray(icons, 3).map((row, rowIndex) => (
+          <View key={rowIndex} className="mb-4 flex-row">
+            {row.map((icon) => (
+              <View key={icon} className="m-4 flex-1 items-center">
+                <Icon name={icon} size={48} color={greys(theme)[0]} />
+                <Text
+                  style={{ color: greys(theme)[0] }}
+                  className="mt-2 w-full truncate text-center text-xs">
+                  {icon}
+                </Text>
+              </View>
+            ))}
+            {/* Fill empty columns if row has less than 3 icons */}
+            {Array.from({ length: 3 - row.length }).map((_, idx) => (
+              <View key={`empty-${idx}`} className="flex-1" />
+            ))}
+          </View>
+        ))}
+      </View>
     </Container>
   );
 }
