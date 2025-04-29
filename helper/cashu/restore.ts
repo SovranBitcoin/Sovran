@@ -53,6 +53,7 @@ export async function* restoreMint({
       let emptyBatchCount: number = 0;
       let restoredProofs: Proof[] = [];
       let totalProofsProcessed = 0;
+      let firstEmptyStart = 0; // Track the first position where proofs begin to be empty
 
       while (emptyBatchCount < MAX_GAP) {
         yield {
@@ -73,9 +74,13 @@ export async function* restoreMint({
         ).proofs;
 
         if (uncheckedProofs.length === 0) {
+          if (emptyBatchCount === 0) {
+            firstEmptyStart = start;
+          }
           emptyBatchCount++;
         } else {
           emptyBatchCount = 0;
+          firstEmptyStart = 0; // Reset if we find proofs again
           totalProofsProcessed += uncheckedProofs.length;
 
           // Process this batch immediately instead of waiting
@@ -122,11 +127,18 @@ export async function* restoreMint({
         start += BATCH_SIZE;
       }
 
+      // Calculate the final index after searching
+      const keysetIndex = firstEmptyStart !== 0 ? firstEmptyStart : start - MAX_GAP * BATCH_SIZE;
+
       // Build the full response
       response = {
         ...response,
         [keyset.unit]: {
           proofs: restoredProofs,
+          keysets: {
+            ...response?.[keyset?.unit]?.keysets,
+            [keyset.id]: keysetIndex,
+          },
         },
       };
 
@@ -137,7 +149,8 @@ export async function* restoreMint({
         currentUnit: i + 1,
         totalUnits: uniqueUnits.length,
         proofCount: restoredProofs.length,
-        message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs`,
+        index: keysetIndex, // Add index to the yield data
+        message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs, index: ${keysetIndex}`,
         mintUrl,
         response,
       };

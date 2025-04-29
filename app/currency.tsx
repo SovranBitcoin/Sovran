@@ -73,7 +73,7 @@ function ModalScreen() {
       memo,
     });
 
-    navigation.goBack();
+    navigation?.goBack();
     navigation.replace(params.to, {
       ...params,
       unifiedRequest: response.unifiedRequest,

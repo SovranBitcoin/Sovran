@@ -140,7 +140,7 @@ function ModalScreen({
 
       setLoading(false);
     } catch (error) {
-      showMessage(error.name, {}, { emoji: '🚨' });
+      showMessage(error.message);
     }
   };
 

@@ -11,7 +11,13 @@ import { createStyles } from './helper';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
-import { addMints, appendProofsV2, setSelectedMint } from 'helper/redux/cashu';
+import {
+  addMints,
+  appendProofsV2,
+  increaseCounterV2,
+  setKeysets,
+  setSelectedMint,
+} from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { MintItem } from './MintItem';
@@ -252,10 +258,16 @@ const ChainLoadingAnimation = () => {
             const { value: restoredMint } = result;
             const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
 
+            console.log('restoredMint', restoredMint);
+
             mints.push({
               profileId: mint.id,
               mintUrl,
               proofs,
+              keysets: _.merge(
+                {},
+                ..._.map(_.values(restoredMint), (unit) => _.get(unit, 'keysets', {}))
+              ),
             });
           }
 
@@ -269,6 +281,7 @@ const ChainLoadingAnimation = () => {
                     return {
                       ...mint,
                       proofs: mintData?.proofs || [],
+                      keysets: mintData?.keysets || [],
                     };
                   }),
                 };
@@ -395,6 +408,7 @@ const ChainLoadingAnimation = () => {
       _.forEach(mintGroup.mints, (mint) => {
         const mintUrl = mint.mintUrl;
         const proofs = mint.proofs || [];
+        const keysets = mint.keysets || {};
 
         store.dispatch(addMints({ profileId, mints: [mintUrl] }));
         store.dispatch(setSelectedMint({ profileId, mintUrl }));
@@ -408,6 +422,19 @@ const ChainLoadingAnimation = () => {
               proofs: proofs,
             })
           );
+        }
+        if (!_.isEmpty(keysets)) {
+          _.forEach(keysets, (value, key) => {
+            console.log('add keyset', key, value);
+            store.dispatch(
+              increaseCounterV2({
+                profileId,
+                mintUrl,
+                keysetId: key,
+                amount: value,
+              })
+            );
+          });
         }
       });
     });

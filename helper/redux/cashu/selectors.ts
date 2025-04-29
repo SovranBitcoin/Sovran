@@ -48,7 +48,7 @@ export const memoizedGetCounter = ({ profileId, mintUrl }) =>
 
 export const memoizedGetCounterV2 = ({ profileId, mintUrl, keysetId }) =>
   createSelector(
-    [(state) => _.get(state.cashu, ['profiles', profileId, 'counters', mintUrl, keysetId], 0)],
+    [(state) => _.get(state.cashu, ['profiles', profileId, 'counters', mintUrl, keysetId], 1)],
     (counter) => counter
   );
 
