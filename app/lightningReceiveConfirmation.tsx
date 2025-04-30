@@ -116,7 +116,7 @@ function ModalScreen() {
     });
     const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
 
-    if (status.state === 'PAID') {
+    if (status.state === 'PAID' || status.state === 'ISSUED') {
       const profileId = store.getState().nostr?.currentProfile?.id;
       await store.dispatch(
         updateTransaction({
