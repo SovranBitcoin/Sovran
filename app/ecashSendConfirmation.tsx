@@ -199,9 +199,11 @@ function ModalScreen() {
   };
 
   const handleCopyEmoji = async () => {
-    const emoji = encode('🥜', token);
-    await Clipboard.setStringAsync(emoji);
-    showSuccess('ecash_token_copied', {});
+    SheetManager.show('emoji-picker', {
+      payload: {
+        token,
+      },
+    });
   };
 
   return (
