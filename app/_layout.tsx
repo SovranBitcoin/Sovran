@@ -38,6 +38,7 @@ import ndk from 'components/ndk';
 import 'components/layout/sheets/registerSheets';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
+import { WalletsProvider } from 'components/providers/WalletsProviders';
 
 // Configure constants
 const RELAY_URLS = [
@@ -312,9 +313,11 @@ export default function RootLayout() {
               <ActionSheetProvider>
                 <SheetProvider context="global">
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <TransactionProvider>
-                      <MainStack />
-                    </TransactionProvider>
+                    <WalletsProvider>
+                      <TransactionProvider>
+                        <MainStack />
+                      </TransactionProvider>
+                    </WalletsProvider>
                   </View>
                 </SheetProvider>
               </ActionSheetProvider>
