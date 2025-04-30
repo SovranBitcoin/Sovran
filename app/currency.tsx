@@ -320,14 +320,14 @@ function ModalScreen() {
                 }}
               />
               <Text>{'  →  '}</Text>
-              {params?.profile?.picture ? (
+              {params?.profile?.picture || params?.profile?.image ? (
                 <Image
                   style={{
                     width: 28,
                     height: 28,
                     borderRadius: 1000,
                   }}
-                  source={{ uri: params.profile.picture }}
+                  source={{ uri: params.profile?.picture || params.profile?.image }}
                 />
               ) : (
                 <View />
