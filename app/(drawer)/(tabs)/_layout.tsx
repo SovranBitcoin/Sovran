@@ -176,9 +176,9 @@ const TabLayout = () => {
   );
 
   const HeaderRight = () => (
-    <Pressable onPress={() => navigation.navigate('feed')}>
+    <Pressable onPress={() => navigation.navigate('cards')}>
       <View style={styles.headerRightContainer}>
-        <Icon name="famicons:notifications" color={greys(theme)[0]} />
+        <Icon name="solar:card-bold" color={greys(theme)[0]} />
         {/* <ProfileAvatar picture={currentProfile?.picture} /> */}
       </View>
     </Pressable>
