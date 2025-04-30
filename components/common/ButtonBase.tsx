@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useRef, useEffect, useState, ReactNode } from 'react';
-import { greys, black } from 'helper/colors';
+import { greys, black, shades } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -139,7 +139,7 @@ export const ButtonBase = ({
             <Icon
               size={16}
               name="ant-design:loading-outlined"
-              color={greys(theme)[100]}
+              color={shades[300]}
               spin={{
                 delay: 0,
                 duration: 1000,
