@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { CashuMint, CashuWallet, getDecodedToken, injectWebSocketImpl } from '@cashu/cashu-ts';
 import {
+  appendProofsV2,
   increaseCounterV2,
   memoizedGetCounterV2,
   memoizedGetTransactions,
@@ -54,7 +55,7 @@ export const TransactionProvider = ({ children }) => {
 
   // Helper function to update transaction status in Redux
   const updateTransactionStatus = (
-    { token, type, transactionType, request },
+    { token, type, transactionType, request, quote },
     status,
     additionalData = {}
   ) => {
@@ -62,9 +63,12 @@ export const TransactionProvider = ({ children }) => {
       updateTransaction({
         profileId: 0,
         matcher: (tx) => {
-          return type
+          return type === 'ecash'
             ? tx.token === token && tx.type === type && tx.transactionType === transactionType
-            : tx.request === request && tx.type === type && tx.transactionType === transactionType;
+            : tx.request === request &&
+                tx.type === type &&
+                tx.transactionType === transactionType &&
+                tx.mintQuote?.quote === quote;
         },
         updateFn: (tx) => ({
           ...tx,
@@ -205,11 +209,12 @@ export const TransactionProvider = ({ children }) => {
                 })
               );
 
-              await updateStateAfterPayment(
-                store.getState().nostr.currentProfile.id,
-                proofs,
-                mintQuote.quote,
-                mintUrl
+              await store.dispatch(
+                appendProofsV2({
+                  profileId: store.getState().nostr.currentProfile.id,
+                  mintUrl,
+                  proofs: proofs,
+                })
               );
 
               publishWalletEvent([
@@ -231,6 +236,7 @@ export const TransactionProvider = ({ children }) => {
                   request,
                   type,
                   transactionType,
+                  quote: mintQuote.quote,
                 },
                 'paid',
                 { paid: true, completedAt: Date.now() }
