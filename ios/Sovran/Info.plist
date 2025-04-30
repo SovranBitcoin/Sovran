@@ -41,7 +41,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NFCReaderUsageDescription</key>
-    <string>Interact with nearby NFC devices</string>
+    <string>Sovran needs NFC access to send payment requests at the users request.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
@@ -50,19 +50,11 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Sovran requires camera access so users can scan QR Codes which allows them to easily pay specific lightning addresses.</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
-    <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to save photos</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>Sovran will show the users location on some transactions to help them keep track of the location they spent the funds at.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
@@ -81,7 +73,7 @@
     <false/>
     <key>UIDeviceFamily</key>
     <array>
-      <integer>1</integer>
+        <integer>1</integer>
     </array>
     <key>UIStatusBarStyle</key>
     <string>UIStatusBarStyleDefault</string>
