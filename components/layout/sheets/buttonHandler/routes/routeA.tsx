@@ -24,7 +24,7 @@ const RouteA = ({ payload }) => {
     if (result && typeof result.then === 'function') {
       result.finally(() => {
         setProcessingButtonIndex(null);
-        router?.close();
+        // router?.close();
       });
     } else {
       setProcessingButtonIndex(null);

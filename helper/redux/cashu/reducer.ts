@@ -140,7 +140,7 @@ export const cashuReducer = (state = initialState, action) => {
     case INCREMENT_COUNTER:
       return _.update(
         ['profiles', action.payload.profileId, 'counters', action.payload.mintUrl],
-        (count = 0) => count + action.payload.amount,
+        (count = 1) => count + action.payload.amount,
         state
       );
 
@@ -152,7 +152,7 @@ export const cashuReducer = (state = initialState, action) => {
       const { profileId, mintUrl, keysetId, amount } = action.payload;
       return _.update(
         ['profiles', profileId, 'counters', mintUrl, keysetId],
-        (count = 0) => count + amount,
+        (count = 1) => count + amount,
         state
       );
     }

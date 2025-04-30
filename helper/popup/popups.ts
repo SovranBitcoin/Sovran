@@ -236,12 +236,27 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 
   'Token already spent.': {
     title: 'Token Already Spent',
-    text: '',
+    text: 'This token has already been spent. Each token can only be redeemed once',
     type: MESSAGE_TYPES.WARNING,
   },
   'Insufficient funds': {
     title: 'Insufficient Funds',
     text: 'You do not have enough funds to complete this transaction.',
+    type: MESSAGE_TYPES.ERROR,
+  },
+  'Witness is missing for p2pk signature': {
+    title: 'Witness is missing for p2pk signature',
+    text: "This happens when you try to spend ecash locked to someone else's pubkey",
+    type: MESSAGE_TYPES.ERROR,
+  },
+  'mint quote already issued': {
+    title: 'Invoice already paid',
+    text: 'This invoice has already been paid.',
+    type: MESSAGE_TYPES.ERROR,
+  },
+  no_funds: {
+    title: 'No New ecash',
+    text: "You don't have any new ecash to redeem.",
     type: MESSAGE_TYPES.ERROR,
   },
 };

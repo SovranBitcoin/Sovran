@@ -214,18 +214,14 @@ export async function getMeltQuote({
   mintUrl: string;
   mppAmount?: number;
 }): Promise<MeltQuoteResponse> {
-  try {
-    const wallet = await getWallet({ unit, mintUrl });
-    const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
+  const wallet = await getWallet({ unit, mintUrl });
+  const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
 
-    return await wallet.mint.createMeltQuote({
-      request: pr,
-      unit,
-      ...options,
-    });
-  } catch (error) {
-    throw new AppError('melt_quote_error', JSON.stringify(error));
-  }
+  return await wallet.mint.createMeltQuote({
+    request: pr,
+    unit,
+    ...options,
+  });
 }
 
 export async function sendMultiPathPayment({ pr }) {

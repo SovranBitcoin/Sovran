@@ -10,7 +10,7 @@ import Container from 'components/layout/Container';
 const TabTwoScreen = () => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
-
+  return null;
   return (
     <View
       style={{

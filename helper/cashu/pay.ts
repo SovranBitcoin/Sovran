@@ -471,8 +471,8 @@ export async function receiveEcash({
 
   const response = await wallet.receive(token, {
     counter,
-    keysetId: wallet.keysetId,
-    proofsWeHave,
+    // keysetId: wallet.keysetId,
+    // proofsWeHave,
     ...(giveaway ? { privkey: giveaway.private_key } : {}),
   });
   console.log('[receiveEcash] response', response);
@@ -578,30 +578,26 @@ export async function cancelEcashTransaction(
   transaction: Transaction,
   navigation: any
 ): Promise<void> {
-  try {
-    console.log('[cancelEcashTransaction]', transaction);
-    await receiveEcash({
-      token: transaction.token as string,
-      unit: transaction.unit,
-      refund: true,
-    });
+  console.log('[cancelEcashTransaction]', transaction);
+  await receiveEcash({
+    token: transaction.token as string,
+    unit: transaction.unit,
+    refund: true,
+  });
 
-    const profileId = store.getState().nostr?.currentProfile?.id;
-    store.dispatch(
-      updateTransaction({
-        profileId,
-        matcher: (t: Transaction) => t.token === transaction.token,
-        updateFn: (t: Transaction) => ({
-          ...t,
-          paid: true,
-          isCancel: true,
-        }),
-      })
-    );
+  const profileId = store.getState().nostr?.currentProfile?.id;
+  store.dispatch(
+    updateTransaction({
+      profileId,
+      matcher: (t: Transaction) => t.token === transaction.token,
+      updateFn: (t: Transaction) => ({
+        ...t,
+        paid: true,
+        isCancel: true,
+      }),
+    })
+  );
 
-    SheetManager.hide('button-handler');
-    navigation.navigate('', {}, { closeParents: true });
-  } catch (error) {
-    showMessage(error.message, {}, { emoji: '🚨' });
-  }
+  SheetManager.hide('button-handler');
+  navigation.navigate('', {}, { closeParents: true });
 }

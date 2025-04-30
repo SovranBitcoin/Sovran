@@ -16,6 +16,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchBar } from './payments';
+import { showMessage } from 'helper/popup/popups';
 
 const Stack = createNativeStackNavigator();
 
@@ -176,7 +177,7 @@ const TabLayout = () => {
   );
 
   const HeaderRight = () => (
-    <Pressable onPress={() => navigation.navigate('cards')}>
+    <Pressable onPress={() => showMessage('not_implemented')}>
       <View style={styles.headerRightContainer}>
         <Icon name="solar:card-bold" color={greys(theme)[0]} />
         {/* <ProfileAvatar picture={currentProfile?.picture} /> */}

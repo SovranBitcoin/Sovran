@@ -26,6 +26,7 @@ async function getProfile(currentProfile) {
   const balance = await sdk.getBalance();
 
   if (balance <= 0) {
+    showMessage('no_funds');
     return;
   }
 

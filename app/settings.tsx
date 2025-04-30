@@ -16,6 +16,11 @@ import { truncateMiddle } from 'helper/strings';
 import { Linking } from 'react-native';
 import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
+import * as Application from 'expo-application';
+
+const name = Application.applicationName;
+const version = Application.nativeApplicationVersion;
+const buildNumber = Application.nativeBuildVersion;
 
 export const Section: React.FC<{
   title: string;
@@ -297,7 +302,24 @@ const ModalScreen: React.FC<{}> = () => {
         onPress={() => {
           navigation.navigate('settings/design');
         }}>
-        <Text style={styles.contentFooter}>App Version x</Text>
+        <Text
+          style={[
+            styles.contentFooter,
+            {
+              fontFamily: 'OverpassBold',
+            },
+          ]}>
+          {name}
+        </Text>
+        <Text
+          style={[
+            styles.contentFooter,
+            {
+              marginTop: 4,
+            },
+          ]}>
+          App Version {version} ({buildNumber})
+        </Text>
       </TouchableOpacity>
     </Container>
   );

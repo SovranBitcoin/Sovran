@@ -138,23 +138,27 @@ const Camera: React.FC = () => {
   }, [navigation]);
 
   const handleBarcodeScanned = useCallback(
-    (scanning: ScanningData): void => {
-      if (!navigation.isFocused()) {
-        return;
-      }
+    async (scanning: ScanningData): Promise<void> => {
+      try {
+        if (!navigation.isFocused()) {
+          return;
+        }
 
-      if (!scanned || scanning.data.startsWith('ur:')) {
-        setLoading(true);
-        barcodeHandler({
-          scanning,
-          navigation,
-          urDecoder,
-          unit,
-          selectedMint,
-          setProgress,
-          setLoading,
-          setScanned,
-        });
+        if (!scanned || scanning.data.startsWith('ur:')) {
+          setLoading(true);
+          await barcodeHandler({
+            scanning,
+            navigation,
+            urDecoder,
+            unit,
+            selectedMint,
+            setProgress,
+            setLoading,
+            setScanned,
+          });
+        }
+      } catch (error) {
+        showMessage(error.message);
       }
     },
     [navigation, scanned, urDecoder, unit, selectedMint]

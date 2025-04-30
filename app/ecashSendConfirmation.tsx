@@ -42,6 +42,7 @@ import {
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { npubToPubkey } from 'components/layout/Transaction';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -97,12 +98,18 @@ function ModalScreen() {
   };
 
   const handleCancelSend = async () => {
-    const profileId = store.getState().nostr?.currentProfile?.id;
-    const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+    try {
+      const profileId = store.getState().nostr?.currentProfile?.id;
+      const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
-    const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
+      const transaction = transactions.find(
+        (t) => t.token === token && t.transactionType === 'send'
+      );
 
-    await cancelEcashTransaction(transaction, navigation);
+      await cancelEcashTransaction(transaction, navigation);
+    } catch (error) {
+      showMessage(error.message);
+    }
   };
 
   const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
@@ -164,6 +171,7 @@ function ModalScreen() {
     try {
       setIsCheckingStatus(true);
       const proofsSpent = await checkProofsSpent(token);
+      console.log(18279387, proofsSpent);
 
       if (proofsSpent) {
         const decodedToken = getDecodedToken(token);
@@ -182,6 +190,7 @@ function ModalScreen() {
         showMessage('ecash_transaction_pending', {}, { emoji: '❌' });
       }
     } catch (error) {
+      console.log(18279387, error);
       showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' });
     } finally {
       setIsCheckingStatus(false);
@@ -194,6 +203,7 @@ function ModalScreen() {
       children={
         <>
           <BalanceUpdate
+            pubkey={npubToPubkey(getCurrentTransaction[0]?.nostr?.pubkey)}
             transactionType="send"
             topAmount={formatCurrency(
               {

@@ -14,6 +14,7 @@ import CachedImage from 'components/common/Image';
 import { truncateMiddle } from 'helper/strings';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { useTypedNavigation } from 'helper/navigation';
+import { nip19 } from 'nostr-tools';
 
 interface TransactionStatus {
   block_time: number;
@@ -74,13 +75,25 @@ interface TransactionProps {
   account?: AccountData;
 }
 
+export function npubToPubkey(npub: string): string {
+  if (!npub) return '';
+
+  if (npub.startsWith('npub')) {
+    const data = nip19.decode(npub);
+    if (data.type === 'npub') {
+      return data.data;
+    }
+  }
+  return npub;
+}
+
 /**
  * Transaction component displays transaction details with appropriate formatting
  */
 export function Transaction({ tx, transactions, account }: TransactionProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
-  const { currentProfile, profiles, search } = useNostr();
+  const { profiles, search } = useNostr();
   const { esims } = useEsims();
   const { settings } = useSettings();
   const { activeConnections } = useTransactions();
@@ -109,10 +122,12 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
 
   // Get profile picture from nostr data
   const profilePicture =
-    search?.find((s: ProfileData) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.picture ||
-    profiles?.find((p: ProfileData) => p?.pubkey === tx?.nostr?.pubkey)?.picture ||
-    search?.find((s: ProfileData) => s?.pubkey === tx?.nostr?.pubkey)?.profile?.image ||
-    profiles?.find((p: ProfileData) => p?.pubkey === tx?.nostr?.pubkey)?.image;
+    search?.find((s: ProfileData) => s?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.profile
+      ?.picture ||
+    profiles?.find((p: ProfileData) => p?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.picture ||
+    search?.find((s: ProfileData) => s?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.profile
+      ?.image ||
+    profiles?.find((p: ProfileData) => p?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.image;
 
   /**
    * Handle navigation when transaction is pressed
