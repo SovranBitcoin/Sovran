@@ -43,6 +43,7 @@ import { useTransactions } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { npubToPubkey } from 'components/layout/Transaction';
+import { encode } from 'helper/third-party/emoji';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -197,6 +198,12 @@ function ModalScreen() {
     }
   };
 
+  const handleCopyEmoji = async () => {
+    const emoji = encode('🥜', token);
+    await Clipboard.setStringAsync(emoji);
+    showSuccess('ecash_token_copied', {});
+  };
+
   return (
     <Modal
       showClose
@@ -290,6 +297,12 @@ function ModalScreen() {
                 icon: 'mdi:cancel',
                 variant: 'secondary',
                 onPress: handleCancelSend,
+              },
+              {
+                text: 'Copy as Emoji',
+                icon: 'fluent:emoji-24-filled',
+                variant: 'primary',
+                onPress: handleCopyEmoji,
               },
             ]}
           />

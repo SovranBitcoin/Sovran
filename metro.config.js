@@ -8,6 +8,7 @@ const config = getDefaultConfig(__dirname);
 // I guess I hate working within a specific icon library...
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'fluent:emoji-24-filled',
     'mdi:lightbulb-on-outline',
     'mdi:lightbulb-on',
     'majesticons:lightbulb-shine',
