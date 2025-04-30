@@ -86,16 +86,17 @@ function ModalScreen() {
     await write(token);
   };
 
-  const handleCopy = async () => {
-    showSuccess('ecash_token_copied', {});
+  const handleCopy = async (onClose) => {
     await Clipboard.setStringAsync(token);
+    showSuccess('ecash_token_copied', {}, {}, onClose);
   };
 
-  const handleShare = async () => {
+  const handleShare = async (onClose) => {
     await Share.share({
       url: uri,
       message: token,
     });
+    onClose();
   };
 
   const handleCancelSend = async () => {
@@ -109,7 +110,7 @@ function ModalScreen() {
 
       await cancelEcashTransaction(transaction, navigation);
     } catch (error) {
-      showMessage(error.message);
+      showMessage(error.message, {}, {}, onClose);
     }
   };
 
@@ -166,7 +167,7 @@ function ModalScreen() {
     }
   };
 
-  const handleCheckStatus = async () => {
+  const handleCheckStatus = async (onClose) => {
     if (isCheckingStatus) return;
 
     try {
@@ -186,23 +187,25 @@ function ModalScreen() {
               closeParents: true,
             }
           );
+          onClose();
         });
       } else {
-        showMessage('ecash_transaction_pending', {}, { emoji: '❌' });
+        showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
     } catch (error) {
       console.log(18279387, error);
-      showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' });
+      showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' }, onClose);
     } finally {
       setIsCheckingStatus(false);
     }
   };
 
-  const handleCopyEmoji = async () => {
+  const handleCopyEmoji = async (onClose) => {
     SheetManager.show('emoji-picker', {
       payload: {
         token,
       },
+      onClose,
     });
   };
 

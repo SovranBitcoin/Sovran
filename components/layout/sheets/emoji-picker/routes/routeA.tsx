@@ -12,7 +12,7 @@ import { showSuccess } from 'helper/popup/popups';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/common/Card';
 
-const EmojiGrid = ({ payload }) => {
+const EmojiGrid = ({ router, payload }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -35,7 +35,9 @@ const EmojiGrid = ({ payload }) => {
     // Return the selected emoji when closing the sheet
     const encodedEmoji = encode(emoji, payload.token);
     Clipboard.setStringAsync(encodedEmoji);
-    showSuccess('ecash_token_copied', {});
+    showSuccess('ecash_token_copied', {}, {}, () => {
+      router?.goBack();
+    });
   };
 
   return (

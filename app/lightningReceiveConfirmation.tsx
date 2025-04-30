@@ -52,18 +52,19 @@ function ModalScreen() {
     }
   }, [getCurrentTransaction[0]?.paid, navigation]);
 
-  const handleCopy = async () => {
-    showSuccess('lightning_address_copied', {});
+  const handleCopy = async (onClose) => {
     await Clipboard.setStringAsync(request);
+    showSuccess('lightning_address_copied', {}, {}, onClose);
   };
 
-  const handleShare = async () => {
+  const handleShare = async (onClose) => {
     if (uri) {
       await Share.share({
         url: uri,
         message: request,
       });
     }
+    onClose();
   };
 
   // Format currency display options
@@ -107,7 +108,7 @@ function ModalScreen() {
         getCurrentTransaction[0].transactionType
   );
 
-  const handleCheckStatus = async () => {
+  const handleCheckStatus = async (onClose) => {
     const currentTx = getCurrentTransaction[0];
     const wallet = await getWallet({
       unit: currentTx.unit,
@@ -132,10 +133,11 @@ function ModalScreen() {
       showMessage(
         'funds_received',
         { amount: currentTx.amount, unit: currentTx.unit },
-        { emoji: '🎉' }
+        { emoji: '🎉' },
+        onClose
       );
     } else {
-      showMessage('lightning_transaction_pending', {}, { emoji: '❌' });
+      showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
     }
   };
 

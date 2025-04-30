@@ -8,17 +8,18 @@ import { greys, shades } from 'helper/colors';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 
-const RouteA = ({ payload }) => {
+const RouteA = ({ router, payload }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const router = useSheetRouter();
   const [processingButtonIndex, setProcessingButtonIndex] = useState(null);
 
   const handleButtonPress = (onPress, index) => {
     setProcessingButtonIndex(index);
 
     // Call the original onPress function
-    const result = onPress();
+    const result = onPress(() => {
+      router?.goBack();
+    });
 
     // If it's a promise, reset the processing state when it resolves or rejects
     if (result && typeof result.then === 'function') {
