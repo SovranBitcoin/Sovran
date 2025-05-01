@@ -14,6 +14,7 @@ import { checkIfAlreadyRedeemed } from 'helper/payment-handler/handlers';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { useTypedNavigation } from 'helper/navigation';
+import { decode, isEncoded } from 'helper/third-party/emoji';
 
 export const pool = new SimplePool();
 
@@ -79,17 +80,24 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
 
     const text = await Clipboard.getStringAsync();
 
-    if (!text) {
+    let decodedText;
+    if (isEncoded(text)) {
+      decodedText = decode(text);
+    } else {
+      decodedText = text;
+    }
+
+    if (!decodedText) {
       showMessage('no_clipboard_address', {}, { emoji: '🚨' });
       return;
     }
 
-    if (!isValidEcashToken(text)) {
-      showMessage('invalid_address', { address: text }, { emoji: '🚨' });
+    if (!isValidEcashToken(decodedText)) {
+      showMessage('invalid_address', { address: decodedText }, { emoji: '🚨' });
       return;
     }
 
-    handleEcashToken({ token: text });
+    handleEcashToken({ token: decodedText });
   };
 
   /**

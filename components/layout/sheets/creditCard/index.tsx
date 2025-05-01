@@ -31,4 +31,5 @@ function CreditCardSheet(props: any) {
 }
 
 // Register the sheet with its unique name
-registerSheet(sheetName, CreditCardSheet);
+export default ({ context }: { context: 'global' | 'modal' }) =>
+  registerSheet(sheetName, CreditCardSheet, context);

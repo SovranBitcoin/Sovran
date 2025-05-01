@@ -35,10 +35,12 @@ import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { getFollowedUsers } from './ProfilePage';
 import ndk from 'components/ndk';
-import 'components/layout/sheets/registerSheets';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
 import { WalletsProvider } from 'components/providers/WalletsProviders';
+import { registerAllSheets } from 'components/layout/sheets/registerSheets';
+
+registerAllSheets({ context: 'global' });
 
 // Configure constants
 const RELAY_URLS = [

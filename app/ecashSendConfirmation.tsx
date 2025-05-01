@@ -202,6 +202,7 @@ function ModalScreen() {
 
   const handleCopyEmoji = async (onClose) => {
     SheetManager.show('emoji-picker', {
+      context: 'modal',
       payload: {
         token,
       },

@@ -62,3 +62,38 @@ export function decode(text: string): string {
   let decodedArray = new Uint8Array(decoded);
   return new TextDecoder().decode(decodedArray);
 }
+
+export function isEncoded(text: string): boolean {
+  if (!text || text.length <= 1) {
+    return false;
+  }
+
+  // Constants from the original code
+  const VARIATION_SELECTOR_START = 0xfe00;
+  const VARIATION_SELECTOR_END = 0xfe0f;
+  const VARIATION_SELECTOR_SUPPLEMENT_START = 0xe0100;
+  const VARIATION_SELECTOR_SUPPLEMENT_END = 0xe01ef;
+
+  // Look at each character after the first one (which would be the emoji)
+  const chars = Array.from(text);
+
+  // If there's at least one valid variation selector, consider it encoded
+  let hasVariationSelector = false;
+
+  // Skip the first character (potential emoji) and check the rest
+  for (let i = 1; i < chars.length; i++) {
+    const codePoint = chars[i].codePointAt(0)!;
+
+    // Check if the character is a variation selector
+    if (
+      (codePoint >= VARIATION_SELECTOR_START && codePoint <= VARIATION_SELECTOR_END) ||
+      (codePoint >= VARIATION_SELECTOR_SUPPLEMENT_START &&
+        codePoint <= VARIATION_SELECTOR_SUPPLEMENT_END)
+    ) {
+      hasVariationSelector = true;
+      break;
+    }
+  }
+
+  return hasVariationSelector;
+}

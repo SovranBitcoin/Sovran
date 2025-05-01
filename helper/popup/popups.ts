@@ -295,6 +295,7 @@ export const showMessage = (
   };
 
   SheetManager.show('popup-sheet', {
+    context: 'modal',
     payload,
     onClose,
   });

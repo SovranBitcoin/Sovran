@@ -21,6 +21,10 @@ import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { SheetProvider } from 'react-native-actions-sheet';
 
+import { registerAllSheets } from 'components/layout/sheets/registerSheets';
+
+registerAllSheets({ context: 'modal' });
+
 const headerHeight = Constants.statusBarHeight ?? 0;
 
 interface ModalProps {
@@ -149,7 +153,7 @@ export default function Modal({
     React.isValidElement(children) ? children : <View>{children}</View>;
 
   return (
-    <SheetProvider context="global">
+    <SheetProvider context="modal">
       <View
         style={[
           {

@@ -164,6 +164,7 @@ function ModalScreen() {
       switch (params.to) {
         case 'lightningReceiveConfirmation':
           SheetManager.show('transaction-message', {
+            context: 'modal',
             onClose: async (data) => {
               if (data?.action === 'confirm') {
                 await handleLightningReceive({ memo: data.message });
@@ -182,6 +183,7 @@ function ModalScreen() {
           }
           console.log('[handleNext] balance passed', balance, amount, unit);
           SheetManager.show('transaction-message', {
+            context: 'modal',
             onClose: async (data) => {
               if (data?.action === 'confirm') {
                 await handleEcashSend({ message: data.message });

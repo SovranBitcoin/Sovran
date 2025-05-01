@@ -19,4 +19,5 @@ function SheetWithRouter(props: any) {
   );
 }
 
-registerSheet(sheetName, SheetWithRouter);
+export default ({ context }: { context: 'global' | 'modal' }) =>
+  registerSheet(sheetName, SheetWithRouter, context);
