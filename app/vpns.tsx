@@ -12,8 +12,9 @@ import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function ModalScreen() {
+function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -362,3 +363,5 @@ const createStyles = (theme) =>
       width: '80%',
     },
   });
+
+export default withSheetProvider(ModalScreen);

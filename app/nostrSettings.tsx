@@ -13,8 +13,9 @@ import { getPublicKey, nip19 } from 'nostr-tools';
 import CachedImage from 'components/common/Image';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function ModalScreen() {
+function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -218,3 +219,5 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[0],
     },
   });
+
+export default withSheetProvider(ModalScreen);

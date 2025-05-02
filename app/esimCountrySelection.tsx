@@ -10,6 +10,7 @@ import { FlagIcon } from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -88,8 +89,6 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
-
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
@@ -113,3 +112,5 @@ const createStyles = (theme) =>
       marginLeft: 8,
     },
   });
+
+export default withSheetProvider(ModalScreen);

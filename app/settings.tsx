@@ -17,6 +17,7 @@ import { Linking } from 'react-native';
 import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -489,4 +490,4 @@ const App: React.FC<{}> = () => (
   </ActionSheetProvider>
 );
 
-export default App;
+export default withSheetProvider(App);

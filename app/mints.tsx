@@ -4,8 +4,9 @@ import DonutChartContainer from 'components/layout/Donut';
 import { useSelector } from 'react-redux';
 import { memoizedGetAllBalances } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function TabOneScreen() {
+function TabOneScreen() {
   const balances = useSelector(memoizedGetAllBalances);
 
   const chartData = balances.map((balance) => {
@@ -40,3 +41,5 @@ export default function TabOneScreen() {
     </View>
   );
 }
+
+export default withSheetProvider(TabOneScreen);

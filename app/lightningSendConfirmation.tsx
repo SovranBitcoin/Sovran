@@ -19,6 +19,7 @@ import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const navigation = useTypedNavigation();
@@ -281,4 +282,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

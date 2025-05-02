@@ -14,6 +14,7 @@ import { useTypedRoute } from 'helper/navigation/index';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -132,4 +133,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

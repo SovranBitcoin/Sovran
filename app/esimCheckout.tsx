@@ -19,6 +19,7 @@ import { Card } from 'components/common/Card';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -214,4 +215,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

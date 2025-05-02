@@ -8,6 +8,7 @@ import { useTypedRoute } from 'helper/navigation';
 import { Post } from './ProfilePage/post';
 import React, { useMemo } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ParentPosts({ parentPosts }) {
   return (
@@ -41,7 +42,7 @@ function Replies({ post }) {
   );
 }
 
-export default function ModalScreen() {
+function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
 
   const { event, parentPosts } = useTypedRoute<'post'>();
@@ -59,3 +60,5 @@ export default function ModalScreen() {
     </Modal>
   );
 }
+
+export default withSheetProvider(ModalScreen);

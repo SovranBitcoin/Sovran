@@ -16,6 +16,7 @@ import { truncateMiddle } from 'helper/strings';
 import React from 'react';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {
@@ -300,7 +301,7 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);
 
 const createStyles = (theme) =>
   StyleSheet.create({

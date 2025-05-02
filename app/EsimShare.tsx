@@ -6,6 +6,7 @@ import { useTypedRoute } from 'helper/navigation';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/Themed';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const { esimCode, esimLink, location } = useTypedRoute<'esimShare'>();
@@ -49,4 +50,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

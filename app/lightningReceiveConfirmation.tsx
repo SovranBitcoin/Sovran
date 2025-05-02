@@ -17,6 +17,7 @@ import { useTransactions } from 'components/providers/TransactionsProvider';
 import { getMint, getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const navigation = useNavigation();
@@ -220,4 +221,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

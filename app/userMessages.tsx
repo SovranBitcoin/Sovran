@@ -1,6 +1,9 @@
 import React from 'react';
 import Message from './MessagePage';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function ModalScreen() {
+function ModalScreen() {
   return <Message />;
 }
+
+export default withSheetProvider(ModalScreen);

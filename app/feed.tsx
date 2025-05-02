@@ -10,6 +10,7 @@ import { EventKind } from './Profile';
 import { useNostr } from 'helper/redux/nostr';
 import { View } from 'components/common/Themed';
 import { Tabs } from 'components/common/Tabs';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });
@@ -131,4 +132,4 @@ const createStyles = (theme) =>
     },
   });
 
-export default TabTwoScreen;
+export default withSheetProvider(TabTwoScreen);

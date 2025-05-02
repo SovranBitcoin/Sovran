@@ -28,6 +28,7 @@ import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 export function BalanceUpdate({
   topAmount,
@@ -850,7 +851,7 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);
 
 const createStyles = (theme) =>
   StyleSheet.create({

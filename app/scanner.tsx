@@ -1,6 +1,6 @@
 import React from 'react';
 import Camera from './camera';
-
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { View } from 'components/common/Themed';
 
 function ModalScreen() {
@@ -16,4 +16,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

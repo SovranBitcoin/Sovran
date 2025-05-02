@@ -9,6 +9,7 @@ import { store } from 'helper/redux/store';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 const BITREFILL_URL = 'https://embed.bitrefill.com/buy';
 const BITREFILL_NOSTR_PUBKEY = 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264';
@@ -103,7 +104,7 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
   );
 }
 
-export default function ModalScreen() {
+function ModalScreen() {
   return <BitrefillWidget />;
 }
 
@@ -115,3 +116,5 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
 });
+
+export default withSheetProvider(ModalScreen);

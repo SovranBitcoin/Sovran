@@ -18,6 +18,7 @@ import { memoizedGetMints } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 // Types
 interface TokenProps {
@@ -275,4 +276,4 @@ const createStyles = (theme: any) =>
     },
   });
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

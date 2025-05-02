@@ -15,8 +15,9 @@ import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
 // Import the base TextInput from React Native instead
 import { TextInput as RNTextInput } from 'react-native';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function ModalScreen() {
+function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const inputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -498,3 +499,5 @@ function ProfileImage({ profile, loading }) {
     </Skeleton>
   );
 }
+
+export default withSheetProvider(ModalScreen);

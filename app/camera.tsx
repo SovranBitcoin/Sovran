@@ -4,6 +4,7 @@ import { View } from 'components/common/Themed';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function CameraScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -20,4 +21,4 @@ function CameraScreen() {
   );
 }
 
-export default CameraScreen;
+export default withSheetProvider(CameraScreen);

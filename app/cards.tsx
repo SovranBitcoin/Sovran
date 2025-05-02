@@ -6,6 +6,7 @@ import Modal from 'components/layout/Modal';
 import Swiper from 'react-native-web-infinite-swiper';
 import { Text } from 'components/common/Themed';
 import Container from 'components/layout/Container';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 const TabTwoScreen = () => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
@@ -141,4 +142,4 @@ const createStyles = (theme: any) =>
     },
   });
 
-export default TabTwoScreen;
+export default withSheetProvider(TabTwoScreen);

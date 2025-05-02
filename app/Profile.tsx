@@ -14,6 +14,7 @@ import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 import ActionSheet, {
   Route,
@@ -1207,4 +1208,4 @@ const createStyles = (theme: any) =>
     },
   });
 
-export default Screen;
+export default withSheetProvider(Screen);

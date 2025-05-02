@@ -9,6 +9,7 @@ import { FlashList } from '@shopify/flash-list';
 import Image from 'components/common/Image';
 import PagerView from 'react-native-pager-view';
 import { Tabs } from 'components/common/Tabs';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
   const filters = useMemo(
@@ -482,4 +483,4 @@ const createStyles = (theme: any) =>
     },
   });
 
-export default TabTwoScreen;
+export default withSheetProvider(TabTwoScreen);

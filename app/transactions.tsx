@@ -13,6 +13,7 @@ import Icon from 'assets/icons';
 
 import Modal from 'components/layout/Modal';
 import { Tabs } from 'components/common/Tabs';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -193,4 +194,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

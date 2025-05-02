@@ -14,8 +14,9 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-export default function ModalScreen() {
+function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useNavigation();
@@ -292,3 +293,5 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[2300],
     },
   });
+
+export default withSheetProvider(ModalScreen);

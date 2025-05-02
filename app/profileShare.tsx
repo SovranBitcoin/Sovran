@@ -2,6 +2,7 @@ import React from 'react';
 import Modal from 'components/layout/Modal';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { useTypedRoute } from 'helper/navigation';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const { npub } = useTypedRoute<'profileShare'>();
@@ -12,4 +13,4 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

@@ -10,6 +10,7 @@ import { useSelector } from 'react-redux';
 import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/common/SearchableList';
 import Container from 'components/layout/Container';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 // An array of available themes
 const themes = [
@@ -121,7 +122,7 @@ function ThemeSettings({}: ThemeSettingsProps) {
   );
 }
 
-export default ThemeSettings;
+export default withSheetProvider(ThemeSettings);
 
 const createStyles = (theme) =>
   StyleSheet.create({
