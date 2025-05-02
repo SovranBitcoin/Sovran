@@ -1,5 +1,5 @@
 import '../../shim';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -102,6 +104,107 @@ const RELAY_URLS = [
   'wss://nos.lol',
 ];
 
+// Separate ProfilePictureSelector component
+const ProfilePictureSelector = ({
+  selectedProfilePicture,
+  setSelectedProfilePicture,
+  isSubmitting,
+  styles,
+}) => (
+  <View style={styles.profileImageContainer}>
+    <View style={styles.selectedProfileContainer}>
+      {selectedProfilePicture && (
+        <Image source={{ uri: selectedProfilePicture.uri }} style={styles.selectedProfileImage} />
+      )}
+    </View>
+
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.profileOptionsScroll}
+      contentContainerStyle={styles.profileOptionsContent}>
+      {profilePictures.map((profile, index) => (
+        <TouchableOpacity
+          key={index}
+          onPress={() =>
+            handleProfilePictureSelect(profile, setSelectedProfilePicture, isSubmitting)
+          }
+          style={[
+            styles.profileOption,
+            selectedProfilePicture === profile && styles.selectedProfileOption,
+            isSubmitting && styles.disabledControl,
+          ]}
+          disabled={isSubmitting}>
+          <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </View>
+);
+
+// Helper function for profile picture selection
+const handleProfilePictureSelect = (profile, setSelectedProfilePicture, isSubmitting) => {
+  if (isSubmitting) return;
+  setSelectedProfilePicture(profile);
+};
+
+// Separate NameInput component
+const NameInput = ({ name, setName, isSubmitting, styles, theme }) => (
+  <View style={styles.inputContainer}>
+    <Text weight="medium" size={14} style={styles.inputLabel}>
+      Enter your name
+    </Text>
+    <TextInput
+      placeholder="Your public profile name"
+      onChangeText={(newText) => setName(newText)}
+      style={[styles.textInput, isSubmitting && styles.disabledControl]}
+      editable={!isSubmitting}
+      placeholderTextColor={greys(theme)[600]}
+      value={name}
+    />
+    <Text weight="regular" size={12} style={styles.privacyNote}>
+      Note that your profile will be public, so anyone can search for you and send funds. While your
+      profile is public, your transactions remain private.
+    </Text>
+  </View>
+);
+
+// Separate ButtonBar component
+const ButtonBar = ({ handleCreateProfile, handleExistingAccount, isSubmitting, styles, theme }) => (
+  <View style={styles.bottomButtons}>
+    <TouchableOpacity
+      style={[styles.createButton, isSubmitting && styles.disabledControl]}
+      onPress={handleCreateProfile}
+      disabled={isSubmitting}>
+      {isSubmitting ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={greys(theme)[0]} />
+          <Text weight="bold" size={16} style={[styles.createButtonText, { marginLeft: 8 }]}>
+            Creating...
+          </Text>
+        </View>
+      ) : (
+        <Text weight="bold" size={16} style={styles.createButtonText}>
+          Create Sovran Account
+        </Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[styles.existingButton, isSubmitting && styles.disabledControl]}
+      onPress={handleExistingAccount}
+      disabled={isSubmitting}>
+      <Text
+        size={16}
+        weight="bold"
+        style={[styles.existingButtonText, isSubmitting && styles.disabledButtonText]}>
+        I already have a Sovran account
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
+
+// Main RecoveryScreen component
 const RecoveryScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -109,19 +212,15 @@ const RecoveryScreen = () => {
   const { profiles, setProfiles, setCurrentProfile } = useNostr();
 
   // State
-  const [name, setName] = useState('');
   const [selectedProfilePicture, setSelectedProfilePicture] = useState(profilePictures[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mnemonic] = useState(generateMnemonic());
-
-  const handleProfilePictureSelect = (profile) => {
-    if (isSubmitting) return;
-    setSelectedProfilePicture(profile);
-  };
+  const [name, setName] = useState('');
 
   const { ndk } = useNDK();
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
+    console.log(name);
     try {
       if (!name.trim() || isSubmitting) return;
 
@@ -149,8 +248,7 @@ const RecoveryScreen = () => {
       const profile = user.profile || {};
       profile.image = selectedProfilePicture.uri;
       profile.name = name;
-      await user.publish();
-
+      const response = await user.publish();
       // Update local profile storage
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
       const newProfile = {
@@ -181,111 +279,49 @@ const RecoveryScreen = () => {
     });
   };
 
-  // Components
-  const ProfilePictureSelector = () => (
-    <View style={styles.profileImageContainer}>
-      <View style={styles.selectedProfileContainer}>
-        {selectedProfilePicture && (
-          <Image source={{ uri: selectedProfilePicture.uri }} style={styles.selectedProfileImage} />
-        )}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.profileOptionsScroll}
-        contentContainerStyle={styles.profileOptionsContent}>
-        {profilePictures.map((profile, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={() => handleProfilePictureSelect(profile)}
-            style={[
-              styles.profileOption,
-              selectedProfilePicture === profile && styles.selectedProfileOption,
-              isSubmitting && styles.disabledControl,
-            ]}
-            disabled={isSubmitting}>
-            <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
-
-  const NameInput = () => (
-    <View style={styles.inputContainer}>
-      <Text weight="medium" size={14} style={styles.inputLabel}>
-        Enter your name
-      </Text>
-      <TextInput
-        style={[styles.textInput, isSubmitting && styles.disabledControl]}
-        placeholder="Your public profile name"
-        placeholderTextColor={greys(theme)[600]}
-        value={name}
-        onChangeText={setName}
-        editable={!isSubmitting}
-      />
-      <Text weight="regular" size={12} style={styles.privacyNote}>
-        Note that your profile will be public, so anyone can search for you and send funds. While
-        your profile is public, your transactions remain private.
-      </Text>
-    </View>
-  );
-
-  const ButtonBar = () => (
-    <View style={styles.bottomButtons}>
-      <TouchableOpacity
-        style={[styles.createButton, isSubmitting && styles.disabledControl]}
-        onPress={handleCreateProfile}
-        disabled={isSubmitting}>
-        {isSubmitting ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={greys(theme)[0]} />
-            <Text weight="bold" size={16} style={[styles.createButtonText, { marginLeft: 8 }]}>
-              Creating...
-            </Text>
-          </View>
-        ) : (
-          <Text weight="bold" size={16} style={styles.createButtonText}>
-            Create Sovran Account
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.existingButton, isSubmitting && styles.disabledControl]}
-        onPress={handleExistingAccount}
-        disabled={isSubmitting}>
-        <Text
-          size={16}
-          weight="bold"
-          style={[styles.existingButtonText, isSubmitting && styles.disabledButtonText]}>
-          I already have a Sovran account
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <>
-      <Container>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled">
-          <View style={styles.container}>
-            <Text weight="bold" size={24} style={styles.headerTitle}>
-              Create Sovran Profile
-            </Text>
-            <Text weight="regular" size={14} style={styles.headerSubtitle}>
-              Your profile lets others find you and send you bitcoin easily.
-            </Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}>
+        <Container>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled">
+            <View style={styles.container}>
+              <Text weight="bold" size={24} style={styles.headerTitle}>
+                Create Sovran Profile
+              </Text>
+              <Text weight="regular" size={14} style={styles.headerSubtitle}>
+                Your profile lets others find you and send you bitcoin easily.
+              </Text>
 
-            <ProfilePictureSelector />
-            <NameInput />
-          </View>
-        </ScrollView>
-      </Container>
-      <ButtonBar />
+              <ProfilePictureSelector
+                selectedProfilePicture={selectedProfilePicture}
+                setSelectedProfilePicture={setSelectedProfilePicture}
+                isSubmitting={isSubmitting}
+                styles={styles}
+              />
+
+              <NameInput
+                name={name}
+                setName={setName}
+                isSubmitting={isSubmitting}
+                styles={styles}
+                theme={theme}
+              />
+            </View>
+          </ScrollView>
+        </Container>
+      </KeyboardAvoidingView>
+
+      <ButtonBar
+        handleCreateProfile={handleCreateProfile}
+        handleExistingAccount={handleExistingAccount}
+        isSubmitting={isSubmitting}
+        styles={styles}
+        theme={theme}
+      />
     </>
   );
 };

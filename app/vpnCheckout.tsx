@@ -69,7 +69,6 @@ function ModalScreen() {
           unit,
           meltQuote: JSON.stringify(meltQuote),
           pubkey: LNVPN_PUBKEY,
-          redirect: 'vpns',
         });
       }
     } catch (error) {

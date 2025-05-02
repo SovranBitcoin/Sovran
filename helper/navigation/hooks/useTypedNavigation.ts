@@ -19,7 +19,7 @@ export const useTypedNavigation = <T extends keyof NavigationParams>() => {
     }
   ) => {
     // https://github.com/ammarahm-ed/react-native-actions-sheet/issues/346
-    SheetManager.hide('button-handler');
+    SheetManager?.hide('button-handler');
     if (options?.closeParents) {
       // Close all parent screens
       let parentNavigation: AppNavigationProp = navigation;
@@ -38,14 +38,8 @@ export const useTypedNavigation = <T extends keyof NavigationParams>() => {
       }
     } else if (options?.closeCurrentAndParents) {
       // Close the current screen and all parent screens
-      if (navigation.canGoBack()) {
-        navigation.goBack(); // Close current screen
-        let parentNavigation = navigation.getParent<AppNavigationProp>();
-        while (parentNavigation && parentNavigation.canGoBack()) {
-          parentNavigation.goBack();
-          parentNavigation = parentNavigation.getParent<AppNavigationProp>();
-        }
-      }
+      navigation.popToTop();
+      navigation.goBack(null);
     }
 
     // Perform the navigation

@@ -16,7 +16,9 @@ const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route
   const handleDeleteProfile = async () => {
     try {
       await dispatch(resetApp());
-      router.close();
+      router?.close();
+      navigation?.goBack();
+      navigation?.goBack();
       navigation.navigate(
         'index',
         {},

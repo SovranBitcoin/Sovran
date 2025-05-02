@@ -439,11 +439,16 @@ const ChainLoadingAnimation = () => {
       });
     });
 
+    navigation?.goBack();
+    navigation?.goBack();
+    navigation?.goBack();
+    navigation?.goBack();
+    navigation?.goBack();
     navigation.navigate(
       '',
       {},
       {
-        closeParents: true,
+        closeCurrentAndParents: true,
       }
     );
   };

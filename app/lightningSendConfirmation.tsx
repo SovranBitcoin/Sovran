@@ -89,7 +89,7 @@ function ModalScreen() {
         navigation.navigate(
           redirect || (pubkey ? 'userMessages' : 'index'),
           { pubkey },
-          { closeParents: true }
+          { closeCurrentAndParents: true }
         );
       });
     } catch (e) {
@@ -102,7 +102,7 @@ function ModalScreen() {
   };
 
   const handleCancel = () => {
-    navigation.goBack();
+    navigation.navigate('index', {}, { closeCurrentAndParents: true });
   };
 
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
