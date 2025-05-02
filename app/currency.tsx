@@ -310,7 +310,7 @@ function ModalScreen() {
           />
           <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
           {params.to === 'ecashSendConfirmation' && params?.profile && (
-            <TouchableOpacity style={[sovran.listItem, { alignSelf: 'center' }]}>
+            <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
               <Icon
                 name="solar:key-bold"
                 size={16}

@@ -88,7 +88,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
 
   return (
     <TouchableOpacity
-      style={[sovran.listItem, { alignSelf: 'center' }]}
+      style={[sovran(theme).listItem, { alignSelf: 'center' }]}
       onPress={handlePress}
       onPressIn={() => {}}
       onPressOut={() => {}}>
@@ -141,16 +141,13 @@ const opacity = (color: string, alpha: number) => {
   );
 };
 
-// Current theme (would be dynamic in a real app)
-const currentTheme: Theme = 'dark';
-
 // Base styles that can be composed together
-const baseStyles = {
+const baseStyles = (theme: string) => ({
   // Base container styles
   container: {
     padding: 8,
-    backgroundColor: greys(currentTheme)[1800],
-    borderColor: greys(currentTheme)[1300],
+    backgroundColor: greys(theme)[1800],
+    borderColor: greys(theme)[1300],
     borderWidth: 0.2,
     borderRadius: 8,
   } as ViewStyle,
@@ -270,17 +267,17 @@ const baseStyles = {
   // Border variations
   borderSubtle: {
     borderWidth: 0.2,
-    borderColor: greys(currentTheme)[1300],
+    borderColor: greys(theme)[1300],
   } as ViewStyle,
 
   borderMedium: {
     borderWidth: 0.5,
-    borderColor: greys(currentTheme)[1400],
+    borderColor: greys(theme)[1400],
   } as ViewStyle,
 
   borderProminent: {
     borderWidth: 1,
-    borderColor: greys(currentTheme)[1500],
+    borderColor: greys(theme)[1500],
   } as ViewStyle,
 
   // Layout variations
@@ -297,56 +294,56 @@ const baseStyles = {
   overflowHidden: {
     overflow: 'hidden',
   } as ViewStyle,
-};
+});
 
 // Pre-composed style combinations
-const sovran = {
+const sovran = (theme: string) => ({
   // Base styles
-  ...baseStyles,
+  ...baseStyles(theme),
 
   // Composed styles for common use cases
   card: {
-    ...baseStyles.container,
-    ...baseStyles.roundedMedium,
-    ...baseStyles.borderSubtle,
-    ...baseStyles.spacingRegular,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).roundedMedium,
+    ...baseStyles(theme).borderSubtle,
+    ...baseStyles(theme).spacingRegular,
   } as ViewStyle,
 
   pill: {
-    ...baseStyles.container,
-    ...baseStyles.roundedPillFull,
-    ...baseStyles.borderMedium,
-    ...baseStyles.spacingTight,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).roundedPillFull,
+    ...baseStyles(theme).borderMedium,
+    ...baseStyles(theme).spacingTight,
   } as ViewStyle,
 
   semiPill: {
-    ...baseStyles.container,
-    ...baseStyles.roundedPill,
-    ...baseStyles.borderMedium,
-    ...baseStyles.spacingTight,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).roundedPill,
+    ...baseStyles(theme).borderMedium,
+    ...baseStyles(theme).spacingTight,
   } as ViewStyle,
 
   listItem: {
-    ...baseStyles.container,
-    ...baseStyles.row,
-    ...baseStyles.roundedMedium,
-    ...baseStyles.borderSubtle,
-    ...baseStyles.marginVerticalTight,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).row,
+    ...baseStyles(theme).roundedMedium,
+    ...baseStyles(theme).borderSubtle,
+    ...baseStyles(theme).marginVerticalTight,
   } as ViewStyle,
 
   section: {
-    ...baseStyles.container,
-    ...baseStyles.column,
-    ...baseStyles.roundedSmall,
-    ...baseStyles.borderSubtle,
-    ...baseStyles.spacingRegular,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).column,
+    ...baseStyles(theme).roundedSmall,
+    ...baseStyles(theme).borderSubtle,
+    ...baseStyles(theme).spacingRegular,
   } as ViewStyle,
 
   input: {
-    ...baseStyles.container,
-    ...baseStyles.roundedSmall,
-    ...baseStyles.borderMedium,
-    ...baseStyles.spacingTight,
+    ...baseStyles(theme).container,
+    ...baseStyles(theme).roundedSmall,
+    ...baseStyles(theme).borderMedium,
+    ...baseStyles(theme).spacingTight,
     padding: 12,
   } as ViewStyle,
 
@@ -364,27 +361,21 @@ const sovran = {
   } as ViewStyle,
 
   selectionControlInactive: {
-    backgroundColor: greys(currentTheme)[1400],
-    borderColor: greys(currentTheme)[1000],
+    backgroundColor: greys(theme)[1400],
+    borderColor: greys(theme)[1000],
   } as ViewStyle,
 
   // Background variations
   backgroundSubtle: {
-    backgroundColor: opacity(greys(currentTheme)[1800], 0.75),
+    backgroundColor: opacity(greys(theme)[1800], 0.75),
   } as ViewStyle,
 
   backgroundSolid: {
-    backgroundColor: greys(currentTheme)[1800],
+    backgroundColor: greys(theme)[1800],
   } as ViewStyle,
-};
+});
 
-// Function to update theme
-const updateTheme = (isDark: boolean) => {
-  currentTheme.isDark = isDark;
-  // In a real implementation, you'd recompute all the styles here
-};
-
-export { sovran, updateTheme };
+export { sovran };
 
 registerSheet('mint', MintSheet);
 

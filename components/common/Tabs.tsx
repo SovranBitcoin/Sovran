@@ -42,7 +42,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
       }}>
       <View
         style={[
-          sovran.listItem,
+          sovran(theme).listItem,
           {
             flexDirection: 'row',
             width: '100%',

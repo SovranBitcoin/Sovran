@@ -156,7 +156,7 @@ const MintItem: React.FC<MintItemProps> = ({
       <TouchableOpacity
         key={mint.id}
         style={[
-          sovran.listItem,
+          sovran(theme).listItem,
           globalLoading && styles.disabledMintItem,
           {
             backgroundColor: greys(theme)[2100],
@@ -323,7 +323,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
                 }
                 style={[
                   styles.currencyButton,
-                  sovran.borderSubtle,
+                  sovran(theme).borderSubtle,
 
                   {
                     marginRight: 8,

@@ -600,7 +600,7 @@ export function MintAddMore({ onClose, payload }) {
                 key={option}
                 style={[
                   styles.currencyButton,
-                  sovran.borderSubtle,
+                  sovran(theme).borderSubtle,
                   ((option === 'BTC' && selectedCurrency === 'SAT') ||
                     (option === 'All' && selectedCurrency === 'All') ||
                     (option !== 'BTC' && option !== 'All' && selectedCurrency === option)) &&

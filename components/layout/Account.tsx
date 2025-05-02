@@ -156,7 +156,12 @@ export function Account({ accounts, account, goToIndex }: AccountProps): React.R
       <View style={styles.transparentBackground}>
         <View style={styles.transparentBackgroundWithPadding} />
         <View style={styles.transparentBackgroundRow}>
-          <View style={[styles.accountUnitContainer, sovran.backgroundSolid, sovran.borderSubtle]}>
+          <View
+            style={[
+              styles.accountUnitContainer,
+              sovran(theme).backgroundSolid,
+              sovran(theme).borderSubtle,
+            ]}>
             <Text style={styles.accountUnitText} weight="bold">
               {account.unit === 'sat' ? 'BTC' : account.unit.toUpperCase()}
             </Text>
