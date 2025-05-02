@@ -44,6 +44,7 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { npubToPubkey } from 'components/layout/Transaction';
 import { encode } from 'helper/third-party/emoji';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -202,7 +203,6 @@ function ModalScreen() {
 
   const handleCopyEmoji = async (onClose) => {
     SheetManager.show('emoji-picker', {
-      context: 'modal',
       payload: {
         token,
       },
@@ -318,8 +318,6 @@ function ModalScreen() {
   );
 }
 
-export default ModalScreen;
-
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
@@ -331,3 +329,5 @@ const createStyles = (theme) =>
       color: greys(theme)[1000],
     },
   });
+
+export default withSheetProvider(ModalScreen);

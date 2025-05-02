@@ -67,7 +67,6 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
             icon={<Icon name={'tabler:dots'} />}
             onPress={() => {
               SheetManager.show('button-handler', {
-                context: 'modal',
                 payload: { buttons },
               });
             }}

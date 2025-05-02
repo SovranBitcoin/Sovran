@@ -1,4 +1,6 @@
 import { SheetManager } from 'react-native-actions-sheet';
+import Constants from 'expo-constants';
+import { router } from 'expo-router';
 
 const MESSAGE_TYPES = {
   ERROR: 'error',
@@ -294,8 +296,10 @@ export const showMessage = (
     ...options,
   };
 
+  const isModal = router?.canGoBack();
+
   SheetManager.show('popup-sheet', {
-    context: 'modal',
+    context: isModal ? undefined : 'global',
     payload,
     onClose,
   });

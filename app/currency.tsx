@@ -28,6 +28,7 @@ import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { runWithAnimationFrame } from './onboard/new';
+import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -164,7 +165,6 @@ function ModalScreen() {
       switch (params.to) {
         case 'lightningReceiveConfirmation':
           SheetManager.show('transaction-message', {
-            context: 'modal',
             onClose: async (data) => {
               if (data?.action === 'confirm') {
                 await handleLightningReceive({ memo: data.message });
@@ -183,7 +183,6 @@ function ModalScreen() {
           }
           console.log('[handleNext] balance passed', balance, amount, unit);
           SheetManager.show('transaction-message', {
-            context: 'modal',
             onClose: async (data) => {
               if (data?.action === 'confirm') {
                 await handleEcashSend({ message: data.message });
@@ -360,4 +359,4 @@ const createStyles = (theme) =>
     },
   });
 
-export default ModalScreen;
+export default withSheetProvider(ModalScreen);

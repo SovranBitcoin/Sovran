@@ -150,7 +150,6 @@ function ModalScreen({
       await handleRedeem();
     } else {
       SheetManager.show('mint-accepter', {
-        context: 'modal',
         payload: { mint: mintUrl },
         onClose: async ({ trusted }) => {
           if (trusted) {

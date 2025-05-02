@@ -23,7 +23,7 @@ import { SheetProvider } from 'react-native-actions-sheet';
 
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 
-registerAllSheets({ context: 'modal' });
+registerAllSheets({ context: undefined });
 
 const headerHeight = Constants.statusBarHeight ?? 0;
 
@@ -153,53 +153,51 @@ export default function Modal({
     React.isValidElement(children) ? children : <View>{children}</View>;
 
   return (
-    <SheetProvider context="modal">
+    <View
+      style={[
+        {
+          position: 'relative',
+          display: 'flex',
+          flex: 1,
+          backgroundColor: bgColor,
+        },
+        childrenStyles,
+      ]}>
+      {renderHeader()}
+
+      <FlatList
+        inverted={inverted}
+        data={[0]}
+        style={{
+          height: '100%',
+          flex: 1,
+          backgroundColor: bgColor,
+          marginTop: Platform.OS === 'web' ? 48 : showHeader ? headerHeight : 0,
+          paddingTop: showBack || showClose ? 16 : 0,
+        }}
+        contentContainerStyle={{ paddingBottom: buttonHeight + 42 }}
+        scrollEventThrottle={100}
+        renderItem={renderItem}
+      />
+
       <View
         style={[
           {
-            position: 'relative',
-            display: 'flex',
-            flex: 1,
-            backgroundColor: bgColor,
+            width: '100%',
+            backgroundColor: 'transparent',
+            paddingBottom: padding,
           },
-          childrenStyles,
-        ]}>
-        {renderHeader()}
-
-        <FlatList
-          inverted={inverted}
-          data={[0]}
-          style={{
-            height: '100%',
-            flex: 1,
-            backgroundColor: bgColor,
-            marginTop: Platform.OS === 'web' ? 48 : showHeader ? headerHeight : 0,
-            paddingTop: showBack || showClose ? 16 : 0,
-          }}
-          contentContainerStyle={{ paddingBottom: buttonHeight + 42 }}
-          scrollEventThrottle={100}
-          renderItem={renderItem}
-        />
-
-        <View
-          style={[
-            {
-              width: '100%',
-              backgroundColor: 'transparent',
-              paddingBottom: padding,
-            },
-            // Position needs specific settings for keyboard avoiding view in message contact page
-            typeof title !== 'string'
-              ? {}
-              : {
-                  position: 'absolute',
-                  top: Dimensions.get('window').height - buttonHeight - titleOffset,
-                },
-          ]}
-          onLayout={handleButtonLayout}>
-          {buttons}
-        </View>
+          // Position needs specific settings for keyboard avoiding view in message contact page
+          typeof title !== 'string'
+            ? {}
+            : {
+                position: 'absolute',
+                top: Dimensions.get('window').height - buttonHeight - titleOffset,
+              },
+        ]}
+        onLayout={handleButtonLayout}>
+        {buttons}
       </View>
-    </SheetProvider>
+    </View>
   );
 }
