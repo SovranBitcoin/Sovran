@@ -192,14 +192,14 @@ const ModalScreen: React.FC<{}> = () => {
             navigation.navigate('themeSettings');
           }}
         />
-        <RowButton
+        {/* <RowButton
           label="Language"
           onPress={() => {
             navigation.navigate('languageSettings', {
               countries: ['GB', 'FR', 'ES', 'DE', 'PT'],
             });
           }}
-        />
+        /> */}
       </Section>
       <Section title="App Information">
         <RowButton

@@ -26,6 +26,7 @@ import React from 'react';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { Section } from 'components/common/Section';
 
 export const LNVPN_PUBKEY = '06dde95f0268ce40128bf73ca6e85567b8567688ea52f24dcd5734e77c50f2d9';
 

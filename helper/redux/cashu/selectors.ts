@@ -1,8 +1,9 @@
 import { createSelector } from 'reselect';
 import _ from 'lodash';
+import { RootState } from 'helper/redux/store/reducer';
 
 export const memoizedGetMints = createSelector(
-  [(state) => state.cashu.profiles[state.nostr.currentProfile.id]?.mints],
+  [(state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.mints],
   (mints) => {
     return mints || [];
   }
@@ -10,7 +11,7 @@ export const memoizedGetMints = createSelector(
 
 export const memoizedGetSupportedUnits = createSelector(
   [
-    (state) =>
+    (state: RootState) =>
       state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
   ],
   (keysets) => {
@@ -19,52 +20,61 @@ export const memoizedGetSupportedUnits = createSelector(
 );
 
 export const memoizedGetTransactionByMatcher = ({ profileId, matcher }) =>
-  createSelector([(state) => state.cashu.profiles[profileId]?.transactions], (transactions) => {
-    if (!transactions || transactions.length === 0) return null;
-    return matcher(transactions);
-  });
+  createSelector(
+    [(state: RootState) => state.cashu.profiles[profileId]?.transactions],
+    (transactions) => {
+      if (!transactions || transactions.length === 0) return null;
+      return matcher(transactions);
+    }
+  );
 export const memoizedGetSelectedMint = createSelector(
-  [(state) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
+  [(state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
   (selectedMint) => {
     return selectedMint;
   }
 );
 
 export const memoizedGetKeysets = (mintUrl) =>
-  createSelector([(state) => state.cashu?.keysets?.[mintUrl]], (keysets) => {
+  createSelector([(state: RootState) => state.cashu?.keysets?.[mintUrl]], (keysets) => {
     return keysets;
   });
 
 export const memoizedGetMintInfo = (mintUrl) =>
-  createSelector([(state) => state.cashu?.info?.[mintUrl]], (info) => {
+  createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]], (info) => {
     return info;
   });
 
 export const memoizedGetCounter = ({ profileId, mintUrl }) =>
   createSelector(
-    [(state) => state.cashu.profiles[profileId]?.counters?.[mintUrl]],
+    [(state: RootState) => state.cashu.profiles[profileId]?.counters?.[mintUrl]],
     (counter) => 200 + (counter || 0)
   );
 
 export const memoizedGetCounterV2 = ({ profileId, mintUrl, keysetId }) =>
   createSelector(
-    [(state) => _.get(state.cashu, ['profiles', profileId, 'counters', mintUrl, keysetId], 1)],
+    [
+      (state: RootState) =>
+        _.get(state.cashu, ['profiles', profileId, 'counters', mintUrl, keysetId], 1),
+    ],
     (counter) => counter
   );
 
 export const memoizedGetTransactions = ({ id }: { id: number }) =>
-  createSelector([(state) => state.cashu?.profiles[id]?.transactions], (transactions) => {
-    return transactions;
-  });
+  createSelector(
+    [(state: RootState) => state.cashu?.profiles[id]?.transactions],
+    (transactions) => {
+      return transactions;
+    }
+  );
 
 export const memoizedGetProofs = (unit) =>
   createSelector(
     [
-      (state) =>
+      (state: RootState) =>
         state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
           state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
-      (state) =>
+      (state: RootState) =>
         state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
     ],
     (proofs, keysets) => {
@@ -77,7 +87,7 @@ export const memoizedGetProofs = (unit) =>
     }
   );
 export const memoizedGetAllBalances = createSelector(
-  [(state) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs],
+  [(state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs],
   (proofsByMint) => {
     return Object.keys(proofsByMint).map((mint) => {
       return {
@@ -91,10 +101,10 @@ export const memoizedGetAllBalances = createSelector(
 
 export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
   [
-    (state) => memoizedGetMints(state),
-    (state) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs || {},
-    (state) => state.cashu?.keysets || {},
-    (state) => state.cashu?.info || {},
+    (state: RootState) => memoizedGetMints(state),
+    (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs || {},
+    (state: RootState) => state.cashu?.keysets || {},
+    (state: RootState) => state.cashu?.info || {},
   ],
   (mints, proofsByMint, keysets, info) => {
     // Start with all mints the user has
@@ -158,11 +168,11 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
 export const memoizedGetBalance = (unit, mintUrl = null) =>
   createSelector(
     [
-      (state) =>
+      (state: RootState) =>
         state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
           mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
-      (state) =>
+      (state: RootState) =>
         state.cashu?.keysets?.[
           mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
@@ -181,8 +191,8 @@ export const memoizedGetBalance = (unit, mintUrl = null) =>
 export const memoizedGetTotalBalance = (unit) =>
   createSelector(
     [
-      (state) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs,
-      (state) => state.cashu?.keysets,
+      (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs,
+      (state: RootState) => state.cashu?.keysets,
     ],
     (proofsByMint, keysets) => {
       if (!proofsByMint || !keysets) return 0;
