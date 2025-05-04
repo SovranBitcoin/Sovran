@@ -10,6 +10,10 @@ import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import Modal from 'components/layout/Modal';
+import { View } from 'components/common/Themed';
+import { greys } from 'helper/colors';
+import { Dimensions } from 'react-native';
 
 const BITREFILL_URL = 'https://embed.bitrefill.com/buy';
 const BITREFILL_NOSTR_PUBKEY = 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264';
@@ -54,13 +58,13 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
   const { events, setEvents } = useBitrefill();
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
-  const { product, amount } = useTypedRoute();
-
+  const { product, amount, email } = useTypedRoute();
   const config = {
     ...(amount && { value: amount }),
     theme,
     paymentMethods: ['lightning'],
     showPaymentInfo: false,
+    ...(email && { email }),
   };
 
   const handleMessage = async (e) => {
@@ -87,6 +91,7 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
         unit: 'sat',
         meltQuote: JSON.stringify(meltQuote),
         pubkey: BITREFILL_NOSTR_PUBKEY,
+        email: email,
       });
     }
   };
@@ -105,15 +110,27 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
 }
 
 function ModalScreen() {
-  return <BitrefillWidget />;
+  const theme = useSelector(memoizedGetTheme);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        height: Dimensions.get('window').height,
+        width: Dimensions.get('window').width,
+        marginTop: 83,
+        backgroundColor: greys('dark')[2300],
+      }}>
+      <BitrefillWidget />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   webView: {
     width: 'auto',
     height: 'auto',
-    backgroundColor: 'black',
-    marginTop: 40,
+    backgroundColor: greys('dark')[2300],
   },
 });
 

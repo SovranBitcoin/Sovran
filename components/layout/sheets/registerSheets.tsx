@@ -10,6 +10,7 @@ import { default as registerMintAdder } from 'components/layout/sheets/mint-adde
 import { default as registerTransactionMessage } from 'components/layout/sheets/transaction-message';
 import { default as registerCreditCard } from 'components/layout/sheets/creditCard';
 import { default as registerEmojiPicker } from 'components/layout/sheets/emoji-picker';
+import { default as registerEmail } from 'components/layout/sheets/email';
 
 export function registerAllSheets({ context }: { context: 'global' | 'modal' }) {
   registerExample({ context });
@@ -24,4 +25,5 @@ export function registerAllSheets({ context }: { context: 'global' | 'modal' }) 
   registerTransactionMessage({ context });
   registerCreditCard({ context });
   registerEmojiPicker({ context });
+  registerEmail({ context });
 }

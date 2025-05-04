@@ -30,6 +30,7 @@ function ModalScreen() {
     pubkey,
     meltQuote: initialMeltQuote,
     redirect,
+    email,
   } = useTypedRoute<'lightningSendConfirmation'>();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
@@ -83,6 +84,7 @@ function ModalScreen() {
         unit,
         pubkey,
         meltQuote: parsedQuote,
+        email,
       });
 
       showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {

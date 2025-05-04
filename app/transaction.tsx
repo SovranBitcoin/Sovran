@@ -546,6 +546,16 @@ const transactionConfig = {
       {
         keys: [
           {
+            label: 'Email',
+            output: (tx, value) => {
+              return tx.email;
+            },
+          },
+        ],
+      },
+      {
+        keys: [
+          {
             label: 'Cancelled',
             output: (tx, value) => {
               return tx.isCancel ? <TrueIcon /> : <FalseIcon />;

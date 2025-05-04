@@ -8,6 +8,7 @@ import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
 import { products } from './products';
+import { SheetManager } from 'react-native-actions-sheet';
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -163,7 +164,17 @@ export default function ModalScreen() {
           </TouchableOpacity>
         ))}
         <TouchableOpacity
-          onPress={() => navigation.navigate('bitrefill', {})}
+          onPress={() => {
+            SheetManager.show('email-sheet', {
+              onClose: (response: { action: string; message: string }) => {
+                if (response?.action === 'confirm' && response?.message) {
+                  navigation.navigate('bitrefill', {
+                    email: response.message,
+                  });
+                }
+              },
+            });
+          }}
           style={styles.searchButton}>
           <Text size={16} weight="bold">
             Search All Giftcards

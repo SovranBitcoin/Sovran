@@ -98,12 +98,14 @@ export async function sendLightning({
   unit,
   pubkey,
   meltQuote,
+  email,
 }: {
   mintUrl: string;
   pr: string;
   unit: string;
   pubkey?: string;
   meltQuote: MeltQuoteResponse;
+  email?: string;
 }): Promise<LightningSendTransaction> {
   const keys = await getKeys({ unit, mintUrl });
 
@@ -194,6 +196,7 @@ export async function sendLightning({
     paid: true,
     meltQuote,
     mintUrl,
+    email,
     nostr: {
       pubkey: pubkey || '',
     },

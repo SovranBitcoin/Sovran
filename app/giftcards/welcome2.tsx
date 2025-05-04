@@ -18,6 +18,7 @@ import { Card } from 'components/common/Card';
 import lookup from 'country-code-lookup';
 import RenderHtml from 'react-native-render-html';
 import { Dimensions } from 'react-native';
+import { SheetManager } from 'react-native-actions-sheet';
 
 const width = Dimensions.get('window').width;
 
@@ -269,10 +270,16 @@ export default function ModalScreen() {
 
           <Button
             onPress={() =>
-              navigation.navigate('bitrefill', {
-                product: selectedProduct,
-                country: selectedCountry,
-                amount: selectedAmount,
+              SheetManager.show('email-sheet', {
+                onClose: (response: { action: string; message: string }) => {
+                  if (response?.action === 'confirm' && response?.message) {
+                    navigation.navigate('bitrefill', {
+                      product: selectedProduct,
+                      country: selectedCountry,
+                      amount: selectedAmount,
+                    });
+                  }
+                },
               })
             }
             text="Buy"
