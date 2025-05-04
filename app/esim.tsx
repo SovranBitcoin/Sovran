@@ -175,7 +175,18 @@ function ModalScreen() {
         <>
           <View style={styles.chartContainer}>
             <DonutChartContainer
-              data={getDataUsageChartData()}
+              data={[
+                {
+                  amount: usageData.remaining.gb,
+                  label: 'Remaining',
+                  value: `${usageData.remaining.gb.toFixed(2)} GB`,
+                },
+                {
+                  amount: usageData.total.gb - usageData.remaining.gb,
+                  label: 'Used',
+                  value: `${usageData.total.gb.toFixed(2)} GB`,
+                },
+              ]}
               titleText="Data Usage"
               totalValueSuffix="GB"
               disableItems={true}
