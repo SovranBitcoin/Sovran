@@ -15,6 +15,7 @@ import { Easing } from 'react-native-reanimated';
 import { View } from 'components/common/Themed';
 
 export const icons = [
+  'material-symbols:report-rounded',
   'mdi:lightbulb-on-outline',
   'mdi:lightbulb-on',
   'majesticons:lightbulb-shine',
