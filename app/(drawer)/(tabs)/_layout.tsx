@@ -177,7 +177,7 @@ const TabLayout = () => {
   );
 
   const HeaderRight = () => (
-    <Pressable onPress={() => showMessage('not_implemented')}>
+    <Pressable style={{ opacity: 0 }} onPress={() => showMessage('not_implemented')}>
       <View style={styles.headerRightContainer}>
         <Icon name="solar:card-bold" color={greys(theme)[0]} />
         {/* <ProfileAvatar picture={currentProfile?.picture} /> */}
