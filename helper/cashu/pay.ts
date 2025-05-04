@@ -201,11 +201,11 @@ export async function sendLightning({
       pubkey: pubkey || '',
     },
     counter,
-    proofs: {
-      change,
-      keep: proofsToKeep,
-      send: proofsToSend,
-    },
+    // proofs: {
+    //   change,
+    //   keep: proofsToKeep,
+    //   send: proofsToSend,
+    // },
   };
 
   store.dispatch(
@@ -380,10 +380,10 @@ export async function sendEcash({
     },
     mintUrl: wallet.mint.mintUrl,
     counter,
-    proofs: {
-      send,
-      keep,
-    },
+    // proofs: {
+    //   send,
+    //   keep,
+    // },
     ...(p2pk ? { p2pk: { pubkey: p2pk.pubkey, privkey: p2pk.privkey } } : {}),
   };
 
@@ -514,9 +514,9 @@ export async function receiveEcash({
     paid: true,
     counter,
     ...(from ? { nostr: { pubkey: from } } : {}),
-    proofs: {
-      keep: newProofs,
-    },
+    // proofs: {
+    //   keep: newProofs,
+    // },
     refund,
     fromNIP05,
     ...(giveaway
