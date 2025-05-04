@@ -6,7 +6,19 @@ import {
   UPDATE_MESSAGE_STATUS,
   ADD_MESSAGE,
   APPEND_QUERY,
+  MUTE_USER,
+  REPORT_USER,
 } from './actionTypes';
+
+export const muteUser = (pubkey: string) => ({
+  type: MUTE_USER,
+  payload: pubkey,
+});
+
+export const reportUser = (pubkey: string) => ({
+  type: REPORT_USER,
+  payload: pubkey,
+});
 
 export const setCurrentProfile = (profile) => ({
   type: SET_CURRENT_PROFILE,

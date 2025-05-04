@@ -5,3 +5,5 @@ export const SET_FOLLOWS = 'SET_FOLLOWS';
 export const UPDATE_MESSAGE_STATUS = 'UPDATE_MESSAGE_STATUS';
 export const ADD_MESSAGE = 'ADD_MESSAGE';
 export const APPEND_QUERY = 'APPEND_QUERY';
+export const MUTE_USER = 'MUTE_USER';
+export const REPORT_USER = 'REPORT_USER';

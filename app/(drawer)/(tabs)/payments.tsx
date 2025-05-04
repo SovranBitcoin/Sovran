@@ -2,8 +2,8 @@ import React, { useCallback, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { Text, View } from 'components/common/Themed';
-import { useNostr } from 'helper/redux/nostr';
-import { useCashu } from 'helper/redux/cashu';
+import { memoizedIsMuted, useNostr } from 'helper/redux/nostr';
+import { memoizedGetTransactions, useCashu } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';
 import Modal from 'components/layout/Modal';
 import { VerifiedIcon } from 'assets/icons';
@@ -29,6 +29,26 @@ export function convertNpub(pubkey: string) {
   }
   return maybeConvertNpub(pubkey)?.slice(2);
 }
+
+const RenderContactItem = ({ item }: { item: any }) => {
+  const { profiles } = useNostr();
+  const theme = useSelector(memoizedGetTheme);
+  const navigation = useTypedNavigation();
+  const muted = item.profile?.muted;
+  if (muted) return null;
+  return (
+    <ContactItem
+      isVerified={
+        profiles.some((profile) => profile.pubkey === item.pubkey) ||
+        item.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
+        item.pubkey === LNVPN_PUBKEY
+      }
+      contact={item}
+      theme={theme}
+      navigation={navigation}
+    />
+  );
+};
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -131,19 +151,6 @@ const Section = () => {
 
   const getItemCount = (data) => data.length;
 
-  const renderContactItem = ({ item }) => (
-    <ContactItem
-      isVerified={
-        profiles.some((profile) => profile.pubkey === item.pubkey) ||
-        item.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
-        item.pubkey === LNVPN_PUBKEY
-      }
-      contact={item}
-      theme={theme}
-      navigation={navigation}
-    />
-  );
-
   return (
     <Modal showBack={false} showHeader={false} buttons={null} childrenStyles={styles.modalContent}>
       <View
@@ -181,7 +188,7 @@ const Section = () => {
             <VirtualizedList
               data={enrichedContacts}
               initialNumToRender={10}
-              renderItem={renderContactItem}
+              renderItem={(item) => <RenderContactItem {...item} />}
               keyExtractor={(item) => item.pubkey}
               getItemCount={getItemCount}
               getItem={getItem}
@@ -202,7 +209,7 @@ const Section = () => {
             <VirtualizedList
               data={follows}
               initialNumToRender={1}
-              renderItem={renderContactItem}
+              renderItem={(item) => <RenderContactItem {...item} />}
               keyExtractor={(item) => item.pubkey}
               getItemCount={getItemCount}
               getItem={getItem}
