@@ -29,12 +29,7 @@ interface SectionProps {
   special?: boolean;
 }
 
-export function Section({
-  items,
-  style,
-  camera = false,
-  special = true,
-}: SectionProps): JSX.Element {
+export function Section({ items, style, camera = false, special }: SectionProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
 
@@ -85,7 +80,7 @@ export function Section({
                 {titleText}
               </Text>
 
-              {renderValueContent(item, titleText, theme)}
+              {renderValueContent(item, titleText, theme, special)}
             </View>
           );
         })}
@@ -94,9 +89,14 @@ export function Section({
   );
 
   // Helper function to render the appropriate value content based on the item type
-  function renderValueContent(item: SectionItem, titleText: string, theme: any): JSX.Element {
+  function renderValueContent(
+    item: SectionItem,
+    titleText: string,
+    theme: any,
+    special: boolean
+  ): JSX.Element {
     // Email address format (@example)
-    if (item.value?.includes?.('@')) {
+    if (item.value?.includes?.('@') && special) {
       const [username, domain] = item.value.split('@');
       return (
         <View
