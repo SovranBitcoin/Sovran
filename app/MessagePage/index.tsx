@@ -191,14 +191,15 @@ export default function ModalScreen() {
     .reduce((unique, msg) => {
       return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
     }, []);
-
   // Combine all timeline items and sort by date
   const timelimeItems = [
     ...esimsWithRequest,
     ...vpnsWithRequest,
     ...(currentTransactions?.transactions || []),
     ...filteredMessages,
-    ...events.filter((event) => convertNpub(event.pubkey) === convertNpub(BITREFILL_NOSTR_PUBKEY)),
+    ...(params?.pubkey === 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264'
+      ? events
+      : []),
   ].sort((a, b) => {
     const getDate = (item) => {
       const vpnDate = item?.cc ? item.created_at : null;
