@@ -11,6 +11,7 @@ import { default as registerTransactionMessage } from 'components/layout/sheets/
 import { default as registerCreditCard } from 'components/layout/sheets/creditCard';
 import { default as registerEmojiPicker } from 'components/layout/sheets/emoji-picker';
 import { default as registerEmail } from 'components/layout/sheets/email';
+import { default as registerVideo } from 'components/layout/sheets/video';
 
 export function registerAllSheets({ context }: { context: 'global' | 'modal' }) {
   registerExample({ context });
@@ -26,4 +27,5 @@ export function registerAllSheets({ context }: { context: 'global' | 'modal' }) 
   registerCreditCard({ context });
   registerEmojiPicker({ context });
   registerEmail({ context });
+  registerVideo({ context });
 }

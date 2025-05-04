@@ -1,18 +1,30 @@
-import { View } from 'react-native';
+import { View, Text } from 'components/common/Themed';
 import { useState, useEffect, useRef } from 'react';
 import 'react-native-gesture-handler';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoSource, VideoView } from 'expo-video';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { Dimensions } from 'react-native';
+import Modal from 'components/layout/Modal';
+import { ButtonHandler } from 'components/common/ButtonHandler';
+import { useTypedNavigation } from 'helper/navigation';
+import { SheetManager } from 'react-native-actions-sheet';
+import { Card } from 'components/common/Card';
 
-export function VideoScreen({ videoSource, ...props }) {
+const assetId = require('../../assets/videos/redeem.mp4');
+
+const videoSource: VideoSource = {
+  assetId,
+};
+
+export function VideoScreen({ ...props }) {
   const theme = useSelector(memoizedGetTheme);
   const ref = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const player = useVideoPlayer(videoSource, (player) => {
     player.loop = true;
-    // player.play();
+    player.play();
   });
 
   useEffect(() => {
@@ -26,20 +38,51 @@ export function VideoScreen({ videoSource, ...props }) {
   }, [player]);
 
   return (
-    <View {...props}>
-      <VideoView
+    <Modal
+      showHeader={false}
+      buttons={
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Close',
+              icon: 'mdi:close',
+              variant: 'secondary',
+              onPress: () => {
+                SheetManager.hide('video-sheet');
+              },
+            },
+          ]}
+        />
+      }>
+      <View
         style={{
-          width: '100%',
-          height: 250,
-          marginBottom: 8,
-          borderRadius: 8,
-          backgroundColor: greys(theme)[1500],
-          borderColor: greys(theme)[1300],
-          borderWidth: 0.5,
-        }}
-        ref={ref}
-        player={player}
-      />
-    </View>
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: greys(theme)[2300],
+          padding: 12,
+        }}>
+        <Text
+          style={{
+            fontSize: 24,
+            fontFamily: 'OverpassBold',
+            color: greys(theme)[0],
+            marginBottom: 16,
+          }}>
+          How to redeem npub.cash tokens
+        </Text>
+        <VideoView
+          style={{
+            width: 300,
+            height: 300,
+            borderRadius: 16,
+            backgroundColor: greys(theme)[1500],
+          }}
+          ref={ref}
+          player={player}
+        />
+        <Card variant="info" message="This will be automated in future versions!" />
+      </View>
+    </Modal>
   );
 }

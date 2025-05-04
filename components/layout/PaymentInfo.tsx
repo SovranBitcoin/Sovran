@@ -17,6 +17,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { showMessage } from 'helper/popup/popups';
 import { Section } from 'components/common/Section';
+import { Card } from 'components/common/Card';
+import { SheetManager } from 'react-native-actions-sheet';
 
 interface TabItem {
   name: string;

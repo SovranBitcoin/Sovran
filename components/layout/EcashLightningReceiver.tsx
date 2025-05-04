@@ -15,6 +15,8 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { useTypedNavigation } from 'helper/navigation';
 import { decode, isEncoded } from 'helper/third-party/emoji';
+import { Card } from 'components/common/Card';
+import { SheetManager } from 'react-native-actions-sheet';
 
 export const pool = new SimplePool();
 
@@ -171,6 +173,23 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
             unit="sat"
           />
         )}
+        <View
+          style={{
+            margin: 16,
+            marginTop: -8,
+          }}>
+          <Card
+            onPress={() => {
+              SheetManager.show('video-sheet', {
+                payload: {
+                  video: 'https://npub.cash/video.mp4',
+                },
+              });
+            }}
+            message="Swipe down on the main homepage to redeem npub.cash tokens, click here to watch a video demo."
+            variant="info"
+          />
+        </View>
       </View>
     </Modal>
   );
