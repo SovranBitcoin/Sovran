@@ -2,12 +2,16 @@ import React from 'react';
 import { Animated, Dimensions, Pressable } from 'react-native';
 import { View, Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
-import { ArrowIcon, InfoIcon, VerifiedIcon } from 'assets/icons';
+import Icon, { ArrowIcon, InfoIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import opacity from 'hex-color-opacity';
 import CachedImage from 'components/common/Image';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { SheetManager } from 'react-native-actions-sheet';
+import { muteUser, reportUser } from 'helper/redux/nostr';
+import { useDispatch } from 'react-redux';
+import { showMessage } from 'helper/popup/popups';
 
 const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
   const navigation = useTypedNavigation();
@@ -23,6 +27,8 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
     profile?.username ||
     profile?.name ||
     'Unknown User';
+
+  const dispatch = useDispatch();
 
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
@@ -53,7 +59,10 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
         {/* Back Button */}
         <TouchableOpacity
           onPress={handleGoBack}
-          style={[styles.iconButton, { backgroundColor: opacity(greys(theme)[2300], 0.25) }]}>
+          style={[
+            styles.iconButton,
+            { marginLeft: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+          ]}>
           <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
         </TouchableOpacity>
 
@@ -78,9 +87,37 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
         </View>
 
         {/* Placeholder Button (Hidden) */}
-        <Pressable style={styles.hiddenButton}>
-          <InfoIcon color={greys(theme)[0]} />
-        </Pressable>
+        <TouchableOpacity
+          onPress={() => {
+            SheetManager.show('button-handler', {
+              payload: {
+                buttons: [
+                  {
+                    icon: 'la:user-slash',
+                    text: 'Mute User',
+                    onPress: async () => {
+                      await showMessage('User muted successfully');
+                      dispatch(muteUser(params.pubkey));
+                    },
+                  },
+                  {
+                    icon: 'material-symbols:report-rounded',
+                    text: 'Report User',
+                    onPress: async () => {
+                      await showMessage('User reported successfully');
+                      dispatch(reportUser(params.pubkey));
+                    },
+                  },
+                ],
+              },
+            });
+          }}
+          style={[
+            styles.iconButton,
+            { marginRight: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+          ]}>
+          <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -121,7 +158,6 @@ const styles = {
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
   profileContainer: {
     flexDirection: 'column',
