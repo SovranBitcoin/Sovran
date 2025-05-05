@@ -3,43 +3,43 @@ appId: com.sovranbitcoin
 - launchApp
 
 - startRecording:
-    path: './.maestro/lightning-note-skip-video'
+    path: './.maestro/receive/lightning-note-skip-video'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_1'
+    path: './.maestro/receive/lightning-note-skip-step_1'
 - assertVisible: 'Receive'
 - tapOn: 'Receive'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_2'
+    path: './.maestro/receive/lightning-note-skip-step_2'
 - tapOn:
     id: 'more-button'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_3'
+    path: './.maestro/receive/lightning-note-skip-step_3'
 - tapOn: 'Fixed Amount'
 
 - assertVisible: 'Select Amount'
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_4'
+    path: './.maestro/receive/lightning-note-skip-step_4'
 - tapOn: '1'
 - tapOn: '0'
 - tapOn: '0'
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_5'
+    path: './.maestro/receive/lightning-note-skip-step_5'
 - tapOn: 'Next'
 
 - assertVisible: 'Add a note'
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_6'
+    path: './.maestro/receive/lightning-note-skip-step_6'
 - tapOn: 'Skip'
 
 - assertVisible: 'Receive Bitcoin'
 - assertVisible: 'Share'
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_7'
+    path: './.maestro/receive/lightning-note-skip-step_7'
 - assertVisible: 'Transfer Complete'
 - takeScreenshot:
-    path: './.maestro/lightning-note-skip-step_8'
+    path: './.maestro/receive/lightning-note-skip-step_8'
 
 - stopRecording

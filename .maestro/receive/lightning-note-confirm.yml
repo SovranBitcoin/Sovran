@@ -3,52 +3,51 @@ appId: com.sovranbitcoin
 - launchApp
 
 - startRecording:
-    path: './.maestro/lightning-note-confirm-video'
-    label: 'ReceiveLightning'
+    path: './.maestro/receive/lightning-note-confirm-video'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_1'
+    path: './.maestro/receive/lightning-note-confirm-step_1'
 - assertVisible: 'Receive'
 - tapOn: 'Receive'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_2'
+    path: './.maestro/receive/lightning-note-confirm-step_2'
 - tapOn:
     id: 'more-button'
 
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_3'
+    path: './.maestro/receive/lightning-note-confirm-step_3'
 - tapOn: 'Fixed Amount'
 
 - assertVisible: 'Select Amount'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_4'
+    path: './.maestro/receive/lightning-note-confirm-step_4'
 - tapOn: '1'
 - tapOn: '0'
 - tapOn: '0'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_5'
+    path: './.maestro/receive/lightning-note-confirm-step_5'
 - tapOn: 'Next'
 
 - assertVisible: 'Add a note'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_6'
+    path: './.maestro/receive/lightning-note-confirm-step_6'
 - tapOn:
     id: 'message-input'
 - inputText: 'Test'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_7'
+    path: './.maestro/receive/lightning-note-confirm-step_7'
 - hideKeyboard
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_8'
+    path: './.maestro/receive/lightning-note-confirm-step_8'
 - tapOn: 'Confirm'
 
 - assertVisible: 'Receive Bitcoin'
 - assertVisible: 'Share'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_9'
+    path: './.maestro/receive/lightning-note-confirm-step_9'
 - assertVisible: 'Transfer Complete'
 - takeScreenshot:
-    path: './.maestro/lightning-note-confirm-step_10'
+    path: './.maestro/receive/lightning-note-confirm-step_10'
 
 - stopRecording
