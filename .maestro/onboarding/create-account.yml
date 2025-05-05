@@ -29,11 +29,15 @@ appId: com.sovranbitcoin
 
 - assertVisible: 'Create Sovran Profile'
 - tapOn: 'Your public profile name'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_4'
 - inputText: 'Test'
 - hideKeyboard
 - takeScreenshot:
-    path: './.maestro/onboarding/create-account-step_4'
+    path: './.maestro/onboarding/create-account-step_5'
 - tapOn: 'Create Sovran Account'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_6'
 
 - assertVisible: 'Your Recovery Phrase'
 - copyTextFrom:
@@ -48,6 +52,8 @@ appId: com.sovranbitcoin
 - takeScreenshot:
     path: './.maestro/onboarding/create-account-step_5'
 - tapOn: "I've written it down"
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_6'
 - tapOn: "Yes, I've written it down"
 
 - assertVisible: 'Verify your Recovery Phrase'
@@ -59,30 +65,47 @@ appId: com.sovranbitcoin
 - inputText: ${output.word11}
 - hideKeyboard
 - takeScreenshot:
-    path: './.maestro/onboarding/create-account-step_6'
+    path: './.maestro/onboarding/create-account-step_7'
 - tapOn: 'Verify'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_8'
 - tapOn: 'Continue'
 
 - assertVisible: 'Processing'
 - assertVisible: 'Profile'
 - takeScreenshot:
-    path: Processing
+    path: './.maestro/onboarding/create-account-step_9'
 
 - assertVisible: 'Add Mint'
 - takeScreenshot:
-    path: AddMint
+    path: './.maestro/onboarding/create-account-step_10'
 - tapOn:
     id: 'add-mint'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_11'
 - tapOn:
     id: 'add-mint-item-0'
 - takeScreenshot:
-    path: './.maestro/onboarding/create-account-step_7'
+    path: './.maestro/onboarding/create-account-step_12'
 - tapOn:
     id: 'save-mints'
+
+- assertVisible: 'Profile'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_13'
+
+- assertVisible: 'Loading sat...'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_14'
+
+- assertVisible: 'Complete'
+- takeScreenshot:
+    path: './.maestro/onboarding/create-account-step_15'
+- tapOn: 'Complete'
 
 - assertVisible: 'BTC'
 - assertVisible: '0'
 - takeScreenshot:
-    path: './.maestro/onboarding/create-account-step_8'
+    path: './.maestro/onboarding/create-account-step_16'
 
 - stopRecording
