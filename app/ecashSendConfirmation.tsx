@@ -100,7 +100,7 @@ function ModalScreen() {
     onClose();
   };
 
-  const handleCancelSend = async () => {
+  const handleCancelSend = async (onClose) => {
     try {
       const profileId = store.getState().nostr?.currentProfile?.id;
       const transactions = memoizedGetTransactions({ id: profileId })(store.getState());

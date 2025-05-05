@@ -436,6 +436,7 @@ export async function receiveEcash({
 
   const getPubkeyFromToken = (token: string) => {
     const decodedToken = getDecodedToken(token);
+    console.log('[receiveEcash] decodedToken', decodedToken);
 
     try {
       return JSON.parse(decodedToken.proofs[0].secret)[0] === 'P2PK'
