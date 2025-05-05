@@ -6,25 +6,25 @@ appId: com.sovranbitcoin
     file: terms.yml
 
 - startRecording:
-    path: './.maestro/create-account-video'
+    path: './.maestro/onboarding/create-account-video'
     label: 'Onboarding'
 
 - assertVisible: 'Welcome to'
 - assertVisible: 'Sovran'
 - takeScreenshot:
-    path: './.maestro/create-account-step_1'
+    path: './.maestro/onboarding/create-account-step_1'
 - tapOn: 'Next'
 
 - assertVisible: 'BITCOIN THAT'
 - assertVisible: 'FEELS LIKE CASH'
 - takeScreenshot:
-    path: './.maestro/create-account-step_2'
+    path: './.maestro/onboarding/create-account-step_2'
 - tapOn: 'Next'
 
 - assertVisible: 'POWERED BY'
 - assertVisible: 'NOSTR'
 - takeScreenshot:
-    path: './.maestro/create-account-step_3'
+    path: './.maestro/onboarding/create-account-step_3'
 - tapOn: 'Next'
 
 - assertVisible: 'Create Sovran Profile'
@@ -32,7 +32,7 @@ appId: com.sovranbitcoin
 - inputText: 'Test'
 - hideKeyboard
 - takeScreenshot:
-    path: './.maestro/create-account-step_4'
+    path: './.maestro/onboarding/create-account-step_4'
 - tapOn: 'Create Sovran Account'
 
 - assertVisible: 'Your Recovery Phrase'
@@ -46,7 +46,7 @@ appId: com.sovranbitcoin
     id: 'mnemonic-word-11'
 - evalScript: ${output.word11 = maestro.copiedText}
 - takeScreenshot:
-    path: './.maestro/create-account-step_5'
+    path: './.maestro/onboarding/create-account-step_5'
 - tapOn: "I've written it down"
 - tapOn: "Yes, I've written it down"
 
@@ -59,7 +59,7 @@ appId: com.sovranbitcoin
 - inputText: ${output.word11}
 - hideKeyboard
 - takeScreenshot:
-    path: './.maestro/create-account-step_6'
+    path: './.maestro/onboarding/create-account-step_6'
 - tapOn: 'Verify'
 - tapOn: 'Continue'
 
@@ -76,13 +76,13 @@ appId: com.sovranbitcoin
 - tapOn:
     id: 'add-mint-item-0'
 - takeScreenshot:
-    path: './.maestro/create-account-step_7'
+    path: './.maestro/onboarding/create-account-step_7'
 - tapOn:
     id: 'save-mints'
 
 - assertVisible: 'BTC'
 - assertVisible: '0'
 - takeScreenshot:
-    path: './.maestro/create-account-step_8'
+    path: './.maestro/onboarding/create-account-step_8'
 
 - stopRecording
