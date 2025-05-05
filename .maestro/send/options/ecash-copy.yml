@@ -1,0 +1,10 @@
+appId: com.sovranbitcoin
+---
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-copy-step_1'
+- assertVisible: 'Send Ecash'
+
+- tapOn: 'Copy'
+- assertVisible: 'Token Copied'
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-copy-step_2'

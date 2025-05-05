@@ -3,15 +3,18 @@ import { Dimensions } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import ProfileComponent from '../Profile';
 import { useNostr } from 'helper/redux/nostr';
+import { useSelector } from 'react-redux';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 
 const screenWidth = Dimensions.get('screen').width;
 
 export default function DrawerLayout() {
   const { currentProfile } = useNostr();
+  const selectedMint = useSelector(memoizedGetSelectedMint);
   return (
     <Drawer
       screenOptions={{
-        swipeEnabled: currentProfile?.pubkey ? true : false,
+        swipeEnabled: currentProfile?.pubkey && selectedMint ? true : false,
         headerShown: false,
         drawerType: 'slide',
         swipeEdgeWidth: screenWidth * 0.15,
@@ -19,7 +22,10 @@ export default function DrawerLayout() {
         drawerPosition: 'left',
         drawerStyle: {
           backgroundColor: 'transparent',
-          width: currentProfile?.pubkey ? Math.max(screenWidth - 50, screenWidth * 0.9) : 0,
+          width:
+            currentProfile?.pubkey && selectedMint
+              ? Math.max(screenWidth - 50, screenWidth * 0.9)
+              : 0,
           paddingRight: 0,
         },
         keyboardDismissMode: 'none',
@@ -28,7 +34,7 @@ export default function DrawerLayout() {
         },
       }}
       drawerContent={() => {
-        if (!currentProfile?.pubkey) return <></>;
+        if (!(currentProfile?.pubkey && selectedMint)) return <></>;
         return <ProfileComponent />;
       }}>
       <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />

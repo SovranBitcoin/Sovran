@@ -219,7 +219,9 @@ export default function TermsConditionsScreen({ onClose }) {
             onValueChange={toggleCheckbox}
             color={isChecked ? shades[300] : undefined}
           />
-          <Text style={styles.checkboxText}>I have read and agree to the Terms and Conditions</Text>
+          <Text id="terms-checkbox" style={styles.checkboxText}>
+            I have read and agree to the Terms and Conditions
+          </Text>
         </TouchableOpacity>
       </View>
     </Container>

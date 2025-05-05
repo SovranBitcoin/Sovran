@@ -59,6 +59,7 @@ const RouteA = ({ router, payload }) => {
 
           return (
             <TouchableOpacity
+              testID={button.testID}
               key={i}
               style={{
                 justifyContent: 'flex-start',

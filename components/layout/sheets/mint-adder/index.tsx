@@ -10,6 +10,11 @@ function SheetWithRouter(props: any) {
 
   return (
     <ActionSheet
+      testIDs={{
+        modal: 'mint-adder-modal',
+        backdrop: 'mint-adder-backdrop',
+        sheet: 'mint-adder-sheet',
+      }}
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="route-a"

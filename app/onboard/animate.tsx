@@ -753,6 +753,7 @@ const ChainLoadingAnimation = () => {
           {/* Step icon and button */}
           <View style={[styles.iconContainer, { justifyContent: 'center', alignItems: 'center' }]}>
             <TouchableOpacity
+              testID="add-mint"
               onPress={() => {
                 SheetManager.show('mint-adder', {
                   payload: {

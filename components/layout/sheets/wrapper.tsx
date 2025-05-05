@@ -39,11 +39,14 @@ const Wrapper: React.FC<WrapperProps> = ({
   scrollContainerStyle,
 }) => {
   const theme = useSelector(memoizedGetTheme);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [buttonHeight, setButtonHeight] = useState(0);
-  const styles = createStyles(theme, buttonHeight);
+  const styles = createStyles(theme, buttonHeight, containerHeight);
 
   return (
-    <View style={[styles.actionSheetContainer, containerStyle]}>
+    <View
+      onLayout={(event) => setContainerHeight(event.nativeEvent.layout.height)}
+      style={[styles.actionSheetContainer, containerStyle]}>
       <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>{children}</ScrollView>
       {buttons && (
         <View
@@ -56,7 +59,7 @@ const Wrapper: React.FC<WrapperProps> = ({
   );
 };
 
-const createStyles = (theme: string, buttonHeight: number) =>
+const createStyles = (theme: string, buttonHeight: number, containerHeight: number) =>
   StyleSheet.create({
     actionSheetContainer: {
       height: '100%',
@@ -71,7 +74,7 @@ const createStyles = (theme: string, buttonHeight: number) =>
       padding: 0,
       backgroundColor: 'transparent',
       position: 'absolute',
-      top: Dimensions.get('window').height - buttonHeight - 100,
+      top: containerHeight - buttonHeight,
       width: '100%',
     },
     sectionHeader: {

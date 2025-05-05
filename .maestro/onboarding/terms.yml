@@ -1,0 +1,11 @@
+appId: com.sovranbitcoin
+---
+- clearState
+- launchApp
+- assertVisible: 'Terms'
+- scrollUntilVisible:
+    element: 'I have read and agree to the Terms and Conditions'
+    direction: DOWN
+    timeout: 100000
+- tapOn: 'I have read and agree to the Terms and Conditions'
+- tapOn: 'Next'

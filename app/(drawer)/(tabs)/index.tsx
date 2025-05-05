@@ -18,6 +18,7 @@ import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
 import { AccountPagerView } from '../../../components/layout/AccountPagerView';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 
 async function getProfile(currentProfile) {
   const sk = nip19.decode(currentProfile?.nsec).data;
@@ -93,6 +94,7 @@ function TabOneScreen({
 
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
   const settings = useSelector((state) => state.settings.settings);
+  const selectedMint = useSelector(memoizedGetSelectedMint);
 
   if (!settings?.termsAccepted) {
     return (
@@ -109,7 +111,7 @@ function TabOneScreen({
     );
   }
 
-  if (!currentProfile?.pubkey) {
+  if (!(currentProfile?.pubkey && selectedMint)) {
     return <Welcome />;
   }
 

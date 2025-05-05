@@ -44,6 +44,7 @@ const MessageInput = ({
       <Text style={styles.subtitle}>Add an optional message to your transaction</Text>
 
       <TextInput
+        testID="message-input"
         style={styles.textInput}
         multiline
         numberOfLines={4}

@@ -1,0 +1,11 @@
+appId: com.sovranbitcoin
+---
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-share-step_1'
+- assertVisible: 'Send Ecash'
+
+- tapOn: 'Share'
+- assertVisible: 'Save Image'
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-share-step_1'
+- tapOn: 'Save Image'

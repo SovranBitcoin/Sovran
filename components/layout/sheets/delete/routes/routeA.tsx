@@ -17,13 +17,12 @@ const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route
     try {
       await dispatch(resetApp());
       router?.close();
-      navigation?.goBack();
-      navigation?.goBack();
       navigation.navigate(
         'index',
         {},
         {
-          closeParents: true,
+          current: 'drawer',
+          closeCurrentAndParents: true,
         }
       );
     } catch (error) {}

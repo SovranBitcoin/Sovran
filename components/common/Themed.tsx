@@ -211,6 +211,7 @@ export function UntranslatedText({
 
   return (
     <DefaultText
+      testID={props.testID}
       style={[
         {
           color: greys(theme)[0],
@@ -251,7 +252,12 @@ export function Text({
   }
 
   return (
-    <UntranslatedText weight={weight} size={size} family={family} {...otherProps}>
+    <UntranslatedText
+      testID={props.testID}
+      weight={weight}
+      size={size}
+      family={family}
+      {...otherProps}>
       {displayText}
     </UntranslatedText>
   );

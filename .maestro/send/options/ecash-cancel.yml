@@ -1,0 +1,12 @@
+appId: com.sovranbitcoin
+---
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-cancel-step_1'
+- assertVisible: 'Send Ecash'
+
+- tapOn:
+    id: 'more-button'
+- assertVisible: 'Cancel Transaction'
+- tapOn: 'Cancel Transaction'
+- takeScreenshot:
+    path: './.maestro/send/options/ecash-cancel-step_2'

@@ -220,11 +220,11 @@ const RecoveryScreen = () => {
   const { ndk } = useNDK();
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
-    console.log(name);
     try {
       if (!name.trim() || isSubmitting) return;
 
-      const accountIndex = profiles ? profiles.length : 0;
+      // const accountIndex = profiles ? profiles.length : 0;
+      const accountIndex = 0; // for now we force it to create account at index 0 only
 
       // Generate keys from mnemonic
       const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
@@ -265,7 +265,8 @@ const RecoveryScreen = () => {
         id: accountIndex,
       };
 
-      setProfiles([...(profiles || []), newProfile]);
+      // setProfiles([...(profiles || []), newProfile]);
+      setProfiles([newProfile]); // for now we force it to create account at index 0 only
       setCurrentProfile(newProfile);
       navigation.navigate('onboard/displayMnemonic', { mnemonic });
     } catch (err) {}

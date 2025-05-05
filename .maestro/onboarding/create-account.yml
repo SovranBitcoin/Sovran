@@ -1,0 +1,88 @@
+appId: com.sovranbitcoin
+---
+- launchApp
+
+- runFlow:
+    file: terms.yml
+
+- startRecording:
+    path: './.maestro/create-account-video'
+    label: 'Onboarding'
+
+- assertVisible: 'Welcome to'
+- assertVisible: 'Sovran'
+- takeScreenshot:
+    path: './.maestro/create-account-step_1'
+- tapOn: 'Next'
+
+- assertVisible: 'BITCOIN THAT'
+- assertVisible: 'FEELS LIKE CASH'
+- takeScreenshot:
+    path: './.maestro/create-account-step_2'
+- tapOn: 'Next'
+
+- assertVisible: 'POWERED BY'
+- assertVisible: 'NOSTR'
+- takeScreenshot:
+    path: './.maestro/create-account-step_3'
+- tapOn: 'Next'
+
+- assertVisible: 'Create Sovran Profile'
+- tapOn: 'Your public profile name'
+- inputText: 'Test'
+- hideKeyboard
+- takeScreenshot:
+    path: './.maestro/create-account-step_4'
+- tapOn: 'Create Sovran Account'
+
+- assertVisible: 'Your Recovery Phrase'
+- copyTextFrom:
+    id: 'mnemonic-word-2'
+- evalScript: ${output.word2 = maestro.copiedText}
+- copyTextFrom:
+    id: 'mnemonic-word-5'
+- evalScript: ${output.word5 = maestro.copiedText}
+- copyTextFrom:
+    id: 'mnemonic-word-11'
+- evalScript: ${output.word11 = maestro.copiedText}
+- takeScreenshot:
+    path: './.maestro/create-account-step_5'
+- tapOn: "I've written it down"
+- tapOn: "Yes, I've written it down"
+
+- assertVisible: 'Verify your Recovery Phrase'
+- tapOn: 'Enter word 3'
+- inputText: ${output.word2}
+- tapOn: 'Next'
+- inputText: ${output.word5}
+- tapOn: 'Next'
+- inputText: ${output.word11}
+- hideKeyboard
+- takeScreenshot:
+    path: './.maestro/create-account-step_6'
+- tapOn: 'Verify'
+- tapOn: 'Continue'
+
+- assertVisible: 'Processing'
+- assertVisible: 'Profile'
+- takeScreenshot:
+    path: Processing
+
+- assertVisible: 'Add Mint'
+- takeScreenshot:
+    path: AddMint
+- tapOn:
+    id: 'add-mint'
+- tapOn:
+    id: 'add-mint-item-0'
+- takeScreenshot:
+    path: './.maestro/create-account-step_7'
+- tapOn:
+    id: 'save-mints'
+
+- assertVisible: 'BTC'
+- assertVisible: '0'
+- takeScreenshot:
+    path: './.maestro/create-account-step_8'
+
+- stopRecording

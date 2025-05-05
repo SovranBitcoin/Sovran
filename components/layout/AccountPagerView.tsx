@@ -191,6 +191,7 @@ export function AccountPagerView({
 
           return (
             <TouchableOpacity
+              testID={text.children.toLowerCase()}
               key={page}
               style={[
                 styles.touchableOpacity,

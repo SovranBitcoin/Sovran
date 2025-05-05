@@ -9,6 +9,7 @@ const RouteA = ({ router, payload }: RouteScreenProps<'example-sheet-with-router
   return (
     <View>
       <Button
+        testID="route-b-button"
         title="Go to Route B"
         onPress={() => {
           router.navigate('route-b', { data: 'test' });

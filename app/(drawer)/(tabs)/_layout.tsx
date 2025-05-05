@@ -17,6 +17,7 @@ import { TAB_SCREENS } from 'helper/navigation/screens';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 
 const Stack = createNativeStackNavigator();
 
@@ -163,9 +164,10 @@ const TabLayout = () => {
   const { currentProfile } = useNostr();
   const settings = useSelector((state) => state.settings.settings);
   const styles = createStyles(theme);
+  const selectedMint = useSelector(memoizedGetSelectedMint);
 
   // Determine if navigation should be visible
-  const isNavigationVisible = !!currentProfile?.pubkey && !!settings?.termsAccepted;
+  const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
 
   // Component for header left (drawer opener)
   const HeaderLeft = () => (

@@ -40,6 +40,7 @@ export const ButtonBase = ({
   style,
   noPadding = false,
   renderBackground,
+  ...props
 }: ButtonBaseProps): JSX.Element => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showLoading, setShowLoading] = useState<boolean>(false);
@@ -119,6 +120,7 @@ export const ButtonBase = ({
         },
       ]}>
       <TouchableOpacity
+        testID={props?.testID}
         disabled={isDisabled}
         className="m-1 mb-2 items-center justify-center overflow-hidden rounded-full border border-[0.33px] py-1"
         style={[

@@ -55,7 +55,11 @@ const MnemonicDisplayScreen = () => {
   const renderWordCell = (index) => (
     <View key={index} style={styles.wordCell}>
       <Text style={styles.wordNumber}>{`${index + 1}.`}</Text>
-      <Text style={styles.wordText} numberOfLines={1} ellipsizeMode="tail">
+      <Text
+        testID={`mnemonic-word-${index}`}
+        style={styles.wordText}
+        numberOfLines={1}
+        ellipsizeMode="tail">
         {words[index] || ''}
       </Text>
     </View>
@@ -81,7 +85,7 @@ const MnemonicDisplayScreen = () => {
               </Text>
             </View>
 
-            <View style={styles.gridContainer}>
+            <View style={styles.gridContainer} testID="mnemonic-grid">
               {Array.from({ length: 4 }).map((_, rowIndex) => (
                 <View key={rowIndex} style={styles.gridRow}>
                   {Array.from({ length: 3 }).map((_, colIndex) =>

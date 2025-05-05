@@ -1,0 +1,46 @@
+appId: com.sovranbitcoin
+---
+- launchApp
+
+- startRecording:
+    path: './.maestro/send/ecash-note-skip-video'
+
+- assertVisible: 'Send'
+- takeScreenshot:
+    path: './.maestro/send/ecash-note-skip-step_1'
+- tapOn: 'Send'
+
+- assertVisible: 'Select Amount'
+- takeScreenshot:
+    path: './.maestro/send/ecash-note-skip-step_2'
+- tapOn: '1'
+- tapOn: '0'
+- takeScreenshot:
+    path: './.maestro/send/ecash-note-skip-step_3'
+- tapOn: 'Next'
+
+- assertVisible: 'Add a note'
+- takeScreenshot:
+    path: './.maestro/send/ecash-note-skip-step_4'
+- tapOn: 'Skip'
+
+- assertVisible: 'Send Ecash'
+- takeScreenshot:
+    path: './.maestro/send/ecash-note-skip-step_5'
+
+- runFlow:
+    file: './options/ecash-copy.yml'
+
+- runFlow:
+    file: './options/ecash-share.yml'
+
+- runFlow:
+    file: './options/ecash-check-status.yml'
+
+- runFlow:
+    file: './options/ecash-copy-as-emoji.yml'
+
+- runFlow:
+    file: './options/ecash-cancel.yml'
+
+- stopRecording

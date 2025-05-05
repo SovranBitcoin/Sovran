@@ -17,16 +17,16 @@ const EmojiGrid = ({ router, payload }) => {
   const styles = createStyles(theme);
 
   const emojis = [
-    '🥜', // peanut (inside joke in some bitcoin circles)
-    '⚡', // lightning (for Lightning Network)
-    '🧡', // orange heart (bitcoin community love)
-    '🏆', // trophy (winning)
-    '🌋', // volcano (El Salvador volcano bonds)
-    '🚀', // rocket (to the moon)
-    '💰', // money bag
-    '🔑', // key (private keys)
-    '🦡', // badger (bitcoin badger/mascot)
-    '🦍', // ape ("apeing in")
+    { id: 'nut', emoji: '🥜' }, // peanut (inside joke in some bitcoin circles)
+    { id: 'lightning', emoji: '⚡' }, // lightning (for Lightning Network)
+    { id: 'heart', emoji: '🧡' }, // orange heart (bitcoin community love)
+    { id: 'trophy', emoji: '🏆' }, // trophy (winning)
+    { id: 'volcano', emoji: '🌋' }, // volcano (El Salvador volcano bonds)
+    { id: 'rocket', emoji: '🚀' }, // rocket (to the moon)
+    { id: 'money', emoji: '💰' }, // money bag
+    { id: 'key', emoji: '🔑' }, // key (private keys)
+    { id: 'badger', emoji: '🦡' }, // badger (bitcoin badger/mascot)
+    { id: 'ape', emoji: '🦍' }, // ape ("apeing in")
   ];
 
   const emojiRows = chunk(emojis, 4); // 3 columns per row
@@ -51,13 +51,14 @@ const EmojiGrid = ({ router, payload }) => {
           <View key={rowIndex} style={styles.row}>
             {row.map((emoji, colIndex) => (
               <TouchableOpacity
+                testID={emoji.id}
                 key={colIndex}
                 style={[
                   styles.emojiButton,
                   colIndex > 0 && { marginLeft: 8 }, // Only add marginLeft if not the first in the row
                 ]}
-                onPress={() => handleEmojiSelect(emoji)}>
-                <Text style={styles.emoji}>{emoji}</Text>
+                onPress={() => handleEmojiSelect(emoji.emoji)}>
+                <Text style={styles.emoji}>{emoji.emoji}</Text>
               </TouchableOpacity>
             ))}
           </View>

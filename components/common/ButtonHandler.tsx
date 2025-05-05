@@ -48,6 +48,7 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
       {buttons.slice(0, 2).map((button, index) => (
         <View key={index} className="flex-1 bg-transparent">
           <Button
+            testID={button.testID}
             onPress={() => {
               if (!button.disabled) {
                 runWithAnimationFrame(button.onPress, setLoading)();
@@ -64,6 +65,7 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
       {buttons.length > 2 && (
         <View className="w-16 bg-transparent">
           <Button
+            testID="more-button"
             icon={<Icon name={'tabler:dots'} />}
             onPress={() => {
               SheetManager.show('button-handler', {
