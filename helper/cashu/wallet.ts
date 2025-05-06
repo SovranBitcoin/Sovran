@@ -5,6 +5,7 @@ import * as bip39 from '@scure/bip39';
 import { getKeys } from './keys';
 import { getMint } from './mint';
 import { memoizedGetCurrentProfile } from '../redux/nostr';
+import _ from 'lodash';
 
 interface GetWalletParams {
   unit: string;
@@ -39,6 +40,21 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
     unit,
     bip39seed: seed.privateKey as Uint8Array,
   });
+
+  wallet._send = async function (amount, currentProofs, options = {}) {
+    const { keep, send } = await this.send(Number(amount), currentProofs, options);
+
+    const used = _.differenceWith(currentProofs, keep, (a, b) =>
+      _.isEqual(
+        _.pick(a, ['C', 'id', 'secret', 'amount']),
+        _.pick(b, ['C', 'id', 'secret', 'amount'])
+      )
+    );
+
+    console.log({ keep, send, used });
+
+    return { keep, send, used };
+  };
 
   await wallet.loadMint();
 

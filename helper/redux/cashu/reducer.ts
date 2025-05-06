@@ -124,11 +124,17 @@ export const cashuReducer = (state = initialState, action) => {
       return _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
+          // First ensure we're only processing proofs with matching IDs
           return proofs.filter((existingProof) => {
-            return action.payload.proofs.some((proof) => {
+            // Check if any proof in the used array matches this existing proof
+            return !action.payload.proofs.some((usedProof) => {
+              // Only consider comparisons if IDs match
+              if (usedProof.id !== existingProof.id) return false;
+
+              // Otherwise do the full comparison
               return _.isEqual(
                 _.pick(existingProof, ['C', 'id', 'secret', 'amount']),
-                _.pick(proof, ['C', 'id', 'secret', 'amount'])
+                _.pick(usedProof, ['C', 'id', 'secret', 'amount'])
               );
             });
           });

@@ -134,13 +134,13 @@ export async function sendLightning({
     keysetId: wallet.keysetId,
   })(store.getState());
 
-  const { keep: proofsToKeep, send: proofsToSend } = await wallet.send(
-    meltQuote.amount + meltQuote.fee_reserve,
-    currentProofs,
-    {
-      counter: counter, // it's going up forever, laura
-    }
-  );
+  const {
+    keep: proofsToKeep,
+    send: proofsToSend,
+    used,
+  } = await wallet._send(meltQuote.amount + meltQuote.fee_reserve, currentProofs, {
+    counter: counter, // it's going up forever, laura
+  });
 
   store.dispatch(
     increaseCounterV2({
@@ -174,7 +174,7 @@ export async function sendLightning({
     removeProofs({
       profileId,
       mintUrl,
-      proofs: proofsToSend,
+      proofs: used,
     })
   );
 
@@ -330,18 +330,16 @@ export async function sendEcash({
     keysetId: wallet.keysetId,
   })(state);
 
-  const { keep, send } = await wallet.send(Number(amount), currentProofs, {
+  const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
     ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
     counter,
   });
-
-  console.log({ keep, send });
 
   await store.dispatch(
     removeProofs({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
-      proofs: send,
+      proofs: used,
     })
   );
 
