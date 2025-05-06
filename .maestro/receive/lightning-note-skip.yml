@@ -5,40 +5,70 @@ appId: com.sovranbitcoin
 - startRecording:
     path: './.maestro/receive/lightning-note-skip-video'
 
+- assertVisible: 'Receive'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
+
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_1'
-- assertVisible: 'Receive'
 - tapOn: 'Receive'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_2'
 - tapOn:
     id: 'more-button'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_3'
 - tapOn: 'Fixed Amount'
 
 - assertVisible: 'Select Amount'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_4'
 - tapOn: '1'
 - tapOn: '0'
 - tapOn: '0'
+
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_5'
 - tapOn: 'Next'
 
 - assertVisible: 'Add a note'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_6'
 - tapOn: 'Skip'
 
 - assertVisible: 'Receive Bitcoin'
 - assertVisible: 'Share'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_7'
 - assertVisible: 'Transfer Complete'
+- extendedWaitUntil:
+    visible: 'akwjdhljkahwlkdjaklwjd'
+    optional: true
+    timeout: 500
 - takeScreenshot:
     path: './.maestro/receive/lightning-note-skip-step_8'
 
