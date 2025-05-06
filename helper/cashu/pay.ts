@@ -301,9 +301,14 @@ export async function sendEcash({
 }): Promise<EcashSendTransaction> {
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
-  const proofs = memoizedGetProofs(unit)(state);
-  const balance = memoizedGetBalance(unit)(state);
+
   const profile = memoizedGetCurrentProfile(state);
+  const keys = await getKeys({ unit, mintUrl: selectedMint });
+
+  const allProofs = store.getState().cashu?.profiles[profile.id]?.proofs?.[selectedMint];
+  const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
+
+  const balance = memoizedGetBalance(unit)(state);
 
   if (amount > balance) {
     throw new AppError('insufficient_funds', 'Insufficient funds');
@@ -325,10 +330,12 @@ export async function sendEcash({
     keysetId: wallet.keysetId,
   })(state);
 
-  const { keep, send } = await wallet.send(Number(amount), proofs, {
+  const { keep, send } = await wallet.send(Number(amount), currentProofs, {
     ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
     counter,
   });
+
+  console.log({ keep, send });
 
   await store.dispatch(
     removeProofs({

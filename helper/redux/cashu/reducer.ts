@@ -124,15 +124,14 @@ export const cashuReducer = (state = initialState, action) => {
       return _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          return proofs.filter(
-            (existingProof) =>
-              !action.payload.proofs.some((proofToRemove) =>
-                _.isEqual(
-                  _.pick(existingProof, ['C', 'id', 'secret', 'amount']),
-                  _.pick(proofToRemove, ['C', 'id', 'secret', 'amount'])
-                )
-              )
-          );
+          return proofs.filter((existingProof) => {
+            return action.payload.proofs.some((proof) => {
+              return _.isEqual(
+                _.pick(existingProof, ['C', 'id', 'secret', 'amount']),
+                _.pick(proof, ['C', 'id', 'secret', 'amount'])
+              );
+            });
+          });
         },
         state
       );
