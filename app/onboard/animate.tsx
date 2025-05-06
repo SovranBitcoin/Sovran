@@ -186,10 +186,12 @@ const ChainLoadingAnimation = () => {
             const mint = mintsToProcess[index];
             try {
               const mintInfo = await (await getMint({ mintUrl: mint })).getInfo();
-              const units = mintInfo.nuts[4].methods.map((method) => ({
-                name: method.unit,
-                weight: 0.5,
-              }));
+              const units = mintInfo.nuts[4].methods
+                .map((method) => ({
+                  name: method.unit,
+                  weight: 0.5,
+                }))
+                .filter((unit) => ['sat', 'usd', 'eur', 'gbp'].includes(unit.name));
 
               mints.push({
                 id: `mint-${profileId}-${index}`,
@@ -602,6 +604,7 @@ const ChainLoadingAnimation = () => {
               },
             });
 
+            console.log('KEYSET_COMPLETE123123123', currentMint?.currencies, result?.value?.unit);
             setCurrencyIndex(
               currentMint?.currencies?.findIndex((c) => c?.name === result?.value?.unit)
             );
@@ -688,6 +691,7 @@ const ChainLoadingAnimation = () => {
     if (!currentMintInfo) return '';
 
     const currencies = currentMintInfo.mint.currencies;
+    console.log(123213123, currencies, currencyIndex);
     if (currencyIndex < currencies.length) {
       return currencies[currencyIndex].name;
     }
