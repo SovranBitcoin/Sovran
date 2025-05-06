@@ -8,11 +8,13 @@ export async function* restoreMint({
   profile,
   BATCH_SIZE = 100,
   MAX_GAP = 4,
+  allowedUnits = ['sat', 'usd', 'eur', 'gbp'],
 }: {
   mintUrl: string;
   profile: string;
   BATCH_SIZE?: number;
   MAX_GAP?: number;
+  allowedUnits?: string[];
 }) {
   try {
     let response = {};
@@ -20,9 +22,9 @@ export async function* restoreMint({
 
     const keysets = (await mint.getKeys()).keysets;
 
-    const uniqueUnits = keysets.filter(
-      (keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit)
-    );
+    const uniqueUnits = keysets
+      .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
+      .filter((keyset) => allowedUnits.includes(keyset.unit));
 
     yield {
       label: 'INIT',
