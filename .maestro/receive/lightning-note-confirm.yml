@@ -6,88 +6,68 @@ appId: com.sovranbitcoin
     path: './.maestro/receive/lightning-note-confirm-video'
 
 - assertVisible: 'Receive'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_1'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_1'
 - tapOn: 'Receive'
 
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_2'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_2'
 - tapOn:
     id: 'more-button'
 
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_3'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_3'
 - tapOn: 'Fixed Amount'
 
 - assertVisible: 'Select Amount'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_4'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_4'
 - tapOn: '1'
 - tapOn: '0'
 - tapOn: '0'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_5'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_5'
 - tapOn: 'Next'
 
 - assertVisible: 'Add a note'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_6'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_6'
 - tapOn:
     id: 'message-input'
 - inputText: 'Test'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_7'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_7'
 - hideKeyboard
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_8'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_8'
 - tapOn: 'Confirm'
 
 - assertVisible: 'Receive Bitcoin'
 - assertVisible: 'Share'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_9'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_9'
 - assertVisible: 'Transfer Complete'
-- extendedWaitUntil:
-    visible: 'akwjdhljkahwlkdjaklwjd'
-    optional: true
-    timeout: 500
-- takeScreenshot:
-    path: './.maestro/receive/lightning-note-confirm-step_10'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_10'
 
 - stopRecording

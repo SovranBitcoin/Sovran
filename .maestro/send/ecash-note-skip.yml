@@ -6,27 +6,39 @@ appId: com.sovranbitcoin
     path: './.maestro/send/ecash-note-skip-video'
 
 - assertVisible: 'Send'
-- takeScreenshot:
-    path: './.maestro/send/ecash-note-skip-step_1'
+
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/ecash-note-skip-step_1'
+
 - tapOn: 'Send'
 
 - assertVisible: 'Select Amount'
-- takeScreenshot:
-    path: './.maestro/send/ecash-note-skip-step_2'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/ecash-note-skip-step_2'
 - tapOn: '1'
 - tapOn: '0'
-- takeScreenshot:
-    path: './.maestro/send/ecash-note-skip-step_3'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/ecash-note-skip-step_3'
 - tapOn: 'Next'
 
 - assertVisible: 'Add a note'
-- takeScreenshot:
-    path: './.maestro/send/ecash-note-skip-step_4'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/ecash-note-skip-step_4'
 - tapOn: 'Skip'
 
 - assertVisible: 'Send Ecash'
-- takeScreenshot:
-    path: './.maestro/send/ecash-note-skip-step_5'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/ecash-note-skip-step_5'
 
 - runFlow:
     file: './options/ecash-copy.yml'

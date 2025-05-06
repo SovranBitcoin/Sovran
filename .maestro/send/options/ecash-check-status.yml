@@ -1,16 +1,23 @@
 appId: com.sovranbitcoin
 ---
-- takeScreenshot:
-    path: './.maestro/send/options/ecash-check-status-step_1'
 - assertVisible: 'Send Ecash'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-check-status-step_1'
 
 - tapOn:
     id: 'more-button'
 - assertVisible: 'Check Status'
 - tapOn: 'Check Status'
-- takeScreenshot:
-    path: './.maestro/send/options/ecash-check-status-step_2'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-check-status-step_2'
 
 - assertVisible: 'Transaction Pending'
-- takeScreenshot:
-    path: './.maestro/send/options/ecash-check-status-step_3'
+
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-check-status-step_3'
