@@ -111,6 +111,8 @@ appId: com.sovranbitcoin
       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_11'
 - tapOn:
     id: 'add-mint-item-0'
+- tapOn:
+    id: 'add-mint-item-1'
 - runFlow:
     file: ../helper/screenshot.yml
     env:

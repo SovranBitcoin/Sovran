@@ -86,6 +86,8 @@ appId: com.sovranbitcoin
       SCREENSHOT_PATH: './.maestro/onboarding/recover-account-step_4'
 - tapOn:
     id: 'add-mint-item-0'
+- tapOn:
+    id: 'add-mint-item-1'
 - runFlow:
     file: ../helper/screenshot.yml
     env:

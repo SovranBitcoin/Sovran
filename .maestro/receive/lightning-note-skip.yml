@@ -5,6 +5,8 @@ appId: com.sovranbitcoin
 - startRecording:
     path: './.maestro/receive/lightning-note-skip-video'
 
+- assertVisible: 'BTC'
+
 - assertVisible: 'Receive'
 - runFlow:
     file: ../helper/screenshot.yml
@@ -32,7 +34,9 @@ appId: com.sovranbitcoin
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-skip-step_4'
 - tapOn: '1'
 - tapOn: '0'
-- tapOn: '0'
+- tapOn: '2'
+- tapOn: '3'
+# 1023 is guarenteed to produce a lot of proofs because it doesn't evenly fit as a power of 2
 
 - runFlow:
     file: ../helper/screenshot.yml
