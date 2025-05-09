@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.0.11</string>
+    <string>0.0.12</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>30</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -97,6 +97,13 @@
     <array>
       <string>D2760000850100</string>
       <string>D2760000850101</string>
+      <string>5361746f63617368</string>
+      <string>A0000002471001</string>
+      <string>A000000003101001</string>
+    </array>
+    <key>com.apple.developer.nfc.readersession.formats</key>
+    <array>
+      <string>TAG</string>
     </array>
   </dict>
 </plist>
