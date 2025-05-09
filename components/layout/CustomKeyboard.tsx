@@ -42,6 +42,18 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
           return prevInputValue;
         }
 
+        // Handle zeros based on unit type
+        if (newValue.startsWith('0')) {
+          // In integer mode (sats), don't allow any leading zeros
+          if (unit === 'sat') {
+            return prevInputValue;
+          }
+          // In decimal mode, only prevent multiple leading zeros
+          else if (newValue.startsWith('00')) {
+            return prevInputValue;
+          }
+        }
+
         // Handle decimal precision
         const parts = newValue.split('.');
         if (parts[1] && parts[1].length > 2) {
