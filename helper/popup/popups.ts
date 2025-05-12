@@ -96,7 +96,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   insufficient_balance: {
     title: 'Insufficient Balance',
     text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) =>
-      `Unable to send ${amount} ${unit.toUpperCase()} with fee of ${fee} ${unit.toUpperCase()}, you need to receive more funds before making this purchase.`,
+      `Unable to send ${amount} ${unit.toUpperCase()} with fee of ${fee} ${unit.toUpperCase()}, you need to receive more funds or change mint.`,
     type: MESSAGE_TYPES.ERROR,
   },
   funds_received: {
