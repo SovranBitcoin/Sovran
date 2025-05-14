@@ -110,8 +110,7 @@ export async function sendLightning({
   const keys = await getKeys({ unit, mintUrl });
 
   const profile = memoizedGetCurrentProfile(store.getState());
-  const allProofs = store.getState().cashu?.profiles[profile.id]?.proofs?.[mintUrl];
-  const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
+  const currentProofs = memoizedGetProofs(unit)(store.getState());
 
   const wallet = await getWallet({ unit, mintUrl, profile: null });
 
@@ -306,7 +305,8 @@ export async function sendEcash({
   const keys = await getKeys({ unit, mintUrl: selectedMint });
 
   const allProofs = store.getState().cashu?.profiles[profile.id]?.proofs?.[selectedMint];
-  const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
+  const currentProofs = memoizedGetProofs(unit)(state);
+  // const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
 
   const balance = memoizedGetBalance(unit)(state);
 
