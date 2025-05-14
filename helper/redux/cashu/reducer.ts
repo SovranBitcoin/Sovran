@@ -133,8 +133,8 @@ export const cashuReducer = (state = initialState, action) => {
 
               // Otherwise do the full comparison
               return _.isEqual(
-                _.pick(existingProof, ['C', 'id', 'secret', 'amount']),
-                _.pick(usedProof, ['C', 'id', 'secret', 'amount'])
+                _.pick(existingProof, ['C', 'secret', 'amount']),
+                _.pick(usedProof, ['C', 'secret', 'amount'])
               );
             });
           });
