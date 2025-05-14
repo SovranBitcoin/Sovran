@@ -6,6 +6,8 @@ import { getKeys } from './keys';
 import { getMint } from './mint';
 import { memoizedGetCurrentProfile } from '../redux/nostr';
 import _ from 'lodash';
+import { wordlist } from '@scure/bip39/wordlists/english';
+import { mnemonicToSeed, mnemonicToSeedSync } from 'bip39';
 
 interface GetWalletParams {
   unit: string;
@@ -36,19 +38,18 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
 
   const seed = root.derive(`${DERIVATION_PATH}/0'/${currentProfile?.id}'/0/0`);
 
+  const cashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
+
   const wallet = new CashuWallet(mint, {
     unit,
-    bip39seed: seed.privateKey as Uint8Array,
+    bip39seed: mnemonicToSeedSync(cashuMnemonic),
   });
 
   wallet._send = async function (amount, currentProofs, options = {}) {
     const { keep, send } = await this.send(Number(amount), currentProofs, options);
 
     const used = _.differenceWith(currentProofs, keep, (a, b) =>
-      _.isEqual(
-        _.pick(a, ['C', 'id', 'secret', 'amount']),
-        _.pick(b, ['C', 'id', 'secret', 'amount'])
-      )
+      _.isEqual(_.pick(a, ['C', 'secret', 'amount']), _.pick(b, ['C', 'secret', 'amount']))
     );
 
     console.log({ keep, send, used });
