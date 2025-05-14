@@ -59,7 +59,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
         style={styles.profileAvatar}
       />
       <View style={styles.profileBody}>
-        <Text style={styles.profileName}>{currentProfile?.name}</Text>
+        <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
         <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
       </View>
       <FeatherIcon color={greys(theme)[700]} name="chevron-right" size={22} />
@@ -174,15 +174,15 @@ const ModalScreen: React.FC<{}> = () => {
 
   return (
     <Container>
-      {/* <Section title="Account">
+      <Section title="Account">
         <ProfileButton currentProfile={currentProfile} theme={theme} />
-        <RowButton
+        {/* <RowButton
           label="Manage Profiles"
           onPress={() => {
-            SheetManager.show("sheet-with-router");
+            SheetManager.show('sheet-with-router');
           }}
-        />
-      </Section> */}
+        /> */}
+      </Section>
       <Section title="Preferences">
         <RowButton label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
         <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
