@@ -48,4 +48,5 @@ android/
 
 .monicon
 .vscode
+.env
 # helper/cashu/secrets.ts
