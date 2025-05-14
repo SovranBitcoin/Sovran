@@ -20,7 +20,7 @@ export async function* restoreMint({
     let response = {};
     const mint = await getMint({ mintUrl });
 
-    const keysets = (await mint.getKeys()).keysets;
+    const keysets = (await mint.getKeySets()).keysets;
 
     const uniqueUnits = keysets
       .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
