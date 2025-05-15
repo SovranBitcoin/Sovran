@@ -50,3 +50,8 @@ android/
 .vscode
 .env
 # helper/cashu/secrets.ts
+
+# ios
+ios/*
+!ios/Sovran/Info.plist
+!ios/Sovran/Sovran.entitlements
