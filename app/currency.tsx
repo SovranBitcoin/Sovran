@@ -218,7 +218,15 @@ function ModalScreen() {
 
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
-    if (!text) return;
+    if (!text) {
+      showMessage('no_clipboard_address', {}, { emoji: '🚨' });
+      return;
+    }
+
+    if (!isValidLNURL(text)) {
+      showMessage('invalid_address', { address: text }, { emoji: '🚨' });
+      return;
+    }
 
     const scanning: ScanningData = { data: text };
     setLoading(true);
