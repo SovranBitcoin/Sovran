@@ -16,7 +16,7 @@ import { showMessage } from 'helper/popup/popups';
 
 import { View, Text } from 'components/common/Themed';
 import { isValidPaymentRequest } from 'helper/cashu/helper';
-import { handlePaymentRequest } from 'helper/payment-handler/handlers';
+import { barcodeHandler, handlePaymentRequest } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
@@ -29,6 +29,12 @@ import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { runWithAnimationFrame } from './onboard/new';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { URDecoder } from '@gandlaf21/bc-ur';
+
+interface ScanningData {
+  data: string;
+  type?: string;
+}
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -206,26 +212,26 @@ function ModalScreen() {
     }
   };
 
+  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
+  const [progress, setProgress] = useState<number>(0);
+  const [scanned, setScanned] = useState<boolean>(false);
+
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
+    if (!text) return;
 
-    if (isValidPaymentRequest(text)) {
-      await handlePaymentRequest({ request: text, navigation });
-      return;
-    }
-
-    if (!text) {
-      showMessage('no_clipboard_address', {}, { emoji: '🚨' });
-      return;
-    }
-
-    if (!isValidLNURL(text)) {
-      showMessage('invalid_address', { address: text }, { emoji: '🚨' });
-      return;
-    }
-
-    // This is kept to maintain the original logic but appears to be incomplete in the original
-    throw new Error('Function not implemented.');
+    const scanning: ScanningData = { data: text };
+    setLoading(true);
+    await barcodeHandler({
+      scanning,
+      navigation,
+      urDecoder,
+      unit,
+      selectedMint,
+      setProgress,
+      setLoading,
+      setScanned,
+    });
   };
 
   const renderButtons = () => {
