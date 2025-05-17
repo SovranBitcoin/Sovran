@@ -65,22 +65,19 @@ function ModalScreen() {
   const [query, setQuery] = useState();
   const [fetchingPackages, setFetchingPackages] = useState(false);
   const { vpn, updateVpn } = useVpn();
+
+  console.log(129837, params);
   //
   const activateVPN = async () => {
-    const response = await fetch('https://lnvpn.net/api/v1/getTunnelConfig', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        Priority: 'u=0',
-      },
-      body: `paymentHash=${params.payment_hash}&location=${params.cc}`,
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    const response = await fetch(
+      `https://esim.sovran.cash/api/vpn/activate?paymentHash=${params.payment_hash}&location=${params.cc}`
+    );
+
+    if (!response.ok) {
+      showMessage('activation_failed', {}, { emoji: '🚨' });
+      return;
+    }
+
     const data = await response.json();
     //
 
@@ -299,19 +296,19 @@ function ModalScreen() {
                     },
                   ]
                 : []),
-              ...(new Date() <
-              new Date(
-                vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
-              )
-                ? [
-                    {
-                      text: 'Activate',
-                      variant: 'primary',
-                      disabled: remainingTime === 'Calculating...',
-                      onPress: activateVPN,
-                    },
-                  ]
-                : []),
+              // ...(new Date() <
+              // new Date(
+              //   vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
+              // )
+              //   ? [
+              //       {
+              //         text: 'Activate',
+              //         variant: 'primary',
+              //         disabled: remainingTime === 'Calculating...',
+              //         onPress: activateVPN,
+              //       },
+              //     ]
+              //   : []),
               ...(remainingTime === 'Not activated'
                 ? [
                     {

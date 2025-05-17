@@ -1,9 +1,10 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { View } from 'components/common/Themed';
 const Container: React.FC<{
   children: React.ReactNode;
   style?: any;
@@ -15,16 +16,16 @@ const Container: React.FC<{
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: greys(theme)[2300], ...style }}>
-      <ScrollView
-        scrollEnabled={scroll}
-        contentContainerStyle={[
+      <View
+        // scrollEnabled={scroll}
+        style={[
           styles.content,
           {
             ...contentContainerStyle,
           },
         ]}>
         {children}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };

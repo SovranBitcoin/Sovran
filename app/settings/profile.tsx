@@ -38,22 +38,6 @@ const Profile = () => {
   const [cashuMnemonic, setCashuMnemonic] = useState('');
   const navigation = useNavigation();
 
-  useEffect(() => {
-    if (currentProfile) {
-      try {
-        // Calculate cashu mnemonic
-        const root = getRoot(currentProfile);
-        const path = `${DERIVATION_PATH}/0'/${currentProfile?.id}'/0/0`;
-        const seed = root.derive(path);
-        const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey, wordlist);
-        setCashuMnemonic(derivedCashuMnemonic);
-      } catch (error) {
-        console.error('Error calculating cashu mnemonic:', error);
-        setCashuMnemonic('Error calculating cashu mnemonic');
-      }
-    }
-  }, [currentProfile]);
-
   function getRoot(profile) {
     if (profile?.root?.xpriv) {
       const root = HDKey.fromExtendedKey(profile.root.xpriv);
@@ -130,50 +114,52 @@ const Profile = () => {
 
   return (
     <Container>
-      <SafeAreaView style={styles.content}>
-        <Text style={styles.sectionTitle}>Profile Details</Text>
+      <ScrollView>
+        <SafeAreaView style={styles.content}>
+          <Text style={styles.sectionTitle}>Profile Details</Text>
 
-        <View style={styles.profilePictureContainer}>
-          <Image
-            source={{
-              uri: currentProfile?.picture || 'https://via.placeholder.com/150',
-            }}
-            style={styles.profilePicture}
-          />
-        </View>
+          <View style={styles.profilePictureContainer}>
+            <Image
+              source={{
+                uri: currentProfile?.picture || 'https://via.placeholder.com/150',
+              }}
+              style={styles.profilePicture}
+            />
+          </View>
 
-        {renderCopyableDetail(
-          'NIP06:',
-          currentProfile?.mnemonic,
-          'mnemonic_copied',
-          'mnemonic',
-          'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!'
-        )}
+          {renderCopyableDetail(
+            'NIP06:',
+            currentProfile?.mnemonic,
+            'mnemonic_copied',
+            'mnemonic',
+            'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!'
+          )}
 
-        {renderCopyableDetail(
-          'Npub:',
-          currentProfile?.npub,
-          'npub_copied',
-          null,
-          'Your public identifier on the Nostr network.'
-        )}
+          {renderCopyableDetail(
+            'Npub:',
+            currentProfile?.npub,
+            'npub_copied',
+            null,
+            'Your public identifier on the Nostr network.'
+          )}
 
-        {renderCopyableDetail(
-          'Nsec:',
-          currentProfile?.nsec,
-          'nsec_copied',
-          'nsec',
-          'Your private key. Never share this with anyone.'
-        )}
+          {renderCopyableDetail(
+            'Nsec:',
+            currentProfile?.nsec,
+            'nsec_copied',
+            'nsec',
+            'Your private key. Never share this with anyone.'
+          )}
 
-        {renderCopyableDetail(
-          `NUT13:`,
-          cashuMnemonic,
-          'cashu_mnemonic_copied',
-          'cashuMnemonic',
-          'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.'
-        )}
-      </SafeAreaView>
+          {renderCopyableDetail(
+            `NUT13:`,
+            currentProfile?.nut13,
+            'cashu_mnemonic_copied',
+            'cashuMnemonic',
+            'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.'
+          )}
+        </SafeAreaView>
+      </ScrollView>
     </Container>
   );
 };

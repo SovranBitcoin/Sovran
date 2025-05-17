@@ -177,7 +177,11 @@ const Screen = () => {
 
   function getName(profile) {
     const dn =
-      profile?.displayName || profile?.display_name || profile?.username || profile?.name || '';
+      profile?.profile?.displayName ||
+      profile?.profile?.display_name ||
+      profile?.profile?.username ||
+      profile?.profile?.name ||
+      '';
     return dn;
   }
 

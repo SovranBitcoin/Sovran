@@ -14,6 +14,7 @@ import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
+import { showMessage } from 'helper/popup/popups';
 
 function TabTwoScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -48,6 +49,31 @@ function TabTwoScreen() {
     expiredVpns.length > 99 ? '99+' : expiredVpns.length,
   ];
 
+  const fetchPackages = async () => {
+    try {
+      const response = await fetch('https://esim.sovran.cash/api/vpn/countries');
+      const data = await response.json();
+
+      if (data) {
+        setFetchingPackages(data);
+        return data;
+      }
+      return null;
+    } catch (error) {
+      showMessage('vpns_error', {}, { emoji: '🚨' });
+      return null;
+    }
+  };
+
+  const handleGetDataPress = async () => {
+    setFetchingPackages(true);
+    const countries = await fetchPackages();
+    if (countries) {
+      navigation.navigate('vpns', { countries: countries });
+    }
+    setFetchingPackages(false);
+  };
+
   return (
     <Modal
       showBack={false}
@@ -60,7 +86,8 @@ function TabTwoScreen() {
             {
               text: 'Get a VPN',
               variant: 'primary',
-              onPress: () => navigation.navigate('vpns'),
+              loading: fetchingPackages,
+              onPress: handleGetDataPress,
             },
           ]}
         />

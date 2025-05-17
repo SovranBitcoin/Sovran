@@ -7,6 +7,7 @@ import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
+import { ScrollView } from 'react-native';
 
 // Organization interface
 interface Organization {
@@ -75,15 +76,17 @@ export default function OrganizationScreen() {
 
   return (
     <Container>
-      <View style={styles.organizationGrid}>
-        {FEATURED_ORGANIZATIONS.map((org) => (
-          <OrganizationTile
-            key={org.pubkey}
-            organization={org}
-            onPress={() => handleNavigation(org.pubkey)}
-          />
-        ))}
-      </View>
+      <ScrollView>
+        <View style={styles.organizationGrid}>
+          {FEATURED_ORGANIZATIONS.map((org) => (
+            <OrganizationTile
+              key={org.pubkey}
+              organization={org}
+              onPress={() => handleNavigation(org.pubkey)}
+            />
+          ))}
+        </View>
+      </ScrollView>
     </Container>
   );
 }

@@ -19,6 +19,7 @@ import lookup from 'country-code-lookup';
 import RenderHtml from 'react-native-render-html';
 import { Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
+import { ScrollView } from 'react-native';
 
 const width = Dimensions.get('window').width;
 
@@ -164,128 +165,130 @@ export default function ModalScreen() {
 
   return (
     <Container>
-      <CachedImage
-        source={image || { uri: selectedProduct?.logoPreview }}
-        style={styles.productImage}
-      />
+      <ScrollView>
+        <CachedImage
+          source={image || { uri: selectedProduct?.logoPreview }}
+          style={styles.productImage}
+        />
 
-      <SectionTitle title="Country" />
-      <TouchableOpacity onPress={handleCountrySelect}>
-        <View style={styles.productDetails}>
-          <Text size={16} weight="bold">
-            {selectedCountry ? lookup.byIso(selectedCountry)?.country : 'Select Country'}
-          </Text>
-          <Icon name="fluent:chevron-down-12-filled" size={16} color={greys(theme)[0]} />
-        </View>
-      </TouchableOpacity>
-
-      {selectedCountry && (
-        <>
-          <SectionTitle title="Amount" />
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              width: '100%',
-              backgroundColor: 'transparent',
-            }}>
-            <AmountList
-              packages={selectedProduct?.packages || []}
-              currency={selectedProduct?.currency || ''}
-              styles={styles}
-              filterCondition={true}
-              selectedAmount={selectedAmount}
-              onSelect={setSelectedAmount}
-            />
-            <AmountList
-              packages={selectedProduct?.packages || []}
-              currency={selectedProduct?.currency || ''}
-              styles={styles}
-              filterCondition={false}
-              selectedAmount={selectedAmount}
-              onSelect={setSelectedAmount}
-            />
-          </View>
-
-          <SectionTitle title="Details" />
+        <SectionTitle title="Country" />
+        <TouchableOpacity onPress={handleCountrySelect}>
           <View style={styles.productDetails}>
-            <RenderHtml
-              tagsStyles={{
-                div: {
-                  width: width - 48 - 16,
-                  color: greys(theme)[200],
-                },
-                p: {
-                  margin: 0,
-                  marginBottom: 8,
-                },
-                a: {
-                  color: shades[300],
-                  textDecorationLine: 'none',
-                },
-                ul: {
-                  margin: 0,
-                  paddingLeft: 10,
-                },
-              }}
-              source={{ html: '<div>' + selectedProduct?.descriptions?.en + '</div>' }}
-            />
+            <Text size={16} weight="bold">
+              {selectedCountry ? lookup.byIso(selectedCountry)?.country : 'Select Country'}
+            </Text>
+            <Icon name="fluent:chevron-down-12-filled" size={16} color={greys(theme)[0]} />
           </View>
+        </TouchableOpacity>
 
-          <SectionTitle title="How to Redeem" />
-          <View style={styles.productDetails}>
-            <RenderHtml
-              tagsStyles={{
-                div: {
-                  width: width - 48 - 16,
-                  color: greys(theme)[200],
-                },
-                p: {
-                  margin: 0,
-                },
-                a: {
-                  color: shades[300],
-                  textDecorationLine: 'none',
-                },
-                ul: {
-                  margin: 0,
-                  paddingLeft: 10,
-                },
-              }}
-              source={{
-                html: '<div>' + selectedProduct?.instructions?.en + '</div>',
-              }}
+        {selectedCountry && (
+          <>
+            <SectionTitle title="Amount" />
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                width: '100%',
+                backgroundColor: 'transparent',
+              }}>
+              <AmountList
+                packages={selectedProduct?.packages || []}
+                currency={selectedProduct?.currency || ''}
+                styles={styles}
+                filterCondition={true}
+                selectedAmount={selectedAmount}
+                onSelect={setSelectedAmount}
+              />
+              <AmountList
+                packages={selectedProduct?.packages || []}
+                currency={selectedProduct?.currency || ''}
+                styles={styles}
+                filterCondition={false}
+                selectedAmount={selectedAmount}
+                onSelect={setSelectedAmount}
+              />
+            </View>
+
+            <SectionTitle title="Details" />
+            <View style={styles.productDetails}>
+              <RenderHtml
+                tagsStyles={{
+                  div: {
+                    width: width - 48 - 16,
+                    color: greys(theme)[200],
+                  },
+                  p: {
+                    margin: 0,
+                    marginBottom: 8,
+                  },
+                  a: {
+                    color: shades[300],
+                    textDecorationLine: 'none',
+                  },
+                  ul: {
+                    margin: 0,
+                    paddingLeft: 10,
+                  },
+                }}
+                source={{ html: '<div>' + selectedProduct?.descriptions?.en + '</div>' }}
+              />
+            </View>
+
+            <SectionTitle title="How to Redeem" />
+            <View style={styles.productDetails}>
+              <RenderHtml
+                tagsStyles={{
+                  div: {
+                    width: width - 48 - 16,
+                    color: greys(theme)[200],
+                  },
+                  p: {
+                    margin: 0,
+                  },
+                  a: {
+                    color: shades[300],
+                    textDecorationLine: 'none',
+                  },
+                  ul: {
+                    margin: 0,
+                    paddingLeft: 10,
+                  },
+                }}
+                source={{
+                  html: '<div>' + selectedProduct?.instructions?.en + '</div>',
+                }}
+              />
+            </View>
+
+            {selectedProduct?.specialNote?.en && (
+              <Card message={selectedProduct?.specialNote?.en} variant="warning" theme={theme} />
+            )}
+
+            <Card
+              message="Gift cards are provided through a third party."
+              variant="info"
+              theme={theme}
             />
-          </View>
 
-          {selectedProduct?.specialNote?.en && (
-            <Card message={selectedProduct?.specialNote?.en} variant="warning" theme={theme} />
-          )}
-
-          <Card
-            message="Gift cards are provided through a third party."
-            variant="info"
-            theme={theme}
-          />
-
-          <Button
-            onPress={() =>
-              SheetManager.show('email-sheet', {
-                onClose: (response: { action: string; message: string }) => {
-                  if (response?.action === 'confirm' && response?.message) {
-                    navigation.navigate('bitrefill', {
-                      product: selectedProduct,
-                      country: selectedCountry,
-                      amount: selectedAmount,
-                    });
-                  }
-                },
-              })
-            }
-            text="Buy"
-          />
-        </>
-      )}
+            <Button
+              onPress={() =>
+                SheetManager.show('email-sheet', {
+                  onClose: (response: { action: string; message: string }) => {
+                    if (response?.action === 'confirm' && response?.message) {
+                      navigation.navigate('bitrefill', {
+                        product: selectedProduct,
+                        country: selectedCountry,
+                        amount: selectedAmount,
+                      });
+                    }
+                  },
+                })
+              }
+              text="Buy"
+            />
+          </>
+        )}
+      </ScrollView>
     </Container>
   );
 }

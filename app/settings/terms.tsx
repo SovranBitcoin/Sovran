@@ -8,6 +8,7 @@ import Container from 'components/layout/Container';
 import React, { useState } from 'react';
 import Checkbox from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { ScrollView } from 'react-native';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -197,33 +198,35 @@ export default function TermsConditionsScreen({ onClose }) {
 
   return (
     <Container scroll={true} style={styles.container}>
-      <Text style={styles.titleText}>Terms</Text>
+      <ScrollView>
+        <Text style={styles.titleText}>Terms</Text>
 
-      {/* <View style={styles.scrollContainer}> */}
-      {/* <ScrollView
+        {/* <View style={styles.scrollContainer}> */}
+        {/* <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       > */}
-      <Text style={styles.termsText}>{terms}</Text>
-      {/* </ScrollView> */}
-      {/* </View> */}
-      <View
-        style={{
-          marginTop: 64,
-        }}>
-        <Button text="Next" onPress={onClose} disabled={!isChecked} />
+        <Text style={styles.termsText}>{terms}</Text>
+        {/* </ScrollView> */}
+        {/* </View> */}
+        <View
+          style={{
+            marginTop: 64,
+          }}>
+          <Button text="Next" onPress={onClose} disabled={!isChecked} />
 
-        <TouchableOpacity style={styles.checkboxContainer} onPress={toggleCheckbox}>
-          <Checkbox
-            value={isChecked}
-            onValueChange={toggleCheckbox}
-            color={isChecked ? shades[300] : undefined}
-          />
-          <Text id="terms-checkbox" style={styles.checkboxText}>
-            I have read and agree to the Terms and Conditions
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.checkboxContainer} onPress={toggleCheckbox}>
+            <Checkbox
+              value={isChecked}
+              onValueChange={toggleCheckbox}
+              color={isChecked ? shades[300] : undefined}
+            />
+            <Text id="terms-checkbox" style={styles.checkboxText}>
+              I have read and agree to the Terms and Conditions
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </Container>
   );
 }

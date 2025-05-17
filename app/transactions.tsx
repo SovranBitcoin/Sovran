@@ -5,11 +5,11 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useState } from 'react';
-import React from 'react';
 import { Transactions } from 'components/layout/Transactions';
 import Container from 'components/layout/Container';
 import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
+import { ScrollView } from 'react-native';
 
 import Modal from 'components/layout/Modal';
 import { Tabs } from 'components/common/Tabs';

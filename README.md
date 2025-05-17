@@ -50,3 +50,10 @@ Go to `Settings > Profile` to see all your mnemonics.
 Also it didn't feel right for the NIP06 and NUT13 to share the same mnemonic.
 
 We are the only ones to my knowledge who are trying to create a single mnemonic phrase to recover _multiple_ nostr profiles which all have ecash in _multiple_ mints.
+
+## TODO:
+
+- When opening the wallet lets fetch all the mint infos and keysets just to be up-to-date.
+- When I make a transaction and new proofs are created, and if they produce keysetId's I've never seen before I should automatically fetch the keyset from the mint and it to redux. I think this will ensure I always have all the keysets.
+- Check nut13 mnemonic is stored correctly so we don't need to compute it every tx.
+- Create better Container component that handles: Buttons, Scrolling, Keyboard Avoiding, Safe Area, works in Modals or regular screens, handles titles, handles back buttons, handles navigation.

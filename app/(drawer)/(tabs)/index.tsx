@@ -19,6 +19,7 @@ import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
 import { AccountPagerView } from '../../../components/layout/AccountPagerView';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { isProduction } from 'helper/version';
 
 async function getProfile(currentProfile) {
   const sk = nip19.decode(currentProfile?.nsec).data;
@@ -75,7 +76,7 @@ function TabOneScreen({
     },
   ],
 }) {
-  const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
+  const supportedUnits = isProduction ? ['sat', 'usd', 'eur', 'gbp'] : ['sat'];
 
   const [accounts, setAccounts] = useState([
     ...currencies.filter((u) => supportedUnits.includes(u.unit)),

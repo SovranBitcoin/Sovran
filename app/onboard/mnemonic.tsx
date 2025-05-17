@@ -129,11 +129,21 @@ const RecoveryScreen: React.FC<{}> = () => {
 
   // Handle submit from keyboard
   const handleSubmitEditing = () => {
-    handleNextWord();
+    if (activeWordIndex === TOTAL_WORDS - 1) {
+      handleSubmit();
+    } else {
+      handleNextWord();
+    }
   };
 
   // Handle key press for backspace functionality
   const handleKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    console.log(nativeEvent);
+    // if keypress is next then try to submit
+    if (nativeEvent.key === 'Next' && isSubmitEnabled()) {
+      handleSubmit();
+    }
+
     if (nativeEvent.key === 'Backspace' && currentInput === '' && activeWordIndex > 0) {
       // Move to previous word if current word is empty and backspace is pressed
       if (isVerifyMode) {
@@ -312,7 +322,10 @@ const RecoveryScreen: React.FC<{}> = () => {
                     : `Enter word ${activeWordIndex + 1} of 12`
                 }
                 placeholderTextColor={greys(theme)[700]}
-                returnKeyType="next"
+                returnKeyType={
+                  // if on last one
+                  activeWordIndex === words.length - 1 ? 'done' : 'next'
+                }
               />
             </View>
             <View style={styles.gridContainer}>

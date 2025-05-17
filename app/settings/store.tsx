@@ -5,6 +5,7 @@ import { Text } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
 import _ from 'lodash';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { ScrollView } from 'react-native';
 
 export default function ModalScreen() {
   const store = useSelector((state) => state);
@@ -60,12 +61,12 @@ export default function ModalScreen() {
 
   return (
     <Container>
-      <Text style={{ color: 'white' }}>
-        {JSON.stringify(store.cashu.profiles[0].proofs, null, 2)}
-      </Text>
-      <TouchableOpacity onPress={copyToClipboard}>
-        <Text style={{ color: 'red', backgroundColor: 'pink' }}>Copy Store to Clipboard</Text>
-      </TouchableOpacity>
+      <ScrollView>
+        <Text style={{ color: 'white' }}>{JSON.stringify(store, null, 2)}</Text>
+        <TouchableOpacity onPress={copyToClipboard}>
+          <Text style={{ color: 'red', backgroundColor: 'pink' }}>Copy Store to Clipboard</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </Container>
   );
 }

@@ -9,6 +9,7 @@ import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
+import { ScrollView } from 'react-native';
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -147,40 +148,42 @@ export default function ModalScreen() {
 
   return (
     <Container>
-      <View style={styles.productGrid}>
-        {availableProducts.map((product, index) => (
+      <ScrollView>
+        <View style={styles.productGrid}>
+          {availableProducts.map((product, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => handleProductPress(product)}
+              style={styles.productCard}>
+              {product.productImage && (
+                <CachedImage source={product.productImage} style={styles.productImage} />
+              )}
+              <View style={styles.productInfo}>
+                <Text size={16} weight="bold">
+                  {product.title}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
           <TouchableOpacity
-            key={index}
-            onPress={() => handleProductPress(product)}
-            style={styles.productCard}>
-            {product.productImage && (
-              <CachedImage source={product.productImage} style={styles.productImage} />
-            )}
-            <View style={styles.productInfo}>
-              <Text size={16} weight="bold">
-                {product.title}
-              </Text>
-            </View>
+            onPress={() => {
+              SheetManager.show('email-sheet', {
+                onClose: (response: { action: string; message: string }) => {
+                  if (response?.action === 'confirm' && response?.message) {
+                    navigation.navigate('bitrefill', {
+                      email: response.message,
+                    });
+                  }
+                },
+              });
+            }}
+            style={styles.searchButton}>
+            <Text size={16} weight="bold">
+              Search All Giftcards
+            </Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity
-          onPress={() => {
-            SheetManager.show('email-sheet', {
-              onClose: (response: { action: string; message: string }) => {
-                if (response?.action === 'confirm' && response?.message) {
-                  navigation.navigate('bitrefill', {
-                    email: response.message,
-                  });
-                }
-              },
-            });
-          }}
-          style={styles.searchButton}>
-          <Text size={16} weight="bold">
-            Search All Giftcards
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      </ScrollView>
     </Container>
   );
 }

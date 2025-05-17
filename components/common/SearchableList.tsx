@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Pressable, ViewStyle } from 'react-native';
+import { Pressable, ViewStyle, ScrollView } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
@@ -68,7 +68,7 @@ export function SearchableList({
     <View style={{ backgroundColor: greys(theme)[2300] }}>
       <TextInput placeholder={searchPlaceholder} value={searchText} onChangeText={onSearchChange} />
       <View className="h-4" style={{ backgroundColor: 'transparent' }} />
-      {data.map(renderItem)}
+      <ScrollView>{data.map(renderItem)}</ScrollView>
     </View>
   );
 }

@@ -44,7 +44,7 @@ function ModalScreen() {
 
     try {
       const response = await fetch(
-        `https://esim.sovran.cash/search?query=${encodeURIComponent(query)}&limit=10`
+        `https://esim.sovran.cash/api/search?query=${encodeURIComponent(query)}&limit=10`
       );
       const data = await response.json();
 

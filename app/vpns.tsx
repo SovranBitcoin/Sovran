@@ -13,6 +13,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { getCountry } from './esimCountrySelection';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -20,6 +21,7 @@ function ModalScreen() {
 
   const { params } = useRoute();
   const [country, setCountry] = useState('RU');
+  console.log(123123, country, params);
 
   const [dataType, setDataType] = useState('Local');
   const [packages, setPackages] = useState([
@@ -54,7 +56,7 @@ function ModalScreen() {
       price: 9,
     },
   ]);
-  const [countries, setCountries] = useState([]);
+  // const [countries, setCountries] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(3);
   const [loading, setLoading] = useState(false);
 
@@ -69,52 +71,9 @@ function ModalScreen() {
   // }, []);
 
   useEffect(() => {
-    function getCountryCode(countryName) {
-      // Map the input country string to match the format recognized by Intl.DisplayNames
-      const countryMap = {
-        '🇸🇬 Singapore': 'SG',
-        '🇺🇸 United States': 'US',
-        // "🇺🇸 United States 2 (NY)": "US",
-        '🇫🇮 Finland': 'FI',
-        '🇬🇧 United Kingdom': 'GB',
-        '🇨🇦 Canada': 'CA',
-        '🇮🇳 India': 'IN',
-        '🇳🇱 Netherlands': 'NL',
-        '🇷🇺 Russia': 'RU',
-        '🇺🇦 Ukraine': 'UA',
-        '🇨🇭 Switzerland': 'CH',
-        '🇮🇱 Israel': 'IL',
-        '🇰🇿 Kazakhstan': 'KZ',
-        '🇷🇴 Romania': 'RO',
-        '🇰🇪 Kenya': 'KE',
-        '🇮🇸 Iceland': 'IS',
-      };
-
-      return countryMap[countryName];
-    }
-
     if (params?.packageList) {
       setPackages(JSON.parse(params?.packageList));
     }
-
-    fetch('https://lnvpn.net/api/v1/countryList')
-      .then((response) => {
-        response.json().then((data) => {
-          const c = data
-            .map((country) => {
-              return {
-                country: getCountryCode(country.country),
-                cc: country.cc,
-              };
-            })
-            .filter((d) => {
-              return d.country !== 'NL' && d.country !== 'CH';
-            });
-          setCountries(c);
-        });
-      })
-      .catch((error) => {})
-      .finally(() => {});
   }, []);
 
   useEffect(() => {
@@ -122,6 +81,7 @@ function ModalScreen() {
       setCountry(params?.country);
     }
   }, [params?.country]);
+  console.log(192837, params.country, params.countries);
 
   const handleCountryChange = (newCountry) => {
     setCountry(newCountry);
@@ -147,27 +107,23 @@ function ModalScreen() {
       (p) => p.packageCode === selectedPackage
     )?.duration_code;
     try {
-      const response = await fetch('https://lnvpn.net/api/v1/getInvoice', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-origin',
-          Priority: 'u=0',
-        },
-        body: `duration=${selectedPackageDurationCode}`,
-        mode: 'cors',
-        credentials: 'omit',
-      });
+      const response = await fetch(
+        `https://esim.sovran.cash/api/vpn/invoice?duration=${selectedPackageDurationCode}`
+      );
+
+      console.log(response);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch VPN invoice: ${response.status} ${response.statusText}`);
+      }
+
       const data = await response.json();
 
       setVpn({
         location: country,
         duration: selectedPackageDuration,
         duration_code: selectedPackageDurationCode,
-        cc: countries.find((c) => c.country === country)?.cc,
+        cc: params?.countries.find((c) => c.isoCode === country)?.cc,
         created_at: new Date().toISOString(),
         ...data,
       });
@@ -223,11 +179,11 @@ function ModalScreen() {
               <Button
                 text={'Change'}
                 variant="primary"
-                position="left"
+                // position="left"
                 noPadding
                 onPress={() => {
                   navigation.navigate('esimCountrySelection', {
-                    countries: countries.map((c) => c.country),
+                    countries: params?.countries,
                     type: 'vpn',
                   });
                 }}

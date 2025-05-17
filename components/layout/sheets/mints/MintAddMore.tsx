@@ -18,6 +18,7 @@ import { getMint } from 'components/cashu';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import Container from 'components/layout/Container';
 import Modal from 'components/layout/Modal';
+import { isDev, isProduction, isTestFlight } from 'helper/version';
 
 interface MintCount {
   mintUrl: string;
@@ -290,14 +291,18 @@ function useRecommendedMints(): { mintCounts: MintCount[] } {
           totalCount: 16,
           count: 0,
         },
-        {
-          mintUrl: 'https://testnut.cashu.space',
-          count: 999,
-        },
-        {
-          mintUrl: 'https://nofees.testnut.cashu.space',
-          count: 998,
-        },
+        ...(isDev
+          ? [
+              {
+                mintUrl: 'https://testnut.cashu.space',
+                count: 999,
+              },
+              {
+                mintUrl: 'https://nofees.testnut.cashu.space',
+                count: 998,
+              },
+            ]
+          : []),
       ],
     ].reduce((acc: MintCount[], curr) => {
       const existing = acc.find((item) => item.mintUrl === curr.mintUrl);
@@ -308,8 +313,6 @@ function useRecommendedMints(): { mintCounts: MintCount[] } {
       }
       return acc;
     }, []);
-
-    console.log(23283728372, counts);
 
     counts.sort((a, b) => b.count - a.count);
     return counts;
@@ -423,7 +426,11 @@ export function MintAddMore({ onClose, payload }) {
 
   // Extract allowed currencies from payload
   const allowedCurrencies = useMemo(
-    () => new Set((payload?.currencies || ['SAT']).map((curr) => curr.toUpperCase())),
+    () =>
+      new Set(
+        payload?.currencies?.map((curr) => curr.toUpperCase()) ||
+          (isProduction ? ['SAT', 'USD', 'EUR', 'GBP'] : ['SAT']).map((curr) => curr.toUpperCase())
+      ),
     [payload]
   );
 

@@ -6,6 +6,7 @@ import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { isProduction } from 'helper/version';
 
 // Define interface for balance items
 interface BalanceItem {
@@ -23,7 +24,7 @@ interface CurrencySelectorProps {
   onCurrencyChange: (currency: string) => void;
 }
 
-const SUPPORTED_CURRENCIES = ['SAT', 'USD', 'EUR', 'GBP'];
+const SUPPORTED_CURRENCIES = isProduction ? ['SAT', 'USD', 'EUR', 'GBP'] : ['SAT'];
 
 const CurrencySelector: React.FC<CurrencySelectorProps> = ({
   selectedCurrency,

@@ -38,7 +38,9 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
 
   const seed = root.derive(`${DERIVATION_PATH}/0'/${currentProfile?.id}'/0/0`);
 
-  const cashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
+  // const cashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
+
+  const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
 
   const wallet = new CashuWallet(mint, {
     unit,

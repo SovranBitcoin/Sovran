@@ -73,12 +73,12 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
    * Handles pasting ecash tokens from clipboard
    */
   const handleEcashPaste = async (): Promise<void> => {
-    const hasReadPermission = await Clipboard.hasStringAsync();
+    // const hasReadPermission = await Clipboard.hasStringAsync();
 
-    if (!hasReadPermission) {
-      showMessage('clipboard_permission_denied', {}, { emoji: '🚨' });
-      return;
-    }
+    // if (!hasReadPermission) {
+    //   showMessage('clipboard_permission_denied', {}, { emoji: '🚨' });
+    //   return;
+    // }
 
     const text = await Clipboard.getStringAsync();
 

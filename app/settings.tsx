@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';
@@ -174,25 +174,26 @@ const ModalScreen: React.FC<{}> = () => {
 
   return (
     <Container>
-      <Section title="Account">
-        <ProfileButton currentProfile={currentProfile} theme={theme} />
-        {/* <RowButton
+      <ScrollView>
+        <Section title="Account">
+          <ProfileButton currentProfile={currentProfile} theme={theme} />
+          {/* <RowButton
           label="Manage Profiles"
           onPress={() => {
             SheetManager.show('sheet-with-router');
           }}
         /> */}
-      </Section>
-      <Section title="Preferences">
-        <RowButton label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
-        <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
-        <RowButton
-          label="Theme"
-          onPress={() => {
-            navigation.navigate('themeSettings');
-          }}
-        />
-        {/* <RowButton
+        </Section>
+        <Section title="Preferences">
+          <RowButton label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
+          <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
+          <RowButton
+            label="Theme"
+            onPress={() => {
+              navigation.navigate('themeSettings');
+            }}
+          />
+          {/* <RowButton
           label="Language"
           onPress={() => {
             navigation.navigate('languageSettings', {
@@ -200,44 +201,44 @@ const ModalScreen: React.FC<{}> = () => {
             });
           }}
         /> */}
-      </Section>
-      <Section title="App Information">
-        <RowButton
-          label="About This Release"
-          onPress={() => {
-            navigation.navigate('settings/about');
-          }}
-        />
-        <RowButton
-          label="View Source on GitHub"
-          onPress={() => {
-            Linking.openURL('https://github.com/SovranBitcoin/Sovran');
-          }}
-        />
-        <RowButton
-          label="Contact the Developer"
-          onPress={() => {
-            Linking.openURL('https://x.com/KevinKelbie');
-          }}
-        />
-      </Section>
-      <Section title="Security">
-        <RowButton
-          label="Show Seed Phrase"
-          onPress={() => {
-            navigation.navigate('settings/showSeedPhrase');
-          }}
-          isFirst
-        />
-        <RowButton
-          label="Verify Seed Phrase"
-          onPress={() => {
-            navigation.navigate('settings/verifySeedPhrase');
-          }}
-          isFirst
-        />
-      </Section>
-      {/* <Section title="npub.cash Settings">
+        </Section>
+        <Section title="App Information">
+          <RowButton
+            label="About This Release"
+            onPress={() => {
+              navigation.navigate('settings/about');
+            }}
+          />
+          <RowButton
+            label="View Source on GitHub"
+            onPress={() => {
+              Linking.openURL('https://github.com/SovranBitcoin/Sovran');
+            }}
+          />
+          <RowButton
+            label="Contact the Developer"
+            onPress={() => {
+              Linking.openURL('https://x.com/KevinKelbie');
+            }}
+          />
+        </Section>
+        <Section title="Security">
+          <RowButton
+            label="Show Seed Phrase"
+            onPress={() => {
+              navigation.navigate('settings/showSeedPhrase');
+            }}
+            isFirst
+          />
+          <RowButton
+            label="Verify Seed Phrase"
+            onPress={() => {
+              navigation.navigate('settings/verifySeedPhrase');
+            }}
+            isFirst
+          />
+        </Section>
+        {/* <Section title="npub.cash Settings">
         <View style={styles.rowWrapper}>
           <View style={[styles.row, styles.rowFirst, styles.rowLast]}>
             <Text style={styles.rowLabel}>Listen for Transactions</Text>
@@ -255,73 +256,80 @@ const ModalScreen: React.FC<{}> = () => {
           }}
         />
       </Section> */}
-      {/* <Section title="Mint Settings">
+        {/* <Section title="Mint Settings">
         <RowButton
           label="Manage Mints"
           onPress={() => {
             SheetManager.show("mint");
           }}
         /> */}
-      {/* <RowButton
+        {/* <RowButton
           label="Mint allocation"
           onPress={() => {
             navigation.navigate("mints");
           }}
         /> */}
-      {/* </Section> */}
-      <Section title="Danger Zone" isDanger>
-        <RowButton
-          label="Delete Account"
-          onPress={() => {
-            SheetManager.show('delete-router');
-          }}
-          isLast
-          isDanger
-        />
-      </Section>
-      <Section title="Debugging">
-        <RowButton
+        {/* </Section> */}
+        <Section title="Danger Zone" isDanger>
+          <RowButton
+            label="Delete Account"
+            onPress={() => {
+              SheetManager.show('delete-router');
+            }}
+            isLast
+            isDanger
+          />
+        </Section>
+        <Section title="Advanced Debugging">
+          {/* <RowButton
           label="Show Local Storage"
           onPress={() => {
             navigation.navigate('settings/store');
           }}
-        />
-        <RowButton
-          label="Restore Counter"
+        /> */}
+          <RowButton
+            label="Nostr Data"
+            onPress={() => {
+              navigation.navigate('settings/nostrData');
+            }}
+          />
+          <RowButton
+            label="Restore Counter"
+            onPress={() => {
+              navigation.navigate('settings/restoreCounter');
+            }}
+          />
+          <RowButton
+            label="Check Proofs"
+            onPress={() => {
+              navigation.navigate('settings/proofs');
+            }}
+          />
+        </Section>
+        <TouchableOpacity
           onPress={() => {
-            navigation.navigate('settings/restoreCounter');
-          }}
-        />
-        <RowButton
-          label="Check Proofs"
-          onPress={() => {
-            navigation.navigate('settings/proofs');
-          }}
-        />
-      </Section>
-      <TouchableOpacity
-        onPress={() => {
-          navigation.navigate('settings/design');
-        }}>
-        <Text
-          style={[
-            styles.contentFooter,
-            {
-              fontFamily: 'OverpassBold',
-            },
-          ]}>
-          {name}
-        </Text>
-        <Text
-          style={[
-            styles.contentFooter,
-            {
-              marginTop: 4,
-            },
-          ]}>
-          App Version {version} ({buildNumber})
-        </Text>
-      </TouchableOpacity>
+            navigation.navigate('settings/design');
+          }}>
+          <Text
+            style={[
+              styles.contentFooter,
+              {
+                fontFamily: 'OverpassBold',
+              },
+            ]}>
+            {name}
+          </Text>
+          <Text
+            style={[
+              styles.contentFooter,
+              {
+                marginTop: 4,
+              },
+            ]}>
+            App Version {version} ({buildNumber})
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </Container>
   );
 };

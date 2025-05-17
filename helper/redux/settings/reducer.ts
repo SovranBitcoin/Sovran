@@ -1,4 +1,10 @@
-import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME, TERMS_ACCEPTED } from './actionTypes';
+import {
+  SET_DISPLAY_BITCOIN,
+  SET_LANGUAGE,
+  SET_THEME,
+  TERMS_ACCEPTED,
+  SET_EXPERIMENTAL,
+} from './actionTypes';
 
 const initialState = {
   settings: {
@@ -46,6 +52,15 @@ export const settingsReducer = (state = initialState, action) => {
             termsAccepted: true,
             date: action.payload.date,
           },
+        },
+      };
+    }
+    case SET_EXPERIMENTAL: {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          experimental: action.payload,
         },
       };
     }

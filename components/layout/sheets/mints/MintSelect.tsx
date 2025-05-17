@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import _ from 'lodash';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { store } from 'helper/redux/store';
+import { isProduction } from 'helper/version';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -235,7 +236,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   // limit to specified currencies: sat, eur, gbp, usd
   const currencies: SupportedCurrency[] = _.uniq(
     multipleBalances.map((b) => b.unit?.toUpperCase())
-  ).filter((c) => ['SAT', 'EUR', 'GBP', 'USD'].includes(c));
+  ).filter((c) => (isProduction ? ['SAT', 'EUR', 'GBP', 'USD'] : ['SAT']).includes(c));
 
   // Filter mints based on the selected currency
   const filteredMints = useMemo(() => {

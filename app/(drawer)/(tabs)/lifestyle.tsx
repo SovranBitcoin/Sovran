@@ -7,6 +7,7 @@ import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';
+import { RootState } from 'helper/redux/store/reducer';
 
 // Constants
 const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
@@ -87,6 +88,8 @@ const ServicesSection = () => {
     }
   };
 
+  const settings = useSelector((state: RootState) => state.settings.settings);
+
   return (
     <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}>
       <Text
@@ -100,7 +103,9 @@ const ServicesSection = () => {
         Lifestyle
       </Text>
       <View style={styles.gridContainer}>
-        {SERVICE_MENU_ITEMS.map((item) => (
+        {SERVICE_MENU_ITEMS.filter((item) =>
+          item.id === 'giftcards' ? settings?.experimental : true
+        ).map((item) => (
           <MenuItem
             key={item.id}
             item={item}

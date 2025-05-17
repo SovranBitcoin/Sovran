@@ -81,13 +81,12 @@ async function publishWalletEvent(
         ...mints
           .filter((item, index, self) => index === self.findIndex((t) => t === item))
           .map((mint) => ['mint', mint]),
-        ['name', 'Cashu Wallet'],
+        ['name', 'Sovran Wallet'],
         ['unit', 'sat'],
-        ['description', 'Mobile Cashu wallet'],
+        ['description', 'iOS Sovran wallet'],
         ...relays
           .filter((item, index, self) => index === self.findIndex((t) => t === item))
           .map((relay) => ['relay', relay]),
-        ['alt', 'Cashu mobile wallet'],
       ],
       pubkey: pubKey,
       content: '', // You might want to add encrypted content here using nip44

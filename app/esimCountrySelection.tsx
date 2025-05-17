@@ -12,6 +12,14 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
+export const getCountry = (iso) => {
+  try {
+    return lookup.byIso(iso)?.country;
+  } catch (err) {
+    return undefined;
+  }
+};
+
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -19,15 +27,8 @@ function ModalScreen() {
   const { countries, packageList, type } = useTypedRoute<'esimCountrySelection'>();
   const [searchText, setSearchText] = useState('');
 
-  const getCountry = (iso) => {
-    try {
-      return lookup.byIso(iso)?.country;
-    } catch (err) {
-      return undefined;
-    }
-  };
-
   const filteredCountries = countries
+    ?.map((c) => (type === 'vpn' ? c.isoCode : c))
     .filter((c) => {
       try {
         const countryName = lookup.byIso(c)?.country || '';

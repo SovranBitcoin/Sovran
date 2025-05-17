@@ -7,6 +7,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
 import { getWallet } from 'helper/cashu';
 import { removeProofs } from 'helper/redux/cashu'; // Import the removeProofs action
+import { ScrollView } from 'react-native';
 
 export default function ModalScreen() {
   const dispatch = useDispatch(); // Add dispatch hook
@@ -190,94 +191,96 @@ export default function ModalScreen() {
 
   return (
     <Container>
-      <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>Proof Status</Text>
+      <ScrollView>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>Proof Status</Text>
 
-      {error && <Text style={{ color: reds[300], marginBottom: 12 }}>{error}</Text>}
+        {error && <Text style={{ color: reds[300], marginBottom: 12 }}>{error}</Text>}
 
-      <Button text="Refresh All Proofs" onPress={checkAllMints} disabled={checkingSpent} />
+        <Button text="Refresh All Proofs" onPress={checkAllMints} disabled={checkingSpent} />
 
-      {checkingSpent && <Text style={{ marginTop: 10 }}>Checking proof status...</Text>}
-      {removingSpent && <Text style={{ marginTop: 10 }}>Removing spent proofs...</Text>}
+        {checkingSpent && <Text style={{ marginTop: 10 }}>Checking proof status...</Text>}
+        {removingSpent && <Text style={{ marginTop: 10 }}>Removing spent proofs...</Text>}
 
-      {activeMintsData.map((mintData) => {
-        const spentProofCount = getSpentProofCount(mintData.url);
+        {activeMintsData.map((mintData) => {
+          const spentProofCount = getSpentProofCount(mintData.url);
 
-        return (
-          <View
-            key={mintData.url}
-            style={{
-              marginTop: 16,
-              padding: 10,
-              borderWidth: 1,
-              borderColor: greys(theme)[1800],
-              backgroundColor: greys(theme)[2000],
-              borderRadius: 8,
-            }}>
+          return (
             <View
-              style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text
-                style={{ fontWeight: 'bold', flex: 1 }}
-                numberOfLines={1}
-                ellipsizeMode="middle">
-                {mintData.url}
-              </Text>
-              <Text style={{ fontWeight: 'bold' }}>Total: {mintData.totalAmount} sats</Text>
-            </View>
-
-            <Button
-              text={`Check ${mintData.proofs.length} Proofs`}
-              onPress={() => checkProofSpentStatus(mintData.url)}
-              disabled={checkingSpent}
-              style={{ marginBottom: 10 }}
-            />
-
-            {mintData.proofs.length > 0 && (
-              <View>
-                {mintData.proofs.map((proof, index) => {
-                  const states = proofStates[mintData.url] || [];
-                  const state = states[index];
-                  const isSpent = state?.state === 'SPENT';
-                  const isPending = state?.state === 'PENDING';
-                  const statusColor = isSpent ? reds[300] : isPending ? 'orange' : greens[300];
-
-                  return (
-                    <View
-                      key={`${proof.id}-${index}`}
-                      style={{
-                        flexDirection: 'row',
-                        padding: 8,
-                        marginBottom: 4,
-                        borderRadius: 4,
-                      }}>
-                      <Text style={{ flex: 0.15 }}>#{index + 1}</Text>
-                      <Text style={{ flex: 0.2 }}>{proof.amount} sats</Text>
-                      <Text style={{ flex: 0.35, color: statusColor, fontWeight: 'bold' }}>
-                        {state?.state || 'UNKNOWN'}
-                      </Text>
-                      <Text
-                        style={{ flex: 0.3, fontFamily: 'monospace', fontSize: 10 }}
-                        numberOfLines={1}>
-                        {proof?.id ? `${proof.id.substring(0, 8)}...` : 'N/A'}
-                      </Text>
-                    </View>
-                  );
-                })}
-
-                {/* Add Remove Spent Proofs button at the bottom of the list */}
-                <Button
-                  text={`Remove ${spentProofCount} Spent Proofs`}
-                  onPress={() => removeSpentProofsForMint(mintData.url)}
-                  disabled={removingSpent || spentProofCount === 0}
-                  style={{
-                    marginTop: 10,
-                    backgroundColor: spentProofCount > 0 ? reds[300] : undefined,
-                  }}
-                />
+              key={mintData.url}
+              style={{
+                marginTop: 16,
+                padding: 10,
+                borderWidth: 1,
+                borderColor: greys(theme)[1800],
+                backgroundColor: greys(theme)[2000],
+                borderRadius: 8,
+              }}>
+              <View
+                style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text
+                  style={{ fontWeight: 'bold', flex: 1 }}
+                  numberOfLines={1}
+                  ellipsizeMode="middle">
+                  {mintData.url}
+                </Text>
+                <Text style={{ fontWeight: 'bold' }}>Total: {mintData.totalAmount} sats</Text>
               </View>
-            )}
-          </View>
-        );
-      })}
+
+              <Button
+                text={`Check ${mintData.proofs.length} Proofs`}
+                onPress={() => checkProofSpentStatus(mintData.url)}
+                disabled={checkingSpent}
+                style={{ marginBottom: 10 }}
+              />
+
+              {mintData.proofs.length > 0 && (
+                <View>
+                  {mintData.proofs.map((proof, index) => {
+                    const states = proofStates[mintData.url] || [];
+                    const state = states[index];
+                    const isSpent = state?.state === 'SPENT';
+                    const isPending = state?.state === 'PENDING';
+                    const statusColor = isSpent ? reds[300] : isPending ? 'orange' : greens[300];
+
+                    return (
+                      <View
+                        key={`${proof.id}-${index}`}
+                        style={{
+                          flexDirection: 'row',
+                          padding: 8,
+                          marginBottom: 4,
+                          borderRadius: 4,
+                        }}>
+                        <Text style={{ flex: 0.15 }}>#{index + 1}</Text>
+                        <Text style={{ flex: 0.2 }}>{proof.amount} sats</Text>
+                        <Text style={{ flex: 0.35, color: statusColor, fontWeight: 'bold' }}>
+                          {state?.state || 'UNKNOWN'}
+                        </Text>
+                        <Text
+                          style={{ flex: 0.3, fontFamily: 'monospace', fontSize: 10 }}
+                          numberOfLines={1}>
+                          {proof?.id ? `${proof.id.substring(0, 8)}...` : 'N/A'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+
+                  {/* Add Remove Spent Proofs button at the bottom of the list */}
+                  <Button
+                    text={`Remove ${spentProofCount} Spent Proofs`}
+                    onPress={() => removeSpentProofsForMint(mintData.url)}
+                    disabled={removingSpent || spentProofCount === 0}
+                    style={{
+                      marginTop: 10,
+                      backgroundColor: spentProofCount > 0 ? reds[300] : undefined,
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
     </Container>
   );
 }

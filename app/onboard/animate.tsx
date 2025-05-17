@@ -28,6 +28,7 @@ import _ from 'lodash';
 import { getProfile } from './components/fetchAccountData';
 import { Currency } from './components/CurrencyIcon';
 import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 const { height } = Dimensions.get('window');
 
@@ -114,19 +115,27 @@ const ChainLoadingAnimation = () => {
           const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
 
           // Transform profiles with additional data
-          const processedProfiles = profiles.map((profile) => ({
-            ...profile,
-            id: profile.id,
-            pubkey: profile.pubkey,
-            picture: profile.profile?.image,
-            npub: profile.npub,
-            nsec: profile.nsec,
-            mnemonic,
-            root: {
-              xpub: root.publicExtendedKey,
-              xpriv: root.privateExtendedKey,
-            },
-          }));
+          const processedProfiles = profiles.map((profile, index) => {
+            const DERIVATION_PATH = `m/44'/129372'`;
+            const path = `${DERIVATION_PATH}/0'/${index}'/0/0`;
+            const seed = root.derive(path);
+            const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey, wordlist);
+
+            return {
+              ...profile,
+              id: profile.id,
+              pubkey: profile.pubkey,
+              picture: profile.profile?.image,
+              npub: profile.npub,
+              nsec: profile.nsec,
+              mnemonic,
+              root: {
+                xpub: root.publicExtendedKey,
+                xpriv: root.privateExtendedKey,
+              },
+              nut13: derivedCashuMnemonic,
+            };
+          });
 
           // Create and add profile steps
           const profileSteps = processedProfiles.map((profile, index) => ({
