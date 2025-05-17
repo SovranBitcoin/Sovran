@@ -79,6 +79,4 @@ const configWithMonicon = withMonicon(config, {
   ]
 });
 
-configWithMonicon
-
 module.exports = withNativeWind(configWithMonicon, { input: './global.css' });

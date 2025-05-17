@@ -6,6 +6,7 @@ import _ from 'lodash/fp';
 
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
@@ -234,13 +235,43 @@ const migrations = {
       state
     );
   },
+  72: (state: RootState) => {
+    return _.update(
+      ['nostr', 'profiles'],
+      (profiles = []) =>
+        profiles.map((profile: any, index: number) => {
+          if (profile?.nut13) {
+            return profile;
+          }
+
+          try {
+            const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(profile.mnemonic));
+            const DERIVATION_PATH = `m/44'/129372'`;
+            const path = `${DERIVATION_PATH}/0'/${index}'/0/0`;
+            const seed = root.derive(path);
+            const derivedCashuMnemonic = bip39.entropyToMnemonic(
+              seed.privateKey as Uint8Array,
+              wordlist
+            );
+
+            return {
+              ...profile,
+              nut13: derivedCashuMnemonic,
+            };
+          } catch (error) {
+            return profile;
+          }
+        }),
+      state
+    );
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 40,
+  version: 72,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
