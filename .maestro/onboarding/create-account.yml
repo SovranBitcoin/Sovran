@@ -5,51 +5,51 @@ appId: com.sovranbitcoin
 - runFlow:
     file: terms.yml
 
-- startRecording:
-    path: './.maestro/onboarding/create-account-video'
-    label: 'Onboarding'
+# - startRecording:
+#     path: './.maestro/onboarding/create-account-video'
+#     label: 'Onboarding'
 
 - assertVisible: 'Welcome to'
 - assertVisible: 'Sovran'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_1'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_1'
 - tapOn: 'Next'
 
 - assertVisible: 'BITCOIN THAT'
 - assertVisible: 'FEELS LIKE CASH'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_2'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_2'
 - tapOn: 'Next'
 
 - assertVisible: 'POWERED BY'
 - assertVisible: 'NOSTR'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_3'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_3'
 - tapOn: 'Next'
 
 - assertVisible: 'Create Sovran Profile'
 - tapOn: 'Your public profile name'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_4'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_4'
 - inputText: 'Test'
 - hideKeyboard
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_5'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_5'
 - tapOn: 'Create Sovran Account'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_6'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_6'
 
 - assertVisible: 'Your Recovery Phrase'
 - copyTextFrom:
@@ -61,15 +61,15 @@ appId: com.sovranbitcoin
 - copyTextFrom:
     id: 'mnemonic-word-11'
 - evalScript: ${output.word11 = maestro.copiedText}
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_5'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_5'
 - tapOn: "I've written it down"
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_6'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_6'
 - tapOn: "Yes, I've written it down"
 
 - assertVisible: 'Verify your Recovery Phrase'
@@ -80,35 +80,35 @@ appId: com.sovranbitcoin
 - tapOn: 'Next'
 - inputText: ${output.word11}
 - hideKeyboard
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_7'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_7'
 - tapOn: 'Verify'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_8'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_8'
 - tapOn: 'Continue'
 
 - assertVisible: 'Processing'
 - assertVisible: 'Profile'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_9'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_9'
 
 - assertVisible: 'Add Mint'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_10'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_10'
 - tapOn:
     id: 'add-mint'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_11'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_11'
 - tapOn:
     id: 'add-mint-item-0'
 - tapOn:
@@ -121,29 +121,29 @@ appId: com.sovranbitcoin
     id: 'save-mints'
 
 - assertVisible: 'Profile'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_13'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_13'
 
 - assertVisible: 'Loading sat...'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_14'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_14'
 
 - assertVisible: 'Complete'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_15'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_15'
 - tapOn: 'Complete'
 
 - assertVisible: 'BTC'
 - assertVisible: '0'
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
-      SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_16'
+# - runFlow:
+#     file: ../helper/screenshot.yml
+#     env:
+#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_16'
 
-- stopRecording
+# - stopRecording
