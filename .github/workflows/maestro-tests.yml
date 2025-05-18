@@ -11,6 +11,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -27,7 +32,13 @@ jobs:
         run: npm run prebuild
 
       - name: Build iOS app
-        run: xcodebuild build -scheme 'Sovran' -configuration Debug -project 'ios/Sovran.xcodeproj' -destination 'generic/platform=iOS Simulator' CONFIGURATION_BUILD_DIR=$PWD/build
+        run: |
+          cd ios
+          xcodebuild build -scheme 'Sovran' -workspace 'Sovran.xcworkspace' -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 14' -verbose
+
+      - name: Find built app
+        run: |
+          find . -name "*.app" -type d
 
       - name: Run Maestro tests on cloud
         uses: mobile-dev-inc/action-maestro-cloud@v1
