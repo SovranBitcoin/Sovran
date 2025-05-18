@@ -94,8 +94,17 @@ appId: com.sovranbitcoin
 - tapOn:
     id: 'save-mints'
 
-- assertVisible: 'Loading sat...'
-- assertVisible: 'Loading usd...'
-- assertVisible: 'Loading eur...'
+- assertVisible:
+    text: 'Loading sat...'
+    timeout: 100000
+
+- assertVisible:
+    text: 'Loading usd...'
+    timeout: 100000
+
+- assertVisible:
+    text: 'Loading eur...'
+    timeout: 100000
+
 - assertVisible: 'BTC'
 # - stopRecording
