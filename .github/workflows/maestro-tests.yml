@@ -1,18 +1,33 @@
 name: Build and run Maestro tests (Native iOS)
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 jobs:
   build:
-    runs-on: macOS-latest
+    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
-      - run: xcodebuild build -scheme 'Sovran' -configuration Debug -project 'Sovran.xcodeproj' -destination 'generic/platform=iOS Simulator' CONFIGURATION_BUILD_DIR=$PWD/build
-      - uses: mobile-dev-inc/action-maestro-cloud@v1
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run prebuild
+        run: npm run prebuild
+
+      - name: Build iOS app
+        run: xcodebuild build -scheme 'Sovran' -configuration Debug -project 'ios/Sovran.xcodeproj' -destination 'generic/platform=iOS Simulator' CONFIGURATION_BUILD_DIR=$PWD/build
+
+      - name: Run Maestro tests on cloud
+        uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
           api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
           # note that you can supply the project id any way you like, it is not secret
