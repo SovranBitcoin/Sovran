@@ -291,18 +291,14 @@ function useRecommendedMints(): { mintCounts: MintCount[] } {
           totalCount: 16,
           count: 0,
         },
-        ...(isDev
-          ? [
-              {
-                mintUrl: 'https://testnut.cashu.space',
-                count: 999,
-              },
-              {
-                mintUrl: 'https://nofees.testnut.cashu.space',
-                count: 998,
-              },
-            ]
-          : []),
+        {
+          mintUrl: 'https://testnut.cashu.space',
+          count: 999,
+        },
+        {
+          mintUrl: 'https://nofees.testnut.cashu.space',
+          count: 998,
+        },
       ],
     ].reduce((acc: MintCount[], curr) => {
       const existing = acc.find((item) => item.mintUrl === curr.mintUrl);
