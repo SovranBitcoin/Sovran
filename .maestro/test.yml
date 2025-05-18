@@ -1,0 +1,5 @@
+appId: com.sovranbitcoin
+---
+- clearState
+- launchApp
+- assertVisible: 'Terms'
