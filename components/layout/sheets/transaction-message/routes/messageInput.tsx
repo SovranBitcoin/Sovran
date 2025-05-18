@@ -9,43 +9,6 @@ import { View, Text } from 'components/common/Themed';
 import { ClickOutsideProvider, useClickOutside } from 'react-native-click-outside';
 import { Keyboard } from 'react-native';
 
-export function ResponsiveTextInput({
-  message,
-  setMessage,
-}: {
-  message: string;
-  setMessage: (message: string) => void;
-}) {
-  return (
-    <ClickOutsideProvider>
-      <TI message={message} setMessage={setMessage} />
-    </ClickOutsideProvider>
-  );
-}
-
-function TI({ message, setMessage }: { message: string; setMessage: (message: string) => void }) {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
-  useClickOutside(() => {
-    Keyboard.dismiss();
-  });
-
-  return (
-    <TextInput
-      testID="message-input"
-      style={styles.textInput}
-      multiline
-      numberOfLines={4}
-      placeholder="Enter your message here (optional)"
-      placeholderTextColor={greys(theme)[1000]}
-      value={message}
-      onChangeText={setMessage}
-      textAlignVertical="top"
-    />
-  );
-}
-
 const MessageInput = ({
   router,
   payload,
@@ -82,8 +45,17 @@ const MessageInput = ({
       <Text style={styles.title}>Add a note</Text>
       <Text style={styles.subtitle}>Add an optional message to your transaction</Text>
 
-      <ResponsiveTextInput message={message} setMessage={setMessage} />
-
+      <TextInput
+        testID="message-input"
+        style={styles.textInput}
+        multiline
+        numberOfLines={4}
+        placeholder="Enter your message here (optional)"
+        placeholderTextColor={greys(theme)[1000]}
+        value={message}
+        onChangeText={setMessage}
+        textAlignVertical="top"
+      />
       <ButtonHandler
         colors={[greys(theme)[1800], greys(theme)[1800]]}
         context="sheet"
