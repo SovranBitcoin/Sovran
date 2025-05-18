@@ -1,49 +1,32 @@
-name: Build and run Maestro tests (Native iOS)
+name: EAS Builds
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+
 jobs:
-  build:
-    runs-on: macos-latest
+  eas-build:
+    name: Trigger EAS build for development-sim
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: 🏗 Setup repository
+        uses: actions/checkout@v3
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '15.4'
-
-      - name: Setup Node.js
+      - name: 🏗 Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '22.14.0'
-          cache: 'npm'
+          node-version: 18.x
+          cache: yarn
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run postinstall
-        run: npm run postinstall
-
-      - name: Run prebuild
-        run: npm run prebuild
-
-      - name: Build iOS app
-        run: |
-          cd ios
-          xcodebuild build -scheme 'Sovran' -workspace 'Sovran.xcworkspace' -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 14' IPHONEOS_DEPLOYMENT_TARGET=15.1 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -verbose
-
-      - name: Find built app
-        run: |
-          find . -name "*.app" -type d
-
-      - name: Run Maestro tests on cloud
-        uses: mobile-dev-inc/action-maestro-cloud@v1
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
         with:
-          api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
-          # note that you can supply the project id any way you like, it is not secret
-          project-id: ${{ secrets.MAESTRO_PROJECT_ID }}
-          app-file: build/Sovran.app
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: yarn install
+
+      - name: 🚀 Send build request
+        run: eas build --platform all --non-interactive --no-wait --profile development-sim
+        shell: bash

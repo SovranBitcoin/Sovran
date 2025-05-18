@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "eas-build-on-success": "bash ./eas-build-on-success.sh",
     "postinstall": "patch-package",
     "start": "expo start",
     "android": "expo run:android",
