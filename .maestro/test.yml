@@ -3,3 +3,7 @@ appId: com.sovranbitcoin
 - clearState
 - launchApp
 - assertVisible: 'Terms'
+- runFlow:
+    file: ./helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/test'
