@@ -20,7 +20,7 @@ import { Easing } from 'react-native-reanimated';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { SheetProvider } from 'react-native-actions-sheet';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as Sentry from '@sentry/react-native';
+// import * as Sentry from '@sentry/react-native';
 import { NostrProvider } from 'nostr-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -58,18 +58,18 @@ const RELAY_URLS = [
   'wss://nos.lol',
 ];
 
-const SENTRY_DSN =
-  'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
+// const SENTRY_DSN =
+//   'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
 
 // Initialize global configurations
 LogBox.ignoreAllLogs();
 dayjs.extend(relativeTime);
 
 // Initialize Sentry
-Sentry.init({
-  dsn: SENTRY_DSN,
-  sendDefaultPii: true,
-});
+// Sentry.init({
+//   dsn: SENTRY_DSN,
+//   sendDefaultPii: true,
+// });
 
 // Initialize QueryClient
 const queryClient = new QueryClient();
