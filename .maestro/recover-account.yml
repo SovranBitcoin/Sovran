@@ -71,7 +71,6 @@ appId: com.sovranbitcoin
 - tapOn: 'Next'
 
 - hideKeyboard
-- tapOn: 'Submit'
 
 - assertVisible: 'Add Mint'
 # - runFlow:
