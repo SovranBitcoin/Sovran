@@ -18,4 +18,4 @@ else
 fi
 
 MAESTRO_API_KEY=$MAESTRO_API_KEY
-maestro cloud --project-id="proj_01jvhrahrjf5dtcy4zbpewj7p2" --apiKey $MAESTRO_API_KEY $APP_EXECUTABLE_PATH .maestro/test.yml  
+maestro cloud --project-id="proj_01jvhrahrjf5dtcy4zbpewj7p2" --apiKey $MAESTRO_API_KEY $APP_EXECUTABLE_PATH --flows .maestro  
