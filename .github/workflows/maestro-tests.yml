@@ -1,0 +1,37 @@
+name: Maestro Tests iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-12
+
+    steps:
+      # Step 1: Check out your code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Java (Maestro needs this)
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'adopt'
+          java-version: '11'
+
+      # Step 3: Set up iOS Simulator
+      - name: Set up iOS Simulator
+        uses: futureware-tech/simulator-action@v2
+        with:
+          model: 'iPhone 14 Pro'
+
+      # Step 4: Set up and run Maestro tests
+      - name: Run Maestro tests
+        uses: dniHze/maestro-test-action@v1
+        with:
+          flow: .maestro
+          screenshot-dir: screenshots
+          report: report.xml
