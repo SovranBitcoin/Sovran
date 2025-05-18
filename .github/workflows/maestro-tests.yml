@@ -34,7 +34,7 @@ jobs:
       - name: Build iOS app
         run: |
           cd ios
-          xcodebuild build -scheme 'Sovran' -workspace 'Sovran.xcworkspace' -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 14' -verbose
+          xcodebuild build -scheme 'Sovran' -workspace 'Sovran.xcworkspace' -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 14' IPHONEOS_DEPLOYMENT_TARGET=15.1 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -verbose
 
       - name: Find built app
         run: |
