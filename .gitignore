@@ -52,6 +52,6 @@ android/
 # helper/cashu/secrets.ts
 
 # ios
-ios/*
-!ios/Sovran/Info.plist
-!ios/Sovran/Sovran.entitlements
+# ios/*
+# !ios/Sovran/Info.plist
+# !ios/Sovran/Sovran.entitlements

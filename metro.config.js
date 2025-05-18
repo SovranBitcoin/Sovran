@@ -1,11 +1,10 @@
+const { getDefaultConfig } = require('@expo/metro-config');
 const { withMonicon } = require('@monicon/metro');
-const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
-// eslint-disable-next-line no-undef
 const config = getDefaultConfig(__dirname);
 
-// I guess I hate working within a specific icon library...
+// First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
     'material-symbols:info-rounded',
@@ -70,7 +69,6 @@ const configWithMonicon = withMonicon(config, {
     'stash:qr-code',
     'majesticons:eye-off',
     'majesticons:eye',
-    'material-symbols-light:currency-bitcoin',
     'fa6-solid:chevron-left',
     'fa6-solid:chevron-right',
     'fluent:add-24-filled',
@@ -79,4 +77,7 @@ const configWithMonicon = withMonicon(config, {
   ]
 });
 
-module.exports = withNativeWind(configWithMonicon, { input: './global.css' });
+// Then apply NativeWind
+const finalConfig = withNativeWind(configWithMonicon, { input: './global.css' });
+
+module.exports = finalConfig;
