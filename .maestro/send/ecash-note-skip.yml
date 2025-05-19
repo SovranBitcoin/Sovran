@@ -1,9 +1,11 @@
 appId: com.sovranbitcoin
+name: Send Ecash Without Note
+
 ---
 - launchApp
 
-- startRecording:
-    path: './.maestro/send/ecash-note-skip-video'
+# - startRecording:
+#     path: './.maestro/send/ecash-note-skip-video'
 
 - assertVisible: 'Send'
 
@@ -54,5 +56,4 @@ appId: com.sovranbitcoin
 
 - runFlow:
     file: './options/ecash-cancel.yml'
-
-- stopRecording
+# - stopRecording

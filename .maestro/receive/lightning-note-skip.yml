@@ -1,9 +1,11 @@
 appId: com.sovranbitcoin
+name: Receive Lightning Without Note
+
 ---
 - launchApp
 
-- startRecording:
-    path: './.maestro/receive/lightning-note-skip-video'
+# - startRecording:
+#     path: './.maestro/receive/lightning-note-skip-video'
 
 - assertVisible: 'BTC'
 
@@ -62,5 +64,4 @@ appId: com.sovranbitcoin
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-skip-step_8'
-
-- stopRecording
+# - stopRecording

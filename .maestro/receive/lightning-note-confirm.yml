@@ -1,9 +1,11 @@
 appId: com.sovranbitcoin
+name: Receive Lightning With Note
+
 ---
 - launchApp
 
-- startRecording:
-    path: './.maestro/receive/lightning-note-confirm-video'
+# - startRecording:
+#     path: './.maestro/receive/lightning-note-confirm-video'
 
 - assertVisible: 'Receive'
 - runFlow:
@@ -69,5 +71,4 @@ appId: com.sovranbitcoin
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_10'
-
-- stopRecording
+# - stopRecording

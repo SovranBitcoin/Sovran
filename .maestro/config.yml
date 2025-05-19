@@ -3,8 +3,12 @@ executionOrder:
   flowsOrder:
     - Recover Account
     - Create Account
+    - Receive Lightning With Note
+    - Receive Lightning Without Note
+    - Send Ecash Without Note
 
 flows:
   - onboarding/*
-  # - receive/*
+  - receive/*
+  - send/*
   # - helper/*
