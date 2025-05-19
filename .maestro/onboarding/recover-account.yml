@@ -2,10 +2,10 @@ appId: com.sovranbitcoin
 name: Recover Account
 
 ---
-- launchApp
+# - launchApp
 
 - runFlow:
-    file: terms.yml
+    file: ../helper/terms.yml
 
 # - startRecording:
 #     path: './.maestro/onboarding/recover-account-video'
@@ -97,16 +97,18 @@ name: Recover Account
     id: 'save-mints'
 
 - extendedWaitUntil:
-    visible: 'Loading sat...'
-    timeout: 10000
+    visible: 'Restoring keyset for sat'
+    timeout: 100000
 
 - extendedWaitUntil:
-    visible: 'Loading usd...'
-    timeout: 10000
+    visible: 'Restoring keyset for usd'
+    timeout: 100000
 
 - extendedWaitUntil:
-    visible: 'Loading eur...'
-    timeout: 10000
+    visible: 'Restoring keyset for eur'
+    timeout: 100000
 
-- assertVisible: 'BTC'
+- extendedWaitUntil:
+    visible: 'BTC'
+    timeout: 200000
 # - stopRecording

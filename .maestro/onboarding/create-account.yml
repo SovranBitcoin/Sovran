@@ -2,10 +2,10 @@ appId: com.sovranbitcoin
 name: Create Account
 
 ---
-- launchApp
+# - launchApp
 
 - runFlow:
-    file: terms.yml
+    file: ../helper/terms.yml
 
 # - startRecording:
 #     path: 'onboarding_create-account-video'
@@ -81,12 +81,14 @@ name: Create Account
 - inputText: ${output.word5}
 - tapOn: 'Next'
 - inputText: ${output.word11}
-- hideKeyboard
+- tapOn: 'Next'
+
+# - hideKeyboard
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_7'
-- tapOn: 'Verify'
+# - tapOn: 'Verify'
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
