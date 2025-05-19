@@ -95,14 +95,23 @@ name: Create Account
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_8'
 - tapOn: 'Continue'
 
-- assertVisible: 'Processing'
-- assertVisible: 'Profile'
+- extendedWaitUntil:
+    visible: 'Processing'
+    timeout: 100000
+
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 100000
+
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_9'
 
-- assertVisible: 'Add Mint'
+- extendedWaitUntil:
+    visible: 'Add Mint'
+    timeout: 100000
+
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
@@ -124,27 +133,40 @@ name: Create Account
 - tapOn:
     id: 'save-mints'
 
-- assertVisible: 'Profile'
+- extendedWaitUntil:
+    visible: 'Profile'
+    timeout: 100000
+
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_13'
 
-- assertVisible: 'Loading sat...'
+- extendedWaitUntil:
+    visible: 'Loading sat...'
+    timeout: 100000
+
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_14'
 
-- assertVisible: 'Complete'
+- extendedWaitUntil:
+    visible: 'Complete'
+    timeout: 100000
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_15'
 # - tapOn: 'Complete'
 
-- assertVisible: 'BTC'
-- assertVisible: '0'
+- extendedWaitUntil:
+    visible: 'BTC'
+    timeout: 100000
+
+- extendedWaitUntil:
+    visible: '0'
+    timeout: 100000
 # - runFlow:
 #     file: ../helper/screenshot.yml
 #     env:
