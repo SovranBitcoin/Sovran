@@ -1,9 +1,11 @@
 appId: com.sovranbitcoin
+name: Recover Account
+
 ---
 - launchApp
 
 - runFlow:
-    file: ./helper/terms.yml
+    file: terms.yml
 
 # - startRecording:
 #     path: './.maestro/onboarding/recover-account-video'

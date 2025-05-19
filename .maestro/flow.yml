@@ -1,0 +1,10 @@
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - Terms
+    - Recover Account
+
+flows:
+  - onboarding/*
+  - receive/*
+  - helper/*

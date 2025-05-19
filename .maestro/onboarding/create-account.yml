@@ -1,4 +1,6 @@
 appId: com.sovranbitcoin
+name: Create Account
+
 ---
 - launchApp
 
@@ -6,15 +8,15 @@ appId: com.sovranbitcoin
     file: terms.yml
 
 # - startRecording:
-#     path: './.maestro/onboarding/create-account-video'
+#     path: 'onboarding_create-account-video'
 #     label: 'Onboarding'
 
 - assertVisible: 'Welcome to'
 - assertVisible: 'Sovran'
-# - runFlow:
-#     file: ../helper/screenshot.yml
-#     env:
-#       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_1'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: 'maestro_onboarding_create-account-step_1'
 - tapOn: 'Next'
 
 - assertVisible: 'BITCOIN THAT'
