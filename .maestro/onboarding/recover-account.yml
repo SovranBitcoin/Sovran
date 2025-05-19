@@ -96,17 +96,17 @@ name: Recover Account
 - tapOn:
     id: 'save-mints'
 
-- assertVisible:
-    text: 'Loading sat...'
-    timeout: 100000
+- extendedWaitUntil:
+    visible: 'Loading sat...'
+    timeout: 10000
 
-- assertVisible:
-    text: 'Loading usd...'
-    timeout: 100000
+- extendedWaitUntil:
+    visible: 'Loading usd...'
+    timeout: 10000
 
-- assertVisible:
-    text: 'Loading eur...'
-    timeout: 100000
+- extendedWaitUntil:
+    visible: 'Loading eur...'
+    timeout: 10000
 
 - assertVisible: 'BTC'
 # - stopRecording
