@@ -141,7 +141,7 @@ name: Create Account
 #     file: ../helper/screenshot.yml
 #     env:
 #       SCREENSHOT_PATH: './.maestro/onboarding/create-account-step_15'
-- tapOn: 'Complete'
+# - tapOn: 'Complete'
 
 - assertVisible: 'BTC'
 - assertVisible: '0'
