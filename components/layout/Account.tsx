@@ -153,6 +153,10 @@ export function Account({ accounts, account, goToIndex }: AccountProps): React.R
     <NonGestureView key={account.key} index={0} style={styles.nonGestureView}>
       <View style={styles.transparentBackground}>
         <View style={styles.transparentBackgroundWithPadding} />
+        <View
+          style={{
+            height: 70,
+          }}></View>
         <PrimaryBalance account={account} />
       </View>
 

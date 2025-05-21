@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Text, View } from 'components/common/Themed';
 import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
@@ -36,7 +36,8 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 
   return (
     <View style={styles.container}>
-      <View style={[styles.unitContainer, sovran(theme).backgroundSolid, sovran(theme).borderSubtle]}>
+      <View
+        style={[styles.unitContainer, sovran(theme).backgroundSolid, sovran(theme).borderSubtle]}>
         <Text style={styles.unitText} weight="bold">
           {unit === 'sat' ? 'BTC' : unit.toUpperCase()}
         </Text>
@@ -49,9 +50,19 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
-      flexDirection: 'row',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      transform: [{ translateX: '-50%' }],
+      // left: 0,
+      // right: 0,
+      // width: 300,
+      // backgroundColor: 'red',
+      // flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
+      pointerEvents: 'box-none',
+      // marginTop: 28,
     },
     unitContainer: {
       alignItems: 'center',
@@ -60,6 +71,8 @@ const createStyles = (theme: string) =>
       paddingHorizontal: 12,
       paddingVertical: 8,
       marginRight: 8,
+      height: 40,
+      marginBottom: 4,
     },
     unitText: {
       color: greys(theme)[200],

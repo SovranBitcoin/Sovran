@@ -61,6 +61,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   onPress,
   unit,
   actionSheetRef,
+  style,
 }) => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
@@ -88,7 +89,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
 
   return (
     <TouchableOpacity
-      style={[sovran(theme).listItem, { alignSelf: 'center' }]}
+      style={[sovran(theme).listItem, { alignSelf: 'center' }, style]}
       onPress={handlePress}
       onPressIn={() => {}}
       onPressOut={() => {}}>
@@ -97,7 +98,9 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
       ) : (
         <View style={styles.placeholderIcon} />
       )}
-      <Text style={styles.name}>{selectedMint?.replace('https://', '')?.split('/')?.[0]}</Text>
+      <Text style={styles.name}>
+        {mintInfo?.data?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
+      </Text>
       <Text style={styles.dot}>•</Text>
       <Text style={styles.balance}>
         {formatCurrency(
@@ -386,13 +389,14 @@ const SelectedMintDisplay: React.FC<SelectedMintDisplayProps> = ({
   pr,
   unit,
   loading,
+  style,
 }) => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const actionSheetRef = useRef<ActionSheetRef>(null);
 
   return (
     <>
-      <MintSelectorButton unit={unit} actionSheetRef={actionSheetRef} />
+      <MintSelectorButton style={style} unit={unit} actionSheetRef={actionSheetRef} />
 
       <MintSheet
         actionSheetRef={actionSheetRef}
