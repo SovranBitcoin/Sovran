@@ -14,6 +14,7 @@ import { useRoute } from '@react-navigation/native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { getCountry } from './esimCountrySelection';
+import { fetchVpnInvoice } from 'helper/api/sovran';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -107,17 +108,7 @@ function ModalScreen() {
       (p) => p.packageCode === selectedPackage
     )?.duration_code;
     try {
-      const response = await fetch(
-        `https://esim.sovran.cash/api/vpn/invoice?duration=${selectedPackageDurationCode}`
-      );
-
-      console.log(response);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch VPN invoice: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await fetchVpnInvoice({ duration: selectedPackageDurationCode });
 
       setVpn({
         location: country,

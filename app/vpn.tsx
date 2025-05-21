@@ -17,6 +17,7 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { activateVpn } from 'helper/api/sovran';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes
@@ -69,21 +70,15 @@ function ModalScreen() {
   console.log(129837, params);
   //
   const activateVPN = async () => {
-    const response = await fetch(
-      `https://esim.sovran.cash/api/vpn/activate?paymentHash=${params.payment_hash}&location=${params.cc}`
-    );
+    try {
+      const data = await activateVpn({
+        paymentHash: params.payment_hash,
+        location: params.cc,
+      });
 
-    if (!response.ok) {
-      showMessage('activation_failed', {}, { emoji: '🚨' });
-      return;
-    }
-
-    const data = await response.json();
-    //
-
-    const orderedAt = new Date();
-    let expiryDate;
-    switch (params.duration) {
+      const orderedAt = new Date();
+      let expiryDate;
+      switch (params.duration) {
       case '1 hour':
         expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
         break;
@@ -107,6 +102,9 @@ function ModalScreen() {
       ordered_at: orderedAt.toISOString(),
       expiry_date: expiryDate.toISOString(),
     });
+    } catch (error) {
+      showMessage('activation_failed', {}, { emoji: '🚨' });
+    }
   };
 
   const downloadAndShareVPN = async () => {

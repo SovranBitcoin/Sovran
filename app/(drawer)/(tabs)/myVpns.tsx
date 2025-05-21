@@ -15,6 +15,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 import { showMessage } from 'helper/popup/popups';
+import { fetchVpnCountries } from 'helper/api/sovran';
 
 function TabTwoScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -51,8 +52,7 @@ function TabTwoScreen() {
 
   const fetchPackages = async () => {
     try {
-      const response = await fetch('https://esim.sovran.cash/api/vpn/countries');
-      const data = await response.json();
+      const data = await fetchVpnCountries();
 
       if (data) {
         setFetchingPackages(data);

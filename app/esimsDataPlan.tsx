@@ -15,6 +15,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { fetchQuote } from 'helper/api/sovran';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -74,13 +75,7 @@ function ModalScreen() {
     setLoading(true);
     const currentPackage = packages.find((p) => p.packageCode === selectedPackage);
 
-    const path =
-      type === 'TOPUP'
-        ? `https://esim.sovran.cash/api/quote?packageCode=${currentPackage.packageCode}&type=TOPUP&iccid=${iccid}`
-        : `https://esim.sovran.cash/api/quote?packageCode=${currentPackage.packageCode}`;
-
-    fetch(path)
-      .then((response) => response.json())
+    fetchQuote({ packageCode: currentPackage.packageCode, iccid, type })
       .then((data) => {
         const esim = {
           package: {
