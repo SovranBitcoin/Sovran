@@ -877,6 +877,17 @@ export function BtcIcon({ height = 34, width = 34, color, weight }) {
   return <Icon name={iconName} color={color || greys(theme)[0]} size={width} />;
 }
 
+export function BtcUnit({ color, width = '24', height = '24' }) {
+  const theme = useSelector(memoizedGetTheme);
+  return (
+    <Icon
+      name="material-symbols:currency-bitcoin"
+      color={color || greys(theme)[0]}
+      size={width}
+    />
+  );
+}
+
 export function ShareIcon() {
   const theme = useSelector(memoizedGetTheme);
 

@@ -1,7 +1,7 @@
 import { UntranslatedText, View } from 'components/common/Themed';
 import { useMemo } from 'react';
 import { formatCurrency } from 'helper/currency';
-import Icon, { LightningUnit } from 'assets/icons';
+import Icon, { LightningUnit, BtcUnit } from 'assets/icons';
 import { convertTime } from 'helper/time';
 import { greens, greys, reds, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
@@ -322,7 +322,10 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
   const renderAmountDetails = (): JSX.Element => {
     const sign = isSend ? '-' : isReceive ? '+' : '';
     const precision = tx.unit === 'sat' ? (settings.display_btc === 0 ? 8 : 0) : 2;
-    const currencyDisplay = settings.display_btc === 1 && tx.unit === 'sat' ? 'none' : 'name';
+    const currencyDisplay =
+      tx.unit === 'sat' && [0, 1, 3].includes(settings.display_btc)
+        ? 'none'
+        : 'name';
     const denomination =
       tx.unit === 'sat' ? (settings.display_btc === 0 ? 'btc' : 'sats') : tx.unit;
 
@@ -360,6 +363,13 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
               {sign}
             </UntranslatedText>
           )}
+          {[0, 3].includes(settings.display_btc) && tx.unit === 'sat' && (
+            <BtcUnit
+              width={'10'}
+              height="10"
+              color={isSend ? reds[300] : greens[300]}
+            />
+          )}
           <UntranslatedText
             style={{
               fontFamily: 'OverpassBold',
@@ -376,7 +386,11 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
           </UntranslatedText>
 
           {settings.display_btc === 1 && tx.unit === 'sat' && (
-            <LightningUnit width={'10'} height="10" color={isSend ? reds[300] : greens[300]} />
+            <LightningUnit
+              width={'10'}
+              height="10"
+              color={isSend ? reds[300] : greens[300]}
+            />
           )}
         </View>
         {relatedAmount && (
