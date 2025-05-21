@@ -5,7 +5,12 @@ import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
 import { getInvoiceFromLnurl } from 'helper/third-party/lnurl';
-import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
+import {
+  memoizedGetBalance,
+  memoizedGetSelectedMint,
+  memoizedGetProofs,
+  memoizedGetKeysets,
+} from 'helper/redux/cashu';
 import { getMeltQuote, isValidLNURL, receiveLightning, sendEcash } from 'components/cashu';
 import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
@@ -30,6 +35,11 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { runWithAnimationFrame } from './onboard/new';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
+import {
+  useNetworkStatus,
+  validateOfflinePayment,
+  OfflineValidationResult,
+} from 'helper/offline';
 
 interface ScanningData {
   data: string;
@@ -53,12 +63,26 @@ function ModalScreen() {
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+  const proofs = useSelector(memoizedGetProofs(unit));
+  const keysets = useSelector(memoizedGetKeysets(selectedMint));
+  const isOnline = useNetworkStatus();
+  const [offlineStatus, setOfflineStatus] = useState<OfflineValidationResult | null>(null);
 
   // Validate the amount whenever it changes
   useEffect(() => {
     // Amount must be greater than 0 to be valid
     setIsValidAmount(amount > 0);
   }, [amount]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setOfflineStatus(
+        validateOfflinePayment(amount, unit, proofs as any, keysets as any)
+      );
+    } else {
+      setOfflineStatus(null);
+    }
+  }, [isOnline, amount, unit, proofs, keysets]);
 
   const handleMintSelected = async (mint, balance) => {
     try {
@@ -111,6 +135,19 @@ function ModalScreen() {
       ...params,
       token: transaction.token,
       amount: unit === 'sat' ? amount : amount * 100,
+    });
+  };
+
+  const openNoteSheet = () => {
+    SheetManager.show('transaction-message', {
+      onClose: async (data) => {
+        if (data?.action === 'confirm') {
+          await handleEcashSend({ message: data.message });
+        } else if (data?.action === 'skip') {
+          await handleEcashSend({ message: undefined });
+        }
+        setLoading(false);
+      },
     });
   };
 
@@ -182,22 +219,46 @@ function ModalScreen() {
           });
           break;
         case 'ecashSendConfirmation':
-          // check balance
-          if (unit === 'sat' ? balance < amount : balance < amount) {
-            showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
-            return;
-          }
-          console.log('[handleNext] balance passed', balance, amount, unit);
-          SheetManager.show('transaction-message', {
-            onClose: async (data) => {
-              if (data?.action === 'confirm') {
-                await handleEcashSend({ message: data.message });
-              } else if (data?.action === 'skip') {
-                await handleEcashSend({ message: undefined });
+          if (!isOnline) {
+            const status = offlineStatus ||
+              validateOfflinePayment(amount, unit, proofs as any, keysets as any);
+            if (status.canPay) {
+              openNoteSheet();
+            } else {
+              const buttons: any[] = [];
+              if (status.underpay !== undefined) {
+                buttons.push({
+                  text: `Underpay by ${status.underpay} ${unit.toUpperCase()}`,
+                  icon: 'lucide:arrow-down',
+                  variant: 'primary',
+                  onPress: () => {
+                    setAmount(amount - status.underpay!);
+                    openNoteSheet();
+                  },
+                });
               }
+              if (status.overpay !== undefined) {
+                buttons.push({
+                  text: `Overpay by ${status.overpay} ${unit.toUpperCase()}`,
+                  icon: 'lucide:arrow-up',
+                  variant: 'primary',
+                  onPress: () => {
+                    setAmount(amount + status.overpay!);
+                    openNoteSheet();
+                  },
+                });
+              }
+              SheetManager.show('button-handler', { payload: { buttons } });
               setLoading(false);
-            },
-          });
+            }
+          } else {
+            // check balance online
+            if (unit === 'sat' ? balance < amount : balance < amount) {
+              showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
+              return;
+            }
+            openNoteSheet();
+          }
           break;
         default:
           await handleDefaultSend();
@@ -323,6 +384,11 @@ function ModalScreen() {
             onChange={setAmount}
           />
           <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+          {!isOnline && (
+            <Text style={{ alignSelf: 'center', marginTop: 8 }}>
+              Offline {offlineStatus?.canPay ? '✅' : '❌'}
+            </Text>
+          )}
           {params.to === 'ecashSendConfirmation' && params?.profile && (
             <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
               <Icon
