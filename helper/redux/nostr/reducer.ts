@@ -9,6 +9,8 @@ import {
   APPEND_QUERY,
   MUTE_USER,
   REPORT_USER,
+  ADD_CONTACT,
+  REMOVE_CONTACT,
 } from './actionTypes';
 
 const initialState = {
@@ -85,6 +87,7 @@ const initialState = {
     loaded_messages: [],
   },
   follows: {},
+  contacts: [],
 };
 
 export const nostrReducer = (state = initialState, action) => {
@@ -172,6 +175,28 @@ export const nostrReducer = (state = initialState, action) => {
           }
           return s;
         }),
+      };
+    }
+
+    case ADD_CONTACT: {
+      const existing = state.contacts.find(
+        (c) => c.pubkey === action.payload.pubkey
+      );
+      if (existing) {
+        return {
+          ...state,
+          contacts: state.contacts.map((c) =>
+            c.pubkey === action.payload.pubkey ? action.payload : c
+          ),
+        };
+      }
+      return { ...state, contacts: [...state.contacts, action.payload] };
+    }
+
+    case REMOVE_CONTACT: {
+      return {
+        ...state,
+        contacts: state.contacts.filter((c) => c.pubkey !== action.payload),
       };
     }
 

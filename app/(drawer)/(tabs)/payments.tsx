@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { Text, View } from 'components/common/Themed';
-import { memoizedIsMuted, useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetTransactions, useCashu } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';
 import Modal from 'components/layout/Modal';
@@ -54,10 +54,9 @@ const Section = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { profiles, search, currentProfile, messages, follows } = useNostr();
+  const { profiles, search, currentProfile, messages, contacts } = useNostr();
   const { transactions } = useCashu();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
-  const [following, setFollowing] = useState([]);
 
   const filteredProfiles = profiles.filter((p) => p.pubkey !== currentProfile?.pubkey);
   const filteredSearch = search.filter((s) => s.pubkey !== currentProfile?.pubkey);
@@ -71,23 +70,35 @@ const Section = () => {
       return acc;
     }, {});
 
-  const combinedSearchAndProfiles = [
-    ...filteredProfiles,
-    ...filteredSearch
-      .filter((group) => group.pubkey)
-      .map((f) => ({ pubkey: f.pubkey, ...f.profile }))
-      .filter(
-        (profile) =>
-          messages.some((m) => m.pubkey === profile.pubkey) ||
-          transactions.some((t) => convertNpub(t.nostr?.pubkey) === profile.pubkey) ||
-          profile.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
-          profile.pubkey === LNVPN_PUBKEY
-      )
-      .filter(
-        (profile, index, self) => index === self.findIndex((t) => t.pubkey === profile.pubkey)
-      ),
-    ...following.map((f) => ({ pubkey: f.pubkey, ...f.profile })),
-  ];
+  const combinedSearchAndProfilesMap = new Map();
+
+  filteredProfiles.forEach((profile) => {
+    if (profile.pubkey) {
+      combinedSearchAndProfilesMap.set(profile.pubkey, profile);
+    }
+  });
+
+  filteredSearch
+    .filter((group) => group.pubkey)
+    .map((f) => ({ pubkey: f.pubkey, ...f.profile }))
+    .filter(
+      (profile) =>
+        messages.some((m) => m.pubkey === profile.pubkey) ||
+        transactions.some((t) => convertNpub(t.nostr?.pubkey) === profile.pubkey) ||
+        profile.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
+        profile.pubkey === LNVPN_PUBKEY
+    )
+    .forEach((profile) => {
+      combinedSearchAndProfilesMap.set(profile.pubkey, profile);
+    });
+
+  contacts
+    .map((f) => ({ pubkey: f.pubkey, ...f.profile }))
+    .forEach((profile) => {
+      combinedSearchAndProfilesMap.set(profile.pubkey, profile);
+    });
+
+  const combinedSearchAndProfiles = Array.from(combinedSearchAndProfilesMap.values());
 
   const groupedMessages = messages.reduce((acc, message) => {
     const { pubkey: pk, sender } = message;
@@ -97,10 +108,29 @@ const Section = () => {
     return acc;
   }, {});
 
-  const enrichedContacts = Object.values({
-    ...groupedTransactions,
-    ...groupedMessages,
-  })
+  const combinedGroups = {} as any;
+
+  Object.values(groupedTransactions).forEach((group: any) => {
+    if (!combinedGroups[group.pubkey]) {
+      combinedGroups[group.pubkey] = { pubkey: group.pubkey, transactions: [], messages: [] };
+    }
+    combinedGroups[group.pubkey].transactions = [
+      ...(combinedGroups[group.pubkey].transactions || []),
+      ...(group.transactions || []),
+    ];
+  });
+
+  Object.values(groupedMessages).forEach((group: any) => {
+    if (!combinedGroups[group.pubkey]) {
+      combinedGroups[group.pubkey] = { pubkey: group.pubkey, transactions: [], messages: [] };
+    }
+    combinedGroups[group.pubkey].messages = [
+      ...(combinedGroups[group.pubkey].messages || []),
+      ...(group.messages || []),
+    ];
+  });
+
+  const enrichedContacts = Object.values(combinedGroups)
     .filter((group) => group.pubkey !== 'Unknown')
     .map((group) => ({
       pubkey: group.pubkey,
@@ -136,7 +166,7 @@ const Section = () => {
 
   const onPageSelected = useCallback((event) => {
     const pageIndex = event.nativeEvent.position;
-    const tabNames = ['Recent activity', 'Following'];
+    const tabNames = ['Recent activity', 'Contacts'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
@@ -145,7 +175,7 @@ const Section = () => {
     pagerRef.current?.setPage(index);
   };
 
-  const tabs = ['Recent activity', 'Following'].filter(Boolean);
+  const tabs = ['Recent activity', 'Contacts'].filter(Boolean);
 
   const getItem = (data, index) => data[index];
 
@@ -157,7 +187,12 @@ const Section = () => {
         style={{
           paddingHorizontal: 16,
         }}>
-        <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+        <Tabs
+          tabs={tabs}
+          selectedTab={selectedTab}
+          handleTabPress={handleTabPress}
+          amounts={[enrichedContacts.length, contacts.length]}
+        />
       </View>
       <View
         style={{
@@ -175,7 +210,7 @@ const Section = () => {
             marginHorizontal: -16,
           }}
           initialPage={0}
-          scrollEnabled={follows.length > 0}>
+          scrollEnabled={contacts.length > 0}>
           <ScrollView
             key="1"
             style={{
@@ -207,7 +242,7 @@ const Section = () => {
               overflow: 'hidden',
             }}>
             <VirtualizedList
-              data={follows}
+              data={contacts}
               initialNumToRender={1}
               renderItem={(item) => <RenderContactItem {...item} />}
               keyExtractor={(item) => item.pubkey}
