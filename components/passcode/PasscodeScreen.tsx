@@ -62,24 +62,25 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     }
   };
 
-  const name = currentProfile?.displayName || currentProfile?.name;
+  const name =
+    currentProfile?.profile?.displayName ||
+    currentProfile?.profile?.name ||
+    currentProfile?.profile?.display_name ||
+    currentProfile?.profile?.username;
 
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
       {currentProfile?.picture && (
-        <CachedImage
-          style={styles.avatar}
-          source={{ uri: currentProfile.picture }}
-        />
+        <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
       )}
-      {name && <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>}
-      <Text style={styles.title}>Enter Passcode</Text>
+      {name ? (
+        <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
+      ) : (
+        <Text style={styles.title}>Enter Passcode</Text>
+      )}
       <View style={styles.dotsContainer}>
         {Array.from({ length: passcode.length }).map((_, i) => (
-          <View
-            key={i}
-            style={value.length > i ? styles.dotActive : styles.dot}
-          />
+          <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
         ))}
       </View>
       <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
