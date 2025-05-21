@@ -1,5 +1,5 @@
 import 'app/global';
-import { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -18,6 +18,8 @@ import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
 import { AccountPagerView } from '../../../components/layout/AccountPagerView';
+import WalletHeader from '../../../components/layout/WalletHeader';
+import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { isProduction } from 'helper/version';
 
@@ -96,6 +98,15 @@ function TabOneScreen({
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
   const settings = useSelector((state) => state.settings.settings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
+  const navigation = useTypedNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <WalletHeader unit={account.unit} accounts={accounts} setAccount={setAccount} />
+      ),
+    });
+  }, [navigation, account, accounts]);
 
   if (!settings?.termsAccepted) {
     return (
