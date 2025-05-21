@@ -265,13 +265,16 @@ const migrations = {
       state
     );
   },
+  73: (state: RootState) => {
+    return _.set(state, ['nostr', 'contacts'], []);
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 72,
+  version: 73,
   migrate: createMigrate(migrations, { debug: true }),
 };
 

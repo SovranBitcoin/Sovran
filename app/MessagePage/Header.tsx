@@ -9,8 +9,8 @@ import CachedImage from 'components/common/Image';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { SheetManager } from 'react-native-actions-sheet';
-import { muteUser, reportUser } from 'helper/redux/nostr';
-import { useDispatch } from 'react-redux';
+import { muteUser, reportUser, addContact, removeContact } from 'helper/redux/nostr';
+import { useDispatch, useSelector } from 'react-redux';
 import { showMessage } from 'helper/popup/popups';
 
 const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
@@ -29,6 +29,8 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
     'Unknown User';
 
   const dispatch = useDispatch();
+  const contacts = useSelector((state) => state.nostr.contacts || []);
+  const isContact = contacts.some((c) => c.pubkey === params.pubkey);
 
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
@@ -92,6 +94,19 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
             SheetManager.show('button-handler', {
               payload: {
                 buttons: [
+                  {
+                    icon: isContact ? 'la:user-minus' : 'la:user-plus',
+                    text: isContact ? 'Remove Contact' : 'Add Contact',
+                    onPress: async () => {
+                      if (isContact) {
+                        dispatch(removeContact(params.pubkey));
+                        await showMessage('Contact removed');
+                      } else {
+                        dispatch(addContact({ pubkey: params.pubkey, profile }));
+                        await showMessage('Contact added');
+                      }
+                    },
+                  },
                   {
                     icon: 'la:user-slash',
                     text: 'Mute User',
