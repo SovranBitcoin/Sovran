@@ -323,9 +323,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     const sign = isSend ? '-' : isReceive ? '+' : '';
     const precision = tx.unit === 'sat' ? (settings.display_btc === 0 ? 8 : 0) : 2;
     const currencyDisplay =
-      tx.unit === 'sat' && [0, 1, 3].includes(settings.display_btc)
-        ? 'none'
-        : 'name';
+      tx.unit === 'sat' && [0, 1, 3].includes(settings.display_btc) ? 'none' : 'name';
     const denomination =
       tx.unit === 'sat' ? (settings.display_btc === 0 ? 'btc' : 'sats') : tx.unit;
 
@@ -364,11 +362,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
             </UntranslatedText>
           )}
           {[0, 3].includes(settings.display_btc) && tx.unit === 'sat' && (
-            <BtcUnit
-              width={'10'}
-              height="10"
-              color={isSend ? reds[300] : greens[300]}
-            />
+            <BtcUnit width={'16'} height="16" color={isSend ? reds[300] : greens[300]} />
           )}
           <UntranslatedText
             style={{
@@ -377,7 +371,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
               color: isSend ? reds[300] : greens[300],
               margin: 0,
               fontWeight: 'bold',
-              alignSelf: 'flex-end',
+              alignSelf: 'center',
               textShadowColor: opacity(greys(theme)[0], 0.5),
               textShadowOffset: { width: 0, height: 0 },
               textShadowRadius: 1,
@@ -387,8 +381,11 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
 
           {settings.display_btc === 1 && tx.unit === 'sat' && (
             <LightningUnit
-              width={'10'}
-              height="10"
+              style={{
+                marginBottom: 6,
+              }}
+              width={'14'}
+              height="14"
               color={isSend ? reds[300] : greens[300]}
             />
           )}
