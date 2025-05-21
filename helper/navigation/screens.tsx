@@ -402,4 +402,18 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
       presentation: 'modal',
     },
   },
+  {
+    name: 'charts',
+    title: 'Charts',
+    options: {
+      headerLargeTitle: true,
+    },
+  },
+  {
+    name: 'chart',
+    title: 'Chart',
+    options: {
+      headerLargeTitle: true,
+    },
+  },
 ];

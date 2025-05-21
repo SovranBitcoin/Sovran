@@ -80,6 +80,7 @@ export const icons = [
   'fluent:add-24-filled',
   'material-symbols:refresh-rounded',
   'ic:round-refresh',
+  'mdi:chart-line',
 ];
 
 export default ({
