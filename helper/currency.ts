@@ -164,7 +164,7 @@ export function formatCurrency(currency: Currency, options: FormatOptions): stri
  * Simplified wrapper for formatCurrency with sensible defaults
  * @param amount - Amount to format
  * @param unit - Currency unit (e.g., 'sat', 'usd')
- * @param display - Display style: 0 (BTC value), 1 (default - sats with no symbol), 2 (sats with name)
+ * @param display - Display style: 0 (BTC value), 1 (default - sats with no symbol), 2 (sats with name), 3 (sats with BTC icon)
  * @returns Formatted currency string
  */
 export const formatCurrencyWrapper = (amount: number, unit: string, display = 1): string => {

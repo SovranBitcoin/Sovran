@@ -15,7 +15,7 @@ interface Account {
 }
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
-type DisplayBtcMode = 0 | 1 | 2;
+type DisplayBtcMode = 0 | 1 | 2 | 3;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';
 
 interface PrimaryBalanceProps {
@@ -39,7 +39,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const toggleUnit = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setDisplayBitcoin(((settings.display_btc + 1) % 3) as DisplayBtcMode);
+    setDisplayBitcoin(((settings.display_btc + 1) % 4) as DisplayBtcMode);
   }, [settings.display_btc, setDisplayBitcoin]);
 
   return (
@@ -136,6 +136,26 @@ export function AmountFormatter({
           }}>
           {formatCurrencyWrapper(amount, unit, displayBtc)}
         </Text>
+      )}
+
+      {displayBtc === 3 && (
+        <>
+          <View
+            style={{ marginLeft: weight === 'heavy' ? -7 : -4, backgroundColor: 'transparent' }}>
+            <BtcIcon weight={weight} height={size} width={size * 1.4} color={currentColor} />
+          </View>
+          <Text
+            size={size}
+            weight={weight}
+            style={{
+              color: currentColor,
+              marginLeft: weight === 'heavy' ? -7 : -4,
+              margin: 0,
+              zIndex: 2,
+            }}>
+            {formatCurrencyWrapper(amount, unit, displayBtc)}
+          </Text>
+        </>
       )}
     </View>
   );
