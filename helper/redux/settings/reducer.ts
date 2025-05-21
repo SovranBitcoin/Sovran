@@ -4,6 +4,7 @@ import {
   SET_THEME,
   TERMS_ACCEPTED,
   SET_EXPERIMENTAL,
+  SET_PASSCODE,
 } from './actionTypes';
 
 const initialState = {
@@ -11,6 +12,7 @@ const initialState = {
     lang: 'en',
     theme: 'dark',
     display_btc: 1,
+    passcode: '',
   },
 };
 
@@ -61,6 +63,15 @@ export const settingsReducer = (state = initialState, action) => {
         settings: {
           ...state.settings,
           experimental: action.payload,
+        },
+      };
+    }
+    case SET_PASSCODE: {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          passcode: action.payload,
         },
       };
     }

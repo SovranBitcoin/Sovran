@@ -39,6 +39,7 @@ import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
 import { WalletsProvider } from 'components/providers/WalletsProviders';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
+import PasscodeGate from 'components/passcode/PasscodeGate';
 
 registerAllSheets({ context: 'global' });
 
@@ -317,7 +318,9 @@ export default function RootLayout() {
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
                     <WalletsProvider>
                       <TransactionProvider>
-                        <MainStack />
+                        <PasscodeGate>
+                          <MainStack />
+                        </PasscodeGate>
                       </TransactionProvider>
                     </WalletsProvider>
                   </View>

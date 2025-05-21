@@ -3,3 +3,4 @@ export const SET_LANGUAGE = 'SET_LANGUAGE';
 export const SET_THEME = 'SET_THEME';
 export const TERMS_ACCEPTED = 'TERMS_ACCEPTED';
 export const SET_EXPERIMENTAL = 'SET_EXPERIMENTAL';
+export const SET_PASSCODE = 'SET_PASSCODE';
