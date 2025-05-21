@@ -64,6 +64,12 @@ export type NavigationParams = {
     type: 'vpn' | 'esim';
   };
 
+  charts: { unit: string };
+  chart: {
+    type: string;
+    unit: string;
+  };
+
   // Add other endpoints here
   // exampleEndpoint: { param1: string; param2: number };
 };
