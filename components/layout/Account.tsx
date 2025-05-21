@@ -10,8 +10,7 @@ import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
-import { useTypedNavigation } from 'helper/navigation/hooks/useTypedNavigation';
+import { sovran } from 'components/layout/sheets/mints';
 import { NonGestureView } from './NonGestureView';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
@@ -44,7 +43,6 @@ export function Account({ accounts, account, goToIndex }: AccountProps): React.R
   const theme = useSelector(memoizedGetTheme);
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const dispatch = useDispatch();
-  const navigation = useTypedNavigation();
   const styles = createStyles(theme);
 
   // Animation values
@@ -155,22 +153,6 @@ export function Account({ accounts, account, goToIndex }: AccountProps): React.R
     <NonGestureView key={account.key} index={0} style={styles.nonGestureView}>
       <View style={styles.transparentBackground}>
         <View style={styles.transparentBackgroundWithPadding} />
-        <View style={styles.transparentBackgroundRow}>
-          <View
-            style={[
-              styles.accountUnitContainer,
-              sovran(theme).backgroundSolid,
-              sovran(theme).borderSubtle,
-            ]}>
-            <Text style={styles.accountUnitText} weight="bold">
-              {account.unit === 'sat' ? 'BTC' : account.unit.toUpperCase()}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.transparentBackgroundRowCenter}>
-          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={account.unit} />
-        </View>
         <PrimaryBalance account={account} />
       </View>
 
@@ -240,25 +222,8 @@ const createStyles = (theme: string) =>
       flexDirection: 'row',
       backgroundColor: 'transparent',
     },
-    accountUnitContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 99999,
-      elevation: 1,
-      zIndex: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      margin: 'auto',
-      marginBottom: 8,
-    },
     accountUnitText: {
       color: greys(theme)[200], // Using a default theme value
-    },
-    transparentBackgroundRowCenter: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'transparent',
     },
     maxWidthContainer: {
       width: '100%', // Fixed invalid CSS value
