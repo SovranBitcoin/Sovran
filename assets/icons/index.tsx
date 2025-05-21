@@ -449,9 +449,10 @@ export function CloseIcon2({ color, width, height }) {
   );
 }
 
-export function LightningUnit({ color, width = '24', height = '24' }) {
+export function LightningUnit({ style, color, width = '24', height = '24' }) {
   return (
     <Svg
+      style={style}
       viewBox="0 0 360 360"
       height={width}
       width={height}
@@ -875,6 +876,13 @@ export function BtcIcon({ height = 34, width = 34, color, weight }) {
       ? 'material-symbols:currency-bitcoin'
       : 'material-symbols-light:currency-bitcoin';
   return <Icon name={iconName} color={color || greys(theme)[0]} size={width} />;
+}
+
+export function BtcUnit({ color, width = '24', height = '24' }) {
+  const theme = useSelector(memoizedGetTheme);
+  return (
+    <Icon name="material-symbols:currency-bitcoin" color={color || greys(theme)[0]} size={width} />
+  );
 }
 
 export function ShareIcon() {
