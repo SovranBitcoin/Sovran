@@ -36,8 +36,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
         key={String(value)}
         className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{ backgroundColor: greys(theme)[2300] }}
-        onPress={() => handlePress(value)}
-      >
+        onPress={() => handlePress(value)}>
         {value === '<' ? (
           <Text style={{ color: 'white', fontSize: 24 }}>⌫</Text>
         ) : (
@@ -49,8 +48,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
               color: 'white',
               fontWeight: 'bold',
               fontFamily: 'OverpassBold',
-            }}
-          >
+            }}>
             {value}
           </Text>
         )}
@@ -65,7 +63,6 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
     ['7', '8', '9'],
     ['', '0', '<'],
   ];
-
   return (
     <View className="items-center justify-center bg-transparent">
       {buttons.map((row, rowIndex) => (

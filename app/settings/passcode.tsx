@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import NumericKeyboard from 'components/passcode/NumericKeyboard';
 import Container from 'components/layout/Container';
+import { View, Text } from 'components/common/Themed';
+import { ScrollView } from 'react-native';
 
 const PASSCODE_LENGTH = 4;
 
@@ -50,20 +52,17 @@ const PasscodeSettings: React.FC = () => {
 
   return (
     <Container>
-      <View style={styles.container}>
+      <ScrollView>
         <Text style={styles.title}>
           {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
         </Text>
         <View style={styles.dotsContainer}>
           {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
-            <View
-              key={i}
-              style={currentValue.length > i ? styles.dotActive : styles.dot}
-            />
+            <View key={i} style={currentValue.length > i ? styles.dotActive : styles.dot} />
           ))}
         </View>
         <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-      </View>
+      </ScrollView>
     </Container>
   );
 };
