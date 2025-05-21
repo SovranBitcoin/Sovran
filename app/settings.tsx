@@ -237,6 +237,13 @@ const ModalScreen: React.FC<{}> = () => {
             }}
             isFirst
           />
+          <RowButton
+            label="Passcode"
+            onPress={() => {
+              navigation.navigate('settings/passcode');
+            }}
+            isFirst
+          />
         </Section>
         {/* <Section title="npub.cash Settings">
         <View style={styles.rowWrapper}>

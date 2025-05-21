@@ -355,6 +355,10 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Verify Seed Phrase',
   },
   {
+    name: 'settings/passcode',
+    title: 'Passcode',
+  },
+  {
     name: 'settings/profile',
     title: 'Profile',
   },
