@@ -16,6 +16,7 @@ import { setSearch } from 'helper/redux/nostr';
 // Import the base TextInput from React Native instead
 import { TextInput as RNTextInput } from 'react-native';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { searchUsers as apiSearchUsers } from 'helper/api/sovran';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -43,10 +44,7 @@ function ModalScreen() {
     setHasSearched(true); // Set this to true when search is initiated
 
     try {
-      const response = await fetch(
-        `https://esim.sovran.cash/api/search?query=${encodeURIComponent(query)}&limit=10`
-      );
-      const data = await response.json();
+      const data = await apiSearchUsers({ query, limit: 10 });
 
       if (data.results && Array.isArray(data.results)) {
         const formattedResults = data.results.map((result) => {

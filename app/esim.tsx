@@ -17,6 +17,7 @@ import React from 'react';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { fetchOrderData, fetchEsimData } from 'helper/api/sovran';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {
@@ -56,28 +57,7 @@ export function convertDataUsage(data) {
   };
 }
 
-// API functions moved out of component for cleaner organization
-const fetchOrderData = async (esim) => {
-  const baseUrl = 'https://esim.sovran.cash/api/order';
-  const params = new URLSearchParams({
-    request: esim.request,
-    packageCode: esim.package.packageCode,
-  });
 
-  if (esim.type === 'TOPUP' && esim?.iccid) {
-    params.append('slug', esim.package.slug);
-    params.append('iccid', esim.iccid);
-    params.append('type', 'TOPUP');
-  }
-
-  const response = await fetch(`${baseUrl}?${params}`);
-  return response.json();
-};
-
-const fetchEsimData = async (orderNo) => {
-  const response = await fetch(`https://esim.sovran.cash/api/order/query?orderNo=${orderNo}`);
-  return response.json();
-};
 
 function ModalScreen() {
   const [loadingEsim, setLoadingEsim] = useState(false);
@@ -94,7 +74,13 @@ function ModalScreen() {
   const fetchAndUpdateEsims = async (esim) => {
     try {
       setLoadingEsim(true);
-      const orderData = await fetchOrderData(esim);
+      const orderData = await fetchOrderData({
+        request: esim.request,
+        packageCode: esim.package.packageCode,
+        slug: esim.package.slug,
+        iccid: esim.iccid,
+        type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
+      });
       const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
       if (orderNo) {
         const esimData = await fetchEsimData(orderNo);

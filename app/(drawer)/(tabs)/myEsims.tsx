@@ -16,9 +16,8 @@ import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
+import { fetchProducts } from 'helper/api/sovran';
 
-// Constants
-const API_URL = 'https://esim.sovran.cash/api/products';
 
 // Separate component for eSIM item
 const EsimItem = ({ esim, navigation }) => {
@@ -127,8 +126,7 @@ function EsimsScreen() {
   // Fetch packages from API
   const fetchPackages = async () => {
     try {
-      const response = await fetch(API_URL);
-      const data = await response.json();
+      const data = await fetchProducts();
 
       if (data.success && data.obj?.packageList) {
         setPackageList(data.obj.packageList);
