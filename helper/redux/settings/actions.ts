@@ -1,4 +1,10 @@
-import { SET_DISPLAY_BITCOIN, SET_LANGUAGE, SET_THEME, SET_EXPERIMENTAL } from './actionTypes';
+import {
+  SET_DISPLAY_BITCOIN,
+  SET_LANGUAGE,
+  SET_THEME,
+  SET_EXPERIMENTAL,
+  SET_PASSCODE,
+} from './actionTypes';
 
 export const setLanguage = (lang: string) => ({
   type: SET_LANGUAGE,
@@ -18,4 +24,9 @@ export const setDisplayBitcoin = (display: number) => ({
 export const setExperimental = (experimental: boolean) => ({
   type: SET_EXPERIMENTAL,
   payload: experimental,
+});
+
+export const setPasscode = (passcode: string) => ({
+  type: SET_PASSCODE,
+  payload: passcode,
 });
