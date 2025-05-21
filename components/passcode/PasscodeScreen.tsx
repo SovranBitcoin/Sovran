@@ -4,6 +4,8 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
+import CachedImage from '../common/Image';
+import { useNostr } from 'helper/redux/nostr';
 
 interface Props {
   passcode: string;
@@ -12,9 +14,11 @@ interface Props {
 
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const theme = useSelector(memoizedGetTheme);
+  const { currentProfile } = useNostr();
   const [value, setValue] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
+  const shake = useRef(new Animated.Value(0)).current;
   const styles = createStyles(theme);
 
   const handlePress = (val: string) => {
@@ -28,6 +32,28 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           useNativeDriver: true,
         }).start(() => onSuccess());
       } else {
+        Animated.sequence([
+          Animated.timing(shake, {
+            toValue: -10,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shake, {
+            toValue: 10,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shake, {
+            toValue: -10,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shake, {
+            toValue: 0,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+        ]).start();
         setTimeout(() => {
           setValue('');
           setKeyIdx((k) => k + 1);
@@ -36,8 +62,17 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     }
   };
 
+  const name = currentProfile?.displayName || currentProfile?.name;
+
   return (
-    <Animated.View style={[styles.container, { opacity }]}>
+    <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
+      {currentProfile?.picture && (
+        <CachedImage
+          style={styles.avatar}
+          source={{ uri: currentProfile.picture }}
+        />
+      )}
+      {name && <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>}
       <Text style={styles.title}>Enter Passcode</Text>
       <View style={styles.dotsContainer}>
         {Array.from({ length: passcode.length }).map((_, i) => (
@@ -59,6 +94,18 @@ const createStyles = (theme: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: greys(theme)[2300],
+    },
+    avatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      marginBottom: 16,
+    },
+    welcome: {
+      color: greys(theme)[0],
+      fontSize: 18,
+      marginBottom: 16,
+      fontFamily: 'OverpassBold',
     },
     title: {
       color: greys(theme)[0],
