@@ -22,6 +22,8 @@ import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { isProduction } from 'helper/version';
+import Icon from 'assets/icons';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
 
 async function getProfile(currentProfile) {
   const sk = nip19.decode(currentProfile?.nsec).data;
@@ -105,8 +107,16 @@ function TabOneScreen({
       headerTitle: () => (
         <WalletHeader unit={account.unit} accounts={accounts} setAccount={setAccount} />
       ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('charts', {})}
+          style={{ marginRight: 12 }}
+        >
+          <Icon name="mdi:chart-line" color={greys(theme)[0]} size={28} />
+        </TouchableOpacity>
+      ),
     });
-  }, [navigation, account, accounts]);
+  }, [navigation, account, accounts, theme]);
 
   if (!settings?.termsAccepted) {
     return (

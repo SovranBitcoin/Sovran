@@ -74,6 +74,7 @@ const configWithMonicon = withMonicon(config, {
     'fluent:add-24-filled',
     'material-symbols:refresh-rounded',
     'ic:round-refresh',
+    'mdi:chart-line',
   ]
 });
 
