@@ -264,39 +264,6 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
-            output: (tx, value) => {
-              return (
-                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
-              );
-            },
-          },
-          {
-            label: 'Amount (USD)',
-            output: (tx, value) => {
-              return (
-                '≈ ' +
-                formatCurrency(
-                  {
-                    currency: 'BTC',
-                    value: Math.abs(tx.amount),
-                    denomination: 'sats',
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: 2,
-                    currencyDisplay: 'symbol',
-                    denomination: 'usd',
-                  }
-                )
-              );
-            },
-          },
-        ],
-      },
-      {
-        keys: [
-          {
             label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
@@ -322,28 +289,6 @@ const transactionConfig = {
             label: 'token',
             output: (tx, value) => {
               return value ? truncateMiddle(value, 5) : '';
-            },
-          },
-          {
-            label: 'counter',
-            output: (tx, value) => {
-              return value;
-            },
-          },
-        ],
-      },
-      {
-        keys: [
-          {
-            label: 'Cancelled',
-            output: (tx, value) => {
-              return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
-            },
-          },
-          {
-            label: 'Is Refund Transaction',
-            output: (tx, value) => {
-              return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
           },
         ],
@@ -363,43 +308,6 @@ const transactionConfig = {
       {
         keys: [
           {
-            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
-            output: (tx, value) => {
-              return (
-                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
-              );
-            },
-          },
-          {
-            label: 'Amount (USD)',
-            output: (tx, value) => {
-              if (tx.unit === 'usd') {
-                return null;
-              }
-
-              return (
-                '≈ ' +
-                formatCurrency(
-                  {
-                    currency: 'BTC',
-                    value: Math.abs(tx.amount),
-                    denomination: 'sats',
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: 2,
-                    currencyDisplay: 'symbol',
-                    denomination: 'usd',
-                  }
-                )
-              );
-            },
-          },
-        ],
-      },
-      {
-        keys: [
-          {
             label: 'date',
             output: (tx, value) => {
               return convertTime(new Date(value));
@@ -425,28 +333,6 @@ const transactionConfig = {
             label: 'token',
             output: (tx, value) => {
               return value ? truncateMiddle(value, 5) : '';
-            },
-          },
-          {
-            label: 'counter',
-            output: (tx, value) => {
-              return value;
-            },
-          },
-        ],
-      },
-      {
-        keys: [
-          {
-            label: 'Cancelled',
-            output: (tx, value) => {
-              return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
-            },
-          },
-          {
-            label: 'Is Refund Transaction',
-            output: (tx, value) => {
-              return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
           },
         ],
@@ -471,39 +357,6 @@ const transactionConfig = {
           },
         ],
         title: '',
-      },
-      {
-        keys: [
-          {
-            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
-            output: (tx, value) => {
-              return (
-                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
-              );
-            },
-          },
-          {
-            label: 'Amount (USD)',
-            output: (tx, value) => {
-              return (
-                '≈ ' +
-                formatCurrency(
-                  {
-                    currency: 'BTC',
-                    value: Math.abs(tx.amount),
-                    denomination: 'sats',
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: 2,
-                    currencyDisplay: 'symbol',
-                    denomination: 'usd',
-                  }
-                )
-              );
-            },
-          },
-        ],
       },
       {
         keys: [
@@ -535,12 +388,6 @@ const transactionConfig = {
               return truncateMiddle(value, 5);
             },
           },
-          {
-            label: 'counter',
-            output: (tx, value) => {
-              return value;
-            },
-          },
         ],
       },
       {
@@ -553,73 +400,8 @@ const transactionConfig = {
           },
         ],
       },
-      {
-        keys: [
-          {
-            label: 'Cancelled',
-            output: (tx, value) => {
-              return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
-            },
-          },
-          {
-            label: 'Is Refund Transaction',
-            output: (tx, value) => {
-              return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
-            },
-          },
-        ],
-      },
     ],
     receive: [
-      {
-        keys: [
-          {
-            label: (tx, key) => `Amount (${tx.unit === 'sat' ? 'BTC' : tx.unit.toUpperCase()})`,
-            output: (tx, value) => {
-              return (
-                <AmountFormatter weight={'regular'} size={16} amount={tx.amount} unit={tx.unit} />
-              );
-            },
-          },
-          {
-            label: (tx, key) => `Amount (${tx.unit === 'usd' ? 'BTC' : 'USD'})`,
-            output: (tx, value) => {
-              if (tx.unit === 'usd') {
-                return formatCurrency(
-                  {
-                    currency: 'BTC',
-                    value: getLightningAmount({ pr: tx.request }),
-                    denomination: 'sats',
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: 0,
-                    currencyDisplay: 'name',
-                    denomination: 'sats',
-                  }
-                );
-              }
-
-              return (
-                '≈ ' +
-                formatCurrency(
-                  {
-                    currency: 'BTC',
-                    value: Math.abs(tx.amount),
-                    denomination: 'sats',
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: 2,
-                    currencyDisplay: 'symbol',
-                    denomination: 'usd',
-                  }
-                )
-              );
-            },
-          },
-        ],
-      },
       {
         keys: [
           {
@@ -654,28 +436,6 @@ const transactionConfig = {
             label: 'quote',
             output: (tx, value) => {
               return truncateMiddle(tx.mintQuote.quote, 5);
-            },
-          },
-          {
-            label: 'counter',
-            output: (tx, value) => {
-              return value;
-            },
-          },
-        ],
-      },
-      {
-        keys: [
-          {
-            label: 'Cancelled',
-            output: (tx, value) => {
-              return tx.isCancel ? <TrueIcon /> : <FalseIcon />;
-            },
-          },
-          {
-            label: 'Is Refund Transaction',
-            output: (tx, value) => {
-              return tx.isRefund ? <TrueIcon /> : <FalseIcon />;
             },
           },
         ],
