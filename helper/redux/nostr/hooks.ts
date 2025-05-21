@@ -6,6 +6,8 @@ import {
   updateMessageStatus,
   setFollows,
   setSearch,
+  addContact,
+  removeContact,
 } from './actions';
 
 export const useNostr = () => {
@@ -15,9 +17,10 @@ export const useNostr = () => {
   const profiles = useSelector((state) => state.nostr.profiles);
   const messages = useSelector((state) => state.nostr.messages);
   const follows = useSelector((state) => state.nostr.follows);
+  const contacts = useSelector((state) => state.nostr.contacts);
 
   return {
-    search: [...search, ...Object.values(follows).flat()],
+    search: [...search, ...Object.values(follows).flat(), ...(contacts || [])],
     currentProfile,
     profiles: profiles || [],
     messages: [...(messages[currentProfile.pubkey] || []), ...(messages['loaded_messages'] || [])],
@@ -29,6 +32,9 @@ export const useNostr = () => {
     },
     setFollows: (follows) => dispatch(setFollows(follows)),
     follows: [...(follows[currentProfile.pubkey] || [])],
+    contacts: contacts || [],
+    addContact: (contact) => dispatch(addContact(contact)),
+    removeContact: (pubkey) => dispatch(removeContact(pubkey)),
     setSearch: (search) => dispatch(setSearch(search)),
   };
 };

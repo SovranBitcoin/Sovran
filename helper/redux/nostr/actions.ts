@@ -8,6 +8,8 @@ import {
   APPEND_QUERY,
   MUTE_USER,
   REPORT_USER,
+  ADD_CONTACT,
+  REMOVE_CONTACT,
 } from './actionTypes';
 
 export const muteUser = (pubkey: string) => ({
@@ -53,4 +55,14 @@ export const updateMessageStatus = (pubkey, messageId, status) => ({
 export const addMessage = (pubkey, message) => ({
   type: ADD_MESSAGE,
   payload: { pubkey, message },
+});
+
+export const addContact = (contact) => ({
+  type: ADD_CONTACT,
+  payload: contact,
+});
+
+export const removeContact = (pubkey) => ({
+  type: REMOVE_CONTACT,
+  payload: pubkey,
 });
