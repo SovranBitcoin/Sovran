@@ -36,13 +36,20 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 
   return (
     <View style={styles.container}>
-      <View
+      {/* <View
         style={[styles.unitContainer, sovran(theme).backgroundSolid, sovran(theme).borderSubtle]}>
         <Text style={styles.unitText} weight="bold">
           {unit === 'sat' ? 'BTC' : unit.toUpperCase()}
         </Text>
-      </View>
-      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} />
+      </View> */}
+      <SelectedMintDisplay
+        style={{
+          width: Dimensions.get('window').width - 32 - 16 - 16,
+          marginLeft: 48,
+        }}
+        onMintSelected={handleMintSelected}
+        unit={unit}
+      />
     </View>
   );
 }
@@ -50,18 +57,18 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      transform: [{ translateX: '-50%' }],
+      // position: 'absolute',
+      top: -2,
+      // left: 0,
+      // transform: [{ translateX: '-50%' }],
       // left: 0,
       // right: 0,
       // width: 300,
       // backgroundColor: 'red',
       // flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      pointerEvents: 'box-none',
+      // alignItems: 'flex-start',
+      // justifyContent: 'flex-start',
+      // pointerEvents: 'box-none',
       // marginTop: 28,
     },
     unitContainer: {

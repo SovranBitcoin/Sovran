@@ -89,36 +89,48 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
 
   return (
     <TouchableOpacity
-      style={[sovran(theme).listItem, { alignSelf: 'center' }, style]}
+      style={[
+        sovran(theme).listItem,
+        { alignSelf: 'center', justifyContent: 'space-between' },
+        style,
+      ]}
       onPress={handlePress}
       onPressIn={() => {}}
       onPressOut={() => {}}>
-      {mintInfo?.data?.icon_url ? (
-        <Image source={{ uri: mintInfo?.data?.icon_url }} style={styles.icon} />
-      ) : (
-        <View style={styles.placeholderIcon} />
-      )}
-      <Text style={styles.name}>
-        {mintInfo?.data?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
-      </Text>
-      <Text style={styles.dot}>•</Text>
-      <Text style={styles.balance}>
-        {formatCurrency(
-          {
-            currency: currencyValue,
-            value: balance || 0,
-            denomination: denominationValue,
-          },
-          {
-            locale: 'en-US',
-            precision,
-            currencyDisplay,
-            denomination: denominationValue,
-          }
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+        {mintInfo?.data?.icon_url ? (
+          <Image source={{ uri: mintInfo?.data?.icon_url }} style={styles.icon} />
+        ) : (
+          <View style={styles.placeholderIcon} />
         )}
-      </Text>
-      <View style={styles.chevronContainer}>
-        <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+        <Text style={styles.name}>
+          {mintInfo?.data?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
+        </Text>
+      </View>
+      <Text style={styles.dot}>•</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={styles.balance}>
+          {formatCurrency(
+            {
+              currency: currencyValue,
+              value: balance || 0,
+              denomination: denominationValue,
+            },
+            {
+              locale: 'en-US',
+              precision,
+              currencyDisplay,
+              denomination: denominationValue,
+            }
+          )}
+        </Text>
+        <View style={styles.chevronContainer}>
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -485,9 +497,9 @@ export const createStyles = (theme: string) =>
     },
     name: {
       color: greys(theme)[100],
-      fontSize: 14,
+      fontSize: 12,
       marginLeft: 8,
-      fontFamily: 'OverpassRegular',
+      fontFamily: 'OverpassBold',
     },
     dot: {
       color: greys(theme)[700],
@@ -496,7 +508,7 @@ export const createStyles = (theme: string) =>
     },
     balance: {
       color: greys(theme)[0],
-      fontSize: 14,
+      fontSize: 12,
       fontFamily: 'OverpassBold',
     },
     chevronContainer: {

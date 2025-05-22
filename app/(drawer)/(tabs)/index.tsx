@@ -159,7 +159,7 @@ function TabOneScreen({
 const createStyles = (theme) =>
   StyleSheet.create({
     scrollView: {
-      marginTop: -38,
+      marginTop: -64,
       marginBottom: -24,
       backgroundColor: greys(theme)[2300],
     },
