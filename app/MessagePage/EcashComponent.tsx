@@ -4,31 +4,51 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades } from 'helper/colors';
 import { Button } from 'components/common/Button';
-import { receiveEcash } from 'components/cashu';
+import { cancelEcashTransaction, receiveEcash } from 'components/cashu';
 import { showMessage } from 'helper/popup/popups';
 import { useCashu } from 'helper/redux/cashu';
+import { useTypedNavigation } from 'helper/navigation';
+import { convertTime } from 'helper/time';
 import opacity from 'hex-color-opacity';
 
 interface Props {
   token: string;
   theme: string;
   isReceived: boolean;
+  date?: string;
 }
 
-const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
+const EcashComponent = ({ token, theme, isReceived, date }: Props) => {
   const styles = createStyles(theme, isReceived);
   const { transactions } = useCashu();
+  const navigation = useTypedNavigation();
 
   const decoded = getDecodedToken(token);
   const amount = decoded.proofs.reduce((a, p) => a + p.amount, 0);
   const unit = decoded.unit;
 
-  const isClaimed = transactions.some((t) => t.token === token);
+  const sendTx = transactions.find(
+    (t) => t.token === token && t.transactionType === 'send'
+  );
+  const receiveTx = transactions.find(
+    (t) => t.token === token && t.transactionType === 'receive'
+  );
+
+  const isClaimed = isReceived ? Boolean(receiveTx) : Boolean(sendTx?.paid);
 
   const handleRedeem = async () => {
     try {
       await receiveEcash({ token, unit });
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' });
+    } catch (error) {
+      showMessage(error.message, {}, { emoji: '🚨' });
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!sendTx) return;
+    try {
+      await cancelEcashTransaction(sendTx, navigation);
     } catch (error) {
       showMessage(error.message, {}, { emoji: '🚨' });
     }
@@ -62,11 +82,18 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
           </View>
         </View>
         <Button
-          text={isClaimed ? 'Redeemed' : 'Redeem'}
+          text={
+            isClaimed
+              ? 'Redeemed'
+              : isReceived
+              ? 'Redeem'
+              : 'Cancel'
+          }
           variant="primary"
           disabled={isClaimed}
-          onPress={handleRedeem}
+          onPress={isReceived ? handleRedeem : handleCancel}
         />
+        {date && <Text style={styles.timestamp}>{convertTime(new Date(date))}</Text>}
       </LinearGradient>
     </View>
   );
@@ -129,6 +156,14 @@ const createStyles = (theme: string, isReceived: boolean) =>
       color: greys(theme)[0],
       opacity: 0.75,
     },
+    timestamp: {
+      color: greys(theme)[0],
+      opacity: 0.75,
+      fontFamily: 'OverpassBold',
+      fontSize: 12,
+      textAlign: 'right',
+      marginTop: 8,
+    },
   });
 
-export default CashuTokenComponent;
+export default EcashComponent;

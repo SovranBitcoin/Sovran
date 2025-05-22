@@ -6,7 +6,15 @@ import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
 import { getInvoiceFromLnurl } from 'helper/third-party/lnurl';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { getMeltQuote, isValidLNURL, receiveLightning, sendEcash } from 'components/cashu';
+import {
+  getMeltQuote,
+  isValidLNURL,
+  receiveLightning,
+  sendEcash,
+} from 'components/cashu';
+import { useNostr } from 'helper/redux/nostr';
+import { finalizeEvent, nip04, nip19, SimplePool } from 'nostr-tools';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -36,11 +44,44 @@ interface ScanningData {
   type?: string;
 }
 
+async function sendDM(priv: string, pub: string, toPubkey: string, message: string, relays: string[]) {
+  const encryptMessage = async (privKey: string, recipientPubKey: string, msg: string) => {
+    return nip04.encrypt(privKey, recipientPubKey, msg);
+  };
+
+  const signEventAsync = async (privKey: string, event: any) => {
+    return finalizeEvent(event, hexToBytes(privKey));
+  };
+
+  const content = await encryptMessage(priv, toPubkey, message);
+  const event = {
+    kind: 4,
+    tags: [['p', toPubkey]],
+    content,
+    pubkey: pub,
+    created_at: Math.floor(Date.now() / 1000),
+    id: '',
+    sig: '',
+  };
+
+  const signedEvent = await signEventAsync(priv, event);
+  return new Promise((resolve, reject) => {
+    const pool = new SimplePool();
+    const pubs = pool.publish(relays, signedEvent);
+
+    Promise.any(pubs)
+      .then(() => resolve(signedEvent))
+      .catch((error) => reject(`Failed to publish: ${error}`))
+      .finally(() => pool.close(relays));
+  });
+}
+
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const dispatch = useDispatch();
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const { currentProfile } = useNostr();
   const { params } = useRoute();
   const navigation = useTypedNavigation();
 
@@ -106,6 +147,32 @@ function ModalScreen() {
           }
         : {}),
     });
+
+    if (params?.profile?.npub) {
+      try {
+        const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
+        const privKeyHex = bytesToHex(privKeyBytes as Uint8Array);
+        const { data: recipientHex } = nip19.decode(params.profile.npub);
+        const recipient = bytesToHex(recipientHex as Uint8Array);
+        const relays = [
+          'wss://relay1.nostrchat.io',
+          'wss://relay2.nostrchat.io',
+          'wss://relay.damus.io',
+          'wss://relay.snort.social',
+          'wss://nos.lol',
+          'wss://purplepag.es',
+          'wss://relay.primal.net',
+          'wss://nostr.thank.eu',
+          'wss://relay.vanderwarker.family',
+          'wss://nostr-relay.bitcoin.ninja',
+          'wss://lnbits.btc-payserver.eu/nostrrelay/1',
+          'wss://nostr.girino.org',
+        ];
+        await sendDM(privKeyHex, currentProfile.pubkey, recipient, transaction.token, relays);
+      } catch (e) {
+        console.error('Failed to send token DM', e);
+      }
+    }
 
     navigation.replace(params.to, {
       ...params,

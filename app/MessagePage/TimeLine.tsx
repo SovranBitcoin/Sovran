@@ -5,7 +5,7 @@ import TransactionComponent from './TransactionComponent';
 import { useNostr } from 'helper/redux/nostr';
 import EventComponent from './EventsComponent';
 import VpnComponent from './VpnComponent';
-import CashuTokenComponent from './CashuTokenComponent';
+import EcashComponent from './EcashComponent';
 import { isValidEcashToken } from 'components/cashu';
 
 const TimelineItem = ({ item, theme }) => {
@@ -32,7 +32,7 @@ const TimelineItem = ({ item, theme }) => {
   if (isMessage) {
     if (isTokenMessage) {
       return (
-        <CashuTokenComponent token={item.content} theme={theme} isReceived={isMessageReceived} />
+        <EcashComponent token={item.content} theme={theme} isReceived={isMessageReceived} />
       );
     }
     return <MessageComponent message={item} theme={theme} isReceived={isMessageReceived} />;

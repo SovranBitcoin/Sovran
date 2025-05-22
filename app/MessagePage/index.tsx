@@ -37,6 +37,7 @@ import { Button } from 'components/common/Button';
 import ndk from 'components/ndk';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { isValidEcashToken } from 'components/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 
@@ -233,7 +234,12 @@ export default function ModalScreen() {
     let cancelButtonIndex = 0;
     let destructiveButtonIndex = -1;
 
-    if (item.order || item?.request) {
+    const redeemedToken =
+      item?.content &&
+      isValidEcashToken(item.content) &&
+      transactions.some((t) => t.token === item.content);
+
+    if (item.order || item?.request || redeemedToken) {
       options = ['View Details', 'Cancel'];
       destructiveButtonIndex = 0;
       cancelButtonIndex = 1;
@@ -253,6 +259,14 @@ export default function ModalScreen() {
               navigation.navigate('vpn', { ...item });
             } else {
               navigation.navigate('esim', { ...p, ...item, ...o });
+            }
+          } else if (redeemedToken) {
+            const tx = transactions.find((t) => t.token === item.content);
+            if (tx) {
+              navigation.navigate('transaction', {
+                id: tx.token,
+                transactionType: tx.transactionType,
+              });
             }
           } else {
             navigation.navigate('transaction', {
