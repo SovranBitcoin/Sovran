@@ -10,6 +10,7 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
+// WARNING: never use _.set, it will obviously delete the users storage...
 const migrations = {
   0: (state: RootState) => {
     return _.update(
@@ -265,8 +266,8 @@ const migrations = {
       state
     );
   },
-  73: (state: RootState) => {
-    return _.set(state, ['nostr', 'contacts'], []);
+  74: (state: RootState) => {
+    return _.update(['nostr', 'contacts'], (contacts = []) => contacts, state);
   },
 };
 
@@ -274,7 +275,7 @@ const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 73,
+  version: 74,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
