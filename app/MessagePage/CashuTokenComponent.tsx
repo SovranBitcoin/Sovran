@@ -7,6 +7,7 @@ import { Button } from 'components/common/Button';
 import { receiveEcash } from 'components/cashu';
 import { showMessage } from 'helper/popup/popups';
 import { useCashu } from 'helper/redux/cashu';
+import opacity from 'hex-color-opacity';
 
 interface Props {
   token: string;
@@ -50,21 +51,22 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
         ]}
       />
       <LinearGradient colors={gradientColors} style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerText}>Cashu token</Text>
-        </View>
-        <Text style={styles.amountText}>
-          {amount} {unit === 'sat' ? 'sats' : unit}
-        </Text>
+        <Text style={styles.mintText}>{decoded.mint}</Text>
+
         <View style={styles.footer}>
-          <Text style={styles.mintText}>{decoded.mint}</Text>
-          <Button
-            text={isClaimed ? 'Redeemed' : 'Redeem'}
-            variant="primary"
-            disabled={isClaimed}
-            onPress={handleRedeem}
-          />
+          <View>
+            <Text style={styles.amountText}>
+              {amount} {unit === 'sat' ? 'sats' : unit}
+            </Text>
+            {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
+          </View>
         </View>
+        <Button
+          text={isClaimed ? 'Redeemed' : 'Redeem'}
+          variant="primary"
+          disabled={isClaimed}
+          onPress={handleRedeem}
+        />
       </LinearGradient>
     </View>
   );
@@ -104,14 +106,22 @@ const createStyles = (theme: string, isReceived: boolean) =>
     },
     amountText: {
       fontFamily: 'OverpassHeavy',
-      fontSize: 16,
+      fontSize: 24,
       color: greys(theme)[0],
-      marginBottom: 8,
+      marginBottom: 0,
     },
     footer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+    },
+    memoText: {
+      fontFamily: 'OverpassRegular',
+      fontSize: 12,
+      color: greys(theme)[0],
+      backgroundColor: opacity(greys(theme)[0], 0.1),
+      padding: 16,
+      borderRadius: 8,
     },
     mintText: {
       fontFamily: 'OverpassBold',
