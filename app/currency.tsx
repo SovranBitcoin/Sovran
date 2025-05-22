@@ -23,6 +23,8 @@ import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { greys } from 'helper/colors';
 import { maybeConvertNpub } from 'helper/cashu/pay';
+import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
+import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
@@ -91,6 +93,8 @@ function ModalScreen() {
     });
   };
 
+  const { sendEncryptedDirectMessage } = useSendEncryptedDirectMessage();
+
   const handleEcashSend = async ({ message }) => {
     console.log('[handleEcashSend]', unit === 'sat' ? amount : amount * 100, unit, message, params);
     const transaction = await sendEcash({
@@ -106,6 +110,17 @@ function ModalScreen() {
           }
         : {}),
     });
+
+    if (params?.profile?.npub) {
+      try {
+        await sendEncryptedDirectMessage({
+          message: transaction.token,
+          recipient: convertNpub(params.profile.npub),
+        });
+      } catch (e) {
+        console.error('Failed to send ecash token over Nostr', e);
+      }
+    }
 
     navigation.replace(params.to, {
       ...params,
