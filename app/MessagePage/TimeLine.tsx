@@ -5,6 +5,8 @@ import TransactionComponent from './TransactionComponent';
 import { useNostr } from 'helper/redux/nostr';
 import EventComponent from './EventsComponent';
 import VpnComponent from './VpnComponent';
+import CashuTokenComponent from './CashuTokenComponent';
+import { isValidEcashToken } from 'components/cashu';
 
 const TimelineItem = ({ item, theme }) => {
   const { currentProfile } = useNostr();
@@ -16,6 +18,8 @@ const TimelineItem = ({ item, theme }) => {
   const isEsim = !!item.order?.ac;
   const isTransaction = !!item.unit;
 
+  const isTokenMessage = isMessage && isValidEcashToken(item.content);
+
   // Determine if message is received
   const isMessageReceived =
     isMessage && (item.receiver === currentProfile.pubkey || item.id === -1);
@@ -26,6 +30,11 @@ const TimelineItem = ({ item, theme }) => {
 
   // Render appropriate component based on item type
   if (isMessage) {
+    if (isTokenMessage) {
+      return (
+        <CashuTokenComponent token={item.content} theme={theme} isReceived={isMessageReceived} />
+      );
+    }
     return <MessageComponent message={item} theme={theme} isReceived={isMessageReceived} />;
   }
 
