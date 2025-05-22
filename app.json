@@ -3,9 +3,6 @@
     "name": "Sovran",
     "slug": "sovran",
     "version": "0.0.13",
-    "experiments": {
-      "tsconfigPaths": true
-    },
     "orientation": "portrait",
     "scheme": "sovran",
     "userInterfaceStyle": "automatic",

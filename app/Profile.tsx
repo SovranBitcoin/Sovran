@@ -361,7 +361,7 @@ const Screen = () => {
               Payments
             </Text>
           </Pressable>
-          <Pressable
+          {/* <Pressable
             onPress={() => {
               navigation.navigate('myEsims', {}, { current: 'drawer' });
             }}
@@ -370,8 +370,8 @@ const Screen = () => {
             <Text size={18} weight="bold" style={styles.menuText}>
               eSIM
             </Text>
-          </Pressable>
-          <Pressable
+          </Pressable> */}
+          {/* <Pressable
             onPress={() => {
               navigation.navigate('myVpns', {}, { current: 'drawer' });
             }}
@@ -380,7 +380,7 @@ const Screen = () => {
             <Text size={18} weight="bold" style={styles.menuText}>
               VPN
             </Text>
-          </Pressable>
+          </Pressable> */}
           <Pressable
             onPress={() => {
               navigation.navigate('lifestyle', {}, { current: 'drawer' });
