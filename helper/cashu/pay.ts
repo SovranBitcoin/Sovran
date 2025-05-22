@@ -214,6 +214,7 @@ export async function sendLightning({
     })
   );
 
+
   return transaction;
 }
 
@@ -270,6 +271,7 @@ export async function receiveLightning({
       transaction,
     })
   );
+
 
   return transaction;
 }
@@ -398,6 +400,14 @@ export async function sendEcash({
       transaction,
     })
   );
+  if (to) {
+    try {
+      const { sendNutzap } = await import("../nostr/nutzap");
+      await sendNutzap({ token: encodedToken, recipient: to, content: memo || "" });
+    } catch (e) {
+      console.error("Failed to send nutzap", e);
+    }
+  }
 
   return transaction;
 }

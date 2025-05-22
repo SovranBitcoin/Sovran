@@ -1,5 +1,5 @@
 import { sendEcash } from 'helper/cashu/pay';
-import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { bytesToHex } from '@noble/hashes/utils';
 import { NDKEvent, NDKKind, NDKPrivateKeySigner, ProfilePointer } from '@nostr-dev-kit/ndk';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
@@ -39,21 +39,10 @@ export const useSendEncryptedDirectMessage = () => {
 
     const pubkey: string = (result.data as ProfilePointer).pubkey;
 
-    const token = await sendEcash({
+    await sendEcash({
       unit: decodedRequest.unit as string,
       amount: decodedRequest.amount as number,
       to: pubkey,
-    });
-
-    const decodedToken = getDecodedToken(token);
-    sendEncryptedDirectMessage({
-      message: JSON.stringify({
-        mint: decodedToken.mint,
-        unit: decodedToken.unit,
-        proofs: decodedToken.proofs,
-        id: decodedRequest.id,
-      }),
-      recipient: pubkey,
     });
   };
 
