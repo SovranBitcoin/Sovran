@@ -2,14 +2,12 @@ import { View } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useRoute } from '@react-navigation/native';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useState } from 'react';
 import { Transactions } from 'components/layout/Transactions';
 import Container from 'components/layout/Container';
-import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
-import { ScrollView } from 'react-native';
 
 import Modal from 'components/layout/Modal';
 import { Tabs } from 'components/common/Tabs';
@@ -17,23 +15,14 @@ import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const { account } = useTypedRoute<'transactions'>() || {
-    account: { unit: '' },
-  };
-  const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Default to sat unit if no params provided
+  const route = useRoute();
+  const params: any = route.params || {};
+  const account = params.account || { type: 'ecash', unit: 'sat' };
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<string>('all');
   const [at, setAt] = useState<string>('all');
   const [tab, setTab] = useState('All');
-
-  const handleCurrencyChange = (currency: string) => {
-    setSelectedCurrency(currency.toLowerCase());
-  };
-
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
-  };
 
   const toggleFilter = (newFilter: 'incoming' | 'outgoing') => {
     setFilter((prevFilter) => (prevFilter === newFilter ? 'all' : newFilter));
@@ -59,10 +48,6 @@ function ModalScreen() {
             height: 4,
           }}></View>
 
-        <CurrencySelector
-          selectedCurrency={selectedCurrency.toUpperCase()}
-          onCurrencyChange={handleCurrencyChange}
-        />
         <View
           style={{
             flexDirection: 'row',
@@ -179,10 +164,7 @@ function ModalScreen() {
         </View>
         <View style={{ marginBottom: 64 }}></View>
         <Transactions
-          account={{
-            ...account,
-            unit: selectedCurrency,
-          }}
+          account={account}
           filter={filter}
           type={type}
           at={at}
