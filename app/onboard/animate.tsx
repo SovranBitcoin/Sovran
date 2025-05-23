@@ -29,6 +29,7 @@ import { getProfile } from './components/fetchAccountData';
 import { Currency } from './components/CurrencyIcon';
 import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { apple_mnemonic, giveaways } from 'helper/cashu/secrets';
 
 const { height } = Dimensions.get('window');
 
@@ -200,7 +201,13 @@ const ChainLoadingAnimation = () => {
                   name: method.unit,
                   weight: 0.5,
                 }))
-                .filter((unit) => ['sat', 'usd', 'eur', 'gbp'].includes(unit.name));
+                .filter((unit) =>
+                  (mnemonic.trim() ===
+                  'suit edge uphold icon modify more oak can zero legal sudden rival'
+                    ? ['sat']
+                    : ['sat', 'usd', 'eur', 'gbp']
+                  ).includes(unit.name)
+                );
 
               mints.push({
                 id: `mint-${profileId}-${index}`,
@@ -258,7 +265,15 @@ const ChainLoadingAnimation = () => {
           const mints = [];
           for (const mint of message.payload.mints) {
             const { mintUrl } = mint;
-            const generator = await restoreMint({ mintUrl, profile });
+            const generator = await restoreMint({
+              mintUrl,
+              profile,
+              allowedUnits:
+                mnemonic.trim() ===
+                'suit edge uphold icon modify more oak can zero legal sudden rival'
+                  ? ['sat']
+                  : ['sat', 'usd', 'eur', 'gbp'],
+            });
             let result = await generator.next();
 
             while (!result.done) {

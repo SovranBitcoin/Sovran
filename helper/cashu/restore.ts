@@ -7,8 +7,8 @@ export async function* restoreMint({
   mintUrl,
   profile,
   BATCH_SIZE = 100,
-  MAX_GAP = 4,
-  allowedUnits = ['sat', 'usd', 'eur', 'gbp'],
+  MAX_GAP = 2,
+  allowedUnits = ['sat'],
 }: {
   mintUrl: string;
   profile: string;
