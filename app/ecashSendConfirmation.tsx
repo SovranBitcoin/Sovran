@@ -2,7 +2,6 @@ import React, { useEffect, useState, createContext, useContext, useRef, useCallb
 import { Share, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
-import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -45,6 +44,7 @@ import { Section } from 'components/common/Section';
 import { npubToPubkey } from 'components/layout/Transaction';
 import { encode } from 'helper/third-party/emoji';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -218,32 +218,8 @@ function ModalScreen() {
           <BalanceUpdate
             pubkey={npubToPubkey(getCurrentTransaction[0]?.nostr?.pubkey)}
             transactionType="send"
-            topAmount={formatCurrency(
-              {
-                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-                value: amount,
-                denomination: unit === 'sat' ? 'sats' : unit,
-              },
-              {
-                locale: 'en-US',
-                precision: unit === 'sat' ? 8 : 2,
-                currencyDisplay: 'symbol',
-                denomination: unit === 'sat' ? 'btc' : unit,
-              }
-            )}
-            bottomAmount={formatCurrency(
-              {
-                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-                value: amount,
-                denomination: unit === 'sat' ? 'sats' : unit,
-              },
-              {
-                locale: 'en-US',
-                precision: 2,
-                currencyDisplay: 'symbol',
-                denomination: unit === 'sat' ? 'usd' : unit,
-              }
-            )}
+            amount={amount}
+            unit={unit}
           />
           <PaymentInfo
             setUri={setUri}

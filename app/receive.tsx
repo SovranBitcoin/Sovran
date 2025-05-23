@@ -5,11 +5,9 @@ import { SheetProvider } from 'react-native-actions-sheet';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {
-  const { unit, type } = useTypedRoute<'receive'>();
+  const { unit } = useTypedRoute<'receive'>();
 
-  if (type === 'ecash' || type === 'lightning') {
-    return <EcashLightningReceiver unit={unit} type={type} />;
-  }
+  return <EcashLightningReceiver unit={unit} />;
 }
 
 export default withSheetProvider(ModalScreen);

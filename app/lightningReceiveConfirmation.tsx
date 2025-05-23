@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Share, Text } from 'react-native';
 import { View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
-import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
@@ -18,6 +17,7 @@ import { getMint, getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 function ModalScreen() {
   const navigation = useNavigation();
@@ -148,14 +148,7 @@ function ModalScreen() {
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       children={
         <>
-          <BalanceUpdate
-            transactionType="receive"
-            topAmount={formatCurrency(getCurrencyData(), getCurrencyOptions('btc'))}
-            bottomAmount={formatCurrency(
-              getCurrencyData(),
-              getCurrencyOptions(isBitcoin ? 'usd' : unit)
-            )}
-          />
+          <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
           <PaymentInfo
             setUri={setUri}
             data={[

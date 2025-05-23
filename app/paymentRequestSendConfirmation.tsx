@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
 import { formatCurrency } from 'helper/currency';
-import { BalanceUpdate } from './transaction';
 import { useNavigation } from 'expo-router';
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
@@ -15,6 +14,7 @@ import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -65,8 +65,9 @@ function ModalScreen() {
           <BalanceUpdate
             pubkey={to}
             transactionType="send"
-            topAmount={formatAmount(isSats ? 'btc' : unit)}
-            bottomAmount={formatAmount('usd')}
+            amount={amount}
+            unit={unit}
+            request={request}
           />
 
           <Section

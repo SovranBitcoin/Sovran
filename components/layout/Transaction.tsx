@@ -15,7 +15,8 @@ import { truncateMiddle } from 'helper/strings';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { useTypedNavigation } from 'helper/navigation';
 import { nip19 } from 'nostr-tools';
-
+import { Text } from 'components/common/Themed';
+import { AmountFormatter } from 'components/common/AmountFormatter';
 interface TransactionStatus {
   block_time: number;
   [key: string]: any;
@@ -323,7 +324,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     const sign = isSend ? '-' : isReceive ? '+' : '';
     const precision = tx.unit === 'sat' ? (settings.display_btc === 0 ? 8 : 0) : 2;
     const currencyDisplay =
-      tx.unit === 'sat' && [0, 1, 3].includes(settings.display_btc) ? 'none' : 'name';
+      tx.unit === 'sat' && [0, 1, 3].includes(settings.display_btc) ? 'none' : 'none';
     const denomination =
       tx.unit === 'sat' ? (settings.display_btc === 0 ? 'btc' : 'sats') : tx.unit;
 
@@ -361,7 +362,14 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
               {sign}
             </UntranslatedText>
           )}
-          {[0, 3].includes(settings.display_btc) && tx.unit === 'sat' && (
+          <AmountFormatter
+            amount={amount}
+            unit={tx.unit}
+            size={16}
+            weight="heavy"
+            color={isSend ? reds[300] : greens[300]}
+          />
+          {/* {[0, 3].includes(settings.display_btc) && tx.unit === 'sat' && (
             <BtcUnit width={'16'} height="16" color={isSend ? reds[300] : greens[300]} />
           )}
           <UntranslatedText
@@ -377,9 +385,9 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
               textShadowRadius: 1,
             }}>
             {amount}
-          </UntranslatedText>
+          </UntranslatedText> */}
 
-          {settings.display_btc === 1 && tx.unit === 'sat' && (
+          {/* {settings.display_btc === 1 && tx.unit === 'sat' && (
             <LightningUnit
               style={{
                 marginBottom: 6,
@@ -388,7 +396,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
               height="14"
               color={isSend ? reds[300] : greens[300]}
             />
-          )}
+          )} */}
         </View>
         {relatedAmount && (
           <View className="flex flex-row items-center bg-transparent">

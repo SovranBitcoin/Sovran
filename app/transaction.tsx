@@ -1,261 +1,26 @@
 import { useNavigation } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import Modal from 'components/layout/Modal';
-import { StyledText, Text, View } from 'components/common/Themed';
+import { Text, View } from 'components/common/Themed';
 import { convertTime } from 'helper/time';
-import { formatCurrency } from 'helper/currency';
-import { cancelEcashTransaction, getLightningAmount } from 'components/cashu';
-import Icon, { FalseIcon, TrueIcon } from 'assets/icons';
+import { cancelEcashTransaction } from 'components/cashu';
+import Icon from 'assets/icons';
 import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch from react-redux
 import { useCashu } from 'helper/redux/cashu';
-import { useNostr } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
-import { greens, greys, shades } from 'helper/colors';
-import opacity from 'hex-color-opacity';
-import { BlurView } from 'expo-blur';
-import { useEsims } from 'helper/redux/esim';
+import { greys } from 'helper/colors';
 
-import { AmountFormatter } from 'components/layout/PrimaryBalance';
-import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Snow from 'react-native-snow-bg';
 import { getGiveaway } from './ecashReceiveConfirmation';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
-import React from 'react';
+import { useTypedRoute } from 'helper/navigation';
 import { truncateMiddle } from 'helper/strings';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-
-export function BalanceUpdate({
-  topAmount,
-  bottomAmount,
-  transactionType,
-  amount,
-  unit,
-  pubkey,
-  request,
-  transaction,
-  percentageDone,
-}) {
-  const theme = useSelector(memoizedGetTheme);
-  const { search, profiles, currentProfile } = useNostr();
-  const profilePicture =
-    search?.find((s) => s.pubkey === pubkey)?.profile?.picture ||
-    profiles?.find((s) => s.pubkey === pubkey)?.picture ||
-    search?.find((s) => s.pubkey === pubkey)?.profile?.image ||
-    profiles?.find((s) => s.pubkey === pubkey)?.image ||
-    search?.find((s) => s.pubkey === pubkey)?.profile?.picture;
-  const { esims } = useEsims();
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        paddingLeft: 8,
-        backgroundColor: 'transparent',
-      }}>
-      <View
-        style={{
-          backgroundColor: 'transparent',
-        }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            backgroundColor: 'transparent',
-            alignItems: 'center',
-          }}>
-          {transactionType === 'send' ? (
-            <Text
-              size={32}
-              weight="bold"
-              style={{
-                color: shades[300],
-                marginRight: 6,
-              }}>
-              -
-            </Text>
-          ) : (
-            transactionType === 'receive' && (
-              <Text
-                weight="bold"
-                size={24}
-                style={{
-                  color: greens[300],
-                  textShadowColor: opacity(greys(theme)[0], 0.5),
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 1,
-                  marginRight: 6,
-                }}>
-                +
-              </Text>
-            )
-          )}
-          <Text
-            weight="bold"
-            size={32}
-            style={{
-              color: transactionType === 'send' ? shades[300] : greens[300],
-              textShadowColor: opacity(greys(theme)[0], 0.5),
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 1,
-              backgroundColor: 'transparent',
-            }}>
-            {topAmount ? (
-              topAmount
-            ) : (
-              <AmountFormatter
-                amount={amount}
-                unit={unit}
-                size={32}
-                weight="heavy"
-                color={transactionType === 'receive' ? greens[300] : shades[300]}
-              />
-            )}
-          </Text>
-        </View>
-        <Text
-          size={20}
-          style={{
-            color: greys(theme)[0],
-            marginLeft: 18,
-            backgroundColor: 'transparent',
-          }}>
-          {amount < 0 ? '-' : ''}
-          {bottomAmount
-            ? bottomAmount
-            : formatCurrency(
-                {
-                  currency: unit === 'sat' ? 'BTC' : unit?.toUpperCase(),
-                  value: Math.abs(amount),
-                  denomination: unit === 'sat' ? 'sats' : unit,
-                },
-                {
-                  locale: 'en-US',
-                  precision: 2,
-                  currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
-                  denomination: unit === 'usd' ? 'sats' : 'usd',
-                }
-              )}
-        </Text>
-      </View>
-      <View
-        style={{
-          padding: 16,
-          backgroundColor: 'transparent',
-          transform: [{ scale: 1.25 }],
-        }}>
-        {profilePicture ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -4,
-                right: -4,
-                zIndex: 100,
-                backgroundColor: greys(theme)[1800],
-                borderRadius: 100,
-                height: 16,
-                width: 16,
-                padding: 3,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}>
-              {transactionType === 'receive' ? (
-                <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} size={10} />
-              ) : transaction?.isCancel ? (
-                <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
-              ) : (
-                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} size={10} />
-              )}
-            </View>
-            <CachedImage
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 1000,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}
-              source={{
-                uri: profilePicture,
-              }}
-            />
-          </View>
-        ) : transactionType === 'receive' ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
-          </View>
-        ) : esims
-            .map((e) => e.request)
-            .filter((a) => a)
-            .includes(request) ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -4,
-                right: -4,
-                zIndex: 100,
-                backgroundColor: greys(theme)[1800],
-                borderRadius: 100,
-                height: 16,
-                width: 16,
-                padding: 3,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}>
-              {transaction?.isCancel ? (
-                <Icon name="mdi:cancel" color={greys(theme)[100]} />
-              ) : (
-                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-              )}
-            </View>
-            <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
-          </View>
-        ) : (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            {transaction?.isCancel ? (
-              <Icon name="mdi:cancel" color={greys(theme)[100]} />
-            ) : (
-              <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-            )}
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 // todo: add nostr receiver/sender info
 const transactionConfig = {

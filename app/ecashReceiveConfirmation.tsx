@@ -3,7 +3,6 @@ import { StyleSheet } from 'react-native';
 import { formatCurrency } from 'helper/currency';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash } from 'components/cashu';
-import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -19,6 +18,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 // Types
 interface TokenProps {
@@ -205,15 +205,7 @@ function ModalScreen({
       <>
         {giveaway?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
 
-        <BalanceUpdate
-          transactionType="receive"
-          amount={amount}
-          unit={unit}
-          bottomAmount={unit !== 'sat' ? <></> : null}
-          topAmount={null}
-          pubkey={''}
-          request=""
-        />
+        <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
 
         {memo && <Section items={[{ title: 'Note', value: memo }]} style={{}} camera={false} />}
 

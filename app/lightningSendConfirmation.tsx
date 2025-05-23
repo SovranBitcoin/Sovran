@@ -7,7 +7,6 @@ import {
   getTimestamp,
   sendLightning,
 } from 'components/cashu';
-import { BalanceUpdate } from './transaction';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { View } from 'components/common/Themed';
@@ -20,6 +19,7 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 function ModalScreen() {
   const navigation = useTypedNavigation();
@@ -134,20 +134,6 @@ function ModalScreen() {
           <BalanceUpdate
             pubkey={pubkey}
             transactionType="send"
-            topAmount={formatCurrency(
-              {
-                currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-                value: amount,
-                denomination: unit === 'sat' ? 'sats' : unit,
-              },
-              {
-                locale: 'en-US',
-                precision: unit === 'sat' ? 8 : 2,
-                currencyDisplay: 'symbol',
-                denomination: unit === 'sat' ? 'btc' : unit,
-              }
-            )}
-            bottomAmount={formatAmount(amount, 'usd')}
             amount={amount}
             unit={unit}
             request={pr}
