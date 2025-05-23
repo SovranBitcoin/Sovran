@@ -11,6 +11,7 @@ import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { find, get, some } from 'lodash';
+import { formatCurrency } from 'helper/currency';
 
 interface BalanceUpdateProps {
   transactionType: 'send' | 'receive' | string;
@@ -19,6 +20,7 @@ interface BalanceUpdateProps {
   pubkey?: string;
   request?: string;
   transaction?: { isCancel?: boolean };
+  bottomAmount?: string;
 }
 
 export function BalanceUpdate({
@@ -28,6 +30,7 @@ export function BalanceUpdate({
   pubkey,
   request,
   transaction,
+  bottomAmount,
 }: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
@@ -150,7 +153,7 @@ export function BalanceUpdate({
   };
 
   return (
-    <View className="flex-row items-center justify-between py-4 pr-4 pl-2 bg-transparent">
+    <View className="flex-row items-center justify-between bg-transparent py-4 pl-2 pr-4">
       <View className="bg-transparent">
         <View className="flex-row items-center bg-transparent">
           <Sign />
@@ -171,6 +174,31 @@ export function BalanceUpdate({
             backgroundColor: 'transparent',
           }}>
           {amount < 0 ? '-' : ''}
+          <Text
+            size={20}
+            style={{
+              color: greys(theme)[100],
+              fontFamily: 'OverpassBold',
+              marginLeft: 18,
+              backgroundColor: 'transparent',
+            }}>
+            {amount < 0 ? '-' : ''}
+            {bottomAmount
+              ? bottomAmount
+              : formatCurrency(
+                  {
+                    currency: unit === 'sat' ? 'BTC' : unit?.toUpperCase(),
+                    value: Math.abs(amount),
+                    denomination: unit === 'sat' ? 'sats' : unit,
+                  },
+                  {
+                    locale: 'en-US',
+                    precision: 2,
+                    currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
+                    denomination: unit === 'usd' ? 'sats' : 'usd',
+                  }
+                )}
+          </Text>
         </Text>
       </View>
       <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
