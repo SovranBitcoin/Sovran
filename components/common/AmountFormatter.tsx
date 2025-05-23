@@ -53,7 +53,8 @@ export function AmountFormatter({
     <View className="flex-row items-center" style={{ backgroundColor: 'transparent' }}>
       {displayBtc === 0 && (
         <>
-          <View style={{ marginLeft: weight === 'heavy' ? 0 : -4, backgroundColor: 'transparent' }}>
+          <View
+            style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
             <BtcIcon weight={weight} height={size} width={size * 1.4} color={currentColor} />
           </View>
           <Text
@@ -103,7 +104,8 @@ export function AmountFormatter({
 
       {displayBtc === 3 && (
         <>
-          <View style={{ marginLeft: weight === 'heavy' ? 0 : -4, backgroundColor: 'transparent' }}>
+          <View
+            style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
             <BtcIcon weight={weight} height={size} width={size * 1.4} color={currentColor} />
           </View>
           <Text
