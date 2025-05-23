@@ -1,6 +1,7 @@
+import React, { useMemo } from 'react';
 import { Text, View } from 'components/common/Themed';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux'; // Import useDispatch from react-redux
+import { useSelector } from 'react-redux';
 import { useNostr } from 'helper/redux/nostr';
 import { greens, greys, shades } from 'helper/colors';
 import opacity from 'hex-color-opacity';
@@ -9,72 +10,156 @@ import { useEsims } from 'helper/redux/esim';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
+import { find, get, some } from 'lodash';
 
-export function BalanceUpdate({ transactionType, amount, unit, pubkey, request, transaction }) {
+interface BalanceUpdateProps {
+  transactionType: 'send' | 'receive' | string;
+  amount: number;
+  unit: string;
+  pubkey?: string;
+  request?: string;
+  transaction?: { isCancel?: boolean };
+}
+
+export function BalanceUpdate({
+  transactionType,
+  amount,
+  unit,
+  pubkey,
+  request,
+  transaction,
+}: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
-  const profilePicture =
-    search?.find((s) => s.pubkey === pubkey)?.profile?.picture ||
-    profiles?.find((s) => s.pubkey === pubkey)?.picture ||
-    search?.find((s) => s.pubkey === pubkey)?.profile?.image ||
-    profiles?.find((s) => s.pubkey === pubkey)?.image ||
-    search?.find((s) => s.pubkey === pubkey)?.profile?.picture;
   const { esims } = useEsims();
 
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        paddingLeft: 8,
-        backgroundColor: 'transparent',
-      }}>
-      <View
-        style={{
-          backgroundColor: 'transparent',
-        }}>
-        <View
+  const profilePicture = useMemo(() => {
+    const getPicture = (arr?: any[]) => {
+      const item = find(arr, { pubkey });
+      return (
+        get(item, 'profile.picture') ||
+        get(item, 'picture') ||
+        get(item, 'profile.image') ||
+        get(item, 'image')
+      );
+    };
+
+    return getPicture(search) || getPicture(profiles);
+  }, [search, profiles, pubkey]);
+
+  const isEsimRequest = useMemo(
+    () => some(esims, (e) => e?.request && e.request === request),
+    [esims, request]
+  );
+
+  const isSend = transactionType === 'send';
+  const isReceive = transactionType === 'receive';
+
+  const Sign = () => {
+    if (isSend)
+      return (
+        <Text size={32} weight="bold" className="ml-2" style={{ color: shades[300] }}>
+          -
+        </Text>
+      );
+    if (isReceive)
+      return (
+        <Text
+          weight="bold"
+          size={24}
+          className="ml-2"
           style={{
-            flexDirection: 'row',
-            backgroundColor: 'transparent',
-            alignItems: 'center',
+            color: greens[300],
+            textShadowColor: opacity(greys(theme)[0], 0.5),
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 1,
           }}>
-          {transactionType === 'send' ? (
-            <Text
-              size={32}
-              weight="bold"
-              style={{
-                color: shades[300],
-                marginRight: 0,
-                marginLeft: 8,
-              }}>
-              -
-            </Text>
-          ) : (
-            transactionType === 'receive' && (
-              <Text
-                weight="bold"
-                size={24}
-                style={{
-                  color: greens[300],
-                  textShadowColor: opacity(greys(theme)[0], 0.5),
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 1,
-                  marginRight: 0,
-                  marginLeft: 8,
-                }}>
-                +
-              </Text>
-            )
-          )}
+          +
+        </Text>
+      );
+    return null;
+  };
+
+  const ArrowIcon = () => (
+    <View
+      className="absolute -bottom-1 -right-1 z-10 rounded-full"
+      style={{
+        backgroundColor: greys(theme)[1800],
+        borderRadius: 100,
+        height: 16,
+        width: 16,
+        padding: 3,
+        borderColor: greys(theme)[1300],
+        borderWidth: 0.2,
+      }}>
+      {isReceive ? (
+        <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} size={10} />
+      ) : transaction?.isCancel ? (
+        <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
+      ) : (
+        <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} size={10} />
+      )}
+    </View>
+  );
+
+  const renderRightIcon = () => {
+    if (profilePicture) {
+      return (
+        <View className="relative h-7 w-7 bg-transparent">
+          <ArrowIcon />
+          <CachedImage
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 1000,
+              borderColor: greys(theme)[1300],
+              borderWidth: 0.2,
+            }}
+            source={{ uri: profilePicture }}
+          />
+        </View>
+      );
+    }
+
+    if (isReceive) {
+      return (
+        <View className="relative h-7 w-7 bg-transparent">
+          <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
+        </View>
+      );
+    }
+
+    if (isEsimRequest) {
+      return (
+        <View className="relative h-7 w-7 bg-transparent">
+          <ArrowIcon />
+          <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
+        </View>
+      );
+    }
+
+    return (
+      <View className="relative h-7 w-7 bg-transparent">
+        {transaction?.isCancel ? (
+          <Icon name="mdi:cancel" color={greys(theme)[100]} />
+        ) : (
+          <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View className="flex-row items-center justify-between py-4 pr-4 pl-2 bg-transparent">
+      <View className="bg-transparent">
+        <View className="flex-row items-center bg-transparent">
+          <Sign />
           <AmountFormatter
             amount={amount}
             unit={unit}
             size={28}
             weight="heavy"
-            color={transactionType === 'receive' ? greens[300] : shades[300]}
+            color={isReceive ? greens[300] : shades[300]}
           />
         </View>
         <Text
@@ -88,113 +173,8 @@ export function BalanceUpdate({ transactionType, amount, unit, pubkey, request, 
           {amount < 0 ? '-' : ''}
         </Text>
       </View>
-      <View
-        style={{
-          padding: 16,
-          backgroundColor: 'transparent',
-          transform: [{ scale: 1.25 }],
-        }}>
-        {profilePicture ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -4,
-                right: -4,
-                zIndex: 100,
-                backgroundColor: greys(theme)[1800],
-                borderRadius: 100,
-                height: 16,
-                width: 16,
-                padding: 3,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}>
-              {transactionType === 'receive' ? (
-                <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} size={10} />
-              ) : transaction?.isCancel ? (
-                <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
-              ) : (
-                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} size={10} />
-              )}
-            </View>
-            <CachedImage
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 1000,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}
-              source={{
-                uri: profilePicture,
-              }}
-            />
-          </View>
-        ) : transactionType === 'receive' ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
-          </View>
-        ) : esims
-            .map((e) => e.request)
-            .filter((a) => a)
-            .includes(request) ? (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -4,
-                right: -4,
-                zIndex: 100,
-                backgroundColor: greys(theme)[1800],
-                borderRadius: 100,
-                height: 16,
-                width: 16,
-                padding: 3,
-                borderColor: greys(theme)[1300],
-                borderWidth: 0.2,
-              }}>
-              {transaction?.isCancel ? (
-                <Icon name="mdi:cancel" color={greys(theme)[100]} />
-              ) : (
-                <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-              )}
-            </View>
-            <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
-          </View>
-        ) : (
-          <View
-            style={{
-              position: 'relative',
-              width: 28,
-              height: 28,
-              backgroundColor: 'transparent',
-            }}>
-            {transaction?.isCancel ? (
-              <Icon name="mdi:cancel" color={greys(theme)[100]} />
-            ) : (
-              <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-            )}
-          </View>
-        )}
+      <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
+        {renderRightIcon()}
       </View>
     </View>
   );
