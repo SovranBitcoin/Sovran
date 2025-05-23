@@ -61,7 +61,11 @@ export function BalanceUpdate({
   const Sign = () => {
     if (isSend)
       return (
-        <Text size={32} weight="bold" className="ml-2" style={{ color: shades[300] }}>
+        <Text
+          size={32}
+          weight="bold"
+          className="ml-2"
+          style={{ color: shades[300], marginRight: 8 }}>
           -
         </Text>
       );
@@ -76,6 +80,7 @@ export function BalanceUpdate({
             textShadowColor: opacity(greys(theme)[0], 0.5),
             textShadowOffset: { width: 0, height: 0 },
             textShadowRadius: 1,
+            marginRight: 8,
           }}>
           +
         </Text>
