@@ -49,32 +49,16 @@ async function getProfile(currentProfile) {
 function TabOneScreen({
   currencies = [
     {
-      key: 'sat-cashu',
-      treasury: 'Personal Treasury',
       unit: 'sat',
-      label: 'Bitcoin ecash',
-      type: 'ecash',
     },
     {
-      key: 'usd-cashu',
-      treasury: 'Personal Treasury',
       unit: 'usd',
-      label: 'Dollar ecash',
-      type: 'ecash',
     },
     {
-      key: 'eur-cashu',
-      treasury: 'Personal Treasury',
       unit: 'eur',
-      label: 'Cashu (eEUR)',
-      type: 'ecash',
     },
     {
-      key: 'gbp-cashu',
-      treasury: 'Personal Treasury',
       unit: 'gbp',
-      label: 'Cashu (eGBP)',
-      type: 'ecash',
     },
   ],
 }) {

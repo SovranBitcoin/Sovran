@@ -1,8 +1,0 @@
-appId: com.sovranbitcoin
----
-- extendedWaitUntil: # Implementing a delay to ensure animations finish
-    visible: 'akwjdhljkahwawjhgdjhlkdjaklwjd' # some text that would never appear
-    optional: true
-    timeout: ${TIMEOUT:-750}
-- takeScreenshot:
-    path: ${SCREENSHOT_PATH}

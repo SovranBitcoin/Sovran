@@ -35,5 +35,4 @@ export const giveaways = {
           'This ecash token is part of our Android Christmas giveaway and is only redeemable on that platform.',
       },
   },
-  apple_mnemonic: process.env.APPLE_MNEMONIC,
 };
