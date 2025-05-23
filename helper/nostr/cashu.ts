@@ -41,7 +41,6 @@ interface NostrEvent {
 }
 
 export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | null> {
-  return null;
   const pool = new SimplePool();
   try {
     const events = await pool.get(relays, {
