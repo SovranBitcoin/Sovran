@@ -90,7 +90,7 @@ export function BalanceUpdate({
 
   const ArrowIcon = () => (
     <View
-      className="absolute -bottom-1 -right-1 z-10 rounded-full"
+      className="absolute -bottom-2 -right-2 z-10 rounded-full"
       style={{
         backgroundColor: greys(theme)[1800],
         borderRadius: 100,
