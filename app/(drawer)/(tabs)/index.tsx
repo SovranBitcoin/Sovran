@@ -26,7 +26,7 @@ import { isProduction } from 'helper/version';
 async function getProfile(currentProfile) {
   const sk = nip19.decode(currentProfile?.nsec).data;
   const signer = new NsecSigner(sk);
-  const sdk = new NCSDK('https://npub.cash', signer);
+  const sdk = new NCSDK('https://npubx.cash', signer);
   const balance = await sdk.getBalance();
 
   if (balance <= 0) {
@@ -40,7 +40,7 @@ async function getProfile(currentProfile) {
     await receiveEcash({
       token,
       unit: 'sat',
-      fromNIP05: `${currentProfile?.npub}@npub.cash`,
+      fromNIP05: `${currentProfile?.npub}@npubx.cash`,
     });
     showMessage('funds_received', { amount: balance, unit: 'sat' }, { emoji: '🎉' }, () => {});
   }

@@ -121,7 +121,7 @@ const createStyles = (theme: any) =>
 
 const checkNameAvailability = async (name: string, domain: string) => {
   try {
-    const response = await fetch(`https://npub.cash/.well-known/nostr.json?name=${name}`);
+    const response = await fetch(`https://npubx.cash/.well-known/nostr.json?name=${name}`);
     const data = await response.json();
     return !data.names || Object.keys(data.names).length === 0;
   } catch (error) {
@@ -240,7 +240,7 @@ const NpubSelector = ({
   };
 
   const handleDomainPress = () => {
-    const options = ['@sovran.money', '@sovran.cash', '@sovran.id', '@npub.cash', 'Cancel'];
+    const options = ['@sovran.money', '@sovran.cash', '@sovran.id', '@npubx.cash', 'Cancel'];
     const cancelButtonIndex = 4;
 
     showActionSheetWithOptions(
