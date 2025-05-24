@@ -80,7 +80,7 @@ interface EcashSendTransaction extends BaseEcashTransaction {
 
 interface EcashReceiveTransaction extends BaseEcashTransaction {
   transactionType: 'receive';
-  fromNIP05?: string; // Used for when we redeem from npub.cash or other lightning servers
+  fromNIP05?: string; // Used for when we redeem from npubx.cash or other lightning servers
   proofs: {
     keep: Proof[];
   };

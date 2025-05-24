@@ -69,7 +69,7 @@ export function VideoScreen({ ...props }) {
             color: greys(theme)[0],
             marginBottom: 16,
           }}>
-          How to redeem npub.cash tokens
+          How to redeem npubx.cash tokens
         </Text>
         <VideoView
           style={{

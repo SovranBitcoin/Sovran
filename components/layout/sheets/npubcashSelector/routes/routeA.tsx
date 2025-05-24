@@ -22,7 +22,7 @@ const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route
           fontSize: 18,
         }}>
         <Picker.Item label="sovran.id" value="sovran.id" />
-        <Picker.Item label="npub.cash" value="npub.cash" />
+        <Picker.Item label="npubx.cash" value="npubx.cash" />
       </Picker>
     </View>
   );

@@ -168,7 +168,7 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
       <View>
         {showLightningAddress && (
           <PaymentInfo
-            data={`${currentProfile.npub}@npub.cash`}
+            data={`${currentProfile.npub}@npubx.cash`}
             popupMessage="lightning_address_copied"
             unit="sat"
           />
@@ -183,11 +183,11 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
               onPress={() => {
                 SheetManager.show('video-sheet', {
                   payload: {
-                    video: 'https://npub.cash/video.mp4',
+                    video: 'https://npubx.cash/video.mp4',
                   },
                 });
               }}
-              message="Swipe down on the main homepage to redeem npub.cash tokens, click here to watch a video demo."
+              message="Swipe down on the main homepage to redeem npubx.cash tokens, click here to watch a video demo."
               variant="info"
             />
           </View>

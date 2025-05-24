@@ -245,7 +245,7 @@ const ModalScreen: React.FC<{}> = () => {
             isFirst
           />
         </Section>
-        {/* <Section title="npub.cash Settings">
+        {/* <Section title="npubx.cash Settings">
         <View style={styles.rowWrapper}>
           <View style={[styles.row, styles.rowFirst, styles.rowLast]}>
             <Text style={styles.rowLabel}>Listen for Transactions</Text>
