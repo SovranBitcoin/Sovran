@@ -223,11 +223,6 @@ function ModalScreen() {
       return;
     }
 
-    if (!isValidLNURL(text)) {
-      showMessage('invalid_address', { address: text }, { emoji: '🚨' });
-      return;
-    }
-
     const scanning: ScanningData = { data: text };
     setLoading(true);
     await barcodeHandler({
