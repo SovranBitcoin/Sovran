@@ -318,10 +318,14 @@ export function EcashSendConfirmation({
                 title: 'Status',
                 value: (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text>{isListening ? 'Pending' : 'Completed'}</Text>
-                    {isListening && (
-                      <Spinner style={{ marginLeft: 4 }} size={12} />
-                    )}
+                    <Text
+                      style={{
+                        color: greys(theme)[0],
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                    </Text>
+                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
                   </View>
                 ),
               },

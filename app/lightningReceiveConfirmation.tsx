@@ -209,12 +209,14 @@ export function LightningReceiveConfirmation({
                 title: 'Status',
                 value: (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text>
-                      {getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending'}
+                    <Text
+                      style={{
+                        color: greys(theme)[0],
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                     </Text>
-                    {isListening && !getCurrentTransaction?.[0]?.paid && (
-                      <Spinner style={{ marginLeft: 4 }} size={12} />
-                    )}
+                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
                   </View>
                 ),
               },
