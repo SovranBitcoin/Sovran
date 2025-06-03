@@ -15,10 +15,14 @@ import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { truncateMiddle } from 'helper/strings';
+import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { MintDetailPage } from "./ecashSendConfirmation";
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
@@ -54,6 +58,9 @@ export function LightningSendConfirmation({
 
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
+  const theme = useSelector(memoizedGetTheme);
+  const selectedMintUrl = useSelector(memoizedGetSelectedMint);
+  const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
   const handleMintSelected = async (mint, balance) => {
     try {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
@@ -156,14 +163,12 @@ export function LightningSendConfirmation({
             loading={loading}
           />
 
-          <Section
-            items={[
-              {
-                title: 'Note',
-                value: getDescription({ pr }),
-              },
-            ]}
-          />
+          {getDescription({ pr }) && (
+            <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
+              <Card message={getDescription({ pr })} variant="info" />
+            </View>
+          )}
+          <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
 
           <Section
             items={[
@@ -206,10 +211,6 @@ export function LightningSendConfirmation({
           <Section
             items={[
               {
-                title: 'Created at',
-                value: getTimestamp({ pr }),
-              },
-              {
                 title: 'Expires at',
                 value: getExpiry({ pr }),
               },
@@ -219,33 +220,16 @@ export function LightningSendConfirmation({
               },
             ]}
           />
-
           <Section
             items={[
-              {
-                title: 'Type',
-                value: 'Lightning',
-              },
-              {
-                title: 'Transaction Type',
-                value: 'Send',
-              },
+              { title: "Date", value: getTimestamp({ pr }) },
+              { title: "Type", value: "Send • Lightning" },
+              { title: "Request", value: truncateMiddle(pr, 5) },
+              { title: "Quote", value: truncateMiddle(quoteId, 7) },
             ]}
           />
 
-          <Section
-            special={false}
-            items={[
-              {
-                title: 'Request',
-                value: truncateMiddle(pr, 5),
-              },
-              {
-                title: 'Quote',
-                value: truncateMiddle(quoteId, 7),
-              },
-            ]}
-          />
+
         </View>
       }
       buttons={
