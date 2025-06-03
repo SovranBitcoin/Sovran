@@ -119,7 +119,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
     splitTransactionsByStatus(filteredTransactions);
 
   // Limit the number of transactions per status shown on the index page
-  const MAX_DISPLAYED_TRANSACTIONS_PER_STATUS = 10;
+  const MAX_DISPLAYED_TRANSACTIONS_PER_STATUS = 5;
   const sortByDateDesc = (a: Transaction, b: Transaction) =>
     new Date(b.date).getTime() - new Date(a.date).getTime();
 
