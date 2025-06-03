@@ -4,7 +4,6 @@ import { View } from 'components/common/Themed';
 import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
-import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
@@ -17,17 +16,16 @@ import {
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { useTransactions } from 'components/providers/TransactionsProvider';
-import { getMint, getWallet } from 'helper/cashu';
+import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
-import { theme } from 'tailwind.config';
+import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintDetailPage } from './ecashSendConfirmation';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
-import { greys } from 'helper/colors';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 
@@ -49,6 +47,7 @@ export function LightningReceiveConfirmation({
   overrideButtons?: ButtonHandlerButton[];
 }) {
   const navigation = useNavigation();
+  const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState(null);
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
 
