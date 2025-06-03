@@ -65,11 +65,7 @@ function ModalScreen() {
     });
   }
 
-  if (
-    transaction.type === 'ecash' &&
-    !transaction.paid &&
-    transaction.transactionType === 'send'
-  ) {
+  if (transaction.type === 'ecash' && !transaction.paid && transaction.transactionType === 'send') {
     extraButtons.push({
       text: 'Open Invoice',
       variant: 'secondary',
@@ -95,9 +91,7 @@ function ModalScreen() {
   }
 
   if (transaction.type === 'ecash' && transaction.transactionType === 'receive') {
-    return (
-      <EcashReceiveConfirmation token={transaction.token} extraButtons={extraButtons} />
-    );
+    return <EcashReceiveConfirmation token={transaction.token} extraButtons={extraButtons} />;
   }
 
   if (transaction.type === 'lightning' && transaction.transactionType === 'receive') {
@@ -116,10 +110,11 @@ function ModalScreen() {
   if (transaction.type === 'lightning' && transaction.transactionType === 'send') {
     return (
       <LightningSendConfirmation
+        transaction={transaction}
         pr={transaction.request}
         unit={transaction.unit}
         pubkey={transaction?.nostr?.pubkey}
-        meltQuote={transaction.mintQuote ? JSON.stringify(transaction.mintQuote) : undefined}
+        meltQuote={transaction.meltQuote ? JSON.stringify(transaction.meltQuote) : undefined}
         extraButtons={extraButtons}
       />
     );

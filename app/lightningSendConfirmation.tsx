@@ -22,12 +22,13 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { MintDetailPage } from "./ecashSendConfirmation";
+import { MintDetailPage } from './ecashSendConfirmation';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 
 export function LightningSendConfirmation({
+  transaction,
   pr,
   unit: initialUnit,
   pubkey,
@@ -36,6 +37,7 @@ export function LightningSendConfirmation({
   email,
   extraButtons = [],
 }: {
+  transaction?: any;
   pr: string;
   unit: string;
   pubkey?: string;
@@ -155,60 +157,26 @@ export function LightningSendConfirmation({
             unit={unit}
             request={pr}
           />
-
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            pr={pr}
-            unit={unit}
-            loading={loading}
-          />
+          {!transaction?.paid && (
+            <SelectedMintDisplay
+              onMintSelected={handleMintSelected}
+              pr={pr}
+              unit={unit}
+              loading={loading}
+            />
+          )}
 
           {getDescription({ pr }) && (
             <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
               <Card message={getDescription({ pr })} variant="info" />
             </View>
           )}
-          <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
 
-          <Section
-            items={[
-              {
-                title: `Amount (${unit === 'sat' ? 'BTC' : unit.toUpperCase()})`,
-                value: formatCurrency(
-                  {
-                    currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-                    value: amount,
-                    denomination: unit === 'sat' ? 'sats' : unit,
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: unit === 'sat' ? 8 : 2,
-                    currencyDisplay: 'symbol',
-                    denomination: unit === 'sat' ? 'btc' : unit,
-                  }
-                ),
-              },
-              {
-                title: 'Amount (USD)',
-                value: '≈' + formatAmount(amount, 'usd'),
-              },
-            ]}
-          />
+          {transaction?.paid && (
+            <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
+          )}
 
-          <Section
-            items={[
-              {
-                title: `Fee (${getCurrencyDisplay()})`,
-                value: formatAmount(feeReserve),
-              },
-              {
-                title: 'Fee (USD)',
-                value: '≈' + formatAmount(feeReserve, 'usd'),
-              },
-            ]}
-          />
-
-          <Section
+          {/* <Section
             items={[
               {
                 title: 'Expires at',
@@ -219,17 +187,19 @@ export function LightningSendConfirmation({
                 value: getExpiresIn({ pr }),
               },
             ]}
-          />
+          /> */}
           <Section
             items={[
-              { title: "Date", value: getTimestamp({ pr }) },
-              { title: "Type", value: "Send • Lightning" },
-              { title: "Request", value: truncateMiddle(pr, 5) },
-              { title: "Quote", value: truncateMiddle(quoteId, 7) },
+              { title: 'Date', value: getTimestamp({ pr }) },
+              { title: 'Type', value: 'Send • Lightning' },
+              { title: 'Request', value: truncateMiddle(pr, 5) },
+              { title: 'Quote', value: truncateMiddle(quoteId, 7) },
+              {
+                title: `Fee (${getCurrencyDisplay()})`,
+                value: formatAmount(feeReserve),
+              },
             ]}
           />
-
-
         </View>
       }
       buttons={
@@ -266,14 +236,8 @@ export function LightningSendConfirmation({
 }
 
 function ModalScreen() {
-  const {
-    pr,
-    unit,
-    pubkey,
-    meltQuote,
-    redirect,
-    email,
-  } = useTypedRoute<'lightningSendConfirmation'>();
+  const { pr, unit, pubkey, meltQuote, redirect, email } =
+    useTypedRoute<'lightningSendConfirmation'>();
 
   return (
     <LightningSendConfirmation
