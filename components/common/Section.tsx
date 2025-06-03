@@ -17,7 +17,7 @@ interface ItemTitle {
 
 interface SectionItem {
   title: ItemTitle | string;
-  value: string;
+  value: React.ReactNode;
   direction?: 'row' | 'column';
   align?: 'left' | 'right';
 }
@@ -95,6 +95,19 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     theme: any,
     special: boolean
   ): JSX.Element {
+    if (React.isValidElement(item.value)) {
+      return (
+        <View
+          className="bg-transparent flex-row items-center"
+          style={{
+            flex: 1,
+            justifyContent: item.align === 'left' ? 'flex-start' : 'flex-end',
+            marginRight: titleText === '' ? 0 : 8,
+          }}>
+          {item.value}
+        </View>
+      );
+    }
     // Email address format (@example)
     if (item.value?.includes?.('@') && special) {
       const [username, domain] = item.value.split('@');
@@ -193,7 +206,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
             flex: 1,
           }}>
-          {item.value}
+          {String(item.value)}
         </Text>
       </View>
     );
