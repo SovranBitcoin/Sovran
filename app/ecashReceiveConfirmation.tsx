@@ -106,24 +106,26 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
 };
 
 // Main component
-function ModalScreen({
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function EcashReceiveConfirmation({
+  token,
   showConfirmation,
+  extraButtons = [],
 }: {
-  showConfirmation: (
+  token: string;
+  showConfirmation?: (
     title: string,
     message: string,
     onConfirm: () => void,
     onCancel: () => void
   ) => void;
+  extraButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const mints = useSelector(memoizedGetMints);
-
-  const {
-    params: { token },
-  } = useRoute() as { params: { token: string; unit: string } };
 
   const amount = getTokenAmount({ token });
   const memo = getTokenMemo({ token });
@@ -194,6 +196,7 @@ function ModalScreen({
               onPress: handleRedeemPress,
               loading: loading,
             },
+            ...extraButtons,
           ]}
         />
       }>
@@ -254,5 +257,13 @@ const createStyles = (theme: any) =>
       marginBottom: -3,
     },
   });
+
+function ModalScreen() {
+  const {
+    params: { token },
+  } = useRoute() as { params: { token: string } };
+
+  return <EcashReceiveConfirmation token={token} />;
+}
 
 export default withSheetProvider(ModalScreen);

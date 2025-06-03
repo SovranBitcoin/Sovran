@@ -21,17 +21,27 @@ import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function LightningSendConfirmation({
+  pr,
+  unit: initialUnit,
+  pubkey,
+  meltQuote: initialMeltQuote,
+  redirect,
+  email,
+  extraButtons = [],
+}: {
+  pr: string;
+  unit: string;
+  pubkey?: string;
+  meltQuote?: string;
+  redirect?: string;
+  email?: string;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const navigation = useTypedNavigation();
   const dispatch = useDispatch();
-  const {
-    pr,
-    unit: initialUnit,
-    pubkey,
-    meltQuote: initialMeltQuote,
-    redirect,
-    email,
-  } = useTypedRoute<'lightningSendConfirmation'>();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -262,10 +272,33 @@ function ModalScreen() {
                 onPress: handleLightningSend,
                 loading: loading,
               },
+              ...extraButtons,
             ]}
           />
         </View>
       }
+    />
+  );
+}
+
+function ModalScreen() {
+  const {
+    pr,
+    unit,
+    pubkey,
+    meltQuote,
+    redirect,
+    email,
+  } = useTypedRoute<'lightningSendConfirmation'>();
+
+  return (
+    <LightningSendConfirmation
+      pr={pr}
+      unit={unit}
+      pubkey={pubkey}
+      meltQuote={meltQuote}
+      redirect={redirect}
+      email={email}
     />
   );
 }

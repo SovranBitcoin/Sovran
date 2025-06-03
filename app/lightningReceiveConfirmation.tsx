@@ -5,7 +5,6 @@ import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
-import { useTypedRoute } from 'helper/navigation';
 import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -26,15 +25,24 @@ import { theme } from 'tailwind.config';
 import { MintDetailPage } from './ecashSendConfirmation';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
+import { useTypedRoute } from 'helper/navigation';
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function LightningReceiveConfirmation({
+  request,
+  paymentRequest = '',
+  unit,
+  amount,
+  extraButtons = [],
+}: {
+  request: string;
+  paymentRequest?: string;
+  unit: string;
+  amount: number;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const navigation = useNavigation();
-  const {
-    request,
-    paymentRequest = '',
-    unit,
-    amount,
-  } = useTypedRoute<'lightningReceiveConfirmation'>();
   const [uri, setUri] = useState(null);
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
 
@@ -233,10 +241,29 @@ function ModalScreen() {
                 variant: 'secondary',
                 onPress: handleCheckStatus,
               },
+              ...extraButtons,
             ]}
           />
         </View>
       }
+    />
+  );
+}
+
+function ModalScreen() {
+  const {
+    request,
+    paymentRequest = '',
+    unit,
+    amount,
+  } = useTypedRoute<'lightningReceiveConfirmation'>();
+
+  return (
+    <LightningReceiveConfirmation
+      request={request}
+      paymentRequest={paymentRequest}
+      unit={unit}
+      amount={amount}
     />
   );
 }

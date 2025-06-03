@@ -87,11 +87,22 @@ export function MintDetailPage({ mintInfo, theme }: any) {
   );
 }
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function EcashSendConfirmation({
+  unit,
+  amount,
+  token,
+  extraButtons = [],
+}: {
+  unit: string;
+  amount: number;
+  token: string;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
@@ -354,6 +365,7 @@ function ModalScreen() {
                 variant: 'primary',
                 onPress: handleCopyEmoji,
               },
+              ...extraButtons,
             ]}
           />
         </View>
@@ -373,5 +385,10 @@ const createStyles = (theme) =>
       color: greys(theme)[1000],
     },
   });
+
+function ModalScreen() {
+  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
+  return <EcashSendConfirmation unit={unit} amount={amount} token={token} />;
+}
 
 export default withSheetProvider(ModalScreen);

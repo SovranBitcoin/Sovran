@@ -10,16 +10,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { runWithAnimationFrame } from 'app/onboard/new';
 
+export interface ButtonHandlerButton {
+  disabled?: boolean;
+  loading?: boolean;
+  variant: 'primary' | 'secondary';
+  icon?: string;
+  text: string;
+  onPress: any;
+}
+
 interface ButtonHandlerProps {
   context?: 'tab';
-  buttons: {
-    disabled?: boolean;
-    loading?: boolean;
-    variant: 'primary' | 'secondary';
-    icon?: string;
-    text: string;
-    onPress: any;
-  }[];
+  buttons: ButtonHandlerButton[];
   style?: StyleSheet;
   colors?: readonly [string, string, ...string[]];
 }
