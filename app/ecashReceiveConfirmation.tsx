@@ -217,7 +217,11 @@ export function EcashReceiveConfirmation({
         )}
 
         {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
-        <MintDetailPage mintInfo={mintInfo} theme={theme} />
+        <MintDetailPage
+          mintInfo={mintInfo}
+          theme={theme}
+          transactionType="receive"
+        />
 
         <Section
           items={[

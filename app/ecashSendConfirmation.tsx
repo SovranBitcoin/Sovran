@@ -51,7 +51,15 @@ import { truncateMiddle } from 'helper/strings';
 import { MintIcon } from 'components/layout/sheets/mints';
 import { Card } from 'components/common/Card';
 
-export function MintDetailPage({ mintInfo, theme }: any) {
+export function MintDetailPage({
+  mintInfo,
+  theme,
+  transactionType,
+}: {
+  mintInfo: any;
+  theme: any;
+  transactionType: 'send' | 'receive';
+}) {
   return (
     <View
       style={{
@@ -72,7 +80,7 @@ export function MintDetailPage({ mintInfo, theme }: any) {
             fontFamily: 'OverpassHeavy',
             fontSize: 16,
           }}>
-          Sending with
+          {transactionType === 'send' ? 'Sending with' : 'Receiving with'}
         </Text>
         <Text
           style={{
@@ -290,6 +298,7 @@ export function EcashSendConfirmation({
             mintInfo={mintInfo}
             getCurrentTransaction={getCurrentTransaction}
             theme={theme}
+            transactionType="send"
           />
           <Section
             items={[

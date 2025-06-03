@@ -189,6 +189,7 @@ export function LightningReceiveConfirmation({
             mintInfo={mintInfo}
             getCurrentTransaction={getCurrentTransaction}
             theme={theme}
+            transactionType="receive"
           />
           <Section
             items={[
