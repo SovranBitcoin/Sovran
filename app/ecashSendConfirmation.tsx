@@ -231,7 +231,7 @@ export function EcashSendConfirmation({
     try {
       setIsCheckingStatus(true);
       const proofsSpent = await checkProofsSpent(token);
-      console.log(18279387, proofsSpent);
+
 
       if (proofsSpent) {
         const decodedToken = getDecodedToken(token);
@@ -251,7 +251,7 @@ export function EcashSendConfirmation({
         showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
     } catch (error) {
-      console.log(18279387, error);
+
       showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' }, onClose);
     } finally {
       setIsCheckingStatus(false);
@@ -267,7 +267,6 @@ export function EcashSendConfirmation({
     });
   };
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
-  console.log(1082, mintInfo);
   return (
     <Modal
       showClose
@@ -297,12 +296,7 @@ export function EcashSendConfirmation({
               <Card message={getCurrentTransaction[0].memo} variant="info" />
             </View>
           )}
-          <MintDetailPage
-            mintInfo={mintInfo}
-            getCurrentTransaction={getCurrentTransaction}
-            theme={theme}
-            transactionType="send"
-          />
+          <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
           <Section
             items={[
               {
