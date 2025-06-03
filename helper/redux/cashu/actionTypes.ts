@@ -14,3 +14,4 @@ export const INCREASE_COUNTER_V2 = 'INCREASE_COUNTER_V2';
 export const ADD_MINTS = 'ADD_MINTS';
 export const REMOVE_MINTS = 'REMOVE_MINTS';
 export const RESET_COUNTER = 'RESET_COUNTER';
+export const SET_KEYS = 'SET_KEYS';

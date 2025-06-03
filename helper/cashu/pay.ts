@@ -113,6 +113,9 @@ export async function sendLightning({
   const currentProofs = memoizedGetProofs(unit)(store.getState());
 
   const wallet = await getWallet({ unit, mintUrl, profile: null });
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  wallet.keysetId = keysetId;
 
   if (!meltQuote.amount) {
     throw new AppError('invalid_invoice', 'No amount specified in payment request');
@@ -200,11 +203,11 @@ export async function sendLightning({
       pubkey: pubkey || '',
     },
     counter,
-    // proofs: {
-    //   change,
-    //   keep: proofsToKeep,
-    //   send: proofsToSend,
-    // },
+    proofs: {
+      change,
+      keep: proofsToKeep,
+      send: proofsToSend,
+    },
   };
 
   store.dispatch(
@@ -235,6 +238,10 @@ export async function receiveLightning({
     profile: null,
   });
 
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  wallet.keysetId = keysetId;
+
   const mintQuote = await wallet.createMintQuote(amount, memo);
 
   if (mintQuote.error) {
@@ -262,6 +269,7 @@ export async function receiveLightning({
     mintUrl: wallet.mint.mintUrl,
     paymentRequest: paymentRequest.toEncodedRequest(),
     unifiedRequest: unifiedRequest.toEncodedRequest(),
+    memo,
   };
 
   store.dispatch(
@@ -302,11 +310,8 @@ export async function sendEcash({
   const selectedMint = memoizedGetSelectedMint(state);
 
   const profile = memoizedGetCurrentProfile(state);
-  const keys = await getKeys({ unit, mintUrl: selectedMint });
 
-  const allProofs = store.getState().cashu?.profiles[profile.id]?.proofs?.[selectedMint];
   const currentProofs = memoizedGetProofs(unit)(state);
-  // const currentProofs = allProofs.filter((p: { id: string }) => p?.id === keys.id);
 
   const balance = memoizedGetBalance(unit)(state);
 
@@ -319,6 +324,10 @@ export async function sendEcash({
     mintUrl: selectedMint,
     profile: null,
   });
+
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  wallet.keysetId = keysetId;
 
   if (!wallet) {
     throw new AppError('wallet_not_found', 'Wallet not found');
@@ -333,9 +342,10 @@ export async function sendEcash({
   const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
     ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
     counter,
+    offline: true,
   });
 
-  await store.dispatch(
+  store.dispatch(
     removeProofs({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
@@ -343,7 +353,7 @@ export async function sendEcash({
     })
   );
 
-  await store.dispatch(
+  store.dispatch(
     appendProofsV2({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
@@ -417,27 +427,10 @@ export async function receiveEcash({
   fromNIP05?: string;
   refund?: boolean;
 }): Promise<EcashReceiveTransaction> {
-  console.log('[receiveEcash]', {
-    token,
-    unit,
-    from,
-    memo,
-    fromNIP05,
-    refund,
-  });
   const state = store.getState();
-  console.log('[receiveEcash] state', state);
-
   const profile = memoizedGetCurrentProfile(state);
-  console.log('[receiveEcash] profile', profile);
-
   const decodedToken = getDecodedToken(token);
-  console.log('[receiveEcash] decodedToken', decodedToken);
   const receiveMintUrl = decodedToken.mint;
-  console.log('[receiveEcash] receiveMintUrl', receiveMintUrl);
-
-  const proofsWeHave = memoizedGetProofs(unit)(state);
-  console.log('[receiveEcash] proofsWeHave', proofsWeHave);
 
   const getPubkeyFromToken = (token: string) => {
     const decodedToken = getDecodedToken(token);
@@ -453,19 +446,21 @@ export async function receiveEcash({
       return null;
     }
   };
-  console.log('[receiveEcash] getPubkeyFromToken', getPubkeyFromToken(token));
 
   const giveaway = Object.values(giveaways).find(({ public_key }) => {
     return getPubkeyFromToken(token) === public_key;
   });
-  console.log('[receiveEcash] giveaway', giveaway);
 
   const wallet = await getWallet({
     unit,
     mintUrl: receiveMintUrl,
     profile: null,
   });
-  console.log('[receiveEcash] wallet', wallet);
+
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  console.log({ activeKeyset });
+  wallet.keysetId = keysetId;
 
   if (!wallet) {
     throw new AppError('wallet_not_found', 'Wallet not found');
@@ -474,17 +469,15 @@ export async function receiveEcash({
   const counter = memoizedGetCounterV2({
     profileId: profile.id,
     mintUrl: receiveMintUrl,
-    keysetId: wallet.keysetId,
+    keysetId: keysetId,
   })(state);
-  console.log('[receiveEcash] counter', counter);
 
   const response = await wallet.receive(token, {
     counter,
-    // keysetId: wallet.keysetId,
+    keysetId,
     // proofsWeHave,
     ...(giveaway ? { privkey: giveaway.private_key } : {}),
   });
-  console.log('[receiveEcash] response', response);
 
   if (!response) {
     throw new AppError('invalid_token', 'Invalid token');
@@ -506,7 +499,6 @@ export async function receiveEcash({
   );
 
   const totalAmount = decodedToken.proofs.map((p) => p.amount).reduce((a, b) => a + b, 0);
-  console.log('[receiveEcash] totalAmount', totalAmount);
 
   const transaction: EcashReceiveTransaction = {
     amount: totalAmount,
@@ -534,7 +526,6 @@ export async function receiveEcash({
         }
       : {}),
   };
-  console.log('[receiveEcash] transaction', transaction);
 
   store.dispatch(
     appendTransaction({

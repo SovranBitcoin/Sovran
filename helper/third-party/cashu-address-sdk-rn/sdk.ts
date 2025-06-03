@@ -11,7 +11,7 @@ export class NCSDK {
   }
 
   async getInfo() {
-    const url = `${this.baseUrl}/api/v1/info`;
+    const url = `${this.baseUrl}/api/v2/user/info`;
     //
     const method = 'GET';
     //
@@ -29,7 +29,7 @@ export class NCSDK {
   }
 
   async getToken() {
-    const url = `${this.baseUrl}/api/v1/claim`;
+    const url = `${this.baseUrl}/api/v2/claim`;
     const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
@@ -42,7 +42,7 @@ export class NCSDK {
     return data.data.token;
   }
   async getWithdraw() {
-    const url = `${this.baseUrl}/api/v1/withdrawals`;
+    const url = `${this.baseUrl}/api/v2/withdrawals`;
     const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
@@ -54,15 +54,36 @@ export class NCSDK {
     }
     return data;
   }
-  async getBalance() {
-    const url = `${this.baseUrl}/api/v1/balance`;
+
+  async setMint(mintUrl: string) {
+    const url = `${this.baseUrl}/api/v2/user/mint`;
+    const method = 'PATCH';
+    const authTemplate = createAuthTemplate(url, method);
+    const signedAuthEvent = await this.signer.signEvent(authTemplate);
+    const authHeader = createAuthHeader(signedAuthEvent);
+    const res = await authedJsonRequest(url, authHeader, {
+      method,
+      body: JSON.stringify({ mint_url: mintUrl }),
+    });
+    const data = await res.json();
+    console.log(12763, data);
+    if (data.error) {
+      console.log(19287, data);
+      throw new Error(data.message);
+    }
+    this.baseUrl = mintUrl;
+  }
+
+  async getQuotes({ since }: { since?: number }) {
+    const url = `${this.baseUrl}/api/v2/wallet/quotes`;
     const method = 'GET';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);
-    const res = await authedJsonRequest(url, authHeader);
+    const res = await authedJsonRequest(url + (since ? `?since=${since}` : ''), authHeader);
     const data = (await res.json()) as BalanceResponse;
     if (data.error) {
+      console.log(2329837, data);
       throw new Error(data.message);
     }
     return data.data;
@@ -81,7 +102,7 @@ export class NCSDK {
     paymentToken: string
   ): Promise<{ error: true; message: string } | { error: false }>;
   async setUsername(username: string, paymentToken: string | undefined) {
-    const url = `${this.baseUrl}/api/v1/info/username`;
+    const url = `${this.baseUrl}/api/v2/info/username`;
     const method = 'PUT';
     const authTemplate = createAuthTemplate(url, method);
     const signedAuthEvent = await this.signer.signEvent(authTemplate);

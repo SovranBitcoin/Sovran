@@ -55,7 +55,7 @@ export function AmountFormatter({
         <>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} height={size} width={size * 1.4} color={currentColor} />
+            <BtcIcon weight={weight} height={size} width={size} color={currentColor} />
           </View>
           <Text
             size={size}
@@ -106,7 +106,7 @@ export function AmountFormatter({
         <>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} height={size} width={size * 1.4} color={currentColor} />
+            <BtcIcon weight={weight} height={size} width={size} color={currentColor} />
           </View>
           <Text
             size={size}

@@ -41,7 +41,7 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
       style={{
         flexDirection: 'row',
         padding: 8,
-        paddingBottom: 16,
+        paddingBottom: 38,
         marginBottom: context === 'tab' ? 48 : 0,
         ...style,
       }}>

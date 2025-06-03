@@ -20,30 +20,129 @@ import TermsConditionsScreen from 'app/settings/terms';
 import { AccountPagerView } from '../../../components/layout/AccountPagerView';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import {
+  appendTransaction,
+  appendTransactionsV2,
+  memoizedGetSelectedMint,
+  memoizedGetTransactionByMatcher,
+} from 'helper/redux/cashu';
 import { isProduction } from 'helper/version';
+import { MintQuoteResponse } from '@cashu/cashu-ts';
+import _ from 'lodash';
+import { useTransactions } from 'components/providers/TransactionsProvider';
 
-async function getProfile(currentProfile) {
+async function getProfile(currentProfile, listenToTransaction) {
   const sk = nip19.decode(currentProfile?.nsec).data;
   const signer = new NsecSigner(sk);
   const sdk = new NCSDK('https://npubx.cash', signer);
-  const balance = await sdk.getBalance();
 
-  if (balance <= 0) {
-    showMessage('no_funds');
-    return;
-  }
+  // TODO: get last transaction that is npubx.cash from fromNIP05
+  const lastTransaction = memoizedGetTransactionByMatcher({
+    profileId: currentProfile.id,
+    matcher: (txs) => {
+      const transactions = _.filter(txs, {
+        fromNIP05: `${currentProfile?.npub}@npubx.cash`,
+        type: 'lightning',
+        transactionType: 'receive',
+        unit: 'sat',
+      });
 
-  const token = await sdk.getToken();
+      return _.sortBy(transactions, (tx) => new Date(tx.date));
+    },
+  })(store.getState());
 
-  if (token) {
-    await receiveEcash({
-      token,
+  const lt = lastTransaction?.[lastTransaction?.length - 1];
+
+  // const info = await sdk.getInfo();
+  // // {"data": {"user": {"lock_quote": false, "mintUrl": "https://mint.minibits.cash/Bitcoin", "pubkey": "c7d25e67daecaecfd2b7945c89d99cc037857c46bebe6d010c2543d0c7c03b4b"}}, "error": false}
+  // // TODO: store this in settings
+
+  // this +1 is kinda hacky, lets remove that and instead filter quotes based on transactions in redux
+  const quotes = (await sdk.getQuotes({ since: new Date(lt?.date).getTime() / 1000 + 1 })).quotes;
+  // // [
+  // // {"amount": 5, "created_at": 1748060852, "expires_at": 1748147251, "locked": false, "mint_url": "https://mint.minibits.cash/Bitcoin", "paid_at": 1748060862, "quote_id": "bhYfrfGdWEuuRrsS8Ti4w9-nc6MnczFtvYlZFAzS", "request": "lnbc50n1p5rzj4npp544czew644u6cyedwvryhmlj8sg3zlmujygsu7x9uh60yrehszq3sdqqcqzzsxqyz5vqsp53wksgnt876825mcz6x7ktg6g5qp7ruvhk3rfzrtxntdxa6ajqfts9qxpqysgqzm7s7qhula8fqqq6d9a5pstylkd7m2hepp5uy49g0md8zlrymq44whetjkxcgkr904pvgr6q8aazkr48vq3ry0jlp8x9xtm88ayr6tsplw9573", "state": "PAID"},
+  // // {"amount": 5, "created_at": 1748049508, "expires_at": 1748135908, "locked": false, "mint_url": "https://mint.minibits.cash/Bitcoin", "paid_at": 1748049519, "quote_id": "SgJ-euqTH0VZ1CuGWr7ibYS9-Qr8M6QiBXBZHpdX", "request": "lnbc50n1p5rz8nypp5xzymk2ghp4vv3d0qr3stl2dgh26hnfeywp96rk4l4c8x2x7erdmsdqqcqzzsxqyz5vqsp5qzm3j8rpl4mtcljuqsfhswh5hmz90q5fug82e0kg6uf6ru74s72q9qxpqysgq3wgtd8u9qvd2evg4hv5v65ftznpvak9jaj64tw54nqhaerv497k5z8lkf6djm2vuycgj366g07vyghcc7lenkygcynu94d67qfjnlcqp4h9gtx", "state": "PAID"}
+  // // ]
+  // // {"quotes": [{"amount": 5, "created_at": 1748049508, "expires_at": 1748135908, "locked": false, "mint_url": "https://mint.minibits.cash/Bitcoin", "paid_at": 1748049519, "quote_id": "SgJ-euqTH0VZ1CuGWr7ibYS9-Qr8M6QiBXBZHpdX", "request": "lnbc50n1p5rz8nypp5xzymk2ghp4vv3d0qr3stl2dgh26hnfeywp96rk4l4c8x2x7erdmsdqqcqzzsxqyz5vqsp5qzm3j8rpl4mtcljuqsfhswh5hmz90q5fug82e0kg6uf6ru74s72q9qxpqysgq3wgtd8u9qvd2evg4hv5v65ftznpvak9jaj64tw54nqhaerv497k5z8lkf6djm2vuycgj366g07vyghcc7lenkygcynu94d67qfjnlcqp4h9gtx", "state": "PAID"}]}
+  // // TODO: append a new transaction with these details
+
+  let transactions = [];
+  for (const quote of quotes) {
+    const mintQuote: MintQuoteResponse = {
+      quote: quote.quote_id,
+      request: quote.request,
+      expiry: quote.expires_at,
+      state: quote.state,
+    };
+
+    const transaction = {
+      request: quote.request,
+      amount: quote.amount,
+      mintQuote,
+      date: new Date(quote.paid_at * 1000),
+      type: 'lightning',
+      paid: false,
+      transactionType: 'receive',
       unit: 'sat',
+      mintUrl: quote.mint_url,
       fromNIP05: `${currentProfile?.npub}@npubx.cash`,
-    });
-    showMessage('funds_received', { amount: balance, unit: 'sat' }, { emoji: '🎉' }, () => {});
+    };
+
+    store.dispatch(
+      appendTransactionsV2({
+        profileId: currentProfile.id,
+        transactions: [transaction],
+      })
+    );
+    transactions.push(transaction);
   }
+
+  listenToTransaction(transactions);
+
+  // const mintQuote: MintQuoteResponse = {
+  //   quote: quotes[0].quote_id,
+  //   request: quotes[0].request,
+  //   expiry: quotes[0].expires_at,
+  //   state: quotes[0].state,
+  // };
+
+  // const transaction = {
+  //   request: quotes[0].request,
+  //   amount: quotes[0].amount,
+  //   mintQuote,
+  //   date: new Date(quotes[0].paid_at * 1000),
+  //   type: 'lightning',
+  //   paid: false,
+  //   transactionType: 'receive',
+  //   unit: 'sat',
+  //   mintUrl: quotes[0].mint_url,
+  //   fromNIP05: `${currentProfile?.npub}@npubx.cash`,
+  // };
+
+  // store.dispatch(
+  //   appendTransaction({
+  //     profileId: currentProfile.id,
+  //     transaction,
+  //   })
+  // );
+
+  // const balance = await sdk.getBalance();
+
+  // if (balance <= 0) {
+  //   showMessage('no_funds');
+  //   return;
+  // }
+
+  // const token = await sdk.getToken();
+
+  // if (token) {
+  //   await receiveEcash({
+  //     token,
+  //     unit: 'sat',
+  //     fromNIP05: `${currentProfile?.npub}@npubx.cash`,
+  //   });
+  //   showMessage('funds_received', { amount: balance, unit: 'sat' }, { emoji: '🎉' }, () => {});
+  // }
 }
 
 function TabOneScreen({
@@ -72,7 +171,7 @@ function TabOneScreen({
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await getProfile(currentProfile);
+    await getProfile(currentProfile, listenToTransaction);
     setRefreshing(false);
   }, []);
 
@@ -91,6 +190,8 @@ function TabOneScreen({
       ),
     });
   }, [navigation, account, accounts]);
+
+  const { listenToTransaction } = useTransactions();
 
   if (!settings?.termsAccepted) {
     return (
@@ -143,7 +244,7 @@ function TabOneScreen({
 const createStyles = (theme) =>
   StyleSheet.create({
     scrollView: {
-      marginTop: -64,
+      marginTop: 0,
       marginBottom: -24,
       backgroundColor: greys(theme)[2300],
     },

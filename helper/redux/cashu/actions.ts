@@ -15,6 +15,7 @@ import {
   RESET_COUNTER,
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
+  SET_KEYS,
 } from './actionTypes';
 
 export const addMints = ({ profileId, mints }) => ({
@@ -35,6 +36,11 @@ export const setSelectedMint = ({ profileId, mintUrl }) => ({
 export const setKeysets = ({ mintUrl, keysets }) => ({
   type: SET_KEYSETS,
   payload: { mintUrl, keysets },
+});
+
+export const setKeys = ({ mintUrl, keys }) => ({
+  type: SET_KEYS,
+  payload: { mintUrl, keys },
 });
 
 export const setInfo = ({ mintUrl, mintInfo }) => ({

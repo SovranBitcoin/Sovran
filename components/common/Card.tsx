@@ -8,6 +8,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 type VariantType = 'warning' | 'info';
 
 interface CardProps {
+  title?: string;
   message: string;
   variant: VariantType;
   onPress?: () => void;
@@ -20,7 +21,7 @@ interface VariantStyle {
   color: string;
 }
 
-export const Card: React.FC<CardProps> = ({ message, variant, icon, onPress }) => {
+export const Card: React.FC<CardProps> = ({ title, message, variant, icon, onPress }) => {
   const theme = useSelector(memoizedGetTheme);
 
   const variantStyles = useMemo<Record<VariantType, VariantStyle>>(
@@ -58,7 +59,19 @@ export const Card: React.FC<CardProps> = ({ message, variant, icon, onPress }) =
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
+        flexDirection: 'column',
+        alignItems: 'flex-start',
       }}>
+      {title && (
+        <Text
+          className="pl-4 pr-1 pt-4 text-base font-medium"
+          style={{
+            color: greys(theme)[600],
+            fontFamily: 'OverpassHeavy',
+          }}>
+          {title}
+        </Text>
+      )}
       <Text
         className="flex-1 p-4 pr-1 text-base font-medium"
         style={{

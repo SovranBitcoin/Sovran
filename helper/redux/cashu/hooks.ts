@@ -2,6 +2,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedMint } from './actions';
 import { useQuery } from '@tanstack/react-query';
 import { getMint } from 'helper/cashu';
+import { memoizedGetMintInfo } from './selectors';
 
 export const useCashu = () => {
   const dispatch = useDispatch();
@@ -23,11 +24,5 @@ export const useCashu = () => {
 };
 
 export const useGetMintInfo = ({ mintUrl }: { mintUrl: string }) => {
-  return useQuery({
-    queryKey: ['cashu-mint-info', mintUrl],
-    queryFn: async () => {
-      return await (await getMint({ mintUrl: mintUrl })).getInfo();
-    },
-    staleTime: 60 * 1000 * 5, // 5 minutes
-  });
+  return useSelector(memoizedGetMintInfo(mintUrl));
 };

@@ -1,7 +1,13 @@
 import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
-import { CashuMint, CashuWallet, getDecodedToken, injectWebSocketImpl } from '@cashu/cashu-ts';
+import {
+  CashuMint,
+  CashuWallet,
+  getDecodedToken,
+  injectWebSocketImpl,
+  MintQuoteResponse,
+} from '@cashu/cashu-ts';
 import {
   appendProofsV2,
   increaseCounterV2,
@@ -24,7 +30,7 @@ export const useTransactions = () => {
 };
 
 export const TransactionProvider = ({ children }) => {
-  const transactions = useSelector(memoizedGetTransactions({ id: 0 }));
+  const allTransactions = useSelector(memoizedGetTransactions({ id: 0 }));
   // Use a ref to hold the Map object to prevent unnecessary re-renders
   const activeConnectionsRef = useRef(new Map());
   const [activeConnections, setActiveConnections] = useState([]);
@@ -59,7 +65,7 @@ export const TransactionProvider = ({ children }) => {
     status,
     additionalData = {}
   ) => {
-    store.dispatch(
+    return store.dispatch(
       updateTransaction({
         profileId: 0,
         matcher: (tx) => {
@@ -93,198 +99,183 @@ export const TransactionProvider = ({ children }) => {
   }, []);
 
   // Start listening to a transaction
-  const listenToTransaction = async (transaction) => {
-    const { type, token, transactionType, mintQuote, request } = transaction;
+  const listenToTransaction = async (transactions) => {
+    console.log('listenToTransaction', transactions);
 
-    if (transaction.paid) {
-      return;
-    }
+    // if (transaction?.paid) {
+    //   return;
+    // }
 
-    const id =
-      type === 'ecash'
-        ? type + '_' + token + '_' + transactionType
-        : type + '_' + request + '_' + transactionType;
+    // join requests together with _ seperator
+    const id = transactions.map((t) => t.request).join('_');
+    console.log('listenToTransaction id', id);
 
     // Skip if already listening
     if (activeConnectionsRef.current.has(id)) {
       return;
     }
 
-    try {
-      const mintUrl = transaction.mintUrl;
-      const mint = new CashuMint(mintUrl);
-      const wallet = new CashuWallet(mint);
+    console.log('listenToTransaction transactions', transactions);
 
-      injectWebSocketImpl(WebSocket);
+    // group transactions by mintUrl and type, so we need:
+    // { [mintUrl]: { lightning: [...], ecash: [...] } }
+    const groupedTransactions = transactions.reduce((acc: any, tx: any) => {
+      const mintUrl = tx.mintUrl;
+      if (!acc[mintUrl]) {
+        acc[mintUrl] = { lightning: [], ecash: [] };
+      }
+      if (tx.type === 'ecash') {
+        acc[mintUrl].ecash.push(tx);
+      } else {
+        acc[mintUrl].lightning.push(tx);
+      }
+      return acc;
+    }, {});
 
-      let unsub;
+    console.log('listenToTransaction groupedTransactions', groupedTransactions);
 
-      // Choose the appropriate listener based on transaction type
-      if (type === 'ecash') {
-        const decodedToken = getDecodedToken(token);
-        // Make sure there are proofs to listen to
-        unsub = await wallet.onProofStateUpdates(
-          decodedToken.proofs,
-          (update) => {
-            const isPaid = update.state === 'SPENT';
+    // loop over mints
+    for (const [mintUrl, txs] of Object.entries(groupedTransactions)) {
+      console.log('listenToTransaction mintUrl', mintUrl);
+      console.log('listenToTransaction txs', txs);
+      // loop over txs
+      const w = await getWallet({
+        mintUrl,
+        unit: 'sat',
+      });
+      console.log('listenToTransaction w', w);
 
-            // If paid, unsubscribe from updates
-            if (isPaid) {
-              // Update transaction status to paid
-              showMessage('funds_sent', { amount: transaction.amount, unit: transaction.unit });
+      for (const [type, txs_] of Object.entries(txs)) {
+        console.log('listenToTransaction txs_', type, txs_);
+        try {
+          injectWebSocketImpl(WebSocket);
+          let unsub;
 
-              updateTransactionStatus(
-                {
-                  token,
-                  type,
-                  transactionType,
-                },
-                'paid',
-                { paid: true, completedAt: Date.now() }
-              );
-
-              // Clean up the connection
-              if (unsub) {
-                unsub();
-                // Remove transaction from active connections
-                removeConnection(id);
-              }
-            }
-          },
-          async (error) => {
-            console.error(`Error in transaction ${id}:`, error);
-
-            // Update transaction status to error
-            updateTransactionStatus(
-              {
-                token,
-                type,
-                transactionType,
-              },
-              'error',
-              { error: error.message }
+          if (type === 'lightning') {
+            console.log(
+              'listenToTransaction txs_.map((tx) => tx.mintQuote.quote)',
+              txs_.map((tx) => tx.mintQuote.quote)
             );
+            unsub = await w.onMintQuoteUpdates(
+              txs_.map((tx) => tx.mintQuote.quote),
+              async (update: MintQuoteResponse) => {
+                try {
+                  // This finds the current transaction thats being updated.
+                  const transaction = txs_.find((tx) => tx.mintQuote.quote === update.quote);
+                  console.log('listenToTransaction transaction', transaction);
 
-            // Clean up the connection
+                  if (!transaction) return;
+
+                  const isPaid = update.state === 'PAID';
+
+                  // We only really care about paid events
+                  console.log('listenToTransaction isPaid', isPaid);
+                  if (isPaid) {
+                    const counter = memoizedGetCounterV2({
+                      profileId: store.getState().nostr.currentProfile.id,
+                      mintUrl,
+                      keysetId: w.keysetId,
+                    })(store.getState());
+
+                    console.log(
+                      'listenToTransaction counter',
+                      counter,
+                      transaction.amount,
+                      transaction.mintQuote.quote,
+                      w.keysetId
+                    );
+
+                    // Mint proofs
+                    const proofs = await w.mintProofs(
+                      transaction.amount,
+                      transaction.mintQuote.quote,
+                      {
+                        counter,
+                        keysetId: w.keysetId,
+                      }
+                    );
+                    console.log('listenToTransaction proofs', proofs);
+
+                    // Increase counter
+                    store.dispatch(
+                      increaseCounterV2({
+                        profileId: store.getState().nostr.currentProfile.id,
+                        mintUrl,
+                        keysetId: w.keysetId,
+                        amount: proofs.length,
+                      })
+                    );
+                    console.log('listenToTransaction counter', counter);
+
+                    // Add proofs to redux
+                    await store.dispatch(
+                      appendProofsV2({
+                        profileId: store.getState().nostr.currentProfile.id,
+                        mintUrl,
+                        proofs: proofs,
+                      })
+                    );
+                    console.log('listenToTransaction proofs', proofs);
+
+                    // Publish wallet event, this basically just makes sure we can restore our account via nostr
+                    publishWalletEvent([
+                      ...new Set([
+                        ...store
+                          .getState()
+                          .cashu?.profiles?.[
+                            store.getState().nostr.currentProfile.id
+                          ]?.transactions.map((t) => t.mintUrl),
+                        mintUrl,
+                      ]),
+                    ]);
+                    console.log('publishWalletEvent');
+
+                    // Update transaction status to paid
+                    showMessage('funds_sent', {
+                      amount: transaction.amount,
+                      unit: transaction.unit,
+                    });
+                    console.log('Funds Sent');
+
+                    // We update the transaction status
+                    const t = updateTransactionStatus(
+                      {
+                        request: transaction.request,
+                        type: transaction.type,
+                        transactionType: transaction.transactionType,
+                        quote: transaction.mintQuote.quote,
+                      },
+                      'paid',
+                      { paid: true, completedAt: Date.now() }
+                    );
+                    console.log('Update Transaction Status', t);
+
+                    // Important: We clean up the connection only if ALL quotes are paid
+                    // get txs from allTransactions and find ones where the request matches the current transaction
+                    const allQuotesPaid = allTransactions.filter((t) =>
+                      transactions.some((t2) => t.request === t2.request)
+                    );
+                    console.log('listenToTransaction allQuotesPaid', allQuotesPaid);
+                    if (allQuotesPaid) {
+                      unsub();
+
+                      removeConnection(id);
+                    }
+                  }
+                } catch (err) {
+                  console.log('listenToTransaction error', err);
+                }
+              },
+              async (error) => {}
+            );
             if (unsub) {
-              unsub();
-              // Remove transaction from active connections
-              removeConnection(id);
+              addConnection(id, { unsub });
             }
           }
-        );
-        if (unsub) {
-          addConnection(id, { unsub });
-        }
-      } else if (type === 'lightning') {
-        unsub = await wallet.onMintQuoteUpdates(
-          [mintQuote.quote],
-          async (update) => {
-            const isPaid = update.state === 'PAID';
-
-            if (isPaid) {
-              // todo: i want to make a provider for wallets/mints
-              const w = await getWallet({
-                mintUrl,
-                unit: transaction.unit,
-              });
-
-              const counter = memoizedGetCounterV2({
-                profileId: store.getState().nostr.currentProfile.id,
-                mintUrl,
-                keysetId: w.keysetId,
-              })(store.getState());
-
-              const proofs = await w.mintProofs(transaction.amount, mintQuote.quote, {
-                counter,
-                keysetId: w.keysetId,
-              });
-
-              store.dispatch(
-                increaseCounterV2({
-                  profileId: store.getState().nostr.currentProfile.id,
-                  mintUrl,
-                  keysetId: w.keysetId,
-                  amount: proofs.length,
-                })
-              );
-
-              await store.dispatch(
-                appendProofsV2({
-                  profileId: store.getState().nostr.currentProfile.id,
-                  mintUrl,
-                  proofs: proofs,
-                })
-              );
-
-              publishWalletEvent([
-                ...new Set([
-                  ...store
-                    .getState()
-                    .cashu?.profiles?.[
-                      store.getState().nostr.currentProfile.id
-                    ]?.transactions.map((t) => t.mintUrl),
-                  mintUrl,
-                ]),
-              ]);
-
-              // Update transaction status to paid
-              showMessage('funds_sent', { amount: transaction.amount, unit: transaction.unit });
-
-              updateTransactionStatus(
-                {
-                  request,
-                  type,
-                  transactionType,
-                  quote: mintQuote.quote,
-                },
-                'paid',
-                { paid: true, completedAt: Date.now() }
-              );
-              // Clean up the connection
-              if (unsub) {
-                unsub();
-                // Remove transaction from active connections
-                removeConnection(id);
-              }
-            }
-          },
-          (error) => {
-            console.error(`Error in transaction ${id}:`, error);
-            // Update transaction status to error
-            updateTransactionStatus(
-              {
-                request,
-                type,
-                transactionType,
-              },
-              'error',
-              { error: error.message }
-            );
-            // Clean up the connection
-            if (unsub) {
-              unsub();
-              // Remove transaction from active connections
-              removeConnection(id);
-            }
-          }
-        );
-        if (unsub) {
-          addConnection(id, { unsub });
+        } catch (error) {
+          console.log(12037, error);
         }
       }
-    } catch (error) {
-      console.error(`Error setting up listener for transaction ${id}:`, error);
-      // Set that transaction is not listening with error status
-      updateTransactionStatus(
-        {
-          type,
-          transactionType,
-          request,
-        },
-        'error',
-        { error: error.message }
-      );
     }
   };
 
@@ -307,7 +298,7 @@ export const TransactionProvider = ({ children }) => {
     }));
 
   const value = {
-    transactions,
+    transactions: allTransactions,
     listenToTransaction,
     stopListening,
     getActiveConnections,

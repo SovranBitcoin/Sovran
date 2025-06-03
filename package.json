@@ -110,6 +110,7 @@
     "react-dom": "19.0.0",
     "react-native": "0.79.2",
     "react-native-actions-sheet": "^0.9.7",
+    "react-native-avoid-softinput": "^7.0.1",
     "react-native-bip39": "^2.3.0",
     "react-native-cache": "^2.0.3",
     "react-native-chart-kit": "^6.12.0",

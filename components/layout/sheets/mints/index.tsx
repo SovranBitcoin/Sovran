@@ -57,6 +57,44 @@ interface ProcessedMintData {
   isLoading: boolean;
 }
 
+export function MintIcon({ mintInfo, size = 32 }) {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+
+  return (
+    <View
+      style={{
+        width: size,
+        marginRight: 8,
+      }}>
+      {mintInfo?.icon_url ? (
+        <Image
+          source={{ uri: mintInfo?.icon_url }}
+          style={[
+            styles.icon,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 3,
+            },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.placeholderIcon,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 3,
+            },
+          ]}
+        />
+      )}
+    </View>
+  );
+}
+
 const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   onPress,
   unit,
@@ -91,8 +129,12 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
     <TouchableOpacity
       style={[
         sovran(theme).listItem,
-        { alignSelf: 'center', justifyContent: 'space-between' },
+        { alignSelf: 'center' },
         style,
+        {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        },
       ]}
       onPress={handlePress}
       onPressIn={() => {}}
@@ -100,20 +142,18 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
         }}>
-        {mintInfo?.data?.icon_url ? (
-          <Image source={{ uri: mintInfo?.data?.icon_url }} style={styles.icon} />
-        ) : (
-          <View style={styles.placeholderIcon} />
-        )}
-        <Text style={styles.name}>
-          {mintInfo?.data?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
-        </Text>
-      </View>
-      <Text style={styles.dot}>•</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={styles.balance}>
+        <MintIcon mintInfo={mintInfo} />
+        <View
+          style={{
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            marginRight: 10,
+          }}>
+          <Text style={styles.name}>
+            {mintInfo?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
+          </Text>
+          {/* <Text style={styles.balance}>
           {formatCurrency(
             {
               currency: currencyValue,
@@ -127,11 +167,14 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
               denomination: denominationValue,
             }
           )}
-        </Text>
-        <View style={styles.chevronContainer}>
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+        </Text> */}
+          <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
         </View>
       </View>
+      <View style={styles.chevronContainer}>
+        <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+      </View>
+      {/* <Text style={styles.dot}>•</Text> */}
     </TouchableOpacity>
   );
 };
@@ -139,6 +182,8 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
 import { ViewStyle } from 'react-native';
 import MintDetailPage from './MintDetailsPage';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { AmountFormatter } from 'components/common/AmountFormatter';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Theme type definition
 interface Theme {
@@ -485,21 +530,21 @@ export const createStyles = (theme: string) =>
       marginBottom: 8,
     },
     icon: {
-      width: 24,
-      height: 24,
+      width: 32,
+      height: 32,
       borderRadius: 12,
     },
     placeholderIcon: {
-      width: 24,
-      height: 24,
-      borderRadius: 32,
-      backgroundColor: greys(theme)[400],
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      backgroundColor: greys(theme)[1000],
     },
     name: {
       color: greys(theme)[100],
       fontSize: 12,
-      marginLeft: 8,
       fontFamily: 'OverpassBold',
+      marginLeft: -2,
     },
     dot: {
       color: greys(theme)[700],
@@ -507,11 +552,14 @@ export const createStyles = (theme: string) =>
       marginHorizontal: 8,
     },
     balance: {
-      color: greys(theme)[0],
+      color: greys(theme)[200],
       fontSize: 12,
       fontFamily: 'OverpassBold',
     },
     chevronContainer: {
+      alignSelf: 'center',
+      justifyContent: 'flex-end',
+
       padding: 4,
     },
     chevron: {

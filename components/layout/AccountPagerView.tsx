@@ -127,7 +127,13 @@ export function AccountPagerView({
         id: 'scan_button',
         children: 'Scan',
       },
-      icon: <Icon name="stash:qr-code" size={24} color={greys(theme)[0]} />,
+      icon: (
+        <Icon
+          name="stash:qr-code"
+          size={24}
+          color={theme === 'light' ? greys(theme)[2300] : greys(theme)[0]}
+        />
+      ),
     },
     {
       page: 'currency',
@@ -281,14 +287,14 @@ const createStyles = (theme: string) =>
       backgroundColor: greys(theme)[1800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
+      borderWidth: 0.3,
+      borderColor: greys(theme)[1500],
     },
     sendIconView: {
       backgroundColor: greys(theme)[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
+      borderWidth: 0.3,
+      borderColor: greys(theme)[1500],
     },
   });

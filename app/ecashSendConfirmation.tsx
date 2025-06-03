@@ -18,11 +18,12 @@ import {
   getEncodedTokenV4,
   injectWebSocketImpl,
 } from '@cashu/cashu-ts';
-import _ from 'lodash';
+import _, { capitalize } from 'lodash';
 import {
   memoizedGetTransactionByMatcher,
   memoizedGetTransactions,
   updateTransaction,
+  useGetMintInfo,
 } from 'helper/redux/cashu';
 import { cancelEcashTransaction, getWallet } from 'helper/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -45,6 +46,46 @@ import { npubToPubkey } from 'components/layout/Transaction';
 import { encode } from 'helper/third-party/emoji';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { convertTime } from 'helper/time';
+import { truncateMiddle } from 'helper/strings';
+import { MintIcon } from 'components/layout/sheets/mints';
+import { Card } from 'components/common/Card';
+
+export function MintDetailPage({ mintInfo, theme }: any) {
+  return (
+    <View
+      style={{
+        margin: 16,
+        marginTop: 8,
+        padding: 16,
+        marginBottom: 0,
+        borderRadius: 8,
+        backgroundColor: greys(theme)[1800],
+        flexDirection: 'row',
+      }}>
+      <View>
+        <MintIcon size={40} mintInfo={mintInfo} />
+      </View>
+      <View>
+        <Text
+          style={{
+            fontFamily: 'OverpassHeavy',
+            fontSize: 16,
+          }}>
+          Sending with
+        </Text>
+        <Text
+          style={{
+            fontFamily: 'OverpassRegular',
+            fontSize: 16,
+            color: greys(theme)[100],
+          }}>
+          {mintInfo?.name}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -119,13 +160,7 @@ function ModalScreen() {
   const isLongToken = formattedToken.length >= 500;
 
   const isListening = activeConnections?.some(
-    (connection) =>
-      connection.id ===
-      getCurrentTransaction[0].type +
-        '_' +
-        getCurrentTransaction[0].token +
-        '_' +
-        getCurrentTransaction[0].transactionType
+    (connection) => connection.id === getCurrentTransaction[0].token
   );
 
   const checkProofsSpent = async (token: string): Promise<boolean> => {
@@ -209,7 +244,8 @@ function ModalScreen() {
       onClose,
     });
   };
-
+  const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+  console.log(1082, mintInfo);
   return (
     <Modal
       showClose
@@ -227,15 +263,47 @@ function ModalScreen() {
             unit={unit}
             data={formattedToken}
             animated={isLongToken}
+            showSection={false}
+          />
+          {getCurrentTransaction[0].memo && (
+            <View
+              style={{
+                margin: 16,
+                marginTop: 12,
+                marginBottom: 0,
+              }}>
+              <Card message={getCurrentTransaction[0].memo} variant="info" />
+            </View>
+          )}
+          <MintDetailPage
+            mintInfo={mintInfo}
+            getCurrentTransaction={getCurrentTransaction}
+            theme={theme}
           />
           <Section
             items={[
               {
-                title: 'Listening',
-                value: String(isListening),
+                title: 'Date',
+                value: convertTime(new Date(getCurrentTransaction[0]?.date)),
+              },
+              {
+                title: 'Type',
+                value:
+                  capitalize(String(getCurrentTransaction[0]?.type)) +
+                  ' • ' +
+                  capitalize(String(getCurrentTransaction[0]?.transactionType)),
+              },
+              {
+                title: 'Status',
+                value: isListening ? 'Pending' : 'Completed',
+              },
+              {
+                title: 'Token',
+                value: truncateMiddle(token, 6),
               },
             ]}
           />
+
           {/* <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text> */}
         </>
       }

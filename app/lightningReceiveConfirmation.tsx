@@ -10,7 +10,11 @@ import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import _ from 'lodash';
-import { memoizedGetTransactionByMatcher, updateTransaction } from 'helper/redux/cashu';
+import {
+  memoizedGetTransactionByMatcher,
+  updateTransaction,
+  useGetMintInfo,
+} from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { getMint, getWallet } from 'helper/cashu';
@@ -18,6 +22,10 @@ import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { theme } from 'tailwind.config';
+import { MintDetailPage } from './ecashSendConfirmation';
+import { truncateMiddle } from 'helper/strings';
+import { Card } from 'components/common/Card';
 
 function ModalScreen() {
   const navigation = useNavigation();
@@ -33,13 +41,14 @@ function ModalScreen() {
   const getCurrentTransaction = useSelector(
     memoizedGetTransactionByMatcher({
       profileId: currentProfile.id,
-      matcher: (txs) =>
-        _.filter(txs, {
+      matcher: (txs) => {
+        return _.filter(txs, {
           request: request,
           type: 'lightning',
           unit: unit,
           amount: amount,
-        }),
+        });
+      },
     })
   );
 
@@ -85,28 +94,16 @@ function ModalScreen() {
 
   const isBitcoin = unit === 'sat';
 
-  const {
-    transactions,
-    listenToTransaction,
-    stopListening,
-    getActiveConnections,
-    activeConnections,
-  } = useTransactions();
+  const { listenToTransaction, activeConnections } = useTransactions();
 
   useEffect(() => {
     if (getCurrentTransaction?.[0]) {
-      listenToTransaction(getCurrentTransaction?.[0]);
+      listenToTransaction([getCurrentTransaction?.[0]]);
     }
   }, [getCurrentTransaction?.[0]]);
 
-  const isListening = activeConnections?.some(
-    (connection) =>
-      connection.id ===
-      getCurrentTransaction[0].type +
-        '_' +
-        getCurrentTransaction[0].request +
-        '_' +
-        getCurrentTransaction[0].transactionType
+  const isListening = activeConnections?.some((connection) =>
+    connection.id.includes(getCurrentTransaction[0].request)
   );
 
   const handleCheckStatus = async (onClose) => {
@@ -142,6 +139,8 @@ function ModalScreen() {
     }
   };
 
+  const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+
   return (
     <Modal
       showClose
@@ -150,6 +149,7 @@ function ModalScreen() {
         <>
           <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
           <PaymentInfo
+            showSection={false}
             setUri={setUri}
             data={[
               { name: 'Lightning', value: request },
@@ -167,12 +167,39 @@ function ModalScreen() {
               // },
             ]}
           />
+          {getCurrentTransaction[0].memo && (
+            <View
+              style={{
+                margin: 16,
+                marginTop: 12,
+                marginBottom: 0,
+              }}>
+              <Card message={getCurrentTransaction[0].memo} variant="info" />
+            </View>
+          )}
+          <MintDetailPage
+            mintInfo={mintInfo}
+            getCurrentTransaction={getCurrentTransaction}
+            theme={theme}
+          />
           <Section
             items={[
               {
-                title: 'Listening',
-                value: String(isListening),
+                title: 'Request',
+                value: truncateMiddle(request, 10),
               },
+              {
+                title: 'Type',
+                value: 'Lightning • Receive',
+              },
+              {
+                title: 'Status',
+                value: getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending',
+              },
+              // {
+              //   title: 'Listening',
+              //   value: String(isListening),
+              // },
             ]}
           />
         </>
