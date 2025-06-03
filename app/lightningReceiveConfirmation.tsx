@@ -38,6 +38,7 @@ export function LightningReceiveConfirmation({
   amount,
   autoGoBackOnPaid = true,
   extraButtons = [],
+  overrideButtons,
 }: {
   request: string;
   paymentRequest?: string;
@@ -45,6 +46,7 @@ export function LightningReceiveConfirmation({
   amount: number;
   autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
+  overrideButtons?: ButtonHandlerButton[];
 }) {
   const navigation = useNavigation();
   const [uri, setUri] = useState(null);
@@ -211,27 +213,29 @@ export function LightningReceiveConfirmation({
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text
                       style={{
-                        color: greys(theme)[0],
-                        fontFamily: 'OverpassBold',
-                      }}>
-                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
-                    </Text>
-                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-                  </View>
-                ),
-              },
-              // {
-              //   title: 'Listening',
-              //   value: String(isListening),
-              // },
-            ]}
-          />
-        </>
-      }
-      buttons={
-        <View
-          style={{
-            flexDirection: 'row',
+            buttons={
+              overrideButtons ?? [
+                {
+                  text: 'Copy',
+                  icon: 'lets-icons:copy',
+                  variant: 'primary',
+                  onPress: handleCopy,
+                },
+                {
+                  text: 'Share',
+                  icon: 'ri:share-fill',
+                  variant: 'secondary',
+                  onPress: handleShare,
+                },
+                {
+                  text: 'Check Status',
+                  icon: 'humbleicons:refresh',
+                  variant: 'secondary',
+                  onPress: handleCheckStatus,
+                },
+                ...extraButtons,
+              ]
+            }
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: 'transparent',

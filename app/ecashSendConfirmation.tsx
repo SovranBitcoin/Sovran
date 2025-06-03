@@ -103,11 +103,13 @@ export function EcashSendConfirmation({
   amount,
   token,
   extraButtons = [],
+  overrideButtons,
 }: {
   unit: string;
   amount: number;
   token: string;
   extraButtons?: ButtonHandlerButton[];
+  overrideButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -320,45 +322,47 @@ export function EcashSendConfirmation({
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text
                       style={{
-                        color: greys(theme)[0],
-                        fontFamily: 'OverpassBold',
-                      }}>
-                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
-                    </Text>
-                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-                  </View>
-                ),
-              },
-              {
-                title: 'Token',
-                value: truncateMiddle(token, 6),
-              },
-            ]}
-          />
-
-          {/* <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text> */}
-        </>
-      }
-      buttons={
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
-            paddingBottom: 8,
-          }}>
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
+            buttons={
+              overrideButtons ?? [
+                {
+                  text: 'Copy',
+                  icon: 'lets-icons:copy',
+                  variant: 'primary',
+                  onPress: handleCopy,
+                },
+                {
+                  text: 'Share',
+                  icon: 'ri:share-fill',
+                  variant: 'secondary',
+                  onPress: handleShare,
+                },
+                {
+                  text: 'NFC',
+                  icon: 'ph:contactless-payment-fill',
+                  variant: 'secondary',
+                  onPress: handleNFCSend,
+                },
+                {
+                  text: 'Check Status',
+                  icon: 'humbleicons:refresh',
+                  variant: 'secondary',
+                  onPress: handleCheckStatus,
+                },
+                {
+                  text: 'Cancel Transaction',
+                  icon: 'mdi:cancel',
+                  variant: 'secondary',
+                  onPress: handleCancelSend,
+                },
+                {
+                  text: 'Copy as Emoji',
+                  icon: 'fluent:emoji-24-filled',
+                  variant: 'primary',
+                  onPress: handleCopyEmoji,
+                },
+                ...extraButtons,
+              ]
+            }
                 variant: 'secondary',
                 onPress: handleShare,
               },

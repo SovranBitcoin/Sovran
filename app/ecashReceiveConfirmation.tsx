@@ -112,6 +112,7 @@ export function EcashReceiveConfirmation({
   token,
   showConfirmation,
   extraButtons = [],
+  overrideButtons,
 }: {
   token: string;
   showConfirmation?: (
@@ -121,6 +122,7 @@ export function EcashReceiveConfirmation({
     onCancel: () => void
   ) => void;
   extraButtons?: ButtonHandlerButton[];
+  overrideButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -182,22 +184,24 @@ export function EcashReceiveConfirmation({
       transparent={false}
       buttons={
         <ButtonHandler
-          buttons={[
-            {
-              text: 'Cancel',
-              icon: null,
-              variant: 'secondary',
-              onPress: handleCancel,
-            },
-            {
-              text: 'Redeem Ecash',
-              icon: null,
-              variant: 'primary',
-              onPress: handleRedeemPress,
-              loading: loading,
-            },
-            ...extraButtons,
-          ]}
+          buttons={
+            overrideButtons ?? [
+              {
+                text: 'Cancel',
+                icon: null,
+                variant: 'secondary',
+                onPress: handleCancel,
+              },
+              {
+                text: 'Redeem Ecash',
+                icon: null,
+                variant: 'primary',
+                onPress: handleRedeemPress,
+                loading: loading,
+              },
+              ...extraButtons,
+            ]
+          }
         />
       }>
       <>

@@ -33,65 +33,35 @@ function ModalScreen() {
     );
   }
 
-  const extraButtons: ButtonHandlerButton[] = [];
+  let overrideButtons: ButtonHandlerButton[] | undefined;
 
   if (transaction?.nostr?.pubkey) {
-    extraButtons.push({
-      text: 'View Chat',
-      variant: 'secondary',
-      onPress: () => {
-        navigation.goBack();
-        navigation.navigate('userMessages', {
-          pubkey: transaction.nostr.pubkey,
-        });
+    overrideButtons = [
+      {
+        text: 'View Messages',
+        variant: 'secondary',
+        onPress: () => {
+          navigation.goBack();
+          navigation.navigate('userMessages', {
+            pubkey: transaction.nostr.pubkey,
+          });
+        },
       },
-    });
-  }
-
-  if (transaction.request && !transaction.paid) {
-    extraButtons.push({
-      text: 'Open Invoice',
-      variant: 'secondary',
-      onPress: () => {
-        navigation.navigate('lightningReceiveConfirmation', {
-          unit: transaction.unit,
-          request: transaction.request,
-          amount: transaction.amount,
-          transaction: JSON.stringify(transaction),
-          unifiedRequest: transaction.unifiedRequest,
-          paymentRequest: transaction.paymentRequest,
-        });
-      },
-    });
-  }
-
-  if (transaction.type === 'ecash' && !transaction.paid && transaction.transactionType === 'send') {
-    extraButtons.push({
-      text: 'Open Invoice',
-      variant: 'secondary',
-      onPress: () => {
-        navigation.navigate('ecashSendConfirmation', {
-          unit: transaction.unit,
-          token: transaction.token,
-          amount: transaction.amount,
-        });
-      },
-    });
-  }
-
-  if (transaction.type === 'ecash' && transaction.transactionType === 'send') {
-    return (
+    ];
       <EcashSendConfirmation
         unit={transaction.unit}
         amount={transaction.amount}
         token={transaction.token}
-        extraButtons={extraButtons}
+        overrideButtons={overrideButtons}
       />
     );
   }
 
   if (transaction.type === 'ecash' && transaction.transactionType === 'receive') {
-    return <EcashReceiveConfirmation token={transaction.token} extraButtons={extraButtons} />;
+      <EcashReceiveConfirmation
+        token={transaction.token}
+        overrideButtons={overrideButtons}
+      />
   }
 
   if (transaction.type === 'lightning' && transaction.transactionType === 'receive') {
@@ -102,7 +72,7 @@ function ModalScreen() {
         unit={transaction.unit}
         amount={transaction.amount}
         autoGoBackOnPaid={false}
-        extraButtons={extraButtons}
+        overrideButtons={overrideButtons}
       />
     );
   }
@@ -110,7 +80,7 @@ function ModalScreen() {
   if (transaction.type === 'lightning' && transaction.transactionType === 'send') {
     return (
       <LightningSendConfirmation
-        transaction={transaction}
+        overrideButtons={overrideButtons}
         pr={transaction.request}
         unit={transaction.unit}
         pubkey={transaction?.nostr?.pubkey}

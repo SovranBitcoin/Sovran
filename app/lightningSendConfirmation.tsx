@@ -22,6 +22,8 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+  overrideButtons,
+  overrideButtons?: ButtonHandlerButton[];
 import { MintDetailPage } from './ecashSendConfirmation';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
@@ -217,22 +219,24 @@ export function LightningSendConfirmation({
                 text: 'Cancel',
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
-                onPress: handleCancel,
-              },
-              {
-                text: 'Send',
-                icon: 'ri:send-plane-2-fill',
-                variant: 'primary',
-                onPress: handleLightningSend,
-                loading: loading,
-              },
-              ...extraButtons,
-            ]}
-          />
-        </View>
-      }
-    />
-  );
+            buttons={
+              overrideButtons ?? [
+                {
+                  text: 'Cancel',
+                  icon: 'ri:close-circle-line',
+                  variant: 'secondary',
+                  onPress: handleCancel,
+                },
+                {
+                  text: 'Send',
+                  icon: 'ri:send-plane-2-fill',
+                  variant: 'primary',
+                  onPress: handleLightningSend,
+                  loading: loading,
+                },
+                ...extraButtons,
+              ]
+            }
 }
 
 function ModalScreen() {
