@@ -33,35 +33,18 @@ function ModalScreen() {
     );
   }
 
-  let overrideButtons: ButtonHandlerButton[] | undefined;
-
-  if (transaction?.nostr?.pubkey) {
-    overrideButtons = [
-      {
-        text: 'View Messages',
-        variant: 'secondary',
-        onPress: () => {
-          navigation.goBack();
-          navigation.navigate('userMessages', {
-            pubkey: transaction.nostr.pubkey,
-          });
-        },
-      },
-    ];
+  if (transaction?.transactionType === 'send' && transaction.type === 'ecash') {
+    return (
       <EcashSendConfirmation
         unit={transaction.unit}
         amount={transaction.amount}
         token={transaction.token}
-        overrideButtons={overrideButtons}
       />
     );
   }
 
   if (transaction.type === 'ecash' && transaction.transactionType === 'receive') {
-      <EcashReceiveConfirmation
-        token={transaction.token}
-        overrideButtons={overrideButtons}
-      />
+    return <EcashReceiveConfirmation transaction={transaction} token={transaction.token} />;
   }
 
   if (transaction.type === 'lightning' && transaction.transactionType === 'receive') {
@@ -72,7 +55,6 @@ function ModalScreen() {
         unit={transaction.unit}
         amount={transaction.amount}
         autoGoBackOnPaid={false}
-        overrideButtons={overrideButtons}
       />
     );
   }
@@ -80,12 +62,11 @@ function ModalScreen() {
   if (transaction.type === 'lightning' && transaction.transactionType === 'send') {
     return (
       <LightningSendConfirmation
-        overrideButtons={overrideButtons}
+        transaction={transaction}
         pr={transaction.request}
         unit={transaction.unit}
         pubkey={transaction?.nostr?.pubkey}
         meltQuote={transaction.meltQuote ? JSON.stringify(transaction.meltQuote) : undefined}
-        extraButtons={extraButtons}
       />
     );
   }

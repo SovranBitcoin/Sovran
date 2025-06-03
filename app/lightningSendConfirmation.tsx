@@ -22,8 +22,6 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-  overrideButtons,
-  overrideButtons?: ButtonHandlerButton[];
 import { MintDetailPage } from './ecashSendConfirmation';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
@@ -190,6 +188,7 @@ export function LightningSendConfirmation({
               },
             ]}
           /> */}
+
           <Section
             items={[
               { title: 'Date', value: getTimestamp({ pr }) },
@@ -214,29 +213,53 @@ export function LightningSendConfirmation({
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={[
-              {
-                text: 'Cancel',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
             buttons={
-              overrideButtons ?? [
-                {
-                  text: 'Cancel',
-                  icon: 'ri:close-circle-line',
-                  variant: 'secondary',
-                  onPress: handleCancel,
-                },
-                {
-                  text: 'Send',
-                  icon: 'ri:send-plane-2-fill',
-                  variant: 'primary',
-                  onPress: handleLightningSend,
-                  loading: loading,
-                },
-                ...extraButtons,
-              ]
+              transaction?.paid
+                ? [
+                    {
+                      text: 'Close',
+                      icon: 'ri:close-circle-line',
+                      variant: 'secondary',
+                      onPress: handleCancel,
+                    },
+                    ...(transaction.nostr.pubkey
+                      ? [
+                          {
+                            text: 'View Message',
+                            icon: 'ri:message-2-line',
+                            variant: 'primary',
+                            onPress: () => {
+                              navigation.navigate('userMessages', {
+                                pubkey: transaction.nostr.pubkey,
+                              });
+                              navigation.goBack();
+                            },
+                          },
+                        ]
+                      : []),
+                  ]
+                : [
+                    {
+                      text: 'Cancel',
+                      icon: 'ri:close-circle-line',
+                      variant: 'secondary',
+                      onPress: handleCancel,
+                    },
+                    {
+                      text: 'Send',
+                      icon: 'ri:send-plane-2-fill',
+                      variant: 'primary',
+                      onPress: handleLightningSend,
+                      loading: loading,
+                    },
+                    ...extraButtons,
+                  ]
             }
+          />
+        </View>
+      }
+    />
+  );
 }
 
 function ModalScreen() {

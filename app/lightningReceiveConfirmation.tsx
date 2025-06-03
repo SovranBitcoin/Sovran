@@ -28,6 +28,7 @@ import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { greys } from 'helper/colors';
 
 export function LightningReceiveConfirmation({
   request,
@@ -36,7 +37,6 @@ export function LightningReceiveConfirmation({
   amount,
   autoGoBackOnPaid = true,
   extraButtons = [],
-  overrideButtons,
 }: {
   request: string;
   paymentRequest?: string;
@@ -44,7 +44,6 @@ export function LightningReceiveConfirmation({
   amount: number;
   autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
-  overrideButtons?: ButtonHandlerButton[];
 }) {
   const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
@@ -110,10 +109,10 @@ export function LightningReceiveConfirmation({
   const { listenToTransaction, activeConnections } = useTransactions();
 
   useEffect(() => {
-    if (getCurrentTransaction?.[0]) {
+    if (!getCurrentTransaction?.[0].paid) {
       listenToTransaction([getCurrentTransaction?.[0]]);
     }
-  }, [getCurrentTransaction?.[0]]);
+  }, [getCurrentTransaction?.[0].paid]);
 
   const isListening = activeConnections?.some((connection) =>
     connection.id.includes(getCurrentTransaction[0].request)
@@ -161,25 +160,27 @@ export function LightningReceiveConfirmation({
       children={
         <>
           <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
-          <PaymentInfo
-            showSection={false}
-            setUri={setUri}
-            data={[
-              { name: 'Lightning', value: request },
-              // { name: 'Ecash', value: paymentRequest },
-            ]}
-            unit={unit}
-            popupMessage={[
-              {
-                name: 'lightning_address_copied',
-                value: request,
-              },
-              // {
-              //   name: 'payment_request_copied',
-              //   value: paymentRequest,
-              // },
-            ]}
-          />
+          {!getCurrentTransaction[0].paid && (
+            <PaymentInfo
+              showSection={false}
+              setUri={setUri}
+              data={[
+                { name: 'Lightning', value: request },
+                // { name: 'Ecash', value: paymentRequest },
+              ]}
+              unit={unit}
+              popupMessage={[
+                {
+                  name: 'lightning_address_copied',
+                  value: request,
+                },
+                // {
+                //   name: 'payment_request_copied',
+                //   value: paymentRequest,
+                // },
+              ]}
+            />
+          )}
           {getCurrentTransaction[0].memo && (
             <View
               style={{
@@ -212,56 +213,59 @@ export function LightningReceiveConfirmation({
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text
                       style={{
-            buttons={
-              overrideButtons ?? [
-                {
-                  text: 'Copy',
-                  icon: 'lets-icons:copy',
-                  variant: 'primary',
-                  onPress: handleCopy,
-                },
-                {
-                  text: 'Share',
-                  icon: 'ri:share-fill',
-                  variant: 'secondary',
-                  onPress: handleShare,
-                },
-                {
-                  text: 'Check Status',
-                  icon: 'humbleicons:refresh',
-                  variant: 'secondary',
-                  onPress: handleCheckStatus,
-                },
-                ...extraButtons,
-              ]
-            }
+                        color: greys(theme)[0],
+                        fontSize: 16,
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                    </Text>
+                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+                  </View>
+                ),
+              },
+              // {
+              //   title: 'Listening',
+              //   value: String(isListening),
+              // },
+            ]}
+          />
+        </>
+      }
+      buttons={
+        <View
+          style={{
+            flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: 'transparent',
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={[
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
-                variant: 'secondary',
-                onPress: handleShare,
-              },
-              {
-                text: 'Check Status',
-                icon: 'humbleicons:refresh',
-                variant: 'secondary',
-                onPress: handleCheckStatus,
-              },
-              ...extraButtons,
-            ]}
+            buttons={
+              getCurrentTransaction[0].paid
+                ? []
+                : [
+                    {
+                      text: 'Copy',
+                      icon: 'lets-icons:copy',
+                      variant: 'primary',
+                      onPress: handleCopy,
+                    },
+                    {
+                      text: 'Share',
+                      icon: 'ri:share-fill',
+                      variant: 'secondary',
+                      onPress: handleShare,
+                    },
+                    {
+                      text: 'Check Status',
+                      icon: 'humbleicons:refresh',
+                      variant: 'secondary',
+                      onPress: handleCheckStatus,
+                    },
+                    ...extraButtons,
+                  ]
+            }
           />
         </View>
       }

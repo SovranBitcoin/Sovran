@@ -97,7 +97,7 @@ async function getProfile(currentProfile, listenToTransaction) {
     transactions.push(transaction);
   }
 
-  listenToTransaction(transactions);
+  // listenToTransaction(transactions);
 
   // const mintQuote: MintQuoteResponse = {
   //   quote: quotes[0].quote_id,

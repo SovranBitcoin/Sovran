@@ -110,11 +110,12 @@ import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 
 export function EcashReceiveConfirmation({
   token,
+  transaction,
   showConfirmation,
   extraButtons = [],
-  overrideButtons,
 }: {
-  token: string;
+  token?: string;
+  transaction: any;
   showConfirmation?: (
     title: string,
     message: string,
@@ -122,7 +123,6 @@ export function EcashReceiveConfirmation({
     onCancel: () => void
   ) => void;
   extraButtons?: ButtonHandlerButton[];
-  overrideButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -185,22 +185,24 @@ export function EcashReceiveConfirmation({
       buttons={
         <ButtonHandler
           buttons={
-            overrideButtons ?? [
-              {
-                text: 'Cancel',
-                icon: null,
-                variant: 'secondary',
-                onPress: handleCancel,
-              },
-              {
-                text: 'Redeem Ecash',
-                icon: null,
-                variant: 'primary',
-                onPress: handleRedeemPress,
-                loading: loading,
-              },
-              ...extraButtons,
-            ]
+            transaction?.paid
+              ? []
+              : [
+                  {
+                    text: 'Cancel',
+                    icon: null,
+                    variant: 'secondary',
+                    onPress: handleCancel,
+                  },
+                  {
+                    text: 'Redeem Ecash',
+                    icon: null,
+                    variant: 'primary',
+                    onPress: handleRedeemPress,
+                    loading: loading,
+                  },
+                  ...extraButtons,
+                ]
           }
         />
       }>
@@ -221,15 +223,11 @@ export function EcashReceiveConfirmation({
         )}
 
         {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
-        <MintDetailPage
-          mintInfo={mintInfo}
-          theme={theme}
-          transactionType="receive"
-        />
+        <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="receive" />
 
         <Section
           items={[
-            { title: 'Date', value: 'Now' },
+            // { title: 'Date', value: 'Now' },
             { title: 'Type', value: 'Ecash • Receive' },
             { title: 'Token', value: truncateMiddle(token, 6) },
           ]}
