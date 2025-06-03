@@ -60,12 +60,16 @@ const SERVICE_MENU_ITEMS = [
 const MenuItem = ({ item, theme, onPress }) => {
   const styles = createStyles(theme);
 
-  if (item.empty) {
-    return <View style={styles.gridItem} />;
-  }
-
   return (
-    <TouchableOpacity onPress={onPress} style={styles.gridItem}>
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.gridItem,
+        {
+          opacity: item.empty ? 0 : 1,
+          pointerEvents: item.empty ? 'none' : 'auto',
+        },
+      ]}>
       <View style={styles.iconContainer}>
         <Icon name={item.icon} size={32} color={greys(theme)[0]} />
       </View>
@@ -91,7 +95,11 @@ const ServicesSection = () => {
   const settings = useSelector((state: RootState) => state.settings.settings);
 
   return (
-    <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}>
+    <View
+      style={{
+        paddingTop: 64 + 32,
+      }}>
+      {/* <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}> */}
       <Text
         size={32}
         style={{
@@ -114,7 +122,8 @@ const ServicesSection = () => {
           />
         ))}
       </View>
-    </Modal>
+      {/* </Modal> */}
+    </View>
   );
 };
 
@@ -145,7 +154,7 @@ const createStyles = (theme) =>
       justifyContent: 'space-between',
       padding: 16,
       paddingTop: 4,
-      width: '100%',
+      // width: '100%',
     },
     iconContainer: {
       alignItems: 'center',
@@ -158,7 +167,7 @@ const createStyles = (theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 8,
-      backgroundColor: greys(theme)[2300],
+      // backgroundColor: greys(theme)[2300],
       flexBasis: '22%', // Ensure max 4 icons per row
       marginBottom: 16,
     },
