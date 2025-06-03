@@ -1,5 +1,5 @@
 import React, { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
-import { Share, StyleSheet } from 'react-native';
+import { Share, StyleSheet, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
 import Modal from 'components/layout/Modal';
@@ -315,7 +315,18 @@ export function EcashSendConfirmation({
               },
               {
                 title: 'Status',
-                value: isListening ? 'Pending' : 'Completed',
+                value: (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text>{isListening ? 'Pending' : 'Completed'}</Text>
+                    {isListening && (
+                      <ActivityIndicator
+                        style={{ marginLeft: 4 }}
+                        size="small"
+                        color={greys(theme)[0]}
+                      />
+                    )}
+                  </View>
+                ),
               },
               {
                 title: 'Token',

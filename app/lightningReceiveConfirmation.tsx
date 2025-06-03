@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Share, Text } from 'react-native';
+import { Share, Text, ActivityIndicator } from 'react-native';
 import { View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
@@ -26,6 +26,7 @@ import { MintDetailPage } from './ecashSendConfirmation';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
+import { greys } from 'helper/colors';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 
@@ -205,7 +206,20 @@ export function LightningReceiveConfirmation({
               },
               {
                 title: 'Status',
-                value: getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending',
+                value: (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text>
+                      {getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending'}
+                    </Text>
+                    {isListening && !getCurrentTransaction?.[0]?.paid && (
+                      <ActivityIndicator
+                        style={{ marginLeft: 4 }}
+                        size="small"
+                        color={greys(theme)[0]}
+                      />
+                    )}
+                  </View>
+                ),
               },
               // {
               //   title: 'Listening',
