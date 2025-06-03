@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
 import Modal from 'components/layout/Modal';
 import Icon from 'assets/icons';
+import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
 import { View, Text } from 'components/common/Themed';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
@@ -51,7 +52,15 @@ import { truncateMiddle } from 'helper/strings';
 import { MintIcon } from 'components/layout/sheets/mints';
 import { Card } from 'components/common/Card';
 
-export function MintDetailPage({ mintInfo, theme }: any) {
+export function MintDetailPage({
+  mintInfo,
+  theme,
+  transactionType,
+}: {
+  mintInfo: any;
+  theme: any;
+  transactionType: 'send' | 'receive';
+}) {
   return (
     <View
       style={{
@@ -72,7 +81,7 @@ export function MintDetailPage({ mintInfo, theme }: any) {
             fontFamily: 'OverpassHeavy',
             fontSize: 16,
           }}>
-          Sending with
+          {transactionType === 'send' ? 'Sending with' : 'Receiving with'}
         </Text>
         <Text
           style={{
@@ -87,11 +96,22 @@ export function MintDetailPage({ mintInfo, theme }: any) {
   );
 }
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function EcashSendConfirmation({
+  unit,
+  amount,
+  token,
+  extraButtons = [],
+}: {
+  unit: string;
+  amount: number;
+  token: string;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
@@ -209,7 +229,6 @@ function ModalScreen() {
     try {
       setIsCheckingStatus(true);
       const proofsSpent = await checkProofsSpent(token);
-      console.log(18279387, proofsSpent);
 
       if (proofsSpent) {
         const decodedToken = getDecodedToken(token);
@@ -229,7 +248,6 @@ function ModalScreen() {
         showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
     } catch (error) {
-      console.log(18279387, error);
       showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' }, onClose);
     } finally {
       setIsCheckingStatus(false);
@@ -245,7 +263,6 @@ function ModalScreen() {
     });
   };
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
-  console.log(1082, mintInfo);
   return (
     <Modal
       showClose
@@ -257,14 +274,16 @@ function ModalScreen() {
             amount={amount}
             unit={unit}
           />
-          <PaymentInfo
-            setUri={setUri}
-            popupMessage="ecash_token_copied"
-            unit={unit}
-            data={formattedToken}
-            animated={isLongToken}
-            showSection={false}
-          />
+          {!getCurrentTransaction[0].paid && (
+            <PaymentInfo
+              setUri={setUri}
+              popupMessage="ecash_token_copied"
+              unit={unit}
+              data={formattedToken}
+              animated={isLongToken}
+              showSection={false}
+            />
+          )}
           {getCurrentTransaction[0].memo && (
             <View
               style={{
@@ -275,11 +294,7 @@ function ModalScreen() {
               <Card message={getCurrentTransaction[0].memo} variant="info" />
             </View>
           )}
-          <MintDetailPage
-            mintInfo={mintInfo}
-            getCurrentTransaction={getCurrentTransaction}
-            theme={theme}
-          />
+          <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
           <Section
             items={[
               {
@@ -295,7 +310,19 @@ function ModalScreen() {
               },
               {
                 title: 'Status',
-                value: isListening ? 'Pending' : 'Completed',
+                value: (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      style={{
+                        color: greys(theme)[0],
+                        fontFamily: 'OverpassBold',
+                        fontSize: 16,
+                      }}>
+                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                    </Text>
+                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+                  </View>
+                ),
               },
               {
                 title: 'Token',
@@ -317,44 +344,71 @@ function ModalScreen() {
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={[
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
-                variant: 'secondary',
-                onPress: handleShare,
-              },
-              {
-                text: 'NFC',
-                icon: 'ph:contactless-payment-fill',
-                variant: 'secondary',
-                onPress: handleNFCSend,
-              },
-              {
-                text: 'Check Status',
-                icon: 'humbleicons:refresh',
-                variant: 'secondary',
-                onPress: handleCheckStatus,
-              },
-              {
-                text: 'Cancel Transaction',
-                icon: 'mdi:cancel',
-                variant: 'secondary',
-                onPress: handleCancelSend,
-              },
-              {
-                text: 'Copy as Emoji',
-                icon: 'fluent:emoji-24-filled',
-                variant: 'primary',
-                onPress: handleCopyEmoji,
-              },
-            ]}
+            buttons={
+              getCurrentTransaction[0].paid
+                ? [
+                    {
+                      text: 'Close',
+                      icon: 'ri:close-circle-line',
+                      variant: 'secondary',
+                      onPress: () => navigation.goBack(),
+                    },
+                    ...(getCurrentTransaction[0].nostr?.pubkey
+                      ? [
+                          {
+                            text: 'View Messages',
+                            icon: 'mdi:message-reply',
+                            variant: 'primary',
+                            onPress: () => {
+                              navigation.navigate('userMessages', {
+                                pubkey: getCurrentTransaction[0].nostr.pubkey,
+                              });
+                              navigation.goBack();
+                            },
+                          },
+                        ]
+                      : []),
+                  ]
+                : [
+                    {
+                      text: 'Copy',
+                      icon: 'lets-icons:copy',
+                      variant: 'primary',
+                      onPress: handleCopy,
+                    },
+                    {
+                      text: 'Share',
+                      icon: 'ri:share-fill',
+                      variant: 'secondary',
+                      onPress: handleShare,
+                    },
+                    {
+                      text: 'NFC',
+                      icon: 'ph:contactless-payment-fill',
+                      variant: 'secondary',
+                      onPress: handleNFCSend,
+                    },
+                    {
+                      text: 'Check Status',
+                      icon: 'humbleicons:refresh',
+                      variant: 'secondary',
+                      onPress: handleCheckStatus,
+                    },
+                    {
+                      text: 'Cancel Transaction',
+                      icon: 'mdi:cancel',
+                      variant: 'secondary',
+                      onPress: handleCancelSend,
+                    },
+                    {
+                      text: 'Copy as Emoji',
+                      icon: 'fluent:emoji-24-filled',
+                      variant: 'primary',
+                      onPress: handleCopyEmoji,
+                    },
+                    ...extraButtons,
+                  ]
+            }
           />
         </View>
       }
@@ -373,5 +427,10 @@ const createStyles = (theme) =>
       color: greys(theme)[1000],
     },
   });
+
+function ModalScreen() {
+  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
+  return <EcashSendConfirmation unit={unit} amount={amount} token={token} />;
+}
 
 export default withSheetProvider(ModalScreen);

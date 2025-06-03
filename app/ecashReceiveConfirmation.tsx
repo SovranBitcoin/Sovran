@@ -106,24 +106,28 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
 };
 
 // Main component
-function ModalScreen({
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function EcashReceiveConfirmation({
+  token,
+  transaction,
   showConfirmation,
+  extraButtons = [],
 }: {
-  showConfirmation: (
+  token?: string;
+  transaction: any;
+  showConfirmation?: (
     title: string,
     message: string,
     onConfirm: () => void,
     onCancel: () => void
   ) => void;
+  extraButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const mints = useSelector(memoizedGetMints);
-
-  const {
-    params: { token },
-  } = useRoute() as { params: { token: string; unit: string } };
 
   const amount = getTokenAmount({ token });
   const memo = getTokenMemo({ token });
@@ -180,21 +184,26 @@ function ModalScreen({
       transparent={false}
       buttons={
         <ButtonHandler
-          buttons={[
-            {
-              text: 'Cancel',
-              icon: null,
-              variant: 'secondary',
-              onPress: handleCancel,
-            },
-            {
-              text: 'Redeem Ecash',
-              icon: null,
-              variant: 'primary',
-              onPress: handleRedeemPress,
-              loading: loading,
-            },
-          ]}
+          buttons={
+            transaction?.paid
+              ? []
+              : [
+                  {
+                    text: 'Cancel',
+                    icon: null,
+                    variant: 'secondary',
+                    onPress: handleCancel,
+                  },
+                  {
+                    text: 'Redeem Ecash',
+                    icon: null,
+                    variant: 'primary',
+                    onPress: handleRedeemPress,
+                    loading: loading,
+                  },
+                  ...extraButtons,
+                ]
+          }
         />
       }>
       <>
@@ -214,11 +223,11 @@ function ModalScreen({
         )}
 
         {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
-        <MintDetailPage mintInfo={mintInfo} theme={theme} />
+        <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="receive" />
 
         <Section
           items={[
-            { title: 'Date', value: 'Now' },
+            // { title: 'Date', value: 'Now' },
             { title: 'Type', value: 'Ecash • Receive' },
             { title: 'Token', value: truncateMiddle(token, 6) },
           ]}
@@ -254,5 +263,13 @@ const createStyles = (theme: any) =>
       marginBottom: -3,
     },
   });
+
+function ModalScreen() {
+  const {
+    params: { token },
+  } = useRoute() as { params: { token: string } };
+
+  return <EcashReceiveConfirmation token={token} />;
+}
 
 export default withSheetProvider(ModalScreen);

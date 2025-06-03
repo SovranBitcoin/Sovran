@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Share, Text } from 'react-native';
 import { View } from 'components/common/Themed';
+import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
-import { formatCurrency } from 'helper/currency';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
-import { useTypedRoute } from 'helper/navigation';
 import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -17,24 +16,37 @@ import {
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { useTransactions } from 'components/providers/TransactionsProvider';
-import { getMint, getWallet } from 'helper/cashu';
+import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
-import { theme } from 'tailwind.config';
+import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintDetailPage } from './ecashSendConfirmation';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
+import { useTypedRoute } from 'helper/navigation';
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { greys } from 'helper/colors';
+
+export function LightningReceiveConfirmation({
+  request,
+  paymentRequest = '',
+  unit,
+  amount,
+  autoGoBackOnPaid = true,
+  extraButtons = [],
+}: {
+  request: string;
+  paymentRequest?: string;
+  unit: string;
+  amount: number;
+  autoGoBackOnPaid?: boolean;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const navigation = useNavigation();
-  const {
-    request,
-    paymentRequest = '',
-    unit,
-    amount,
-  } = useTypedRoute<'lightningReceiveConfirmation'>();
+  const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState(null);
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
 
@@ -54,13 +66,13 @@ function ModalScreen() {
 
   // Auto-navigate back when payment is received
   useEffect(() => {
-    if (getCurrentTransaction?.[0]?.paid) {
+    if (autoGoBackOnPaid && getCurrentTransaction?.[0]?.paid) {
       const timer = setTimeout(() => {
         navigation.goBack();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [getCurrentTransaction[0]?.paid, navigation]);
+  }, [autoGoBackOnPaid, getCurrentTransaction[0]?.paid, navigation]);
 
   const handleCopy = async (onClose) => {
     await Clipboard.setStringAsync(request);
@@ -97,10 +109,10 @@ function ModalScreen() {
   const { listenToTransaction, activeConnections } = useTransactions();
 
   useEffect(() => {
-    if (getCurrentTransaction?.[0]) {
+    if (!getCurrentTransaction?.[0].paid) {
       listenToTransaction([getCurrentTransaction?.[0]]);
     }
-  }, [getCurrentTransaction?.[0]]);
+  }, [getCurrentTransaction?.[0].paid]);
 
   const isListening = activeConnections?.some((connection) =>
     connection.id.includes(getCurrentTransaction[0].request)
@@ -148,25 +160,27 @@ function ModalScreen() {
       children={
         <>
           <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
-          <PaymentInfo
-            showSection={false}
-            setUri={setUri}
-            data={[
-              { name: 'Lightning', value: request },
-              // { name: 'Ecash', value: paymentRequest },
-            ]}
-            unit={unit}
-            popupMessage={[
-              {
-                name: 'lightning_address_copied',
-                value: request,
-              },
-              // {
-              //   name: 'payment_request_copied',
-              //   value: paymentRequest,
-              // },
-            ]}
-          />
+          {!getCurrentTransaction[0].paid && (
+            <PaymentInfo
+              showSection={false}
+              setUri={setUri}
+              data={[
+                { name: 'Lightning', value: request },
+                // { name: 'Ecash', value: paymentRequest },
+              ]}
+              unit={unit}
+              popupMessage={[
+                {
+                  name: 'lightning_address_copied',
+                  value: request,
+                },
+                // {
+                //   name: 'payment_request_copied',
+                //   value: paymentRequest,
+                // },
+              ]}
+            />
+          )}
           {getCurrentTransaction[0].memo && (
             <View
               style={{
@@ -181,6 +195,7 @@ function ModalScreen() {
             mintInfo={mintInfo}
             getCurrentTransaction={getCurrentTransaction}
             theme={theme}
+            transactionType="receive"
           />
           <Section
             items={[
@@ -194,7 +209,19 @@ function ModalScreen() {
               },
               {
                 title: 'Status',
-                value: getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending',
+                value: (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      style={{
+                        color: greys(theme)[0],
+                        fontSize: 16,
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                    </Text>
+                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+                  </View>
+                ),
               },
               // {
               //   title: 'Listening',
@@ -214,29 +241,52 @@ function ModalScreen() {
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={[
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
-                variant: 'secondary',
-                onPress: handleShare,
-              },
-              {
-                text: 'Check Status',
-                icon: 'humbleicons:refresh',
-                variant: 'secondary',
-                onPress: handleCheckStatus,
-              },
-            ]}
+            buttons={
+              getCurrentTransaction[0].paid
+                ? []
+                : [
+                    {
+                      text: 'Copy',
+                      icon: 'lets-icons:copy',
+                      variant: 'primary',
+                      onPress: handleCopy,
+                    },
+                    {
+                      text: 'Share',
+                      icon: 'ri:share-fill',
+                      variant: 'secondary',
+                      onPress: handleShare,
+                    },
+                    {
+                      text: 'Check Status',
+                      icon: 'humbleicons:refresh',
+                      variant: 'secondary',
+                      onPress: handleCheckStatus,
+                    },
+                    ...extraButtons,
+                  ]
+            }
           />
         </View>
       }
+    />
+  );
+}
+
+function ModalScreen() {
+  const {
+    request,
+    paymentRequest = '',
+    unit,
+    amount,
+  } = useTypedRoute<'lightningReceiveConfirmation'>();
+
+  return (
+    <LightningReceiveConfirmation
+      request={request}
+      paymentRequest={paymentRequest}
+      unit={unit}
+      amount={amount}
     />
   );
 }

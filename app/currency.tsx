@@ -22,7 +22,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { greys } from 'helper/colors';
-import { maybeConvertNpub } from 'helper/cashu/pay';
+import { maybeConvertNpub, npubToPublicKey } from 'helper/cashu/pay';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
@@ -94,7 +94,7 @@ function ModalScreen() {
   const handleEcashSend = async ({ message }) => {
     console.log('[handleEcashSend]', unit === 'sat' ? amount : amount * 100, unit, message, params);
     const transaction = await sendEcash({
-      to: params?.profile?.npub,
+      to: npubToPublicKey(params?.profile?.npub),
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,

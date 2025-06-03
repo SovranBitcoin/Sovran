@@ -15,23 +15,39 @@ import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { truncateMiddle } from 'helper/strings';
+import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { MintDetailPage } from './ecashSendConfirmation';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
-function ModalScreen() {
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+
+export function LightningSendConfirmation({
+  transaction,
+  pr,
+  unit: initialUnit,
+  pubkey,
+  meltQuote: initialMeltQuote,
+  redirect,
+  email,
+  extraButtons = [],
+}: {
+  transaction?: any;
+  pr: string;
+  unit: string;
+  pubkey?: string;
+  meltQuote?: string;
+  redirect?: string;
+  email?: string;
+  extraButtons?: ButtonHandlerButton[];
+}) {
   const navigation = useTypedNavigation();
   const dispatch = useDispatch();
-  const {
-    pr,
-    unit: initialUnit,
-    pubkey,
-    meltQuote: initialMeltQuote,
-    redirect,
-    email,
-  } = useTypedRoute<'lightningSendConfirmation'>();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -44,6 +60,9 @@ function ModalScreen() {
 
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
+  const theme = useSelector(memoizedGetTheme);
+  const selectedMintUrl = useSelector(memoizedGetSelectedMint);
+  const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
   const handleMintSelected = async (mint, balance) => {
     try {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
@@ -138,67 +157,27 @@ function ModalScreen() {
             unit={unit}
             request={pr}
           />
+          {!transaction?.paid && (
+            <SelectedMintDisplay
+              onMintSelected={handleMintSelected}
+              pr={pr}
+              unit={unit}
+              loading={loading}
+            />
+          )}
 
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            pr={pr}
-            unit={unit}
-            loading={loading}
-          />
+          {getDescription({ pr }) && (
+            <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
+              <Card message={getDescription({ pr })} variant="info" />
+            </View>
+          )}
 
-          <Section
+          {transaction?.paid && (
+            <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
+          )}
+
+          {/* <Section
             items={[
-              {
-                title: 'Note',
-                value: getDescription({ pr }),
-              },
-            ]}
-          />
-
-          <Section
-            items={[
-              {
-                title: `Amount (${unit === 'sat' ? 'BTC' : unit.toUpperCase()})`,
-                value: formatCurrency(
-                  {
-                    currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-                    value: amount,
-                    denomination: unit === 'sat' ? 'sats' : unit,
-                  },
-                  {
-                    locale: 'en-US',
-                    precision: unit === 'sat' ? 8 : 2,
-                    currencyDisplay: 'symbol',
-                    denomination: unit === 'sat' ? 'btc' : unit,
-                  }
-                ),
-              },
-              {
-                title: 'Amount (USD)',
-                value: '≈' + formatAmount(amount, 'usd'),
-              },
-            ]}
-          />
-
-          <Section
-            items={[
-              {
-                title: `Fee (${getCurrencyDisplay()})`,
-                value: formatAmount(feeReserve),
-              },
-              {
-                title: 'Fee (USD)',
-                value: '≈' + formatAmount(feeReserve, 'usd'),
-              },
-            ]}
-          />
-
-          <Section
-            items={[
-              {
-                title: 'Created at',
-                value: getTimestamp({ pr }),
-              },
               {
                 title: 'Expires at',
                 value: getExpiry({ pr }),
@@ -208,31 +187,17 @@ function ModalScreen() {
                 value: getExpiresIn({ pr }),
               },
             ]}
-          />
+          /> */}
 
           <Section
             items={[
+              { title: 'Date', value: getTimestamp({ pr }) },
+              { title: 'Type', value: 'Send • Lightning' },
+              { title: 'Request', value: truncateMiddle(pr, 5) },
+              { title: 'Quote', value: truncateMiddle(quoteId, 7) },
               {
-                title: 'Type',
-                value: 'Lightning',
-              },
-              {
-                title: 'Transaction Type',
-                value: 'Send',
-              },
-            ]}
-          />
-
-          <Section
-            special={false}
-            items={[
-              {
-                title: 'Request',
-                value: truncateMiddle(pr, 5),
-              },
-              {
-                title: 'Quote',
-                value: truncateMiddle(quoteId, 7),
+                title: `Fee (${getCurrencyDisplay()})`,
+                value: formatAmount(feeReserve),
               },
             ]}
           />
@@ -248,24 +213,67 @@ function ModalScreen() {
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={[
-              {
-                text: 'Cancel',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
-                onPress: handleCancel,
-              },
-              {
-                text: 'Send',
-                icon: 'ri:send-plane-2-fill',
-                variant: 'primary',
-                onPress: handleLightningSend,
-                loading: loading,
-              },
-            ]}
+            buttons={
+              transaction?.paid
+                ? [
+                    {
+                      text: 'Close',
+                      icon: 'ri:close-circle-line',
+                      variant: 'secondary',
+                      onPress: handleCancel,
+                    },
+                    ...(transaction.nostr.pubkey
+                      ? [
+                          {
+                            text: 'View Message',
+                            icon: 'ri:message-2-line',
+                            variant: 'primary',
+                            onPress: () => {
+                              navigation.navigate('userMessages', {
+                                pubkey: transaction.nostr.pubkey,
+                              });
+                              navigation.goBack();
+                            },
+                          },
+                        ]
+                      : []),
+                  ]
+                : [
+                    {
+                      text: 'Cancel',
+                      icon: 'ri:close-circle-line',
+                      variant: 'secondary',
+                      onPress: handleCancel,
+                    },
+                    {
+                      text: 'Send',
+                      icon: 'ri:send-plane-2-fill',
+                      variant: 'primary',
+                      onPress: handleLightningSend,
+                      loading: loading,
+                    },
+                    ...extraButtons,
+                  ]
+            }
           />
         </View>
       }
+    />
+  );
+}
+
+function ModalScreen() {
+  const { pr, unit, pubkey, meltQuote, redirect, email } =
+    useTypedRoute<'lightningSendConfirmation'>();
+
+  return (
+    <LightningSendConfirmation
+      pr={pr}
+      unit={unit}
+      pubkey={pubkey}
+      meltQuote={meltQuote}
+      redirect={redirect}
+      email={email}
     />
   );
 }
