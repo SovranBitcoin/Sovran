@@ -307,6 +307,12 @@ const ModalScreen: React.FC<{}> = () => {
             }}
           />
           <RowButton
+            label="Websocket Connections"
+            onPress={() => {
+              navigation.navigate('settings/websocketConnections');
+            }}
+          />
+          <RowButton
             label="Check Proofs"
             onPress={() => {
               navigation.navigate('settings/proofs');
