@@ -71,6 +71,7 @@ export function VideoScreen({ ...props }) {
           }}>
           How to redeem npubx.cash tokens
         </Text>
+
         <VideoView
           style={{
             width: 300,
@@ -81,6 +82,16 @@ export function VideoScreen({ ...props }) {
           ref={ref}
           player={player}
         />
+      </View>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: greys(theme)[2300],
+          padding: 12,
+          paddingTop: 0,
+        }}>
         <Card variant="info" message="This will be automated in future versions!" />
       </View>
     </Modal>
