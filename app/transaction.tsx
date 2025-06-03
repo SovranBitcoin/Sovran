@@ -107,6 +107,7 @@ function ModalScreen() {
         paymentRequest={transaction.paymentRequest}
         unit={transaction.unit}
         amount={transaction.amount}
+        autoGoBackOnPaid={false}
         extraButtons={extraButtons}
       />
     );

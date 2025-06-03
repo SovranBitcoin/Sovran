@@ -34,12 +34,14 @@ export function LightningReceiveConfirmation({
   paymentRequest = '',
   unit,
   amount,
+  autoGoBackOnPaid = true,
   extraButtons = [],
 }: {
   request: string;
   paymentRequest?: string;
   unit: string;
   amount: number;
+  autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
 }) {
   const navigation = useNavigation();
@@ -62,13 +64,13 @@ export function LightningReceiveConfirmation({
 
   // Auto-navigate back when payment is received
   useEffect(() => {
-    if (getCurrentTransaction?.[0]?.paid) {
+    if (autoGoBackOnPaid && getCurrentTransaction?.[0]?.paid) {
       const timer = setTimeout(() => {
         navigation.goBack();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [getCurrentTransaction[0]?.paid, navigation]);
+  }, [autoGoBackOnPaid, getCurrentTransaction[0]?.paid, navigation]);
 
   const handleCopy = async (onClose) => {
     await Clipboard.setStringAsync(request);
