@@ -1,9 +1,10 @@
 import React, { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
-import { Share, StyleSheet, ActivityIndicator } from 'react-native';
+import { Share, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
 import Modal from 'components/layout/Modal';
 import Icon from 'assets/icons';
+import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
 import { View, Text } from 'components/common/Themed';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
@@ -319,11 +320,7 @@ export function EcashSendConfirmation({
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text>{isListening ? 'Pending' : 'Completed'}</Text>
                     {isListening && (
-                      <ActivityIndicator
-                        style={{ marginLeft: 4 }}
-                        size="small"
-                        color={greys(theme)[0]}
-                      />
+                      <Spinner style={{ marginLeft: 4 }} size={12} />
                     )}
                   </View>
                 ),

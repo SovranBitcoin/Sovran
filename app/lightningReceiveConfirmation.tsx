@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Share, Text, ActivityIndicator } from 'react-native';
+import { Share, Text } from 'react-native';
 import { View } from 'components/common/Themed';
+import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { formatCurrency } from 'helper/currency';
@@ -212,11 +213,7 @@ export function LightningReceiveConfirmation({
                       {getCurrentTransaction?.[0]?.paid ? 'Paid' : 'Pending'}
                     </Text>
                     {isListening && !getCurrentTransaction?.[0]?.paid && (
-                      <ActivityIndicator
-                        style={{ marginLeft: 4 }}
-                        size="small"
-                        color={greys(theme)[0]}
-                      />
+                      <Spinner style={{ marginLeft: 4 }} size={12} />
                     )}
                   </View>
                 ),
