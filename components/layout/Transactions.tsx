@@ -118,6 +118,21 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const { pending: filteredPendingTransactions, confirmed: filteredConfirmedTransactions } =
     splitTransactionsByStatus(filteredTransactions);
 
+  // Limit the number of transactions per status shown on the index page
+  const MAX_DISPLAYED_TRANSACTIONS_PER_STATUS = 10;
+  const sortByDateDesc = (a: Transaction, b: Transaction) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime();
+
+  const limitedPendingTransactions = [...filteredPendingTransactions]
+    .sort(sortByDateDesc)
+    .slice(0, MAX_DISPLAYED_TRANSACTIONS_PER_STATUS);
+
+  const limitedConfirmedTransactions = [...filteredConfirmedTransactions]
+    .sort(sortByDateDesc)
+    .slice(0, MAX_DISPLAYED_TRANSACTIONS_PER_STATUS);
+
+  const limitedTransactions = [...limitedPendingTransactions, ...limitedConfirmedTransactions];
+
   // Group transactions by date for better display
   const groupTransactionsByStatusAndDate = (txs: Transaction[]) => {
     const grouped = {
@@ -151,7 +166,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
     return grouped;
   };
 
-  const groupedTransactions = groupTransactionsByStatusAndDate(filteredTransactions);
+  // Group the limited transactions by status and date for display
+  const groupedTransactions = groupTransactionsByStatusAndDate(limitedTransactions);
 
   // Get appropriate label based on filter
   const getLabel = () => {
