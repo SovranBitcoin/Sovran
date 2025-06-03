@@ -40,13 +40,14 @@ export const TransactionProvider = ({ children }) => {
       unsub: connection.unsub,
       timestamp: Date.now(),
     });
-    setActiveConnections([
-      ...Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
-        id,
-        since: connection.timestamp,
-      })),
-      { id, since: Date.now() },
-    ]);
+    setActiveConnections(
+      Array.from(activeConnectionsRef.current.entries()).map(
+        ([id, connection]) => ({
+          id,
+          since: connection.timestamp,
+        })
+      )
+    );
   };
 
   const removeConnection = (id: string) => {
