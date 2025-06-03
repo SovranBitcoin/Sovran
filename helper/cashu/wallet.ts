@@ -15,64 +15,83 @@ interface GetWalletParams {
   profile: any;
 }
 
-const DERIVATION_PATH = `m/44'/129372'`;
+// wallet caches for all the mints
+let walletCache: { [key: string]: CashuWallet } = {};
 
 export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
-  const keys = await getKeys({ unit, mintUrl });
-
-  if (!keys) {
-    throw {
-      message: 'unsupported_currency',
-      params: {
-        unit,
-        mintUrl,
-      },
-    };
+  if (walletCache[mintUrl]) {
+    return walletCache[mintUrl];
   }
 
-  const mint = await getMint({ mintUrl });
+  let times = []; // Reset times array for each call
+  const startTime = performance.now();
+  times.push(startTime);
 
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
+  times.push(performance.now());
 
-  const root = getRoot(currentProfile);
+  const mintInfo = store.getState().cashu.info[mintUrl];
+  times.push(performance.now());
 
-  const seed = root.derive(`${DERIVATION_PATH}/0'/${currentProfile?.id}'/0/0`);
+  const keys = store.getState().cashu.keys[mintUrl];
+  times.push(performance.now());
 
-  // const cashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
+  const keysets = store.getState().cashu.keysets[mintUrl];
+  times.push(performance.now());
+
+  const mint = await getMint({ mintUrl, forceRefresh: !(keysets || keys) });
+  times.push(performance.now());
 
   const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
+  times.push(performance.now());
 
   const wallet = new CashuWallet(mint, {
-    unit,
+    keys,
+    keysets,
+    mintInfo,
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
   });
+  times.push(performance.now());
 
   wallet._send = async function (amount, currentProofs, options = {}) {
     const { keep, send } = await this.send(Number(amount), currentProofs, options);
-
     const used = _.differenceWith(currentProofs, keep, (a, b) =>
       _.isEqual(_.pick(a, ['C', 'secret', 'amount']), _.pick(b, ['C', 'secret', 'amount']))
     );
-
-    console.log({ keep, send, used });
-
     return { keep, send, used };
   };
+  times.push(performance.now());
 
-  await wallet.loadMint();
+  // Convert to seconds from function start
+  const secondsFromStart = times.map((time) => (time - startTime) / 1000);
 
-  return wallet;
-}
-
-function getRoot(currentProfile) {
-  if (!currentProfile?.root?.xpriv) {
-    const root = HDKey.fromExtendedKey(currentProfile?.root?.xpriv);
-    if (root) {
-      return root;
-    }
+  // Calculate step durations in seconds
+  const stepDurations = [];
+  for (let i = 1; i < secondsFromStart.length; i++) {
+    stepDurations.push(secondsFromStart[i] - secondsFromStart[i - 1]);
   }
 
-  const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(currentProfile?.mnemonic));
+  const totalTime = secondsFromStart[secondsFromStart.length - 1];
+  const longestStep = Math.max(...stepDurations);
+  const shortestStep = Math.min(...stepDurations);
 
-  return root;
+  console.log(
+    'Wallet created in',
+    totalTime.toFixed(3),
+    's',
+    '\nTimestamps (seconds from start):',
+    secondsFromStart.map((t) => t.toFixed(3) + 's'),
+    '\nStep durations:',
+    stepDurations.map((d) => d.toFixed(3) + 's'),
+    '\nLongest step:',
+    longestStep.toFixed(3),
+    's',
+    '\nShortest step:',
+    shortestStep.toFixed(3),
+    's'
+  );
+
+  walletCache[mintUrl] = wallet;
+
+  return wallet;
 }

@@ -45,10 +45,13 @@ const themes = [
   // "tropical-forest",
   // "ice-queen",
   // "coral-sunrise"
+  // 'light',
+  'light',
 ];
 
 // Mapping of theme names to user-friendly names
 const themeNameMap = {
+  // light: 'Light',
   light: 'Light',
   dark: 'Dark',
   navy: 'Navy',

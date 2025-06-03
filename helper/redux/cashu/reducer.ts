@@ -16,6 +16,7 @@ import {
   RESET_COUNTER,
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
+  SET_KEYS,
 } from './actionTypes';
 import { ensureProfileExists } from './helpers';
 
@@ -58,6 +59,9 @@ export const cashuReducer = (state = initialState, action) => {
     case SET_KEYSETS:
       return _.set(['keysets', action.payload.mintUrl], action.payload.keysets, state);
 
+    case SET_KEYS:
+      return _.set(['keys', action.payload.mintUrl], action.payload.keys, state);
+
     case SET_INFO:
       return _.set(['info', action.payload.mintUrl], action.payload.mintInfo, state);
 
@@ -98,6 +102,7 @@ export const cashuReducer = (state = initialState, action) => {
     }
 
     case APPEND_TRANSACTIONS_V2:
+      // check if tx already exists inside transactions and return early
       return _.update(
         ['profiles', action.payload.profileId, 'transactions'],
         (transactions = []) => _.concat(transactions, action.payload.transactions),

@@ -7,6 +7,8 @@ import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
 
 interface AccountType {
   key: string;
@@ -18,6 +20,33 @@ interface WalletHeaderProps {
   unit: string;
   accounts: AccountType[];
   setAccount: (account: AccountType) => void;
+}
+
+export function Background() {
+  const theme = useSelector(memoizedGetTheme);
+  const styles = createStyles(theme);
+
+  const defaultColors: readonly [string, string, ...string[]] = [
+    greys(theme)[2300],
+    opacity(greys(theme)[2300], 0.9),
+    opacity(greys(theme)[2300], 0.85),
+    opacity(greys(theme)[2300], 0.755),
+    opacity(greys(theme)[2300], 0.33),
+    opacity(greys(theme)[2300], 0),
+  ] as const;
+
+  return (
+    <LinearGradient
+      colors={defaultColors}
+      style={{
+        width: '100%',
+        // position: 'absolute',
+        // left: 0,
+        // right: 0,
+        height: 100,
+        pointerEvents: 'none',
+      }}></LinearGradient>
+  );
 }
 
 export default function WalletHeader({ unit, accounts, setAccount }: WalletHeaderProps) {
@@ -34,18 +63,32 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
     }
   };
 
+  const defaultColors: readonly [string, string, ...string[]] = [
+    greys(theme)[2300],
+    opacity(greys(theme)[2300], 0.9),
+    opacity(greys(theme)[2300], 0.85),
+    opacity(greys(theme)[2300], 0.755),
+    opacity(greys(theme)[2300], 0.33),
+    opacity(greys(theme)[2300], 0),
+  ] as const;
+
   return (
     <View style={styles.container}>
-      {/* <View
-        style={[styles.unitContainer, sovran(theme).backgroundSolid, sovran(theme).borderSubtle]}>
-        <Text style={styles.unitText} weight="bold">
-          {unit === 'sat' ? 'BTC' : unit.toUpperCase()}
-        </Text>
-      </View> */}
+      {/* <LinearGradient
+        colors={defaultColors}
+        style={{
+          width: '100%',
+          position: 'absolute',
+          top: -42,
+          left: 0,
+          right: 0,
+          height: 100,
+          pointerEvents: 'none',
+        }}></LinearGradient> */}
       <SelectedMintDisplay
         style={{
-          width: Dimensions.get('window').width - 32 - 16 - 16,
-          marginLeft: 48,
+          width: Dimensions.get('window').width - 32 - 16 - 16 - 16 - 16 - 16 - 16,
+          marginLeft: 50 - 16 - 16 - 16,
         }}
         onMintSelected={handleMintSelected}
         unit={unit}
@@ -57,8 +100,17 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
+      position: 'absolute',
+      transform: [{ translateX: '-50%' }],
+      width: Dimensions.get('window').width,
+      height: 52,
+      marginTop: 42,
+      pointerEvents: 'box-none',
+
+      // height: 52,
+      // marginTop: 42,
       // position: 'absolute',
-      top: -2,
+      // top: -2,
       // left: 0,
       // transform: [{ translateX: '-50%' }],
       // left: 0,

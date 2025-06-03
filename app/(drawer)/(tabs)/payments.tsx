@@ -394,10 +394,11 @@ const formatCustomDate = (date) => {
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: 'black',
+      backgroundColor: greys(theme)[2300],
       flexDirection: 'column',
       margin: 0,
       flex: 1,
+      paddingTop: 64 + 32,
     },
     modalContent: {
       padding: 0,
@@ -408,9 +409,10 @@ const createStyles = (theme) =>
     },
     searchBlurView: {
       borderRadius: 86,
-      margin: 16,
+      marginTop: 64,
+      marginLeft: 24,
       marginBottom: 8,
-      height: 38,
+      height: 48,
       overflow: 'hidden',
     },
     searchPressable: {
@@ -430,8 +432,8 @@ const createStyles = (theme) =>
     searchPlaceholder: {
       position: 'absolute',
       left: 16,
-      top: 10,
-      fontSize: 14,
+      top: 14,
+      fontSize: 16,
       fontFamily: 'OverpassRegular',
       color: greys(theme)[1000],
     },

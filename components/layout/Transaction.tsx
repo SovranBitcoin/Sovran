@@ -111,12 +111,8 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
   const isSend = tx.transactionType === 'send';
   const isReceive = tx.transactionType === 'receive';
 
-  const isListening = activeConnections?.some(
-    (connection: ConnectionData) =>
-      connection.id ===
-      (tx.type === 'ecash'
-        ? `${tx.type}_${tx.token}_${tx.transactionType}`
-        : `${tx.type}_${tx.request}_${tx.transactionType}`)
+  const isListening = activeConnections?.some((connection: ConnectionData) =>
+    connection.id.includes(tx.request)
   );
 
   const showLoading = isListening;

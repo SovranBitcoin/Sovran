@@ -651,6 +651,27 @@ export const greys = (t = 'dark') => {
       };
     }
 
+    case 'light': {
+      return {
+        2300: '#f3f3f3', // done
+        2100: '#e7e7e7',
+        2000: '#dbdbdb',
+        1900: '#cfcfcf',
+        1800: '#ffffff', // done
+        1500: '#cccccc',
+        1400: '#b0b0b0',
+        1300: '#969696',
+        1200: '#7a7a7a',
+        1000: '#606060',
+        700: '#484848',
+        600: '#383838',
+        400: '#2f2f2f',
+        200: '#292929', // done
+        100: '#191919', // done
+        0: '#141414', // done
+      };
+    }
+
     case 'dark':
     default: {
       return {

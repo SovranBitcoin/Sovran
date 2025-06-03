@@ -9,7 +9,7 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { translateText } from 'components/common/Themed';
+import { translateText, Text } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -18,6 +18,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import WalletHeader, { Background } from 'components/layout/WalletHeader';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,7 +31,7 @@ const Tab = createBottomTabNavigator();
 // Component for profile avatar
 const ProfileAvatar = ({ picture }) =>
   picture ? (
-    <CachedImage source={{ uri: picture }} style={{ width: 38, height: 38, borderRadius: 1000 }} />
+    <CachedImage source={{ uri: picture }} style={{ width: 48, height: 48, borderRadius: 1000 }} />
   ) : (
     <UserIcon />
   );
@@ -50,7 +51,7 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
           }}>
           <BlurView
             tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-            intensity={Platform.OS === 'ios' ? 50 : 7.5}
+            intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
             experimentalBlurMethod="dimezisBlurView"
             style={[
               {
@@ -93,8 +94,7 @@ const TabBarBackground = ({ theme }) => (
   <>
     <BlurView
       tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-      intensity={Platform.OS === 'ios' ? 75 : 7.5}
-      experimentalBlurMethod="dimezisBlurView"
+      intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
       style={[
         StyleSheet.absoluteFill,
         {
@@ -135,6 +135,7 @@ const createStyles = (theme) =>
     },
     headerStyle: {
       backgroundColor: greys(theme)[2300],
+      height: 0,
     },
     headerLeftContainer: {
       marginLeft: 8,
@@ -217,6 +218,7 @@ const TabLayout = () => {
     tabBarIcon: ({ focused }) => (
       <TabBarIcon title={title} IconComponent={IconComponent} focused={focused} theme={theme} />
     ),
+
     headerLeft: HeaderLeft,
     headerRight: HeaderRight,
   });
@@ -232,6 +234,7 @@ const TabLayout = () => {
             ...styles.tabBarStyle,
             display: isNavigationVisible ? 'flex' : 'none',
           },
+          headerBackground: () => <Background />,
           tabBarBackground: () => <TabBarBackground theme={theme} />,
           lazy: true,
         }}>

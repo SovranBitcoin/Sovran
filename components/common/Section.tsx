@@ -31,7 +31,6 @@ interface SectionProps {
 
 export function Section({ items, style, camera = false, special }: SectionProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
 
   const ContainerView = camera ? BlurView : View;
 
@@ -75,6 +74,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
                 size={16}
                 style={{
                   color: greys(theme)[600],
+                  fontFamily: 'OverpassRegular',
                   marginRight: titleText === '' ? 0 : 8,
                 }}>
                 {titleText}
@@ -186,7 +186,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     return (
       <View className="bg-transparent">
         <Text
-          weight={titleText === '' ? 'mono' : 'regular'}
+          weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
           style={{
             color: greys(theme)[0],

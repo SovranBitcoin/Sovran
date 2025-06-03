@@ -326,14 +326,15 @@ const createStyles = (theme: any) =>
       alignSelf: 'center',
     },
     dateHeader: {
-      fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      fontFamily: 'OverpassHeavy',
+      color: greys(theme)[1000],
       textAlign: 'left',
       marginVertical: 4,
       backgroundColor: 'transparent',
     },
     transactionsLabel: {
-      color: greys(theme)[0],
+      color: greys(theme)[700],
+      fontFamily: 'OverpassBold',
       margin: 0,
     },
     transactionContainer: {

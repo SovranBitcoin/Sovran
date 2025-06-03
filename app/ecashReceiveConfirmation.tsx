@@ -13,12 +13,21 @@ import { showMessage } from 'helper/popup/popups';
 import { giveaways } from 'helper/cashu/secrets';
 import { useRoute } from '@react-navigation/native';
 import { useTypedNavigation } from 'helper/navigation';
-import { memoizedGetMints } from 'helper/redux/cashu';
+import {
+  memoizedGetMints,
+  memoizedGetTransactionByMatcher,
+  useGetMintInfo,
+} from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { truncateMiddle } from 'helper/strings';
+import { Card } from 'components/common/Card';
+import { View } from 'components/common/Themed';
+import { MintDetailPage } from './ecashSendConfirmation';
+import _ from 'lodash';
 
 // Types
 interface TokenProps {
@@ -161,21 +170,7 @@ function ModalScreen({
     }
   };
 
-  const renderFormattedAmount = (currency, showApprox = false) => {
-    return `${showApprox ? '≈' : ''}${formatCurrency(
-      {
-        currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-        value: amount,
-        denomination: unit === 'sat' ? 'sats' : unit,
-      },
-      {
-        locale: 'en-US',
-        precision: currency === 'BTC' ? 8 : 2,
-        currencyDisplay: 'symbol',
-        denomination: currency.toLowerCase(),
-      }
-    )}`;
-  };
+  const mintInfo = useGetMintInfo({ mintUrl });
 
   return (
     <Modal
@@ -207,33 +202,25 @@ function ModalScreen({
 
         <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
 
-        {memo && <Section items={[{ title: 'Note', value: memo }]} style={{}} camera={false} />}
+        {memo && (
+          <View
+            style={{
+              margin: 16,
+              marginTop: 12,
+              marginBottom: 0,
+            }}>
+            <Card message={memo} variant="info" />
+          </View>
+        )}
+
+        {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
+        <MintDetailPage mintInfo={mintInfo} theme={theme} />
 
         <Section
           items={[
-            {
-              title: `Amount (${unit === 'sat' ? 'BTC' : unit.toUpperCase()})`,
-              value: renderFormattedAmount(unit === 'sat' ? 'BTC' : unit.toUpperCase()),
-            },
-            {
-              title: 'Amount (USD)',
-              value: renderFormattedAmount('usd', true),
-            },
-            {
-              title: 'Mints',
-              value: mintUrl,
-            },
-          ]}
-          style={{}}
-          camera={false}
-        />
-
-        <Section items={[{ title: 'Date', value: 'Now' }]} style={{}} camera={false} />
-
-        <Section
-          items={[
-            { title: 'Type', value: 'Ecash' },
-            { title: 'Transaction Type', value: 'Receive' },
+            { title: 'Date', value: 'Now' },
+            { title: 'Type', value: 'Ecash • Receive' },
+            { title: 'Token', value: truncateMiddle(token, 6) },
           ]}
           style={{}}
           camera={false}

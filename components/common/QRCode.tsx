@@ -23,10 +23,10 @@ export const Circle = memo(() => {
         width: 100,
         height: 100,
         borderRadius: 9999,
-        transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.6 }],
+        transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.575 }],
         left: '50%' as any,
         top: '50%' as any,
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys('dark')[0],
       }}
     />
   );
@@ -69,7 +69,7 @@ export const QRCode = memo(function QRCode({
     (): ViewStyle => ({
       ...(hasBackground
         ? {
-            backgroundColor: greys(theme)[1800],
+            backgroundColor: greys('dark')[0],
             padding: 16,
             borderRadius: 16,
           }
@@ -82,8 +82,8 @@ export const QRCode = memo(function QRCode({
     <View style={containerStyle}>
       <EQRCode
         enableLinearGradient
-        linearGradient={[shades[100], shades[400]]}
-        backgroundColor={greys(theme)[1800]}
+        linearGradient={[shades[200], shades[500]]}
+        backgroundColor={greys('dark')[0]}
         color={greys(theme)[1800]}
         value={props.data}
         size={width - 2 * padding}
