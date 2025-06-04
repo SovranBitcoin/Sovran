@@ -38,9 +38,7 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
 
   const wallet = new CashuWallet(mint, {
-    keys,
-    keysets,
-    mintInfo,
+    ...(shouldRefresh ? {} : { keys, keysets, mintInfo }),
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
   });
 
