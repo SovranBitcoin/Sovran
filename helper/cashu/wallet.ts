@@ -18,8 +18,8 @@ interface GetWalletParams {
 // wallet caches for all the mints
 let walletCache: { [key: string]: CashuWallet } = {};
 
-export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
-  if (walletCache[mintUrl]) {
+export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams) {
+  if (walletCache[mintUrl] && !forceRefresh) {
     return walletCache[mintUrl];
   }
 
@@ -30,16 +30,16 @@ export async function getWallet({ unit, mintUrl, profile }: GetWalletParams) {
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
   times.push(performance.now());
 
-  const mintInfo = store.getState().cashu.info[mintUrl];
+  const mintInfo = store.getState().cashu?.info?.[mintUrl];
   times.push(performance.now());
 
-  const keys = store.getState().cashu.keys[mintUrl];
+  const keys = store.getState().cashu?.keys?.[mintUrl];
   times.push(performance.now());
 
-  const keysets = store.getState().cashu.keysets[mintUrl];
+  const keysets = store.getState().cashu?.keysets?.[mintUrl];
   times.push(performance.now());
 
-  const mint = await getMint({ mintUrl, forceRefresh: !(keysets || keys) });
+  const mint = await getMint({ mintUrl, forceRefresh: !(keysets && keys) || forceRefresh });
   times.push(performance.now());
 
   const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
