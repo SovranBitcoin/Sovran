@@ -3,25 +3,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { store } from 'helper/redux/store';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const relays = [
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
-  'wss://nostr.thank.eu',
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
-  'wss://relay.vanderwarker.family',
-  'wss://nostr-relay.bitcoin.ninja',
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
-  'wss://lnbits.btc-payserver.eu/nostrrelay/1',
-  'wss://relay.damus.io',
-  'wss://nostr.girino.org',
-  'wss://relay.8333.space/',
-  'wss://relay.snort.social',
-  'wss://nostr.mutinywallet.com',
-  'wss://nos.lol',
-];
+import { relays } from 'components/ndk';
 
 const cache = new Cache({
   namespace: 'last-wallet-event',

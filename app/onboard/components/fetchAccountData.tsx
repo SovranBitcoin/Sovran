@@ -2,6 +2,7 @@ import { getPublicKey, nip19 } from 'nostr-tools';
 import NDK, { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 import { fetchEventFromRelays } from 'helper/nostr/cashu';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import { relays } from 'components/ndk';
 
 export const fetchAccountData = async ({ nsec }) => {
   let { data: sk } = nip19.decode(nsec);
@@ -11,14 +12,7 @@ export const fetchAccountData = async ({ nsec }) => {
   const signer = new NDKPrivateKeySigner(nsec);
   const ndk = new NDK({
     signer: signer,
-    explicitRelayUrls: [
-      'wss://relay.primal.net',
-      'wss://relay.damus.io',
-      'wss://relay.8333.space/',
-      'wss://relay.snort.social',
-      'wss://nostr.mutinywallet.com',
-      'wss://nos.lol',
-    ],
+    explicitRelayUrls: relays,
   });
 
   await ndk.connect();

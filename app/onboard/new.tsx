@@ -18,7 +18,7 @@ import { greys, shades } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Themed';
 import { useTypedNavigation } from 'helper/navigation';
-import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
+import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
@@ -29,6 +29,7 @@ import { entropyToMnemonic } from 'bip39';
 import * as Crypto from 'expo-crypto';
 import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
+import { relays } from 'components/ndk';
 
 /**
  * Executes an async function within a requestAnimationFrame to improve UI responsiveness
@@ -94,14 +95,7 @@ const profilePictures = [
 ];
 
 // Relay URLs used for Nostr connections
-const RELAY_URLS = [
-  'wss://relay.primal.net',
-  'wss://relay.damus.io',
-  'wss://relay.8333.space/',
-  'wss://relay.snort.social',
-  'wss://nostr.mutinywallet.com',
-  'wss://nos.lol',
-];
+const RELAY_URLS = relays;
 
 // Separate ProfilePictureSelector component
 const ProfilePictureSelector = ({
@@ -218,37 +212,54 @@ const RecoveryScreen = () => {
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
     try {
+      console.log('[handleCreateProfile]');
       if (!name.trim() || isSubmitting) return;
 
+      console.log('[handleCreateProfile] name:', name);
       const accountIndex = 0; // for now we force it to create account at index 0 only
 
+      console.log('[handleCreateProfile] accountIndex:', accountIndex);
       // Generate keys from mnemonic
       const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
         mnemonic,
         undefined,
         accountIndex
       );
+      console.log('[handleCreateProfile] sk:', sk);
+      console.log('[handleCreateProfile] pk:', pk);
 
       const nsec = nip19.nsecEncode(sk);
       const npub = nip19.npubEncode(pk);
 
+      console.log('[handleCreateProfile] nsec:', nsec);
+      console.log('[handleCreateProfile] npub:', npub);
+
       // Build profile event
-      const event = {
+      const event: EventTemplate = {
         kind: 0,
-        pubkey: pk,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [],
+        tags: [
+          [
+            'client',
+            'sovran.money',
+            '31990:1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2:sovran-app',
+          ],
+        ],
         content: JSON.stringify({
           name,
           picture: selectedProfilePicture.uri,
         }),
-      } as const;
+      };
+      console.log('[handleCreateProfile] event:', event);
 
-      const signedEvent = finalizeEvent(event, hexToBytes(sk));
+      const signedEvent = finalizeEvent(event, sk);
+      console.log('[handleCreateProfile] signedEvent:', signedEvent);
       const pool = new SimplePool();
+      console.log('[handleCreateProfile] pool:', pool);
       await Promise.any(pool.publish(RELAY_URLS, signedEvent)).finally(() =>
         pool.close(RELAY_URLS)
       );
+      console.log('[handleCreateProfile] published');
 
       // Update local profile storage
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
@@ -270,7 +281,9 @@ const RecoveryScreen = () => {
       setProfiles([newProfile]); // for now we force it to create account at index 0 only
       setCurrentProfile(newProfile);
       navigation.navigate('onboard/displayMnemonic', { mnemonic });
-    } catch (err) {}
+    } catch (err) {
+      console.error(err);
+    }
   }, setIsSubmitting);
 
   const handleExistingAccount = () => {

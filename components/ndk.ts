@@ -1,15 +1,11 @@
 import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
 
-const relays = [
+export const relays = [
   'wss://purplepag.es',
   'wss://relay.primal.net',
   'wss://nostr.thank.eu',
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
   'wss://relay.vanderwarker.family',
   'wss://nostr-relay.bitcoin.ninja',
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
   'wss://lnbits.btc-payserver.eu/nostrrelay/1',
   'wss://relay.damus.io',
   'wss://nostr.girino.org',
@@ -17,6 +13,22 @@ const relays = [
   'wss://relay.snort.social',
   'wss://nostr.mutinywallet.com',
   'wss://nos.lol',
+  'wss://relay.nostr.band/all',
+  'wss://relay.roli.social',
+  'wss://deschooling.us',
+  'wss://relay-verified.deschooling.us',
+  'wss://feeds.nostr.band/nostrhispano',
+  'wss://search.nos.today',
+  'wss://nostr-relay.app',
+  'wss://nb.relay.center',
+  'wss://nostrja-kari-nip50.heguro.com',
+  'wss://nfdn.betanet.dotalgo.io',
+  'wss://saltivka.org',
+  'wss://filter.stealth.wine?broadcast=true',
+  'wss://nostr.novacisko.cz',
+  'wss://relay.noswhere.com',
+  'wss://relay1.nostrchat.io',
+  'wss://relay2.nostrchat.io',
 ];
 
 const ndk = new NDK({

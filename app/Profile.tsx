@@ -31,24 +31,9 @@ import React from 'react';
 import TextInput from 'components/common/TextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Image from 'components/common/Image';
+import { relays } from 'components/ndk';
 
 const npubs = [];
-const relays = [
-  'wss://relay.nostr.band/all',
-  'wss://relay.roli.social',
-  'wss://deschooling.us',
-  'wss://relay-verified.deschooling.us',
-  'wss://feeds.nostr.band/nostrhispano',
-  'wss://search.nos.today',
-  'wss://nostr-relay.app',
-  'wss://nb.relay.center',
-  'wss://nostrja-kari-nip50.heguro.com',
-  'wss://nfdn.betanet.dotalgo.io',
-  'wss://saltivka.org',
-  'wss://filter.stealth.wine?broadcast=true',
-  'wss://nostr.novacisko.cz',
-  'wss://relay.noswhere.com',
-];
 
 export const EventKind = {
   Unknown: -1,
