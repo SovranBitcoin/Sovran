@@ -19,31 +19,23 @@ interface GetWalletParams {
 let walletCache: { [key: string]: CashuWallet } = {};
 
 export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams) {
-  if (walletCache[mintUrl] && !forceRefresh) {
+  const mintInfo = store.getState().cashu?.info?.[mintUrl];
+  const keys = store.getState().cashu?.keys?.[mintUrl];
+  const keysets = store.getState().cashu?.keysets?.[mintUrl];
+
+  const shouldRefresh = !(keysets && keys && mintInfo) || forceRefresh;
+
+  if (walletCache[mintUrl] && !shouldRefresh) {
     return walletCache[mintUrl];
   }
 
-  let times = []; // Reset times array for each call
-  const startTime = performance.now();
-  times.push(startTime);
-
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
-  times.push(performance.now());
 
-  const mintInfo = store.getState().cashu?.info?.[mintUrl];
-  times.push(performance.now());
-
-  const keys = store.getState().cashu?.keys?.[mintUrl];
-  times.push(performance.now());
-
-  const keysets = store.getState().cashu?.keysets?.[mintUrl];
-  times.push(performance.now());
-
-  const mint = await getMint({ mintUrl, forceRefresh: !(keysets && keys) || forceRefresh });
-  times.push(performance.now());
-
+  const mint = await getMint({
+    mintUrl,
+    forceRefresh: shouldRefresh,
+  });
   const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
-  times.push(performance.now());
 
   const wallet = new CashuWallet(mint, {
     keys,
@@ -51,7 +43,6 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
     mintInfo,
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
   });
-  times.push(performance.now());
 
   wallet._send = async function (amount, currentProofs, options = {}) {
     const { keep, send } = await this.send(Number(amount), currentProofs, options);
@@ -60,36 +51,6 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
     );
     return { keep, send, used };
   };
-  times.push(performance.now());
-
-  // Convert to seconds from function start
-  const secondsFromStart = times.map((time) => (time - startTime) / 1000);
-
-  // Calculate step durations in seconds
-  const stepDurations = [];
-  for (let i = 1; i < secondsFromStart.length; i++) {
-    stepDurations.push(secondsFromStart[i] - secondsFromStart[i - 1]);
-  }
-
-  const totalTime = secondsFromStart[secondsFromStart.length - 1];
-  const longestStep = Math.max(...stepDurations);
-  const shortestStep = Math.min(...stepDurations);
-
-  console.log(
-    'Wallet created in',
-    totalTime.toFixed(3),
-    's',
-    '\nTimestamps (seconds from start):',
-    secondsFromStart.map((t) => t.toFixed(3) + 's'),
-    '\nStep durations:',
-    stepDurations.map((d) => d.toFixed(3) + 's'),
-    '\nLongest step:',
-    longestStep.toFixed(3),
-    's',
-    '\nShortest step:',
-    shortestStep.toFixed(3),
-    's'
-  );
 
   walletCache[mintUrl] = wallet;
 

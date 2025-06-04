@@ -14,17 +14,13 @@ export async function getMint({ mintUrl, forceRefresh = false }: GetMintParams) 
   if (forceRefresh) {
     const mintInfo = await mint.getInfo();
 
-    Alert.alert('Mint updated1');
     store.dispatch(
       setInfo({
         mintUrl,
         mintInfo,
       })
     );
-
-    Alert.alert('Mint updated2');
     store.dispatch(setKeysets({ mintUrl, keysets: (await mint.getKeySets()).keysets }));
-    Alert.alert('Mint updated3');
     store.dispatch(setKeys({ mintUrl, keys: (await mint.getKeys()).keysets }));
   }
 

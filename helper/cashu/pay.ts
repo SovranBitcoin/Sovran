@@ -107,8 +107,6 @@ export async function sendLightning({
   meltQuote: MeltQuoteResponse;
   email?: string;
 }): Promise<LightningSendTransaction> {
-  const keys = await getKeys({ unit, mintUrl });
-
   const profile = memoizedGetCurrentProfile(store.getState());
   const currentProofs = memoizedGetProofs(unit)(store.getState());
 
