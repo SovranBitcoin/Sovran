@@ -34,7 +34,7 @@ import Footer from './Footer';
 import Header from './Header';
 import TimelineItem from './TimeLine';
 import { Button } from 'components/common/Button';
-import ndk from 'components/ndk';
+import ndk, { relays } from 'components/ndk';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -272,22 +272,6 @@ export default function ModalScreen() {
       const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
       const privKey = bytesToHex(privKeyBytes);
       const pubKey = convertNpub(currentProfile.pubkey);
-
-      // Common relays
-      const relays = [
-        'wss://relay1.nostrchat.io',
-        'wss://relay2.nostrchat.io',
-        'wss://relay.damus.io',
-        'wss://relay.snort.social',
-        'wss://nos.lol',
-        'wss://purplepag.es',
-        'wss://relay.primal.net',
-        'wss://nostr.thank.eu',
-        'wss://relay.vanderwarker.family',
-        'wss://nostr-relay.bitcoin.ninja',
-        'wss://lnbits.btc-payserver.eu/nostrrelay/1',
-        'wss://nostr.girino.org',
-      ];
 
       const sentEvent = await sendDM(privKey, pubKey, recipientPubKey, message, relays);
 

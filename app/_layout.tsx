@@ -34,7 +34,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { getFollowedUsers } from './ProfilePage';
-import ndk from 'components/ndk';
+import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
 import { WalletsProvider } from 'components/providers/WalletsProviders';
@@ -44,20 +44,7 @@ import PasscodeGate from 'components/passcode/PasscodeGate';
 registerAllSheets({ context: 'global' });
 
 // Configure constants
-const RELAY_URLS = [
-  'wss://purplepag.es',
-  'wss://relay.primal.net',
-  'wss://nostr.thank.eu',
-  'wss://relay.vanderwarker.family',
-  'wss://nostr-relay.bitcoin.ninja',
-  'wss://lnbits.btc-payserver.eu/nostrrelay/1',
-  'wss://relay.damus.io',
-  'wss://nostr.girino.org',
-  'wss://relay.8333.space/',
-  'wss://relay.snort.social',
-  'wss://nostr.mutinywallet.com',
-  'wss://nos.lol',
-];
+const RELAY_URLS = relays;
 
 // const SENTRY_DSN =
 //   'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
