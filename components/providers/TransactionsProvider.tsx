@@ -41,12 +41,10 @@ export const TransactionProvider = ({ children }) => {
       timestamp: Date.now(),
     });
     setActiveConnections(
-      Array.from(activeConnectionsRef.current.entries()).map(
-        ([id, connection]) => ({
-          id,
-          since: connection.timestamp,
-        })
-      )
+      Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
+        id,
+        since: connection.timestamp,
+      }))
     );
   };
 
@@ -144,6 +142,10 @@ export const TransactionProvider = ({ children }) => {
         mintUrl,
         unit: 'sat',
       });
+      const activeKeyset = w.getActiveKeyset(w.keysets.filter((key) => key.unit === 'sat'));
+      const keysetId = activeKeyset.id;
+      w.keysetId = keysetId;
+
       console.log('listenToTransaction w', w);
 
       for (const [type, txs_] of Object.entries(txs)) {
@@ -265,6 +267,8 @@ export const TransactionProvider = ({ children }) => {
                   }
                 } catch (err) {
                   console.log('listenToTransaction error', err);
+                  unsub();
+                  removeConnection(id);
                 }
               },
               async (error) => {}
