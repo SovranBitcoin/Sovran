@@ -71,6 +71,32 @@ function RecommendedItem({ mintUrl, onSelect }: { mintUrl: string; onSelect: (u:
   );
 }
 
+function CurrentMintItem({
+  mintUrl,
+  selected,
+  onSelect,
+}: {
+  mintUrl: string;
+  selected: boolean;
+  onSelect: (u: string) => void;
+}) {
+  const theme = useSelector(memoizedGetTheme);
+  const info = useGetMintInfo({ mintUrl });
+  return (
+    <MintItem
+      key={mintUrl}
+      mint={{ id: mintUrl, name: mintUrl.replace('https://', '').split('/')[0], iconUrl: info?.icon_url || null }}
+      balance={undefined}
+      isSelected={selected}
+      isLoading={false}
+      globalLoading={false}
+      selectedCurrency={'SAT'}
+      theme={theme}
+      onPress={() => onSelect(mintUrl)}
+    />
+  );
+}
+
 const SelectMint = ({ router }: RouteScreenProps<'npc-mint-selector', 'select'>) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -100,22 +126,14 @@ const SelectMint = ({ router }: RouteScreenProps<'npc-mint-selector', 'select'>)
         <View>
           <Text weight="bold" style={styles.sectionHeader}>Choose mint</Text>
           <View style={styles.mintScroll}>
-            {mints.map((m) => {
-              const info = useGetMintInfo({ mintUrl: m });
-              return (
-                <MintItem
-                  key={m}
-                  mint={{ id: m, name: m.replace('https://', '').split('/')[0], iconUrl: info?.icon_url || null }}
-                  balance={undefined}
-                  isSelected={currentProfile.npcMint === m}
-                  isLoading={false}
-                  globalLoading={false}
-                  selectedCurrency={'SAT'}
-                  theme={theme}
-                  onPress={() => handleSelect(m)}
-                />
-              );
-            })}
+            {mints.map((m) => (
+              <CurrentMintItem
+                key={m}
+                mintUrl={m}
+                selected={currentProfile.npcMint === m}
+                onSelect={handleSelect}
+              />
+            ))}
           </View>
           {mintCounts.length > 0 && (
             <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>Recommended mints</Text>
