@@ -153,6 +153,12 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
                 variant: 'secondary',
                 onPress: handleFixedAmount,
               },
+              {
+                text: 'Choose Mint',
+                icon: 'fluent:building-bank-20-filled',
+                variant: 'secondary',
+                onPress: () => SheetManager.show('npc-mint-selector'),
+              },
               // {
               //   text: "Customize Lightning Address",
               //   icon: "mdi:at",

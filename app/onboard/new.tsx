@@ -275,6 +275,7 @@ const RecoveryScreen = () => {
           xpub: root.publicExtendedKey,
         },
         id: accountIndex,
+        npcMint: 'https://mint.minibits.cash/Bitcoin',
       };
 
       // setProfiles([...(profiles || []), newProfile]);

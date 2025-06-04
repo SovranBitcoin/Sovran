@@ -72,7 +72,7 @@ interface MintItemProps {
   onPress: () => void;
 }
 
-const MintItem: React.FC<MintItemProps> = ({
+export const MintItem: React.FC<MintItemProps> = ({
   mint,
   balance,
   isSelected,

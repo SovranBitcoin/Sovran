@@ -418,7 +418,10 @@ const ChainLoadingAnimation = () => {
   const handleComplete = () => {
     const profileSteps = _.filter(steps, { type: 'profile' });
     const uniqueProfiles = _.keyBy(profileSteps, 'id');
-    const profiles = _.values(uniqueProfiles).map((profile) => profile.profile);
+    const profiles = _.values(uniqueProfiles).map((profile) => ({
+      ...profile.profile,
+      npcMint: 'https://mint.minibits.cash/Bitcoin',
+    }));
 
     store.dispatch(setProfiles(profiles));
     store.dispatch(setCurrentProfile(profiles[0]));
