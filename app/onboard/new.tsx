@@ -18,12 +18,11 @@ import { greys, shades } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Themed';
 import { useTypedNavigation } from 'helper/navigation';
-import NDK, { NDKPrivateKeySigner, NDKUser } from '@nostr-dev-kit/ndk';
-import { nip19 } from 'nostr-tools';
+import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
+import { hexToBytes } from '@noble/hashes/utils';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
 import * as bip39 from '@scure/bip39';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 global.Buffer = require('buffer').Buffer;
 
 import { entropyToMnemonic } from 'bip39';
@@ -217,13 +216,10 @@ const RecoveryScreen = () => {
   const [mnemonic] = useState(generateMnemonic());
   const [name, setName] = useState('');
 
-  const { ndk } = useNDK();
-
   const handleCreateProfile = runWithAnimationFrame(async () => {
     try {
       if (!name.trim() || isSubmitting) return;
 
-      // const accountIndex = profiles ? profiles.length : 0;
       const accountIndex = 0; // for now we force it to create account at index 0 only
 
       // Generate keys from mnemonic
@@ -233,27 +229,32 @@ const RecoveryScreen = () => {
         accountIndex
       );
 
-      let nsec = nip19.nsecEncode(sk);
+      const nsec = nip19.nsecEncode(sk);
       const npub = nip19.npubEncode(pk);
-      const hexpk = nip19.decode(nsec).data;
 
-      // Set up NDK signer and connect
-      const signer = new NDKPrivateKeySigner(hexpk);
-      ndk.signer = signer;
+      // Build profile event
+      const event = {
+        kind: 0,
+        pubkey: pk,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: JSON.stringify({
+          name,
+          picture: selectedProfilePicture.uri,
+        }),
+      } as const;
 
-      // Create and update user profile
-      const user = ndk.getUser({ npub });
-      await user.fetchProfile();
+      const signedEvent = finalizeEvent(event, hexToBytes(sk));
+      const pool = new SimplePool();
+      await Promise.any(pool.publish(RELAY_URLS, signedEvent)).finally(() =>
+        pool.close(RELAY_URLS)
+      );
 
-      const profile = user.profile || {};
-      profile.image = selectedProfilePicture.uri;
-      profile.name = name;
-      const response = await user.publish();
       // Update local profile storage
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
       const newProfile = {
-        ...profile,
-        picture: profile.image,
+        name,
+        picture: selectedProfilePicture.uri,
         pubkey: pk,
         npub,
         nsec,
