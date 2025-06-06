@@ -120,7 +120,7 @@ export const cashuReducer = (state = initialState, action) => {
       return _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          return _.concat(proofs, action.payload.proofs);
+          return _.unionBy(proofs, action.payload.proofs, 'secret');
         },
         state
       );
@@ -129,19 +129,37 @@ export const cashuReducer = (state = initialState, action) => {
       return _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          // First ensure we're only processing proofs with matching IDs
-          return proofs.filter((existingProof) => {
-            // Check if any proof in the used array matches this existing proof
-            return !action.payload.proofs.some((usedProof) => {
-              // Only consider comparisons if IDs match
-              if (usedProof.id !== existingProof.id) return false;
+          console.log('action.payload.proofs', action.payload.proofs);
+          // Remove proofs from state which are in action.payload.proofs
+          // _.isEqual(
+          //   _.pick(existingProof, ['C', 'secret', 'amount']),
+          //   _.pick(usedProof, ['C', 'secret', 'amount'])
+          // )
+          // So loop over every proof, and check if the same C , secret and amount exists in action.payload.proofs
+          console.log('proofs', proofs);
+          return proofs.filter((proof) => {
+            console.log('proof', proof);
+            const shouldRemove = action.payload.proofs.some((usedProof) => {
+              const proofPicked = {
+                C: proof.C,
+                secret: proof.secret,
+                amount: proof.amount,
+              };
+              const usedProofPicked = {
+                C: usedProof.C,
+                secret: usedProof.secret,
+                amount: usedProof.amount,
+              };
+              const isMatch = _.isEqual(proofPicked, usedProofPicked);
 
-              // Otherwise do the full comparison
-              return _.isEqual(
-                _.pick(existingProof, ['C', 'secret', 'amount']),
-                _.pick(usedProof, ['C', 'secret', 'amount'])
-              );
+              if (isMatch) {
+                console.log('Match found:', { proofPicked, usedProofPicked });
+              }
+
+              return isMatch;
             });
+
+            return !shouldRemove; // Keep proofs that shouldn't be removed
           });
         },
         state

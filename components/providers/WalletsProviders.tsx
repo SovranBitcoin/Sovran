@@ -31,17 +31,17 @@ export const WalletsProvider = ({ children }: { children: React.ReactNode }) => 
     return walletsRef.current.get(mintUrl);
   };
 
-  useEffect(() => {
-    const profile = store.getState().nostr.currentProfile;
-    const mints =
-      store.getState().cashu?.profiles?.[profile?.id]?.mints || [];
+  // useEffect(() => {
+  //   const profile = store.getState().nostr.currentProfile;
+  //   const mints =
+  //     store.getState().cashu?.profiles?.[profile?.id]?.mints || [];
 
-    mints.forEach((mintUrl: string) => {
-      loadWallet({ unit: 'sat', mintUrl, profile, forceRefresh: true }).catch(
-        (e) => console.log('wallet preload error', e)
-      );
-    });
-  }, []);
+  //   mints.forEach((mintUrl: string) => {
+  //     loadWallet({ unit: 'sat', mintUrl, profile, forceRefresh: true }).catch(
+  //       (e) => console.log('wallet preload error', e)
+  //     );
+  //   });
+  // }, []);
 
   const value = { connect, getWallet, wallets };
 

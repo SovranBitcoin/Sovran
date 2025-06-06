@@ -37,10 +37,7 @@ export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | nu
   return null;
 }
 
-async function publishWalletEvent(
-  mints: string[],
-  units: string[] = ['sat', 'usd']
-): Promise<string>[] {
+async function publishWalletEvent(mints: string[], units: string[] = ['sat']): Promise<string>[] {
   try {
     const currentProfile = store.getState().nostr?.currentProfile;
 

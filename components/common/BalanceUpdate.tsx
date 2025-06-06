@@ -21,6 +21,7 @@ interface BalanceUpdateProps {
   request?: string;
   transaction?: { isCancel?: boolean };
   bottomAmount?: string;
+  cancelled?: boolean;
 }
 
 export function BalanceUpdate({
@@ -31,6 +32,7 @@ export function BalanceUpdate({
   request,
   transaction,
   bottomAmount,
+  cancelled,
 }: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
@@ -146,9 +148,11 @@ export function BalanceUpdate({
       );
     }
 
+    console.log(transaction, 198273);
+
     return (
       <View className="relative h-7 w-7 bg-transparent">
-        {transaction?.isCancel ? (
+        {cancelled ? (
           <Icon name="mdi:cancel" color={greys(theme)[100]} />
         ) : (
           <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />

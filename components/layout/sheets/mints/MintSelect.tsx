@@ -195,11 +195,12 @@ const MintItem: React.FC<MintItemProps> = ({
           <Text style={styles.mintName}>{mint.name}</Text>
           <Text style={styles.mintBalance}>{formattedBalance}</Text>
         </View>
-        {/* <TouchableOpacity
+        <TouchableOpacity
           onPress={() => {
-            router?.navigate("mintDetailsPage");
-          }}
-        >
+            router?.navigate('mintDetailsPage', {
+              mintUrl: mint.id,
+            });
+          }}>
           <Icon
             style={{
               padding: 8,
@@ -210,7 +211,7 @@ const MintItem: React.FC<MintItemProps> = ({
             }}
             name="bx:dots-vertical-rounded"
           />
-        </TouchableOpacity> */}
+        </TouchableOpacity>
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -236,7 +237,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   // limit to specified currencies: sat, eur, gbp, usd
   const currencies: SupportedCurrency[] = _.uniq(
     multipleBalances.map((b) => b.unit?.toUpperCase())
-  ).filter((c) => (isProduction ? ['SAT', 'EUR', 'GBP', 'USD'] : ['SAT']).includes(c));
+  ).filter((c) => (isProduction ? ['SAT'] : ['SAT']).includes(c));
 
   // Filter mints based on the selected currency
   const filteredMints = useMemo(() => {

@@ -8,34 +8,72 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 
 ## Features
 
-- [x] Payment features include:
+- [x] (optional) pin code to unlock app
+- [ ] Payment requests (needs more testing)
 
-  - [x] Payment requests
-  - [x] Lightning receiving
-  - [x] Lightning sending
-  - [x] Ecash receiving
-  - [x] Ecash sending
-  - [ ] Offline ecash sending
-  - [x] Animated and static QR codes
-  - [x] Backup balance with mnemonic
-  - [x] Send money over Nostr
-  - [x] npubx.cash lightning URL
-  - [ ] Custom Lightning URLs
-  - [x] Easy to use QR scanner
-  - [ ] Multipath Payment: Implement MPP and design an intuitive UI to pay from multiple mints
-  - [ ] Mint Management: Implement better ways to help the user distribute ecash between mints
-  - [ ] Unified payment addresses: Write a formal NUT for this to get community input & implement it in Sovran
-  - [x] Basic NFC functionality
+- [x] Lightning Receiving
+
+  - [x] Attach note
+  - [x] Websockets
+  - [x] Check Status Button
+
+- [x] Lightning Sending
+
+  - [ ] Attach note
+  - [x] Calculate Lightning fees + Mint fees
+  - [x] via Pasting, Scanning, DM
+
+- [x] Ecash Receiving
+
+  - [x] via Pasting, Scanning
+  - [x] Attach note
+
+- [x] Ecash Sending
+
+  - [x] via Copy, DM, NFC, Share QR Image, Emoji
+  - [x] Lock to NPUB
+  - [x] Cancel (which automatically redeems ecash)
+  - [x] Attach note
+  - [x] Websockets
+  - [x] Check Status Button
+
+- [ ] Offline Receive
+
+  - [ ] via locked ecash
+  - [ ] Store now and redeem later
+
+- [x] QR Codes
+
+  - [x] QR Code Scanner
+  - [x] Animated or Static depending on context
+
+- [x] NIP06 Mnemonic Seed for Nostr identities
+- [x] NUT13 Mnemonic Seed for Ecash
+
+- [x] NPCV2 Lightning URL
+
+  - [ ] Scroll down to fetch ecash
+  - [ ] Change NPC mint
+  - [ ] Custom Lightning URL e.g. satoshi@npubx.cash
+
+- [ ] Multipath Payment: Implement MPP and design an intuitive UI to pay from multiple mints
+- [ ] Mint Management: Implement better ways to help the user distribute ecash between mints
+- [ ] Unified payment addresses: Write a formal NUT for this to get community input & implement it in Sovran
+
+- [x] Basic NFC functionality
+
+  - [x] Automatic Keyset Rotation on receive/send.
 
 - [x] Marketplace features include:
 
-  - [x] Bitrefill gift cards
-  - [x] VPN using LNVPN (WireGuard)
-  - [x] eSIMs in 150 countries
-  - [x] Donation centre to donate to those in need
+  - [ ] Bitrefill gift cards (behind dev flag)
+  - [ ] VPN using LNVPN (WireGuard)
+  - [ ] eSIMs in 150 countries
+  - [ ] Donation centre to donate to those in need
 
 - [x] Nostr features:
-  - [x] Multiple profiles via a single mnemonic
+
+  - [ ] Multiple profiles via a single mnemonic (removed for now)
   - [x] Send direct messages to contacts
   - [x] Transactions enriched with Nostr information (profile pictures, names, etc.)
 
@@ -55,5 +93,4 @@ We are the only ones to my knowledge who are trying to create a single mnemonic 
 
 - When opening the wallet lets fetch all the mint infos and keysets just to be up-to-date.
 - When I make a transaction and new proofs are created, and if they produce keysetId's I've never seen before I should automatically fetch the keyset from the mint and it to redux. I think this will ensure I always have all the keysets.
-- Check nut13 mnemonic is stored correctly so we don't need to compute it every tx.
 - Create better Container component that handles: Buttons, Scrolling, Keyboard Avoiding, Safe Area, works in Modals or regular screens, handles titles, handles back buttons, handles navigation

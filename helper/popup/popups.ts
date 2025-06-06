@@ -223,6 +223,18 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     type: MESSAGE_TYPES.INFO,
   },
 
+  'keyset id inactive.': {
+    title: 'Keyset Inactive',
+    text: 'You need to update your wallet',
+    buttons: [
+      {
+        text: 'Update Wallet',
+        page: 'update-wallet',
+      },
+    ],
+    type: MESSAGE_TYPES.INFO,
+  },
+
   // Cashu related
   'bad response': {
     title: 'Bad Response',
@@ -279,6 +291,7 @@ export const showMessage = (
   options: ShowMessageOptions = {},
   onClose: ((data: unknown) => void) | undefined = undefined
 ) => {
+  console.log(129837, `!${messageCode}!`);
   const config =
     MESSAGE_CONFIGS[messageCode] || { title: messageCode } || MESSAGE_CONFIGS['general_error'];
 

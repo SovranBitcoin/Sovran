@@ -12,19 +12,12 @@ export class NCSDK {
 
   async getInfo() {
     const url = `${this.baseUrl}/api/v2/user/info`;
-    //
     const method = 'GET';
-    //
     const authTemplate = createAuthTemplate(url, method);
-    //
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
-    //
     const authHeader = createAuthHeader(signedAuthEvent);
-    //
     const res = await authedJsonRequest(url, authHeader);
-    //
     const data = await res.json();
-    //
     return data;
   }
 

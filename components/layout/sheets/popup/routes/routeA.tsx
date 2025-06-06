@@ -53,8 +53,6 @@ const RouteA = ({
         backgroundColor: greys(theme)[1800],
         padding: 16,
         justifyContent: isModal ? 'center' : 'flex-end',
-        // flex: 1,
-        // height: "90%",
       }}>
       <View style={styles.iconContainer}>
         <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>

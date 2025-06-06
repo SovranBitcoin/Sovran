@@ -1,6 +1,6 @@
 import { UntranslatedText, View } from 'components/common/Themed';
 import { useMemo } from 'react';
-import { formatCurrency } from 'helper/currency';
+import { formatCurrency, formatCurrencyWrapper } from 'helper/currency';
 import Icon, { LightningUnit, BtcUnit } from 'assets/icons';
 import { convertTime } from 'helper/time';
 import { greens, greys, reds, shades } from 'helper/colors';
@@ -191,7 +191,6 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     } = {}
   ): string | null => {
     if (!transaction?.amount) return null;
-
     return formatCurrency(
       {
         currency: transaction.unit === 'sat' ? 'BTC' : (transaction.unit.toUpperCase() as any),
@@ -324,11 +323,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     const denomination =
       tx.unit === 'sat' ? (settings.display_btc === 0 ? 'btc' : 'sats') : tx.unit;
 
-    const amount = formatAmount(tx, {
-      precision,
-      currencyDisplay,
-      denomination,
-    });
+    const amount = tx.amount;
     const relatedAmount = relatedTransaction ? formatAmount(relatedTransaction) : null;
 
     return (

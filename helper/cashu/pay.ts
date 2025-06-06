@@ -26,6 +26,7 @@ import { nip19 } from 'nostr-tools';
 import { v4 as uuidv4 } from 'uuid';
 import { showMessage } from '../popup/popups';
 import { SheetManager } from 'react-native-actions-sheet';
+import { getUsedProofs } from './wallet';
 
 interface BaseTransaction {
   amount: number;
@@ -107,115 +108,165 @@ export async function sendLightning({
   meltQuote: MeltQuoteResponse;
   email?: string;
 }): Promise<LightningSendTransaction> {
-  const profile = memoizedGetCurrentProfile(store.getState());
-  const currentProofs = memoizedGetProofs(unit)(store.getState());
+  console.log('[sendLightning]', { mintUrl, pr, unit, pubkey, meltQuote, email });
+  const state = store.getState();
+  const profile = memoizedGetCurrentProfile(state);
 
-  const wallet = await getWallet({ unit, mintUrl, profile: null });
-  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
-  const keysetId = activeKeyset.id;
-  wallet.keysetId = keysetId;
+  // Retry logic for wallet operations
+  const attemptSend = async (forceRefresh = false): Promise<LightningSendTransaction> => {
+    const currentProofs = memoizedGetProofs(unit)(state);
 
-  if (!meltQuote.amount) {
-    throw new AppError('invalid_invoice', 'No amount specified in payment request');
-  }
+    const wallet = await getWallet({
+      unit,
+      mintUrl,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
 
-  const balance = currentProofs
-    .map((p: { amount: number }) => p.amount)
-    .reduce((a: number, b: number) => a + b, 0);
-  if (meltQuote.amount + meltQuote.fee_reserve > balance) {
-    throw new AppError('insufficient_funds', 'Insufficient funds');
-  }
+    console.log('[sendLightning] wallet', wallet);
 
-  const profileId = store.getState().nostr?.currentProfile?.id;
+    const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+    const keysetId = activeKeyset.id;
+    wallet.keysetId = keysetId;
 
-  const counter = memoizedGetCounterV2({
-    profileId,
-    mintUrl,
-    keysetId: wallet.keysetId,
-  })(store.getState());
+    console.log('[sendLightning] activeKeyset', activeKeyset);
 
-  const {
-    keep: proofsToKeep,
-    send: proofsToSend,
-    used,
-  } = await wallet._send(meltQuote.amount + meltQuote.fee_reserve, currentProofs, {
-    counter: counter, // it's going up forever, laura
-  });
+    if (!meltQuote.amount) {
+      throw new AppError('invalid_invoice', 'No amount specified in payment request');
+    }
 
-  store.dispatch(
-    increaseCounterV2({
-      profileId,
-      mintUrl: mintUrl,
-      keysetId: wallet.keysetId,
-      amount: proofsToKeep.length + proofsToSend.length,
-    })
-  );
+    const balance = currentProofs
+      .map((p: { amount: number }) => p.amount)
+      .reduce((a: number, b: number) => a + b, 0);
+    if (meltQuote.amount + meltQuote.fee_reserve > balance) {
+      throw new AppError('insufficient_funds', 'Insufficient funds');
+    }
 
-  const counter2 = memoizedGetCounterV2({
-    profileId,
-    mintUrl,
-    keysetId: wallet.keysetId,
-  })(store.getState());
+    const profileId = store.getState().nostr?.currentProfile?.id;
 
-  const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
-    counter: counter2, // it's going up forever, laura
-  });
-
-  store.dispatch(
-    increaseCounterV2({
-      profileId,
-      mintUrl: mintUrl,
-      keysetId: wallet.keysetId,
-      amount: change.length,
-    })
-  );
-
-  store.dispatch(
-    removeProofs({
+    const counter = memoizedGetCounterV2({
       profileId,
       mintUrl,
-      proofs: used,
-    })
-  );
+      keysetId: wallet.keysetId,
+    })(store.getState());
 
-  store.dispatch(
-    appendProofsV2({
+    console.log('[sendLightning] counter', counter, meltQuote);
+
+    const { send: proofsToSend, keep: proofsToKeep } = wallet.selectProofsToSend(
+      currentProofs,
+      Number(meltQuote.amount) + Number(meltQuote.fee_reserve),
+      true
+    );
+
+    const used = getUsedProofs(currentProofs, proofsToKeep);
+
+    const keyset_fee =
+      proofsToSend.reduce((acc, proof) => acc + proof.amount, 0) -
+      Number(meltQuote.amount) -
+      Number(meltQuote.fee_reserve);
+
+    store.dispatch(
+      increaseCounterV2({
+        profileId,
+        mintUrl: mintUrl,
+        keysetId: wallet.keysetId,
+        amount: proofsToKeep.length + proofsToSend.length,
+      })
+    );
+
+    const counter2 = memoizedGetCounterV2({
       profileId,
       mintUrl,
-      proofs: [...proofsToKeep, ...change],
-    })
-  );
+      keysetId: wallet.keysetId,
+    })(store.getState());
 
-  const transaction: LightningSendTransaction = {
-    request: pr,
-    amount: meltQuote.amount,
-    date: new Date().toISOString(),
-    type: 'lightning',
-    transactionType: 'send',
-    unit,
-    paid: true,
-    meltQuote,
-    mintUrl,
-    email,
-    nostr: {
-      pubkey: pubkey || '',
-    },
-    counter,
-    proofs: {
-      change,
-      keep: proofsToKeep,
-      send: proofsToSend,
-    },
+    console.log('[sendLightning] counter2', { counter2, meltQuote, proofsToSend });
+    const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
+      counter: counter2, // it's going up forever, laura
+      keysetId,
+    });
+
+    store.dispatch(
+      increaseCounterV2({
+        profileId,
+        mintUrl: mintUrl,
+        keysetId: wallet.keysetId,
+        amount: change.length,
+      })
+    );
+
+    store.dispatch(
+      removeProofs({
+        profileId,
+        mintUrl,
+        proofs: used,
+      })
+    );
+
+    store.dispatch(
+      appendProofsV2({
+        profileId,
+        mintUrl,
+        proofs: [...proofsToKeep, ...change],
+      })
+    );
+
+    const transaction: LightningSendTransaction = {
+      request: pr,
+      amount: meltQuote.amount,
+      date: new Date().toISOString(),
+      type: 'lightning',
+      transactionType: 'send',
+      unit,
+      paid: true,
+      meltQuote,
+      fees: {
+        lightning_fee: meltQuote.fee_reserve,
+        keyset_fee: keyset_fee,
+      },
+      mintUrl,
+      email,
+      nostr: {
+        pubkey: pubkey || '',
+      },
+      counter,
+      proofs: {
+        change,
+        keep: proofsToKeep,
+        send: proofsToSend,
+      },
+    };
+
+    store.dispatch(
+      appendTransaction({
+        profileId: profile.id,
+        transaction,
+      })
+    );
+
+    return transaction;
   };
 
-  store.dispatch(
-    appendTransaction({
-      profileId: profile.id,
-      transaction,
-    })
-  );
+  // First attempt
+  try {
+    return await attemptSend(false);
+  } catch (error) {
+    console.log(error.message);
+    // Check if it's the specific keyset inactive error
+    if (error.message === 'keyset id inactive.') {
+      Alert.alert('Updating keyset...');
+      console.log('[sendLightning] Keyset inactive, retrying with forceRefresh');
+      try {
+        return await attemptSend(true);
+      } catch (retryError) {
+        console.error('[sendLightning] Retry failed:', retryError);
+        throw retryError;
+      }
+    }
 
-  return transaction;
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 export async function receiveLightning({
@@ -315,110 +366,144 @@ export async function sendEcash({
   to?: string;
   p2pk?: { pubkey?: string; privkey?: string };
 }): Promise<EcashSendTransaction> {
+  console.log('[sendEcash]', { amount, unit, memo, to, p2pk });
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
-
   const profile = memoizedGetCurrentProfile(state);
 
-  const currentProofs = memoizedGetProofs(unit)(state);
+  // Retry logic for wallet operations
+  const attemptSend = async (forceRefresh = false): Promise<EcashSendTransaction> => {
+    const currentProofs = memoizedGetProofs(unit)(state);
+    const balance = memoizedGetBalance(unit)(state);
 
-  const balance = memoizedGetBalance(unit)(state);
+    console.log('[sendEcash] balance', { balance, amount, currentProofs, selectedMint });
 
-  if (amount > balance) {
-    throw new AppError('insufficient_funds', 'Insufficient funds');
-  }
+    if (amount > balance) {
+      throw new AppError('insufficient_funds', 'Insufficient funds');
+    }
 
-  const wallet = await getWallet({
-    unit,
-    mintUrl: selectedMint,
-    profile: null,
-  });
+    console.log('[sendEcash] getting wallet', { forceRefresh });
 
-  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
-  const keysetId = activeKeyset.id;
-  wallet.keysetId = keysetId;
+    const wallet = await getWallet({
+      unit,
+      mintUrl: selectedMint,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
 
-  if (!wallet) {
-    throw new AppError('wallet_not_found', 'Wallet not found');
-  }
+    console.log('[sendEcash] got wallet', wallet);
 
-  const counter = memoizedGetCounterV2({
-    profileId: profile.id,
-    mintUrl: wallet.mint.mintUrl,
-    keysetId: wallet.keysetId,
-  })(state);
+    if (!wallet) {
+      throw new AppError('wallet_not_found', 'Wallet not found');
+    }
 
-  const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
-    ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
-    counter,
-    offline: true,
-  });
+    const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+    const keysetId = activeKeyset.id;
+    wallet.keysetId = keysetId;
 
-  store.dispatch(
-    removeProofs({
-      profileId: profile.id,
-      mintUrl: wallet.mint.mintUrl,
-      proofs: used,
-    })
-  );
+    console.log('[sendEcash] activeKeyset', activeKeyset);
 
-  store.dispatch(
-    appendProofsV2({
-      profileId: profile.id,
-      mintUrl: wallet.mint.mintUrl,
-      proofs: keep,
-    })
-  );
-
-  const token: Token = {
-    proofs: send,
-    mint: wallet.mint.mintUrl,
-    unit,
-    memo,
-  };
-
-  store.dispatch(
-    increaseCounterV2({
+    const counter = memoizedGetCounterV2({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
       keysetId: wallet.keysetId,
-      amount: send.length + keep.length,
-    })
-  );
+    })(state);
 
-  const encodedToken = getEncodedToken(token, {
-    version: 4,
-  });
+    console.log('awd', { currentProofs });
 
-  const transaction: EcashSendTransaction = {
-    amount,
-    date: new Date().toISOString(),
-    type: 'ecash',
-    token: encodedToken,
-    memo,
-    transactionType: 'send',
-    unit,
-    paid: false,
-    nostr: {
-      pubkey: to,
-    },
-    mintUrl: wallet.mint.mintUrl,
-    counter,
-    // proofs: {
-    //   send,
-    //   keep,
-    // },
-    ...(p2pk ? { p2pk: { pubkey: p2pk.pubkey, privkey: p2pk.privkey } } : {}),
+    const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
+      ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
+      counter,
+      keysetId,
+    });
+
+    store.dispatch(
+      removeProofs({
+        profileId: profile.id,
+        mintUrl: wallet.mint.mintUrl,
+        proofs: used,
+      })
+    );
+
+    store.dispatch(
+      appendProofsV2({
+        profileId: profile.id,
+        mintUrl: wallet.mint.mintUrl,
+        proofs: keep,
+      })
+    );
+
+    const token: Token = {
+      proofs: send,
+      mint: wallet.mint.mintUrl,
+      unit,
+      memo,
+    };
+
+    store.dispatch(
+      increaseCounterV2({
+        profileId: profile.id,
+        mintUrl: wallet.mint.mintUrl,
+        keysetId: wallet.keysetId,
+        amount: send.length + keep.length,
+      })
+    );
+
+    const encodedToken = getEncodedToken(token, {
+      version: 4,
+    });
+
+    const transaction: EcashSendTransaction = {
+      amount,
+      date: new Date().toISOString(),
+      type: 'ecash',
+      token: encodedToken,
+      memo,
+      transactionType: 'send',
+      unit,
+      paid: false,
+      nostr: {
+        pubkey: to,
+      },
+      mintUrl: wallet.mint.mintUrl,
+      counter,
+      // proofs: {
+      //   send,
+      //   keep,
+      // },
+      ...(p2pk ? { p2pk: { pubkey: p2pk.pubkey, privkey: p2pk.privkey } } : {}),
+    };
+
+    store.dispatch(
+      appendTransaction({
+        profileId: profile.id,
+        transaction,
+      })
+    );
+
+    return transaction;
   };
 
-  store.dispatch(
-    appendTransaction({
-      profileId: profile.id,
-      transaction,
-    })
-  );
+  // First attempt
+  try {
+    return await attemptSend(false);
+  } catch (error) {
+    console.log(error.message);
+    // Check if it's the specific keyset inactive error
+    if (error.message === 'keyset id inactive.') {
+      Alert.alert('Updating keyset...');
+      console.log('[sendEcash] Keyset inactive, retrying with forceRefresh');
+      try {
+        return await attemptSend(true);
+      } catch (retryError) {
+        console.error('[sendEcash] Retry failed:', retryError);
+        throw retryError;
+      }
+    }
 
-  return transaction;
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 export async function receiveEcash({
@@ -450,7 +535,6 @@ export async function receiveEcash({
         ? JSON.parse(decodedToken.proofs[0].secret)[1].data
         : null;
     } catch (error) {
-      // this means the secret is not JSON and is not a P2PK
       console.error('Error parsing token secret:', error);
       return null;
     }
@@ -460,97 +544,125 @@ export async function receiveEcash({
     return getPubkeyFromToken(token) === public_key;
   });
 
-  const wallet = await getWallet({
-    unit,
-    mintUrl: receiveMintUrl,
-    profile: null,
-  });
+  // Retry logic for wallet operations
+  const attemptReceive = async (forceRefresh = false): Promise<EcashReceiveTransaction> => {
+    console.log('[receiveEcash] getting wallet', { forceRefresh });
+    const wallet = await getWallet({
+      unit,
+      mintUrl: receiveMintUrl,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
+    console.log('[receiveEcash] got wallet', wallet);
 
-  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
-  const keysetId = activeKeyset.id;
-  console.log({ activeKeyset });
-  wallet.keysetId = keysetId;
+    if (!wallet) {
+      throw new AppError('wallet_not_found', 'Wallet not found');
+    }
 
-  if (!wallet) {
-    throw new AppError('wallet_not_found', 'Wallet not found');
-  }
+    const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+    const keysetId = activeKeyset.id;
+    wallet.keysetId = keysetId;
 
-  const counter = memoizedGetCounterV2({
-    profileId: profile.id,
-    mintUrl: receiveMintUrl,
-    keysetId: keysetId,
-  })(state);
+    console.log('[receiveEcash] activeKeyset', activeKeyset);
 
-  const response = await wallet.receive(token, {
-    counter,
-    keysetId,
-    // proofsWeHave,
-    ...(giveaway ? { privkey: giveaway.private_key } : {}),
-  });
-
-  if (!response) {
-    throw new AppError('invalid_token', 'Invalid token');
-  }
-
-  const newProofs = [...response];
-
-  store.dispatch(
-    increaseCounterV2({
+    const counter = memoizedGetCounterV2({
       profileId: profile.id,
       mintUrl: receiveMintUrl,
-      keysetId: wallet.keysetId,
-      amount: newProofs.length,
-    })
-  );
+      keysetId: keysetId,
+    })(state);
 
-  await store.dispatch(
-    appendProofsV2({ profileId: profile.id, mintUrl: receiveMintUrl, proofs: newProofs })
-  );
+    console.log('[receiveEcash] counter', counter);
 
-  const totalAmount = decodedToken.proofs.map((p) => p.amount).reduce((a, b) => a + b, 0);
+    const response = await wallet.receive(token, {
+      counter,
+      keysetId,
+      ...(giveaway ? { privkey: giveaway.private_key } : {}),
+    });
 
-  const transaction: EcashReceiveTransaction = {
-    amount: totalAmount,
-    date: new Date().toISOString(),
-    type: 'ecash',
-    token,
-    transactionType: 'receive',
-    unit,
-    memo,
-    mintUrl: receiveMintUrl,
-    paid: true,
-    counter,
-    ...(from ? { nostr: { pubkey: from } } : {}),
-    // proofs: {
-    //   keep: newProofs,
-    // },
-    refund,
-    fromNIP05,
-    ...(giveaway
-      ? {
-          p2pk: {
-            pubkey: giveaway.public_key,
-            privkey: giveaway.private_key,
-          },
-        }
-      : {}),
+    console.log('[receiveEcash] response', response);
+
+    if (!response) {
+      throw new AppError('invalid_token', 'Invalid token');
+    }
+
+    const newProofs = [...response];
+
+    store.dispatch(
+      increaseCounterV2({
+        profileId: profile.id,
+        mintUrl: receiveMintUrl,
+        keysetId: wallet.keysetId,
+        amount: newProofs.length,
+      })
+    );
+
+    await store.dispatch(
+      appendProofsV2({ profileId: profile.id, mintUrl: receiveMintUrl, proofs: newProofs })
+    );
+
+    const totalAmount = decodedToken.proofs.map((p) => p.amount).reduce((a, b) => a + b, 0);
+
+    const transaction: EcashReceiveTransaction = {
+      amount: totalAmount,
+      date: new Date().toISOString(),
+      type: 'ecash',
+      token,
+      transactionType: 'receive',
+      unit,
+      memo,
+      mintUrl: receiveMintUrl,
+      paid: true,
+      counter,
+      ...(from ? { nostr: { pubkey: from } } : {}),
+      refund,
+      fromNIP05,
+      ...(giveaway
+        ? {
+            p2pk: {
+              pubkey: giveaway.public_key,
+              privkey: giveaway.private_key,
+            },
+          }
+        : {}),
+    };
+
+    store.dispatch(
+      appendTransaction({
+        profileId: profile.id,
+        transaction,
+      })
+    );
+
+    await publishWalletEvent([
+      ...new Set([
+        ...store.getState().cashu?.profiles?.[profile.id]?.transactions.map((t) => t.mintUrl),
+        receiveMintUrl,
+      ]),
+    ]);
+
+    return transaction;
   };
 
-  store.dispatch(
-    appendTransaction({
-      profileId: profile.id,
-      transaction,
-    })
-  );
+  // First attempt
+  try {
+    return await attemptReceive(false);
+  } catch (error) {
+    console.log(error.message);
+    // Check if it's the specific keyset inactive error
+    if (error.message === 'keyset id inactive.') {
+      Alert.alert('Updating keyset...');
+      console.log('[receiveEcash] Keyset inactive, retrying with forceRefresh');
+      try {
+        return await attemptReceive(true);
+      } catch (retryError) {
+        console.error('[receiveEcash] Retry failed:', retryError);
+        throw retryError;
+      }
+    }
 
-  await publishWalletEvent([
-    ...new Set([
-      ...store.getState().cashu?.profiles?.[profile.id]?.transactions.map((t) => t.mintUrl),
-      receiveMintUrl,
-    ]),
-  ]);
-
-  return transaction;
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 export async function getPaymentRequest({

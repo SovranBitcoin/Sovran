@@ -425,7 +425,7 @@ export function MintAddMore({ onClose, payload }) {
     () =>
       new Set(
         payload?.currencies?.map((curr) => curr.toUpperCase()) ||
-          (isProduction ? ['SAT', 'USD', 'EUR', 'GBP'] : ['SAT']).map((curr) => curr.toUpperCase())
+          (isProduction ? ['SAT'] : ['SAT']).map((curr) => curr.toUpperCase())
       ),
     [payload]
   );
