@@ -180,31 +180,40 @@ export const TransactionProvider = ({ children }) => {
                     proof: Proof;
                   }
                 ) => {
-                  const transaction = txs_.find((tx: any) =>
-                    getDecodedToken(tx.token).proofs.find((p: any) => _.isEqual(p, payload.proof))
-                  );
+                  try {
+                    const transaction = txs_.find((tx: any) =>
+                      getDecodedToken(tx.token).proofs.find((p: any) => _.isEqual(p, payload.proof))
+                    );
 
-                  if (!transaction) return;
+                    if (!transaction) return;
 
-                  switch (payload.state) {
-                    case 'PENDING':
-                      break;
-                    case 'SPENT':
-                      updateTransactionStatus(transaction, 'paid', {
-                        paid: true,
-                        completedAt: Date.now(),
-                      });
-                      unsub();
-                      removeConnection(id);
-                      break;
-                    case 'UNSPENT':
-                      break;
-                    default:
-                      break;
+                    switch (payload.state) {
+                      case 'PENDING':
+                        break;
+                      case 'SPENT':
+                        updateTransactionStatus(transaction, 'paid', {
+                          paid: true,
+                          completedAt: Date.now(),
+                        });
+                        unsub();
+                        removeConnection(id);
+                        break;
+                      case 'UNSPENT':
+                        break;
+                      default:
+                        break;
+                    }
+                  } catch (err) {
+                    unsub();
+                    removeConnection(id);
+                    if (err.message === 'keyset id inactive.') {
+                      listenToTransaction(transactions, true);
+                    }
                   }
                 },
                 (err) => {
-                  console.log('listenToTransaction err', err);
+                  unsub();
+                  removeConnection(id);
                 }
               );
             } else if (type === 'lightning') {
