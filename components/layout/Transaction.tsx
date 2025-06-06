@@ -119,12 +119,22 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
 
   // Get profile picture from nostr data
   const profilePicture =
-    search?.find((s: ProfileData) => s?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.profile
-      ?.picture ||
-    profiles?.find((p: ProfileData) => p?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.picture ||
-    search?.find((s: ProfileData) => s?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.profile
-      ?.image ||
-    profiles?.find((p: ProfileData) => p?.pubkey === npubToPubkey(tx?.nostr?.pubkey))?.image;
+    search?.find(
+      (s: ProfileData) =>
+        s?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
+    )?.profile?.picture ||
+    profiles?.find(
+      (p: ProfileData) =>
+        p?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
+    )?.picture ||
+    search?.find(
+      (s: ProfileData) =>
+        s?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
+    )?.profile?.image ||
+    profiles?.find(
+      (p: ProfileData) =>
+        p?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
+    )?.image;
 
   /**
    * Handle navigation when transaction is pressed
@@ -218,7 +228,13 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
   /**
    * Status indicator for transaction icons
    */
-  const StatusIndicator = ({ isCancel }: { isCancel?: boolean }): JSX.Element => (
+  const StatusIndicator = ({
+    isCancel,
+    fromNIP05,
+  }: {
+    isCancel?: boolean;
+    fromNIP05?: boolean;
+  }): JSX.Element => (
     <View
       style={{
         borderColor: greys(theme)[1000],
