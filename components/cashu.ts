@@ -214,14 +214,22 @@ export async function getMeltQuote({
   mintUrl: string;
   mppAmount?: number;
 }): Promise<MeltQuoteResponse> {
-  const wallet = await getWallet({ unit, mintUrl });
+  const wallet = await getWallet({ unit, mintUrl, profile: null });
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  wallet.keysetId = keysetId;
+
   const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
 
-  return await wallet.mint.createMeltQuote({
+  const meltQuote = await wallet.mint.createMeltQuote({
     request: pr,
     unit,
     ...options,
   });
+
+  console.log(123233, { meltQuote });
+
+  return meltQuote;
 }
 
 export async function sendMultiPathPayment({ pr }) {

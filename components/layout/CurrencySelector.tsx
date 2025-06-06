@@ -24,7 +24,7 @@ interface CurrencySelectorProps {
   onCurrencyChange: (currency: string) => void;
 }
 
-const SUPPORTED_CURRENCIES = isProduction ? ['SAT', 'USD', 'EUR', 'GBP'] : ['SAT'];
+const SUPPORTED_CURRENCIES = isProduction ? ['SAT'] : ['SAT'];
 
 const CurrencySelector: React.FC<CurrencySelectorProps> = ({
   selectedCurrency,

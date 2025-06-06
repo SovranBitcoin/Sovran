@@ -98,7 +98,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     if (React.isValidElement(item.value)) {
       return (
         <View
-          className="bg-transparent flex-row items-center"
+          className="flex-row items-center bg-transparent"
           style={{
             flex: 1,
             justifyContent: item.align === 'left' ? 'flex-start' : 'flex-end',
@@ -151,7 +151,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     }
 
     // Handle npub format
-    if (item.value?.startsWith?.('npub')) {
+    if (item.value?.startsWith?.('npub') && special) {
       return renderPrefixedValue('npub', item.value.split('npub')[1], titleText, theme);
     }
 

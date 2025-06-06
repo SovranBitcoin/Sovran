@@ -69,9 +69,9 @@ async function getProfile(currentProfile, listenToTransaction) {
   let transactions = [];
   for (const quote of quotes) {
     const mintQuote: MintQuoteResponse = {
-      quote: quote.quote_id,
+      quote: quote.quoteId,
       request: quote.request,
-      expiry: quote.expires_at,
+      expiry: quote.expiresAt,
       state: quote.state,
     };
 
@@ -79,12 +79,12 @@ async function getProfile(currentProfile, listenToTransaction) {
       request: quote.request,
       amount: quote.amount,
       mintQuote,
-      date: new Date(quote.paid_at * 1000),
+      date: new Date(quote.paidAt * 1000),
       type: 'lightning',
       paid: false,
       transactionType: 'receive',
       unit: 'sat',
-      mintUrl: quote.mint_url,
+      mintUrl: quote.mintUrl,
       fromNIP05: `${currentProfile?.npub}@npubx.cash`,
     };
 
@@ -161,7 +161,7 @@ function TabOneScreen({
     },
   ],
 }) {
-  const supportedUnits = isProduction ? ['sat', 'usd', 'eur', 'gbp'] : ['sat'];
+  const supportedUnits = isProduction ? ['sat'] : ['sat'];
 
   const [accounts, setAccounts] = useState([
     ...currencies.filter((u) => supportedUnits.includes(u.unit)),
@@ -173,7 +173,7 @@ function TabOneScreen({
     setRefreshing(true);
     await getProfile(currentProfile, listenToTransaction);
     setRefreshing(false);
-  }, []);
+  }, [currentProfile?.pubkey]);
 
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);

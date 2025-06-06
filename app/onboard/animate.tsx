@@ -205,7 +205,7 @@ const ChainLoadingAnimation = () => {
                   (mnemonic.trim() ===
                   'suit edge uphold icon modify more oak can zero legal sudden rival'
                     ? ['sat']
-                    : ['sat', 'usd', 'eur', 'gbp']
+                    : ['sat']
                   ).includes(unit.name)
                 );
 
@@ -272,7 +272,7 @@ const ChainLoadingAnimation = () => {
                 mnemonic.trim() ===
                 'suit edge uphold icon modify more oak can zero legal sudden rival'
                   ? ['sat']
-                  : ['sat', 'usd', 'eur', 'gbp'],
+                  : ['sat'],
             });
             let result = await generator.next();
 

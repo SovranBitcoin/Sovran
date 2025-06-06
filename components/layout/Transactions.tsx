@@ -125,15 +125,15 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const sortByDateDesc = (a: Transaction, b: Transaction) =>
     new Date(b.date).getTime() - new Date(a.date).getTime();
 
-  if (showMore) {
-    const limitTxs = (txs: Transaction[]) =>
-      [...txs].sort(sortByDateDesc).slice(0, MAX_DISPLAYED_TRANSACTIONS_PER_STATUS);
+  // if (showMore) {
+  //   const limitTxs = (txs: Transaction[]) =>
+  //     [...txs].sort(sortByDateDesc).slice(0, MAX_DISPLAYED_TRANSACTIONS_PER_STATUS);
 
-    const limitedPendingTransactions = limitTxs(filteredPendingTransactions);
-    const limitedConfirmedTransactions = limitTxs(filteredConfirmedTransactions);
+  //   const limitedPendingTransactions = limitTxs(filteredPendingTransactions);
+  //   const limitedConfirmedTransactions = limitTxs(filteredConfirmedTransactions);
 
-    transactionsForGrouping = [...limitedPendingTransactions, ...limitedConfirmedTransactions];
-  }
+  //   transactionsForGrouping = [...limitedPendingTransactions, ...limitedConfirmedTransactions];
+  // }
 
   // Group transactions by date for better display
   const groupTransactionsByStatusAndDate = (txs: Transaction[]) => {
@@ -352,7 +352,7 @@ const createStyles = (theme: any) =>
     },
     transactionsLabel: {
       color: greys(theme)[700],
-      fontFamily: 'OverpassBold',
+      fontFamily: 'OverpassHeavy',
       margin: 0,
     },
     transactionContainer: {

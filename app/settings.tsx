@@ -18,6 +18,7 @@ import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { RootState } from 'helper/redux/store/reducer';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -172,6 +173,8 @@ const ModalScreen: React.FC<{}> = () => {
     }));
   };
 
+  const settings = useSelector((state: RootState) => state.settings.settings);
+
   return (
     <Container>
       <ScrollView>
@@ -287,38 +290,43 @@ const ModalScreen: React.FC<{}> = () => {
             isDanger
           />
         </Section>
-        <Section title="Advanced Debugging">
-          {/* <RowButton
+        {settings?.experimental && (
+          <>
+            <Section title="Advanced Debugging">
+              {/* <RowButton
           label="Show Local Storage"
           onPress={() => {
             navigation.navigate('settings/store');
           }}
         /> */}
-          <RowButton
-            label="Nostr Data"
-            onPress={() => {
-              navigation.navigate('settings/nostrData');
-            }}
-          />
-          <RowButton
-            label="Restore Counter"
-            onPress={() => {
-              navigation.navigate('settings/restoreCounter');
-            }}
-          />
-          <RowButton
-            label="Websocket Connections"
-            onPress={() => {
-              navigation.navigate('settings/websocketConnections');
-            }}
-          />
-          <RowButton
-            label="Check Proofs"
-            onPress={() => {
-              navigation.navigate('settings/proofs');
-            }}
-          />
-        </Section>
+              <RowButton
+                label="Nostr Data"
+                onPress={() => {
+                  navigation.navigate('settings/nostrData');
+                }}
+              />
+              <RowButton
+                label="Restore Counter"
+                onPress={() => {
+                  navigation.navigate('settings/restoreCounter');
+                }}
+              />
+              <RowButton
+                label="Websocket Connections"
+                onPress={() => {
+                  navigation.navigate('settings/websocketConnections');
+                }}
+              />
+              <RowButton
+                label="Check Proofs"
+                onPress={() => {
+                  navigation.navigate('settings/proofs');
+                }}
+              />
+            </Section>
+          </>
+        )}
+
         <TouchableOpacity
           onPress={() => {
             navigation.navigate('settings/design');

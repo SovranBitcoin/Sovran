@@ -10,6 +10,9 @@ import { showMessage, showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import _ from 'lodash';
 import {
+  appendProofsV2,
+  increaseCounterV2,
+  memoizedGetCounterV2,
   memoizedGetTransactionByMatcher,
   updateTransaction,
   useGetMintInfo,
@@ -29,6 +32,7 @@ import { useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { greys } from 'helper/colors';
+import { publishWalletEvent } from 'helper/nostr/cashu';
 
 export function LightningReceiveConfirmation({
   request,
@@ -118,40 +122,107 @@ export function LightningReceiveConfirmation({
     connection.id.includes(getCurrentTransaction[0].request)
   );
 
-  const handleCheckStatus = async (onClose) => {
-    const currentTx = getCurrentTransaction[0];
-    const wallet = await getWallet({
-      unit: currentTx.unit,
-      mintUrl: currentTx.mintUrl,
-      profile: null,
-    });
-    const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
-
-    if (status.state === 'PAID' || status.state === 'ISSUED') {
-      const profileId = store.getState().nostr?.currentProfile?.id;
-      await store.dispatch(
-        updateTransaction({
-          profileId,
-          matcher: (tx) => tx.request === currentTx.request,
-          updateFn: (tx) => ({
-            ...tx,
-            paid: true,
-          }),
-        })
+  const handleCheckStatus = async (onClose, forceRefresh = false) => {
+    try {
+      const currentTx = getCurrentTransaction[0];
+      const wallet = await getWallet({
+        unit: currentTx.unit,
+        mintUrl: currentTx.mintUrl,
+        profile: null,
+      });
+      const activeKeyset = wallet.getActiveKeyset(
+        wallet.keysets.filter((key) => key.unit === 'sat')
       );
+      const keysetId = activeKeyset.id;
+      wallet.keysetId = keysetId;
 
-      showMessage(
-        'funds_received',
-        { amount: currentTx.amount, unit: currentTx.unit },
-        { emoji: '🎉' },
-        onClose
-      );
-    } else {
-      showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
+      const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
+      console.log(12837, status);
+      if (status.state === 'PAID') {
+        const profileId = store.getState().nostr?.currentProfile?.id;
+
+        const counter = memoizedGetCounterV2({
+          profileId: store.getState().nostr.currentProfile.id,
+          mintUrl: currentTx.mintUrl,
+          keysetId: wallet.keysetId,
+        })(store.getState());
+
+        // Mint proofs
+        const proofs = await wallet.mintProofs(amount, currentTx.mintQuote.quote, {
+          counter,
+          keysetId: wallet.keysetId,
+        });
+
+        // Increase counter
+        store.dispatch(
+          increaseCounterV2({
+            profileId: store.getState().nostr.currentProfile.id,
+            mintUrl: currentTx.mintUrl,
+            keysetId: wallet.keysetId,
+            amount: proofs.length,
+          })
+        );
+
+        // Add proofs to redux
+        await store.dispatch(
+          appendProofsV2({
+            profileId: store.getState().nostr.currentProfile.id,
+            mintUrl: currentTx.mintUrl,
+            proofs: proofs,
+          })
+        );
+
+        // Publish wallet event, this basically just makes sure we can restore our account via nostr
+        publishWalletEvent([
+          ...new Set([
+            ...store
+              .getState()
+              .cashu?.profiles?.[
+                store.getState().nostr.currentProfile.id
+              ]?.transactions.map((t) => t.mintUrl),
+            currentTx.mintUrl,
+          ]),
+        ]);
+
+        // Update transaction status to paid
+        showMessage('funds_sent', {
+          amount: currentTx.amount,
+          unit: currentTx.unit,
+        });
+
+        await store.dispatch(
+          updateTransaction({
+            profileId,
+            matcher: (tx) => tx.request === currentTx.request,
+            updateFn: (tx) => ({
+              ...tx,
+              paid: true,
+            }),
+          })
+        );
+
+        showMessage(
+          'funds_received',
+          { amount: currentTx.amount, unit: currentTx.unit },
+          { emoji: '🎉' },
+          onClose
+        );
+      } else if (status.state === 'ISSUED') {
+      } else {
+        showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
+      }
+    } catch (error) {
+      console.log(error.message);
+      if (error.message === 'keyset id inactive.') {
+        handleCheckStatus(onClose, true);
+      } else {
+      }
     }
   };
 
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+
+  console.log('getCurrentTransaction22', getCurrentTransaction[0]);
 
   return (
     <Modal
@@ -160,7 +231,7 @@ export function LightningReceiveConfirmation({
       children={
         <>
           <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
-          {!getCurrentTransaction[0].paid && (
+          {!getCurrentTransaction[0].paid && !getCurrentTransaction[0].fromNIP05 && (
             <PaymentInfo
               showSection={false}
               setUri={setUri}
@@ -197,11 +268,17 @@ export function LightningReceiveConfirmation({
             theme={theme}
             transactionType="receive"
           />
+
           <Section
+            special={false}
             items={[
               {
                 title: 'Request',
-                value: truncateMiddle(request, 10),
+                value: getCurrentTransaction[0].fromNIP05
+                  ? truncateMiddle(getCurrentTransaction[0].fromNIP05.split('@')[0], 4) +
+                    '@' +
+                    getCurrentTransaction[0].fromNIP05.split('@')[1]
+                  : truncateMiddle(request, 10),
               },
               {
                 title: 'Type',

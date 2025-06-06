@@ -9,6 +9,7 @@ import { greys, shades } from 'helper/colors';
 import EQRCode from 'react-native-qrcode-svg';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Circle background for the QR code center logo
@@ -23,7 +24,7 @@ export const Circle = memo(() => {
         width: 100,
         height: 100,
         borderRadius: 9999,
-        transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.575 }],
+        transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.63 }],
         left: '50%' as any,
         top: '50%' as any,
         backgroundColor: greys('dark')[0],
@@ -67,28 +68,35 @@ export const QRCode = memo(function QRCode({
 
   const containerStyle = useMemo(
     (): ViewStyle => ({
-      ...(hasBackground
-        ? {
-            backgroundColor: greys('dark')[0],
-            padding: 16,
-            borderRadius: 16,
-          }
-        : {}),
+      ...(hasBackground ? {} : {}),
     }),
     [hasBackground, theme]
   );
 
   return (
     <View style={containerStyle}>
-      <EQRCode
-        enableLinearGradient
-        linearGradient={[shades[200], shades[500]]}
-        backgroundColor={greys('dark')[0]}
-        color={greys(theme)[1800]}
-        value={props.data}
-        size={width - 2 * padding}
-        {...props}
-      />
+      <LinearGradient
+        colors={[shades[100], shades[500]]}
+        style={{
+          ...(hasBackground
+            ? {
+                backgroundColor: shades[300],
+                padding: 16,
+                borderRadius: 16,
+              }
+            : {}),
+        }}>
+        <EQRCode
+          color={greys(theme)[0]}
+          // enableLinearGradient
+          // linearGradient={[shades[200], shades[500]]}
+          backgroundColor={'transparent'}
+          // color={greys(theme)[1800]}
+          value={props.data}
+          size={width - 2 * padding}
+          {...props}
+        />
+      </LinearGradient>
     </View>
   );
 });

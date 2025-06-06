@@ -107,53 +107,17 @@ export default function ModalScreen() {
     setRemovingSpent(true);
     setError(null);
 
-    try {
-      // Get all proofs for this mint
-      const mintProofs = allProofs[mintUrl] || [];
+    const spentProofs = activeMintsData
+      .find((mintData) => mintData.url === mintUrl)
+      ?.proofs?.filter((proof, index) => proofStates[mintUrl][index].state === 'SPENT');
 
-      // Get states for this mint
-      const states = proofStates[mintUrl] || [];
+    console.log('Spent proofs:', spentProofs);
 
-      // Create a map of spent proof IDs for accurate identification
-      const spentProofIds = new Set();
-      mintProofs.forEach((proof, index) => {
-        if (states[index]?.state === 'SPENT' && proof.id) {
-          spentProofIds.add(proof.id);
-        }
-      });
-
-      // Filter the proofs to get only the spent ones using the ID map
-      const spentProofs = mintProofs.filter(
-        (proof) => proof && proof.id && spentProofIds.has(proof.id)
-      );
-
-      if (spentProofs.length === 0) {
-        setError(`No spent proofs to remove for mint: ${mintUrl}`);
-        return;
-      }
-
-      console.log(`Removing ${spentProofs.length} spent proofs for mint: ${mintUrl}`);
-
-      const wallet = await getWallet2({ unit: 'sat', mintUrl });
-
-      // Dispatch the removeProofs action with only the spent proofs
-      dispatch(
-        removeProofs({
-          profileId,
-          mintUrl: wallet.mint.mintUrl,
-          proofs: spentProofs,
-        })
-      );
-
-      // After successful removal, refresh the proof states
-      // This will help ensure the UI is in sync with the Redux store
-      await checkProofSpentStatus(mintUrl);
-    } catch (err) {
-      console.error(`Error removing spent proofs for ${mintUrl}:`, err);
-      setError(`Error for ${mintUrl}: ${err.message || JSON.stringify(err)}`);
-    } finally {
-      setRemovingSpent(false);
+    if (spentProofs?.length > 0) {
+      dispatch(removeProofs({ profileId, mintUrl, proofs: spentProofs }));
     }
+
+    setRemovingSpent(false);
   };
 
   // Check proofs when component mounts - only once
