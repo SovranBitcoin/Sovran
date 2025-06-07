@@ -295,15 +295,15 @@ const RecoveryScreen = () => {
   };
 
   return (
-    <>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}>
-        <Container>
-          <ScrollView
-            contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled">
-            <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}>
+      <Container contentContainerStyle={{ flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
               <Text weight="bold" size={24} style={styles.headerTitle}>
                 Create Sovran Profile
               </Text>
@@ -325,19 +325,17 @@ const RecoveryScreen = () => {
                 styles={styles}
                 theme={theme}
               />
-            </View>
-          </ScrollView>
-        </Container>
-      </KeyboardAvoidingView>
-
-      <ButtonBar
-        handleCreateProfile={handleCreateProfile}
-        handleExistingAccount={handleExistingAccount}
-        isSubmitting={isSubmitting}
-        styles={styles}
-        theme={theme}
-      />
-    </>
+          </View>
+        </ScrollView>
+        <ButtonBar
+          handleCreateProfile={handleCreateProfile}
+          handleExistingAccount={handleExistingAccount}
+          isSubmitting={isSubmitting}
+          styles={styles}
+          theme={theme}
+        />
+      </Container>
+    </KeyboardAvoidingView>
   );
 };
 
