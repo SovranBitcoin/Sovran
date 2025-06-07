@@ -181,10 +181,24 @@ export async function sendLightning({
     })(store.getState());
 
     console.log('[sendLightning] counter2', { counter2, meltQuote, proofsToSend });
-    const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
-      counter: counter2, // it's going up forever, laura
-      keysetId,
-    });
+    let change;
+    try {
+      ({ change } = await wallet.meltProofs(meltQuote, proofsToSend, {
+        counter: counter2, // it's going up forever, laura
+        keysetId,
+      }));
+    } catch (meltError) {
+      if (meltError.message !== 'keyset id inactive.') {
+        store.dispatch(
+          appendProofsV2({
+            profileId,
+            mintUrl,
+            proofs: proofsToSend,
+          })
+        );
+      }
+      throw meltError;
+    }
 
     store.dispatch(
       increaseCounterV2({
