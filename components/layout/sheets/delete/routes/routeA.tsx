@@ -2,29 +2,20 @@ import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
 import { View, Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
-import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { resetApp } from 'helper/redux/store/reducer';
+import * as Updates from 'expo-updates';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 
 const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
   const dispatch = useDispatch();
   const handleDeleteProfile = async () => {
     try {
       await dispatch(resetApp());
-      router?.close();
-      navigation.navigate(
-        'index',
-        {},
-        {
-          current: 'drawer',
-          closeCurrentAndParents: true,
-        }
-      );
+      await Updates.reloadAsync();
     } catch (error) {}
   };
 
