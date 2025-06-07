@@ -295,18 +295,17 @@ const RecoveryScreen = () => {
   };
 
   return (
-    <>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}>
-        <Container>
-          <ScrollView
-            contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled">
-            <View style={styles.container}>
-              <Text weight="bold" size={24} style={styles.headerTitle}>
-                Create Sovran Profile
-              </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}>
+      <Container style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
+            <Text weight="bold" size={24} style={styles.headerTitle}>
+              Create Sovran Profile
+            </Text>
               <Text weight="regular" size={14} style={styles.headerSubtitle}>
                 Your profile lets others find you and send you bitcoin easily.
               </Text>
@@ -325,10 +324,9 @@ const RecoveryScreen = () => {
                 styles={styles}
                 theme={theme}
               />
-            </View>
-          </ScrollView>
-        </Container>
-      </KeyboardAvoidingView>
+          </View>
+        </ScrollView>
+      </Container>
 
       <ButtonBar
         handleCreateProfile={handleCreateProfile}
@@ -337,7 +335,7 @@ const RecoveryScreen = () => {
         styles={styles}
         theme={theme}
       />
-    </>
+    </KeyboardAvoidingView>
   );
 };
 
