@@ -5831,11 +5831,6 @@ expo-modules-core@2.3.12:
   dependencies:
     invariant "^2.2.4"
 
-expo-nip55@^0.1.5:
-  version "0.1.5"
-  resolved "https://registry.npmjs.org/expo-nip55/-/expo-nip55-0.1.5.tgz"
-  integrity sha512-TLeo7Kne7Yj138av1Zbvyrh/cG9jozXVeS42g8QJ2WdlnB329MzB6wmx7BkYS5x/MXTL+KvpL3AL8XVHHna51A==
-
 expo-random@^14.0.1:
   version "14.0.1"
   resolved "https://registry.npmjs.org/expo-random/-/expo-random-14.0.1.tgz"
@@ -5905,18 +5900,6 @@ expo-system-ui@~5.0.7:
   dependencies:
     "@react-native/normalize-colors" "0.79.2"
     debug "^4.3.2"
-
-expo-task-manager@~13.1.5:
-  version "13.1.5"
-  resolved "https://registry.npmjs.org/expo-task-manager/-/expo-task-manager-13.1.5.tgz"
-  integrity sha512-9jspZZ6y6hwo6QBwmfsUUX6sY4Mnrw8170LnOqrVfRuClkGaMrqDeBa9YUFTDt/BNYZ/3/QlZZ5QUHT9ziROfQ==
-  dependencies:
-    unimodules-app-loader "~5.1.3"
-
-expo-testflight@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.npmjs.org/expo-testflight/-/expo-testflight-0.3.0.tgz"
-  integrity sha512-wnAPyQKr8EVkoMK/CQYLcmWbD5dPJM0ZcuOq8AZmfzPzP5HfX3lH3iiLcOdoM2K8x7RbXdp/5iGvEmISIljaEw==
 
 expo-video@~2.1.8:
   version "2.1.8"
@@ -6844,11 +6827,6 @@ hex-color-opacity@^0.4.2:
   version "0.4.2"
   resolved "https://registry.npmjs.org/hex-color-opacity/-/hex-color-opacity-0.4.2.tgz"
   integrity sha512-rzZqEtPTqcd+4db5V7iPzgea2XsJlEsjimeqJA/E/4881739J8zQLXOkk6z7kjufN9WtQt5LRauxK8zpMKx95g==
-
-hex-rgb@^5.0.0:
-  version "5.0.0"
-  resolved "https://registry.npmjs.org/hex-rgb/-/hex-rgb-5.0.0.tgz"
-  integrity sha512-NQO+lgVUCtHxZ792FodgW0zflK+ozS9X9dwGp9XvvmPlH7pyxd588cn24TD3rmPm/N0AIRXF10Otah8yKqGw4w==
 
 highlight-words-core@^1.2.0:
   version "1.2.3"
@@ -8457,42 +8435,6 @@ lnurl-offline@1.2.0:
   version "1.2.0"
   resolved "https://registry.npmjs.org/lnurl-offline/-/lnurl-offline-1.2.0.tgz"
   integrity sha512-orNcYGfRYgM5IFmLeCIG4Zm2bN29uYQSwDo4bK8KOrU4mEB+ff18Yg5sQ1vCJ/fz0qWUJx1Dd0/GsEs3d+eaqA==
-
-lnurl-pay@^3.0.1:
-  version "3.0.1"
-  resolved "https://registry.npmjs.org/lnurl-pay/-/lnurl-pay-3.0.1.tgz"
-  integrity sha512-sN5UJdEAgFRlrQkLM2++u+BlXyAuzQ0GpiK4RuWe2xIxPDQxO8lImbAg4M+LTTdTY78romFZHsx8gcmg7h092w==
-  dependencies:
-    "@aws-crypto/sha256-js" "^5.2.0"
-    aes-js "^3.1.2"
-    assert "^2.1.0"
-    axios "^1.5.1"
-    base64-js "^1.5.1"
-    bech32 "^2.0.0"
-    bolt11 "^1.4.1"
-    browserify-zlib "^0.2.0"
-    buffer "^6.0.3"
-    https-browserify "^1.0.0"
-    is-url "^1.2.4"
-    stream-browserify "^3.0.0"
-    stream-http "^3.2.0"
-    tslib "^2.6.2"
-
-lnurl@^0.26.0:
-  version "0.26.2"
-  resolved "https://registry.npmjs.org/lnurl/-/lnurl-0.26.2.tgz"
-  integrity sha512-e9FYdEzwqzW5q1mT4G4eY2BxpVo15AeV+0DAqGVca+9QHb1sC4kjdS39KpenF7DtrPAcpDdEuLsaVr3QAr0i8A==
-  dependencies:
-    async "3.2.5"
-    bech32 "2.0.0"
-    bignumber.js "9.1.2"
-    bolt11 "1.4.1"
-    commander "12.1.0"
-    debug "4.3.5"
-    express "4.19.2"
-    lightning-backends "1.6.5"
-    lnurl-offline "1.2.0"
-    secp256k1 "5.0.0"
 
 local-pkg@^0.5.0:
   version "0.5.1"
@@ -10384,15 +10326,6 @@ qrcode-terminal@0.12.0:
   resolved "https://registry.npmjs.org/qrcode-terminal/-/qrcode-terminal-0.12.0.tgz"
   integrity sha512-EXtzRZmC+YGmGlDFbXKxQiMZNwCLEO6BANKXG4iCtSIM0yqc/pappSx3RIKr4r0uh5JsBckOXeKrB3Iz7mdQpQ==
 
-qrcode@^1.5.3, qrcode@^1.5.4:
-  version "1.5.4"
-  resolved "https://registry.npmjs.org/qrcode/-/qrcode-1.5.4.tgz"
-  integrity sha512-1ca71Zgiu6ORjHqFBDpnSMTR2ReToX4l1Au1VFLyVeBTFavzQnv5JxMFr3ukHVKpSrSA2MCk0lNJSykjUfz7Zg==
-  dependencies:
-    dijkstrajs "^1.0.1"
-    pngjs "^5.0.0"
-    yargs "^15.3.1"
-
 qs@6.11.0:
   version "6.11.0"
   resolved "https://registry.npmjs.org/qs/-/qs-6.11.0.tgz"
@@ -10529,37 +10462,12 @@ react-native-animatable@1.3.3:
   dependencies:
     prop-types "^15.7.2"
 
-react-native-avoid-softinput@^7.0.1:
-  version "7.0.1"
-  resolved "https://registry.yarnpkg.com/react-native-avoid-softinput/-/react-native-avoid-softinput-7.0.1.tgz#ad7f3b3db4858e026df56957839c5081bf8fc2f8"
-  integrity sha512-MWCh4LGz1cWOvxQXhUit9NcjRGC9CXRQcdWzQ0WR7SU1lzTmUqGwsibyde9M5+7f7RgDjLb5fwGTqjO+HJNrFw==
-  dependencies:
-    react-native-is-edge-to-edge "^1.1.6"
-
-react-native-bip39@^2.3.0:
-  version "2.3.0"
-  resolved "https://registry.npmjs.org/react-native-bip39/-/react-native-bip39-2.3.0.tgz"
-  integrity sha512-tHuGXMx7w2pxQTa4L2T2QGeQHAWvGhsRvxdZO5CD99ou+8CE2B0swNrVPus/djsfPYo4BBn3NbbsHjRAAt/Y7Q==
-  dependencies:
-    react-native-crypto "^2.0.1"
-    react-native-randombytes "^2.2.0"
-    unorm "^1.3.3"
-
 react-native-cache@^2.0.3:
   version "2.0.3"
   resolved "https://registry.npmjs.org/react-native-cache/-/react-native-cache-2.0.3.tgz"
   integrity sha512-EV2fp1Xg1ISL+f/JYyafFpt9BsmNcbEZ/IICg8crelI/CsrqZh+5OAUWoBk2WccXpqrC315tL9GaOa9R53zD1A==
   dependencies:
     "@react-native-async-storage/async-storage" "^1.13.4"
-
-react-native-chart-kit@^6.12.0:
-  version "6.12.0"
-  resolved "https://registry.npmjs.org/react-native-chart-kit/-/react-native-chart-kit-6.12.0.tgz"
-  integrity sha512-nZLGyCFzZ7zmX0KjYeeSV1HKuPhl1wOMlTAqa0JhlyW62qV/1ZPXHgT8o9s8mkFaGxdqbspOeuaa6I9jUQDgnA==
-  dependencies:
-    lodash "^4.17.13"
-    paths-js "^0.4.10"
-    point-in-polygon "^1.0.1"
 
 react-native-circular-progress@^1.4.1:
   version "1.4.1"
@@ -10600,11 +10508,6 @@ react-native-css-interop@0.1.22:
     debug "^4.3.7"
     lightningcss "^1.27.0"
     semver "^7.6.3"
-
-react-native-currency-input@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.npmjs.org/react-native-currency-input/-/react-native-currency-input-1.1.1.tgz"
-  integrity sha512-DLsYqXkhpbvwa1M3znaG0bfKh8jlzkf+iO8TRlAJ/t8c+3gXyKwO2YdWqsBUuX0ZHLY4IVBzDjURMEofjq3ypg==
 
 react-native-device-country@^1.0.5:
   version "1.0.5"
@@ -10739,33 +10642,15 @@ react-native-modal@^13.0.1:
     prop-types "^15.6.2"
     react-native-animatable "1.3.3"
 
-react-native-money-input@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.npmjs.org/react-native-money-input/-/react-native-money-input-1.0.1.tgz"
-  integrity sha512-8EE3eeqBCxwlsmizNCJ4W5pUxmpr2Of1PEu7jG92k+LP9Hs1JbIT/M/KAk6XpsEeEOnjKMm8iq9AkWHgpTLFiA==
-
 react-native-nfc-manager@^3.14.12:
   version "3.16.1"
   resolved "https://registry.npmjs.org/react-native-nfc-manager/-/react-native-nfc-manager-3.16.1.tgz"
   integrity sha512-rYhJSThAxAT4AVpZzZJc3X1jiTnZQlmrzk9DeeWLstUTXCoECt/75brLgn+EiXK+AfONnMnFdsSzIyruVWyIdw==
 
-react-native-onboard@^2.6.0:
-  version "2.6.0"
-  resolved "https://registry.npmjs.org/react-native-onboard/-/react-native-onboard-2.6.0.tgz"
-  integrity sha512-33mO3L0s4BxSPJEqpUaVVUVD28iMyVMO+ey4gB4fURVgQRTm1EcDydUsgRhiirGMKdyK8kqh6NI0TTKW7GSYSQ==
-
 react-native-pager-view@6.7.1:
   version "6.7.1"
   resolved "https://registry.npmjs.org/react-native-pager-view/-/react-native-pager-view-6.7.1.tgz"
   integrity sha512-cBSr6xw4g5N7Kd3VGWcf+kmaH7iBWb0DXAf2bVo3bXkzBcBbTOmYSvc0LVLHhUPW8nEq5WjT9LCIYAzgF++EXw==
-
-react-native-qrcode-styled@^0.3.3:
-  version "0.3.3"
-  resolved "https://registry.npmjs.org/react-native-qrcode-styled/-/react-native-qrcode-styled-0.3.3.tgz"
-  integrity sha512-DjxFhFAJBY3y2FEBbWSpwtPaSjsEc5RutTHejxzfRNuyTzg1f5thplGyON8yx0kbi6h0h+57s8cH4aSFGj1mQg==
-  dependencies:
-    qrcode "^1.5.4"
-    react-fast-compare "^3.2.2"
 
 react-native-qrcode-svg@^6.3.14:
   version "6.3.14"
@@ -10783,22 +10668,6 @@ react-native-quick-base64@^2.0.5:
   dependencies:
     base64-js "^1.5.1"
 
-react-native-quick-crypto@^0.7.12:
-  version "0.7.12"
-  resolved "https://registry.npmjs.org/react-native-quick-crypto/-/react-native-quick-crypto-0.7.12.tgz"
-  integrity sha512-3x4SmFz44DN4RjnSWu85f9iGSBqVy8RKj++7eWcGRTir1gMosNH6IxbxQHO4GD/d3tIP21QIijcD+/Z5h7v6DA==
-  dependencies:
-    "@craftzdog/react-native-buffer" "^6.0.5"
-    events "^3.3.0"
-    readable-stream "^4.5.2"
-    string_decoder "^1.3.0"
-    util "^0.12.5"
-
-react-native-radio-buttons-group@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.npmjs.org/react-native-radio-buttons-group/-/react-native-radio-buttons-group-3.1.0.tgz"
-  integrity sha512-DiNM1yI6WfRygUZ+Z/bsjggyLypXsxRNXPNYpPHXSEVbRD6uF5Aei+HMIwyeRbfMKPtHwLq7cGsmUDV01i+rOQ==
-
 react-native-randombytes@^2.2.0:
   version "2.3.0"
   resolved "https://registry.npmjs.org/react-native-randombytes/-/react-native-randombytes-2.3.0.tgz"
@@ -10806,19 +10675,6 @@ react-native-randombytes@^2.2.0:
   dependencies:
     buffer "^4.9.1"
     sjcl "^1.0.3"
-
-react-native-randombytes@^3.6.1:
-  version "3.6.1"
-  resolved "https://registry.npmjs.org/react-native-randombytes/-/react-native-randombytes-3.6.1.tgz"
-  integrity sha512-qxkwMbOZ0Hff1V7VqpaWrR6ItkA+oF6bnI79Qp9F3Tk8WBsdKDi6m1mi3dEdFWePoRLrhJ2L03rU0yabst1tVw==
-  dependencies:
-    buffer "^4.9.1"
-    sjcl "^1.0.3"
-
-react-native-reanimated-skeleton@^1.5.1:
-  version "1.5.1"
-  resolved "https://registry.npmjs.org/react-native-reanimated-skeleton/-/react-native-reanimated-skeleton-1.5.1.tgz"
-  integrity sha512-PO7/hWBDlV8w3l6EJmzzwWwdlXVTrBFuF8QcUu4ZUOMQQGD5YKfBsYnUNkPAfjvYx3ZJfvPORe72QbArI3OGSw==
 
 react-native-reanimated@~3.16.1:
   version "3.16.7"
@@ -10888,29 +10744,10 @@ react-native-skeleton-component@^1.0.0:
   resolved "https://registry.npmjs.org/react-native-skeleton-component/-/react-native-skeleton-component-1.0.0.tgz"
   integrity sha512-sMZoZegq6ZwbxrsrxYdZWVUT5OJb1dCX/hLOlwVBkzItwR5cWBqsYaXeNhPOdasXYDhkVMtDQlgZjgyw9dfMJw==
 
-react-native-skeleton-loading@^1.0.8:
-  version "1.0.12"
-  resolved "https://registry.npmjs.org/react-native-skeleton-loading/-/react-native-skeleton-loading-1.0.12.tgz"
-  integrity sha512-sYFqn6HBSuqUyWRQe7tqwNQFIBUJlJYT0WLH7LC+KujEXZ1oLBBa+fx94rSq4jNYTNqm4fmID52szPTyuxb/KA==
-  dependencies:
-    "@react-native-masked-view/masked-view" "0.3.2"
-    react-native-linear-gradient "^2.8.3"
-    react-native-reanimated "~3.16.1"
-
 react-native-snow-bg@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/react-native-snow-bg/-/react-native-snow-bg-1.0.0.tgz"
   integrity sha512-xD2XCw/TVipK884p+K3PPE5sVh7BGcngi5zeZlq/3upMXOkfWJASzBU1v1oWplzBiF7FdEOor1KQAyabWrsjSg==
-
-react-native-snowflakes@^1.0.3:
-  version "1.0.3"
-  resolved "https://registry.npmjs.org/react-native-snowflakes/-/react-native-snowflakes-1.0.3.tgz"
-  integrity sha512-s1obI7gTGbFKOsZe29rNOTG+ST2jUHCkOhNMPR31rirXgcpzvvY/8fDNGGES+Vva+dj9BFNnbtCNz7pZhSvYEw==
-
-react-native-sticky-parallax-header@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.npmjs.org/react-native-sticky-parallax-header/-/react-native-sticky-parallax-header-1.1.1.tgz"
-  integrity sha512-vP2tCqsWECNy1H5dNbLnMTpgSkswIpRTFO1itkQZX23JERxCUe7EfSQ9gDw0KwYgQm94ix2vWAo2mn/MeVLI0Q==
 
 react-native-svg@15.11.2:
   version "15.11.2"
@@ -10921,11 +10758,6 @@ react-native-svg@15.11.2:
     css-tree "^1.1.3"
     warn-once "0.1.1"
 
-react-native-threads@^0.0.19:
-  version "0.0.19"
-  resolved "https://registry.npmjs.org/react-native-threads/-/react-native-threads-0.0.19.tgz"
-  integrity sha512-VAQB06D+qxGDm3XwNUaDtEh1pKEuRLx4w3/E81z+pK1luMyJhK1W0G+eA0xygcM74dShXCgG10ZNvN+LHfyCLg==
-
 react-native-vector-icons@^10.1.0, react-native-vector-icons@^10.2.0:
   version "10.2.0"
   resolved "https://registry.npmjs.org/react-native-vector-icons/-/react-native-vector-icons-10.2.0.tgz"
@@ -10934,11 +10766,6 @@ react-native-vector-icons@^10.1.0, react-native-vector-icons@^10.2.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
-react-native-video@^6.4.5:
-  version "6.8.2"
-  resolved "https://registry.npmjs.org/react-native-video/-/react-native-video-6.8.2.tgz"
-  integrity sha512-lAf6pa/eqksaQnZ+rx9XWx9HpfNt0xr/XmSXMASynJJ8EqMJTr8gHJe4Wfkebo5W8qAMKRuHYtZs+4Shzl3IIQ==
-
 react-native-view-shot@~4.0.3:
   version "4.0.3"
   resolved "https://registry.npmjs.org/react-native-view-shot/-/react-native-view-shot-4.0.3.tgz"
@@ -10946,22 +10773,10 @@ react-native-view-shot@~4.0.3:
   dependencies:
     html2canvas "^1.4.1"
 
-react-native-virtualized-view@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/react-native-virtualized-view/-/react-native-virtualized-view-1.0.0.tgz"
-  integrity sha512-7YyFMMkNzJ787/giGkKcm0JEx0IcLEE/XHREGz2I4K1RISQGFjEDe6iWsapOnHSR/e1vhebZJ8VmqhSpg5YPzg==
-
 react-native-web-infinite-swiper@^1.0.1:
   version "1.0.1"
   resolved "https://registry.npmjs.org/react-native-web-infinite-swiper/-/react-native-web-infinite-swiper-1.0.1.tgz"
   integrity sha512-e6d0uF9+ImXzkd+Zvah45KAs5ma2irtlHs9OC8jllQmDzHTBlOAmkqyiPWi6FJ1BC1QDV/1DaEbMJf3ALipB4A==
-  dependencies:
-    prop-types "^15.6.2"
-
-react-native-web-swiper@^2.2.4:
-  version "2.2.4"
-  resolved "https://registry.npmjs.org/react-native-web-swiper/-/react-native-web-swiper-2.2.4.tgz"
-  integrity sha512-Lq6fgCuVhEzxgWJU5t+wWhCoOfd0jfQ1Qdwyww/Kln4McPXFKQ6MaSuUHltnFOKYHej97R7avPchn+QB1wIFQg==
   dependencies:
     prop-types "^15.6.2"
 
@@ -10978,13 +10793,6 @@ react-native-web@^0.20.0:
     nullthrows "^1.1.1"
     postcss-value-parser "^4.2.0"
     styleq "^0.1.3"
-
-react-native-websocket@^1.0.2:
-  version "1.0.2"
-  resolved "https://registry.npmjs.org/react-native-websocket/-/react-native-websocket-1.0.2.tgz"
-  integrity sha512-V0yP5gEHrfP6dj3DEgMywf+yyqN6B0csGdPxv8sLSpmEQoN3e9umhwkz0OC/7Tl5BR0yAISSDIs4w95Lp1Sudg==
-  dependencies:
-    prop-types "^15.6.1"
 
 react-native-webview@13.13.5:
   version "13.13.5"
@@ -11097,31 +10905,6 @@ react-universal-interface@^0.6.2:
   version "0.6.2"
   resolved "https://registry.npmjs.org/react-universal-interface/-/react-universal-interface-0.6.2.tgz"
   integrity sha512-dg8yXdcQmvgR13RIlZbTRQOoUrDciFVoSBZILwjE2LFISxZZ8loVJKAkuzswl5js8BHda79bIb2b84ehU8IjXw==
-
-react-use-error-boundary@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.npmjs.org/react-use-error-boundary/-/react-use-error-boundary-3.0.0.tgz"
-  integrity sha512-5urkfyU3ZzInEMSHe1gxtDzlQAHs0krTt0V6h8H2L5nXhDKq3OYXnCs9lGHDkEkYvLmsphw8ap5g8uYfvrkJng==
-
-react-use@^17.6.0:
-  version "17.6.0"
-  resolved "https://registry.npmjs.org/react-use/-/react-use-17.6.0.tgz"
-  integrity sha512-OmedEScUMKFfzn1Ir8dBxiLLSOzhKe/dPZwVxcujweSj45aNM7BEGPb9BEVIgVEqEXx6f3/TsXzwIktNgUR02g==
-  dependencies:
-    "@types/js-cookie" "^2.2.6"
-    "@xobotyi/scrollbar-width" "^1.9.5"
-    copy-to-clipboard "^3.3.1"
-    fast-deep-equal "^3.1.3"
-    fast-shallow-equal "^1.0.0"
-    js-cookie "^2.2.1"
-    nano-css "^5.6.2"
-    react-universal-interface "^0.6.2"
-    resize-observer-polyfill "^1.5.1"
-    screenfull "^5.1.0"
-    set-harmonic-interval "^1.0.1"
-    throttle-debounce "^3.0.1"
-    ts-easing "^0.2.0"
-    tslib "^2.1.0"
 
 react@19.0.0:
   version "19.0.0"
@@ -11479,24 +11262,6 @@ ripemd160@^2.0.0, ripemd160@^2.0.1:
   dependencies:
     hash-base "^3.0.0"
     inherits "^2.0.1"
-
-rn-fetch-blob@^0.12.0:
-  version "0.12.0"
-  resolved "https://registry.npmjs.org/rn-fetch-blob/-/rn-fetch-blob-0.12.0.tgz"
-  integrity sha512-+QnR7AsJ14zqpVVUbzbtAjq0iI8c9tCg49tIoKO2ezjzRunN7YL6zFSFSWZm6d+mE/l9r+OeDM3jmb2tBb2WbA==
-  dependencies:
-    base-64 "0.1.0"
-    glob "7.0.6"
-
-rn-slide-button@^1.0.3:
-  version "1.0.3"
-  resolved "https://registry.npmjs.org/rn-slide-button/-/rn-slide-button-1.0.3.tgz"
-  integrity sha512-quzZNfvNkJ3rTPCTiz5WOezkJoErP3bTiyofOFf4lrpNWPpL2Dt1mXPzxzUC8hYHNl6BQaYuF5VLGL5SIod5Cw==
-
-rn-swipe-button@^1.3.8:
-  version "1.3.8"
-  resolved "https://registry.npmjs.org/rn-swipe-button/-/rn-swipe-button-1.3.8.tgz"
-  integrity sha512-5xC9jBzEJ7XCSImYLFfen+YBnt3S91eOU81Uht3odTUuoWkEwtoaESYqfY7U5CLqXY2lD7yZeD6/O6YalWFyng==
 
 rtl-css-js@^1.16.1:
   version "1.16.1"
@@ -11936,15 +11701,6 @@ socks@^2.7.1:
     ip-address "^9.0.5"
     smart-buffer "^4.2.0"
 
-solid-js@^1.9.4:
-  version "1.9.4"
-  resolved "https://registry.npmjs.org/solid-js/-/solid-js-1.9.4.tgz"
-  integrity sha512-ipQl8FJ31bFUoBNScDQTG3BjN6+9Rg+Q+f10bUbnO6EOTTf5NGerJeHc7wyu5I4RMHEl/WwZwUmy/PTRgxxZ8g==
-  dependencies:
-    csstype "^3.1.0"
-    seroval "^1.1.0"
-    seroval-plugins "^1.1.0"
-
 source-map-js@^1.2.1:
   version "1.2.1"
   resolved "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz"
@@ -12078,31 +11834,6 @@ statuses@~1.5.0:
   resolved "https://registry.npmjs.org/statuses/-/statuses-1.5.0.tgz"
   integrity sha512-OpZ3zP+jT1PI7I8nemJX4AKmAX070ZkYPVWV/AaKTJl+tXCTGyVdC1a4SL8RUQYEwk/f34ZX8UTykN68FwrqAA==
 
-steam-crypto@^0.0:
-  version "0.0.1"
-  resolved "https://registry.npmjs.org/steam-crypto/-/steam-crypto-0.0.1.tgz"
-  integrity sha512-N8pVbZ0xkYeTnoUDepgf29zO1+XimIZMsY7QedDHUWMJ5mvBYMVhhxPwrlM/c72lMnyRCTVsEWG/EmYv7h5b9Q==
-
-"steam-resources@github:seishun/node-steam-resources#v1.2.0":
-  version "1.2.0"
-  resolved "https://codeload.github.com/seishun/node-steam-resources/tar.gz/2e9f12a3a07bd1e8f1bb397109d1d7361da793ca"
-  dependencies:
-    bytebuffer "^5.0"
-    csv-parse "^4.0.1"
-    protobufjs "^4.1"
-
-steam@^1.4.1:
-  version "1.4.1"
-  resolved "https://registry.npmjs.org/steam/-/steam-1.4.1.tgz"
-  integrity sha512-JBJaDNd2lz5a4q/VCBhf3n0L8WWB+A+VCLqWbNycRhembfJ759lBHueXLvibZBvii00rS1pQPPJ0hiea9B5oQg==
-  dependencies:
-    adm-zip "^0.4"
-    buffer-crc32 "^0.2"
-    bytebuffer "^5.0"
-    steam-crypto "^0.0"
-    steam-resources "github:seishun/node-steam-resources#v1.2.0"
-
-stream-browserify@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/stream-browserify/-/stream-browserify-1.0.0.tgz"
   integrity sha512-e+V5xc4LlkOiRr64kZTUdb11exsbpSnwb9uwmXaHeDXCpfHg7vaefMJOxi21Pe74ZOqjZ87blBcqqpNAM4Ku0g==
@@ -12581,13 +12312,6 @@ tiny-invariant@^1.3.3:
   resolved "https://registry.npmjs.org/tiny-invariant/-/tiny-invariant-1.3.3.tgz"
   integrity sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==
 
-tiny-secp256k1@^2.2.3:
-  version "2.2.3"
-  resolved "https://registry.npmjs.org/tiny-secp256k1/-/tiny-secp256k1-2.2.3.tgz"
-  integrity sha512-SGcL07SxcPN2nGKHTCvRMkQLYPSoeFcvArUSCYtjVARiFAWU44cCIqYS0mYAU6nY7XfvwURuTIGo2Omt3ZQr0Q==
-  dependencies:
-    uint8array-tools "0.0.7"
-
 tinyexec@^0.3.2:
   version "0.3.2"
   resolved "https://registry.npmjs.org/tinyexec/-/tinyexec-0.3.2.tgz"
@@ -12611,13 +12335,6 @@ to-regex-range@^5.0.1:
   integrity sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==
   dependencies:
     is-number "^7.0.0"
-
-toastify-react-native@^5.0.0:
-  version "5.0.3"
-  resolved "https://registry.npmjs.org/toastify-react-native/-/toastify-react-native-5.0.3.tgz"
-  integrity sha512-xDsLJrryQiNA7f0VVDyD8S7CyVCiNs0s0t7Afyj/zhBVfe/WYIf+uKJPqQg2P/9TmHixg3Bo92A9MGs8xl254w==
-  dependencies:
-    react-native-vector-icons "^10.2.0"
 
 toggle-selection@^1.0.6:
   version "1.0.6"
@@ -12986,11 +12703,6 @@ url@^0.10.3:
   dependencies:
     punycode "1.3.2"
     querystring "0.2.0"
-
-use-interval@^1.4.0:
-  version "1.4.0"
-  resolved "https://registry.npmjs.org/use-interval/-/use-interval-1.4.0.tgz"
-  integrity sha512-1betIJun2rXKLxa30AFOBZCeZhsBJoJ/3+gkCeYbJ63lAR//EnAb1NjNeFqzgqeM7zQfR76rrCUaA8DvfgoOpA==
 
 use-latest-callback@^0.2.1:
   version "0.2.3"
