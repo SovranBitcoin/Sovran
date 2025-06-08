@@ -14,7 +14,7 @@ import { store } from 'helper/redux/store';
 import Wrapper, { SheetButton } from '../wrapper';
 import { sovran } from '.';
 import { ScrollView } from 'react-native-actions-sheet';
-import { getMint } from 'components/cashu';
+import { getMint, getWallet } from 'components/cashu';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import Container from 'components/layout/Container';
 import Modal from 'components/layout/Modal';
@@ -613,6 +613,14 @@ export function MintAddMore({ onClose, payload }) {
               text: `Save (${selectedMints.size})`,
               variant: 'primary',
               onPress: async () => {
+                await Promise.all(
+                  Array.from(selectedMints).map(async (mintUrl) => {
+                    await getWallet({
+                      mintUrl,
+                      forceRefresh: true,
+                    });
+                  })
+                );
                 await onClose({
                   mints: Array.from(selectedMints),
                 });

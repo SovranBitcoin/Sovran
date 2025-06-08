@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Linking, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { greens, greys } from 'helper/colors';
 import Wrapper from '../wrapper';
-import { truncateMiddle } from 'helper/strings';
 import { RowButton, Section } from 'app/settings';
 import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
 import { useWallet } from 'helper/cashu/wallet';
@@ -15,6 +14,10 @@ import { useSelector } from 'react-redux';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { nip19 } from 'nostr-tools';
+import Heatmap from 'components/layout/Heatmap';
+
+import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 const MintDetailPage = (props) => {
   const theme = 'dark';
@@ -128,19 +131,7 @@ const MintDetailPage = (props) => {
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Mint Header */}
         <View style={styles.headerContainer}>
-          <View style={styles.logoContainer}>
-            {mintInfo.icon_url ? (
-              <Image source={{ uri: mintInfo.icon_url }} style={styles.logoImage} />
-            ) : (
-              <View style={styles.logo}>
-                <Text style={styles.logoText}>
-                  {mintInfo.name ? mintInfo.name.charAt(0).toUpperCase() : 'M'}
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.mintTitle}>{mintInfo.name || 'Unknown Mint'}</Text>
-          {mintInfo.version && <Text style={styles.mintVersion}>{mintInfo.version}</Text>}
+          <Heatmap mintInfo={mintInfo} mintUrl={params?.mintUrl} />
         </View>
 
         {/* Description Card */}
@@ -316,6 +307,16 @@ const createStyles = (theme) =>
       fontSize: 12,
       color: greens[400],
       fontWeight: '600',
+    },
+    container2: {
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    centerContent2: {
+      position: 'absolute',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 
