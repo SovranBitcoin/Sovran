@@ -76,18 +76,18 @@ export const QRCode = memo(function QRCode({
   return (
     <View style={containerStyle}>
       <LinearGradient
-        colors={[shades[100], shades[500]]}
+        colors={!animate ? [shades[200], shades[500]] : [greys(theme)[1500], greys(theme)[1500]]}
         style={{
           ...(hasBackground
             ? {
-                backgroundColor: shades[300],
+                backgroundColor: greys(theme)[2300],
                 padding: 16,
                 borderRadius: 16,
               }
             : {}),
         }}>
         <EQRCode
-          color={greys(theme)[0]}
+          color={animate ? greys(theme)[100] : greys(theme)[0]}
           // enableLinearGradient
           // linearGradient={[shades[200], shades[500]]}
           backgroundColor={'transparent'}
