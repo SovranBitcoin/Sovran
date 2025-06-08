@@ -62,7 +62,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
           </View>
         </View>
         <Button
-          text={isClaimed ? 'Redeemed' : 'Redeem'}
+          text={isClaimed ? 'Claimed' : 'Redeem'}
           variant="primary"
           disabled={isClaimed}
           onPress={handleRedeem}

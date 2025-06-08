@@ -50,6 +50,10 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 - [x] NIP06 Mnemonic Seed for Nostr identities
 - [x] NUT13 Mnemonic Seed for Ecash
 
+- [x] Nostr DMs
+
+  - [x] Ecash formatted nicely so you can click "Redeem"
+
 - [x] NPCV2 Lightning URL
 
   - [ ] Scroll down to fetch ecash
