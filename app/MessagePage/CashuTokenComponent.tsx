@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades } from 'helper/colors';
 import { Button } from 'components/common/Button';
+import { AmountFormatter } from 'components/common/AmountFormatter';
 import { receiveEcash } from 'components/cashu';
 import { showMessage } from 'helper/popup/popups';
 import { useCashu } from 'helper/redux/cashu';
+import { useTypedNavigation } from 'helper/navigation';
 import opacity from 'hex-color-opacity';
 
 interface Props {
@@ -18,12 +20,23 @@ interface Props {
 const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   const styles = createStyles(theme, isReceived);
   const { transactions } = useCashu();
+  const navigation = useTypedNavigation();
 
   const decoded = getDecodedToken(token);
   const amount = decoded.proofs.reduce((a, p) => a + p.amount, 0);
   const unit = decoded.unit;
 
-  const isClaimed = transactions.some((t) => t.token === token);
+  const transaction = transactions.find((t) => t.token === token);
+  const isClaimed = Boolean(transaction);
+
+  const handleViewTransaction = () => {
+    if (transaction) {
+      navigation.navigate('transaction', {
+        id: transaction.token || transaction.request || '',
+        transactionType: transaction.transactionType,
+      });
+    }
+  };
 
   const handleRedeem = async () => {
     try {
@@ -50,24 +63,23 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
           },
         ]}
       />
-      <LinearGradient colors={gradientColors} style={styles.container}>
-        <Text style={styles.mintText}>{decoded.mint}</Text>
+      <Pressable onLongPress={handleViewTransaction}>
+        <LinearGradient colors={gradientColors} style={styles.container}>
+          <Text style={styles.mintText}>{decoded.mint}</Text>
 
-        <View style={styles.footer}>
-          <View>
-            <Text style={styles.amountText}>
-              {amount} {unit === 'sat' ? 'sats' : unit}
-            </Text>
-            {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
+          <View style={styles.footer}>
+            <View>
+              <AmountFormatter amount={amount} unit={unit} size={24} weight="heavy" color={greys(theme)[0]} />
+              {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
+            </View>
           </View>
-        </View>
-        <Button
-          text={isClaimed ? 'Claimed' : 'Redeem'}
-          variant="primary"
-          disabled={isClaimed}
-          onPress={handleRedeem}
-        />
-      </LinearGradient>
+          <Button
+            text={isClaimed ? 'View Transaction' : 'Redeem'}
+            variant="primary"
+            onPress={isClaimed ? handleViewTransaction : handleRedeem}
+          />
+        </LinearGradient>
+      </Pressable>
     </View>
   );
 };
@@ -103,12 +115,6 @@ const createStyles = (theme: string, isReceived: boolean) =>
       fontSize: 14,
       textAlign: 'center',
       color: greys(theme)[0],
-    },
-    amountText: {
-      fontFamily: 'OverpassHeavy',
-      fontSize: 24,
-      color: greys(theme)[0],
-      marginBottom: 0,
     },
     footer: {
       flexDirection: 'row',
