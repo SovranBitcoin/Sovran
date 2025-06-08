@@ -8,6 +8,7 @@ import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { useEsims } from 'helper/redux/esim';
 import { find, get, some } from 'lodash';
+import { npubToPubkey } from 'components/layout/Transaction';
 
 export interface TransactionData {
   id?: string;
@@ -36,9 +37,8 @@ interface TransactionIconProps {
   transaction: TransactionData;
 }
 
-export default function TransactionIcon({
-  transaction,
-}: TransactionIconProps): JSX.Element {
+export default function TransactionIcon({ transaction }: TransactionIconProps): JSX.Element {
+  console.log(123, transaction);
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
   const { esims } = useEsims();
@@ -49,7 +49,9 @@ export default function TransactionIcon({
   const profilePicture = useMemo(() => {
     const getPicture = (arr?: any[]) => {
       const item = find(arr, {
-        pubkey: transaction?.nostr?.pubkey || transaction?.fromNIP05?.split('@')[0],
+        pubkey:
+          transaction?.nostr?.pubkey ||
+          npubToPubkey(transaction?.fromNIP05?.split('@')[0] || transaction?.lud16?.split('@')[0]),
       });
       return (
         get(item, 'profile.picture') ||
@@ -60,7 +62,7 @@ export default function TransactionIcon({
     };
 
     return getPicture(search) || getPicture(profiles);
-  }, [search, profiles, transaction?.nostr?.pubkey, transaction?.fromNIP05]);
+  }, [search, profiles, transaction?.nostr?.pubkey, transaction?.fromNIP05, transaction?.lud16]);
 
   const isEsimRequest = useMemo(
     () => some(esims, (e) => e?.request && e.request === transaction.request),
@@ -71,15 +73,16 @@ export default function TransactionIcon({
     <View
       className="absolute -bottom-2 -right-2 z-10 rounded-full"
       style={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[1500],
         borderRadius: 100,
         height: 16,
         width: 16,
         padding: 3,
         borderColor: greys(theme)[1300],
-        borderWidth: 0.2,
       }}>
-      {transaction.isCancel ? (
+      {transaction.fromNIP05 ? (
+        <Icon name="mdi:at" color={greys(theme)[100]} size={10} />
+      ) : transaction.isCancel ? (
         <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
       ) : (
         <Icon
@@ -100,8 +103,8 @@ export default function TransactionIcon({
             width: 28,
             height: 28,
             borderRadius: 1000,
-            borderColor: greys(theme)[1000],
-            borderWidth: 0.5,
+            borderColor: greys(theme)[1500],
+            borderWidth: 1,
           }}
           source={{ uri: profilePicture }}
         />
@@ -121,7 +124,17 @@ export default function TransactionIcon({
   if (transaction.fromNIP05 && isReceive) {
     return (
       <View className="relative h-7 w-7 bg-transparent">
-        <Icon name="mdi:at" color={greys(theme)[100]} />
+        <StatusIndicator />
+        <CachedImage
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 1000,
+            borderColor: greys(theme)[1500],
+            borderWidth: 1,
+          }}
+          source={{ uri: profilePicture }}
+        />
       </View>
     );
   }

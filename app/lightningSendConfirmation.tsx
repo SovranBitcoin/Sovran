@@ -36,6 +36,7 @@ export function LightningSendConfirmation({
   redirect,
   email,
   extraButtons = [],
+  lud16,
 }: {
   transaction?: any;
   pr: string;
@@ -45,6 +46,7 @@ export function LightningSendConfirmation({
   redirect?: string;
   email?: string;
   extraButtons?: ButtonHandlerButton[];
+  lud16?: string;
 }) {
   const navigation = useTypedNavigation();
   const dispatch = useDispatch();
@@ -104,6 +106,7 @@ export function LightningSendConfirmation({
         pubkey,
         meltQuote: parsedQuote,
         email,
+        lud16,
       });
 
       showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
@@ -156,6 +159,7 @@ export function LightningSendConfirmation({
             amount={amount}
             unit={unit}
             request={pr}
+            transaction={transaction}
           />
           {!transaction?.paid && (
             <SelectedMintDisplay
@@ -193,7 +197,7 @@ export function LightningSendConfirmation({
             items={[
               { title: 'Date', value: getTimestamp({ pr }) },
               { title: 'Type', value: 'Send • Lightning' },
-              { title: 'Request', value: truncateMiddle(pr, 5) },
+              { title: 'Request', value: truncateMiddle(lud16 || pr, lud16 ? 10 : 5) },
               { title: 'Quote', value: truncateMiddle(quoteId, 7) },
               {
                 title: `Fee (${getCurrencyDisplay()})`,
@@ -263,7 +267,7 @@ export function LightningSendConfirmation({
 }
 
 function ModalScreen() {
-  const { pr, unit, pubkey, meltQuote, redirect, email } =
+  const { pr, unit, pubkey, meltQuote, redirect, email, lud16 } =
     useTypedRoute<'lightningSendConfirmation'>();
 
   return (
@@ -274,6 +278,7 @@ function ModalScreen() {
       meltQuote={meltQuote}
       redirect={redirect}
       email={email}
+      lud16={lud16}
     />
   );
 }

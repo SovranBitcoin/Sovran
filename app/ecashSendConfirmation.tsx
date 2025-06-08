@@ -274,6 +274,7 @@ export function EcashSendConfirmation({
             amount={amount}
             unit={unit}
             cancelled={getCurrentTransaction[0].isCancel}
+            transaction={getCurrentTransaction[0]}
           />
           {!getCurrentTransaction[0].paid && (
             <PaymentInfo

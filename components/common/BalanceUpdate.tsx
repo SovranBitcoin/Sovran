@@ -23,11 +23,8 @@ export function BalanceUpdate({
   transactionType,
   amount,
   unit,
-  pubkey,
-  request,
   transaction,
   bottomAmount,
-  cancelled,
 }: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
 
@@ -62,15 +59,6 @@ export function BalanceUpdate({
         </Text>
       );
     return null;
-  };
-  const txData: TransactionData = {
-    transactionType,
-    amount,
-    unit,
-    request,
-    isCancel: cancelled || transaction?.isCancel,
-    ...(pubkey ? { nostr: { pubkey } } : {}),
-    ...((transaction as any)?.fromNIP05 ? { fromNIP05: (transaction as any).fromNIP05 } : {}),
   };
 
   return (
@@ -123,7 +111,7 @@ export function BalanceUpdate({
         </Text>
       </View>
       <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
-        <TransactionIcon transaction={txData} />
+        <TransactionIcon transaction={{ ...transaction, transactionType }} />
       </View>
     </View>
   );
