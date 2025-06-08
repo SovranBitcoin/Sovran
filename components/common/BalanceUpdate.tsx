@@ -1,17 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Text, View } from 'components/common/Themed';
-import Icon from 'assets/icons';
 import { useSelector } from 'react-redux';
-import { useNostr } from 'helper/redux/nostr';
 import { greens, greys, shades } from 'helper/colors';
 import opacity from 'hex-color-opacity';
-import { useEsims } from 'helper/redux/esim';
-
-import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
-import { find, get, some } from 'lodash';
 import { formatCurrency } from 'helper/currency';
+import TransactionIcon, { TransactionData } from './TransactionIcon';
 
 interface BalanceUpdateProps {
   transactionType: 'send' | 'receive' | string;
@@ -35,27 +30,6 @@ export function BalanceUpdate({
   cancelled,
 }: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
-  const { search, profiles } = useNostr();
-  const { esims } = useEsims();
-
-  const profilePicture = useMemo(() => {
-    const getPicture = (arr?: any[]) => {
-      const item = find(arr, { pubkey });
-      return (
-        get(item, 'profile.picture') ||
-        get(item, 'picture') ||
-        get(item, 'profile.image') ||
-        get(item, 'image')
-      );
-    };
-
-    return getPicture(search) || getPicture(profiles);
-  }, [search, profiles, pubkey]);
-
-  const isEsimRequest = useMemo(
-    () => some(esims, (e) => e?.request && e.request === request),
-    [esims, request]
-  );
 
   const isSend = transactionType === 'send';
   const isReceive = transactionType === 'receive';
@@ -89,76 +63,14 @@ export function BalanceUpdate({
       );
     return null;
   };
-
-  const ArrowIcon = () => (
-    <View
-      className="absolute -bottom-2 -right-2 z-10 rounded-full"
-      style={{
-        backgroundColor: greys(theme)[1800],
-        borderRadius: 100,
-        height: 16,
-        width: 16,
-        padding: 3,
-        borderColor: greys(theme)[1300],
-        borderWidth: 0.2,
-      }}>
-      {isReceive ? (
-        <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} size={10} />
-      ) : transaction?.isCancel ? (
-        <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
-      ) : (
-        <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} size={10} />
-      )}
-    </View>
-  );
-
-  const renderRightIcon = () => {
-    if (profilePicture) {
-      return (
-        <View className="relative h-7 w-7 bg-transparent">
-          <ArrowIcon />
-          <CachedImage
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 1000,
-              borderColor: greys(theme)[1300],
-              borderWidth: 0.2,
-            }}
-            source={{ uri: profilePicture }}
-          />
-        </View>
-      );
-    }
-
-    if (isReceive) {
-      return (
-        <View className="relative h-7 w-7 bg-transparent">
-          <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
-        </View>
-      );
-    }
-
-    if (isEsimRequest) {
-      return (
-        <View className="relative h-7 w-7 bg-transparent">
-          <ArrowIcon />
-          <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
-        </View>
-      );
-    }
-
-    console.log(transaction, 198273);
-
-    return (
-      <View className="relative h-7 w-7 bg-transparent">
-        {cancelled ? (
-          <Icon name="mdi:cancel" color={greys(theme)[100]} />
-        ) : (
-          <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-        )}
-      </View>
-    );
+  const txData: TransactionData = {
+    transactionType,
+    amount,
+    unit,
+    request,
+    isCancel: cancelled || transaction?.isCancel,
+    ...(pubkey ? { nostr: { pubkey } } : {}),
+    ...((transaction as any)?.fromNIP05 ? { fromNIP05: (transaction as any).fromNIP05 } : {}),
   };
 
   return (
@@ -211,7 +123,7 @@ export function BalanceUpdate({
         </Text>
       </View>
       <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
-        {renderRightIcon()}
+        <TransactionIcon transaction={txData} />
       </View>
     </View>
   );
