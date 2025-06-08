@@ -15,6 +15,7 @@ import { useSelector } from 'react-redux';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { nip19 } from 'nostr-tools';
+import Heatmap from 'components/layout/Heatmap';
 
 const MintDetailPage = (props) => {
   const theme = 'dark';
@@ -181,6 +182,9 @@ const MintDetailPage = (props) => {
         <Section title="Mint Details">
           <RowButton label="Version" value={mintInfo.version || 'Unknown'} />
         </Section>
+
+        {/* Swap Activity Heatmap */}
+        <Heatmap mintUrl={params?.mintUrl} />
 
         {/* Actions Section */}
         <Section title="Actions">
