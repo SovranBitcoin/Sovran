@@ -1,4 +1,4 @@
-import { getMint } from 'helper/cashu';
+import { getMint } from "helper/cashu";
 import {
   ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,
@@ -16,7 +16,7 @@ import {
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
   SET_KEYS,
-} from './actionTypes';
+} from "./actionTypes";
 
 export const addMints = ({ profileId, mints }) => ({
   type: ADD_MINTS,
@@ -46,6 +46,11 @@ export const setKeys = ({ mintUrl, keys }) => ({
 export const setInfo = ({ mintUrl, mintInfo }) => ({
   type: SET_INFO,
   payload: { mintUrl, mintInfo },
+});
+
+export const setAudit = ({ mintUrl, audit }) => ({
+  type: SET_AUDIT,
+  payload: { mintUrl, audit },
 });
 
 export const setTransactions = ({ profileId, transactions }) => ({
@@ -91,7 +96,12 @@ export const incrementCounter = ({ profileId, mintUrl, amount }) => ({
   payload: { profileId, mintUrl, amount },
 });
 
-export const increaseCounterV2 = ({ profileId, mintUrl, keysetId, amount }) => ({
+export const increaseCounterV2 = ({
+  profileId,
+  mintUrl,
+  keysetId,
+  amount,
+}) => ({
   type: INCREASE_COUNTER_V2,
   payload: { profileId, mintUrl, keysetId, amount },
 });
@@ -119,7 +129,7 @@ export const updateMint = ({ mintUrl }) => {
         setKeysets({
           mintUrl,
           keysets,
-        })
+        }),
       );
 
       const mintInfo = await (await mint).getInfo();
@@ -128,7 +138,7 @@ export const updateMint = ({ mintUrl }) => {
         setInfo({
           mintUrl,
           mintInfo,
-        })
+        }),
       );
 
       return { success: true };
@@ -143,7 +153,9 @@ export const addMintsAction = ({ profileId, mintUrls }) => {
   return async (dispatch) => {
     try {
       // First update all mints (fetch and store keysets and info)
-      const updatePromises = mintUrls.map((mintUrl) => dispatch(updateMint({ mintUrl })));
+      const updatePromises = mintUrls.map((mintUrl) =>
+        dispatch(updateMint({ mintUrl })),
+      );
 
       // Wait for all updates to complete
       const results = await Promise.all(updatePromises);
@@ -157,12 +169,12 @@ export const addMintsAction = ({ profileId, mintUrls }) => {
           addMints({
             profileId,
             mints: mintUrls,
-          })
+          }),
         );
 
         return { success: true };
       } else {
-        return { success: false, error: 'Some mint updates failed' };
+        return { success: false, error: "Some mint updates failed" };
       }
     } catch (error) {
       return { success: false };

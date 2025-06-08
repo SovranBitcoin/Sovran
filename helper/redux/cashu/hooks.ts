@@ -1,8 +1,8 @@
-import { useDispatch, useSelector } from 'react-redux';
-import { setSelectedMint } from './actions';
-import { useQuery } from '@tanstack/react-query';
-import { getMint } from 'helper/cashu';
-import { memoizedGetMintInfo } from './selectors';
+import { useDispatch, useSelector } from "react-redux";
+import { setSelectedMint } from "./actions";
+import { useQuery } from "@tanstack/react-query";
+import { getMint } from "helper/cashu";
+import { memoizedGetMintInfo, memoizedGetAudit } from "./selectors";
 
 export const useCashu = () => {
   const dispatch = useDispatch();
@@ -16,7 +16,8 @@ export const useCashu = () => {
 
   return {
     selectedMint,
-    setSelectedMint: ({ profileId, mintUrl }) => dispatch(setSelectedMint({ profileId, mintUrl })),
+    setSelectedMint: ({ profileId, mintUrl }) =>
+      dispatch(setSelectedMint({ profileId, mintUrl })),
     keysets: keysets || [],
     proofs: proofs || [],
     transactions: transactions || [],
@@ -25,4 +26,8 @@ export const useCashu = () => {
 
 export const useGetMintInfo = ({ mintUrl }: { mintUrl: string }) => {
   return useSelector(memoizedGetMintInfo(mintUrl));
+};
+
+export const useGetAudit = ({ mintUrl }: { mintUrl: string }) => {
+  return useSelector(memoizedGetAudit(mintUrl));
 };

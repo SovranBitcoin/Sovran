@@ -1,23 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
-import { useSelector } from 'react-redux';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc'; // Add UTC plugin
-import { Tabs } from 'components/common/Tabs';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, shades, greys, reds } from 'helper/colors';
-import { Dimensions } from 'react-native';
-import { auditMint } from 'helper/api/sovran';
-import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
-import Image from 'components/common/Image';
+import React, { useEffect, useState, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Animated,
+} from "react-native";
+import { useSelector } from "react-redux";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc"; // Add UTC plugin
+import { Tabs } from "components/common/Tabs";
+import { memoizedGetTheme } from "helper/redux/settings";
+import { greens, shades, greys, reds } from "helper/colors";
+import { Dimensions } from "react-native";
+import { Canvas, Path, Skia, Group } from "@shopify/react-native-skia";
+import Image from "components/common/Image";
 
 const DonutChart = ({
   size = 96,
   strokeWidth = 2.5,
   sections = [
-    { value: 1, color: '#4CAF50' },
-    { value: 1, color: '#FF9800' },
-    { value: 1, color: '#2196F3' },
+    { value: 1, color: "#4CAF50" },
+    { value: 1, color: "#FF9800" },
+    { value: 1, color: "#2196F3" },
   ],
   children,
   gap = 3.5, // Gap between sections in degrees
@@ -41,7 +46,8 @@ const DonutChart = ({
     // Calculate start angle for this section
     let currentStartAngle = (startAngle * Math.PI) / 180;
     for (let i = 0; i < index; i++) {
-      currentStartAngle += (sections[i].value / totalValue) * availableAngle + gapRad;
+      currentStartAngle +=
+        (sections[i].value / totalValue) * availableAngle + gapRad;
     }
 
     const endAngle = currentStartAngle + sectionAngle;
@@ -59,7 +65,7 @@ const DonutChart = ({
       Skia.XYWHRect(center - radius, center - radius, radius * 2, radius * 2),
       (currentStartAngle * 180) / Math.PI,
       (sectionAngle * 180) / Math.PI,
-      false
+      false,
     );
 
     // Draw line to inner arc start
@@ -70,10 +76,15 @@ const DonutChart = ({
 
     // Draw inner arc (reverse direction)
     path.arcToOval(
-      Skia.XYWHRect(center - innerRadius, center - innerRadius, innerRadius * 2, innerRadius * 2),
+      Skia.XYWHRect(
+        center - innerRadius,
+        center - innerRadius,
+        innerRadius * 2,
+        innerRadius * 2,
+      ),
       (endAngle * 180) / Math.PI,
       -(sectionAngle * 180) / Math.PI,
-      false
+      false,
     );
 
     // Close the path
@@ -89,11 +100,16 @@ const DonutChart = ({
   const styles = createStyles(theme);
 
   return (
-    <View style={[{ margin: 'auto', width: size, height: size }]}>
+    <View style={[{ margin: "auto", width: size, height: size }]}>
       <Canvas style={{ width: size, height: size }}>
         <Group>
           {sectionPaths.map((section, index) => (
-            <Path strokeJoin="round" key={index} path={section.path} color={section.color} />
+            <Path
+              strokeJoin="round"
+              key={index}
+              path={section.path}
+              color={section.color}
+            />
           ))}
         </Group>
       </Canvas>
@@ -101,10 +117,11 @@ const DonutChart = ({
       {/* Center content (logo) */}
       <View
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 6,
           left: 6,
-        }}>
+        }}
+      >
         {children}
       </View>
     </View>
@@ -116,6 +133,8 @@ dayjs.extend(utc);
 
 interface HeatmapProps {
   mintUrl: string;
+  wallet?: any;
+  mintInfo?: any;
 }
 
 interface Swap {
@@ -124,52 +143,49 @@ interface Swap {
   time_taken: number;
 }
 
-const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
+const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [data, setData] = useState<Record<string, Swap[]>>({});
   const [swaps, setSwaps] = useState<Swap[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Animation values for the subtle pulsating effect
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
-    (async () => {
-      const json = await auditMint({ mintUrl });
-      console.log(232983729873, json);
+    if (!wallet?.audits) return;
 
-      setSwaps(json.swaps);
+    setSwaps(wallet.audits.swaps);
 
-      const swapsByDayWithStats = json.swaps.reduce((acc, swap) => {
-        // Use dayjs to parse and format in UTC
-        const date = dayjs(swap.created_at).utc().format('YYYY-MM-DD');
+    const swapsByDayWithStats = wallet.audits.swaps.reduce((acc, swap) => {
+      // Use dayjs to parse and format in UTC
+      const date = dayjs(swap.created_at).utc().format("YYYY-MM-DD");
 
-        if (!acc[date]) {
-          acc[date] = {
-            swaps: [],
-            totalAmount: 0,
-            totalFees: 0,
-            count: 0,
-            successRate: 0,
-          };
-        }
+      if (!acc[date]) {
+        acc[date] = {
+          swaps: [],
+          totalAmount: 0,
+          totalFees: 0,
+          count: 0,
+          successRate: 0,
+        };
+      }
 
-        acc[date].swaps.push(swap);
-        acc[date].totalAmount += swap.amount;
-        acc[date].totalFees += swap.fee;
-        acc[date].count += 1;
-        acc[date].successRate =
-          acc[date].swaps.filter((s) => s.state === 'OK').length / acc[date].count;
+      acc[date].swaps.push(swap);
+      acc[date].totalAmount += swap.amount;
+      acc[date].totalFees += swap.fee;
+      acc[date].count += 1;
+      acc[date].successRate =
+        acc[date].swaps.filter((s) => s.state === "OK").length /
+        acc[date].count;
 
-        return acc;
-      }, {});
+      return acc;
+    }, {});
 
-      console.log(129837, JSON.stringify(swapsByDayWithStats, null, 2));
-      setData(swapsByDayWithStats);
-    })();
-  }, []);
+    console.log(129837, JSON.stringify(swapsByDayWithStats, null, 2));
+    setData(swapsByDayWithStats);
+  }, [wallet?.audits]);
 
   // Start the subtle heartbeat animation
   useEffect(() => {
@@ -215,16 +231,16 @@ const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
 
   const getColor = (successRate) => {
     // base colors on green/yellow/red
-    if (successRate >= 0.9) return '#0CED3E';
-    if (successRate >= 0.7) return '#ED9E0C';
-    if (successRate >= 0.5) return '#ED9E0C';
-    if (successRate >= 0.3) return '#FF0000';
-    if (successRate >= 0.1) return '#ED0C46';
-    if (successRate >= 0) return '#ED0C46';
+    if (successRate >= 0.9) return "#0CED3E";
+    if (successRate >= 0.7) return "#ED9E0C";
+    if (successRate >= 0.5) return "#ED9E0C";
+    if (successRate >= 0.3) return "#FF0000";
+    if (successRate >= 0.1) return "#ED0C46";
+    if (successRate >= 0) return "#ED0C46";
     return greys(theme)[1500];
   };
 
-  if (!mintInfo) {
+  if (!mintInfo || !wallet?.audits) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={greens[500]} />
@@ -237,39 +253,46 @@ const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
     <View
       style={{
         flex: 1,
-      }}>
+      }}
+    >
       <View style={styles.logoContainer}>
         <DonutChart
           sections={[
             {
-              value: swaps?.filter((s) => s.state === 'OK').length || 0,
+              value: swaps?.filter((s) => s.state === "OK").length || 0,
               color: greens[300],
             },
             {
-              value: swaps?.filter((s) => s.state === 'ERROR').length || 0,
+              value: swaps?.filter((s) => s.state === "ERROR").length || 0,
               color: reds[300],
             },
-          ]}>
+          ]}
+        >
           {mintInfo.icon_url ? (
-            <Image source={{ uri: mintInfo.icon_url }} style={styles.logoImage} />
+            <Image
+              source={{ uri: mintInfo.icon_url }}
+              style={styles.logoImage}
+            />
           ) : (
             <View style={styles.logo}>
               <Text style={styles.logoText}>
-                {mintInfo.name ? mintInfo.name.charAt(0).toUpperCase() : 'M'}
+                {mintInfo.name ? mintInfo.name.charAt(0).toUpperCase() : "M"}
               </Text>
             </View>
           )}
         </DonutChart>
       </View>
-      <Text style={styles.mintTitle}>{mintInfo.name || 'Unknown Mint'}</Text>
-      {mintInfo.version && <Text style={styles.mintVersion}>{mintInfo.version}</Text>}
+      <Text style={styles.mintTitle}>{mintInfo.name || "Unknown Mint"}</Text>
+      {mintInfo.version && (
+        <Text style={styles.mintVersion}>{mintInfo.version}</Text>
+      )}
       <View style={styles.container}>
         {new Array(30).fill(0).map((_, i) => {
           // Also generate the date range in UTC for consistency
           const date = dayjs()
             .utc()
-            .subtract(30 - i, 'day')
-            .format('YYYY-MM-DD');
+            .subtract(30 - i, "day")
+            .format("YYYY-MM-DD");
 
           const isLastCell = i === 29; // Last cell in the array
 
@@ -305,33 +328,33 @@ const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
 const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
-      width: '100%',
+      width: "100%",
       marginTop: 16,
-      flexDirection: 'row',
+      flexDirection: "row",
       flex: 1,
     },
     header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: 8,
     },
     title: {
       color: greys(theme)[600],
-      fontFamily: 'OverpassRegular',
+      fontFamily: "OverpassRegular",
       fontSize: 16,
     },
     value: {
       color: greys(theme)[0],
-      fontFamily: 'OverpassBold',
+      fontFamily: "OverpassBold",
       fontSize: 16,
     },
     grid: {
-      flexDirection: 'row',
-      alignSelf: 'center',
+      flexDirection: "row",
+      alignSelf: "center",
     },
     column: {
-      flexDirection: 'column',
+      flexDirection: "column",
       marginHorizontal: 1,
     },
     cell: {
@@ -342,16 +365,16 @@ const createStyles = (theme: string) =>
     },
     loading: {
       padding: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
     },
     scrollContainer: {
       flex: 1,
     },
     loadingContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       paddingVertical: 40,
     },
     loadingText: {
@@ -361,25 +384,25 @@ const createStyles = (theme: string) =>
     },
     errorContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       paddingVertical: 40,
       paddingHorizontal: 20,
     },
     errorText: {
       fontSize: 18,
-      fontWeight: 'bold',
-      color: '#D32F2F',
-      textAlign: 'center',
+      fontWeight: "bold",
+      color: "#D32F2F",
+      textAlign: "center",
       marginBottom: 8,
     },
     errorSubtext: {
       fontSize: 14,
       color: greys(theme)[2],
-      textAlign: 'center',
+      textAlign: "center",
     },
     headerContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: 24,
       paddingBottom: 32,
     },
@@ -390,9 +413,9 @@ const createStyles = (theme: string) =>
       width: 84,
       height: 84,
       borderRadius: 100,
-      backgroundColor: '#3f836d',
-      alignItems: 'center',
-      justifyContent: 'center',
+      backgroundColor: "#3f836d",
+      alignItems: "center",
+      justifyContent: "center",
     },
     logoImage: {
       width: 84,
@@ -401,20 +424,20 @@ const createStyles = (theme: string) =>
     },
     logoText: {
       fontSize: 40,
-      fontWeight: 'bold',
-      color: '#ffffff',
+      fontWeight: "bold",
+      color: "#ffffff",
     },
     mintTitle: {
       fontSize: 28,
-      fontFamily: 'OverpassBold',
+      fontFamily: "OverpassBold",
       color: greys(theme)[0],
-      textAlign: 'center',
+      textAlign: "center",
       marginBottom: 4,
     },
     mintVersion: {
       fontSize: 14,
       color: greys(theme)[200],
-      textAlign: 'center',
+      textAlign: "center",
     },
     descriptionContainer: {
       marginHorizontal: 16,
@@ -423,7 +446,7 @@ const createStyles = (theme: string) =>
       backgroundColor: greys(theme)[8],
       borderRadius: 12,
       borderLeftWidth: 4,
-      borderLeftColor: '#FFA726',
+      borderLeftColor: "#FFA726",
     },
     descriptionText: {
       fontSize: 14,
@@ -436,36 +459,36 @@ const createStyles = (theme: string) =>
       marginVertical: 2,
     },
     destructiveButton: {
-      backgroundColor: '#D32F2F',
+      backgroundColor: "#D32F2F",
       borderRadius: 8,
       marginVertical: 2,
     },
     actionText: {
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: "600",
       color: greys(theme)[0],
-      textAlign: 'center',
+      textAlign: "center",
     },
     destructiveText: {
       fontSize: 16,
-      fontWeight: '600',
-      color: '#ffffff',
-      textAlign: 'center',
+      fontWeight: "600",
+      color: "#ffffff",
+      textAlign: "center",
     },
     copiedText: {
       fontSize: 12,
       color: greens[400],
-      fontWeight: '600',
+      fontWeight: "600",
     },
     container2: {
-      position: 'relative',
-      justifyContent: 'center',
-      alignItems: 'center',
+      position: "relative",
+      justifyContent: "center",
+      alignItems: "center",
     },
     centerContent2: {
-      position: 'absolute',
-      justifyContent: 'center',
-      alignItems: 'center',
+      position: "absolute",
+      justifyContent: "center",
+      alignItems: "center",
     },
   });
 
