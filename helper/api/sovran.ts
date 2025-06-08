@@ -43,7 +43,15 @@ export const fetchProducts = async () => {
   return res.json() as Promise<{ success: boolean; obj?: { packageList: ProductPackage[] } }>;
 };
 
-export const fetchQuote = async ({ packageCode, iccid, type }: { packageCode: string | number; iccid?: string; type?: 'TOPUP' | 'BASE' }) => {
+export const fetchQuote = async ({
+  packageCode,
+  iccid,
+  type,
+}: {
+  packageCode: string | number;
+  iccid?: string;
+  type?: 'TOPUP' | 'BASE';
+}) => {
   const params = new URLSearchParams({ packageCode: String(packageCode) });
   if (type === 'TOPUP' && iccid) {
     params.append('type', 'TOPUP');
@@ -53,7 +61,19 @@ export const fetchQuote = async ({ packageCode, iccid, type }: { packageCode: st
   return res.json() as Promise<QuoteResponse>;
 };
 
-export const fetchOrderData = async ({ request, packageCode, slug, iccid, type }: { request: string; packageCode: string | number; slug?: string; iccid?: string; type?: 'TOPUP' }) => {
+export const fetchOrderData = async ({
+  request,
+  packageCode,
+  slug,
+  iccid,
+  type,
+}: {
+  request: string;
+  packageCode: string | number;
+  slug?: string;
+  iccid?: string;
+  type?: 'TOPUP';
+}) => {
   const params = new URLSearchParams({ request, packageCode: String(packageCode) });
   if (type === 'TOPUP' && slug && iccid) {
     params.append('slug', slug);
@@ -85,8 +105,19 @@ export const fetchVpnCountries = async () => {
   return res.json() as Promise<any>;
 };
 
-export const activateVpn = async ({ paymentHash, location }: { paymentHash: string; location: string }) => {
+export const activateVpn = async ({
+  paymentHash,
+  location,
+}: {
+  paymentHash: string;
+  location: string;
+}) => {
   const params = new URLSearchParams({ paymentHash, location });
   const res = await fetch(`${BASE_URL}/vpn/activate?${params}`);
+  return res.json() as Promise<any>;
+};
+
+export const auditMint = async ({ mintUrl }: { mintUrl: string }) => {
+  const res = await fetch(`${BASE_URL}/mint/audit?mintUrl=${mintUrl}`);
   return res.json() as Promise<any>;
 };
