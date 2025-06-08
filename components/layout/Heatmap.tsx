@@ -55,17 +55,26 @@ const Heatmap = ({ mintUrl }: HeatmapProps) => {
 
   const allSwaps = Object.values(data).flat();
   const totalSuccess = allSwaps.filter((s) => s.state === 'OK').length;
-  const overallRate = allSwaps.length ? (totalSuccess / allSwaps.length) * 100 : 0;
+  const overallRate = allSwaps.length
+    ? (totalSuccess / allSwaps.length) * 100
+    : 0;
   const overallTime = allSwaps.length
     ? allSwaps.reduce((acc, s) => acc + (s.time_taken || 0), 0) / allSwaps.length
     : 0;
 
-  const start = dayjs().subtract(83, 'day');
+  const NUM_DAYS = 30;
+  const NUM_COLS = 6;
+  const NUM_ROWS = 5;
+  const start = dayjs().subtract(NUM_DAYS - 1, 'day');
   const columns = [] as any[];
-  for (let c = 0; c < 12; c++) {
+  for (let c = 0; c < NUM_COLS; c++) {
     const col: any[] = [];
-    for (let r = 0; r < 7; r++) {
-      const index = c * 7 + r;
+    for (let r = 0; r < NUM_ROWS; r++) {
+      const index = c * NUM_ROWS + r;
+      if (index >= NUM_DAYS) {
+        col.push({ date: null, successRate: 0, avgTime: 0, total: 0 });
+        continue;
+      }
       const date = start.add(index, 'day').format('YYYY-MM-DD');
       const swaps = data[date] || [];
       const success = swaps.filter((s) => s.state === 'OK').length;
@@ -80,14 +89,14 @@ const Heatmap = ({ mintUrl }: HeatmapProps) => {
   }
 
   const getColor = (cell: { successRate: number; avgTime: number; total: number }) => {
-    if (cell.total === 0) return greys(theme)[1500];
+    if (cell.total === 0 || cell.date === null) return greys(theme)[1500];
     if (selectedTab === TABS[0]) {
-      if (cell.successRate >= 0.8) return greens[400];
-      if (cell.successRate >= 0.5) return '#FFB34D';
+      if (cell.successRate >= 0.9) return greens[400];
+      if (cell.successRate >= 0.7) return '#FFB34D';
       return shades[400];
     } else {
       if (cell.avgTime <= 5000) return greens[400];
-      if (cell.avgTime <= 15000) return '#FFB34D';
+      if (cell.avgTime <= 10000) return '#FFB34D';
       return shades[400];
     }
   };
@@ -98,12 +107,12 @@ const Heatmap = ({ mintUrl }: HeatmapProps) => {
         {selectedTab === TABS[0] ? (
           <>
             <Text style={styles.title}>Success Rate</Text>
-            <Text style={styles.value}>{overallRate.toFixed(0)}%</Text>
+            <Text style={styles.value}>{overallRate.toFixed(1)}%</Text>
           </>
         ) : (
           <>
             <Text style={styles.title}>Average Time</Text>
-            <Text style={styles.value}>{overallTime.toFixed(0)} ms</Text>
+            <Text style={styles.value}>{Math.round(overallTime).toLocaleString()} ms</Text>
           </>
         )}
       </View>
