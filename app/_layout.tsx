@@ -163,7 +163,7 @@ function MySplashScreen({ opacity }) {
 function MainStack() {
   const currentProfile = useSelector((state) => state.nostr.currentProfile);
   const { addMessage, messages, setFollows } = useNostr();
-  const theme = memoizedGetTheme(store.getState());
+  const theme = useSelector(memoizedGetTheme);
 
   // Load followed users
   useEffect(() => {
