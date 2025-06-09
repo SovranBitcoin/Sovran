@@ -108,7 +108,7 @@ export function MintDetailPage({
       </View>
 
       <View>
-        {!transaction?.paid && (
+        {!transaction?.paid && handleCheckStatus && (
           <Button
             style={{
               padding: 0,
