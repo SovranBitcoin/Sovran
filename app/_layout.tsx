@@ -40,6 +40,7 @@ import { TransactionProvider } from 'components/providers/TransactionsProvider';
 import { WalletsProvider } from 'components/providers/WalletsProviders';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
+import { showMessage } from 'helper/popup/popups';
 
 registerAllSheets({ context: 'global' });
 
@@ -277,6 +278,12 @@ export default function RootLayout() {
   // Hide splash screen when app is ready
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) await SplashScreen.hideAsync();
+  }, [appIsReady]);
+
+  useEffect(() => {
+    if (appIsReady) {
+      showMessage('startup_warning', {}, { variant: 'modal' });
+    }
   }, [appIsReady]);
 
   // Show splash screen while loading

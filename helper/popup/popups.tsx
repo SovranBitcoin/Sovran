@@ -243,6 +243,13 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     type: MESSAGE_TYPES.INFO,
   },
 
+  startup_warning: {
+    title: 'Warning',
+    text:
+      'Do not use with large amounts of ecash. Sovran wallet is operated on a best-effort basis and without any guarantees',
+    type: MESSAGE_TYPES.WARNING,
+  },
+
   'outputs have already been signed before.': {
     title: 'Outputs have been signed before',
     text: 'Fix this in the debug settings',
