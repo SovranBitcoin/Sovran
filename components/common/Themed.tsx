@@ -174,40 +174,176 @@ export function translateText({ id, children, lang }) {
 }
 
 type CustomTextProps = {
-  weight?: 'regular' | 'bold' | 'heavy' | 'mono';
+  // Weight props
+  thin?: boolean;
+  extralight?: boolean;
+  light?: boolean;
+  regular?: boolean;
+  medium?: boolean;
+  semibold?: boolean;
+  bold?: boolean;
+  extrabold?: boolean;
+  heavy?: boolean;
+  black?: boolean;
+  mono?: boolean;
+
+  // Font family props
+  overpass?: boolean;
+  lexend?: boolean;
+
+  // Style props
+  italic?: boolean;
   size?: number;
-  family?: 'Overpass' | 'Lexend';
   style?: object;
   lightColor?: string;
   darkColor?: string;
   id?: string;
   children?: React.ReactNode;
   className?: string;
+  testID?: string;
+  loading?: boolean;
 };
 
+function getWeightFromProps(props: CustomTextProps): string {
+  if (props.weight) return props.weight;
+  if (props.thin) return 'thin';
+  if (props.extralight) return 'extralight';
+  if (props.light) return 'light';
+  if (props.medium) return 'medium';
+  if (props.semibold) return 'semibold';
+  if (props.bold) return 'bold';
+  if (props.extrabold) return 'extrabold';
+  if (props.heavy) return 'heavy';
+  if (props.black) return 'black';
+  if (props.mono) return 'mono';
+  return 'regular'; // default
+}
+
+function getFamilyFromProps(props: CustomTextProps): string {
+  if (props.lexend) return 'lexend';
+  return 'overpass'; // default
+}
+
 export function UntranslatedText({
-  weight = 'regular',
   size = 14,
-  family = 'Overpass',
+  italic = false,
+  overpass = true,
+  regular = true,
   ...props
 }: CustomTextProps) {
   const theme = useSelector(memoizedGetTheme);
   const { style, lightColor, darkColor, children, ...otherProps } = props;
 
+  const weight = getWeightFromProps(props);
+  const family = getFamilyFromProps(props);
+
   let fontFamily;
-  switch (weight) {
-    case 'bold':
-      fontFamily = `${family}Bold`;
-      break;
-    case 'heavy':
-      fontFamily = `${family}Heavy`;
-      break;
-    case 'mono':
-      fontFamily = `${family}Mono`;
-      break;
-    default:
-      fontFamily = `${family}Regular`;
+
+  if (weight === 'mono') {
+    fontFamily = `${family.charAt(0).toUpperCase() + family.slice(1)}Mono`;
+  } else {
+    // Handle different weight mappings for each font family
+    let weightSuffix;
+
+    if (family === 'overpass') {
+      switch (weight) {
+        case 'thin':
+          weightSuffix = 'Thin';
+          break;
+        case 'extralight':
+          weightSuffix = 'Extralight';
+          break;
+        case 'light':
+          weightSuffix = 'Light';
+          break;
+        case 'regular':
+          weightSuffix = 'Regular';
+          break;
+        case 'medium':
+          weightSuffix = 'Semibold'; // Overpass doesn't have Medium, map to Semibold
+          break;
+        case 'semibold':
+          weightSuffix = 'Semibold';
+          break;
+        case 'bold':
+          weightSuffix = 'Bold';
+          break;
+        case 'extrabold':
+          weightSuffix = 'Extrabold';
+          break;
+        case 'heavy':
+          weightSuffix = 'Heavy';
+          break;
+        case 'black':
+          weightSuffix = 'Heavy'; // Overpass doesn't have Black, map to Heavy
+          break;
+        default:
+          weightSuffix = 'Regular';
+      }
+    } else {
+      // lexend
+      switch (weight) {
+        case 'thin':
+          weightSuffix = 'Thin';
+          break;
+        case 'extralight':
+          weightSuffix = 'ExtraLight';
+          break;
+        case 'light':
+          weightSuffix = 'Light';
+          break;
+        case 'regular':
+          weightSuffix = 'Regular';
+          break;
+        case 'medium':
+          weightSuffix = 'Medium';
+          break;
+        case 'semibold':
+          weightSuffix = 'SemiBold';
+          break;
+        case 'bold':
+          weightSuffix = 'Bold';
+          break;
+        case 'extrabold':
+          weightSuffix = 'ExtraBold';
+          break;
+        case 'heavy':
+          weightSuffix = 'Black'; // Lexend doesn't have Heavy, map to Black
+          break;
+        case 'black':
+          weightSuffix = 'Black';
+          break;
+        default:
+          weightSuffix = 'Regular';
+      }
+    }
+
+    // Add italic suffix for Overpass (Lexend doesn't seem to have italic variants in your list)
+    const italicSuffix = italic && family === 'overpass' ? 'Italic' : '';
+
+    // Handle special case for Overpass regular italic
+    if (family === 'overpass' && weight === 'regular' && italic) {
+      fontFamily = 'OverpassItalic';
+    } else {
+      fontFamily = `${family.charAt(0).toUpperCase() + family.slice(1)}${weightSuffix}${italicSuffix}`;
+    }
   }
+
+  // Filter out the weight and family props from otherProps
+  const {
+    thin,
+    extralight,
+    light,
+    medium,
+    semibold,
+    bold,
+    extrabold,
+    heavy,
+    black,
+    mono,
+    lexend,
+    ...cleanProps
+  } = otherProps;
 
   return (
     <DefaultText
@@ -220,25 +356,18 @@ export function UntranslatedText({
         },
         style,
       ]}
-      {...otherProps}>
+      {...cleanProps}>
       {children}
     </DefaultText>
   );
 }
 
-export function Text({
-  loading = false,
-  weight = 'regular',
-  size = 14,
-  family = 'Overpass',
-  ...props
-}: CustomTextProps) {
+export function Text({ loading = false, size = 14, italic = false, ...props }: CustomTextProps) {
   const lang = useSelector((state) => state.settings?.settings?.lang);
 
   const { id, children, ...otherProps } = props;
   const displayText = translateText({ id, children, lang });
 
-  // Translation debugging removed
   if (loading) {
     return (
       <Skeleton
@@ -252,12 +381,7 @@ export function Text({
   }
 
   return (
-    <UntranslatedText
-      testID={props.testID}
-      weight={weight}
-      size={size}
-      family={family}
-      {...otherProps}>
+    <UntranslatedText testID={props.testID} size={size} italic={italic} {...otherProps}>
       {displayText}
     </UntranslatedText>
   );

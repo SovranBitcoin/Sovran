@@ -17,6 +17,7 @@ import {
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
   SET_KEYS,
+  SET_AUDIT,
 } from './actionTypes';
 import { ensureProfileExists } from './helpers';
 
@@ -64,6 +65,10 @@ export const cashuReducer = (state = initialState, action) => {
 
     case SET_INFO:
       return _.set(['info', action.payload.mintUrl], action.payload.mintInfo, state);
+
+    case SET_AUDIT:
+      console.log(198273, action.payload);
+      return _.set(['audits', action.payload.mintUrl], action.payload.audit, state);
 
     case SET_PROOFS:
       return _.set(

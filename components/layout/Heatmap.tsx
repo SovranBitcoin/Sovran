@@ -7,9 +7,9 @@ import { Tabs } from 'components/common/Tabs';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, shades, greys, reds } from 'helper/colors';
 import { Dimensions } from 'react-native';
-import { auditMint } from 'helper/api/sovran';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
+import opacity from 'hex-color-opacity';
 
 const DonutChart = ({
   size = 96,
@@ -116,6 +116,8 @@ dayjs.extend(utc);
 
 interface HeatmapProps {
   mintUrl: string;
+  wallet?: any;
+  mintInfo?: any;
 }
 
 interface Swap {
@@ -124,52 +126,48 @@ interface Swap {
   time_taken: number;
 }
 
-const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
+const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [data, setData] = useState<Record<string, Swap[]>>({});
   const [swaps, setSwaps] = useState<Swap[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Animation values for the subtle pulsating effect
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
-    (async () => {
-      const json = await auditMint({ mintUrl });
-      console.log(232983729873, json);
+    if (!wallet?.audits?.swaps) return;
 
-      setSwaps(json.swaps);
+    setSwaps(wallet.audits.swaps);
 
-      const swapsByDayWithStats = json.swaps.reduce((acc, swap) => {
-        // Use dayjs to parse and format in UTC
-        const date = dayjs(swap.created_at).utc().format('YYYY-MM-DD');
+    const swapsByDayWithStats = wallet?.audits?.swaps?.reduce((acc, swap) => {
+      // Use dayjs to parse and format in UTC
+      const date = dayjs(swap.created_at).utc().format('YYYY-MM-DD');
 
-        if (!acc[date]) {
-          acc[date] = {
-            swaps: [],
-            totalAmount: 0,
-            totalFees: 0,
-            count: 0,
-            successRate: 0,
-          };
-        }
+      if (!acc[date]) {
+        acc[date] = {
+          swaps: [],
+          totalAmount: 0,
+          totalFees: 0,
+          count: 0,
+          successRate: 0,
+        };
+      }
 
-        acc[date].swaps.push(swap);
-        acc[date].totalAmount += swap.amount;
-        acc[date].totalFees += swap.fee;
-        acc[date].count += 1;
-        acc[date].successRate =
-          acc[date].swaps.filter((s) => s.state === 'OK').length / acc[date].count;
+      acc[date].swaps.push(swap);
+      acc[date].totalAmount += swap.amount;
+      acc[date].totalFees += swap.fee;
+      acc[date].count += 1;
+      acc[date].successRate =
+        acc[date].swaps.filter((s) => s.state === 'OK').length / acc[date].count;
 
-        return acc;
-      }, {});
+      return acc;
+    }, {});
 
-      console.log(129837, JSON.stringify(swapsByDayWithStats, null, 2));
-      setData(swapsByDayWithStats);
-    })();
-  }, []);
+    console.log(129837, JSON.stringify(swapsByDayWithStats, null, 2));
+    setData(swapsByDayWithStats);
+  }, [wallet?.audits]);
 
   // Start the subtle heartbeat animation
   useEffect(() => {
@@ -224,7 +222,7 @@ const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
     return greys(theme)[1500];
   };
 
-  if (!mintInfo) {
+  if (!mintInfo || !wallet?.audits) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={greens[500]} />
@@ -279,36 +277,183 @@ const Heatmap = ({ mintInfo, mintUrl }: HeatmapProps) => {
                 flex: 1,
                 width: 8,
                 margin: 1,
-                height: 32,
                 borderRadius: 4,
                 backgroundColor: getColor(data[date]?.successRate),
+                height: Math.floor(32 - (25 * Math.log(30 - i)) / Math.log(30)),
                 opacity: opacityAnim,
-                // transform: [{ scale: pulseAnim }],
               }
             : {
                 flex: 1,
                 width: 8,
                 margin: 1,
-                height: 32,
                 borderRadius: 4,
                 opacity: 0.66,
+                // make height be based on index and it should be log scale i want it to be largest at 30 and go down
+                height: Math.floor(32 - (25 * Math.log(30 - i)) / Math.log(30)),
                 backgroundColor: getColor(data[date]?.successRate),
               };
 
           return <CellComponent key={date} style={cellStyle} />;
         })}
       </View>
+      <StatsGrid
+        theme={theme}
+        // calculate success rate overall based on all the swaps
+        successRate={swaps?.filter((s) => s.state === 'OK').length / (swaps?.length || 1)}
+        avgResponse={swaps?.reduce((acc, swap) => acc + swap.time_taken, 0) / (swaps?.length || 1)}
+      />
+    </View>
+  );
+};
+
+const StatsGrid = ({ theme, successRate, avgResponse }) => {
+  const stats = [
+    {
+      label: 'Success Rate',
+      value: successRate ? `${successRate * 100}%` : 'N/A',
+      accent: true,
+      description: 'Successful rate of transactions',
+    },
+    {
+      label: 'Mint Speed',
+      value: avgResponse ? `${(avgResponse / 1000).toFixed(1)}s` : 'N/A',
+      accent: true,
+      description: 'Typical processing time',
+    },
+    // {
+    //   label: 'User Reviews',
+    //   value: '182',
+    //   accent: false,
+    //   description: 'Community feedback',
+    // },
+    // {
+    //   label: 'Rating',
+    //   value: '4.8',
+    //   accent: true,
+    //   description: 'Out of 5 stars',
+    // },
+  ];
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.container3}>
+      {stats.map((stat, index) => (
+        <View key={index} style={[styles.statCard]}>
+          {/* Subtle gradient overlay for depth */}
+
+          <View style={styles.cardContent}>
+            <Text style={[styles.label, { color: greys(theme)[400] }]}>{stat.label}</Text>
+
+            <Text
+              style={[
+                styles.value3,
+                stat.accent ? styles.accentValue : {},
+                { color: greys(theme)[0] },
+              ]}>
+              {stat.value}
+            </Text>
+
+            <Text style={[styles.description, { color: greys(theme)[600] }]}>
+              {stat.description}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 };
 
 const createStyles = (theme: string) =>
   StyleSheet.create({
+    container3: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      margin: -6, // Negative margin to offset card spacing
+      marginTop: 8,
+    },
+
+    statCard: {
+      width: '50%',
+      padding: 6, // Outer padding for consistent grid gaps
+    },
+
+    cardContent: {
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: greys(theme)[1500],
+      position: 'relative',
+      overflow: 'hidden',
+      minHeight: 90,
+      justifyContent: 'space-between',
+      backgroundColor: greys(theme)[1800],
+      shadowColor: greys(theme)[1900],
+      flex: 1,
+
+      // Subtle shadow for depth
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+
+    gradientOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: opacity(greys(theme)[1900], 0.1),
+    },
+
+    label: {
+      fontFamily: 'OverpassSemibold',
+      fontSize: 13,
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+      marginBottom: 4,
+      opacity: 0.9,
+    },
+
+    value3: {
+      fontFamily: 'OverpassSemibold',
+      fontSize: 24,
+      lineHeight: 28,
+      marginBottom: 2,
+      letterSpacing: -0.5,
+    },
+
+    accentValue: {
+      fontSize: 26,
+      lineHeight: 30,
+    },
+
+    description: {
+      fontFamily: 'OverpassRegular',
+      fontSize: 11,
+      lineHeight: 14,
+      opacity: 0.8,
+      letterSpacing: 0.1,
+    },
+
+    accentLine: {
+      position: 'absolute',
+      top: 0,
+      left: 16,
+      right: 16,
+      height: 2,
+      borderRadius: 1,
+    },
     container: {
       width: '100%',
       marginTop: 16,
       flexDirection: 'row',
       flex: 1,
+      justifyContent: 'flex-end',
+      alignItems: 'flex-end',
     },
     header: {
       flexDirection: 'row',
@@ -357,7 +502,7 @@ const createStyles = (theme: string) =>
     loadingText: {
       marginTop: 16,
       fontSize: 16,
-      color: greys(theme)[2],
+      color: greys(theme)[200],
     },
     errorContainer: {
       flex: 1,
@@ -375,7 +520,7 @@ const createStyles = (theme: string) =>
     },
     errorSubtext: {
       fontSize: 14,
-      color: greys(theme)[2],
+      color: greys(theme)[200],
       textAlign: 'center',
     },
     headerContainer: {
@@ -398,6 +543,7 @@ const createStyles = (theme: string) =>
       width: 84,
       height: 84,
       borderRadius: 100,
+      backgroundColor: greys(theme)[0],
     },
     logoText: {
       fontSize: 40,
@@ -420,14 +566,14 @@ const createStyles = (theme: string) =>
       marginHorizontal: 16,
       marginBottom: 16,
       padding: 16,
-      backgroundColor: greys(theme)[8],
+      backgroundColor: greys(theme)[700],
       borderRadius: 12,
       borderLeftWidth: 4,
       borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
-      color: greys(theme)[1],
+      color: greys(theme)[100],
       lineHeight: 20,
     },
     actionButton: {

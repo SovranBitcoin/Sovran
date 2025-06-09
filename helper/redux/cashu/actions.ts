@@ -16,6 +16,7 @@ import {
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
   SET_KEYS,
+  SET_AUDIT,
 } from './actionTypes';
 
 export const addMints = ({ profileId, mints }) => ({
@@ -46,6 +47,11 @@ export const setKeys = ({ mintUrl, keys }) => ({
 export const setInfo = ({ mintUrl, mintInfo }) => ({
   type: SET_INFO,
   payload: { mintUrl, mintInfo },
+});
+
+export const setAudit = ({ mintUrl, audit }) => ({
+  type: SET_AUDIT,
+  payload: { mintUrl, audit },
 });
 
 export const setTransactions = ({ profileId, transactions }) => ({
