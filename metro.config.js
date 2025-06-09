@@ -7,6 +7,7 @@ const config = getDefaultConfig(__dirname);
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'prime:twitter',
     'material-symbols:info-rounded',
     'la:user-slash',
     'material-symbols:report-rounded',

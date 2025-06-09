@@ -490,7 +490,11 @@ export function ProfileIcon() {
   );
 }
 
-export function CurrencyIcon({ width = 36, currency }) {
+export function CurrencyIcon({
+  width = 36,
+  currency,
+  colors = [shades[100], shades[300], shades[500]],
+}) {
   const theme = useSelector(memoizedGetTheme);
   if (currency === 'eur') {
     return (
@@ -637,10 +641,10 @@ export function CurrencyIcon({ width = 36, currency }) {
           }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor={shades[100]} />
-              <Stop offset="25%" stopColor={shades[300]} />
+              {colors.map((color, index) => (
+                <Stop key={index} offset={`${index * 25}%`} stopColor={color} />
+              ))}
               {/* <Stop offset="50%" stopColor={greys('dark')[0]} /> */}
-              <Stop offset="75%" stopColor={shades[500]} />
               {/* <Stop offset="100%" stopColor={greys('dark')[0]} /> */}
             </LinearGradient>
           </Defs>

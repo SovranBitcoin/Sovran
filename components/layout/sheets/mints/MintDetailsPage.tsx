@@ -1,33 +1,36 @@
-import { useState } from "react";
-import { Linking, ActivityIndicator, ScrollView, Alert } from "react-native";
-import { Text, View } from "components/common/Themed";
-import { greens, greys } from "helper/colors";
-import Wrapper from "../wrapper";
-import { RowButton, Section } from "app/settings";
-import {
-  useSheetRouteParams,
-  useSheetRouter,
-} from "react-native-actions-sheet";
-import { useWallet } from "helper/cashu/wallet";
-import { StyleSheet, Clipboard } from "react-native";
-import { ButtonHandler } from "components/common/ButtonHandler";
-import { Card } from "components/common/Card";
-import Image from "components/common/Image";
-import { useSelector } from "react-redux";
-import { NCSDK } from "helper/third-party/cashu-address-sdk-rn/sdk";
-import { NsecSigner } from "helper/third-party/cashu-address-sdk-rn/signer";
-import { nip19 } from "nostr-tools";
-import Heatmap from "components/layout/Heatmap";
-
-import { Canvas, Path, Skia, Group } from "@shopify/react-native-skia";
-import { memoizedGetTheme } from "helper/redux/settings";
+import { useState } from 'react';
+import { Linking, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { Text, View } from 'components/common/Themed';
+import { greens, greys } from 'helper/colors';
+import Wrapper from '../wrapper';
+import { RowButton, Section } from 'app/settings';
+import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
+import { useWallet } from 'helper/cashu/wallet';
+import { StyleSheet } from 'react-native';
+import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Card } from 'components/common/Card';
+import Image from 'components/common/Image';
+import { useSelector } from 'react-redux';
+import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
+import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
+import { nip19 } from 'nostr-tools';
+import Heatmap from 'components/layout/Heatmap';
+import Icon, { CurrencyIcon } from 'assets/icons';
+import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { truncateMiddle } from 'helper/strings';
+import * as Clipboard from 'expo-clipboard';
+import { showSuccess } from 'helper/popup/popups';
+import { useTypedNavigation } from 'helper/navigation';
+import { npubToPubkey } from 'components/layout/Transaction';
 
 const MintDetailPage = (props) => {
-  const theme = "dark";
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const router = useSheetRouter("mint");
+  const router = useSheetRouter('mint');
   const params = useSheetRouteParams();
   const [copiedItem, setCopiedItem] = useState(null);
+  const navigation = useTypedNavigation();
 
   const { wallet, loading, error } = useWallet({
     mintUrl: params?.mintUrl,
@@ -35,16 +38,14 @@ const MintDetailPage = (props) => {
 
   const handleCopy = async (text, itemName) => {
     try {
-      await Clipboard.setString(text);
-      setCopiedItem(itemName);
-      setTimeout(() => setCopiedItem(null), 2000);
+      await Clipboard.setStringAsync(text);
     } catch (error) {
-      Alert.alert("Error", "Failed to copy to clipboard");
+      Alert.alert('Error', 'Failed to copy to clipboard');
     }
   };
 
   const formatNuts = (nuts) => {
-    if (!nuts) return "N/A";
+    if (!nuts) return 'N/A';
     const supportedNuts = Object.keys(nuts).filter((nut) => {
       const nutData = nuts[nut];
       return (
@@ -53,11 +54,11 @@ const MintDetailPage = (props) => {
         (nutData.supported && Array.isArray(nutData.supported))
       );
     });
-    return `NUT-${supportedNuts.join(", NUT-")}`;
+    return `NUT-${supportedNuts.join(', NUT-')}`;
   };
 
   const formatCurrencies = (nuts) => {
-    if (!nuts) return "N/A";
+    if (!nuts) return 'N/A';
     const currencies = new Set();
 
     Object.values(nuts).forEach((nut) => {
@@ -73,22 +74,24 @@ const MintDetailPage = (props) => {
       }
     });
 
-    return currencies.size > 0 ? Array.from(currencies).join(", ") : "SAT";
+    return currencies.size > 0 ? Array.from(currencies).join(', ') : 'SAT';
   };
 
   const handleContactPress = (method, info) => {
     switch (method) {
-      case "email":
+      case 'email':
         Linking.openURL(`mailto:${info}`);
         break;
-      case "twitter":
-        Linking.openURL(`https://x.com/${info.replace("@", "")}`);
+      case 'twitter':
+        Linking.openURL(`https://x.com/${info.replace('@', '')}`);
         break;
-      case "nostr":
-        handleCopy(info, "Nostr Key");
+      case 'nostr':
+        navigation.navigate('userMessages', {
+          pubkey: npubToPubkey(info),
+        });
         break;
       default:
-        handleCopy(info, "Contact Info");
+        handleCopy(info, 'Contact Info');
     }
   };
 
@@ -110,9 +113,7 @@ const MintDetailPage = (props) => {
       <Wrapper>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load mint details</Text>
-          <Text style={styles.errorSubtext}>
-            {error?.message || "Unknown error"}
-          </Text>
+          <Text style={styles.errorSubtext}>{error?.message || 'Unknown error'}</Text>
         </View>
       </Wrapper>
     );
@@ -126,25 +127,17 @@ const MintDetailPage = (props) => {
         <ButtonHandler
           buttons={[
             {
-              text: "Close",
-              variant: "secondary",
+              text: 'Close',
+              variant: 'secondary',
               onPress: () => router?.goBack(),
             },
           ]}
         />
-      }
-    >
-      <ScrollView
-        style={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      }>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Mint Header */}
         <View style={styles.headerContainer}>
-          <Heatmap
-            mintInfo={mintInfo}
-            mintUrl={params?.mintUrl}
-            wallet={wallet}
-          />
+          <Heatmap mintInfo={mintInfo} mintUrl={params?.mintUrl} wallet={wallet} />
         </View>
 
         {/* Description Card */}
@@ -154,20 +147,12 @@ const MintDetailPage = (props) => {
 
         {/* Long Description */}
         {mintInfo.description_long && (
-          <Card
-            theme={theme}
-            variant="warning"
-            message={mintInfo.description_long}
-          />
+          <Card theme={theme} variant="warning" message={mintInfo.description_long} />
         )}
 
         {/* Message of the Day */}
         {mintInfo.motd && (
-          <Card
-            theme={theme}
-            variant="warning"
-            message={`Message: ${mintInfo.motd}`}
-          />
+          <Card theme={theme} variant="warning" message={`Message: ${mintInfo.motd}`} />
         )}
 
         {/* Contact Section */}
@@ -176,23 +161,49 @@ const MintDetailPage = (props) => {
             {mintInfo.contact.map((contact, index) => (
               <RowButton
                 key={index}
-                label={contact.info}
-                sublabel={contact.method.toUpperCase()}
-                onPress={() => handleContactPress(contact.method, contact.info)}
-                rightContent={
-                  copiedItem === `contact-${index}` ? (
-                    <Text style={styles.copiedText}>Copied!</Text>
-                  ) : null
+                label={
+                  contact.method.toUpperCase() === 'NOSTR' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <CurrencyIcon colors={[greys(theme)[700]]} width={20} currency={'nostr'} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                        {truncateMiddle(contact.info, 10)}
+                      </Text>
+                    </View>
+                  ) : contact.method.toUpperCase() === 'TWITTER' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Icon name="prime:twitter" size={20} color={greys(theme)[700]} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                        {contact.info}
+                      </Text>
+                    </View>
+                  ) : contact.method.toUpperCase() === 'EMAIL' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Icon name="mdi:at" size={20} color={greys(theme)[700]} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                        {contact.info}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                        {contact.info}
+                      </Text>
+                    </View>
+                  )
                 }
+                // label={<Icon name="prime:twitter" size={24} color={greys(theme)[700]} />}
+                // label={contact.method.toUpperCase()}
+                // sublabel={contact.method.toUpperCase()}
+                onPress={() => handleContactPress(contact.method, contact.info)}
               />
             ))}
           </Section>
         )}
 
         {/* Mint Details Section */}
-        <Section title="Mint Details">
-          <RowButton label="Version" value={mintInfo.version || "Unknown"} />
-        </Section>
+        {/* <Section title="Mint Details">
+          <RowButton label="Version" value={mintInfo.version || 'Unknown'} />
+        </Section> */}
 
         {/* Actions Section */}
         <Section title="Actions">
@@ -204,7 +215,7 @@ const MintDetailPage = (props) => {
               // Handle edit mint navigation
               const sk = nip19.decode(currentProfile?.nsec).data;
               const signer = new NsecSigner(sk);
-              const sdk = new NCSDK("https://npubx.cash", signer);
+              const sdk = new NCSDK('https://npubx.cash', signer);
 
               await sdk.setMint(params?.mintUrl);
             }}
@@ -222,8 +233,8 @@ const createStyles = (theme) =>
     },
     loadingContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       paddingVertical: 40,
     },
     loadingText: {
@@ -233,25 +244,25 @@ const createStyles = (theme) =>
     },
     errorContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: 'center',
+      alignItems: 'center',
       paddingVertical: 40,
       paddingHorizontal: 20,
     },
     errorText: {
       fontSize: 18,
-      fontWeight: "bold",
-      color: "#D32F2F",
-      textAlign: "center",
+      fontWeight: 'bold',
+      color: '#D32F2F',
+      textAlign: 'center',
       marginBottom: 8,
     },
     errorSubtext: {
       fontSize: 14,
       color: greys(theme)[2],
-      textAlign: "center",
+      textAlign: 'center',
     },
     headerContainer: {
-      alignItems: "center",
+      alignItems: 'center',
       paddingVertical: 24,
       paddingBottom: 32,
     },
@@ -262,9 +273,9 @@ const createStyles = (theme) =>
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: "#3f836d",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: '#3f836d',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     logoImage: {
       width: 80,
@@ -273,20 +284,20 @@ const createStyles = (theme) =>
     },
     logoText: {
       fontSize: 40,
-      fontWeight: "bold",
-      color: "#ffffff",
+      fontWeight: 'bold',
+      color: '#ffffff',
     },
     mintTitle: {
       fontSize: 28,
-      fontFamily: "OverpassBold",
+      fontFamily: 'OverpassBold',
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
       marginBottom: 4,
     },
     mintVersion: {
       fontSize: 14,
       color: greys(theme)[200],
-      textAlign: "center",
+      textAlign: 'center',
     },
     descriptionContainer: {
       marginHorizontal: 16,
@@ -295,7 +306,7 @@ const createStyles = (theme) =>
       backgroundColor: greys(theme)[8],
       borderRadius: 12,
       borderLeftWidth: 4,
-      borderLeftColor: "#FFA726",
+      borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
@@ -308,36 +319,36 @@ const createStyles = (theme) =>
       marginVertical: 2,
     },
     destructiveButton: {
-      backgroundColor: "#D32F2F",
+      backgroundColor: '#D32F2F',
       borderRadius: 8,
       marginVertical: 2,
     },
     actionText: {
       fontSize: 16,
-      fontWeight: "600",
+      fontWeight: '600',
       color: greys(theme)[0],
-      textAlign: "center",
+      textAlign: 'center',
     },
     destructiveText: {
       fontSize: 16,
-      fontWeight: "600",
-      color: "#ffffff",
-      textAlign: "center",
+      fontWeight: '600',
+      color: '#ffffff',
+      textAlign: 'center',
     },
     copiedText: {
       fontSize: 12,
       color: greens[400],
-      fontWeight: "600",
+      fontWeight: '600',
     },
     container2: {
-      position: "relative",
-      justifyContent: "center",
-      alignItems: "center",
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     centerContent2: {
-      position: "absolute",
-      justifyContent: "center",
-      alignItems: "center",
+      position: 'absolute',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 
