@@ -4,7 +4,7 @@ import { SheetProvider, useSheetRouter } from 'react-native-actions-sheet';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, shades } from 'helper/colors';
+import { greys, reds, shades } from 'helper/colors';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 
@@ -56,6 +56,7 @@ const RouteA = ({ router, payload }) => {
         {reorderedButtons.map((button, i) => {
           const isProcessing = processingButtonIndex !== null;
           const isDisabled = isProcessing && processingButtonIndex !== i;
+          const isDangerous = button.variant === 'dangerous';
 
           return (
             <TouchableOpacity
@@ -76,12 +77,16 @@ const RouteA = ({ router, payload }) => {
                   borderRadius: 1000,
                   padding: 4,
                 }}>
-                <Icon color={greys(theme)[0]} name={button.icon} size={32} />
+                <Icon
+                  color={isDangerous ? reds[300] : greys(theme)[0]}
+                  name={button.icon}
+                  size={32}
+                />
               </View>
               <Text
                 style={{
                   marginLeft: 16,
-                  color: greys(theme)[0],
+                  color: isDangerous ? reds[300] : greys(theme)[0],
                 }}
                 size={18}
                 weight="bold">
