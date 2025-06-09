@@ -264,9 +264,10 @@ export function LightningReceiveConfirmation({
           )}
           <MintDetailPage
             mintInfo={mintInfo}
-            getCurrentTransaction={getCurrentTransaction}
+            transaction={getCurrentTransaction}
             theme={theme}
             transactionType="receive"
+            handleCheckStatus={handleCheckStatus}
           />
 
           <Section

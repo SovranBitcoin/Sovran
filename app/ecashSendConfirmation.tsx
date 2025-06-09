@@ -56,11 +56,16 @@ export function MintDetailPage({
   mintInfo,
   theme,
   transactionType,
+  transaction,
+  handleCheckStatus,
 }: {
   mintInfo: any;
   theme: any;
   transactionType: 'send' | 'receive';
+  handleCheckStatus: () => any;
 }) {
+  const [loading, setLoading] = useState(false);
+
   return (
     <View
       style={{
@@ -71,26 +76,74 @@ export function MintDetailPage({
         borderRadius: 8,
         backgroundColor: greys(theme)[1800],
         flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
       }}>
-      <View>
-        <MintIcon size={40} mintInfo={mintInfo} />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          flex: 1,
+        }}>
+        <View>
+          <MintIcon size={40} mintInfo={mintInfo} />
+        </View>
+        <View>
+          <Text
+            style={{
+              fontFamily: 'OverpassHeavy',
+              fontSize: 16,
+            }}>
+            {transactionType === 'send' ? 'Sending with' : 'Receiving with'}
+          </Text>
+          <Text
+            style={{
+              fontFamily: 'OverpassRegular',
+              fontSize: 16,
+              color: greys(theme)[100],
+            }}>
+            {mintInfo?.name}
+          </Text>
+        </View>
       </View>
+
       <View>
-        <Text
-          style={{
-            fontFamily: 'OverpassHeavy',
-            fontSize: 16,
-          }}>
-          {transactionType === 'send' ? 'Sending with' : 'Receiving with'}
-        </Text>
-        <Text
-          style={{
-            fontFamily: 'OverpassRegular',
-            fontSize: 16,
-            color: greys(theme)[100],
-          }}>
-          {mintInfo?.name}
-        </Text>
+        {!transaction?.paid && (
+          <Button
+            style={{
+              padding: 0,
+              width: 40,
+              height: 40,
+              margin: 0,
+              marginBottom: 0,
+              marginTop: 0,
+            }}
+            variant="secondary"
+            onPress={() => {
+              setLoading(true);
+              handleCheckStatus(() => {
+                setLoading(false);
+              });
+            }}
+            text=""
+            icon={
+              <Icon
+                spin={
+                  loading
+                    ? {
+                        delay: 0,
+                        duration: 1500,
+                        outputRange: ['0deg', '360deg'],
+                        easing: 'easeOut',
+                      }
+                    : undefined
+                }
+                size={20}
+                name="humbleicons:refresh"
+              />
+            }
+          />
+        )}
       </View>
     </View>
   );
@@ -296,7 +349,13 @@ export function EcashSendConfirmation({
               <Card message={getCurrentTransaction[0].memo} variant="info" />
             </View>
           )}
-          <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
+          <MintDetailPage
+            transaction={getCurrentTransaction[0]}
+            mintInfo={mintInfo}
+            theme={theme}
+            transactionType="send"
+            handleCheckStatus={handleCheckStatus}
+          />
           <Section
             items={[
               {
@@ -390,23 +449,23 @@ export function EcashSendConfirmation({
                       variant: 'secondary',
                       onPress: handleNFCSend,
                     },
-                    {
-                      text: 'Check Status',
-                      icon: 'humbleicons:refresh',
-                      variant: 'secondary',
-                      onPress: handleCheckStatus,
-                    },
-                    {
-                      text: 'Cancel Transaction',
-                      icon: 'mdi:cancel',
-                      variant: 'secondary',
-                      onPress: handleCancelSend,
-                    },
+                    // {
+                    //   text: 'Check Status',
+                    //   icon: 'humbleicons:refresh',
+                    //   variant: 'secondary',
+                    //   onPress: handleCheckStatus,
+                    // },
                     {
                       text: 'Copy as Emoji',
                       icon: 'fluent:emoji-24-filled',
                       variant: 'primary',
                       onPress: handleCopyEmoji,
+                    },
+                    {
+                      text: 'Cancel Transaction',
+                      icon: 'mdi:cancel',
+                      variant: 'dangerous',
+                      onPress: handleCancelSend,
                     },
                     ...extraButtons,
                   ]

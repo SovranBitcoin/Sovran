@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useRef, useEffect, useState, ReactNode } from 'react';
-import { greys, black, shades } from 'helper/colors';
+import { greys, black, shades, reds } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -52,6 +52,7 @@ export const ButtonBase = ({
     primary: [greys(theme)[0], greys(theme)[0]],
     secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
     transparent: ['transparent', 'transparent'],
+    dangerous: [reds[300]],
   };
 
   const { width } = useWindowDimensions();
