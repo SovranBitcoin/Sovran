@@ -269,13 +269,60 @@ const migrations = {
   74: (state: RootState) => {
     return _.update(['nostr', 'contacts'], (contacts = []) => contacts, state);
   },
+  91: (state: RootState) => {
+    return _.update(
+      ['nostr', 'profiles'],
+      (profiles = []) =>
+        profiles.map((profile: any, index: number) => {
+          // Skip if nut13 already exists
+          console.log(12983708273, profile);
+          if (profile?.nut13) {
+            return profile;
+          }
+
+          try {
+            // Check if we have a mnemonic to work with
+            if (!profile.mnemonic) {
+              console.warn(`No mnemonic found for Cashu profile at index ${index}`);
+              return profile;
+            }
+
+            // Create root HDKey from the profile's mnemonic
+            const seed = bip39.mnemonicToSeedSync(profile.mnemonic);
+            const root = HDKey.fromMasterSeed(seed);
+
+            // NUT-13 derivation path for Cashu
+            const DERIVATION_PATH = `m/44'/129372'`;
+            const path = `${DERIVATION_PATH}/0'/${index}'/0/0`;
+
+            // Derive the specific path
+            const derivedKey = root.derive(path);
+
+            // Convert the derived private key back to a mnemonic
+            const derivedCashuMnemonic = bip39.entropyToMnemonic(
+              derivedKey.privateKey as Uint8Array,
+              wordlist
+            );
+
+            return {
+              ...profile,
+              nut13: derivedCashuMnemonic,
+            };
+          } catch (error) {
+            console.error(`Error deriving NUT-13 for Cashu profile at index ${index}:`, error);
+            return profile;
+          }
+        }),
+      state
+    );
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 74,
+  version: 91,
   migrate: createMigrate(migrations, { debug: true }),
 };
 

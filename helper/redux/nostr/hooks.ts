@@ -9,21 +9,24 @@ import {
   addContact,
   removeContact,
 } from './actions';
+import { RootState } from '../store/reducer';
 
 export const useNostr = () => {
   const dispatch = useDispatch();
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
-  const search = useSelector((state) => state.nostr.search);
-  const profiles = useSelector((state) => state.nostr.profiles);
-  const messages = useSelector((state) => state.nostr.messages);
-  const follows = useSelector((state) => state.nostr.follows);
-  const contacts = useSelector((state) => state.nostr.contacts);
+  const { id } = useSelector((state: RootState) => state.nostr.currentProfile);
+  const search = useSelector((state: RootState) => state.nostr.search);
+  const profiles = useSelector((state: RootState) => state.nostr.profiles);
+  const messages = useSelector((state: RootState) => state.nostr.messages);
+  const follows = useSelector((state: RootState) => state.nostr.follows);
+  const contacts = useSelector((state: RootState) => state.nostr.contacts);
+
+  const currentProfile = profiles?.[id];
 
   return {
     search: [...search, ...Object.values(follows).flat(), ...(contacts || [])],
     currentProfile,
     profiles: profiles || [],
-    messages: [...(messages[currentProfile.pubkey] || []), ...(messages['loaded_messages'] || [])],
+    messages: [...(messages[currentProfile?.pubkey] || []), ...(messages['loaded_messages'] || [])],
     setCurrentProfile: (profile) => dispatch(setCurrentProfile(profile)),
     setProfiles: (profiles) => dispatch(setProfiles(profiles)),
     addMessage: (pubkey, message) => dispatch(addMessage(pubkey, message)),
