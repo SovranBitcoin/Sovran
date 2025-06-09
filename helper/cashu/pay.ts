@@ -100,6 +100,7 @@ export async function sendLightning({
   pubkey,
   meltQuote,
   email,
+  lud16,
 }: {
   mintUrl: string;
   pr: string;
@@ -107,6 +108,7 @@ export async function sendLightning({
   pubkey?: string;
   meltQuote: MeltQuoteResponse;
   email?: string;
+  lud16?: string;
 }): Promise<LightningSendTransaction> {
   console.log('[sendLightning]', { mintUrl, pr, unit, pubkey, meltQuote, email });
   const state = store.getState();
@@ -220,6 +222,7 @@ export async function sendLightning({
       unit,
       paid: true,
       meltQuote,
+      lud16,
       fees: {
         lightning_fee: meltQuote.fee_reserve,
         keyset_fee: keyset_fee,
@@ -649,7 +652,10 @@ export async function receiveEcash({
   } catch (error) {
     console.log(error.message);
     // Check if it's the specific keyset inactive error
-    if (error.message === 'keyset id inactive.') {
+    if (
+      error.message === 'keyset id inactive.' ||
+      error?.message?.startsWith('Could not calculate fees. No keyset found with id:')
+    ) {
       Alert.alert('Updating keyset...');
       console.log('[receiveEcash] Keyset inactive, retrying with forceRefresh');
       try {

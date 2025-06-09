@@ -4,13 +4,11 @@ import { formatCurrency, formatCurrencyWrapper } from 'helper/currency';
 import Icon, { LightningUnit, BtcUnit } from 'assets/icons';
 import { convertTime } from 'helper/time';
 import { greens, greys, reds, shades } from 'helper/colors';
-import { useNostr } from 'helper/redux/nostr';
-import { useEsims } from 'helper/redux/esim';
 import { useSelector } from 'react-redux';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
-import CachedImage from 'components/common/Image';
+import TransactionIcon, { TransactionData } from 'components/common/TransactionIcon';
 import { truncateMiddle } from 'helper/strings';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { useTypedNavigation } from 'helper/navigation';
@@ -27,27 +25,6 @@ interface NostrData {
   [key: string]: any;
 }
 
-interface TransactionData {
-  id?: string;
-  txid?: string;
-  request?: string;
-  token?: string;
-  unit: string;
-  amount: number;
-  date?: string;
-  transactionType: 'send' | 'receive' | string;
-  type?: string;
-  isBuy?: string;
-  isSell?: boolean;
-  paid?: boolean;
-  isCancel?: boolean;
-  unifiedRequest?: string;
-  paymentRequest?: string;
-  from?: string;
-  to?: string;
-  status?: TransactionStatus;
-  nostr?: NostrData;
-}
 
 interface AccountData {
   accountIndex: number;
@@ -94,8 +71,7 @@ export function npubToPubkey(npub: string): string {
 export function Transaction({ tx, transactions, account }: TransactionProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
-  const { profiles, search } = useNostr();
-  const { esims } = useEsims();
+
   const { settings } = useSettings();
   const { activeConnections } = useTransactions();
 
@@ -117,24 +93,6 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
 
   const showLoading = isListening;
 
-  // Get profile picture from nostr data
-  const profilePicture =
-    search?.find(
-      (s: ProfileData) =>
-        s?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
-    )?.profile?.picture ||
-    profiles?.find(
-      (p: ProfileData) =>
-        p?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
-    )?.picture ||
-    search?.find(
-      (s: ProfileData) =>
-        s?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
-    )?.profile?.image ||
-    profiles?.find(
-      (p: ProfileData) =>
-        p?.pubkey === npubToPubkey(tx?.nostr?.pubkey || tx?.fromNIP05?.split('@')[0])
-    )?.image;
 
   /**
    * Handle navigation when transaction is pressed
@@ -218,115 +176,6 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     );
   };
 
-  /**
-   * Component to display transaction icon with status indicator
-   */
-  const IconContainer = ({ children }: { children: React.ReactNode }): JSX.Element => (
-    <View className="relative h-7 w-7 bg-transparent">{children}</View>
-  );
-
-  /**
-   * Status indicator for transaction icons
-   */
-  const StatusIndicator = ({
-    isCancel,
-    fromNIP05,
-  }: {
-    isCancel?: boolean;
-    fromNIP05?: boolean;
-  }): JSX.Element => (
-    <View
-      style={{
-        borderColor: greys(theme)[1000],
-        borderWidth: 0.2,
-        backgroundColor: greys(theme)[1800],
-      }}
-      className="absolute bottom-[-4] right-[-4] z-30 rounded-full p-0.5">
-      {isCancel ? (
-        <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
-      ) : (
-        <Icon
-          name={isReceive ? 'fluent:arrow-download-16-filled' : 'fluent:arrow-upload-16-filled'}
-          color={greys(theme)[100]}
-          size={10}
-        />
-      )}
-    </View>
-  );
-
-  /**
-   * Profile image component for transaction
-   */
-  const ProfileImage = (): JSX.Element => (
-    <CachedImage
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: 1000,
-        borderColor: greys(theme)[1000],
-        borderWidth: 0.5,
-      }}
-      source={{ uri: profilePicture }}
-    />
-  );
-
-  /**
-   * Render transaction icon with appropriate indicators
-   */
-  const renderExchangeIcon = (): JSX.Element => {
-    // For receive transactions
-    if (isReceive) {
-      if (profilePicture) {
-        return (
-          <IconContainer>
-            <StatusIndicator />
-            <ProfileImage />
-          </IconContainer>
-        );
-      } else {
-        return (
-          <IconContainer>
-            <Icon name="fluent:arrow-download-16-filled" color={greys(theme)[100]} />
-          </IconContainer>
-        );
-      }
-    }
-    // For send transactions
-    else {
-      if (profilePicture) {
-        return (
-          <IconContainer>
-            <StatusIndicator isCancel={tx.isCancel} />
-            <ProfileImage />
-          </IconContainer>
-        );
-      } else if (
-        esims
-          .map((e: { request: string }) => e.request)
-          .filter(Boolean)
-          .includes(tx.request)
-      ) {
-        return (
-          <IconContainer>
-            <StatusIndicator isCancel={tx.isCancel} />
-            <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
-          </IconContainer>
-        );
-      } else if (tx.isCancel) {
-        return (
-          <IconContainer>
-            <Icon name="mdi:cancel" color={greys(theme)[100]} />
-          </IconContainer>
-        );
-      } else {
-        return (
-          <IconContainer>
-            <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-          </IconContainer>
-        );
-      }
-    }
-  };
 
   /**
    * Render the amount display with appropriate formatting
@@ -452,7 +301,7 @@ export function Transaction({ tx, transactions, account }: TransactionProps): JS
     <View key={tx.txid} className="bg-transparent">
       <TouchableOpacity className="bg-transparent" onPress={handlePress}>
         <View className="flex flex-row items-center justify-between p-5 pl-4 pr-4">
-          {renderExchangeIcon()}
+          <TransactionIcon transaction={tx} />
 
           <View className="ml-3 flex-grow flex-col bg-transparent">
             <View className="flex flex-row items-end justify-between bg-transparent">

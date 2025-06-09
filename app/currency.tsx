@@ -146,7 +146,7 @@ function ModalScreen() {
     } else {
       console.log(
         '[handleDefaultSend] navigate',
-        params.to,
+        params,
         pr,
         unit === 'sat' ? amount : amount * 100,
         meltQuote
@@ -156,6 +156,7 @@ function ModalScreen() {
         pr,
         amount: unit === 'sat' ? amount : amount * 100,
         meltQuote: JSON.stringify(meltQuote),
+        lud16: params.lud16,
       });
     }
   };
