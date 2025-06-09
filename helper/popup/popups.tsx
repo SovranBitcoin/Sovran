@@ -3,6 +3,8 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import React from 'react';
 import { formatAmount } from 'helper/currency';
+import { Text } from 'components/common/Themed';
+import { AmountFormatter } from 'components/common/AmountFormatter';
 
 const MESSAGE_TYPES = {
   ERROR: 'error',
@@ -100,10 +102,32 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   insufficient_balance: {
     title: 'Insufficient Balance',
     text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) => (
-      <>
-        Not enough funds to send {formatAmount(amount, unit)} with a fee of{' '}
-        {formatAmount(fee, unit)}. Add funds or switch mint.
-      </>
+      <Text
+        style={{
+          textAlign: 'center',
+        }}>
+        Not enough funds to send{' '}
+        <AmountFormatter
+          style={{
+            marginBottom: -4,
+            marginLeft: 3,
+          }}
+          size={14}
+          amount={amount}
+          unit={unit}
+        />{' '}
+        with a fee of{' '}
+        <AmountFormatter
+          style={{
+            marginBottom: -4,
+            marginLeft: 3,
+          }}
+          size={14}
+          amount={fee}
+          unit={unit}
+        />
+        .
+      </Text>
     ),
     type: MESSAGE_TYPES.ERROR,
   },
