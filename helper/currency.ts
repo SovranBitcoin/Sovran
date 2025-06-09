@@ -191,3 +191,11 @@ export const formatCurrencyWrapper = (amount: number, unit: string, display = 1)
     }
   );
 };
+
+/**
+ * Format an amount using the user's display preferences
+ */
+export const formatAmount = (amount: number, unit: string): string => {
+  const display_btc = store.getState().settings.settings.display_btc ?? 1;
+  return formatCurrencyWrapper(amount, unit, display_btc);
+};

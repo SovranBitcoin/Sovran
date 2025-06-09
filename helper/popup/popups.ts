@@ -1,6 +1,8 @@
 import { SheetManager } from 'react-native-actions-sheet';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import React from 'react';
+import { formatAmount } from 'helper/currency';
 
 const MESSAGE_TYPES = {
   ERROR: 'error',
@@ -16,9 +18,11 @@ const MESSAGE_EMOJIS = {
   [MESSAGE_TYPES.SUCCESS]: '🎉',
 };
 
+type MessageText = string | React.ReactNode | ((params: any) => React.ReactNode);
+
 type MessageConfig = {
   title: string;
-  text: string | ((params: any) => string);
+  text: MessageText;
   type: string;
   buttons?: any; // Make button optional
 };
@@ -95,8 +99,12 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   // Balance & Transactions
   insufficient_balance: {
     title: 'Insufficient Balance',
-    text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) =>
-      `Unable to send ${amount} ${unit.toUpperCase()} with fee of ${fee} ${unit.toUpperCase()}, you need to receive more funds or change mint.`,
+    text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) => (
+      <>
+        Not enough funds to send {formatAmount(amount, unit)} with a fee of{' '}
+        {formatAmount(fee, unit)}. Add funds or switch mint.
+      </>
+    ),
     type: MESSAGE_TYPES.ERROR,
   },
   funds_received: {
