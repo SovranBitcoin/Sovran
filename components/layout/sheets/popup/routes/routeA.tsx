@@ -16,7 +16,7 @@ const RouteA = ({
     variant?: string;
     emoji?: string;
     message?: string;
-    submessage?: string;
+    submessage?: React.ReactNode;
     buttons?: any;
   };
 }) => {
@@ -57,7 +57,12 @@ const RouteA = ({
       <View style={styles.iconContainer}>
         <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>
         <Text style={styles.text}>{payload?.message || 'Error'}</Text>
-        {payload?.submessage && <Text style={styles.subText}>{payload?.submessage}</Text>}
+        {payload?.submessage &&
+          (typeof payload.submessage === 'string' ? (
+            <Text style={styles.subText}>{payload.submessage}</Text>
+          ) : (
+            payload.submessage
+          ))}
       </View>
       {payload?.buttons?.map((button) => {
         return (

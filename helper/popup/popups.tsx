@@ -1,6 +1,10 @@
 import { SheetManager } from 'react-native-actions-sheet';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import React from 'react';
+import { formatAmount } from 'helper/currency';
+import { Text } from 'components/common/Themed';
+import { AmountFormatter } from 'components/common/AmountFormatter';
 
 const MESSAGE_TYPES = {
   ERROR: 'error',
@@ -16,9 +20,11 @@ const MESSAGE_EMOJIS = {
   [MESSAGE_TYPES.SUCCESS]: '🎉',
 };
 
+type MessageText = string | React.ReactNode | ((params: any) => React.ReactNode);
+
 type MessageConfig = {
   title: string;
-  text: string | ((params: any) => string);
+  text: MessageText;
   type: string;
   buttons?: any; // Make button optional
 };
@@ -95,8 +101,34 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   // Balance & Transactions
   insufficient_balance: {
     title: 'Insufficient Balance',
-    text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) =>
-      `Unable to send ${amount} ${unit.toUpperCase()} with fee of ${fee} ${unit.toUpperCase()}, you need to receive more funds or change mint.`,
+    text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) => (
+      <Text
+        style={{
+          textAlign: 'center',
+        }}>
+        Not enough funds to send{' '}
+        <AmountFormatter
+          style={{
+            marginBottom: -4,
+            marginLeft: 3,
+          }}
+          size={14}
+          amount={amount}
+          unit={unit}
+        />{' '}
+        with a fee of{' '}
+        <AmountFormatter
+          style={{
+            marginBottom: -4,
+            marginLeft: 3,
+          }}
+          size={14}
+          amount={fee}
+          unit={unit}
+        />
+        .
+      </Text>
+    ),
     type: MESSAGE_TYPES.ERROR,
   },
   funds_received: {
