@@ -37,6 +37,8 @@ const createStyles = (theme: any) =>
 
 ### Styling Approach
 
+**Design:** Check `design.tsx` as it has some useful components.
+
 **Primary:** Use Tailwind CSS for styling whenever possible.
 
 **Colors:** When you need theme-aware colors, use inline styles:

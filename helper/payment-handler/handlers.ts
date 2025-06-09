@@ -10,6 +10,7 @@ import Haptics from 'components/common/Haptics';
 import { isLightningAddress, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
 import { showMessage } from '../popup/popups';
+import { decode } from '@gandlaf21/bolt11-decode';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
@@ -168,17 +169,10 @@ const handleLightning = async ({
   setLoading: (loading: boolean) => void;
 }): Promise<NavigationResult | null> => {
   const lnurl = lnTrim(data);
-  console.log(
-    '[handleLightning]2222',
-    data,
-    unit,
-    balance,
-    setLoading,
-    selectedMint,
-    lnurl,
-    isLightningAddress(lnurl)
-  );
-  if (isLightningAddress(lnurl)) {
+
+  const isLightningAddress_ = isLightningAddress(lnurl);
+  const amount = isLightningAddress_ ? null : getLightningAmount({ pr: lnurl });
+  if (isLightningAddress_ || !amount) {
     return {
       screen: 'currency',
       params: {
@@ -188,7 +182,7 @@ const handleLightning = async ({
       },
     };
   }
-  const amount = getLightningAmount({ pr: lnurl });
+
   if (amount) {
     const meltQuote = await getMeltQuote({
       pr: lnurl,
@@ -276,6 +270,8 @@ export const barcodeHandler = async (props: BarcodeHandlerProps & { navigation: 
 
   const result = await handleBarcode(handlerProps);
   if (result) {
-    navigation.navigate(result.screen, result.params);
+    navigation.navigate(result.screen, result.params, {
+      closeCurrentAndParent: true,
+    });
   }
 };
