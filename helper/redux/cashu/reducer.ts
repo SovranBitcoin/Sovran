@@ -1,4 +1,4 @@
-import _ from "lodash/fp";
+import _ from 'lodash/fp';
 import {
   ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,
@@ -18,8 +18,8 @@ import {
   APPEND_TRANSACTION,
   SET_KEYS,
   SET_AUDIT,
-} from "./actionTypes";
-import { ensureProfileExists } from "./helpers";
+} from './actionTypes';
+import { ensureProfileExists } from './helpers';
 
 const initialState = {
   profiles: [
@@ -42,76 +42,55 @@ export const cashuReducer = (state = initialState, action) => {
   switch (action.type) {
     case ADD_MINTS:
       return _.update(
-        ["profiles", action.payload.profileId, "mints"],
+        ['profiles', action.payload.profileId, 'mints'],
         (mints = []) => [...mints, ...action.payload.mints],
-        state,
+        state
       );
 
     case REMOVE_MINTS:
       return _.update(
-        ["profiles", action.payload.profileId, "mints"],
-        (mints = []) =>
-          mints.filter((mint) => !action.payload.mints.includes(mint)),
-        state,
+        ['profiles', action.payload.profileId, 'mints'],
+        (mints = []) => mints.filter((mint) => !action.payload.mints.includes(mint)),
+        state
       );
 
     case ENSURE_PROFILE_EXISTS:
       return ensureProfileExists(state, action.payload.profileId);
 
     case SET_KEYSETS:
-      return _.set(
-        ["keysets", action.payload.mintUrl],
-        action.payload.keysets,
-        state,
-      );
+      return _.set(['keysets', action.payload.mintUrl], action.payload.keysets, state);
 
     case SET_KEYS:
-      return _.set(
-        ["keys", action.payload.mintUrl],
-        action.payload.keys,
-        state,
-      );
+      return _.set(['keys', action.payload.mintUrl], action.payload.keys, state);
 
     case SET_INFO:
-      return _.set(
-        ["info", action.payload.mintUrl],
-        action.payload.mintInfo,
-        state,
-      );
+      return _.set(['info', action.payload.mintUrl], action.payload.mintInfo, state);
 
     case SET_AUDIT:
-      return _.set(
-        ["audits", action.payload.mintUrl],
-        action.payload.audit,
-        state,
-      );
+      console.log(198273, action.payload);
+      return _.set(['audits', action.payload.mintUrl], action.payload.audit, state);
 
     case SET_PROOFS:
       return _.set(
-        [
-          "profiles",
-          action.payload.profileId,
-          "proofs",
-          action.payload.mintUrl,
-        ],
+        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         action.payload.proofs,
-        state,
+        state
       );
 
     case SET_TRANSACTIONS:
       return _.set(
-        ["profiles", action.payload.profileId, "transactions"],
+        ['profiles', action.payload.profileId, 'transactions'],
         action.payload.transactions,
-        state,
+        state
       );
 
     case UPDATE_TRANSACTION: {
       const { profileId, updateFn, matcher = () => false } = action.payload;
 
       return _.update(
-        ["profiles", profileId, "transactions"],
+        ['profiles', profileId, 'transactions'],
         _.map((tx) => (matcher(tx) ? updateFn(tx) : tx)),
-        state,
+        state
       );
     }
 
@@ -119,63 +98,52 @@ export const cashuReducer = (state = initialState, action) => {
       const { profileId, transaction } = action.payload;
 
       return _.update(
-        ["profiles", profileId, "transactions"],
+        ['profiles', profileId, 'transactions'],
         (transactions = []) => {
           return _.concat(transactions, transaction);
         },
-        state,
+        state
       );
     }
 
     case APPEND_TRANSACTIONS_V2:
       // check if tx already exists inside transactions and return early
       return _.update(
-        ["profiles", action.payload.profileId, "transactions"],
-        (transactions = []) =>
-          _.concat(transactions, action.payload.transactions),
-        state,
+        ['profiles', action.payload.profileId, 'transactions'],
+        (transactions = []) => _.concat(transactions, action.payload.transactions),
+        state
       );
 
     case SET_SELECTED_MINT:
       return _.set(
-        ["profiles", action.payload.profileId, "selectedMint"],
+        ['profiles', action.payload.profileId, 'selectedMint'],
         action.payload.mintUrl,
-        state,
+        state
       );
 
     case APPEND_PROOFS_V2:
       return _.update(
-        [
-          "profiles",
-          action.payload.profileId,
-          "proofs",
-          action.payload.mintUrl,
-        ],
+        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          return _.unionBy(proofs, action.payload.proofs, "secret");
+          return _.unionBy(proofs, action.payload.proofs, 'secret');
         },
-        state,
+        state
       );
 
     case REMOVE_PROOFS:
       return _.update(
-        [
-          "profiles",
-          action.payload.profileId,
-          "proofs",
-          action.payload.mintUrl,
-        ],
+        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          console.log("action.payload.proofs", action.payload.proofs);
+          console.log('action.payload.proofs', action.payload.proofs);
           // Remove proofs from state which are in action.payload.proofs
           // _.isEqual(
           //   _.pick(existingProof, ['C', 'secret', 'amount']),
           //   _.pick(usedProof, ['C', 'secret', 'amount'])
           // )
           // So loop over every proof, and check if the same C , secret and amount exists in action.payload.proofs
-          console.log("proofs", proofs);
+          console.log('proofs', proofs);
           return proofs.filter((proof) => {
-            console.log("proof", proof);
+            console.log('proof', proof);
             const shouldRemove = action.payload.proofs.some((usedProof) => {
               const proofPicked = {
                 C: proof.C,
@@ -190,7 +158,7 @@ export const cashuReducer = (state = initialState, action) => {
               const isMatch = _.isEqual(proofPicked, usedProofPicked);
 
               if (isMatch) {
-                console.log("Match found:", { proofPicked, usedProofPicked });
+                console.log('Match found:', { proofPicked, usedProofPicked });
               }
 
               return isMatch;
@@ -199,31 +167,26 @@ export const cashuReducer = (state = initialState, action) => {
             return !shouldRemove; // Keep proofs that shouldn't be removed
           });
         },
-        state,
+        state
       );
 
     case INCREMENT_COUNTER:
       return _.update(
-        [
-          "profiles",
-          action.payload.profileId,
-          "counters",
-          action.payload.mintUrl,
-        ],
+        ['profiles', action.payload.profileId, 'counters', action.payload.mintUrl],
         (count = 1) => count + action.payload.amount,
-        state,
+        state
       );
 
     case RESET_COUNTER:
       const { profileId } = action.payload;
-      return _.set(["profiles", profileId, "counters"], {}, state);
+      return _.set(['profiles', profileId, 'counters'], {}, state);
 
     case INCREASE_COUNTER_V2: {
       const { profileId, mintUrl, keysetId, amount } = action.payload;
       return _.update(
-        ["profiles", profileId, "counters", mintUrl, keysetId],
+        ['profiles', profileId, 'counters', mintUrl, keysetId],
         (count = 1) => count + amount,
-        state,
+        state
       );
     }
 
