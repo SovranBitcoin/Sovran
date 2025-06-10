@@ -33,6 +33,7 @@ import { useTypedRoute } from 'helper/navigation';
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { greys } from 'helper/colors';
 import { publishWalletEvent } from 'helper/nostr/cashu';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export function LightningReceiveConfirmation({
   request,
@@ -52,7 +53,7 @@ export function LightningReceiveConfirmation({
   const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState(null);
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
 
   const getCurrentTransaction = useSelector(
     memoizedGetTransactionByMatcher({

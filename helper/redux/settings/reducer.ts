@@ -11,7 +11,7 @@ const initialState = {
   settings: {
     lang: 'en',
     theme: 'dark',
-    display_btc: 1,
+    display_btc: 3,
     passcode: '',
   },
 };

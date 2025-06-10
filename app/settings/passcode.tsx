@@ -6,12 +6,16 @@ import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import NumericKeyboard from 'components/passcode/NumericKeyboard';
 import Container from 'components/layout/Container';
+import { Card } from 'components/common/Card';
+import { Button } from 'components/common/Button';
+import { ButtonHandler } from 'components/common/ButtonHandler';
+import { showMessage } from 'helper/popup/popups';
 
 const PASSCODE_LENGTH = 4;
 
 const PasscodeSettings: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
-  const { setPasscode } = useSettings();
+  const { setPasscode, passcode } = useSettings();
   const navigation = useTypedNavigation();
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');
@@ -31,17 +35,6 @@ const PasscodeSettings: React.FC = () => {
     } else {
       if (val.length <= PASSCODE_LENGTH) {
         setConfirm(val);
-        if (val.length === PASSCODE_LENGTH) {
-          if (val === code) {
-            setPasscode(val);
-            navigation.goBack();
-          } else {
-            setStep('create');
-            setCode('');
-            setConfirm('');
-            setKeyIdx((k) => k + 1);
-          }
-        }
       }
     }
   };
@@ -51,6 +44,9 @@ const PasscodeSettings: React.FC = () => {
   return (
     <Container>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <Card
+          message="Forgetting your passcode will prevent you from accessing your wallet."
+          variant="warning"></Card>
         <View style={styles.container}>
           <View style={styles.content}>
             <Text style={styles.title}>
@@ -58,15 +54,42 @@ const PasscodeSettings: React.FC = () => {
             </Text>
             <View style={styles.dotsContainer}>
               {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
-                <View
-                  key={i}
-                  style={currentValue.length > i ? styles.dotActive : styles.dot}
-                />
+                <View key={i} style={currentValue.length > i ? styles.dotActive : styles.dot} />
               ))}
             </View>
           </View>
           <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
         </View>
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Reset',
+              icon: 'reset',
+              variant: 'secondary',
+              onPress: () => {
+                setPasscode('');
+                setStep('create');
+                setCode('');
+                setConfirm('');
+                setKeyIdx(0);
+              },
+            },
+            {
+              text: 'Confirm',
+              icon: 'check',
+              variant: 'primary',
+              disabled: confirm.length !== PASSCODE_LENGTH,
+              onPress: () => {
+                if (code === confirm && code.length === PASSCODE_LENGTH) {
+                  setPasscode(code);
+                  navigation.goBack();
+                } else {
+                  showMessage('passcode_not_match', {}, { emoji: '🚨' });
+                }
+              },
+            },
+          ]}
+        />
       </ScrollView>
     </Container>
   );

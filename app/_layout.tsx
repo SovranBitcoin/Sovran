@@ -2,7 +2,7 @@ import 'global.css';
 
 // Import core libraries
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Animated, Dimensions, StatusBar, LogBox, Platform } from 'react-native';
+import { Animated, Dimensions, StatusBar, LogBox, Platform, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { View } from 'components/common/Themed';
@@ -32,7 +32,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { persistor, store } from 'helper/redux/store';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-import { useNostr } from 'helper/redux/nostr';
+import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
 import { getFollowedUsers } from './ProfilePage';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
@@ -161,7 +161,7 @@ function MySplashScreen({ opacity }) {
  * Stack navigation component
  */
 function MainStack() {
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const { addMessage, messages, setFollows } = useNostr();
   const theme = useSelector(memoizedGetTheme);
 

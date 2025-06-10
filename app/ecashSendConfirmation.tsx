@@ -150,6 +150,7 @@ export function MintDetailPage({
 }
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export function EcashSendConfirmation({
   unit,
@@ -168,7 +169,7 @@ export function EcashSendConfirmation({
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
-  const currentProfile = useSelector((state) => state.nostr?.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
 
   const getCurrentTransaction = useSelector(
     memoizedGetTransactionByMatcher({

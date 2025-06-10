@@ -10,6 +10,8 @@ import { Dimensions } from 'react-native';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
 import opacity from 'hex-color-opacity';
+import { Section } from 'components/common/Section';
+import Icons from 'assets/icons';
 
 const DonutChart = ({
   size = 96,
@@ -320,6 +322,13 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
       accent: true,
       description: 'Typical processing time',
     },
+    // {
+    //   label: 'Rating',
+    //   value: '4/5',
+    //   accent: true,
+    //   // user review count
+    //   description: 'Out of 183 reviews',
+    // },
     // {
     //   label: 'User Reviews',
     //   value: '182',

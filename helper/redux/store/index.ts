@@ -365,7 +365,7 @@ store.subscribe(() => {
     return structure;
   };
 
-  console.log(JSON.stringify(getStructure(store.getState()), null, 2));
+  console.log(23982937, JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

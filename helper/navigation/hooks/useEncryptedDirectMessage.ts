@@ -5,12 +5,11 @@ import { NDKEvent, NDKKind, NDKPrivateKeySigner, ProfilePointer } from '@nostr-d
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { nip04, nip19 } from 'nostr-tools';
 import { useSelector } from 'react-redux';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export const useSendEncryptedDirectMessage = () => {
   const { ndk } = useNDK();
-  const currentProfile = useSelector(
-    (state: { nostr: { currentProfile: any } }) => state.nostr.currentProfile
-  );
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
 
   const sendEncryptedDirectMessage = async ({
     message,

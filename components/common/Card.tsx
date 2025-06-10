@@ -76,6 +76,7 @@ export const Card: React.FC<CardProps> = ({ title, message, variant, icon, onPre
         className=" p-4 pr-1 text-base font-medium"
         style={{
           color: currentStyle.color,
+          marginRight: 8,
         }}>
         {message}
       </Text>

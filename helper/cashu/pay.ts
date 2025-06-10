@@ -679,7 +679,7 @@ export async function getPaymentRequest({
 }): Promise<PaymentRequest> {
   const state = store.getState();
   const mint = memoizedGetSelectedMint(state);
-  const currentProfile = state.nostr?.currentProfile;
+  const currentProfile = memoizedGetCurrentProfile(state);
   const nprofile = nip19.nprofileEncode({
     pubkey: currentProfile?.pubkey,
   });

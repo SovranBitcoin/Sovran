@@ -8,6 +8,7 @@ import { greens, greys, reds } from 'helper/colors';
 import { getWallet } from 'helper/cashu';
 import { removeProofs } from 'helper/redux/cashu'; // Import the removeProofs action
 import { ScrollView } from 'react-native';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export default function ModalScreen() {
   const dispatch = useDispatch(); // Add dispatch hook
@@ -19,7 +20,7 @@ export default function ModalScreen() {
   const [activeMintsData, setActiveMintsData] = useState([]);
 
   const theme = useSelector(memoizedGetTheme);
-  const currentProfile = useSelector((state) => state.nostr?.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
   // Improved selectors to get all data we need

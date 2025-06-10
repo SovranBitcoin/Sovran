@@ -9,18 +9,17 @@ import {
   addContact,
   removeContact,
 } from './actions';
-import { RootState } from '../store/reducer';
+
+import { memoizedGetCurrentProfile } from './selectors';
 
 export const useNostr = () => {
   const dispatch = useDispatch();
-  const { id } = useSelector((state: RootState) => state.nostr.currentProfile);
-  const search = useSelector((state: RootState) => state.nostr.search);
-  const profiles = useSelector((state: RootState) => state.nostr.profiles);
-  const messages = useSelector((state: RootState) => state.nostr.messages);
-  const follows = useSelector((state: RootState) => state.nostr.follows);
-  const contacts = useSelector((state: RootState) => state.nostr.contacts);
-
-  const currentProfile = profiles?.[id];
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
+  const search = useSelector((state) => state.nostr.search);
+  const profiles = useSelector((state) => state.nostr.profiles);
+  const messages = useSelector((state) => state.nostr.messages);
+  const follows = useSelector((state) => state.nostr.follows);
+  const contacts = useSelector((state) => state.nostr.contacts);
 
   return {
     search: [...search, ...Object.values(follows).flat(), ...(contacts || [])],
@@ -34,7 +33,7 @@ export const useNostr = () => {
       dispatch(updateMessageStatus(pubkey, messageId, status));
     },
     setFollows: (follows) => dispatch(setFollows(follows)),
-    follows: [...(follows[currentProfile.pubkey] || [])],
+    follows: [...(follows[currentProfile?.pubkey] || [])],
     contacts: contacts || [],
     addContact: (contact) => dispatch(addContact(contact)),
     removeContact: (pubkey) => dispatch(removeContact(pubkey)),

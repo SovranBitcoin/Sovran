@@ -20,6 +20,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -33,7 +34,7 @@ function ModalScreen() {
 
   const balance = useSelector(memoizedGetBalance(unit));
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const profileId = useSelector(memoizedGetCurrentProfile)?.id;
 
   useEffect(() => {
     if (Platform.OS === 'ios') {

@@ -305,6 +305,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: "You don't have any new ecash to redeem.",
     type: MESSAGE_TYPES.ERROR,
   },
+  passcode_not_match: {
+    title: 'Passcode Not Match',
+    text: 'The passcode does not match. Please try again.',
+    type: MESSAGE_TYPES.ERROR,
+  },
 };
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;

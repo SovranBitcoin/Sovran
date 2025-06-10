@@ -30,6 +30,7 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { runWithAnimationFrame } from './onboard/new';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 interface ScanningData {
   data: string;
@@ -40,7 +41,7 @@ function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const dispatch = useDispatch();
-  const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const profileId = useSelector(memoizedGetCurrentProfile).id;
   const { params } = useRoute();
   const navigation = useTypedNavigation();
 

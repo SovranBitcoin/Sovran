@@ -1,8 +1,8 @@
 import 'app/global';
-import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
+import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
@@ -30,8 +30,12 @@ import { isProduction } from 'helper/version';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { useTransactions } from 'components/providers/TransactionsProvider';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { Text } from 'components/common/Themed';
+import { Card } from 'components/common/Card';
+import { SheetManager } from 'react-native-actions-sheet';
 
-async function getProfile(currentProfile, listenToTransaction) {
+async function getProfile(currentProfile: any, listenToTransaction: any) {
   const sk = nip19.decode(currentProfile?.nsec).data;
   const signer = new NsecSigner(sk);
   const sdk = new NCSDK('https://npubx.cash', signer);
@@ -178,7 +182,7 @@ function TabOneScreen({
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector((state) => state.settings.settings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const navigation = useTypedNavigation();
@@ -229,6 +233,19 @@ function TabOneScreen({
             account={account}
             setAccounts={setAccounts}
           />
+          {new Date().getTime() > new Date('2025-06-19').getTime() && (
+            <View
+              style={{
+                margin: 16,
+                marginTop: -40,
+                marginBottom: 32,
+              }}>
+              <Card
+                message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
+                variant="info"
+              />
+            </View>
+          )}
           <View
             style={{
               margin: 16,

@@ -12,6 +12,7 @@ import { store } from 'helper/redux/store';
 import Icon from 'assets/icons';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { getRawExpiry } from '../cashu';
+import opacity from 'hex-color-opacity';
 
 // Helper function to format the date as needed
 const formatDate = (date: string): string => {
@@ -345,15 +346,17 @@ const createStyles = (theme: any) =>
     },
     dateHeader: {
       fontFamily: 'OverpassHeavy',
-      color: greys(theme)[1000],
+      color: opacity(greys(theme)[1000], 0.7),
       textAlign: 'left',
       marginVertical: 4,
       backgroundColor: 'transparent',
+      fontSize: 14,
     },
     transactionsLabel: {
-      color: greys(theme)[700],
+      color: greys(theme)[1000],
       fontFamily: 'OverpassHeavy',
       margin: 0,
+      fontSize: 16,
     },
     transactionContainer: {
       backgroundColor: greys(theme)[1800],

@@ -23,6 +23,7 @@ import * as Clipboard from 'expo-clipboard';
 import { showSuccess } from 'helper/popup/popups';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/layout/Transaction';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 const MintDetailPage = (props) => {
   const theme = useSelector(memoizedGetTheme);
@@ -95,7 +96,7 @@ const MintDetailPage = (props) => {
     }
   };
 
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
 
   if (loading) {
     return (
@@ -139,6 +140,102 @@ const MintDetailPage = (props) => {
         <View style={styles.headerContainer}>
           <Heatmap mintInfo={mintInfo} mintUrl={params?.mintUrl} wallet={wallet} />
         </View>
+
+        {/* pill tags */}
+        {/* <View style={{}}>
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 8,
+              paddingHorizontal: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: greys(theme)[1500],
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Icon name="material-symbols:update-rounded" size={24} color={greys(theme)[700]} />
+            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+              Realtime Updates
+            </Text>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 8,
+              paddingHorizontal: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: greys(theme)[1500],
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
+            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+              Restore Money
+            </Text>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 8,
+              paddingHorizontal: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: greys(theme)[1500],
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Icon name="uil:invoice" size={24} color={greys(theme)[700]} />
+            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+              Payment Requests
+            </Text>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 8,
+              paddingHorizontal: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: greys(theme)[1500],
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
+            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+              Restore Money
+            </Text>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 8,
+              paddingHorizontal: 8,
+              backgroundColor: greys(theme)[1800],
+              borderRadius: 12,
+              borderWidth: 0.5,
+              borderColor: greys(theme)[1500],
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Icon name="solar:key-bold" size={24} color={greys(theme)[700]} />
+            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+              P2PK
+            </Text>
+          </View>
+        </View> */}
 
         {/* Description Card */}
         {mintInfo.description && (

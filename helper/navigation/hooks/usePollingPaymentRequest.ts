@@ -10,6 +10,7 @@ import { checkTokenSpent, receiveEcash } from 'helper/cashu';
 import { updateTransaction } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 interface PaymentRequestPayload {
   proofs: any[];
@@ -23,9 +24,7 @@ interface UsePollingPaymentRequestParams {
 }
 
 export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRequestParams) => {
-  const currentProfile = useSelector(
-    (state: { nostr: { currentProfile: any } }) => state.nostr.currentProfile
-  );
+  const currentProfile = memoizedGetCurrentProfile(store.getState());
 
   const filters = useMemo(
     () => [
@@ -123,7 +122,7 @@ export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRe
       });
     }
 
-    const profileId = store.getState().nostr?.currentProfile?.id;
+    const profileId = memoizedGetCurrentProfile(store.getState()).id;
     await store.dispatch(
       updateTransaction({
         profileId,

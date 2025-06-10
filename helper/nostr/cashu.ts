@@ -4,6 +4,8 @@ import { store } from 'helper/redux/store';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
+import { memoizedGetAllBalances } from 'helper/redux/cashu';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 const cache = new Cache({
   namespace: 'last-wallet-event',
@@ -39,7 +41,7 @@ export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | nu
 
 async function publishWalletEvent(mints: string[], units: string[] = ['sat']): Promise<string>[] {
   try {
-    const currentProfile = store.getState().nostr?.currentProfile;
+    const currentProfile = memoizedGetCurrentProfile(store.getState());
 
     if (!currentProfile?.pubkey || !currentProfile?.nsec) {
       throw new Error('No valid profile available');

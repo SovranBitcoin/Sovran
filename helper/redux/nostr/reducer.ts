@@ -124,7 +124,7 @@ export const nostrReducer = (state = initialState, action) => {
     }
 
     case SET_FOLLOWS: {
-      const pubkey = state.currentProfile.pubkey;
+      const pubkey = state.profiles?.[state.currentProfile.id]?.pubkey;
       return { ...state, follows: { [pubkey]: action.payload } };
     }
 
@@ -179,9 +179,7 @@ export const nostrReducer = (state = initialState, action) => {
     }
 
     case ADD_CONTACT: {
-      const existing = state.contacts.find(
-        (c) => c.pubkey === action.payload.pubkey
-      );
+      const existing = state.contacts.find((c) => c.pubkey === action.payload.pubkey);
       if (existing) {
         return {
           ...state,

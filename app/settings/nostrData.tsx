@@ -10,10 +10,11 @@ import { EventKind } from 'app/Profile';
 import { greys } from 'helper/colors';
 import Image from 'components/common/Image';
 import { ScrollView } from 'react-native';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export default function ModalScreen() {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
-  const currentProfile = useSelector((state) => state.nostr.currentProfile);
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);
 
