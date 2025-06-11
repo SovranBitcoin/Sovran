@@ -180,9 +180,9 @@ function TabOneScreen({
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await getProfile(currentProfile, listenToTransaction);
-    setRefreshing(false);
+    // setRefreshing(true);
+    // await getProfile(currentProfile, listenToTransaction);
+    // setRefreshing(false);
   }, [currentProfile?.pubkey]);
 
   const theme = useSelector(memoizedGetTheme);
