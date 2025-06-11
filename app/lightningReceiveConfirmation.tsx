@@ -113,12 +113,11 @@ export function LightningReceiveConfirmation({
 
   const { listenToTransaction, activeConnections } = useTransactions();
 
-  // useEffect(() => {
-  //   if (!getCurrentTransaction?.[0].paid) {
-  //     listenToTransaction([getCurrentTransaction?.[0]]);
-  //   }
-  // }, [getCurrentTransaction?.[0].paid]);
-
+  useEffect(() => {
+    if (!getCurrentTransaction?.[0].paid) {
+      listenToTransaction([getCurrentTransaction?.[0]]);
+    }
+  }, [getCurrentTransaction?.[0].paid]);
 
   const isListening = activeConnections?.some((connection) =>
     connection.id.includes(getCurrentTransaction[0].request)

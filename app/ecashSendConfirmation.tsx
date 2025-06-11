@@ -65,7 +65,15 @@ export function MintDetailPage({
   handleCheckStatus: () => any;
 }) {
   const [loading, setLoading] = useState(false);
+  const { transactions, activeConnections } = useTransactions();
 
+  const txs = transactions.filter((tx) => tx.fromNIP05).map((tx) => tx.request);
+
+  const isListening = activeConnections?.some((connection) =>
+    txs.some((txRequest) => connection.id.includes(txRequest))
+  );
+
+  console.log(isListening);
   return (
     <View
       style={{
@@ -119,6 +127,7 @@ export function MintDetailPage({
               marginTop: 0,
             }}
             variant="secondary"
+            disabled={loading || isListening}
             onPress={() => {
               setLoading(true);
               handleCheckStatus(() => {
@@ -129,7 +138,7 @@ export function MintDetailPage({
             icon={
               <Icon
                 spin={
-                  loading
+                  loading || isListening
                     ? {
                         delay: 0,
                         duration: 1500,

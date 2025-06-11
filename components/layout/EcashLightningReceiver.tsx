@@ -17,7 +17,10 @@ import { useTypedNavigation } from 'helper/navigation';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/common/Card';
 import { SheetManager } from 'react-native-actions-sheet';
-
+import { MintDetailPage } from 'app/ecashSendConfirmation';
+import { useGetMintInfo } from 'helper/redux/cashu';
+import { getProfile } from 'app/(drawer)/(tabs)';
+import { useTransactions } from 'components/providers/TransactionsProvider';
 export const pool = new SimplePool();
 
 const screenWidth = Dimensions.get('window').width;
@@ -127,6 +130,9 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
   const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;
   const showLightningAddress = Boolean(currentProfile?.npub && unit === 'sat');
 
+  const mintInfo = useGetMintInfo({ mintUrl: 'https://mint.minibits.cash/Bitcoin' });
+
+  const { listenToTransaction } = useTransactions();
   return (
     <Modal
       showClose
@@ -173,7 +179,16 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
             unit="sat"
           />
         )}
-        {unit === 'sat' && (
+        <MintDetailPage
+          mintInfo={mintInfo}
+          theme={theme}
+          transactionType="receive"
+          handleCheckStatus={async (callback) => {
+            await getProfile(currentProfile, listenToTransaction);
+            callback();
+          }}
+        />
+        {/* {unit === 'sat' && (
           <View
             style={{
               margin: 16,
@@ -191,7 +206,7 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
               variant="info"
             />
           </View>
-        )}
+        )} */}
       </View>
     </Modal>
   );

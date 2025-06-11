@@ -305,7 +305,7 @@ const MintDetailPage = (props) => {
         </Section> */}
 
         {/* Actions Section */}
-        <Section title="Actions">
+        {/* <Section title="Actions">
           {allowSetAsNPC && (
             <RowButton
               label="Set as NPC"
@@ -321,7 +321,7 @@ const MintDetailPage = (props) => {
               }}
             />
           )}
-        </Section>
+        </Section> */}
       </ScrollView>
     </Wrapper>
   );

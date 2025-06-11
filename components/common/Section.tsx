@@ -9,6 +9,7 @@ import { BlurView } from 'expo-blur';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { truncateMiddle } from 'helper/strings';
 
 interface ItemTitle {
   id?: string;
@@ -119,12 +120,12 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           }}>
           <Text
             weight="mono"
-            size={11}
+            size={18}
             style={{
               color: greys(theme)[100],
               textAlign: 'center',
             }}>
-            {username}
+            {truncateMiddle(username, 8)}
           </Text>
           <TouchableOpacity
             onPress={() => {
