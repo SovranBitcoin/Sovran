@@ -111,7 +111,7 @@ export const TransactionProvider = ({ children }) => {
 
       // join requests together with _ seperator
       const id =
-        transactions?.type === 'lightning'
+        transactions?.[0]?.type === 'lightning'
           ? transactions.map((t: any) => t.request).join('_')
           : transactions.map((t: any) => t.token).join('_');
       console.log('listenToTransaction id', id);
@@ -216,6 +216,9 @@ export const TransactionProvider = ({ children }) => {
                   removeConnection(id);
                 }
               );
+              if (unsub) {
+                addConnection(id, unsub);
+              }
             } else if (type === 'lightning') {
               console.log(
                 'listenToTransaction txs_.map((tx) => tx.mintQuote.quote)',
