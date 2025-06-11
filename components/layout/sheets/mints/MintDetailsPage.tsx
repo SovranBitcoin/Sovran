@@ -121,6 +121,8 @@ const MintDetailPage = (props) => {
   }
 
   const mintInfo = wallet.mintInfo._mintInfo;
+  const allowSetAsNPC = // reason: we want to allow websockets for the npubx.cash, otherwise it just complicates the codebase.
+    mintInfo?.nuts?.['17']?.supported?.[0]?.commands?.includes('bolt11_mint_quote');
 
   return (
     <Wrapper
@@ -304,19 +306,21 @@ const MintDetailPage = (props) => {
 
         {/* Actions Section */}
         <Section title="Actions">
-          <RowButton
-            label="Set as NPC"
-            textStyle={styles.actionText}
-            style={styles.actionButton}
-            onPress={async () => {
-              // Handle edit mint navigation
-              const sk = nip19.decode(currentProfile?.nsec).data;
-              const signer = new NsecSigner(sk);
-              const sdk = new NCSDK('https://npubx.cash', signer);
+          {allowSetAsNPC && (
+            <RowButton
+              label="Set as NPC"
+              textStyle={styles.actionText}
+              style={styles.actionButton}
+              onPress={async () => {
+                // Handle edit mint navigation
+                const sk = nip19.decode(currentProfile?.nsec).data;
+                const signer = new NsecSigner(sk);
+                const sdk = new NCSDK('https://npubx.cash', signer);
 
-              await sdk.setMint(params?.mintUrl);
-            }}
-          />
+                await sdk.setMint(params?.mintUrl);
+              }}
+            />
+          )}
         </Section>
       </ScrollView>
     </Wrapper>
