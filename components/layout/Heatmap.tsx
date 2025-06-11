@@ -233,6 +233,8 @@ const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
     );
   }
 
+  const days = 45;
+
   return (
     <View
       style={{
@@ -264,14 +266,14 @@ const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
       <Text style={styles.mintTitle}>{mintInfo.name || 'Unknown Mint'}</Text>
       {mintInfo.version && <Text style={styles.mintVersion}>{mintInfo.version}</Text>}
       <View style={styles.container}>
-        {new Array(30).fill(0).map((_, i) => {
+        {new Array(days).fill(0).map((_, i) => {
           // Also generate the date range in UTC for consistency
           const date = dayjs()
             .utc()
-            .subtract(30 - i, 'day')
+            .subtract(days - i, 'day')
             .format('YYYY-MM-DD');
 
-          const isLastCell = i === 29; // Last cell in the array
+          const isLastCell = i === days - 1; // Last cell in the array
 
           const CellComponent = isLastCell ? Animated.View : View;
           const cellStyle = isLastCell
@@ -281,7 +283,7 @@ const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
                 margin: 1,
                 borderRadius: 4,
                 backgroundColor: getColor(data[date]?.successRate),
-                height: Math.floor(32 - (25 * Math.log(30 - i)) / Math.log(30)),
+                height: Math.floor(30 - (20 * Math.log(days - i)) / Math.log(days)),
                 opacity: opacityAnim,
               }
             : {
@@ -291,7 +293,7 @@ const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
                 borderRadius: 4,
                 opacity: 0.66,
                 // make height be based on index and it should be log scale i want it to be largest at 30 and go down
-                height: Math.floor(32 - (25 * Math.log(30 - i)) / Math.log(30)),
+                height: Math.floor(32 - (25 * Math.log(days - i)) / Math.log(days)),
                 backgroundColor: getColor(data[date]?.successRate),
               };
 
