@@ -68,10 +68,14 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const { transactions: cashuTransactions } = useCashu();
   const navigation = useNavigation();
 
+  function sanityFilter(tx) {
+    return tx.amount === 0 ? false : true;
+  }
+
   // Filter transactions based on account type and filter prop
   const filterTransactions = (transactions: Transaction[]) => {
     // First filter by account type/unit
-    let filtered = transactions.filter((tx) => tx.unit === account.unit);
+    let filtered = transactions.filter((tx) => tx.unit === account.unit).filter(sanityFilter);
 
     // Then filter by transaction type
     filtered = filtered.filter((tx) => {
