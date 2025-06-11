@@ -1,5 +1,5 @@
 import 'app/global';
-import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
+import React, { memo, useCallback, useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
@@ -34,6 +34,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { Text } from 'components/common/Themed';
 import { Card } from 'components/common/Card';
 import { SheetManager } from 'react-native-actions-sheet';
+import { openNpubxWebSocket } from 'helper/npubcash/websocket';
 
 async function getProfile(currentProfile: any, listenToTransaction: any) {
   const sk = nip19.decode(currentProfile?.nsec).data;
@@ -172,10 +173,22 @@ function TabOneScreen({
   ]);
   const [account, setAccount] = useState(accounts[0]);
 
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const handleQuoteUpdate = useCallback(async () => {
+    await getProfile(currentProfile, listenToTransaction);
+  }, [currentProfile?.nsec]);
+
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await getProfile(currentProfile, listenToTransaction);
+    if (!wsRef.current && currentProfile?.nsec) {
+      wsRef.current = openNpubxWebSocket({
+        nsec: currentProfile.nsec,
+        onUpdate: handleQuoteUpdate,
+      });
+    }
     setRefreshing(false);
   }, [currentProfile?.pubkey]);
 
@@ -194,6 +207,15 @@ function TabOneScreen({
       ),
     });
   }, [navigation, account, accounts]);
+
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, []);
 
   const { listenToTransaction } = useTransactions();
 
