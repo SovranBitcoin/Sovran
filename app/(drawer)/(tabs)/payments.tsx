@@ -20,9 +20,6 @@ import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashu/pay';
 import { nip19 } from 'nostr-tools';
 import { memoizedGetMints } from 'helper/redux/cashu/selectors';
-import { CurrencyIcon } from 'assets/icons';
-import { truncateMiddle } from 'helper/strings';
-import { npubToPubkey } from 'components/layout/Transaction';
 
 export function convertNpub(pubkey: string) {
   try {
@@ -54,34 +51,6 @@ const RenderContactItem = ({ item }: { item: any }) => {
   );
 };
 
-const RenderMintItem = ({ item }: { item: any }) => {
-  const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
-  const styles = createStyles(theme);
-
-  return (
-    <TouchableOpacity
-      style={styles.contactItem}
-      onPress={() => {
-        if (item.nostr) {
-          navigation.navigate('userMessages', { pubkey: npubToPubkey(item.nostr) });
-        }
-      }}>
-      <ProfilePicture imageUri={item.icon_url} isVerified={false} theme={theme} />
-      <View style={styles.row}>
-        <View style={styles.textContainer}>
-          <Text style={styles.profileName}>{item.name}</Text>
-          <Text style={styles.previewText}>
-            {item.nostr ? truncateMiddle(item.nostr, 16) : 'No Nostr contact'}
-          </Text>
-        </View>
-        {item.nostr && (
-          <CurrencyIcon currency="nostr" width={20} colors={[greys(theme)[700]]} />
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-};
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -211,14 +180,25 @@ const Section = () => {
         } catch {
           hostname = mintUrl;
         }
+        const pubkey = nostrContact ? convertNpub(nostrContact) : undefined;
+        const profile =
+          (pubkey &&
+            combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) || {
+            pubkey,
+            picture: info.icon_url,
+            image: info.icon_url,
+            displayName: info.name || hostname,
+            name: info.name || hostname,
+          };
         return {
           mintUrl,
-          name: info.name || hostname,
-          icon_url: info.icon_url,
-          nostr: nostrContact,
+          pubkey: pubkey || `mint-${mintUrl}`,
+          profile,
+          transactions: [],
+          messages: [],
         };
       }),
-    [mints, mintInfo],
+    [mints, mintInfo, combinedSearchAndProfiles],
   );
 
   const pagerRef = useRef(null);
@@ -324,8 +304,8 @@ const Section = () => {
             <VirtualizedList
               data={mintsData}
               initialNumToRender={5}
-              renderItem={(item) => <RenderMintItem {...item} />}
-              keyExtractor={(item) => item.mintUrl}
+              renderItem={(item) => <RenderContactItem {...item} />}
+              keyExtractor={(item) => item.pubkey || item.mintUrl}
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
