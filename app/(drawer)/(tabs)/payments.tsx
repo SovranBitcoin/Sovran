@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { Text, View } from 'components/common/Themed';
@@ -19,6 +19,10 @@ import { sovran } from 'components/layout/sheets/mints';
 import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashu/pay';
 import { nip19 } from 'nostr-tools';
+import { memoizedGetMints } from 'helper/redux/cashu/selectors';
+import { CurrencyIcon } from 'assets/icons';
+import { truncateMiddle } from 'helper/strings';
+import { npubToPubkey } from 'components/layout/Transaction';
 
 export function convertNpub(pubkey: string) {
   try {
@@ -47,6 +51,39 @@ const RenderContactItem = ({ item }: { item: any }) => {
       theme={theme}
       navigation={navigation}
     />
+  );
+};
+
+const RenderMintItem = ({ item }: { item: any }) => {
+  const theme = useSelector(memoizedGetTheme);
+  const navigation = useTypedNavigation();
+  const styles = createStyles(theme);
+
+  return (
+    <TouchableOpacity
+      style={styles.contactItem}
+      onPress={() => {
+        if (item.nostr) {
+          navigation.navigate('userMessages', { pubkey: npubToPubkey(item.nostr) });
+        }
+      }}>
+      {item.icon_url ? (
+        <CachedImage style={styles.profilePicture} source={{ uri: item.icon_url }} />
+      ) : (
+        <View style={styles.placeholderCircle} />
+      )}
+      <View style={styles.row}>
+        <View style={styles.textContainer}>
+          <Text style={styles.profileName}>{item.name}</Text>
+          <Text style={styles.previewText}>
+            {item.nostr ? truncateMiddle(item.nostr, 16) : 'No Nostr contact'}
+          </Text>
+        </View>
+        {item.nostr && (
+          <CurrencyIcon currency="nostr" width={20} colors={[greys(theme)[700]]} />
+        )}
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -162,11 +199,37 @@ const Section = () => {
       });
     });
 
+  const mints = useSelector(memoizedGetMints);
+  const mintInfo = useSelector((state: any) => state.cashu?.info || {});
+
+  const mintsData = useMemo(
+    () =>
+      mints.map((mintUrl) => {
+        const info = mintInfo[mintUrl] || {};
+        const nostrContact = (info.contact || []).find(
+          (c: any) => c.method && c.method.toLowerCase() === 'nostr',
+        )?.info;
+        let hostname;
+        try {
+          hostname = new URL(mintUrl).hostname;
+        } catch {
+          hostname = mintUrl;
+        }
+        return {
+          mintUrl,
+          name: info.name || hostname,
+          icon_url: info.icon_url,
+          nostr: nostrContact,
+        };
+      }),
+    [mints, mintInfo],
+  );
+
   const pagerRef = useRef(null);
 
   const onPageSelected = useCallback((event) => {
     const pageIndex = event.nativeEvent.position;
-    const tabNames = ['Recent activity', 'Contacts'];
+    const tabNames = ['Recent activity', 'Contacts', 'Mints'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
@@ -175,7 +238,7 @@ const Section = () => {
     pagerRef.current?.setPage(index);
   };
 
-  const tabs = ['Recent activity', 'Contacts'].filter(Boolean);
+  const tabs = ['Recent activity', 'Contacts', 'Mints'].filter(Boolean);
 
   const getItem = (data, index) => data[index];
 
@@ -191,7 +254,7 @@ const Section = () => {
           tabs={tabs}
           selectedTab={selectedTab}
           handleTabPress={handleTabPress}
-          amounts={[enrichedContacts.length, contacts.length]}
+          amounts={[enrichedContacts.length, contacts.length, mintsData.length]}
         />
       </View>
       <View
@@ -246,6 +309,27 @@ const Section = () => {
               initialNumToRender={1}
               renderItem={(item) => <RenderContactItem {...item} />}
               keyExtractor={(item) => item.pubkey}
+              getItemCount={getItemCount}
+              getItem={getItem}
+              style={{
+                backgroundColor: greys(theme)[2300],
+              }}
+            />
+          </ScrollView>
+          <ScrollView
+            key="3"
+            style={{
+              flex: 1,
+              backgroundColor: greys(theme)[2300],
+              padding: 16,
+              height: '100%',
+              overflow: 'hidden',
+            }}>
+            <VirtualizedList
+              data={mintsData}
+              initialNumToRender={5}
+              renderItem={(item) => <RenderMintItem {...item} />}
+              keyExtractor={(item) => item.mintUrl}
               getItemCount={getItemCount}
               getItem={getItem}
               style={{

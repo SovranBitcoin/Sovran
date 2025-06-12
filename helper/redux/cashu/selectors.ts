@@ -32,6 +32,18 @@ export const memoizedGetTransactionByMatcher = ({ profileId, matcher }) =>
       return matcher(transactions);
     },
   );
+
+export const memoizedGetMintNostrContact = (mintUrl: string) =>
+  createSelector(
+    [(state: RootState) => state.cashu?.info?.[mintUrl]?.contact],
+    (contactList) => {
+      if (!Array.isArray(contactList)) return null;
+      const entry = contactList.find(
+        (c) => c.method && c.method.toLowerCase() === 'nostr',
+      );
+      return entry ? entry.info : null;
+    },
+  );
 export const memoizedGetSelectedMint = createSelector(
   [
     (state: RootState) =>
