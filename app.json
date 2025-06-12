@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.18",
+    "version": "0.0.21",
     "orientation": "portrait",
     "scheme": "sovran",
     "userInterfaceStyle": "automatic",
@@ -12,9 +12,7 @@
       "resizeMode": "contain"
     },
     "icon": "./assets/images/icon_.png",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "buildNumber": "1",
       "infoPlist": {
