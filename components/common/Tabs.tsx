@@ -18,7 +18,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
   const theme = useSelector(memoizedGetTheme);
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
-  const isScrollable = contentWidth > containerWidth && containerWidth > 0;
+  const isScrollable = contentWidth ? contentWidth > containerWidth && containerWidth > 0 : true;
 
   const onTabPress = useCallback(
     (tab: string, index: number) => {
