@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
 import { Text, View } from 'components/common/Themed';
@@ -16,7 +16,9 @@ interface TabsProps {
 
 export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
-  const isScrollable = tabs.length > 3;
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const isScrollable = contentWidth > containerWidth && containerWidth > 0;
 
   const onTabPress = useCallback(
     (tab: string, index: number) => {
@@ -34,6 +36,8 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
         marginTop: 0,
         overflow: 'visible',
       }}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onContentSizeChange={(w) => setContentWidth(w)}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
