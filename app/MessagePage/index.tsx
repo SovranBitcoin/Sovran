@@ -107,6 +107,24 @@ export default function ModalScreen() {
   const paddingAnim = useRef(new Animated.Value(1)).current;
   const paddingAnim2 = useRef(new Animated.Value(8)).current;
 
+  // Refresh user profile when opening the messages screen
+  useEffect(() => {
+    async function refreshProfile() {
+      try {
+        const hex = convertNpub(params.pubkey);
+        const npub = nip19.npubEncode(hex);
+        const profile = await fetchNostrProfile(npub);
+        if (profile) {
+          setSearch([{ pubkey: hex, profile }]);
+        }
+      } catch (err) {
+        console.error('Failed to refresh profile', err);
+      }
+    }
+    if (params?.pubkey) refreshProfile();
+    // We only want to refresh when the pubkey changes
+  }, [params?.pubkey]);
+
   // Handle animation effects
   useEffect(() => {
     Animated.timing(scaleAnim, {
