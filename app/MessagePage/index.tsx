@@ -1,5 +1,4 @@
-import React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   StyleSheet,
   Alert,
@@ -35,6 +34,8 @@ import Header from './Header';
 import TimelineItem from './TimeLine';
 import { Button } from 'components/common/Button';
 import ndk, { relays } from 'components/ndk';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { EventKind } from '../Profile';
 import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -107,23 +108,31 @@ export default function ModalScreen() {
   const paddingAnim = useRef(new Animated.Value(1)).current;
   const paddingAnim2 = useRef(new Animated.Value(8)).current;
 
-  // Refresh user profile when opening the messages screen
+  // Refresh user profile when opening the messages screen using Nostr subscription
+  const profileFilters = useMemo(
+    () => [
+      {
+        authors: [convertNpub(params.pubkey)],
+        kinds: [EventKind.Metadata],
+        limit: 1,
+      },
+    ],
+    [params?.pubkey],
+  );
+
+  const { events: profileEvents } = useSubscribe({ filters: profileFilters });
+
   useEffect(() => {
-    async function refreshProfile() {
+    if (profileEvents && profileEvents.length > 0) {
       try {
-        const hex = convertNpub(params.pubkey);
-        const npub = nip19.npubEncode(hex);
-        const profile = await fetchNostrProfile(npub);
-        if (profile) {
-          setSearch([{ pubkey: hex, profile }]);
-        }
+        const event = profileEvents[0];
+        const content = JSON.parse(event.content);
+        setSearch([{ pubkey: convertNpub(event.pubkey), profile: content }]);
       } catch (err) {
-        console.error('Failed to refresh profile', err);
+        console.error('Failed to parse profile', err);
       }
     }
-    if (params?.pubkey) refreshProfile();
-    // We only want to refresh when the pubkey changes
-  }, [params?.pubkey]);
+  }, [profileEvents]);
 
   // Handle animation effects
   useEffect(() => {
