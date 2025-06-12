@@ -72,6 +72,8 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
             }}
             onPress={() => onTabPress(tab, index)}>
             <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
               style={{
                 color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
                 fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
