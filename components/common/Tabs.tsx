@@ -56,10 +56,11 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
           <TouchableOpacity
             key={tab}
             style={{
-              padding: 10,
+              paddingVertical: 10,
+              paddingHorizontal: 16,
               borderRadius: 24,
               flex: isScrollable ? 0 : 1,
-              minWidth: isScrollable ? 80 : undefined,
+              flexShrink: 0,
               flexDirection: 'row',
               justifyContent: 'center',
               alignItems: 'center',
@@ -73,7 +74,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
             onPress={() => onTabPress(tab, index)}>
             <Text
               numberOfLines={1}
-              ellipsizeMode="tail"
               style={{
                 color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
                 fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
