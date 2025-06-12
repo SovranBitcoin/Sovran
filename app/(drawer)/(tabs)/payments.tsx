@@ -19,7 +19,7 @@ import { sovran } from 'components/layout/sheets/mints';
 import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashu/pay';
 import { nip19 } from 'nostr-tools';
-import { memoizedGetMints } from 'helper/redux/cashu/selectors';
+import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 
 export function convertNpub(pubkey: string) {
   try {
@@ -164,42 +164,46 @@ const Section = () => {
       });
     });
 
-  const mints = useSelector(memoizedGetMints);
+  const allBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const mintInfo = useSelector((state: any) => state.cashu?.info || {});
 
-  const mintsData = useMemo(
-    () =>
-      mints.map((mintUrl) => {
-        const info = mintInfo[mintUrl] || {};
-        const nostrContact = (info.contact || []).find(
-          (c: any) => c.method && c.method.toLowerCase() === 'nostr',
-        )?.info;
-        let hostname;
-        try {
-          hostname = new URL(mintUrl).hostname;
-        } catch {
-          hostname = mintUrl;
-        }
-        const pubkey = nostrContact ? convertNpub(nostrContact) : undefined;
-        const profile =
-          (pubkey &&
-            combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) || {
-            pubkey,
-            picture: info.icon_url,
-            image: info.icon_url,
-            displayName: info.name || hostname,
-            name: info.name || hostname,
-          };
-        return {
-          mintUrl,
-          pubkey: pubkey || `mint-${mintUrl}`,
-          profile,
-          transactions: [],
-          messages: [],
+  const mintsData = useMemo(() => {
+    const uniqueMintUrls = [
+      ...new Set((allBalances || []).map((b: any) => b.mintUrl)),
+    ];
+
+    return uniqueMintUrls.map((mintUrl) => {
+      const info = mintInfo[mintUrl] || {};
+      const nostrContact = (info.contact || []).find(
+        (c: any) => c.method && c.method.toLowerCase() === 'nostr',
+      )?.info;
+      let hostname;
+      try {
+        hostname = new URL(mintUrl).hostname;
+      } catch {
+        hostname = mintUrl;
+      }
+
+      const pubkey = nostrContact ? convertNpub(nostrContact) : undefined;
+      const profile =
+        (pubkey && combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) ||
+        {
+          pubkey,
+          picture: info.icon_url,
+          image: info.icon_url,
+          displayName: info.name || hostname,
+          name: info.name || hostname,
         };
-      }),
-    [mints, mintInfo, combinedSearchAndProfiles],
-  );
+
+      return {
+        mintUrl,
+        pubkey: pubkey || `mint-${mintUrl}`,
+        profile,
+        transactions: [],
+        messages: [],
+      };
+    });
+  }, [allBalances, mintInfo, combinedSearchAndProfiles]);
 
   const pagerRef = useRef(null);
 
