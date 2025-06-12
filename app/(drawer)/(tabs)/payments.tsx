@@ -67,11 +67,7 @@ const RenderMintItem = ({ item }: { item: any }) => {
           navigation.navigate('userMessages', { pubkey: npubToPubkey(item.nostr) });
         }
       }}>
-      {item.icon_url ? (
-        <CachedImage style={styles.profilePicture} source={{ uri: item.icon_url }} />
-      ) : (
-        <View style={styles.placeholderCircle} />
-      )}
+      <ProfilePicture imageUri={item.icon_url} isVerified={false} theme={theme} />
       <View style={styles.row}>
         <View style={styles.textContainer}>
           <Text style={styles.profileName}>{item.name}</Text>
