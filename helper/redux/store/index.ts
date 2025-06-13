@@ -8,6 +8,8 @@ import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
+import { Alert } from 'react-native';
+
 const thunkMiddleware = require('redux-thunk').thunk;
 
 // WARNING: never use _.set, it will obviously delete the users storage...
@@ -269,21 +271,17 @@ const migrations = {
   74: (state: RootState) => {
     return _.update(['nostr', 'contacts'], (contacts = []) => contacts, state);
   },
-  91: (state: RootState) => {
+  101: (state: RootState) => {
     return _.update(
       ['nostr', 'profiles'],
       (profiles = []) =>
         profiles.map((profile: any, index: number) => {
-          // Skip if nut13 already exists
-          console.log(12983708273, profile);
-          if (profile?.nut13) {
-            return profile;
-          }
-
           try {
-            // Check if we have a mnemonic to work with
             if (!profile.mnemonic) {
-              console.warn(`No mnemonic found for Cashu profile at index ${index}`);
+              Alert.alert(
+                'Share this error with the dev team',
+                'No mnemonic found for Cashu profile at index ' + index
+              );
               return profile;
             }
 
@@ -309,7 +307,7 @@ const migrations = {
               nut13: derivedCashuMnemonic,
             };
           } catch (error) {
-            console.error(`Error deriving NUT-13 for Cashu profile at index ${index}:`, error);
+            Alert.alert('Share this error with the dev team', JSON.stringify(error));
             return profile;
           }
         }),
@@ -322,7 +320,7 @@ const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 91,
+  version: 101,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
