@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { Text, View } from 'components/common/Themed';
@@ -19,6 +19,7 @@ import { sovran } from 'components/layout/sheets/mints';
 import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashu/pay';
 import { nip19 } from 'nostr-tools';
+import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 
 export function convertNpub(pubkey: string) {
   try {
@@ -49,6 +50,7 @@ const RenderContactItem = ({ item }: { item: any }) => {
     />
   );
 };
+
 
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -162,11 +164,52 @@ const Section = () => {
       });
     });
 
+  const allBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  const mintInfo = useSelector((state: any) => state.cashu?.info || {});
+
+  const mintsData = useMemo(() => {
+    const uniqueMintUrls = [
+      ...new Set((allBalances || []).map((b: any) => b.mintUrl)),
+    ];
+
+    return uniqueMintUrls.map((mintUrl) => {
+      const info = mintInfo[mintUrl] || {};
+      const nostrContact = (info.contact || []).find(
+        (c: any) => c.method && c.method.toLowerCase() === 'nostr',
+      )?.info;
+      let hostname;
+      try {
+        hostname = new URL(mintUrl).hostname;
+      } catch {
+        hostname = mintUrl;
+      }
+
+      const pubkey = nostrContact ? convertNpub(nostrContact) : undefined;
+      const profile =
+        (pubkey && combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) ||
+        {
+          pubkey,
+          picture: info.icon_url,
+          image: info.icon_url,
+          displayName: info.name || hostname,
+          name: info.name || hostname,
+        };
+
+      return {
+        mintUrl,
+        pubkey: pubkey || `mint-${mintUrl}`,
+        profile,
+        transactions: [],
+        messages: [],
+      };
+    });
+  }, [allBalances, mintInfo, combinedSearchAndProfiles]);
+
   const pagerRef = useRef(null);
 
   const onPageSelected = useCallback((event) => {
     const pageIndex = event.nativeEvent.position;
-    const tabNames = ['Recent activity', 'Contacts'];
+    const tabNames = ['Recent activity', 'Contacts', 'Mints'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
@@ -175,7 +218,7 @@ const Section = () => {
     pagerRef.current?.setPage(index);
   };
 
-  const tabs = ['Recent activity', 'Contacts'].filter(Boolean);
+  const tabs = ['Recent activity', 'Contacts', 'Mints'].filter(Boolean);
 
   const getItem = (data, index) => data[index];
 
@@ -191,7 +234,7 @@ const Section = () => {
           tabs={tabs}
           selectedTab={selectedTab}
           handleTabPress={handleTabPress}
-          amounts={[enrichedContacts.length, contacts.length]}
+          amounts={[enrichedContacts.length, contacts.length, mintsData.length]}
         />
       </View>
       <View
@@ -246,6 +289,27 @@ const Section = () => {
               initialNumToRender={1}
               renderItem={(item) => <RenderContactItem {...item} />}
               keyExtractor={(item) => item.pubkey}
+              getItemCount={getItemCount}
+              getItem={getItem}
+              style={{
+                backgroundColor: greys(theme)[2300],
+              }}
+            />
+          </ScrollView>
+          <ScrollView
+            key="3"
+            style={{
+              flex: 1,
+              backgroundColor: greys(theme)[2300],
+              padding: 16,
+              height: '100%',
+              overflow: 'hidden',
+            }}>
+            <VirtualizedList
+              data={mintsData}
+              initialNumToRender={5}
+              renderItem={(item) => <RenderContactItem {...item} />}
+              keyExtractor={(item) => item.pubkey || item.mintUrl}
               getItemCount={getItemCount}
               getItem={getItem}
               style={{

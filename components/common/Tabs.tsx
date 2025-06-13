@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
 import { Text, View } from 'components/common/Themed';
@@ -16,6 +16,9 @@ interface TabsProps {
 
 export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const isScrollable = contentWidth ? contentWidth > containerWidth && containerWidth > 0 : true;
 
   const onTabPress = useCallback(
     (tab: string, index: number) => {
@@ -33,20 +36,22 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
         marginTop: 0,
         overflow: 'visible',
       }}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onContentSizeChange={(w) => setContentWidth(w)}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
         flexDirection: 'row',
         backgroundColor: 'transparent',
-        width: '100%',
+        width: isScrollable ? undefined : '100%',
       }}>
       <View
         style={[
           sovran(theme).listItem,
           {
             flexDirection: 'row',
-            width: '100%',
-            minWidth: '100%',
+            width: isScrollable ? undefined : '100%',
+            minWidth: isScrollable ? undefined : '100%',
             padding: 2,
             borderRadius: 24,
           },
@@ -55,9 +60,11 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
           <TouchableOpacity
             key={tab}
             style={{
-              padding: 10,
+              paddingVertical: 10,
+              paddingHorizontal: 16,
               borderRadius: 24,
-              flex: 1,
+              flex: isScrollable ? 0 : 1,
+              flexShrink: 0,
               flexDirection: 'row',
               justifyContent: 'center',
               alignItems: 'center',
@@ -70,6 +77,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
             }}
             onPress={() => onTabPress(tab, index)}>
             <Text
+              numberOfLines={1}
               style={{
                 color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
                 fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',

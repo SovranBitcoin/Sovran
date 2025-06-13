@@ -194,6 +194,19 @@ export default function ModalScreen() {
           handleTabPress={() => {}}
         />
 
+        {/* Examples for different tab counts */}
+        <View className="mt-4 space-y-4">
+          {[1, 2, 3, 4, 5].map((count) => (
+            <Tabs
+              key={`example-tabs-${count}`}
+              amounts={Array(count).fill(0)}
+              tabs={Array.from({ length: count }, (_, i) => `Tab ${i + 1}`)}
+              selectedTab={'Tab 1'}
+              handleTabPress={() => {}}
+            />
+          ))}
+        </View>
+
         <View>
           {chunkArray(icons, 3).map((row, rowIndex) => (
             <View key={rowIndex} className="mb-4 flex-row">
