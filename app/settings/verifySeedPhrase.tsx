@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
   View,
   Text,
-  TouchableOpacity,
-  FlatList,
   Alert,
 } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -15,6 +13,7 @@ import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import NumericKeyboard from 'components/passcode/NumericKeyboard';
 
 const VerifySeedPhrase = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -30,13 +29,6 @@ const VerifySeedPhrase = () => {
     }
   }, [currentProfile]);
 
-  const handleWordPress = (word) => {
-    setSelectedWords((prev) => [...prev, word]);
-  };
-
-  const handleDeleteLastWord = () => {
-    setSelectedWords((prev) => prev.slice(0, -1));
-  };
 
   const isVerified = selectedWords.join(' ') === currentProfile?.mnemonic;
 
@@ -48,11 +40,24 @@ const VerifySeedPhrase = () => {
     }
   };
 
-  const renderWord = ({ item }) => (
-    <TouchableOpacity onPress={() => handleWordPress(item)} style={styles.wordButton}>
-      <Text style={styles.wordText}>{item}</Text>
-    </TouchableOpacity>
-  );
+  const keyboardKeys = useMemo(() => {
+    if (!shuffledWords.length) return [] as any;
+    return [
+      shuffledWords.slice(0, 3),
+      shuffledWords.slice(3, 6),
+      shuffledWords.slice(6, 9),
+      shuffledWords.slice(9, 12),
+      ['', '', '<'],
+    ];
+  }, [shuffledWords]);
+
+  const handleKeyboardPress = (val: string) => {
+    if (val === '<') {
+      setSelectedWords((prev) => prev.slice(0, -1));
+    } else if (val) {
+      setSelectedWords((prev) => [...prev, val]);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,13 +74,10 @@ const VerifySeedPhrase = () => {
         {isVerified && <Text style={styles.verifiedText}>Seed Phrase Verified!</Text>}
       </ScrollView>
       <View style={styles.buttonContainer}>
-        <FlatList
-          data={shuffledWords}
-          renderItem={renderWord}
-          keyExtractor={(_, index) => index.toString()}
-          numColumns={3}
-          columnWrapperStyle={styles.columnWrapper}
-          contentContainerStyle={styles.wordContainer}
+        <NumericKeyboard
+          accumulate={false}
+          keys={keyboardKeys}
+          onKeyPress={handleKeyboardPress}
         />
         <ButtonHandler
           buttons={[
@@ -83,11 +85,6 @@ const VerifySeedPhrase = () => {
               variant: 'secondary',
               onPress: handleVerify,
               text: 'Verify',
-            },
-            {
-              variant: 'primary',
-              onPress: handleDeleteLastWord,
-              text: 'Delete',
             },
           ]}
         />
@@ -114,25 +111,6 @@ const createStyles = (theme) =>
       color: greys(theme)[600],
       textTransform: 'uppercase',
     },
-    wordContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-    },
-    wordButton: {
-      backgroundColor: greys(theme)[1800],
-      padding: 8,
-      margin: 4,
-      borderRadius: 8,
-      width: '30%',
-      height: 45,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    wordText: {
-      color: greys(theme)[0],
-      fontSize: 14,
-    },
     selectedWordsContainer: {
       marginVertical: 8,
       padding: 8,
@@ -150,15 +128,8 @@ const createStyles = (theme) =>
       textAlign: 'center',
       marginTop: 20,
     },
-    columnWrapper: {
-      justifyContent: 'space-between',
-    },
     buttonContainer: {
       padding: 8,
-    },
-    button: {
-      margin: 8,
-      marginTop: 0,
     },
   });
 

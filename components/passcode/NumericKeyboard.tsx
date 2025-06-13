@@ -14,6 +14,15 @@ import Haptics from 'components/common/Haptics';
 
 interface Props {
   onKeyPress: (value: string) => void;
+  /**
+   * Optional custom key layout. Each sub array represents a row.
+   */
+  keys?: KeyVal[][];
+  /**
+   * When true (default) the keyboard will accumulate input before calling
+   * onKeyPress. When false each key press will be sent directly.
+   */
+  accumulate?: boolean;
 }
 
 type KeyVal = string | number;
@@ -105,12 +114,22 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
   );
 };
 
-const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
+const NumericKeyboard: React.FC<Props> = ({ onKeyPress, keys, accumulate = true }) => {
   const [inputValue, setInputValue] = useState('');
   const theme = useSelector(memoizedGetTheme);
 
   const handlePress = useCallback(
     (value: KeyVal) => {
+      if (!accumulate) {
+        if (String(value) === '<') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } else {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        onKeyPress(String(value));
+        return;
+      }
+
       setInputValue((prev) => {
         let newValue = prev;
         if (String(value) === '<') {
@@ -124,7 +143,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
         return newValue;
       });
     },
-    [onKeyPress]
+    [onKeyPress, accumulate]
   );
 
   const renderButton = useCallback(
@@ -134,12 +153,14 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
     [handlePress, theme]
   );
 
-  const buttons: KeyVal[][] = [
+  const defaultButtons: KeyVal[][] = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
     ['', '0', '<'],
   ];
+
+  const buttons = keys || defaultButtons;
 
   return (
     <View className="items-center justify-center bg-transparent">
