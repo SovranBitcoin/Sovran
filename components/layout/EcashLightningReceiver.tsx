@@ -142,12 +142,6 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
           <ButtonHandler
             buttons={[
               {
-                text: 'Scan QR',
-                icon: 'stash:qr-code',
-                variant: 'secondary',
-                onPress: handleScanQR,
-              },
-              {
                 text: 'Paste',
                 icon: 'lets-icons:copy',
                 variant: 'primary',
@@ -158,6 +152,12 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
                 icon: 'mdi:decimal',
                 variant: 'secondary',
                 onPress: handleFixedAmount,
+              },
+              {
+                text: 'Scan QR',
+                icon: 'stash:qr-code',
+                variant: 'secondary',
+                onPress: handleScanQR,
               },
               // {
               //   text: "Customize Lightning Address",
