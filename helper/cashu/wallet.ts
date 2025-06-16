@@ -51,6 +51,7 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   let keys = store.getState().cashu?.keys?.[mintUrl];
   let keysets = store.getState().cashu?.keysets?.[mintUrl];
   let audits = store.getState().cashu?.audits?.[mintUrl];
+  const lastFetched = audits?.lastFetched ?? 0;
   const shouldRefresh = forceRefresh || !mintInfo || !keys || !keysets;
 
   const mint = await getMint({
@@ -72,10 +73,12 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
 
   wallet.audits = audits;
   console.log(29372387, forceRefresh, audits);
-  if (forceRefresh || !audits) {
+  const isAuditStale = Date.now() - lastFetched > 24 * 60 * 60 * 1000;
+  if (forceRefresh || !audits || isAuditStale) {
     auditMint({ mintUrl }).then((a) => {
-      store.dispatch(setAudit({ mintUrl, audit: a }));
-      wallet.audits = a;
+      const auditWithTimestamp = { ...a, lastFetched: Date.now() };
+      store.dispatch(setAudit({ mintUrl, audit: auditWithTimestamp }));
+      wallet.audits = auditWithTimestamp;
     });
   }
 
