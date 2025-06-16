@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Share, Text } from 'react-native';
-import { View } from 'components/common/Themed';
+import { Share } from 'react-native';
+import { View, Text } from 'components/common/Themed';
 import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
@@ -31,9 +31,214 @@ import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { greys } from 'helper/colors';
+import { greens, greys, reds } from 'helper/colors';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { MintQuoteResponse } from '@cashu/cashu-ts';
+import { convertTime } from 'helper/time';
+import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import opacity from 'hex-color-opacity';
+
+interface MintQuoteTimelineProps {
+  mintQuotes?: (MintQuoteResponse & { date: Date })[];
+  meltQuotes?: Array<{
+    state: 'UNSPENT' | 'PENDING' | 'SPENT';
+    addedAt?: number;
+    amount: number;
+    [key: string]: any;
+  }>;
+  type: 'mint' | 'melt';
+}
+
+interface TimelineState {
+  label: string;
+  state: string;
+  timestamp?: number;
+  isActive?: boolean;
+  isCompleted?: boolean;
+}
+
+export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTimelineProps) {
+  const theme = useSelector(memoizedGetTheme);
+  const [collapsed, setCollapsed] = useState(false);
+
+  console.log(298739823, meltQuotes);
+
+  const getTimeline = (meltQuotes) => {
+    const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
+    const states = ['UNSPENT', 'PENDING', 'SPENT'];
+
+    // If transaction is cancelled, add CANCELLED as the final state
+    if (transaction?.isCancel) {
+      states.push('CANCELLED');
+    }
+
+    let maxIndex = Math.max(...meltQuotes.map((q) => states.indexOf(q.state)));
+
+    // If cancelled, the CANCELLED state becomes the current (final) state
+    if (transaction?.isCancel) {
+      maxIndex = states.length - 1; // CANCELLED is the last state
+    }
+
+    return states.map((state, i) => {
+      // For CANCELLED state, create a synthetic entry if it doesn't exist in quotes
+      if (state === 'CANCELLED' && !quotes[state]) {
+        return {
+          state,
+          complete: true, // CANCELLED state is always complete when present
+          isCurrent: transaction?.isCancel, // CANCELLED is current when transaction is cancelled
+        };
+      }
+
+      return {
+        state,
+        ...quotes[state],
+        complete: i <= maxIndex,
+        isCurrent: i === maxIndex,
+      };
+    });
+  };
+
+  const states = getTimeline(meltQuotes);
+
+  // Check if we have intermediary steps (both UNSPENT and PENDING)
+  const hasIntermediarySteps =
+    meltQuotes.some((q) => q.state === 'UNSPENT') && meltQuotes.some((q) => q.state === 'PENDING');
+
+  // If there are intermediary steps, always show expanded view
+  const shouldCollapse = collapsed && !hasIntermediarySteps;
+
+  const displayStates = shouldCollapse
+    ? states.filter((_, i) => i === 0 || i === states.length - 1)
+    : states;
+
+  const barWidth = 4.5;
+  const barHeight = 48;
+  const barMarginVertical = 4;
+  const dotSize = barWidth;
+  const dotSpacing = 8;
+
+  // Helper function to get bar color based on state
+  const getBarColor = (item) => {
+    if (item.state === 'CANCELLED') {
+      return '#ef4444'; // Red color for cancelled state
+    }
+    return item.complete ? greens[300] : greys(theme)[400];
+  };
+
+  if (!meltQuotes.length) {
+    return null;
+  }
+
+  return (
+    <View
+      style={{
+        backgroundColor: greys(theme)[1500],
+        padding: 16,
+        margin: 16,
+        borderRadius: 12,
+      }}>
+      <Text
+        size={14}
+        bold
+        style={{
+          color: greys(theme)[400],
+          marginBottom: 8,
+          textTransform: 'uppercase',
+        }}>
+        {transaction?.isCancel ? 'CANCELLED' : _.last(meltQuotes)?.state}
+      </Text>
+
+      <View>
+        {displayStates.map((item, index) => (
+          <React.Fragment key={`${item.state}-${index}`}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginVertical: 0,
+              }}>
+              <View
+                style={{
+                  width: barWidth,
+                  height: barHeight,
+                  backgroundColor: getBarColor(item),
+                  borderRadius: barWidth / 2,
+                  marginVertical: barMarginVertical,
+                  opacity: item.isCurrent ? 1 : 0.5,
+                }}
+              />
+              <View
+                style={{
+                  flex: 1,
+                }}>
+                <Text
+                  size={16}
+                  bold
+                  style={{
+                    color: greys(theme)[0],
+                    marginStart: 12,
+                  }}>
+                  {item.state}
+                </Text>
+                {item.addedAt && (
+                  <Text
+                    size={12}
+                    bold
+                    style={{
+                      color: greys(theme)[600],
+                      marginStart: 12,
+                    }}>
+                    {convertTime(new Date(item.addedAt))}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {shouldCollapse && index === 0 && states.length > 2 && (
+              <View
+                style={{
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  opacity: 0.5,
+                }}>
+                {[...Array(3)].map((_, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: dotSize,
+                      height: dotSize,
+                      backgroundColor: states[1].complete ? greens[300] : greys(theme)[400],
+                      borderRadius: dotSize / 3,
+                      marginVertical: dotSpacing / 3,
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+
+      {/* Only show collapse button if there are no intermediary steps */}
+      {!hasIntermediarySteps && (
+        <TouchableOpacity onPress={() => setCollapsed(!collapsed)}>
+          <Text
+            size={14}
+            bold
+            style={{
+              color: greys(theme)[400],
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              textAlign: 'right',
+            }}>
+            {collapsed ? 'EXPAND' : 'COLLAPSE'}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
 
 export function LightningReceiveConfirmation({
   request,
@@ -153,6 +358,8 @@ export function LightningReceiveConfirmation({
           counter,
           keysetId: wallet.keysetId,
         });
+
+        console.log('123987273proofs', proofs);
 
         // Increase counter
         store.dispatch(

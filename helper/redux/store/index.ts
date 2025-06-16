@@ -314,13 +314,47 @@ const migrations = {
       state
     );
   },
+
+  120: (state: RootState) => {
+    const newState = _.update(
+      ['cashu', 'profiles'],
+      (profiles = []) => {
+        return profiles.map((profile: any) => {
+          console.log(19817329, profile);
+          if (!profile.proofs) {
+            return profile;
+          }
+
+          // remove dups from each array inside proofs
+          const dedupedProofs = Object.fromEntries(
+            Object.entries(profile.proofs).map(([mintUrl, proofs]: any) => [
+              mintUrl,
+              proofs.filter(
+                (item: any, index: any, self: any) =>
+                  index === self.findIndex((t: any) => JSON.stringify(t) === JSON.stringify(item))
+              ),
+            ])
+          );
+
+          console.log(2292173, dedupedProofs);
+
+          return {
+            ...profile,
+            proofs: dedupedProofs,
+          };
+        });
+      },
+      state
+    );
+    return newState;
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 101,
+  version: 120,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
@@ -363,7 +397,7 @@ store.subscribe(() => {
     return structure;
   };
 
-  console.log(23982937, JSON.stringify(store.getState(), null, 2));
+  console.log(2398293, JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

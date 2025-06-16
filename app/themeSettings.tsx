@@ -46,7 +46,7 @@ const themes = [
   // "ice-queen",
   // "coral-sunrise"
   // 'light',
-  'light',
+  // 'light',
 ];
 
 // Mapping of theme names to user-friendly names

@@ -82,6 +82,7 @@ export const TransactionProvider = ({ children }) => {
           ...tx,
           status,
           ...additionalData,
+          proofStates: [...(tx.proofStates || []), ...(additionalData.proofStates || [])],
         }),
       })
     );
@@ -189,16 +190,38 @@ export const TransactionProvider = ({ children }) => {
 
                     switch (payload.state) {
                       case 'PENDING':
+                        updateTransactionStatus(transaction, 'pending', {
+                          proofStates: [
+                            {
+                              ...payload,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
                         break;
                       case 'SPENT':
                         updateTransactionStatus(transaction, 'paid', {
                           paid: true,
                           completedAt: Date.now(),
+                          proofStates: [
+                            {
+                              ...payload,
+                              addedAt: Date.now(),
+                            },
+                          ],
                         });
                         unsub();
                         removeConnection(id);
                         break;
                       case 'UNSPENT':
+                        updateTransactionStatus(transaction, 'unspent', {
+                          proofStates: [
+                            {
+                              ...payload,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
                         break;
                       default:
                         break;
@@ -233,6 +256,35 @@ export const TransactionProvider = ({ children }) => {
                     console.log('listenToTransaction transaction', transaction);
 
                     if (!transaction) return;
+
+                    if (update.state === 'UNPAID') {
+                      updateTransactionStatus(transaction, 'unpaid', {
+                        mintQuotes: [
+                          ...(transaction?.mintQuotes || []),
+                          {
+                            ...update,
+                            addedAt: Date.now(),
+                          },
+                        ],
+                      });
+                    } else if (update.state === 'ISSUED') {
+                      updateTransactionStatus(transaction, 'issued', {
+                        mintQuotes: [
+                          ...(transaction?.mintQuotes || []),
+                          {
+                            ...update,
+                            addedAt: Date.now(),
+                          },
+                        ],
+                      });
+                      const allQuotesPaid = allTransactions.filter((t) =>
+                        transactions.some((t2) => t.request === t2.request)
+                      );
+                      if (allQuotesPaid) {
+                        unsub();
+                        removeConnection(id);
+                      }
+                    }
 
                     const isPaid = update.state === 'PAID';
 
@@ -300,19 +352,23 @@ export const TransactionProvider = ({ children }) => {
                           quote: transaction.mintQuote.quote,
                         },
                         'paid',
-                        { paid: true, completedAt: Date.now() }
+                        {
+                          paid: true,
+                          completedAt: Date.now(),
+                          mintQuotes: [
+                            ...(transaction?.mintQuotes || []),
+                            {
+                              ...update,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        }
                       );
+
+                      await store.dispatch(appendProofState({}));
 
                       // Important: We clean up the connection only if ALL quotes are paid
                       // get txs from allTransactions and find ones where the request matches the current transaction
-                      const allQuotesPaid = allTransactions.filter((t) =>
-                        transactions.some((t2) => t.request === t2.request)
-                      );
-                      console.log('listenToTransaction allQuotesPaid', allQuotesPaid);
-                      if (allQuotesPaid) {
-                        unsub();
-                        removeConnection(id);
-                      }
                     }
                   } catch (err) {
                     unsub();

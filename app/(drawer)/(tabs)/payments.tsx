@@ -51,7 +51,6 @@ const RenderContactItem = ({ item }: { item: any }) => {
   );
 };
 
-
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -168,14 +167,12 @@ const Section = () => {
   const mintInfo = useSelector((state: any) => state.cashu?.info || {});
 
   const mintsData = useMemo(() => {
-    const uniqueMintUrls = [
-      ...new Set((allBalances || []).map((b: any) => b.mintUrl)),
-    ];
+    const uniqueMintUrls = [...new Set((allBalances || []).map((b: any) => b.mintUrl))];
 
     return uniqueMintUrls.map((mintUrl) => {
       const info = mintInfo[mintUrl] || {};
       const nostrContact = (info.contact || []).find(
-        (c: any) => c.method && c.method.toLowerCase() === 'nostr',
+        (c: any) => c.method && c.method.toLowerCase() === 'nostr'
       )?.info;
       let hostname;
       try {
@@ -185,15 +182,13 @@ const Section = () => {
       }
 
       const pubkey = nostrContact ? convertNpub(nostrContact) : undefined;
-      const profile =
-        (pubkey && combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) ||
-        {
-          pubkey,
-          picture: info.icon_url,
-          image: info.icon_url,
-          displayName: info.name || hostname,
-          name: info.name || hostname,
-        };
+      const profile = (pubkey && combinedSearchAndProfiles.find((p) => p.pubkey === pubkey)) || {
+        pubkey,
+        picture: info.icon_url,
+        image: info.icon_url,
+        displayName: info.name || hostname,
+        name: info.name || hostname,
+      };
 
       return {
         mintUrl,
@@ -248,21 +243,12 @@ const Section = () => {
           ref={pagerRef}
           onPageSelected={onPageSelected}
           style={{
-            height: Dimensions.get('window').height - 265,
-            backgroundColor: 'transparent',
-            marginHorizontal: -16,
+            height: Dimensions.get('window').height,
+            backgroundColor: greys(theme)[2300],
           }}
           initialPage={0}
           scrollEnabled={contacts.length > 0}>
-          <ScrollView
-            key="1"
-            style={{
-              flex: 1,
-              backgroundColor: greys(theme)[2300],
-              padding: 16,
-              height: '100%',
-              overflow: 'hidden',
-            }}>
+          <ScrollView key="1">
             <VirtualizedList
               data={enrichedContacts}
               initialNumToRender={10}
@@ -272,18 +258,11 @@ const Section = () => {
               getItem={getItem}
               style={{
                 backgroundColor: greys(theme)[2300],
+                paddingBottom: 256,
               }}
             />
           </ScrollView>
-          <ScrollView
-            key="2"
-            style={{
-              flex: 1,
-              backgroundColor: greys(theme)[2300],
-              padding: 16,
-              height: '100%',
-              overflow: 'hidden',
-            }}>
+          <ScrollView key="2">
             <VirtualizedList
               data={contacts}
               initialNumToRender={1}
@@ -293,18 +272,11 @@ const Section = () => {
               getItem={getItem}
               style={{
                 backgroundColor: greys(theme)[2300],
+                paddingBottom: 256,
               }}
             />
           </ScrollView>
-          <ScrollView
-            key="3"
-            style={{
-              flex: 1,
-              backgroundColor: greys(theme)[2300],
-              padding: 16,
-              height: '100%',
-              overflow: 'hidden',
-            }}>
+          <ScrollView key="3">
             <VirtualizedList
               data={mintsData}
               initialNumToRender={5}
@@ -314,6 +286,7 @@ const Section = () => {
               getItem={getItem}
               style={{
                 backgroundColor: greys(theme)[2300],
+                paddingBottom: 256,
               }}
             />
           </ScrollView>

@@ -75,30 +75,18 @@ function TabTwoScreen() {
   };
 
   return (
-    <Modal
-      showBack={false}
-      childrenStyles={styles.modalContent}
-      showHeader={false}
-      buttons={
-        <ButtonHandler
-          context="tab"
-          buttons={[
-            {
-              text: 'Get a VPN',
-              variant: 'primary',
-              loading: fetchingPackages,
-              onPress: handleGetDataPress,
-            },
-          ]}
-        />
-      }>
+    <View
+      style={{
+        paddingTop: 96,
+        flex: 1,
+        backgroundColor: greys(theme)[2300],
+      }}>
       <Text
         size={32}
         style={{
           fontFamily: 'OverpassHeavy',
           marginLeft: 16,
           marginBottom: 4,
-          marginTop: 4,
         }}>
         VPNs
       </Text>
@@ -141,7 +129,18 @@ function TabTwoScreen() {
             <Text style={styles.noItemsText}>No expired VPNs</Text>
           ))}
       </ScrollView>
-    </Modal>
+      <ButtonHandler
+        context="tab"
+        buttons={[
+          {
+            text: 'Get a VPN',
+            variant: 'primary',
+            loading: fetchingPackages,
+            onPress: handleGetDataPress,
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -247,6 +246,7 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     modalContent: {
       flex: 1,
+      backgroundColor: 'red',
     },
     scrollView: {
       paddingHorizontal: 16,

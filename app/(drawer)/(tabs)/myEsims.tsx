@@ -18,7 +18,6 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 import { fetchProducts } from 'helper/api/sovran';
 
-
 // Separate component for eSIM item
 const EsimItem = ({ esim, navigation }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -190,30 +189,18 @@ function EsimsScreen() {
   ];
 
   return (
-    <Modal
-      showBack={false}
-      showHeader={false}
-      childrenStyles={styles.modalContent}
-      buttons={
-        <ButtonHandler
-          context={'tab'}
-          buttons={[
-            {
-              text: 'Get Data',
-              variant: 'primary',
-              loading: fetchingPackages,
-              onPress: handleGetDataPress,
-            },
-          ]}
-        />
-      }>
+    <View
+      style={{
+        paddingTop: 96,
+        flex: 1,
+        backgroundColor: greys(theme)[2300],
+      }}>
       <Text
         size={32}
         style={{
           fontFamily: 'OverpassHeavy',
           marginLeft: 16,
           marginBottom: 4,
-          marginTop: 4,
         }}>
         eSIMs
       </Text>
@@ -247,7 +234,18 @@ function EsimsScreen() {
           />
         )}
       </ScrollView>
-    </Modal>
+      <ButtonHandler
+        context={'tab'}
+        buttons={[
+          {
+            text: 'Get Data',
+            variant: 'primary',
+            loading: fetchingPackages,
+            onPress: handleGetDataPress,
+          },
+        ]}
+      />
+    </View>
   );
 }
 

@@ -169,7 +169,6 @@ const TabLayout = () => {
 
   // Determine if navigation should be visible
   const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
-
   // Component for header left (drawer opener)
   const HeaderLeft = () => (
     <Pressable onPress={() => navigation.openDrawer()}>
@@ -238,7 +237,7 @@ const TabLayout = () => {
           tabBarBackground: () => <TabBarBackground theme={theme} />,
           lazy: true,
         }}>
-        {TAB_SCREENS.map(({ name, component, title, icon }) => (
+        {TAB_SCREENS(settings).map(({ name, component, title, icon }) => (
           <Tab.Screen
             key={name}
             name={name}

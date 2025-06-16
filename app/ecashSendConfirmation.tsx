@@ -78,7 +78,7 @@ export function MintDetailPage({
     <View
       style={{
         margin: 16,
-        marginTop: 8,
+        marginTop: 16,
         padding: 16,
         marginBottom: 0,
         borderRadius: 8,
@@ -160,6 +160,7 @@ export function MintDetailPage({
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 
 export function EcashSendConfirmation({
   unit,
@@ -365,6 +366,16 @@ export function EcashSendConfirmation({
             theme={theme}
             transactionType="send"
             handleCheckStatus={handleCheckStatus}
+          />
+          {/* <Text
+            style={{
+              color: 'red',
+            }}>
+            {JSON.stringify(getCurrentTransaction[0], null, 2)}
+          </Text> */}
+          <MintQuoteTimeline
+            transaction={getCurrentTransaction[0]}
+            meltQuotes={getCurrentTransaction[0].proofStates}
           />
           <Section
             items={[

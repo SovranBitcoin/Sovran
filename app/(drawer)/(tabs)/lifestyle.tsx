@@ -14,18 +14,18 @@ const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674
 
 // Define service menu items
 const SERVICE_MENU_ITEMS = [
-  // {
-  //   id: 'esims',
-  //   icon: 'fluent:sim-24-filled',
-  //   label: 'eSIMs',
-  //   navigateTo: 'myEsims',
-  // },
-  // {
-  //   id: 'vpn',
-  //   icon: 'ic:baseline-vpn-lock',
-  //   label: 'VPN',
-  //   navigateTo: 'myVpns',
-  // },
+  {
+    id: 'esims',
+    icon: 'fluent:sim-24-filled',
+    label: 'eSIMs',
+    navigateTo: 'myEsims',
+  },
+  {
+    id: 'vpn',
+    icon: 'ic:baseline-vpn-lock',
+    label: 'VPN',
+    navigateTo: 'myVpns',
+  },
   /* {
     id: 'address',
     icon: "mdi:at",
@@ -112,7 +112,9 @@ const ServicesSection = () => {
       </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.filter((item) =>
-          item.id === 'giftcards' ? settings?.experimental : true
+          item.id === 'giftcards' || item.id === 'vpn' || item.id === 'esims'
+            ? settings?.experimental
+            : true
         ).map((item) => (
           <MenuItem
             key={item.id}

@@ -146,6 +146,7 @@ export function LightningSendConfirmation({
       }
     );
   };
+  console.log(JSON.stringify(transaction, null, 2));
 
   return (
     <Modal

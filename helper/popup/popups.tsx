@@ -310,6 +310,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'The passcode does not match. Please try again.',
     type: MESSAGE_TYPES.ERROR,
   },
+  'Lightning payment failed: no_route.': {
+    title: 'Lightning Payment Failed',
+    text: "Your mint isn't well connected to the recipient's lightning network.",
+    type: MESSAGE_TYPES.ERROR,
+  },
 };
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;

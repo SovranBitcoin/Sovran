@@ -171,7 +171,7 @@ export function PaymentInfo({
         style={{
           marginLeft: 16,
           marginRight: 16,
-          marginBottom: 8,
+          marginBottom: 0,
         }}
         items={[
           {

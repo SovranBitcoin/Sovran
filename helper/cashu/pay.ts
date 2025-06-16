@@ -254,7 +254,7 @@ export async function sendLightning({
   try {
     return await attemptSend(false);
   } catch (error) {
-    console.log(error.message);
+    console.log(323986, error.message);
     // Check if it's the specific keyset inactive error
     if (error.message === 'keyset id inactive.') {
       Alert.alert('Updating keyset...');

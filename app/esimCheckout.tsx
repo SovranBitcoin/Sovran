@@ -83,6 +83,7 @@ function ModalScreen() {
         });
       }
     } catch (error) {
+      console.log(JSON.stringify(error, null, 2));
       showMessage('general_error', {}, { emoji: '❌' });
     } finally {
       setLoading(false);

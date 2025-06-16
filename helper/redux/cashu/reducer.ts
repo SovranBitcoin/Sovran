@@ -122,13 +122,24 @@ export const cashuReducer = (state = initialState, action) => {
       );
 
     case APPEND_PROOFS_V2:
-      return _.update(
+      const newState = _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          return _.unionBy(proofs, action.payload.proofs, 'secret');
+          // Combine existing and new proofs
+          const combined = proofs.concat(action.payload.proofs);
+
+          // Deduplicate using native JS
+          const deduped = combined.filter(
+            (item, index, self) =>
+              index === self.findIndex((t) => JSON.stringify(t) === JSON.stringify(item))
+          );
+
+          return deduped;
         },
         state
       );
+
+      return newState;
 
     case REMOVE_PROOFS:
       return _.update(
