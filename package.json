@@ -162,6 +162,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@react-native-community/cli": "latest",
     "@types/lodash": "^4.17.10",
     "@types/react": "^19.1.2",
     "eslint": "^8.57.0",
