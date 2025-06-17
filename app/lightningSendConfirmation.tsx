@@ -178,7 +178,12 @@ export function LightningSendConfirmation({
           )}
 
           {transaction?.paid && (
-            <MintDetailPage mintInfo={mintInfo} theme={theme} transactionType="send" />
+            <MintDetailPage
+              mintInfo={mintInfo}
+              theme={theme}
+              transactionType="send"
+              transaction={transaction}
+            />
           )}
 
           {/* <Section
