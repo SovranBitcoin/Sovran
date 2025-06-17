@@ -239,7 +239,7 @@ function TabOneScreen({
             account={account}
             setAccounts={setAccounts}
           />
-          {new Date().getTime() > new Date('2025-06-19').getTime() && (
+          {new Date().getTime() > new Date('2025-06-18').getTime() && (
             <View
               style={{
                 margin: 16,

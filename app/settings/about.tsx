@@ -113,7 +113,7 @@ export default function ModalScreen() {
             Linking.openURL('https://x.com/SovranBitcoin');
           }}
           text={'Follow us on X'}
-          icon={<Icon name="lucide:twitter" />}
+          icon={<Icon name="hugeicons:new-twitter" />}
         />
       </ScrollView>
     </Container>

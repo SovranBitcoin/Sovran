@@ -10,7 +10,7 @@ const configWithMonicon = withMonicon(config, {
     'uil:invoice',
     'material-symbols:update-rounded',
     'ic:round-cloud-sync',
-    'prime:twitter',
+    'hugeicons:new-twitter',
     'material-symbols:info-rounded',
     'la:user-slash',
     'material-symbols:report-rounded',

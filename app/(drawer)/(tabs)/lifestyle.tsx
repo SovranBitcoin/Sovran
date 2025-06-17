@@ -145,7 +145,7 @@ const TabTwoScreen = () => {
 const createStyles = (theme) =>
   StyleSheet.create({
     container: {
-      backgroundColor: 'black',
+      backgroundColor: greys(theme)[2300],
       flexDirection: 'column',
       flex: 1,
       margin: 0,

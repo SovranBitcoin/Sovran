@@ -140,6 +140,9 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
       buttons={
         <View className="flex-row items-center justify-center bg-transparent pb-2">
           <ButtonHandler
+            // helpButton={{
+            //   text: 'Copy Npub',
+            // }}
             buttons={[
               {
                 text: 'Paste',

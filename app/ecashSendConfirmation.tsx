@@ -74,6 +74,7 @@ export function MintDetailPage({
   );
 
   console.log(isListening);
+  console.log(123232323232, transaction);
   return (
     <View
       style={{
@@ -102,7 +103,13 @@ export function MintDetailPage({
               fontFamily: 'OverpassHeavy',
               fontSize: 16,
             }}>
-            {transactionType === 'send' ? 'Sending with' : 'Receiving with'}
+            {transactionType === 'send'
+              ? transaction?.paid
+                ? 'Sent with'
+                : 'Sending with'
+              : transaction?.paid
+                ? 'Received with'
+                : 'Receiving with'}
           </Text>
           <Text
             style={{

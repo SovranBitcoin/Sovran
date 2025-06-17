@@ -49,6 +49,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           }}>
           <Text
             bold
+            size={12}
             style={{
               color: greens[400],
             }}>

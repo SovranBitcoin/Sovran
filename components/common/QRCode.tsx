@@ -15,8 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
  * Circle background for the QR code center logo
  */
 export const Circle = memo(() => {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <View
       className="absolute z-10"
