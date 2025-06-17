@@ -133,7 +133,7 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
   return (
     <View
       style={{
-        backgroundColor: greys(theme)[1500],
+        backgroundColor: greys(theme)[1800],
         padding: 16,
         margin: 16,
         borderRadius: 12,

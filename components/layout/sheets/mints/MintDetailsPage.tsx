@@ -45,58 +45,25 @@ const MintDetailPage = (props) => {
     }
   };
 
-  const formatNuts = (nuts) => {
-    if (!nuts) return 'N/A';
-    const supportedNuts = Object.keys(nuts).filter((nut) => {
-      const nutData = nuts[nut];
-      return (
-        nutData.supported === true ||
-        (nutData.methods && nutData.methods.length > 0) ||
-        (nutData.supported && Array.isArray(nutData.supported))
-      );
-    });
-    return `NUT-${supportedNuts.join(', NUT-')}`;
-  };
-
-  const formatCurrencies = (nuts) => {
-    if (!nuts) return 'N/A';
-    const currencies = new Set();
-
-    Object.values(nuts).forEach((nut) => {
-      if (nut.methods) {
-        nut.methods.forEach((method) => {
-          if (method.unit) currencies.add(method.unit.toUpperCase());
-        });
-      }
-      if (nut.supported && Array.isArray(nut.supported)) {
-        nut.supported.forEach((item) => {
-          if (item.unit) currencies.add(item.unit.toUpperCase());
-        });
-      }
-    });
-
-    return currencies.size > 0 ? Array.from(currencies).join(', ') : 'SAT';
-  };
-
   const handleContactPress = (method, info) => {
     switch (method) {
       case 'email':
         Linking.openURL(`mailto:${info}`);
         break;
       case 'twitter':
+      case 'x':
         Linking.openURL(`https://x.com/${info.replace('@', '')}`);
         break;
       case 'nostr':
         navigation.navigate('userMessages', {
           pubkey: npubToPubkey(info),
         });
+        router?.close();
         break;
       default:
         handleCopy(info, 'Contact Info');
     }
   };
-
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
 
   if (loading) {
     return (
@@ -268,9 +235,9 @@ const MintDetailPage = (props) => {
                         {truncateMiddle(contact.info, 10)}
                       </Text>
                     </View>
-                  ) : contact.method.toUpperCase() === 'TWITTER' ? (
+                  ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="prime:twitter" size={20} color={greys(theme)[700]} />
+                      <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[700]} />
                       <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
                         {contact.info}
                       </Text>

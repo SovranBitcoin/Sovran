@@ -38,6 +38,7 @@ import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
 import { WalletsProvider } from 'components/providers/WalletsProviders';
+import { PricelistProvider } from 'components/providers/PricelistProvider';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
 
@@ -303,13 +304,15 @@ export default function RootLayout() {
               <ActionSheetProvider>
                 <SheetProvider context="global">
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <WalletsProvider>
-                      <TransactionProvider>
-                        <PasscodeGate>
-                          <MainStack />
-                        </PasscodeGate>
-                      </TransactionProvider>
-                    </WalletsProvider>
+                    <PricelistProvider>
+                      <WalletsProvider>
+                        <TransactionProvider>
+                          <PasscodeGate>
+                            <MainStack />
+                          </PasscodeGate>
+                        </TransactionProvider>
+                      </WalletsProvider>
+                    </PricelistProvider>
                   </View>
                 </SheetProvider>
               </ActionSheetProvider>
