@@ -30,7 +30,7 @@ const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route
       <Card
         variant="warning"
         theme={theme}
-        message="There is no guarantee that your mnemonic phrase will allow you to recover your funds."
+        message="There is no guarantee that your mnemonic phrase will allow you to recover your funds. If you were a TestFlight user its possible your recovery phrase won't restore all your funds."
       />
       <Button text="Delete everything" onPress={handleDeleteProfile} />
     </View>
