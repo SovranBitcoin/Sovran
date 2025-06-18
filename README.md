@@ -22,6 +22,7 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
   - [ ] Attach note
   - [x] Calculate Lightning fees + Mint fees
   - [x] via Pasting, Scanning, DM
+  - [ ] When sending via lightning check if invoice has nostr enabled and enrich the transaction with nostr information
 
 - [x] Ecash Receiving
 
