@@ -169,10 +169,8 @@ const handleLightning = async ({
   setLoading: (loading: boolean) => void;
 }): Promise<NavigationResult | null> => {
   const lnurl = lnTrim(data);
-
-  const isLightningAddress_ = isLightningAddress(lnurl);
-  const amount = isLightningAddress_ ? null : getLightningAmount({ pr: lnurl });
-  if (isLightningAddress_ || !amount) {
+  const amount = getLightningAmount({ pr: lnurl });
+  if (!amount) {
     return {
       screen: 'currency',
       params: {
@@ -221,6 +219,7 @@ export const handleBarcode = async ({
   setLoading,
   setScanned,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
+  console.log(129873, scanning);
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
   if (!scanning.data.startsWith('ur:')) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -237,7 +236,7 @@ export const handleBarcode = async ({
   } else {
     type = 'lightning';
   }
-
+  console.log(129873, type);
   switch (type) {
     case 'ur':
       return handleUR({ scanning, urDecoder, unit, setProgress });

@@ -17,8 +17,13 @@ import dayjs from 'dayjs';
 
 // Lightning invoice parsing utilities
 export function getLightningAmount({ pr }) {
-  const decodedPR = decode(pr as string);
-  return decodedPR.sections.find((route) => route.name === 'amount')?.value / 1000;
+  try {
+    const decodedPR = decode(pr as string);
+    return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
+  } catch (e) {
+    console.log(e);
+    return null;
+  }
 }
 
 export function getTimestamp({ pr }) {

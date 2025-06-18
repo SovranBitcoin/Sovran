@@ -4,7 +4,13 @@ import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
-import { getInvoiceFromLnurl } from 'helper/third-party/lnurl';
+import {
+  decodeUrlOrAddress,
+  getInvoiceFromLnurl,
+  isLightningAddress,
+  isLnurl,
+  isLnurlOrAddress,
+} from 'helper/third-party/lnurl';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { getMeltQuote, isValidLNURL, receiveLightning, sendEcash } from 'components/cashu';
 import { useRoute } from '@react-navigation/native';
@@ -31,7 +37,8 @@ import { runWithAnimationFrame } from './onboard/new';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-
+import { decode } from '@gandlaf21/bolt11-decode';
+import { requestInvoice, utils } from 'lnurl-pay';
 interface ScanningData {
   data: string;
   type?: string;
@@ -116,12 +123,22 @@ function ModalScreen() {
   };
 
   const handleDefaultSend = async () => {
-    console.log('[handleDefaultSend]');
-    const { pr } = await getInvoiceFromLnurl(params.lud16, unit === 'sat' ? amount : amount * 100);
-    console.log('[handleDefaultSend] pr', pr);
+    console.log('[handleDefaultSend]', params);
+    // let pr;
+    // if (isLightningAddress(params.lud16)) {
+
+    const { invoice } = await requestInvoice({
+      lnUrlOrAddress: params.lud16,
+      tokens: utils.toSats(amount),
+    });
+    // let { pr } = await getInvoiceFromLnurl(params.lud16, unit === 'sat' ? amount : amount * 100);
+    // } else {
+    //   pr = params.lud16;
+    // }
+    console.log('[handleDefaultSend] invoice', invoice);
 
     const meltQuote = await getMeltQuote({
-      pr: pr,
+      pr: invoice,
       unit: unit,
       mintUrl: selectedMint,
     });
@@ -148,13 +165,13 @@ function ModalScreen() {
       console.log(
         '[handleDefaultSend] navigate',
         params,
-        pr,
+        invoice,
         unit === 'sat' ? amount : amount * 100,
         meltQuote
       );
       navigation.navigate(params.to, {
         ...params,
-        pr,
+        pr: invoice,
         amount: unit === 'sat' ? amount : amount * 100,
         meltQuote: JSON.stringify(meltQuote),
         lud16: params.lud16,

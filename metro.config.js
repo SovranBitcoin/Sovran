@@ -3,6 +3,7 @@ const { withMonicon } = require('@monicon/metro');
 const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
+config.resolver.unstable_conditionNames = [ 'browser', 'require', 'react-native', ]
 
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
