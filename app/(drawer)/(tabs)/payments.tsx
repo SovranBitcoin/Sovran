@@ -220,7 +220,12 @@ const Section = () => {
   const getItemCount = (data) => data.length;
 
   return (
-    <Modal showBack={false} showHeader={false} buttons={null} childrenStyles={styles.modalContent}>
+    <Modal
+      scrollEnabled={false}
+      showBack={false}
+      showHeader={false}
+      buttons={null}
+      childrenStyles={styles.modalContent}>
       <View
         style={{
           paddingHorizontal: 16,

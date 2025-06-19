@@ -54,6 +54,7 @@ export default function Modal({
   showHeader = true,
   padding = 40,
   backgroundColor,
+  scrollEnabled = true,
   ...props
 }: ModalProps): JSX.Element {
   const navigation = useNavigation();
@@ -178,6 +179,7 @@ export default function Modal({
         contentContainerStyle={{ paddingBottom: buttonHeight + 42 }}
         scrollEventThrottle={100}
         renderItem={renderItem}
+        scrollEnabled={scrollEnabled}
       />
 
       <View
