@@ -1,4 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const BASE_URL = 'https://esim.sovran.cash/api';
+
+// Prefix for storing search results in AsyncStorage
+const SEARCH_CACHE_PREFIX = 'search';
+// Fallback TTL if the API does not provide an expiry timestamp
+const DEFAULT_SEARCH_TTL = 5 * 60 * 1000; // 5 minutes
 
 export interface ProductPackage {
   packageCode: number | string;
@@ -90,9 +97,28 @@ export const fetchEsimData = async ({ orderNo }: { orderNo: string }) => {
 };
 
 export const searchUsers = async ({ query, limit = 10 }: { query: string; limit?: number }) => {
+  const cacheKey = `${SEARCH_CACHE_PREFIX}:${query}:${limit}`;
+
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed.expiresAt && parsed.expiresAt > Date.now()) {
+        return { ...parsed, fromCache: true } as { results: SearchResult[]; expiresAt: number; fromCache: boolean };
+      }
+    }
+  } catch (e) {
+    // ignore cache parsing errors
+  }
+
   const params = new URLSearchParams({ query, limit: String(limit) });
   const res = await fetch(`${BASE_URL}/search?${params}`);
-  return res.json() as Promise<{ results: SearchResult[] }>;
+  const data = (await res.json()) as { results: SearchResult[]; expiresAt?: number };
+
+  const expiresAt = data.expiresAt ?? Date.now() + DEFAULT_SEARCH_TTL;
+  await AsyncStorage.setItem(cacheKey, JSON.stringify({ results: data.results, expiresAt }));
+
+  return { results: data.results, expiresAt, fromCache: false } as { results: SearchResult[]; expiresAt: number; fromCache: boolean };
 };
 
 export const fetchVpnInvoice = async ({ duration }: { duration: string | number }) => {
