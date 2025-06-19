@@ -585,9 +585,9 @@ const createStyles = (theme) =>
       borderWidth: 0.2,
     },
     placeholderCircle: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 48,
+      height: 48,
+      borderRadius: 1000,
       borderColor: greys(theme)[2300],
       borderWidth: 0.2,
       backgroundColor: greys(theme)[1300],
