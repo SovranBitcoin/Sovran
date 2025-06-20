@@ -1,4 +1,5 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Alert } from 'react-native';
+import type { WireGuardStatus } from 'react-native-wireguard-vpn';
 
 import { greys } from 'helper/colors';
 import Modal from 'components/layout/Modal';
@@ -18,6 +19,13 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { activateVpn } from 'helper/api/sovran';
+import {
+  initializeVpn,
+  connectVpn,
+  disconnectVpn,
+  getVpnStatus,
+  parseWireGuardConfig,
+} from 'helper/vpn/wireguard';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes
@@ -66,6 +74,7 @@ function ModalScreen() {
   const [query, setQuery] = useState();
   const [fetchingPackages, setFetchingPackages] = useState(false);
   const { vpn, updateVpn } = useVpn();
+  const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
 
   console.log(129837, params);
   //
@@ -176,6 +185,31 @@ function ModalScreen() {
       setRemainingTime('Not activated');
     }
   }, [vpn, params.payment_request]);
+
+  const handleConnect = async () => {
+    const configLines = vpn
+      ?.find((v) => v.payment_request === params.payment_request)
+      ?.order?.WireguardConfig;
+    if (!configLines) {
+      Alert.alert('Configuration missing');
+      return;
+    }
+    await initializeVpn();
+    await connectVpn(parseWireGuardConfig(configLines));
+    const status = await getVpnStatus();
+    setVpnStatus(status);
+  };
+
+  const handleDisconnect = async () => {
+    await disconnectVpn();
+    const status = await getVpnStatus();
+    setVpnStatus(status);
+  };
+
+  const handleStatus = async () => {
+    const status = await getVpnStatus();
+    setVpnStatus(status);
+  };
 
   return (
     <Modal
@@ -313,6 +347,26 @@ function ModalScreen() {
                       text: 'Activate',
                       variant: 'primary',
                       onPress: activateVPN,
+                    },
+                  ]
+                : []),
+              ...(remainingTime !== 'Not activated'
+                ? [
+                    vpnStatus?.isConnected
+                      ? {
+                          text: 'Disconnect',
+                          variant: 'primary',
+                          onPress: handleDisconnect,
+                        }
+                      : {
+                          text: 'Connect',
+                          variant: 'primary',
+                          onPress: handleConnect,
+                        },
+                    {
+                      text: 'Status',
+                      variant: 'secondary',
+                      onPress: handleStatus,
                     },
                   ]
                 : []),
