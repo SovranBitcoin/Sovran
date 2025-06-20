@@ -202,6 +202,7 @@ type CustomTextProps = {
   className?: string;
   testID?: string;
   loading?: boolean;
+  color?: string;
 };
 
 function getWeightFromProps(props: CustomTextProps): string {
@@ -355,6 +356,7 @@ export function UntranslatedText({
           fontSize: size,
         },
         style,
+        ...(props?.color ? [{ color: props?.color }] : []),
       ]}
       {...cleanProps}>
       {children}
