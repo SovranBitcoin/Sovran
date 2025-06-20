@@ -11077,6 +11077,11 @@ react-native-webview@13.13.5:
     escape-string-regexp "^4.0.0"
     invariant "2.2.4"
 
+react-native-wireguard-vpn@^1.0.15:
+  version "1.0.15"
+  resolved "https://registry.yarnpkg.com/react-native-wireguard-vpn/-/react-native-wireguard-vpn-1.0.15.tgz#c3e4ad324ae60d303f92c9c3d80eb9427f8cfb5e"
+  integrity sha512-jKPlCc+CtyZ4ha8HpujPGUmVtx48CqBRXeLDYFRsMR0mx9NuU4D1JJhTa+nGEjLfeTLlAMurCiP7Z6mmIz1vfA==
+
 react-native@0.79.2:
   version "0.79.2"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.79.2.tgz"
