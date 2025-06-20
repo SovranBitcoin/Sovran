@@ -161,7 +161,8 @@
     "usehooks-ts": "^3.1.0",
     "util": "^0.10.4",
     "vm-browserify": "^0.0.4",
-    "webln": "^0.3.2"
+    "webln": "^0.3.2",
+    "react-native-wireguard-vpn": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
