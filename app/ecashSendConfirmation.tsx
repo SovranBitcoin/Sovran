@@ -181,7 +181,6 @@ export function EcashSendConfirmation({
   extraButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);

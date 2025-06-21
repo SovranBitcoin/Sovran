@@ -45,8 +45,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
   showMore = true,
 }) => {
   const theme = useSelector(memoizedGetTheme);
-  const { transactions } = useCashu();
   const navigation = useNavigation();
+  const { transactions } = useCashu();
 
   const filterFn = useMemo(
     () => (tx: any) => {
