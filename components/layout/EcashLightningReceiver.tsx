@@ -181,7 +181,10 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
             marginTop: 0,
             marginBottom: 8,
           }}>
-          <Card message="NPUBX is an experimental feature." variant="warning" />
+          <Card
+            message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
+            variant="warning"
+          />
         </View>
 
         {showLightningAddress && (
