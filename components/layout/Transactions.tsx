@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
-import { View, SectionList, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 
@@ -81,21 +81,20 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
       return { pending, confirmed };
     }, [filteredTransactions]);
 
-    const groupByDate = useMemo(
-      () => (txs: any[]) => {
-        const groups: Record<string, any[]> = {};
-        txs.forEach((tx) => {
-          const key = formatDate(tx.date || new Date().toISOString());
-          if (!groups[key]) groups[key] = [];
-          groups[key].push(tx);
-        });
-        return groups;
-      },
-      []
-    );
+    const groupByDate = (txs: any[]) => {
+      const groups: Record<string, any[]> = {};
+      txs.forEach((tx) => {
+        const key = formatDate(tx.date || new Date().toISOString());
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(tx);
+      });
+      return groups;
+    };
+
+    const memoizedGroupByDate = useMemo(() => groupByDate, []);
 
     const sliceGrouped = (txs: any[]) => {
-      const grouped = groupByDate(txs);
+      const grouped = memoizedGroupByDate(txs);
       const ordered = Object.keys(grouped).sort(
         (a, b) => new Date(b).getTime() - new Date(a).getTime()
       );
@@ -113,8 +112,22 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
       [splitByStatus.confirmed, days, showMore]
     );
 
-    const renderStatus = useCallback(
-      (label: string, sections: { title: string; data: any[] }[]) => {
+    if (filteredTransactions.length === 0) {
+      return (
+        <View className="flex items-center">
+          <Icon name="fluent:clock-12-filled" color={greys(theme)[1000]} />
+          <Text heavy size={16} style={{ color: greys(theme)[1000] }}>
+            No Transactions
+          </Text>
+          <Text color={greys(theme)[1200]} heavy size={16}>
+            Your transactions will show up here
+          </Text>
+        </View>
+      );
+    }
+
+    if (showMore) {
+      const renderStatus = (label: string, sections: { title: string; data: any[] }[]) => {
         if (sections.length === 0) return null;
         return (
           <View>
@@ -140,37 +153,18 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
             ))}
           </View>
         );
-      },
-      [theme]
-    );
+      };
 
-    const handleViewAll = useCallback(() => {
-      navigation.navigate('transactions', {
-        account,
-      });
-    }, [account, navigation]);
-
-    if (filteredTransactions.length === 0) {
-      return (
-        <View className="flex items-center">
-          <Icon name="fluent:clock-12-filled" color={greys(theme)[1000]} />
-          <Text heavy size={16} style={{ color: greys(theme)[1000] }}>
-            No Transactions
-          </Text>
-          <Text color={greys(theme)[1200]} heavy size={16}>
-            Your transactions will show up here
-          </Text>
-        </View>
-      );
-    }
-
-    if (showMore) {
       return (
         <View className="mt-[-54px] w-full pb-24">
           {renderStatus('Pending transactions', pendingSections)}
           {renderStatus('Confirmed transactions', confirmedSections)}
           <TouchableOpacity
-            onPress={handleViewAll}
+            onPress={() =>
+              navigation.navigate('transactions', {
+                account,
+              })
+            }
             className="mt-4 flex items-center rounded-full border p-3"
             style={{
               backgroundColor: greys(theme)[1800],
@@ -219,11 +213,6 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
         initialNumToRender={10}
         maxToRenderPerBatch={5}
         windowSize={10}
-        getItemLayout={(data, index) => ({
-          length: 70, // Or a dynamic length depending on your item size
-          offset: 70 * index,
-          index,
-        })}
       />
     );
   }
