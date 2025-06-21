@@ -151,6 +151,8 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       width: '100%',
+      marginTop: -48,
+      paddingBottom: 96,
     },
     dateHeader: {
       color: greys(theme)[1000],
