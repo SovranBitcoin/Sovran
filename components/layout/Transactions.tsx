@@ -1,10 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  StyleSheet,
-  SectionList,
-  TouchableOpacity,
-} from 'react-native';
+import { View, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 
@@ -14,6 +9,7 @@ import { store } from 'helper/redux/store';
 import { useCashu } from 'helper/redux/cashu';
 import { Transaction } from 'components/layout/Transaction';
 import { Text } from 'components/common/Themed';
+import Icon from 'assets/icons';
 
 interface Account {
   unit: string;
@@ -54,28 +50,25 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const navigation = useNavigation();
 
   const filterFn = useMemo(
-    () =>
-      (tx: any) => {
-        if (tx.unit !== account.unit) return false;
-        if (filter === 'incoming' && tx.transactionType !== 'receive') return false;
-        if (filter === 'outgoing' && tx.transactionType !== 'send') return false;
-        if (type !== 'all' && tx.type !== type) return false;
-        if (at === 'at' && !tx?.fromNIP05) return false;
-        if (tab === 'Confirmed' && !tx.paid) return false;
-        if (tab === 'Pending' && tx.paid) return false;
-        return true;
-      },
-    [account.unit, filter, type, at, tab],
+    () => (tx: any) => {
+      if (tx.unit !== account.unit) return false;
+      if (filter === 'incoming' && tx.transactionType !== 'receive') return false;
+      if (filter === 'outgoing' && tx.transactionType !== 'send') return false;
+      if (type !== 'all' && tx.type !== type) return false;
+      if (at === 'at' && !tx?.fromNIP05) return false;
+      if (tab === 'Confirmed' && !tx.paid) return false;
+      if (tab === 'Pending' && tx.paid) return false;
+      return true;
+    },
+    [account.unit, filter, type, at, tab]
   );
 
   const filteredTransactions = useMemo(
     () =>
       transactions
         .filter(filterFn)
-        .sort(
-          (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-        ),
-    [transactions, filterFn],
+        .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()),
+    [transactions, filterFn]
   );
 
   const splitByStatus = useMemo(() => {
@@ -101,27 +94,31 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const sliceGrouped = (txs: any[]) => {
     const grouped = groupByDate(txs);
     const ordered = Object.keys(grouped).sort(
-      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+      (a, b) => new Date(b).getTime() - new Date(a).getTime()
     );
     const keys = showMore ? ordered.slice(0, days) : ordered;
-    return keys.map((date) => ({ title: date, data: grouped[date] }));
+    return keys.map((date) => ({ title: date, data: grouped[date], index: date }));
   };
 
   const pendingSections = useMemo(
     () => sliceGrouped(splitByStatus.pending),
-    [splitByStatus.pending, days, showMore],
+    [splitByStatus.pending, days, showMore]
   );
 
   const confirmedSections = useMemo(
     () => sliceGrouped(splitByStatus.confirmed),
-    [splitByStatus.confirmed, days, showMore],
+    [splitByStatus.confirmed, days, showMore]
   );
 
   if (filteredTransactions.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text weight="heavy" style={{ color: greys(theme)[1000] }}>
+        <Icon name="fluent:clock-12-filled" color={greys(theme)[1000]} />
+        <Text heavy size={16} style={{ color: greys(theme)[1000] }}>
           No Transactions
+        </Text>
+        <Text color={greys(theme)[1200]} heavy size={16}>
+          Your transactions will show up here
         </Text>
       </View>
     );
@@ -133,13 +130,13 @@ export const Transactions: React.FC<TransactionsProps> = ({
       return (
         <View>
           <View style={styles.statusHeader}>
-            <Text weight="heavy" size={16} style={styles.transactionsLabel}>
+            <Text heavy size={16} style={styles.transactionsLabel}>
               {label}
             </Text>
           </View>
           {sections.map((section) => (
             <View key={section.title}>
-              <Text size={14} weight="heavy" style={styles.dateHeader}>
+              <Text size={14} heavy style={styles.dateHeader}>
                 {section.title}
               </Text>
               <View style={styles.transactionContainer}>
@@ -179,14 +176,25 @@ export const Transactions: React.FC<TransactionsProps> = ({
     <SectionList
       sections={allSections}
       keyExtractor={(_, index) => index.toString()}
-      renderItem={({ item }) => (
-        <View style={styles.transactionContainer}>
-          <Transaction
-            key={item.request || item.token || item.txid || item.id || Math.random().toString()}
-            tx={item}
-          />
-        </View>
-      )}
+      renderItem={({ item, section, index }) => {
+        return (
+          <View
+            style={[
+              styles.transactionContainer,
+              {
+                borderTopLeftRadius: index === 0 ? 8 : 0,
+                borderTopRightRadius: index === 0 ? 8 : 0,
+                borderBottomLeftRadius: index === section.data.length - 1 ? 8 : 0,
+                borderBottomRightRadius: index === section.data.length - 1 ? 8 : 0,
+              },
+            ]}>
+            <Transaction
+              key={item.request || item.token || item.txid || item.id || Math.random().toString()}
+              tx={item}
+            />
+          </View>
+        );
+      }}
       renderSectionHeader={({ section: { title } }) => (
         <Text size={14} weight="heavy" style={styles.dateHeader}>
           {title}
@@ -223,17 +231,14 @@ const createStyles = (theme: any) =>
       fontFamily: 'OverpassHeavy',
       margin: 0,
       fontSize: 16,
+      marginTop: 8,
     },
     emptyContainer: {
       alignItems: 'center',
-      marginVertical: 16,
     },
     transactionContainer: {
       backgroundColor: greys(theme)[1800],
-      borderColor: greys(theme)[1500],
-      borderWidth: 0.2,
       borderRadius: 8,
-      marginVertical: 8,
     },
     viewMoreButton: {
       alignItems: 'center',
@@ -251,4 +256,3 @@ const createStyles = (theme: any) =>
       color: greys(theme)[0],
     },
   });
-

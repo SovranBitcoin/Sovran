@@ -177,7 +177,6 @@ function ModalScreen() {
             />
           </TouchableOpacity>
         </View>
-        <View style={{ marginBottom: 64 }}></View>
         <Transactions
           account={{
             ...account,
