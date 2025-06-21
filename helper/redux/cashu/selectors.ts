@@ -60,13 +60,13 @@ class TransactionBuilder {
   }
 
   get decodedToken() {
-    if (this.transactionType !== 'ecash') return null;
+    if (this.type !== 'ecash') return null;
 
     return getDecodedToken(this.token);
   }
 
   private get parsedSecret() {
-    if (this.transactionType !== 'ecash') return null;
+    if (this.type !== 'ecash') return null;
 
     try {
       const decodedToken = this.decodedToken;
@@ -78,7 +78,7 @@ class TransactionBuilder {
   }
 
   get isP2PK() {
-    if (this.transactionType !== 'ecash') return null;
+    if (this.type !== 'ecash') return null;
 
     const parsedSecret = this.parsedSecret;
     if (!parsedSecret) {
