@@ -14,7 +14,6 @@ import { store } from 'helper/redux/store';
 import { useCashu } from 'helper/redux/cashu';
 import { Transaction } from 'components/layout/Transaction';
 import { Text } from 'components/common/Themed';
-import { runWithAnimationFrame } from 'app/onboard/new';
 
 interface Account {
   unit: string;
@@ -72,14 +71,12 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
 
   useEffect(() => {
-    runWithAnimationFrame(() => {
-      const result = transactions
-        .filter(filterFn)
-        .sort(
-          (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-        );
-      setFilteredTransactions(result);
-    })();
+    const result = transactions
+      .filter(filterFn)
+      .sort(
+        (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
+      );
+    setFilteredTransactions(result);
   }, [transactions, filterFn]);
 
   const splitByStatus = useMemo(() => {
