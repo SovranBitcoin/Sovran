@@ -136,6 +136,7 @@ export const memoizedGetMintNostrContact = (mintUrl: string) =>
     const entry = contactList.find((c) => c.method && c.method.toLowerCase() === 'nostr');
     return entry ? entry.info : null;
   });
+
 export const memoizedGetSelectedMint = createSelector(
   [(state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
   (selectedMint) => {
