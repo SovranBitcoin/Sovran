@@ -3,7 +3,7 @@ import { getLightningAmount, getMeltQuote, isValidEcashToken, Transaction } from
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { store } from '../redux/store';
 import { decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
-import { memoizedGetBalance } from '../redux/cashu';
+import { memoizedGetBalance, memoizedGetTransactions } from '../redux/cashu';
 import { nip19 } from 'nostr-tools';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
@@ -14,7 +14,7 @@ import { decode } from '@gandlaf21/bolt11-decode';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
-  const transactions = store.getState().cashu?.profiles[profileId]?.transactions || [];
+  const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
   const giveaway = getGiveaway({ token });
   if (!giveaway) return false;

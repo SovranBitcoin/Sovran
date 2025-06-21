@@ -326,15 +326,12 @@ export const TransactionProvider = ({ children }) => {
                       );
 
                       // Publish wallet event, this basically just makes sure we can restore our account via nostr
+                      const currentProfileId = store.getState().nostr.currentProfile.id;
+                      const existingTxs = memoizedGetTransactions({ id: currentProfileId })(
+                        store.getState()
+                      );
                       publishWalletEvent([
-                        ...new Set([
-                          ...store
-                            .getState()
-                            .cashu?.profiles?.[
-                              store.getState().nostr.currentProfile.id
-                            ]?.transactions.map((t) => t.mintUrl),
-                          mintUrl,
-                        ]),
+                        ...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl]),
                       ]);
 
                       // Update transaction status to paid

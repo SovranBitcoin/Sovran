@@ -14,6 +14,7 @@ import {
   increaseCounterV2,
   memoizedGetCounterV2,
   memoizedGetTransactionByMatcher,
+  memoizedGetTransactions,
   updateTransaction,
   useGetMintInfo,
 } from 'helper/redux/cashu';
@@ -381,16 +382,9 @@ export function LightningReceiveConfirmation({
         );
 
         // Publish wallet event, this basically just makes sure we can restore our account via nostr
-        publishWalletEvent([
-          ...new Set([
-            ...store
-              .getState()
-              .cashu?.profiles?.[
-                store.getState().nostr.currentProfile.id
-              ]?.transactions.map((t) => t.mintUrl),
-            currentTx.mintUrl,
-          ]),
-        ]);
+        const currentProfileId = store.getState().nostr.currentProfile.id;
+        const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
+        publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
 
         // Update transaction status to paid
         showMessage('funds_sent', {

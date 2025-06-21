@@ -7,6 +7,7 @@ import {
   increaseCounterV2,
   memoizedGetCounterV2,
   memoizedGetSelectedMint,
+  memoizedGetTransactions,
   removeProofs,
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
@@ -642,7 +643,7 @@ export async function receiveEcash({
 
     await publishWalletEvent([
       ...new Set([
-        ...store.getState().cashu?.profiles?.[profile.id]?.transactions.map((t) => t.mintUrl),
+        ...memoizedGetTransactions({ id: profile.id })(store.getState()).map((t) => t.mintUrl),
         receiveMintUrl,
       ]),
     ]);

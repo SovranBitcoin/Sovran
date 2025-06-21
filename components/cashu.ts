@@ -194,12 +194,8 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
         );
       }
       await updateStateAfterPayment(profileId, proofs, mintQuote.quote, mintUrl);
-      publishWalletEvent([
-        ...new Set([
-          ...store.getState().cashu?.profiles?.[profileId]?.transactions.map((t) => t.mintUrl),
-          mintUrl,
-        ]),
-      ]);
+      const existingTxs = memoizedGetTransactions({ id: profileId })(store.getState());
+      publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl])]);
     } catch (err) {
       console.log('[checkLNPaymentComplete.error]', err);
       Alert.alert('error', JSON.stringify(err));
