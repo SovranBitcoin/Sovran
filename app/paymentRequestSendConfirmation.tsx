@@ -14,7 +14,7 @@ import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -62,7 +62,7 @@ function ModalScreen() {
       title="Send Payment Request"
       children={
         <View style={transparentViewStyle}>
-          <BalanceUpdate
+          <TransactionHeader
             pubkey={to}
             transactionType="send"
             amount={amount}

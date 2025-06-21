@@ -21,7 +21,7 @@ interface VariantStyle {
   color: string;
 }
 
-export const Card: React.FC<CardProps> = ({ title, message, variant, icon, onPress }) => {
+export const Card = ({ title, message, variant, icon, onPress }: CardProps): React.ReactNode => {
   const theme = useSelector(memoizedGetTheme);
 
   const variantStyles = useMemo<Record<VariantType, VariantStyle>>(
@@ -42,26 +42,14 @@ export const Card: React.FC<CardProps> = ({ title, message, variant, icon, onPre
 
   const currentStyle = useMemo(() => variantStyles[variant], [variantStyles, variant]);
 
-  const handlePress = useCallback(() => {
-    onPress?.();
-  }, [onPress]);
-
   return (
     <TouchableOpacity
-      onPress={handlePress}
-      className="my-3 flex-row items-center rounded-lg"
+      onPress={onPress}
       style={{
         backgroundColor: currentStyle.backgroundColor,
-        borderLeftWidth: 5,
         borderLeftColor: currentStyle.borderLeftColor,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-      }}>
+      }}
+      className={`my-3 flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
       {title && (
         <Text
           className="pl-4 pr-1 pt-4 text-base font-medium"
@@ -73,7 +61,7 @@ export const Card: React.FC<CardProps> = ({ title, message, variant, icon, onPre
         </Text>
       )}
       <Text
-        className=" p-4 pr-1 text-base font-medium"
+        className="p-4 pr-1 text-base font-medium"
         style={{
           color: currentStyle.color,
           marginRight: 8,

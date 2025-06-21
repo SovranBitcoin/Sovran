@@ -22,7 +22,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
 import { View } from 'components/common/Themed';
@@ -106,7 +106,7 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
 
 // Main component
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 export function EcashReceiveConfirmation({
   token,
@@ -209,7 +209,7 @@ export function EcashReceiveConfirmation({
       <>
         {giveaway?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
 
-        <BalanceUpdate
+        <TransactionHeader
           transaction={{
             ...transaction,
             amount,
@@ -218,16 +218,7 @@ export function EcashReceiveConfirmation({
           }}
         />
 
-        {memo && (
-          <View
-            style={{
-              margin: 16,
-              marginTop: 12,
-              marginBottom: 0,
-            }}>
-            <Card message={memo} variant="info" />
-          </View>
-        )}
+        {memo && <Card message={memo} variant="info" />}
 
         {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
         <TransactionMintRefresh

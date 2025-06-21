@@ -22,10 +22,10 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 export function LightningSendConfirmation({
   transaction,
@@ -154,7 +154,7 @@ export function LightningSendConfirmation({
       title="Send Lightning"
       children={
         <View style={{ backgroundColor: 'transparent' }}>
-          <BalanceUpdate transaction={transaction} />
+          <TransactionHeader transaction={transaction} />
           {!transaction?.paid && (
             <SelectedMintDisplay
               onMintSelected={handleMintSelected}

@@ -20,7 +20,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { useGetMintInfo } from 'helper/redux/cashu';
 import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
-import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 export const pool = new SimplePool();
 
 const screenWidth = Dimensions.get('window').width;

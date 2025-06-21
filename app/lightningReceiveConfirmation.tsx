@@ -24,7 +24,7 @@ import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
@@ -38,7 +38,7 @@ import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import opacity from 'hex-color-opacity';
-import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { date: Date })[];
@@ -432,7 +432,7 @@ export function LightningReceiveConfirmation({
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       children={
         <>
-          <BalanceUpdate
+          <TransactionHeader
             transaction={{
               ...getCurrentTransaction[0],
               unit,

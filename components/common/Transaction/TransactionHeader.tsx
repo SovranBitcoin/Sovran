@@ -4,15 +4,15 @@ import { greens, greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency } from 'helper/currency';
-import TransactionIcon from './TransactionIcon';
+import TransactionIcon from '../TransactionIcon';
 import { TransactionData } from 'helper/redux/cashu';
 import { CurrencyCode, Denomination } from 'helper/currency';
 
-interface BalanceUpdateProps {
+interface TransactionHeaderProps {
   transaction: TransactionData;
 }
 
-export function BalanceUpdate({ transaction }: BalanceUpdateProps): React.ReactNode {
+export function TransactionHeader({ transaction }: TransactionHeaderProps): React.ReactNode {
   const theme = useSelector(memoizedGetTheme);
 
   return (

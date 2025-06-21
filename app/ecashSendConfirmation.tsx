@@ -26,7 +26,7 @@ import { useTransactions } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
@@ -34,7 +34,7 @@ import { Card } from 'components/common/Card';
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
-import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 export function EcashSendConfirmation({
   unit,
@@ -205,7 +205,7 @@ export function EcashSendConfirmation({
       showClose
       children={
         <>
-          <BalanceUpdate
+          <TransactionHeader
             transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
           />
           {!getCurrentTransaction[0].paid && (
