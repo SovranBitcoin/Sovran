@@ -1,8 +1,8 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   StyleSheet,
-  FlatList,
+  SectionList,
   TouchableOpacity,
 } from 'react-native';
 import { useSelector } from 'react-redux';
@@ -14,7 +14,6 @@ import { store } from 'helper/redux/store';
 import { useCashu } from 'helper/redux/cashu';
 import { Transaction } from 'components/layout/Transaction';
 import { Text } from 'components/common/Themed';
-import { runWithAnimationFrame } from 'app/onboard/new';
 
 interface Account {
   unit: string;
@@ -69,18 +68,15 @@ export const Transactions: React.FC<TransactionsProps> = ({
     [account.unit, filter, type, at, tab],
   );
 
-  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
-
-  useEffect(() => {
-    runWithAnimationFrame(() => {
-      const result = transactions
+  const filteredTransactions = useMemo(
+    () =>
+      transactions
         .filter(filterFn)
         .sort(
           (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-        );
-      setFilteredTransactions(result);
-    })();
-  }, [transactions, filterFn]);
+        ),
+    [transactions, filterFn],
+  );
 
   const splitByStatus = useMemo(() => {
     const pending: any[] = [];
@@ -160,9 +156,8 @@ export const Transactions: React.FC<TransactionsProps> = ({
       );
     };
 
-    const containerStyles = [styles.container, !showMore && { marginTop: 0 }];
     return (
-      <View style={containerStyles}>
+      <View style={styles.container}>
         {renderStatus('Pending transactions', pendingSections)}
         {renderStatus('Confirmed transactions', confirmedSections)}
         <TouchableOpacity
@@ -181,25 +176,26 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const allSections = [...pendingSections, ...confirmedSections];
 
   return (
-    <FlatList
-      data={allSections}
-      keyExtractor={(item) => item.title}
+    <SectionList
+      sections={allSections}
+      keyExtractor={(_, index) => index.toString()}
       renderItem={({ item }) => (
-        <View>
-          <Text size={14} weight="heavy" style={styles.dateHeader}>
-            {item.title}
-          </Text>
-          <View style={styles.transactionContainer}>
-            {item.data.map((tx) => (
-              <Transaction
-                key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
-                tx={tx}
-              />
-            ))}
-          </View>
+        <View style={styles.transactionContainer}>
+          <Transaction
+            key={item.request || item.token || item.txid || item.id || Math.random().toString()}
+            tx={item}
+          />
         </View>
       )}
-      contentContainerStyle={[styles.container, { marginTop: 0 }]}
+      renderSectionHeader={({ section: { title } }) => (
+        <Text size={14} weight="heavy" style={styles.dateHeader}>
+          {title}
+        </Text>
+      )}
+      contentContainerStyle={styles.container}
+      initialNumToRender={10}
+      maxToRenderPerBatch={5}
+      windowSize={10}
     />
   );
 };
