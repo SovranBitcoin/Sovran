@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, SectionList } from 'react-native';
+import { View, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
+import { useNavigation } from 'expo-router';
 
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
@@ -45,6 +46,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { transactions } = useCashu();
+  const navigation = useNavigation();
 
   const filteredTransactions = useMemo(() => {
     return (
@@ -88,7 +90,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
       (a, b) => new Date(b).getTime() - new Date(a).getTime(),
     );
     const datesToDisplay = showMore ? orderedDates.slice(0, days) : orderedDates;
-    return datesToDisplay.map((date) => ({ title: date, data: grouped[date] }));
+    return datesToDisplay.map((date) => ({ title: date, data: [grouped[date]] }));
   }, [grouped, days, showMore]);
 
   if (sections.length === 0) {
@@ -104,10 +106,17 @@ export const Transactions: React.FC<TransactionsProps> = ({
   return (
     <SectionList
       sections={sections}
-      keyExtractor={(item) =>
-        item.request || item.token || item.txid || item.id || Math.random().toString()
-      }
-      renderItem={({ item }) => <Transaction tx={item} />}
+      keyExtractor={(_, index) => index.toString()}
+      renderItem={({ item }) => (
+        <View style={styles.transactionContainer}>
+          {item.map((tx) => (
+            <Transaction
+              key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
+              tx={tx}
+            />
+          ))}
+        </View>
+      )}
       renderSectionHeader={({ section: { title } }) => (
         <Text size={14} weight="heavy" style={styles.dateHeader}>
           {title}
@@ -117,6 +126,23 @@ export const Transactions: React.FC<TransactionsProps> = ({
       initialNumToRender={10}
       maxToRenderPerBatch={5}
       windowSize={10}
+      ListFooterComponent={
+        showMore
+          ? () => (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('transactions', {
+                    account,
+                  })
+                }
+                style={styles.viewMoreButton}>
+                <Text style={styles.viewMoreButtonText}>
+                  View all ({filteredTransactions.length})
+                </Text>
+              </TouchableOpacity>
+            )
+          : null
+      }
     />
   );
 };
@@ -134,6 +160,28 @@ const createStyles = (theme: any) =>
     emptyContainer: {
       alignItems: 'center',
       marginVertical: 16,
+    },
+    transactionContainer: {
+      backgroundColor: greys(theme)[1800],
+      borderColor: greys(theme)[1500],
+      borderWidth: 0.2,
+      borderRadius: 8,
+      marginVertical: 8,
+    },
+    viewMoreButton: {
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: greys(theme)[1800],
+      borderRadius: 10000,
+      borderColor: greys(theme)[1500],
+      borderWidth: 0.2,
+      marginHorizontal: 16,
+      marginTop: 8,
+    },
+    viewMoreButtonText: {
+      fontFamily: 'OverpassBold',
+      fontSize: 14,
+      color: greys(theme)[0],
     },
   });
 
