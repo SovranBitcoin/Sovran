@@ -180,7 +180,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
   return (
     <SectionList
       sections={allSections}
-      keyExtractor={(_, index) => index.toString()}
+      keyExtractor={(item, index) => item.request || item.token || item.txid || item.id}
       renderItem={({ item, section, index }) => {
         return (
           <View
@@ -194,10 +194,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
                 borderBottomRightRadius: index === section.data.length - 1 ? 8 : 0,
               },
             ]}>
-            <Transaction
-              key={item.request || item.token || item.txid || item.id || Math.random().toString()}
-              tx={item}
-            />
+            <Transaction key={item.request || item.token || item.txid || item.id} tx={item} />
           </View>
         );
       }}
@@ -208,7 +205,6 @@ export const Transactions: React.FC<TransactionsProps> = ({
       )}
       contentContainerStyle={{
         width: '100%',
-        marginTop: -54,
         paddingBottom: 96,
       }}
       initialNumToRender={10}
