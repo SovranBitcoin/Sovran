@@ -35,6 +35,7 @@ import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionBuilder } from 'helper/redux/cashu/selectors';
 
 export function EcashSendConfirmation({
   unit,
