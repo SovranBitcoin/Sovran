@@ -15,8 +15,6 @@ function ModalScreen() {
   const navigation = useTypedNavigation();
   const { transactions } = useCashu();
 
-  console.log(JSON.stringify(transactions, null, 2));
-
   const transaction = transactions.find(
     (t) =>
       t.txid === id ||
@@ -62,7 +60,6 @@ function ModalScreen() {
   }
 
   if (transaction.type === 'lightning' && transaction.transactionType === 'send') {
-    console.log(192873, transaction);
     return (
       <LightningSendConfirmation
         transaction={transaction}

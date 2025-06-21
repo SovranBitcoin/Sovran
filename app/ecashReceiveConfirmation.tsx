@@ -209,7 +209,12 @@ export function EcashReceiveConfirmation({
       <>
         {giveaway?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
 
-        <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
+        <BalanceUpdate
+          transactionType="receive"
+          amount={amount}
+          unit={unit}
+          transaction={transaction}
+        />
 
         {memo && (
           <View

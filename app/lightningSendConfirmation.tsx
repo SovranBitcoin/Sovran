@@ -275,7 +275,6 @@ export function LightningSendConfirmation({
 function ModalScreen() {
   const { pr, unit, pubkey, meltQuote, redirect, email, lud16 } =
     useTypedRoute<'lightningSendConfirmation'>();
-
   return (
     <LightningSendConfirmation
       pr={pr}

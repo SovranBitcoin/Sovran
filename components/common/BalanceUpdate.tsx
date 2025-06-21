@@ -30,7 +30,6 @@ export function BalanceUpdate({
 
   const isSend = transactionType === 'send';
   const isReceive = transactionType === 'receive';
-
   const Sign = () => {
     if (isSend)
       return (
@@ -111,7 +110,7 @@ export function BalanceUpdate({
         </Text>
       </View>
       <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
-        <TransactionIcon transaction={{ ...transaction, transactionType }} />
+        <TransactionIcon transaction={transaction} />
       </View>
     </View>
   );

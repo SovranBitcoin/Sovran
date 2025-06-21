@@ -56,20 +56,21 @@ class TransactionBuilder {
   }
 
   get nostrPubkey() {
-    if (this.nostr?.pubkey) return this.nostr?.pubkey;
+    if (this?.nostr?.pubkey) return this.nostr?.pubkey;
 
-    if (this.fromNIP05?.includes('@')) {
+    if (this?.fromNIP05?.includes('@')) {
       return convertNpub(this.fromNIP05?.split('@')[0]);
     }
 
-    if (this.lud16?.includes('@')) {
+    if (this?.lud16?.includes('@')) {
       return convertNpub(this.lud16?.split('@')[0]);
     }
 
-    const parsedSecret = this.parsedSecret;
+    const parsedSecret = this?.parsedSecret;
     if (!parsedSecret) {
       return null;
     }
+
     return parsedSecret[1].data.slice(2);
   }
 
