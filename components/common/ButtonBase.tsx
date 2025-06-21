@@ -19,6 +19,7 @@ import { TouchableOpacity } from './TouchableOpacity';
 type ButtonVariant = 'primary' | 'secondary';
 
 export interface ButtonBaseProps {
+  testID?: string;
   disabled?: boolean;
   loading?: boolean;
   variant: ButtonVariant;

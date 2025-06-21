@@ -26,7 +26,6 @@ import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { MintDetailPage } from './ecashSendConfirmation';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
@@ -39,6 +38,7 @@ import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import opacity from 'hex-color-opacity';
+import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
 
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { date: Date })[];
@@ -471,11 +471,9 @@ export function LightningReceiveConfirmation({
               <Card message={getCurrentTransaction[0].memo} variant="info" />
             </View>
           )}
-          <MintDetailPage
+          <TransactionMintRefresh
             mintInfo={mintInfo}
-            transaction={getCurrentTransaction[0]}
-            theme={theme}
-            transactionType="receive"
+            transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
             handleCheckStatus={handleCheckStatus}
           />
 

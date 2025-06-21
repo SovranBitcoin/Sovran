@@ -26,7 +26,6 @@ import { BalanceUpdate } from 'components/common/BalanceUpdate';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
 import { View } from 'components/common/Themed';
-import { MintDetailPage } from './ecashSendConfirmation';
 import _ from 'lodash';
 
 // Types
@@ -107,6 +106,7 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
 
 // Main component
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
 
 export function EcashReceiveConfirmation({
   token,
@@ -230,11 +230,9 @@ export function EcashReceiveConfirmation({
         )}
 
         {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
-        <MintDetailPage
-          transaction={transaction}
+        <TransactionMintRefresh
+          transaction={{ ...transaction, transactionType: 'receive' }}
           mintInfo={mintInfo}
-          theme={theme}
-          transactionType="receive"
         />
 
         <Section

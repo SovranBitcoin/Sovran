@@ -17,10 +17,10 @@ import { useTypedNavigation } from 'helper/navigation';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/common/Card';
 import { SheetManager } from 'react-native-actions-sheet';
-import { MintDetailPage } from 'app/ecashSendConfirmation';
 import { useGetMintInfo } from 'helper/redux/cashu';
 import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
+import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
 export const pool = new SimplePool();
 
 const screenWidth = Dimensions.get('window').width;
@@ -194,10 +194,11 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
             unit="sat"
           />
         )}
-        <MintDetailPage
+        <TransactionMintRefresh
           mintInfo={mintInfo}
-          theme={theme}
-          transactionType="receive"
+          transaction={{
+            transactionType: 'receive',
+          }}
           handleCheckStatus={async (callback) => {
             await getProfile(currentProfile, listenToTransaction);
             callback();

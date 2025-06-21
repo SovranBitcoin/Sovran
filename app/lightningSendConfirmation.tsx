@@ -22,10 +22,10 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { MintDetailPage } from './ecashSendConfirmation';
 import { BalanceUpdate } from 'components/common/BalanceUpdate';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { TransactionMintRefresh } from 'components/common/TransactionMintRefresh';
 
 export function LightningSendConfirmation({
   transaction,
@@ -171,11 +171,9 @@ export function LightningSendConfirmation({
           )}
 
           {transaction?.paid && (
-            <MintDetailPage
+            <TransactionMintRefresh
               mintInfo={mintInfo}
-              theme={theme}
-              transactionType="send"
-              transaction={transaction}
+              transaction={{ ...transaction, transactionType: 'send' }}
             />
           )}
 
