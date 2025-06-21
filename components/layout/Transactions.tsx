@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, SectionList } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -83,12 +83,15 @@ export const Transactions: React.FC<TransactionsProps> = ({
     return groups;
   }, [filteredTransactions]);
 
-  const orderedDates = Object.keys(grouped).sort(
-    (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-  );
-  const datesToDisplay = showMore ? orderedDates.slice(0, days) : orderedDates;
+  const sections = useMemo(() => {
+    const orderedDates = Object.keys(grouped).sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+    );
+    const datesToDisplay = showMore ? orderedDates.slice(0, days) : orderedDates;
+    return datesToDisplay.map((date) => ({ title: date, data: grouped[date] }));
+  }, [grouped, days, showMore]);
 
-  if (datesToDisplay.length === 0) {
+  if (sections.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text weight="heavy" style={{ color: greys(theme)[1000] }}>
@@ -99,21 +102,22 @@ export const Transactions: React.FC<TransactionsProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      {datesToDisplay.map((date) => (
-        <View key={date} style={styles.groupContainer}>
-          <Text size={14} weight="heavy" style={styles.dateHeader}>
-            {date}
-          </Text>
-          {grouped[date].map((tx) => (
-            <Transaction
-              key={tx.request || tx.token || tx.txid || tx.id}
-              tx={tx}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
+    <SectionList
+      sections={sections}
+      keyExtractor={(item) =>
+        item.request || item.token || item.txid || item.id || Math.random().toString()
+      }
+      renderItem={({ item }) => <Transaction tx={item} />}
+      renderSectionHeader={({ section: { title } }) => (
+        <Text size={14} weight="heavy" style={styles.dateHeader}>
+          {title}
+        </Text>
+      )}
+      contentContainerStyle={styles.container}
+      initialNumToRender={10}
+      maxToRenderPerBatch={5}
+      windowSize={10}
+    />
   );
 };
 
@@ -121,9 +125,6 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       width: '100%',
-    },
-    groupContainer: {
-      marginBottom: 8,
     },
     dateHeader: {
       color: greys(theme)[1000],
