@@ -1,8 +1,7 @@
-import React, { JSX } from 'react';
+import { JSX } from 'react';
 import { Text, View } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { greens, greys, shades } from 'helper/colors';
-import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency } from 'helper/currency';
