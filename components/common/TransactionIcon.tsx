@@ -10,47 +10,41 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
   const theme = useSelector(memoizedGetTheme);
   const nostrData = useSelector(memoizedGetNostrProfile({ nostrPubkey: transaction.nostrPubkey }));
 
-  const StatusIndicator = ({ size, type }: { size: number; type: string }) => (
-    <View
-      className={type === 'small' ? 'absolute -bottom-2 -right-2 z-10 rounded-full' : ''}
-      style={
-        type === 'small'
-          ? {
-              backgroundColor: greys(theme)[1500],
-              borderRadius: 100,
-              height: size + 6,
-              width: size + 6,
-              padding: 3,
-              borderColor: greys(theme)[1300],
-            }
-          : {}
-      }>
-      {transaction.isP2PK ? (
-        <Icon name="solar:key-bold" color={greys(theme)[100]} size={size} />
-      ) : transaction.fromNIP05 ? (
-        <Icon name="mdi:at" color={greys(theme)[100]} size={size} />
-      ) : transaction.isCancel ? (
-        <Icon name="mdi:cancel" color={greys(theme)[100]} size={size} />
-      ) : (
-        <Icon
-          name={
-            transaction.isReceive
-              ? 'fluent:arrow-download-16-filled'
-              : 'fluent:arrow-upload-16-filled'
-          }
-          color={greys(theme)[100]}
-          size={size}
-        />
-      )}
-    </View>
-  );
+  const isSmall = nostrData?.profile?.picture;
+  const iconSize = isSmall ? 10 : 28;
 
   return (
     <View className="relative h-7 w-7 bg-transparent">
-      <StatusIndicator
-        size={nostrData?.profile?.picture ? 10 : 28}
-        type={nostrData?.profile?.picture ? 'small' : 'large'}
-      />
+      <View
+        className={isSmall ? 'absolute -bottom-2 -right-2 z-10 rounded-full' : ''}
+        style={
+          isSmall
+            ? {
+                backgroundColor: greys(theme)[1500],
+                borderRadius: 100,
+                height: iconSize + 6,
+                width: iconSize + 6,
+                padding: 3,
+                borderColor: greys(theme)[1300],
+              }
+            : {}
+        }>
+        <Icon
+          name={
+            transaction.isP2PK
+              ? 'solar:key-bold'
+              : transaction.fromNIP05
+                ? 'mdi:at'
+                : transaction.isCancel
+                  ? 'mdi:cancel'
+                  : transaction.isReceive
+                    ? 'fluent:arrow-download-16-filled'
+                    : 'fluent:arrow-upload-16-filled'
+          }
+          color={greys(theme)[100]}
+          size={iconSize}
+        />
+      </View>
       {nostrData?.profile?.picture && (
         <CachedImage
           style={{
