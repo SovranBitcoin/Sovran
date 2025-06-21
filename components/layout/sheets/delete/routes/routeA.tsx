@@ -3,7 +3,7 @@ import { Card } from 'components/common/Card';
 import { View, Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { resetApp } from 'helper/redux/store/reducer';
+import { resetApp } from 'helper/redux/store';
 import * as Updates from 'expo-updates';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';

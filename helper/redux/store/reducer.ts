@@ -7,7 +7,6 @@ import { pricelistReducer } from '../pricelist/reducer';
 import { vpnReducer } from '../lnvpn/reducer';
 import { esimReducer } from '../esim/reducer';
 import { nostrReducer } from '../nostr/reducer';
-import { persistor } from '.';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
@@ -50,25 +49,5 @@ const rootReducer = (state: RootState | undefined, action: AnyAction): RootState
   return appReducer(state, action);
 };
 
-// Typed reset app action creator
-export const resetApp = (): AppThunk => {
-  return async (dispatch): Promise<void> => {
-    try {
-      // Clear persisted redux data
-      await persistor.purge();
-
-      // Dispatch the reset action to clear the in-memory state
-      dispatch({ type: RESET_APP });
-
-      // Restart persistence after reset
-      persistor.persist();
-
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Failed to reset app:', error);
-      return Promise.reject(error);
-    }
-  };
-};
 
 export default rootReducer;

@@ -1,6 +1,6 @@
 import { applyMiddleware, createStore } from 'redux';
 import { createMigrate, persistStore, persistReducer, MigrationManifest } from 'redux-persist';
-import rootReducer, { RootState } from './reducer';
+import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import _ from 'lodash/fp';
 
@@ -395,3 +395,24 @@ store.subscribe(() => {
 });
 
 export const persistor = persistStore(store);
+
+// Typed reset app action creator moved here to avoid a require cycle
+export const resetApp = (): AppThunk => {
+  return async (dispatch): Promise<void> => {
+    try {
+      // Clear persisted redux data
+      await persistor.purge();
+
+      // Dispatch the reset action to clear the in-memory state
+      dispatch({ type: RESET_APP });
+
+      // Restart persistence after reset
+      persistor.persist();
+
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Failed to reset app:', error);
+      return Promise.reject(error);
+    }
+  };
+};
