@@ -175,6 +175,15 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
         </View>
       }>
       <View>
+        <View
+          style={{
+            margin: 16,
+            marginTop: 0,
+            marginBottom: 8,
+          }}>
+          <Card message="NPUBX is an experimental feature." variant="warning" />
+        </View>
+
         {showLightningAddress && (
           <PaymentInfo
             data={`${currentProfile.npub}@npubx.cash`}
