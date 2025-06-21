@@ -356,6 +356,10 @@ export function maybeConvertNpub(key: string) {
   return key;
 }
 
+export function pubKeyTo02(key: string) {
+  return '02' + key;
+}
+
 export async function sendEcash({
   amount,
   unit,

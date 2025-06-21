@@ -107,63 +107,64 @@ export function Transaction({ tx }: TransactionProps): JSX.Element {
   const { isSend, isReceive, showLoading, fiatAmount, handlePress } = useTransaction(tx);
 
   return (
-    <View key={tx.txid} className="bg-transparent">
-      <TouchableOpacity
-        className="flex flex-row items-center justify-between bg-transparent p-5 pl-4 pr-4"
-        onPress={handlePress}>
-        <TransactionIcon transaction={tx} />
+    <TouchableOpacity
+      key={tx.txid}
+      className="flex flex-row items-center justify-between bg-transparent p-5 pl-4 pr-4"
+      onPress={handlePress}>
+      <TransactionIcon transaction={tx} />
 
-        <View className="ml-3 flex-grow flex-col bg-transparent">
-          <View className="flex flex-row items-end justify-between bg-transparent">
-            <UntranslatedText color={greys(theme)[0]} bold size={14}>
-              {tx.transactionType[0].toUpperCase() + tx.transactionType.slice(1)}
+      <View className="ml-3 flex-grow flex-col bg-transparent">
+        <View className="flex flex-row items-end justify-between bg-transparent">
+          <UntranslatedText color={greys(theme)[0]} bold size={14}>
+            {tx.transactionType[0].toUpperCase() + tx.transactionType.slice(1)}
+          </UntranslatedText>
+          <View className="flex flex-row items-center bg-transparent">
+            <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
+              {isSend ? '- ' : isReceive ? '+ ' : ''}
             </UntranslatedText>
-            <View className="flex flex-row items-center bg-transparent">
-              <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
-                {isSend ? '- ' : isReceive ? '+ ' : ''}
-              </UntranslatedText>
-              <AmountFormatter
-                amount={tx.amount}
-                unit={tx.unit}
-                size={16}
-                weight="heavy"
-                color={isSend ? reds[300] : greens[300]}
-              />
-            </View>
-          </View>
-
-          <View className="flex flex-row justify-between bg-transparent">
-            <View className="flex flex-row items-center">
-              <UntranslatedText regular size={10} color={greys(theme)[200]}>
-                {tx?.date ? convertTime(new Date(tx.date)) : 'Unconfirmed'}
-              </UntranslatedText>
-              {showLoading && (
-                <View className="pl-1">
-                  <Icon
-                    size={8}
-                    name="ant-design:loading-outlined"
-                    color={greys(theme)[100]}
-                    spin={{
-                      delay: 0,
-                      duration: 1000,
-                      outputRange: ['0deg', '360deg'],
-                      easing: 'linear',
-                    }}
-                  />
-                </View>
-              )}
-            </View>
-
-            <UntranslatedText
-              className="font-overpass-heavy self-end text-right text-xs"
-              bold
-              size={10}
-              color={greys(theme)[200]}>
-              {fiatAmount}
-            </UntranslatedText>
+            <AmountFormatter
+              amount={tx.amount}
+              unit={tx.unit}
+              size={16}
+              weight="heavy"
+              color={isSend ? reds[300] : greens[300]}
+            />
           </View>
         </View>
-      </TouchableOpacity>
-    </View>
+
+        <View className="flex flex-row justify-between bg-transparent">
+          <View className="flex flex-row items-center">
+            <UntranslatedText regular size={10} color={greys(theme)[200]}>
+              {tx?.date ? convertTime(new Date(tx.date)) : 'Unconfirmed'}
+            </UntranslatedText>
+            <View className="pl-1">
+              {tx?.paid ? (
+                <Icon size={10} name="simple-line-icons:check" color={greys(theme)[200]} />
+              ) : showLoading ? (
+                <Icon
+                  size={10}
+                  name="ant-design:loading-outlined"
+                  color={greys(theme)[100]}
+                  spin={{
+                    delay: 0,
+                    duration: 1000,
+                    outputRange: ['0deg', '360deg'],
+                    easing: 'linear',
+                  }}
+                />
+              ) : null}
+            </View>
+          </View>
+
+          <UntranslatedText
+            className="font-overpass-heavy self-end text-right text-xs"
+            bold
+            size={10}
+            color={greys(theme)[200]}>
+            {fiatAmount}
+          </UntranslatedText>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }

@@ -28,7 +28,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { greys } from 'helper/colors';
-import { maybeConvertNpub, npubToPublicKey } from 'helper/cashu/pay';
+import { maybeConvertNpub, npubToPublicKey, pubKeyTo02 } from 'helper/cashu/pay';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
@@ -100,16 +100,17 @@ function ModalScreen() {
   };
 
   const handleEcashSend = async ({ message }) => {
-    console.log('[handleEcashSend]', unit === 'sat' ? amount : amount * 100, unit, message, params);
+    console.log('[handleEcashSend]', params);
     const transaction = await sendEcash({
       to: npubToPublicKey(params?.profile?.npub),
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,
-      ...(params?.profile?.npub
+      ...(params?.profile?.pubkey || params?.profile?.npub
         ? {
             p2pk: {
-              pubkey: maybeConvertNpub(params?.profile?.npub),
+              pubkey:
+                pubKeyTo02(params?.profile?.pubkey) || maybeConvertNpub(params?.profile?.npub),
             },
           }
         : {}),

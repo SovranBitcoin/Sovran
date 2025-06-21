@@ -1,5 +1,5 @@
 import React, { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
-import { Share, StyleSheet } from 'react-native';
+import { Share, StyleSheet, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Button } from 'components/common/Button';
 import Modal from 'components/layout/Modal';
@@ -419,6 +419,17 @@ export function EcashSendConfirmation({
               },
             ]}
           />
+
+          <ScrollView
+            horizontal
+            style={{
+              padding: 16,
+              margin: 16,
+              borderRadius: 8,
+              backgroundColor: greys(theme)[1800],
+            }}>
+            <Text mono>{getCurrentTransaction[0].toString()}</Text>
+          </ScrollView>
 
           {/* <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text> */}
         </>

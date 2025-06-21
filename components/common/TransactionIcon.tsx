@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { JSX, useMemo } from 'react';
 import { View } from 'components/common/Themed';
 import Icon from 'assets/icons';
 import CachedImage from 'components/common/Image';
@@ -6,68 +6,32 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
-import { useEsims } from 'helper/redux/esim';
-import { find, get, some } from 'lodash';
-import { npubToPubkey } from 'components/layout/Transaction';
+import _ from 'lodash';
+import { getDecodedToken } from '@cashu/cashu-ts';
+import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 
-export interface TransactionData {
-  id?: string;
-  txid?: string;
-  request?: string;
-  token?: string;
-  unit: string;
-  amount: number;
-  date?: string;
-  transactionType: 'send' | 'receive' | string;
-  type?: string;
-  isBuy?: string;
-  isSell?: boolean;
-  paid?: boolean;
-  isCancel?: boolean;
-  unifiedRequest?: string;
-  paymentRequest?: string;
-  from?: string;
-  to?: string;
-  fromNIP05?: string;
-  status?: { block_time: number; [key: string]: any };
-  nostr?: { pubkey: string; [key: string]: any };
-}
-
-interface TransactionIconProps {
-  transaction: TransactionData;
-}
-
-export default function TransactionIcon({ transaction }: TransactionIconProps): JSX.Element {
-  console.log(123, transaction);
+export default function TransactionIcon({ transaction }: any): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
-  const { esims } = useEsims();
 
-  const isSend = transaction.transactionType === 'send';
   const isReceive = transaction.transactionType === 'receive';
+  const isSend = transaction.transactionType === 'send';
 
   const profilePicture = useMemo(() => {
     const getPicture = (arr?: any[]) => {
-      const item = find(arr, {
-        pubkey:
-          transaction?.nostr?.pubkey ||
-          npubToPubkey(transaction?.fromNIP05?.split('@')[0] || transaction?.lud16?.split('@')[0]),
+      const item = _.find(arr, {
+        pubkey: transaction.nostrPubkey,
       });
       return (
-        get(item, 'profile.picture') ||
-        get(item, 'picture') ||
-        get(item, 'profile.image') ||
-        get(item, 'image')
+        _.get(item, 'profile.picture') ||
+        _.get(item, 'picture') ||
+        _.get(item, 'profile.image') ||
+        _.get(item, 'image')
       );
     };
 
     return getPicture(search) || getPicture(profiles);
-  }, [search, profiles, transaction?.nostr?.pubkey, transaction?.fromNIP05, transaction?.lud16]);
-
-  const isEsimRequest = useMemo(
-    () => some(esims, (e) => e?.request && e.request === transaction.request),
-    [esims, transaction.request]
-  );
+  }, [search, profiles, transaction]);
 
   const StatusIndicator = () => (
     <View
@@ -80,7 +44,9 @@ export default function TransactionIcon({ transaction }: TransactionIconProps): 
         padding: 3,
         borderColor: greys(theme)[1300],
       }}>
-      {transaction.fromNIP05 ? (
+      {transaction.isP2PK ? (
+        <Icon name="solar:key-bold" color={greys(theme)[100]} size={10} />
+      ) : transaction.fromNIP05 ? (
         <Icon name="mdi:at" color={greys(theme)[100]} size={10} />
       ) : transaction.isCancel ? (
         <Icon name="mdi:cancel" color={greys(theme)[100]} size={10} />
@@ -95,33 +61,6 @@ export default function TransactionIcon({ transaction }: TransactionIconProps): 
   );
 
   if (profilePicture) {
-    return (
-      <View className="relative h-7 w-7 bg-transparent">
-        <StatusIndicator />
-        <CachedImage
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 1000,
-            borderColor: greys(theme)[1500],
-            borderWidth: 1,
-          }}
-          source={{ uri: profilePicture }}
-        />
-      </View>
-    );
-  }
-
-  if (isEsimRequest) {
-    return (
-      <View className="relative h-7 w-7 bg-transparent">
-        <StatusIndicator />
-        <Icon name="fluent:sim-24-filled" color={greys(theme)[100]} />
-      </View>
-    );
-  }
-
-  if (transaction.fromNIP05 && isReceive) {
     return (
       <View className="relative h-7 w-7 bg-transparent">
         <StatusIndicator />
@@ -155,9 +94,11 @@ export default function TransactionIcon({ transaction }: TransactionIconProps): 
     );
   }
 
-  return (
-    <View className="relative h-7 w-7 bg-transparent">
-      <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
-    </View>
-  );
+  if (isSend) {
+    return (
+      <View className="relative h-7 w-7 bg-transparent">
+        <Icon name="fluent:arrow-upload-16-filled" color={greys(theme)[100]} />
+      </View>
+    );
+  }
 }

@@ -52,6 +52,7 @@ const configWithMonicon = withMonicon(config, {
     'fluent:wallet-20-filled',
     'material-symbols:settings-rounded',
     'fluent:chevron-down-12-filled',
+    'simple-line-icons:check',
     'ic:baseline-card-giftcard',
     'lucide:arrow-up-right',
     'mdi:charity',
