@@ -20,6 +20,13 @@
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
     <string>0.0.24</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>This app requires access to network features for VPN functionality</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>network-authentication</string>
+      <string>network</string>
+    </array>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
