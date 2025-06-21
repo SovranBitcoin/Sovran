@@ -226,7 +226,7 @@ export function EcashSendConfirmation({
   const handleShare = async (onClose) => {
     await Share.share({
       url: uri,
-      message: token,
+      message: 'cashu://' + token,
     });
     onClose();
   };

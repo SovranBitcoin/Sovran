@@ -68,7 +68,7 @@ class TransactionBuilder {
 
     const parsedSecret = this.parsedSecret;
     if (!parsedSecret) {
-      return false;
+      return null;
     }
     return parsedSecret[1].data.slice(2);
   }
