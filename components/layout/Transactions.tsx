@@ -1,5 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  SectionList,
+  TouchableOpacity,
+} from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 
@@ -48,52 +53,71 @@ export const Transactions: React.FC<TransactionsProps> = ({
   const { transactions } = useCashu();
   const navigation = useNavigation();
 
-  const filteredTransactions = useMemo(() => {
-    return (
+  const filterFn = useMemo(
+    () =>
+      (tx: any) => {
+        if (tx.unit !== account.unit) return false;
+        if (filter === 'incoming' && tx.transactionType !== 'receive') return false;
+        if (filter === 'outgoing' && tx.transactionType !== 'send') return false;
+        if (type !== 'all' && tx.type !== type) return false;
+        if (at === 'at' && !tx?.fromNIP05) return false;
+        if (tab === 'Confirmed' && !tx.paid) return false;
+        if (tab === 'Pending' && tx.paid) return false;
+        return true;
+      },
+    [account.unit, filter, type, at, tab],
+  );
+
+  const filteredTransactions = useMemo(
+    () =>
       transactions
-        // filter by account unit
-        .filter((tx) => tx.unit === account.unit)
-        // incoming or outgoing
-        .filter((tx) => {
-          if (filter === 'incoming') return tx.transactionType === 'receive';
-          if (filter === 'outgoing') return tx.transactionType === 'send';
-          return true;
-        })
-        // lightning vs ecash
-        .filter((tx) => (type === 'all' ? true : tx.type === type))
-        // transactions via NIP05
-        .filter((tx) => (at === 'at' ? tx?.fromNIP05 : true))
-        // pending/confirmed tabs
-        .filter((tx) => {
-          if (tab === 'Confirmed') return tx.paid === true;
-          if (tab === 'Pending') return !tx.paid;
-          return true;
-        })
+        .filter(filterFn)
         .sort(
           (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-        )
-    );
-  }, [transactions, account.unit, filter, type, at, tab]);
+        ),
+    [transactions, filterFn],
+  );
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, typeof filteredTransactions> = {};
+  const splitByStatus = useMemo(() => {
+    const pending: any[] = [];
+    const confirmed: any[] = [];
     filteredTransactions.forEach((tx) => {
+      if (tx.paid) confirmed.push(tx);
+      else pending.push(tx);
+    });
+    return { pending, confirmed };
+  }, [filteredTransactions]);
+
+  const groupByDate = (txs: any[]) => {
+    const groups: Record<string, any[]> = {};
+    txs.forEach((tx) => {
       const key = formatDate(tx.date || new Date().toISOString());
       if (!groups[key]) groups[key] = [];
       groups[key].push(tx);
     });
     return groups;
-  }, [filteredTransactions]);
+  };
 
-  const sections = useMemo(() => {
-    const orderedDates = Object.keys(grouped).sort(
+  const sliceGrouped = (txs: any[]) => {
+    const grouped = groupByDate(txs);
+    const ordered = Object.keys(grouped).sort(
       (a, b) => new Date(b).getTime() - new Date(a).getTime(),
     );
-    const datesToDisplay = showMore ? orderedDates.slice(0, days) : orderedDates;
-    return datesToDisplay.map((date) => ({ title: date, data: [grouped[date]] }));
-  }, [grouped, days, showMore]);
+    const keys = showMore ? ordered.slice(0, days) : ordered;
+    return keys.map((date) => ({ title: date, data: grouped[date] }));
+  };
 
-  if (sections.length === 0) {
+  const pendingSections = useMemo(
+    () => sliceGrouped(splitByStatus.pending),
+    [splitByStatus.pending, days, showMore],
+  );
+
+  const confirmedSections = useMemo(
+    () => sliceGrouped(splitByStatus.confirmed),
+    [splitByStatus.confirmed, days, showMore],
+  );
+
+  if (filteredTransactions.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text weight="heavy" style={{ color: greys(theme)[1000] }}>
@@ -103,18 +127,64 @@ export const Transactions: React.FC<TransactionsProps> = ({
     );
   }
 
+  if (showMore) {
+    const renderStatus = (label: string, sections: { title: string; data: any[] }[]) => {
+      if (sections.length === 0) return null;
+      return (
+        <View>
+          <View style={styles.statusHeader}>
+            <Text weight="heavy" size={16} style={styles.transactionsLabel}>
+              {label}
+            </Text>
+          </View>
+          {sections.map((section) => (
+            <View key={section.title}>
+              <Text size={14} weight="heavy" style={styles.dateHeader}>
+                {section.title}
+              </Text>
+              <View style={styles.transactionContainer}>
+                {section.data.map((tx) => (
+                  <Transaction
+                    key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
+                    tx={tx}
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    };
+
+    return (
+      <View style={styles.container}>
+        {renderStatus('Pending transactions', pendingSections)}
+        {renderStatus('Confirmed transactions', confirmedSections)}
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('transactions', {
+              account,
+            })
+          }
+          style={styles.viewMoreButton}>
+          <Text style={styles.viewMoreButtonText}>View all ({filteredTransactions.length})</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const allSections = [...pendingSections, ...confirmedSections];
+
   return (
     <SectionList
-      sections={sections}
+      sections={allSections}
       keyExtractor={(_, index) => index.toString()}
       renderItem={({ item }) => (
         <View style={styles.transactionContainer}>
-          {item.map((tx) => (
-            <Transaction
-              key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
-              tx={tx}
-            />
-          ))}
+          <Transaction
+            key={item.request || item.token || item.txid || item.id || Math.random().toString()}
+            tx={item}
+          />
         </View>
       )}
       renderSectionHeader={({ section: { title } }) => (
@@ -126,23 +196,6 @@ export const Transactions: React.FC<TransactionsProps> = ({
       initialNumToRender={10}
       maxToRenderPerBatch={5}
       windowSize={10}
-      ListFooterComponent={
-        showMore
-          ? () => (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('transactions', {
-                    account,
-                  })
-                }
-                style={styles.viewMoreButton}>
-                <Text style={styles.viewMoreButtonText}>
-                  View all ({filteredTransactions.length})
-                </Text>
-              </TouchableOpacity>
-            )
-          : null
-      }
     />
   );
 };
@@ -154,10 +207,22 @@ const createStyles = (theme: any) =>
       marginTop: -48,
       paddingBottom: 96,
     },
+    statusHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingBottom: 0,
+      backgroundColor: 'transparent',
+    },
     dateHeader: {
       color: greys(theme)[1000],
       fontFamily: 'OverpassHeavy',
       marginVertical: 4,
+    },
+    transactionsLabel: {
+      color: greys(theme)[1000],
+      fontFamily: 'OverpassHeavy',
+      margin: 0,
+      fontSize: 16,
     },
     emptyContainer: {
       alignItems: 'center',
