@@ -45,7 +45,6 @@ export const Transactions: React.FC<TransactionsProps> = ({
   showMore = true,
 }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const { transactions } = useCashu();
   const navigation = useNavigation();
 
@@ -112,7 +111,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
   if (filteredTransactions.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <View className="flex items-center">
         <Icon name="fluent:clock-12-filled" color={greys(theme)[1000]} />
         <Text heavy size={16} style={{ color: greys(theme)[1000] }}>
           No Transactions
@@ -129,17 +128,17 @@ export const Transactions: React.FC<TransactionsProps> = ({
       if (sections.length === 0) return null;
       return (
         <View>
-          <View style={styles.statusHeader}>
-            <Text heavy size={16} style={styles.transactionsLabel}>
+          <View className="flex-row items-start">
+            <Text heavy size={16} color={greys(theme)[1000]} className="mt-2">
               {label}
             </Text>
           </View>
           {sections.map((section) => (
             <View key={section.title}>
-              <Text size={14} heavy style={styles.dateHeader}>
+              <Text size={14} heavy color={greys(theme)[1000]} className="mb-1">
                 {section.title}
               </Text>
-              <View style={styles.transactionContainer}>
+              <View className="rounded-lg" style={{ backgroundColor: greys(theme)[1800] }}>
                 {section.data.map((tx) => (
                   <Transaction
                     key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
@@ -154,7 +153,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
     };
 
     return (
-      <View style={styles.container}>
+      <View className="mt-[-54px] w-full pb-24">
         {renderStatus('Pending transactions', pendingSections)}
         {renderStatus('Confirmed transactions', confirmedSections)}
         <TouchableOpacity
@@ -163,8 +162,14 @@ export const Transactions: React.FC<TransactionsProps> = ({
               account,
             })
           }
-          style={styles.viewMoreButton}>
-          <Text style={styles.viewMoreButtonText}>View all ({filteredTransactions.length})</Text>
+          className="mt-4 flex items-center rounded-full border p-3"
+          style={{
+            backgroundColor: greys(theme)[1800],
+            borderColor: greys(theme)[1500],
+          }}>
+          <Text size={14} bold>
+            View all ({filteredTransactions.length})
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -180,8 +185,9 @@ export const Transactions: React.FC<TransactionsProps> = ({
         return (
           <View
             style={[
-              styles.transactionContainer,
               {
+                backgroundColor: greys(theme)[1800],
+                borderRadius: 8,
                 borderTopLeftRadius: index === 0 ? 8 : 0,
                 borderTopRightRadius: index === 0 ? 8 : 0,
                 borderBottomLeftRadius: index === section.data.length - 1 ? 8 : 0,
@@ -196,63 +202,18 @@ export const Transactions: React.FC<TransactionsProps> = ({
         );
       }}
       renderSectionHeader={({ section: { title } }) => (
-        <Text size={14} weight="heavy" style={styles.dateHeader}>
+        <Text size={14} heavy color={greys(theme)[1000]} className="mb-1 mt-2">
           {title}
         </Text>
       )}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={{
+        width: '100%',
+        marginTop: -54,
+        paddingBottom: 96,
+      }}
       initialNumToRender={10}
       maxToRenderPerBatch={5}
       windowSize={10}
     />
   );
 };
-
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    container: {
-      width: '100%',
-      marginTop: -48,
-      paddingBottom: 96,
-    },
-    statusHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      paddingBottom: 0,
-      backgroundColor: 'transparent',
-    },
-    dateHeader: {
-      color: greys(theme)[1000],
-      fontFamily: 'OverpassHeavy',
-      marginVertical: 4,
-    },
-    transactionsLabel: {
-      color: greys(theme)[1000],
-      fontFamily: 'OverpassHeavy',
-      margin: 0,
-      fontSize: 16,
-      marginTop: 8,
-    },
-    emptyContainer: {
-      alignItems: 'center',
-    },
-    transactionContainer: {
-      backgroundColor: greys(theme)[1800],
-      borderRadius: 8,
-    },
-    viewMoreButton: {
-      alignItems: 'center',
-      padding: 12,
-      backgroundColor: greys(theme)[1800],
-      borderRadius: 10000,
-      borderColor: greys(theme)[1500],
-      borderWidth: 0.2,
-      marginHorizontal: 16,
-      marginTop: 8,
-    },
-    viewMoreButtonText: {
-      fontFamily: 'OverpassBold',
-      fontSize: 14,
-      color: greys(theme)[0],
-    },
-  });
