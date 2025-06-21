@@ -22,7 +22,6 @@ function ModalScreen() {
 
   const { params } = useRoute();
   const [country, setCountry] = useState('RU');
-  console.log(123123, country, params);
 
   const [dataType, setDataType] = useState('Local');
   const [packages, setPackages] = useState([
@@ -82,7 +81,6 @@ function ModalScreen() {
       setCountry(params?.country);
     }
   }, [params?.country]);
-  console.log(192837, params.country, params.countries);
 
   const handleCountryChange = (newCountry) => {
     setCountry(newCountry);

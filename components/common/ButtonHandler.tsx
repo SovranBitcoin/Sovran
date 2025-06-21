@@ -13,7 +13,7 @@ import { runWithAnimationFrame } from 'app/onboard/new';
 export interface ButtonHandlerButton {
   disabled?: boolean;
   loading?: boolean;
-  variant: 'primary' | 'secondary';
+  variant: 'primary' | 'secondary' | 'dangerous';
   icon?: string;
   text: string;
   onPress: any;

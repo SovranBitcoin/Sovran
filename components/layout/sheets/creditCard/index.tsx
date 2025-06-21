@@ -13,9 +13,9 @@ function CreditCardSheet(props: any) {
   const theme = useSelector(memoizedGetTheme);
   return (
     <ActionSheet
-      onChange={(position, height) => {
-        console.log(position, height);
-      }}
+      // onChange={(position, height) => {
+      //   console.log(position, height);
+      // }}
       backgroundInteractionEnabled
       enableRouterBackNavigation={true}
       routes={routes}

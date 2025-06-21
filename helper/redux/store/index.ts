@@ -119,7 +119,6 @@ const migrations = {
       state
     );
 
-    console.log(293892873, newState);
     return newState;
   },
   40: (state: RootState) => {
@@ -320,7 +319,6 @@ const migrations = {
       ['cashu', 'profiles'],
       (profiles = []) => {
         return profiles.map((profile: any) => {
-          console.log(19817329, profile);
           if (!profile.proofs) {
             return profile;
           }
@@ -335,8 +333,6 @@ const migrations = {
               ),
             ])
           );
-
-          console.log(2292173, dedupedProofs);
 
           return {
             ...profile,
@@ -396,8 +392,6 @@ store.subscribe(() => {
     }
     return structure;
   };
-
-  console.log(2398293, JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

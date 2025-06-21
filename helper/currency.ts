@@ -4,12 +4,12 @@ import { memoizedPricelist } from 'helper/redux/pricelist';
 /**
  * Supported currency codes
  */
-type CurrencyCode = 'BTC' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW';
+export type CurrencyCode = 'BTC' | 'USD' | 'EUR' | 'GBP' | 'AUD' | 'CAD' | 'NZD' | 'KRW';
 
 /**
  * Supported denominations for currency display
  */
-type Denomination =
+export type Denomination =
   | 'btc'
   | 'sats'
   | 'sat'

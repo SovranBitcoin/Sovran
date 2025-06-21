@@ -4,14 +4,8 @@ import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import Icon from 'assets/icons';
-import {
-  ActionSheetRef,
-  registerSheet,
-  useSheetRef,
-  useSheetRouter,
-} from 'react-native-actions-sheet';
+import { ActionSheetRef, registerSheet, useSheetRouter } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { formatCurrency } from 'helper/currency';
 import { Text } from 'components/common/Themed';
 import { addMints, useGetMintInfo } from 'helper/redux/cashu';
 import { Sheet } from 'components/layout/sheets/mints/sheet';

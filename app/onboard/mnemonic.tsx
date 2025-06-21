@@ -138,7 +138,6 @@ const RecoveryScreen: React.FC<{}> = () => {
 
   // Handle key press for backspace functionality
   const handleKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
-    console.log(nativeEvent);
     // if keypress is next then try to submit
     if (nativeEvent.key === 'Next' && isSubmitEnabled()) {
       handleSubmit();

@@ -284,8 +284,6 @@ const ChainLoadingAnimation = () => {
             const { value: restoredMint } = result;
             const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
 
-            console.log('restoredMint', restoredMint);
-
             mints.push({
               profileId: mint.id,
               mintUrl,
@@ -451,7 +449,6 @@ const ChainLoadingAnimation = () => {
         }
         if (!_.isEmpty(keysets)) {
           _.forEach(keysets, (value, key) => {
-            console.log('add keyset', key, value);
             store.dispatch(
               increaseCounterV2({
                 profileId,
@@ -628,7 +625,6 @@ const ChainLoadingAnimation = () => {
               },
             });
 
-            console.log('KEYSET_COMPLETE123123123', currentMint?.currencies, result?.value?.unit);
             setCurrencyIndex(
               currentMint?.currencies?.findIndex((c) => c?.name === result?.value?.unit)
             );
@@ -715,7 +711,6 @@ const ChainLoadingAnimation = () => {
     if (!currentMintInfo) return '';
 
     const currencies = currentMintInfo.mint.currencies;
-    console.log(123213123, currencies, currencyIndex);
     if (currencyIndex < currencies.length) {
       return currencies[currencyIndex].name;
     }

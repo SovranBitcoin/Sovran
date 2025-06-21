@@ -69,9 +69,7 @@ export default function ModalScreen() {
         throw new Error(`No valid proofs found for mint: ${mintUrl}`);
       }
 
-      console.log(`Checking ${validProofs.length} proofs for mint: ${mintUrl}`);
       const states = await wallet.checkProofsStates(validProofs);
-      console.log('Proof states:', states);
 
       // Update proof states for this mint
       setProofStates((prevStates) => ({
@@ -111,8 +109,6 @@ export default function ModalScreen() {
     const spentProofs = activeMintsData
       .find((mintData) => mintData.url === mintUrl)
       ?.proofs?.filter((proof, index) => proofStates[mintUrl][index].state === 'SPENT');
-
-    console.log('Spent proofs:', spentProofs);
 
     if (spentProofs?.length > 0) {
       dispatch(removeProofs({ profileId, mintUrl, proofs: spentProofs }));

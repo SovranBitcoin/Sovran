@@ -104,8 +104,6 @@ export const TransactionProvider = ({ children }) => {
   // Start listening to a transaction
   const listenToTransaction = async (transactions, forceRefresh = false) => {
     try {
-      console.log('listenToTransaction', transactions);
-
       // if (transaction?.paid) {
       //   return;
       // }
@@ -115,14 +113,11 @@ export const TransactionProvider = ({ children }) => {
         transactions?.[0]?.type === 'lightning'
           ? transactions.map((t: any) => t.request).join('_')
           : transactions.map((t: any) => t.token).join('_');
-      console.log('listenToTransaction id', id);
 
       // Skip if already listening
       if (activeConnectionsRef.current.has(id)) {
         return;
       }
-
-      console.log('listenToTransaction transactions', transactions);
 
       // group transactions by mintUrl and type, so we need:
       // { [mintUrl]: { lightning: [...], ecash: [...] } }
@@ -141,12 +136,8 @@ export const TransactionProvider = ({ children }) => {
           return acc;
         }, {});
 
-      console.log('listenToTransaction groupedTransactions', groupedTransactions);
-
       // loop over mints
       for (const [mintUrl, txs] of Object.entries(groupedTransactions)) {
-        console.log('listenToTransaction mintUrl', mintUrl);
-        console.log('listenToTransaction txs', txs);
         // loop over txs
         const w = await getWallet({
           mintUrl,
@@ -157,22 +148,13 @@ export const TransactionProvider = ({ children }) => {
         const keysetId = activeKeyset.id;
         w.keysetId = keysetId;
 
-        console.log('listenToTransaction w', w);
-
         for (const [type, txs_] of Object.entries(txs)) {
-          console.log('listenToTransaction txs_', type, txs_);
           try {
             injectWebSocketImpl(WebSocket);
             let unsub;
 
-            console.log(
-              'test',
-              txs_.map((tx: any) => tx.proof)
-            );
-
             if (type === 'ecash') {
               const proofs = _.flatMap(txs_.map((tx: any) => getDecodedToken(tx.token).proofs));
-              console.log('proofs', { proofs });
               unsub = await w.onProofStateUpdates(
                 // flat map the proofs
                 proofs,
@@ -243,17 +225,12 @@ export const TransactionProvider = ({ children }) => {
                 addConnection(id, unsub);
               }
             } else if (type === 'lightning') {
-              console.log(
-                'listenToTransaction txs_.map((tx) => tx.mintQuote.quote)',
-                txs_.map((tx) => tx.mintQuote.quote)
-              );
               unsub = await w.onMintQuoteUpdates(
                 txs_.map((tx) => tx.mintQuote.quote),
                 async (update: MintQuoteResponse) => {
                   try {
                     // This finds the current transaction thats being updated.
                     const transaction = txs_.find((tx) => tx.mintQuote.quote === update.quote);
-                    console.log('listenToTransaction transaction', transaction);
 
                     if (!transaction) return;
 

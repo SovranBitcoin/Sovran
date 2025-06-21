@@ -70,7 +70,6 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
   // // {"quotes": [{"amount": 5, "created_at": 1748049508, "expires_at": 1748135908, "locked": false, "mint_url": "https://mint.minibits.cash/Bitcoin", "paid_at": 1748049519, "quote_id": "SgJ-euqTH0VZ1CuGWr7ibYS9-Qr8M6QiBXBZHpdX", "request": "lnbc50n1p5rz8nypp5xzymk2ghp4vv3d0qr3stl2dgh26hnfeywp96rk4l4c8x2x7erdmsdqqcqzzsxqyz5vqsp5qzm3j8rpl4mtcljuqsfhswh5hmz90q5fug82e0kg6uf6ru74s72q9qxpqysgq3wgtd8u9qvd2evg4hv5v65ftznpvak9jaj64tw54nqhaerv497k5z8lkf6djm2vuycgj366g07vyghcc7lenkygcynu94d67qfjnlcqp4h9gtx", "state": "PAID"}]}
   // // TODO: append a new transaction with these details
 
-  console.log(quotes.length === 0);
   if (quotes.length === 0) {
     showMessage('no_funds');
     return;

@@ -21,7 +21,6 @@ function ModalScreen() {
     account: { unit: '' },
   };
   const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
-  const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<string>('all');
   const [at, setAt] = useState<string>('all');
@@ -29,10 +28,6 @@ function ModalScreen() {
 
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency.toLowerCase());
-  };
-
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
   };
 
   const toggleFilter = (newFilter: 'incoming' | 'outgoing') => {
@@ -50,8 +45,8 @@ function ModalScreen() {
   };
 
   return (
-    <Modal buttons={<></>}>
-      <Container>
+    <Container>
+      <ScrollView>
         <Tabs tabs={['All', 'Confirmed', 'Pending']} selectedTab={tab} handleTabPress={setTab} />
 
         <View
@@ -177,7 +172,6 @@ function ModalScreen() {
             />
           </TouchableOpacity>
         </View>
-        <View style={{ marginBottom: 64 }}></View>
         <Transactions
           account={{
             ...account,
@@ -189,8 +183,8 @@ function ModalScreen() {
           tab={tab}
           showMore={false}
         />
-      </Container>
-    </Modal>
+      </ScrollView>
+    </Container>
   );
 }
 

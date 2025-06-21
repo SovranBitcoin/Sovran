@@ -1,24 +1,15 @@
-import React, { useEffect, useState, createContext, useContext, useRef, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Share, StyleSheet, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Button } from 'components/common/Button';
 import Modal from 'components/layout/Modal';
-import Icon from 'assets/icons';
 import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
 import { View, Text } from 'components/common/Themed';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
-import { formatCurrency } from 'helper/currency';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
-import {
-  CashuMint,
-  CashuWallet,
-  getDecodedToken,
-  getEncodedTokenV4,
-  injectWebSocketImpl,
-} from '@cashu/cashu-ts';
+import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import _, { capitalize } from 'lodash';
 import {
   memoizedGetTransactionByMatcher,
@@ -31,143 +22,20 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'components/common/useNfc';
-import { runWithAnimationFrame } from './onboard/new';
-import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
-import Checkbox from 'expo-checkbox';
-import {
-  GestureHandlerRootView,
-  NativeViewGestureHandler,
-  Switch,
-} from 'react-native-gesture-handler';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { npubToPubkey } from 'components/layout/Transaction';
-import { encode } from 'helper/third-party/emoji';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
-import { MintIcon } from 'components/layout/sheets/mints';
 import { Card } from 'components/common/Card';
-
-export function MintDetailPage({
-  mintInfo,
-  theme,
-  transactionType,
-  transaction,
-  handleCheckStatus,
-}: {
-  mintInfo: any;
-  theme: any;
-  transactionType: 'send' | 'receive';
-  handleCheckStatus: () => any;
-}) {
-  const [loading, setLoading] = useState(false);
-  const { transactions, activeConnections } = useTransactions();
-
-  const txs = transactions.filter((tx) => tx.fromNIP05).map((tx) => tx.request);
-
-  const isListening = activeConnections?.some((connection) =>
-    txs.some((txRequest) => connection.id.includes(txRequest))
-  );
-
-  console.log(isListening);
-  console.log(123232323232, transaction);
-  return (
-    <View
-      style={{
-        margin: 16,
-        marginTop: 16,
-        padding: 16,
-        marginBottom: 0,
-        borderRadius: 8,
-        backgroundColor: greys(theme)[1800],
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          flex: 1,
-        }}>
-        <View>
-          <MintIcon size={40} mintInfo={mintInfo} />
-        </View>
-        <View>
-          <Text
-            style={{
-              fontFamily: 'OverpassHeavy',
-              fontSize: 16,
-            }}>
-            {transactionType === 'send'
-              ? transaction?.paid
-                ? 'Sent with'
-                : 'Sending with'
-              : transaction?.paid
-                ? 'Received with'
-                : 'Receiving with'}
-          </Text>
-          <Text
-            style={{
-              fontFamily: 'OverpassRegular',
-              fontSize: 16,
-              color: greys(theme)[100],
-            }}>
-            {mintInfo?.name}
-          </Text>
-        </View>
-      </View>
-
-      <View>
-        {!transaction?.paid && handleCheckStatus && (
-          <Button
-            style={{
-              padding: 0,
-              width: 40,
-              height: 40,
-              margin: 0,
-              marginBottom: 0,
-              marginTop: 0,
-            }}
-            variant="secondary"
-            disabled={loading || isListening}
-            onPress={() => {
-              setLoading(true);
-              handleCheckStatus(() => {
-                setLoading(false);
-              });
-            }}
-            text=""
-            icon={
-              <Icon
-                spin={
-                  loading || isListening
-                    ? {
-                        delay: 0,
-                        duration: 1500,
-                        outputRange: ['0deg', '360deg'],
-                        easing: 'easeOut',
-                      }
-                    : undefined
-                }
-                size={20}
-                name="humbleicons:refresh"
-              />
-            }
-          />
-        )}
-      </View>
-    </View>
-  );
-}
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionBuilder } from 'helper/redux/cashu/selectors';
 
 export function EcashSendConfirmation({
   unit,
@@ -181,7 +49,6 @@ export function EcashSendConfirmation({
   extraButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -227,7 +94,7 @@ export function EcashSendConfirmation({
   const handleShare = async (onClose) => {
     await Share.share({
       url: uri,
-      message: token,
+      message: 'cashu://' + token,
     });
     onClose();
   };
@@ -339,13 +206,8 @@ export function EcashSendConfirmation({
       showClose
       children={
         <>
-          <BalanceUpdate
-            pubkey={npubToPubkey(getCurrentTransaction[0]?.nostr?.pubkey)}
-            transactionType="send"
-            amount={amount}
-            unit={unit}
-            cancelled={getCurrentTransaction[0].isCancel}
-            transaction={getCurrentTransaction[0]}
+          <TransactionHeader
+            transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
           />
           {!getCurrentTransaction[0].paid && (
             <PaymentInfo
@@ -367,11 +229,14 @@ export function EcashSendConfirmation({
               <Card message={getCurrentTransaction[0].memo} variant="info" />
             </View>
           )}
-          <MintDetailPage
-            transaction={getCurrentTransaction[0]}
+          <TransactionMintRefresh
+            transaction={{
+              ...getCurrentTransaction[0],
+              unit,
+              amount,
+              transactionType: 'send',
+            }}
             mintInfo={mintInfo}
-            theme={theme}
-            transactionType="send"
             handleCheckStatus={handleCheckStatus}
           />
           {/* <Text
@@ -381,7 +246,12 @@ export function EcashSendConfirmation({
             {JSON.stringify(getCurrentTransaction[0], null, 2)}
           </Text> */}
           <MintQuoteTimeline
-            transaction={getCurrentTransaction[0]}
+            transaction={{
+              ...getCurrentTransaction[0],
+              unit,
+              amount,
+              transactionType: 'send',
+            }}
             meltQuotes={getCurrentTransaction[0].proofStates}
           />
           <Section

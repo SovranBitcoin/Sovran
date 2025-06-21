@@ -12,10 +12,7 @@ export const selectDisplayBitcoin = createSelector(
   (settings) => settings.display_btc
 );
 
-export const selectPasscode = createSelector(
-  [selectSettings],
-  (settings) => settings.passcode
-);
+export const selectPasscode = createSelector([selectSettings], (settings) => settings.passcode);
 
 export const memoizedGetTheme = createSelector(
   [
@@ -23,7 +20,7 @@ export const memoizedGetTheme = createSelector(
       return state.settings.settings.theme;
     },
   ],
-  (theme: RootState) => {
+  (theme: string) => {
     return theme;
   }
 );

@@ -22,10 +22,10 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { MintDetailPage } from './ecashSendConfirmation';
-import { BalanceUpdate } from 'components/common/BalanceUpdate';
+import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 export function LightningSendConfirmation({
   transaction,
@@ -72,7 +72,7 @@ export function LightningSendConfirmation({
       if (pr) {
         // Avoid UI bugs with setTimeout
         await new Promise((resolve) => setTimeout(resolve, 0));
-        console.log(12087387, { pr });
+
         const result = await handleBarcode({
           scanning: { data: pr },
           selectedMint: mint.id,
@@ -82,8 +82,6 @@ export function LightningSendConfirmation({
           setScanned: () => {},
           urDecoder: null,
         });
-
-        console.log(1928739872378, { result });
 
         if (result?.params?.meltQuote) {
           setMeltQuote(result.params.meltQuote);
@@ -118,7 +116,6 @@ export function LightningSendConfirmation({
       });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      console.log(e, errorMessage);
       showMessage(errorMessage, { error: errorMessage }, { emoji: '🚨' });
     } finally {
       setLoading(false);
@@ -146,7 +143,6 @@ export function LightningSendConfirmation({
       }
     );
   };
-  console.log(JSON.stringify(transaction, null, 2));
 
   return (
     <Modal
@@ -154,14 +150,7 @@ export function LightningSendConfirmation({
       title="Send Lightning"
       children={
         <View style={{ backgroundColor: 'transparent' }}>
-          <BalanceUpdate
-            pubkey={pubkey}
-            transactionType="send"
-            amount={amount}
-            unit={unit}
-            request={pr}
-            transaction={transaction}
-          />
+          <TransactionHeader transaction={transaction} />
           {!transaction?.paid && (
             <SelectedMintDisplay
               onMintSelected={handleMintSelected}
@@ -178,11 +167,9 @@ export function LightningSendConfirmation({
           )}
 
           {transaction?.paid && (
-            <MintDetailPage
+            <TransactionMintRefresh
               mintInfo={mintInfo}
-              theme={theme}
-              transactionType="send"
-              transaction={transaction}
+              transaction={{ ...transaction, transactionType: 'send' }}
             />
           )}
 
@@ -275,7 +262,6 @@ export function LightningSendConfirmation({
 function ModalScreen() {
   const { pr, unit, pubkey, meltQuote, redirect, email, lud16 } =
     useTypedRoute<'lightningSendConfirmation'>();
-
   return (
     <LightningSendConfirmation
       pr={pr}

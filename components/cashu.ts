@@ -21,7 +21,6 @@ export function getLightningAmount({ pr }) {
     const decodedPR = decode(pr as string);
     return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
   } catch (e) {
-    console.log(e);
     return null;
   }
 }
@@ -140,15 +139,11 @@ export async function loopOverCheckLnPaymentComplete({
 
 export async function checkLNPaymentComplete({ transaction, callback = () => {} }) {
   const profileId = store.getState().nostr?.currentProfile?.id;
-  console.log('[checkLNPaymentComplete.profileId]', profileId);
   const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
-  console.log('[checkLNPaymentComplete.transactions]', transactions);
   const sortedTransactions = transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-  console.log('[checkLNPaymentComplete.sortedTransactions]', sortedTransactions);
   const transactionsToCheck = transaction.quote
     ? [transactions.find((t) => t.mintQuote.quote === transaction.mintQuote.quote)]
     : sortedTransactions;
-  console.log('[checkLNPaymentComplete.transactionsToCheck]', transactionsToCheck);
   for (const tx of transactionsToCheck) {
     if (!tx || tx.paid || new Date() > getRawExpiry({ pr: tx.request })) continue;
     // Skip if another transaction with the same sweepId is already paid
@@ -158,7 +153,6 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
     ) {
       continue;
     }
-    console.log('[checkLNPaymentComplete.transaction]', tx);
     const { mintQuote, amount, unit, mintUrl } = tx;
     const keyset = await getKeys({ unit, mintUrl });
     try {
@@ -177,7 +171,6 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
         counter,
         keysetId: wallet.keysetId,
       });
-      console.log('[checkLNPaymentComplete.proofs]', proofs);
 
       store.dispatch(
         increaseCounterV2({
@@ -197,7 +190,6 @@ export async function checkLNPaymentComplete({ transaction, callback = () => {} 
       const existingTxs = memoizedGetTransactions({ id: profileId })(store.getState());
       publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl])]);
     } catch (err) {
-      console.log('[checkLNPaymentComplete.error]', err);
       Alert.alert('error', JSON.stringify(err));
     }
   }
@@ -227,8 +219,6 @@ export async function getMeltQuote({
     unit,
     ...options,
   });
-
-  console.log(123233, { meltQuote });
 
   return meltQuote;
 }
