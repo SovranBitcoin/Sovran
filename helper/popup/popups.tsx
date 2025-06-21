@@ -333,7 +333,6 @@ export const showMessage = (
   options: ShowMessageOptions = {},
   onClose: ((data: unknown) => void) | undefined = undefined
 ) => {
-  console.log(129837, `!${messageCode}!`);
   const config =
     MESSAGE_CONFIGS[messageCode] || { title: messageCode } || MESSAGE_CONFIGS['general_error'];
 

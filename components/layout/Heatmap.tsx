@@ -167,7 +167,6 @@ const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
       return acc;
     }, {});
 
-    console.log(129837, JSON.stringify(swapsByDayWithStats, null, 2));
     setData(swapsByDayWithStats);
   }, [wallet?.audits]);
 

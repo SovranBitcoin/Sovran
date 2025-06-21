@@ -63,8 +63,6 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
 
-  console.log(298739823, meltQuotes);
-
   const getTimeline = (meltQuotes) => {
     const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
     const states = ['UNSPENT', 'PENDING', 'SPENT'];
@@ -344,7 +342,7 @@ export function LightningReceiveConfirmation({
       wallet.keysetId = keysetId;
 
       const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
-      console.log(12837, status);
+
       if (status.state === 'PAID') {
         const profileId = store.getState().nostr?.currentProfile?.id;
 
@@ -359,8 +357,6 @@ export function LightningReceiveConfirmation({
           counter,
           keysetId: wallet.keysetId,
         });
-
-        console.log('123987273proofs', proofs);
 
         // Increase counter
         store.dispatch(
@@ -414,7 +410,6 @@ export function LightningReceiveConfirmation({
         showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
     } catch (error) {
-      console.log(error.message);
       if (error.message === 'keyset id inactive.') {
         handleCheckStatus(onClose, true);
       } else {
@@ -423,8 +418,6 @@ export function LightningReceiveConfirmation({
   };
 
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
-
-  console.log('getCurrentTransaction22', getCurrentTransaction[0]);
 
   return (
     <Modal

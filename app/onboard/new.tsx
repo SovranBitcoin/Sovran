@@ -212,27 +212,19 @@ const RecoveryScreen = () => {
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
     try {
-      console.log('[handleCreateProfile]');
       if (!name.trim() || isSubmitting) return;
 
-      console.log('[handleCreateProfile] name:', name);
       const accountIndex = 0; // for now we force it to create account at index 0 only
 
-      console.log('[handleCreateProfile] accountIndex:', accountIndex);
       // Generate keys from mnemonic
       const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
         mnemonic,
         undefined,
         accountIndex
       );
-      console.log('[handleCreateProfile] sk:', sk);
-      console.log('[handleCreateProfile] pk:', pk);
 
       const nsec = nip19.nsecEncode(sk);
       const npub = nip19.npubEncode(pk);
-
-      console.log('[handleCreateProfile] nsec:', nsec);
-      console.log('[handleCreateProfile] npub:', npub);
 
       // Build profile event
       const event: EventTemplate = {
@@ -250,16 +242,12 @@ const RecoveryScreen = () => {
           picture: selectedProfilePicture.uri,
         }),
       };
-      console.log('[handleCreateProfile] event:', event);
 
       const signedEvent = finalizeEvent(event, sk);
-      console.log('[handleCreateProfile] signedEvent:', signedEvent);
       const pool = new SimplePool();
-      console.log('[handleCreateProfile] pool:', pool);
       await Promise.any(pool.publish(RELAY_URLS, signedEvent)).finally(() =>
         pool.close(RELAY_URLS)
       );
-      console.log('[handleCreateProfile] published');
 
       // Update local profile storage
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
@@ -306,24 +294,24 @@ const RecoveryScreen = () => {
             <Text weight="bold" size={24} style={styles.headerTitle}>
               Create Sovran Profile
             </Text>
-              <Text weight="regular" size={14} style={styles.headerSubtitle}>
-                Your profile lets others find you and send you bitcoin easily.
-              </Text>
+            <Text weight="regular" size={14} style={styles.headerSubtitle}>
+              Your profile lets others find you and send you bitcoin easily.
+            </Text>
 
-              <ProfilePictureSelector
-                selectedProfilePicture={selectedProfilePicture}
-                setSelectedProfilePicture={setSelectedProfilePicture}
-                isSubmitting={isSubmitting}
-                styles={styles}
-              />
+            <ProfilePictureSelector
+              selectedProfilePicture={selectedProfilePicture}
+              setSelectedProfilePicture={setSelectedProfilePicture}
+              isSubmitting={isSubmitting}
+              styles={styles}
+            />
 
-              <NameInput
-                name={name}
-                setName={setName}
-                isSubmitting={isSubmitting}
-                styles={styles}
-                theme={theme}
-              />
+            <NameInput
+              name={name}
+              setName={setName}
+              isSubmitting={isSubmitting}
+              styles={styles}
+              theme={theme}
+            />
           </View>
         </ScrollView>
       </Container>

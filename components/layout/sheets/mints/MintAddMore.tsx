@@ -352,8 +352,6 @@ function AddMintItem({
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const styles = createStyles(theme);
 
-  console.log(23282223728372, mintData, mint);
-
   if (!mintData || !mint) {
     return null;
   }
@@ -445,7 +443,6 @@ export function MintAddMore({ onClose, payload }) {
         } catch {
           hostname = mint.mintUrl;
         }
-        console.log(mint, hostname);
         return {
           id: mint.mintUrl,
           name: `${hostname} (${mint.count})`,
@@ -479,8 +476,6 @@ export function MintAddMore({ onClose, payload }) {
               }
             });
           }
-
-          console.log(123123, mintInfo);
 
           // Update the state for this individual mint
           setMintsData((prev) => {
@@ -578,7 +573,6 @@ export function MintAddMore({ onClose, payload }) {
 
   // Get loaded mints that match the currency filter
   const loadedMints = useMemo(() => {
-    console.log(2871111392837, filteredMints, loadedMintIds);
     return filteredMints.filter((mint) => loadedMintIds.has(mint.id));
   }, [filteredMints, loadedMintIds]);
 
@@ -692,7 +686,6 @@ export function MintAddMore({ onClose, payload }) {
           <View>
             {loadedMints.length > 0 ? (
               loadedMints.map((mint, index) => {
-                console.log(19273692212823, mint, index);
                 const mintData = mintsData.get(mint.id);
                 // Skip mints with errors or that are still loading
                 if (!mintData || mintData.error) return null;

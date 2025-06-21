@@ -111,7 +111,6 @@ export async function sendLightning({
   email?: string;
   lud16?: string;
 }): Promise<LightningSendTransaction> {
-  console.log('[sendLightning]', { mintUrl, pr, unit, pubkey, meltQuote, email });
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
 
@@ -126,13 +125,9 @@ export async function sendLightning({
       ...(forceRefresh && { forceRefresh: true }),
     });
 
-    console.log('[sendLightning] wallet', wallet);
-
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
     wallet.keysetId = keysetId;
-
-    console.log('[sendLightning] activeKeyset', activeKeyset);
 
     if (!meltQuote.amount) {
       throw new AppError('invalid_invoice', 'No amount specified in payment request');
@@ -152,8 +147,6 @@ export async function sendLightning({
       mintUrl,
       keysetId: wallet.keysetId,
     })(store.getState());
-
-    console.log('[sendLightning] counter', counter, meltQuote);
 
     const { send: proofsToSend, keep: proofsToKeep } = wallet.selectProofsToSend(
       currentProofs,
@@ -183,7 +176,6 @@ export async function sendLightning({
       keysetId: wallet.keysetId,
     })(store.getState());
 
-    console.log('[sendLightning] counter2', { counter2, meltQuote, proofsToSend });
     const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
       counter: counter2, // it's going up forever, laura
       keysetId,
@@ -255,15 +247,12 @@ export async function sendLightning({
   try {
     return await attemptSend(false);
   } catch (error) {
-    console.log(323986, error.message);
     // Check if it's the specific keyset inactive error
     if (error.message === 'keyset id inactive.') {
       Alert.alert('Updating keyset...');
-      console.log('[sendLightning] Keyset inactive, retrying with forceRefresh');
       try {
         return await attemptSend(true);
       } catch (retryError) {
-        console.error('[sendLightning] Retry failed:', retryError);
         throw retryError;
       }
     }
@@ -374,7 +363,6 @@ export async function sendEcash({
   to?: string;
   p2pk?: { pubkey?: string; privkey?: string };
 }): Promise<EcashSendTransaction> {
-  console.log('[sendEcash]', { amount, unit, memo, to, p2pk });
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
   const profile = memoizedGetCurrentProfile(state);
@@ -384,13 +372,9 @@ export async function sendEcash({
     const currentProofs = memoizedGetProofs(unit)(state);
     const balance = memoizedGetBalance(unit)(state);
 
-    console.log('[sendEcash] balance', { balance, amount, currentProofs, selectedMint });
-
     if (amount > balance) {
       throw new AppError('insufficient_funds', 'Insufficient funds');
     }
-
-    console.log('[sendEcash] getting wallet', { forceRefresh });
 
     const wallet = await getWallet({
       unit,
@@ -398,8 +382,6 @@ export async function sendEcash({
       profile: null,
       ...(forceRefresh && { forceRefresh: true }),
     });
-
-    console.log('[sendEcash] got wallet', wallet);
 
     if (!wallet) {
       throw new AppError('wallet_not_found', 'Wallet not found');
@@ -409,15 +391,11 @@ export async function sendEcash({
     const keysetId = activeKeyset.id;
     wallet.keysetId = keysetId;
 
-    console.log('[sendEcash] activeKeyset', activeKeyset);
-
     const counter = memoizedGetCounterV2({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
       keysetId: wallet.keysetId,
     })(state);
-
-    console.log('awd', { currentProofs });
 
     const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
       ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
@@ -496,11 +474,9 @@ export async function sendEcash({
   try {
     return await attemptSend(false);
   } catch (error) {
-    console.log(error.message);
     // Check if it's the specific keyset inactive error
     if (error.message === 'keyset id inactive.') {
       Alert.alert('Updating keyset...');
-      console.log('[sendEcash] Keyset inactive, retrying with forceRefresh');
       try {
         return await attemptSend(true);
       } catch (retryError) {
@@ -536,7 +512,6 @@ export async function receiveEcash({
 
   const getPubkeyFromToken = (token: string) => {
     const decodedToken = getDecodedToken(token);
-    console.log('[receiveEcash] decodedToken', decodedToken);
 
     try {
       return JSON.parse(decodedToken.proofs[0].secret)[0] === 'P2PK'
@@ -554,14 +529,12 @@ export async function receiveEcash({
 
   // Retry logic for wallet operations
   const attemptReceive = async (forceRefresh = false): Promise<EcashReceiveTransaction> => {
-    console.log('[receiveEcash] getting wallet', { forceRefresh });
     const wallet = await getWallet({
       unit,
       mintUrl: receiveMintUrl,
       profile: null,
       ...(forceRefresh && { forceRefresh: true }),
     });
-    console.log('[receiveEcash] got wallet', wallet);
 
     if (!wallet) {
       throw new AppError('wallet_not_found', 'Wallet not found');
@@ -571,23 +544,17 @@ export async function receiveEcash({
     const keysetId = activeKeyset.id;
     wallet.keysetId = keysetId;
 
-    console.log('[receiveEcash] activeKeyset', activeKeyset);
-
     const counter = memoizedGetCounterV2({
       profileId: profile.id,
       mintUrl: receiveMintUrl,
       keysetId: keysetId,
     })(state);
 
-    console.log('[receiveEcash] counter', counter);
-
     const response = await wallet.receive(token, {
       counter,
       keysetId,
       ...(giveaway ? { privkey: giveaway.private_key } : {}),
     });
-
-    console.log('[receiveEcash] response', response);
 
     if (!response) {
       throw new AppError('invalid_token', 'Invalid token');
@@ -655,14 +622,12 @@ export async function receiveEcash({
   try {
     return await attemptReceive(false);
   } catch (error) {
-    console.log(error.message);
     // Check if it's the specific keyset inactive error
     if (
       error.message === 'keyset id inactive.' ||
       error?.message?.startsWith('Could not calculate fees. No keyset found with id:')
     ) {
       Alert.alert('Updating keyset...');
-      console.log('[receiveEcash] Keyset inactive, retrying with forceRefresh');
       try {
         return await attemptReceive(true);
       } catch (retryError) {
@@ -710,7 +675,6 @@ export async function cancelEcashTransaction(
   transaction: Transaction,
   navigation: any
 ): Promise<void> {
-  console.log('[cancelEcashTransaction]', transaction);
   await receiveEcash({
     token: transaction.token as string,
     unit: transaction.unit,

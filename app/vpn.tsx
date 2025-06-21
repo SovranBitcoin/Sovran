@@ -76,8 +76,6 @@ function ModalScreen() {
   const { vpn, updateVpn } = useVpn();
   const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
 
-  console.log(129837, params);
-  //
   const activateVPN = async () => {
     try {
       const data = await activateVpn({
@@ -88,29 +86,29 @@ function ModalScreen() {
       const orderedAt = new Date();
       let expiryDate;
       switch (params.duration) {
-      case '1 hour':
-        expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
-        break;
-      case '1 day':
-        expiryDate = new Date(orderedAt.getTime() + 24 * 60 * 60 * 1000);
-        break;
-      case '1 week':
-        expiryDate = new Date(orderedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '1 month':
-        expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 1));
-        break;
-      case '3 months':
-        expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 3));
-        break;
-      default:
-        expiryDate = orderedAt;
-    }
-    updateVpn(params.payment_request, {
-      ...data,
-      ordered_at: orderedAt.toISOString(),
-      expiry_date: expiryDate.toISOString(),
-    });
+        case '1 hour':
+          expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
+          break;
+        case '1 day':
+          expiryDate = new Date(orderedAt.getTime() + 24 * 60 * 60 * 1000);
+          break;
+        case '1 week':
+          expiryDate = new Date(orderedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '1 month':
+          expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 1));
+          break;
+        case '3 months':
+          expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 3));
+          break;
+        default:
+          expiryDate = orderedAt;
+      }
+      updateVpn(params.payment_request, {
+        ...data,
+        ordered_at: orderedAt.toISOString(),
+        expiry_date: expiryDate.toISOString(),
+      });
     } catch (error) {
       showMessage('activation_failed', {}, { emoji: '🚨' });
     }
@@ -187,9 +185,8 @@ function ModalScreen() {
   }, [vpn, params.payment_request]);
 
   const handleConnect = async () => {
-    const configLines = vpn
-      ?.find((v) => v.payment_request === params.payment_request)
-      ?.order?.WireguardConfig;
+    const configLines = vpn?.find((v) => v.payment_request === params.payment_request)?.order
+      ?.WireguardConfig;
     if (!configLines) {
       Alert.alert('Configuration missing');
       return;

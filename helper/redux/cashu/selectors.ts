@@ -84,7 +84,6 @@ class TransactionBuilder {
     if (!parsedSecret) {
       return false;
     }
-    console.log(parsedSecret);
     return parsedSecret[0] === 'P2PK';
   }
 

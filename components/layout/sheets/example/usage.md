@@ -3,6 +3,7 @@
 ## Directory Structure
 
 For each sheet, maintain the following structure:
+
 ```
 /components/layout/sheets/[sheet-name]/
 ├── index.tsx                # Main sheet component
@@ -26,38 +27,34 @@ For each sheet, maintain the following structure:
 Create a `routes/index.tsx` file with the following structure:
 
 ```typescript
-import {
-  Route,
-  SheetDefinition,
-  RouteDefinition,
-} from "react-native-actions-sheet";
-import RouteA from "./routeA";
-import RouteB from "./routeB";
+import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
+import RouteA from './routeA';
+import RouteB from './routeB';
 // Import additional route components as needed
 
 // Define a unique name for this sheet
-export const sheetName = "your-sheet-name";
+export const sheetName = 'your-sheet-name';
 
 // Define all available routes for this sheet
 export const routes: Route[] = [
   {
-    name: "route-a",
+    name: 'route-a',
     component: RouteA,
   },
   {
-    name: "route-b",
+    name: 'route-b',
     component: RouteB,
   },
   // Add more routes as needed
 ];
 
 // Add TypeScript type definitions
-declare module "react-native-actions-sheet" {
+declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        "route-a": RouteDefinition;
-        "route-b": RouteDefinition<{ data: string }>;  // Define parameters if needed
+        'route-a': RouteDefinition;
+        'route-b': RouteDefinition<{ data: string }>; // Define parameters if needed
         // Define additional routes with their parameters
       };
     }>;
@@ -72,10 +69,10 @@ For each route, create a component file. Here's an example for `routeA.tsx`:
 ```typescript
 import React from 'react';
 import { View, Button } from 'react-native';
-import { 
-  RouteScreenProps, 
-  useSheetRef, 
-  useSheetRouteParams 
+import {
+  RouteScreenProps,
+  useSheetRef,
+  useSheetRouteParams
 } from 'react-native-actions-sheet';
 
 // Use the correct sheet name and route name in the type parameters
@@ -114,15 +111,15 @@ For `routeB.tsx` with parameter handling:
 ```typescript
 import React from 'react';
 import { View, Button, Text } from 'react-native';
-import { 
-  useSheetRouter, 
-  useSheetRouteParams 
+import {
+  useSheetRouter,
+  useSheetRouteParams
 } from 'react-native-actions-sheet';
 
 const RouteB = ({ router }) => {
   // Get parameters passed from the previous route
   const params = useSheetRouteParams('your-sheet-name', 'route-b');
-  
+
   // Always check if router exists to prevent runtime errors
   if (!router) {
     return null;
@@ -181,20 +178,19 @@ registerSheet(sheetName, SheetWithRouter);
 To use the sheet in your application:
 
 ```typescript
-import { SheetManager } from "react-native-actions-sheet";
+import { SheetManager } from 'react-native-actions-sheet';
 
 // Inside your component:
 const handleOpenSheet = () => {
   SheetManager.show('your-sheet-name', {
     // Handle data returned when sheet is closed
     onClose(data) {
-      console.log('Sheet closed with data:', data);
       // Process returned data here
     },
     // Optional payload to pass to the initial route
     payload: {
-      initialData: 'some value'
-    }
+      initialData: 'some value',
+    },
   });
 };
 ```
@@ -202,18 +198,22 @@ const handleOpenSheet = () => {
 # Best Practices
 
 1. **Naming Conventions**:
+
    - Use kebab-case for sheet and route names (`your-sheet-name`, `route-a`)
    - Use PascalCase for component names (`RouteA`, `SheetWithRouter`)
 
 2. **Type Safety**:
+
    - Always define proper types in the `declare module` section
    - Use correct types for route parameters and return values
 
 3. **Error Handling**:
+
    - Always check if `router` exists before using it
    - Implement fallbacks for missing parameters
 
 4. **Structure**:
+
    - Keep route components focused on a single responsibility
    - Separate business logic from UI components
 
@@ -229,9 +229,9 @@ Data can be passed between routes using the `navigate` method:
 
 ```typescript
 // From route A to route B
-router.navigate('route-b', { 
+router.navigate('route-b', {
   data: 'value',
-  complexObject: { key: 'value' }
+  complexObject: { key: 'value' },
 });
 
 // In route B, access the data
@@ -250,7 +250,9 @@ const ref = useSheetRef('your-sheet-name');
 ref.current.hide({
   success: true,
   result: 'operation completed',
-  data: { /* any data structure */ }
+  data: {
+    /* any data structure */
+  },
 });
 
 // In the component that opened the sheet
@@ -260,7 +262,7 @@ SheetManager.show('your-sheet-name', {
       // Process successful operation
       console.log(data.result);
     }
-  }
+  },
 });
 ```
 
@@ -274,12 +276,12 @@ For full TypeScript support, ensure you define the correct types:
 
 ```typescript
 // In routes/index.tsx
-declare module "react-native-actions-sheet" {
+declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        "route-a": RouteDefinition<{}, { success: boolean, result: string }>;
-        "route-b": RouteDefinition<{ data: string }>;
+        'route-a': RouteDefinition<{}, { success: boolean; result: string }>;
+        'route-b': RouteDefinition<{ data: string }>;
       };
     }>;
   }
@@ -287,6 +289,7 @@ declare module "react-native-actions-sheet" {
 ```
 
 This defines:
+
 - Parameters for each route (after the route name in RouteDefinition)
 - Return type for the entire sheet (the second generic parameter)
 

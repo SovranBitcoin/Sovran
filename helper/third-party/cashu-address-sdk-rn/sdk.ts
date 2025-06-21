@@ -59,9 +59,7 @@ export class NCSDK {
       body: JSON.stringify({ mint_url: mintUrl }),
     });
     const data = await res.json();
-    console.log(12763, data);
     if (data.error) {
-      console.log(19287, data);
       throw new Error(data.message);
     }
     this.baseUrl = mintUrl;
@@ -76,7 +74,6 @@ export class NCSDK {
     const res = await authedJsonRequest(url + (since ? `?since=${since}` : ''), authHeader);
     const data = (await res.json()) as BalanceResponse;
     if (data.error) {
-      console.log(2329837, data);
       throw new Error(data.message);
     }
     return data.data;

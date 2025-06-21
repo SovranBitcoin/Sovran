@@ -65,14 +65,13 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
 
   const cashuMnemonic = currentProfile.nut13; // its better than recomputing it
 
-  console.log('shouldRefresh', shouldRefresh);
   const wallet = new CashuWallet(mint, {
     ...(shouldRefresh ? { keys, keysets, mintInfo } : { keys, keysets, mintInfo }),
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
   });
 
   wallet.audits = audits;
-  console.log(29372387, forceRefresh, audits);
+
   const isAuditStale = Date.now() - lastFetched > 24 * 60 * 60 * 1000;
   if (forceRefresh || !audits || isAuditStale) {
     auditMint({ mintUrl }).then((a) => {
@@ -83,7 +82,6 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   }
 
   wallet._send = async function (amount, currentProofs, options = {}) {
-    console.log(129837, this.keysetId);
     const { keep, send } = await this.send(Number(amount), currentProofs, options);
     const used = getUsedProofs(currentProofs, keep);
     return { keep, send, used };

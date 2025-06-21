@@ -168,7 +168,6 @@ export async function* restoreMint({
 
     return response;
   } catch (err) {
-    console.log(err);
     return null;
   }
 }

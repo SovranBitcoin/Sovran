@@ -45,7 +45,6 @@ export const CreditCardComponent = ({
     SheetManager.show('credit-card-sheet', {
       // Handle data returned when sheet is closed
       onClose(data) {
-        console.log('Credit card sheet closed with data:', data);
         // Process returned data here
       },
     });

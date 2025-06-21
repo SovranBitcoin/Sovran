@@ -232,7 +232,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   );
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  console.log(19827398723, multipleBalances);
 
   // limit to specified currencies: sat, eur, gbp, usd
   const currencies: SupportedCurrency[] = _.uniq(
@@ -366,7 +365,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           </Text>
           <View style={styles.mintScroll}>
             {filteredMints.map((mint) => {
-              console.log(1982739872, mint.iconUrl);
               return (
                 <MintItem
                   key={mint.mintUrl}

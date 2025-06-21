@@ -79,7 +79,6 @@ function ModalScreen() {
         iccid: esim.iccid,
         type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
       });
-      console.log(orderData);
       const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
       if (orderNo) {
         const esimData = await fetchEsimData(orderNo);

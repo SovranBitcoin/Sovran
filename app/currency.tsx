@@ -100,7 +100,6 @@ function ModalScreen() {
   };
 
   const handleEcashSend = async ({ message }) => {
-    console.log('[handleEcashSend]', params);
     const transaction = await sendEcash({
       to: npubToPublicKey(params?.profile?.npub),
       amount: unit === 'sat' ? amount : amount * 100,
@@ -124,37 +123,20 @@ function ModalScreen() {
   };
 
   const handleDefaultSend = async () => {
-    console.log('[handleDefaultSend]', params);
-    // let pr;
-    // if (isLightningAddress(params.lud16)) {
-
     const { invoice } = await requestInvoice({
       lnUrlOrAddress: params.lud16,
       tokens: utils.toSats(amount),
     });
-    // let { pr } = await getInvoiceFromLnurl(params.lud16, unit === 'sat' ? amount : amount * 100);
-    // } else {
-    //   pr = params.lud16;
-    // }
-    console.log('[handleDefaultSend] invoice', invoice);
 
     const meltQuote = await getMeltQuote({
       pr: invoice,
       unit: unit,
       mintUrl: selectedMint,
     });
-    console.log('[handleDefaultSend] meltQuote', meltQuote);
 
     const totalAmount = Number(amount) + Number(meltQuote.fee_reserve);
-    console.log('[handleDefaultSend] totalAmount', totalAmount);
 
     const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
-    console.log(
-      '[handleDefaultSend] isBalanceSufficient',
-      balance,
-      totalAmount,
-      isBalanceSufficient
-    );
 
     if (!isBalanceSufficient) {
       showMessage(
@@ -163,13 +145,6 @@ function ModalScreen() {
         { emoji: '🚨' }
       );
     } else {
-      console.log(
-        '[handleDefaultSend] navigate',
-        params,
-        invoice,
-        unit === 'sat' ? amount : amount * 100,
-        meltQuote
-      );
       navigation.navigate(params.to, {
         ...params,
         pr: invoice,
@@ -207,7 +182,6 @@ function ModalScreen() {
             showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
             return;
           }
-          console.log('[handleNext] balance passed', balance, amount, unit);
           SheetManager.show('transaction-message', {
             onClose: async (data) => {
               if (data?.action === 'confirm') {

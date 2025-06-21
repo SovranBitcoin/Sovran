@@ -67,7 +67,6 @@ export const cashuReducer = (state = initialState, action) => {
       return _.set(['info', action.payload.mintUrl], action.payload.mintInfo, state);
 
     case SET_AUDIT:
-      console.log(198273, action.payload);
       return _.set(['audits', action.payload.mintUrl], action.payload.audit, state);
 
     case SET_PROOFS:
@@ -145,16 +144,7 @@ export const cashuReducer = (state = initialState, action) => {
       return _.update(
         ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
         (proofs = []) => {
-          console.log('action.payload.proofs', action.payload.proofs);
-          // Remove proofs from state which are in action.payload.proofs
-          // _.isEqual(
-          //   _.pick(existingProof, ['C', 'secret', 'amount']),
-          //   _.pick(usedProof, ['C', 'secret', 'amount'])
-          // )
-          // So loop over every proof, and check if the same C , secret and amount exists in action.payload.proofs
-          console.log('proofs', proofs);
           return proofs.filter((proof) => {
-            console.log('proof', proof);
             const shouldRemove = action.payload.proofs.some((usedProof) => {
               const proofPicked = {
                 C: proof.C,
@@ -167,10 +157,6 @@ export const cashuReducer = (state = initialState, action) => {
                 amount: usedProof.amount,
               };
               const isMatch = _.isEqual(proofPicked, usedProofPicked);
-
-              if (isMatch) {
-                console.log('Match found:', { proofPicked, usedProofPicked });
-              }
 
               return isMatch;
             });
