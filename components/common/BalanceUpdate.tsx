@@ -1,4 +1,3 @@
-import { JSX } from 'react';
 import { Text, View } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { greens, greys, shades } from 'helper/colors';
@@ -7,8 +6,13 @@ import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency } from 'helper/currency';
 import TransactionIcon from './TransactionIcon';
 import { TransactionData } from 'helper/redux/cashu';
+import { CurrencyCode, Denomination } from 'helper/currency';
 
-export function BalanceUpdate({ transaction }: { transaction: TransactionData }): JSX.Element {
+interface BalanceUpdateProps {
+  transaction: TransactionData;
+}
+
+export function BalanceUpdate({ transaction }: BalanceUpdateProps): React.ReactNode {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -31,18 +35,17 @@ export function BalanceUpdate({ transaction }: { transaction: TransactionData })
         </View>
         <Text size={18} color={greys(theme)[100]} bold className="ml-8">
           {transaction?.amount < 0 ? '-' : ''}
-          <Text
-            size={18}
-            color={greys(theme)[100]}
-            style={{
-              marginLeft: 18,
-            }}>
+          <Text size={18} color={greys(theme)[100]} className="ml-2">
             {transaction?.amount < 0 ? '-' : ''}
             {formatCurrency(
               {
-                currency: transaction?.unit === 'sat' ? 'BTC' : transaction?.unit?.toUpperCase(),
+                currency:
+                  transaction?.unit === 'sat'
+                    ? 'BTC'
+                    : (transaction?.unit?.toUpperCase() as CurrencyCode),
                 value: Math.abs(transaction?.amount),
-                denomination: transaction?.unit === 'sat' ? 'sats' : transaction?.unit,
+                denomination:
+                  transaction?.unit === 'sat' ? 'sats' : (transaction?.unit as Denomination),
               },
               {
                 locale: 'en-US',
@@ -54,7 +57,7 @@ export function BalanceUpdate({ transaction }: { transaction: TransactionData })
           </Text>
         </Text>
       </View>
-      <View className="bg-transparent p-4" style={{ transform: [{ scale: 1.25 }] }}>
+      <View className="scale-125 transform bg-transparent p-4">
         <TransactionIcon transaction={transaction} />
       </View>
     </View>
