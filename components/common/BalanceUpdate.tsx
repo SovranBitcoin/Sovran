@@ -7,8 +7,9 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency } from 'helper/currency';
 import TransactionIcon from './TransactionIcon';
+import { TransactionData } from 'helper/redux/cashu';
 
-export function BalanceUpdate({ transaction }: any): JSX.Element {
+export function BalanceUpdate({ transaction }: { transaction: TransactionData }): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
 
   return (

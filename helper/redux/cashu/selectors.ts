@@ -25,6 +25,9 @@ export interface TransactionData {
   fromNIP05?: string;
   status?: { block_time: number; [key: string]: any };
   nostr?: { pubkey: string; [key: string]: any };
+
+  isSend?: boolean;
+  isReceive?: boolean;
 }
 
 class TransactionBuilder {
