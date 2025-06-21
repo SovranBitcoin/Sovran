@@ -179,6 +179,7 @@ export const Transactions: React.FC<TransactionsProps> = ({
 
   return (
     <SectionList
+      scrollEnabled={false}
       sections={allSections}
       keyExtractor={(_, index) => index.toString()}
       renderItem={({ item, section, index }) => {
@@ -209,7 +210,6 @@ export const Transactions: React.FC<TransactionsProps> = ({
       contentContainerStyle={{
         width: '100%',
         marginTop: -54,
-        paddingBottom: 96,
       }}
       initialNumToRender={10}
       maxToRenderPerBatch={5}

@@ -50,8 +50,8 @@ function ModalScreen() {
   };
 
   return (
-    <Modal buttons={<></>}>
-      <Container>
+    <Container>
+      <ScrollView>
         <Tabs tabs={['All', 'Confirmed', 'Pending']} selectedTab={tab} handleTabPress={setTab} />
 
         <View
@@ -188,8 +188,8 @@ function ModalScreen() {
           tab={tab}
           showMore={false}
         />
-      </Container>
-    </Modal>
+      </ScrollView>
+    </Container>
   );
 }
 
