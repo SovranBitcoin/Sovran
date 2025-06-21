@@ -154,14 +154,7 @@ export function LightningSendConfirmation({
       title="Send Lightning"
       children={
         <View style={{ backgroundColor: 'transparent' }}>
-          <BalanceUpdate
-            pubkey={pubkey}
-            transactionType="send"
-            amount={amount}
-            unit={unit}
-            request={pr}
-            transaction={transaction}
-          />
+          <BalanceUpdate transaction={transaction} />
           {!transaction?.paid && (
             <SelectedMintDisplay
               onMintSelected={handleMintSelected}

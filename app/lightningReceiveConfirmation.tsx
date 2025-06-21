@@ -432,7 +432,14 @@ export function LightningReceiveConfirmation({
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       children={
         <>
-          <BalanceUpdate transactionType="receive" amount={amount} unit={unit} />
+          <BalanceUpdate
+            transaction={{
+              ...getCurrentTransaction[0],
+              unit,
+              amount,
+              transactionType: 'receive',
+            }}
+          />
           {!getCurrentTransaction[0].paid && !getCurrentTransaction[0].fromNIP05 && (
             <PaymentInfo
               showSection={false}

@@ -28,15 +28,43 @@ export interface TransactionData {
 }
 
 class TransactionBuilder {
+  [key: string]: any;
+
   constructor(transaction: TransactionData) {
+    // First assign all the transaction properties
     Object.assign(this, transaction);
+
+    // Then make getters enumerable by defining them as regular properties
+    this.makeGettersEnumerable();
+  }
+
+  private makeGettersEnumerable() {
+    const prototype = Object.getPrototypeOf(this);
+    const propertyNames = Object.getOwnPropertyNames(prototype);
+
+    for (const propertyName of propertyNames) {
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, propertyName);
+
+      // If it's a getter and not the constructor, make it enumerable
+      if (descriptor?.get && propertyName !== 'constructor') {
+        Object.defineProperty(this, propertyName, {
+          get: descriptor.get,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+    }
   }
 
   get decodedToken() {
+    if (!this.transactionType === 'ecash') return null;
+
     return getDecodedToken(this.token);
   }
 
   private get parsedSecret() {
+    if (!this.transactionType === 'ecash') return null;
+
     try {
       const decodedToken = this.decodedToken;
       const secret = decodedToken?.proofs[0].secret;
@@ -47,6 +75,8 @@ class TransactionBuilder {
   }
 
   get isP2PK() {
+    if (!this.transactionType === 'ecash') return null;
+
     const parsedSecret = this.parsedSecret;
     if (!parsedSecret) {
       return false;
@@ -57,49 +87,40 @@ class TransactionBuilder {
 
   get nostrPubkey() {
     if (this?.nostr?.pubkey) return this.nostr?.pubkey;
-
     if (this?.fromNIP05?.includes('@')) {
       return convertNpub(this.fromNIP05?.split('@')[0]);
     }
-
     if (this?.lud16?.includes('@')) {
       return convertNpub(this.lud16?.split('@')[0]);
     }
-
     const parsedSecret = this?.parsedSecret;
     if (!parsedSecret) {
       return null;
     }
-
     return parsedSecret[1].data.slice(2);
   }
 
   toString() {
     const result: Record<string, any> = {};
-
     // Get all properties (including getters and setters) on the class prototype
     const prototype = Object.getPrototypeOf(this);
     const propertyNames = Object.getOwnPropertyNames(prototype);
-
     // Add instance properties
     const instanceProperties = Object.getOwnPropertyNames(this);
-
     // Combine instance properties and getter methods from the prototype
     const allProperties = [...new Set([...propertyNames, ...instanceProperties])];
 
     // Loop through each property name
     for (const propertyName of allProperties) {
-      const descriptor = Object.getOwnPropertyDescriptor(this, propertyName);
+      if (propertyName === 'constructor' || propertyName === 'makeGettersEnumerable') continue;
 
-      // If it's a getter, get the value by invoking it
-      if (descriptor?.get) {
+      try {
         result[propertyName] = this[propertyName];
-      } else {
-        // Otherwise, add the instance property directly
-        result[propertyName] = this[propertyName];
+      } catch (error) {
+        // Skip properties that can't be accessed
+        continue;
       }
     }
-
     // Return the stringified result
     return JSON.stringify(result, null, 2);
   }

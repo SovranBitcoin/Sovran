@@ -339,12 +339,7 @@ export function EcashSendConfirmation({
       children={
         <>
           <BalanceUpdate
-            pubkey={npubToPubkey(getCurrentTransaction[0]?.nostr?.pubkey)}
-            transactionType="send"
-            amount={amount}
-            unit={unit}
-            cancelled={getCurrentTransaction[0].isCancel}
-            transaction={getCurrentTransaction[0]}
+            transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
           />
           {!getCurrentTransaction[0].paid && (
             <PaymentInfo

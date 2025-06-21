@@ -6,68 +6,35 @@ import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency } from 'helper/currency';
-import TransactionIcon, { TransactionData } from './TransactionIcon';
+import TransactionIcon from './TransactionIcon';
 
 interface BalanceUpdateProps {
-  transactionType: 'send' | 'receive' | string;
-  amount: number;
-  unit: string;
-  pubkey?: string;
-  request?: string;
   transaction?: { isCancel?: boolean };
   bottomAmount?: string;
-  cancelled?: boolean;
 }
 
-export function BalanceUpdate({
-  transactionType,
-  amount,
-  unit,
-  transaction,
-  bottomAmount,
-}: BalanceUpdateProps): JSX.Element {
+export function BalanceUpdate({ transaction, bottomAmount }: BalanceUpdateProps): JSX.Element {
   const theme = useSelector(memoizedGetTheme);
 
-  const isSend = transactionType === 'send';
-  const isReceive = transactionType === 'receive';
-  const Sign = () => {
-    if (isSend)
-      return (
-        <Text
-          size={32}
-          weight="bold"
-          className="ml-2"
-          style={{ color: shades[300], marginRight: 8 }}>
-          -
-        </Text>
-      );
-    if (isReceive)
-      return (
-        <Text
-          weight="bold"
-          size={24}
-          className="ml-2"
-          style={{
-            color: greens[300],
-            textShadowColor: opacity(greys(theme)[0], 0.5),
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 1,
-            marginRight: 8,
-          }}>
-          +
-        </Text>
-      );
-    return null;
-  };
+  const isSend = transaction?.transactionType === 'send';
+  const isReceive = transaction?.transactionType === 'receive';
 
   return (
     <View className="flex-row items-center justify-between bg-transparent py-4 pl-2 pr-4">
       <View className="bg-transparent">
         <View className="flex-row items-center bg-transparent">
-          <Sign />
+          <Text
+            size={isSend ? 32 : 24}
+            className="ml-2"
+            style={{
+              color: isSend ? shades[300] : greens[300],
+              marginRight: 8,
+            }}>
+            {isSend ? '-' : '+'}
+          </Text>
           <AmountFormatter
-            amount={amount}
-            unit={unit}
+            amount={transaction?.amount}
+            unit={transaction?.unit}
             size={28}
             weight="heavy"
             color={isReceive ? greens[300] : shades[300]}
@@ -81,7 +48,7 @@ export function BalanceUpdate({
             fontFamily: 'OverpassBold',
             backgroundColor: 'transparent',
           }}>
-          {amount < 0 ? '-' : ''}
+          {transaction?.amount < 0 ? '-' : ''}
           <Text
             size={20}
             style={{
@@ -90,20 +57,21 @@ export function BalanceUpdate({
               marginLeft: 18,
               backgroundColor: 'transparent',
             }}>
-            {amount < 0 ? '-' : ''}
+            {transaction?.amount < 0 ? '-' : ''}
             {bottomAmount
               ? bottomAmount
               : formatCurrency(
                   {
-                    currency: unit === 'sat' ? 'BTC' : unit?.toUpperCase(),
-                    value: Math.abs(amount),
-                    denomination: unit === 'sat' ? 'sats' : unit,
+                    currency:
+                      transaction?.unit === 'sat' ? 'BTC' : transaction?.unit?.toUpperCase(),
+                    value: Math.abs(transaction?.amount),
+                    denomination: transaction?.unit === 'sat' ? 'sats' : transaction?.unit,
                   },
                   {
                     locale: 'en-US',
                     precision: 2,
-                    currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
-                    denomination: unit === 'usd' ? 'sats' : 'usd',
+                    currencyDisplay: transaction?.unit === 'usd' ? 'name' : 'symbol',
+                    denomination: transaction?.unit === 'usd' ? 'sats' : 'usd',
                   }
                 )}
           </Text>
