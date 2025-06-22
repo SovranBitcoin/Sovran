@@ -14,17 +14,10 @@ import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
-
-const Stack = createNativeStackNavigator();
-
-// Types
-type ThemeType = string;
-type DrawerNavigation = { openDrawer: () => void };
 
 const Tab = createBottomTabNavigator();
 

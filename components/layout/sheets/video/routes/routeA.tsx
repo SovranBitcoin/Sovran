@@ -5,7 +5,6 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 const RouteA = ({ router }: RouteScreenProps<'video-sheet', 'route-a'>) => {
-  // when data is passed from .show() method, it will be available in the payload
   const ref = useSheetRef('mint-adder');
   const theme = useSelector(memoizedGetTheme);
 

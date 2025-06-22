@@ -2,7 +2,7 @@ import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
 
-function SheetWithRouter(props: any) {
+function SheetWithRouter() {
   return (
     <ActionSheet
       testIDs={{

@@ -1,9 +1,9 @@
 import { Text } from 'components/common/Themed';
 import React from 'react';
 import { View, Button } from 'react-native';
-import { useSheetRouteParams } from 'react-native-actions-sheet';
+import { RouteScreenProps, useSheetRouteParams } from 'react-native-actions-sheet';
 
-const RouteB = ({ router }) => {
+const RouteB = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route-b'>) => {
   const params = useSheetRouteParams('example-sheet-with-router', 'route-b');
   // get params from the route
 
