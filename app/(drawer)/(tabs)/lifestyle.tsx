@@ -2,18 +2,26 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedNavigation } from 'helper/navigation';
 
 // Constants
 const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
 
-// Define service menu items
-const SERVICE_MENU_ITEMS = [
+interface MenuItemData {
+  id: string;
+  icon?: string;
+  label?: string;
+  navigateTo?: string;
+  params?: object;
+  empty?: boolean;
+}
+
+const SERVICE_MENU_ITEMS: MenuItemData[] = [
   {
     id: 'esims',
     icon: 'fluent:sim-24-filled',
@@ -26,12 +34,12 @@ const SERVICE_MENU_ITEMS = [
     label: 'VPN',
     navigateTo: 'myVpns',
   },
-  /* {
-    id: 'address',
-    icon: "mdi:at",
-    label: "Address",
-    navigateTo: "settings/customNpub"
-  }, */
+  // {
+  //   id: 'address',
+  //   icon: 'mdi:at',
+  //   label: 'Address',
+  //   navigateTo: 'settings/customNpub',
+  // },
   {
     id: 'giftcards',
     icon: 'ic:baseline-card-giftcard',
@@ -56,8 +64,13 @@ const SERVICE_MENU_ITEMS = [
   { id: 'empty2', empty: true },
 ];
 
-// Separate component for menu item
-const MenuItem = ({ item, theme, onPress }) => {
+interface MenuItemProps {
+  item: MenuItem;
+  onPress: () => void;
+}
+
+const MenuItem = ({ item, onPress }: MenuItemProps) => {
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   return (
@@ -80,11 +93,11 @@ const MenuItem = ({ item, theme, onPress }) => {
 
 // Main section component
 const ServicesSection = () => {
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
-  const handleNavigation = (item) => {
+  const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
       navigation.navigate(item.navigateTo, item.params);
     } else {
@@ -99,7 +112,6 @@ const ServicesSection = () => {
       style={{
         paddingTop: 64 + 32,
       }}>
-      {/* <Modal showBack={false} title="" buttons={null} childrenStyles={{}} showHeader={false}> */}
       <Text
         size={32}
         style={{
@@ -112,12 +124,11 @@ const ServicesSection = () => {
       </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.filter((item) =>
-          ['giftcards', 'vpn', 'esims', 'dontate'].includes(item.id) ? settings?.experimental : true
+          ['giftcards', 'vpn', 'esims', 'donate'].includes(item.id) ? settings?.experimental : true
         ).map((item) => (
           <MenuItem
             key={item.id}
             item={item}
-            theme={theme}
             onPress={() => !item.empty && handleNavigation(item)}
           />
         ))}
@@ -140,7 +151,7 @@ const TabTwoScreen = () => {
 };
 
 // Styles
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[2300],
@@ -154,7 +165,6 @@ const createStyles = (theme) =>
       justifyContent: 'space-between',
       padding: 16,
       paddingTop: 4,
-      // width: '100%',
     },
     iconContainer: {
       alignItems: 'center',
@@ -167,7 +177,6 @@ const createStyles = (theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 8,
-      // backgroundColor: greys(theme)[2300],
       flexBasis: '22%', // Ensure max 4 icons per row
       marginBottom: 16,
     },
@@ -178,7 +187,6 @@ const createStyles = (theme) =>
       fontSize: 11,
       fontFamily: 'OverpassHeavy',
     },
-    // Keep unused styles for potential future use
     image: {
       width: 48,
       height: 48,

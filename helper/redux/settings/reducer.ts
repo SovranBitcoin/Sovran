@@ -13,6 +13,7 @@ const initialState = {
     theme: 'dark',
     display_btc: 3,
     passcode: '',
+    experimental: false,
   },
 };
 
