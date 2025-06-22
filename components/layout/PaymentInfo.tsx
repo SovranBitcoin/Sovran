@@ -3,7 +3,8 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/common/QRCode';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { GradientSkeleton } from '../common/GradientSkeleton';
 import { greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -242,3 +243,5 @@ const TabButton = React.memo(
     );
   }
 );
+
+TabButton.displayName = 'TabButton';

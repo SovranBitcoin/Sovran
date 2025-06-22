@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { useTypedRoute, useTypedNavigation } from 'helper/navigation';

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Platform } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { FlagIcon } from 'assets/icons';
@@ -112,97 +113,6 @@ function ModalScreen() {
     <Modal
       showBack
       title={`Checkout`}
-      children={
-        <>
-          <Section
-            camera={false}
-            items={[
-              {
-                title: 'Location',
-                value: (
-                  <View
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: 'transparent',
-                    }}>
-                    <FlagIcon width={24} height={24} country={params.location} />
-                    <Text
-                      style={{
-                        marginLeft: 4,
-                        fontSize: 16,
-                      }}>
-                      {lookup.byIso(params.location).country}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                title: 'Hash',
-                value: truncateMiddle(params.hash, 5),
-              },
-              {
-                title: 'Duration',
-                value: params.duration,
-              },
-              // {
-              //   title: "Type",
-              //   value: String(params.type),
-              // },
-              // ...(params?.type === "TOPUP"
-              //   ? [
-              //       {
-              //         title: "Topup for",
-              //         value: params?.iccid,
-              //       },
-              //     ]
-              //   : []),
-              // {
-              //   title: "Data",
-              //   value: `${params.volume / 1073741824} GB`,
-              // },
-              // {
-              //   title: "Validity",
-              //   value: `${params.duration} days`,
-              // },
-              // {
-              //   title: "Speed",
-              //   value: params.speed,
-              // },
-            ]}
-          />
-          <Section
-            camera={false}
-            items={[
-              {
-                title: 'Total due',
-                value: `$${params.price}`,
-              },
-            ]}
-          />
-          <Text
-            weight="bold"
-            size={16}
-            style={{
-              marginLeft: 24,
-              fontSize: 16,
-              fontFamily: 'OverpassBold',
-              marginBottom: 8,
-            }}>
-            Pay with
-          </Text>
-          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
-          <View style={{ margin: 16 }}>
-            <Card
-              variant="warning"
-              message="VPN services are provided by LNVPN. You need to install WireGuard to
-            use the VPN."
-              theme={theme}
-            />
-          </View>
-        </>
-      }
       buttons={
         <>
           {iosWarning ? (
@@ -235,8 +145,95 @@ function ModalScreen() {
             ]}
           />
         </>
-      }
-    />
+      }>
+      <Section
+        camera={false}
+        items={[
+          {
+            title: 'Location',
+            value: (
+              <View
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'transparent',
+                }}>
+                <FlagIcon width={24} height={24} country={params.location} />
+                <Text
+                  style={{
+                    marginLeft: 4,
+                    fontSize: 16,
+                  }}>
+                  {lookup.byIso(params.location).country}
+                </Text>
+              </View>
+            ),
+          },
+          {
+            title: 'Hash',
+            value: truncateMiddle(params.hash, 5),
+          },
+          {
+            title: 'Duration',
+            value: params.duration,
+          },
+          // {
+          //   title: "Type",
+          //   value: String(params.type),
+          // },
+          // ...(params?.type === "TOPUP"
+          //   ? [
+          //       {
+          //         title: "Topup for",
+          //         value: params?.iccid,
+          //       },
+          //     ]
+          //   : []),
+          // {
+          //   title: "Data",
+          //   value: `${params.volume / 1073741824} GB`,
+          // },
+          // {
+          //   title: "Validity",
+          //   value: `${params.duration} days`,
+          // },
+          // {
+          //   title: "Speed",
+          //   value: params.speed,
+          // },
+        ]}
+      />
+      <Section
+        camera={false}
+        items={[
+          {
+            title: 'Total due',
+            value: `$${params.price}`,
+          },
+        ]}
+      />
+      <Text
+        weight="bold"
+        size={16}
+        style={{
+          marginLeft: 24,
+          fontSize: 16,
+          fontFamily: 'OverpassBold',
+          marginBottom: 8,
+        }}>
+        Pay with
+      </Text>
+      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      <View style={{ margin: 16 }}>
+        <Card
+          variant="warning"
+          message="VPN services are provided by LNVPN. You need to install WireGuard to
+            use the VPN."
+          theme={theme}
+        />
+      </View>
+    </Modal>
   );
 }
 

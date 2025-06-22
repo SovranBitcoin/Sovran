@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { RouteScreenProps } from 'react-native-actions-sheet';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';

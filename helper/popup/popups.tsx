@@ -1,9 +1,7 @@
 import { SheetManager } from 'react-native-actions-sheet';
-import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import React from 'react';
-import { formatAmount } from 'helper/currency';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 
 const MESSAGE_TYPES = {

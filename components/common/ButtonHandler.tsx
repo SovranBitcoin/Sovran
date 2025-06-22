@@ -3,7 +3,7 @@ import { StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';

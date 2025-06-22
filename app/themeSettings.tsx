@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 
 import { greys } from 'helper/colors';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { useNavigation } from 'expo-router';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';

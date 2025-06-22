@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, View } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
+import { View } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greens, greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';

@@ -5,7 +5,7 @@ import Icon, { PlusIcon, QRIcon, ImportIcon, CheckIcon } from 'assets/icons';
 import { setSearch, useNostr } from 'helper/redux/nostr';
 import { greys } from 'helper/colors';
 import { useDispatch, useSelector } from 'react-redux';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';

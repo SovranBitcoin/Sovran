@@ -3,7 +3,7 @@ import { StyleSheet, Text, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { getMint } from 'helper/cashu/mint';
 import Image from 'components/common/Image';

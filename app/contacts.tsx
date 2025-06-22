@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Image, ScrollView, Keyboard } from 'react-native';
+import { Image, ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -9,12 +9,11 @@ import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { NDKUser } from '@nostr-dev-kit/ndk';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
-// Import the base TextInput from React Native instead
-import { TextInput as RNTextInput } from 'react-native';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { searchUsers as apiSearchUsers } from 'helper/api/sovran';
 
@@ -296,7 +295,7 @@ function NoResultsFound({ theme }) {
           textAlign: 'center',
           marginBottom: 28,
         }}>
-        We couldn't find any users matching your search
+        {"We couldn't find any users matching your search"}
       </Text>
 
       <View

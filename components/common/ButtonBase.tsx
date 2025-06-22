@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, ReactNode, useMemo } from 'react';
 import { View, Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
 import { greys, black, shades, reds } from 'helper/colors';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon from 'assets/icons';

@@ -1,6 +1,7 @@
 import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { resetApp } from 'helper/redux/store';

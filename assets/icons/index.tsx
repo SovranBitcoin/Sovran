@@ -10,7 +10,7 @@ import { Monicon as Icon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 export { FlagIcon } from './flag';
 
 export const icons = [

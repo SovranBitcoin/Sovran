@@ -1,7 +1,7 @@
 import React from 'react';
 import Camera from './camera';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 
 function ModalScreen() {
   return (

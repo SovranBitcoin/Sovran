@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import Icon from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { Button } from 'components/common/Button';

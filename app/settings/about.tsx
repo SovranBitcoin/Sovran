@@ -97,7 +97,7 @@ export default function ModalScreen() {
               marginBottom: 8,
               textAlign: 'center',
             }}>
-            What's New in Version 0.0.22 (1)
+            {"What's New in Version 0.0.22 (1)"}
           </Text>
 
           <ChangelogSection title="Bug Fixes" items={changelogData.bugFixes} emoji="🐛" />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import { StyledText, Text, View } from 'components/common/Themed';
+import { StyledText, Text } from 'components/common/Text';
+import { View } from 'components/common/View';
 import { formatCurrencyWrapper } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { greys } from 'helper/colors';

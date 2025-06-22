@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import 'react-native-gesture-handler';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -69,6 +69,8 @@ export const PostQuote = React.memo(({ id }) => {
     </View>
   );
 });
+
+PostQuote.displayName = 'PostQuote';
 
 export function PostSkeleton() {
   const theme = useSelector(memoizedGetTheme);
@@ -254,13 +256,13 @@ function UrlProcessor({ urls }) {
 
   return (
     <View>
-      {urls?.map((url, idx) =>
+      {urls?.map((url) =>
         isImageUrl(url) ? (
-          <ImageContainer url={url} />
+          <ImageContainer key={url} url={url} />
         ) : isVideoUrl(url) ? (
-          <VideoScreen videoSource={url} />
+          <VideoScreen key={url} videoSource={url} />
         ) : !isVideoUrl(url) && !isImageUrl(url) ? (
-          <ExternalLink url={url} />
+          <ExternalLink key={url} url={url} />
         ) : null
       )}
     </View>
@@ -504,3 +506,5 @@ export const Post = React.memo(
     }
   }
 );
+
+Post.displayName = 'Post';

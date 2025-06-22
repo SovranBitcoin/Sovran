@@ -6,7 +6,8 @@ import { Platform, StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Haptics from 'components/common/Haptics';

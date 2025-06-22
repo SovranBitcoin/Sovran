@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useTypedRoute } from 'helper/navigation';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 function ModalScreen() {

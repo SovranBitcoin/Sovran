@@ -3,7 +3,8 @@ import { Pressable, StyleSheet } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Button } from 'components/common/Button';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
@@ -190,79 +191,6 @@ function ModalScreen() {
     <Modal
       showClose
       title="Get data plan"
-      children={
-        <>
-          <View
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              margin: 8,
-              padding: 8,
-              marginBottom: 0,
-              backgroundColor: greys(theme)[1800],
-              borderRadius: 12,
-              borderColor: greys(theme)[1300],
-              borderWidth: 0.2,
-            }}>
-            <FlagIcon width={32} height={32} country={country} />
-            <Text
-              size={20}
-              weight="heavy"
-              style={{
-                marginLeft: 8,
-                fontSize: 20,
-                fontFamily: 'OverpassHeavy',
-                flex: 1,
-                marginRight: 8,
-              }}
-              numberOfLines={1}
-              ellipsizeMode="tail">
-              {lookup.byIso(country).country}
-            </Text>
-            {type === 'BASE' && (
-              <View
-                style={{
-                  alignItems: 'flex-end',
-                  backgroundColor: 'transparent',
-                  flex: 1,
-                }}>
-                <Button
-                  text="Change"
-                  variant="primary"
-                  position="center"
-                  noPadding
-                  onPress={() => {
-                    navigation.navigate('esimCountrySelection', {
-                      countries,
-                      type,
-                      packageList: packages,
-                    });
-                  }}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: 16,
-                  }}
-                />
-              </View>
-            )}
-          </View>
-
-          <View
-            style={{
-              padding: 8,
-              margin: 8,
-              backgroundColor: greys(theme)[1800],
-              borderRadius: 16,
-              borderColor: greys(theme)[1300],
-              borderWidth: 0.2,
-              overflow: 'hidden',
-            }}>
-            {filteredPackages.map(renderPackageItem)}
-          </View>
-        </>
-      }
       buttons={
         <ButtonHandler
           context="modal"
@@ -276,8 +204,77 @@ function ModalScreen() {
             },
           ]}
         />
-      }
-    />
+      }>
+      <View
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          margin: 8,
+          padding: 8,
+          marginBottom: 0,
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 12,
+          borderColor: greys(theme)[1300],
+          borderWidth: 0.2,
+        }}>
+        <FlagIcon width={32} height={32} country={country} />
+        <Text
+          size={20}
+          weight="heavy"
+          style={{
+            marginLeft: 8,
+            fontSize: 20,
+            fontFamily: 'OverpassHeavy',
+            flex: 1,
+            marginRight: 8,
+          }}
+          numberOfLines={1}
+          ellipsizeMode="tail">
+          {lookup.byIso(country).country}
+        </Text>
+        {type === 'BASE' && (
+          <View
+            style={{
+              alignItems: 'flex-end',
+              backgroundColor: 'transparent',
+              flex: 1,
+            }}>
+            <Button
+              text="Change"
+              variant="primary"
+              position="center"
+              noPadding
+              onPress={() => {
+                navigation.navigate('esimCountrySelection', {
+                  countries,
+                  type,
+                  packageList: packages,
+                });
+              }}
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: 16,
+              }}
+            />
+          </View>
+        )}
+      </View>
+
+      <View
+        style={{
+          padding: 8,
+          margin: 8,
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 16,
+          borderColor: greys(theme)[1300],
+          borderWidth: 0.2,
+          overflow: 'hidden',
+        }}>
+        {filteredPackages.map(renderPackageItem)}
+      </View>
+    </Modal>
   );
 }
 

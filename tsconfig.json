@@ -8,5 +8,10 @@
     "paths": {
       "~/*": ["src/*"]
     }
+  },
+  "expo": {
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

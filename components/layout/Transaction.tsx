@@ -1,4 +1,4 @@
-import { UntranslatedText, View } from 'components/common/Themed';
+import { UntranslatedText } from 'components/common/Text';
 import { formatCurrency } from 'helper/currency';
 import Icon from 'assets/icons';
 import { convertTime } from 'helper/time';
@@ -6,12 +6,14 @@ import { greens, greys, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import TransactionIcon, { TransactionData } from 'components/common/TransactionIcon';
+import TransactionIcon from 'components/common/TransactionIcon';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { useTypedNavigation } from 'helper/navigation';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { JSX } from 'react';
+import { TransactionData } from 'helper/redux/cashu';
+import { View } from 'components/common/View';
 
 interface ConnectionData {
   id: string;

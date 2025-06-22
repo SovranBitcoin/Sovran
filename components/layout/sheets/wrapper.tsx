@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet

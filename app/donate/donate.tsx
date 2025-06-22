@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, Linking, ScrollView } from 'react-n
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';

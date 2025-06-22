@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { getLinkPreview } from 'link-preview-js';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';

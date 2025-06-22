@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ViewStyle } from 'react-native';
-import { StyledText, Text, View } from 'components/common/Themed';
+import { StyledText, Text } from 'components/common/Text';
+import { View } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
 import opacity from 'hex-color-opacity';
@@ -70,10 +71,10 @@ export function Section({ items, style, camera = false, special }: SectionProps)
               }}>
               <Text
                 id={titleId}
-                weight="bold"
+                bold
                 size={16}
+                color={greys(theme)[600]}
                 style={{
-                  color: greys(theme)[600],
                   fontFamily: 'OverpassRegular',
                   marginRight: titleText === '' ? 0 : 8,
                 }}>
@@ -103,8 +104,9 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         </View>
       );
     }
+
     // Email address format (@example)
-    if (item.value?.includes?.('@') && special) {
+    if (typeof item.value === 'string' && item.value?.includes?.('@') && special) {
       const [username, domain] = item.value.split('@');
       return (
         <View
@@ -113,10 +115,10 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             marginRight: titleText === '' ? 0 : 8,
           }}>
           <Text
-            weight="mono"
+            mono
             size={18}
+            color={greys(theme)[100]}
             style={{
-              color: greys(theme)[100],
               textAlign: 'center',
             }}>
             {truncateMiddle(username, 8)}
@@ -146,29 +148,37 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     }
 
     // Handle npub format
-    if (item.value?.startsWith?.('npub') && special) {
+    if (typeof item.value === 'string' && item.value?.startsWith?.('npub') && special) {
       return renderPrefixedValue('npub', item.value.split('npub')[1], titleText, theme);
     }
 
     // Handle creqA format
-    if (item.value?.startsWith?.('creqA')) {
+    if (typeof item.value === 'string' && item.value?.startsWith?.('creqA')) {
       return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText, theme);
     }
 
     // Handle lnbc1 format
-    if (item.value?.startsWith?.('lnbc1') && special) {
+    if (typeof item.value === 'string' && item.value?.startsWith?.('lnbc1') && special) {
       return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText, theme);
     }
 
     // Handle cashu format
-    if ((item.value?.startsWith?.('cashuB') || item.value?.startsWith?.('cashuA')) && special) {
+    if (
+      typeof item.value === 'string' &&
+      (item.value?.startsWith?.('cashuB') || item.value?.startsWith?.('cashuA')) &&
+      special
+    ) {
       const prefix = item.value.startsWith('cashuA') ? 'cashuA' : 'cashuB';
       const value = item.value.split(prefix)[1];
       return renderPrefixedValue(prefix, value, titleText, theme);
     }
 
     // Handle bitcoin lightning+cashu format
-    if (item.value?.startsWith?.('bitcoin:?lightning=') && item.value.includes('&cashu=')) {
+    if (
+      typeof item.value === 'string' &&
+      item.value?.startsWith?.('bitcoin:?lightning=') &&
+      item.value.includes('&cashu=')
+    ) {
       return (
         <View
           className="flex flex-1 flex-col items-center justify-center bg-transparent"
@@ -176,10 +186,10 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             marginRight: titleText === '' ? 0 : 8,
           }}>
           <Text
-            weight="bold"
+            bold
             size={12}
+            color={greys(theme)[100]}
             style={{
-              color: greys(theme)[100],
               textAlign: 'left',
               fontFamily: 'OverpassMono',
               wordBreak: 'break-all',
@@ -196,8 +206,8 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
+          color={greys(theme)[0]}
           style={{
-            color: greys(theme)[0],
             textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
             flex: 1,
           }}>
@@ -216,19 +226,19 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           marginRight: titleText === '' ? 0 : 8,
         }}>
         <Text
-          weight="heavy"
+          heavy
           size={24}
+          color={shades[300]}
           style={{
-            color: shades[300],
             textAlign: 'center',
           }}>
           {prefix}
         </Text>
         <Text
-          weight="bold"
+          bold
           size={12}
+          color={greys(theme)[100]}
           style={{
-            color: greys(theme)[100],
             textAlign: 'center',
             fontFamily: 'OverpassMono',
           }}>

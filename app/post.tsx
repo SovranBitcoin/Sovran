@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { EventKind } from './Profile';
@@ -14,7 +14,7 @@ function ParentPosts({ parentPosts }) {
   return (
     <View>
       {parentPosts.map((e) => {
-        return <Post post={e} isResponse />;
+        return <Post key={e} post={e} isResponse />;
       })}
     </View>
   );
@@ -36,7 +36,7 @@ function Replies({ post }) {
   return (
     <View>
       {events.map((e) => {
-        return <Post post={e} parentPosts={[post]} isResponse />;
+        return <Post key={e} post={e} parentPosts={[post]} isResponse />;
       })}
     </View>
   );

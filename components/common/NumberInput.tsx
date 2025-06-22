@@ -2,7 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 
-import { StyledText, View } from 'components/common/Themed';
+import { StyledText } from 'components/common/Text';
+import { View } from 'components/common/View';
+
 import { greens, greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { LightningUnit } from 'assets/icons';

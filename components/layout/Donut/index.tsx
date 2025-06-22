@@ -5,7 +5,7 @@ import { useFont } from '@shopify/react-native-skia';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import RenderItem from './RenderItem';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';

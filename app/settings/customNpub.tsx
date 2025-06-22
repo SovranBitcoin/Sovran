@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { CheckIcon } from 'assets/icons';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
 import { useActionSheet } from '@expo/react-native-action-sheet';

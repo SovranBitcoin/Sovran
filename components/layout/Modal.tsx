@@ -11,7 +11,9 @@ import {
   StyleProp,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
+
 import { greys } from 'helper/colors';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';

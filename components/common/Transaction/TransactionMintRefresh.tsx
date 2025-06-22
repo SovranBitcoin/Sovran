@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { TransactionData } from 'helper/redux/cashu';

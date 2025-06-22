@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { Link, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
@@ -9,7 +10,7 @@ export default function NotFoundScreen() {
       <Stack.Screen options={{ title: 'Oops!' }} />
       <View style={styles.container}>
         <Text id="not_found_screen_title" style={styles.title}>
-          This screen doesn't exist.
+          {"This screen doesn't exist."}
         </Text>
 
         <Link href="/" style={styles.link}>

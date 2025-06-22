@@ -13,7 +13,8 @@ import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
@@ -287,55 +288,50 @@ function ModalScreen() {
     <Modal
       showBack
       title="Select Amount"
-      children={
-        <>
-          <NumberInput
-            currency={unit}
-            value={amount}
-            type={
-              params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
-                ? 'send'
-                : 'receive'
-            }
-            onChange={setAmount}
-          />
-          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
-          {params.to === 'ecashSendConfirmation' && params?.profile && (
-            <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
-              <Icon
-                name="solar:key-bold"
-                size={16}
-                style={{
-                  backgroundColor: greys(theme)[1200],
-                  borderRadius: 100,
-                  padding: 8,
-                }}
-              />
-              <Text>{'  →  '}</Text>
-              {params?.profile?.picture || params?.profile?.image ? (
-                <Image
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 1000,
-                  }}
-                  source={{ uri: params.profile?.picture || params.profile?.image }}
-                />
-              ) : (
-                <View />
-              )}
-            </TouchableOpacity>
-          )}
-        </>
-      }
       buttons={
         <>
           <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
           {renderButtons()}
         </>
-      }
-    />
-    // <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} />
+      }>
+      <NumberInput
+        currency={unit}
+        value={amount}
+        type={
+          params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
+            ? 'send'
+            : 'receive'
+        }
+        onChange={setAmount}
+      />
+      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      {params.to === 'ecashSendConfirmation' && params?.profile && (
+        <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
+          <Icon
+            name="solar:key-bold"
+            size={16}
+            style={{
+              backgroundColor: greys(theme)[1200],
+              borderRadius: 100,
+              padding: 8,
+            }}
+          />
+          <Text>{'  →  '}</Text>
+          {params?.profile?.picture || params?.profile?.image ? (
+            <Image
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 1000,
+              }}
+              source={{ uri: params.profile?.picture || params.profile?.image }}
+            />
+          ) : (
+            <View />
+          )}
+        </TouchableOpacity>
+      )}
+    </Modal>
   );
 }
 

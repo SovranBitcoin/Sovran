@@ -1,7 +1,8 @@
 import React from 'react';
 
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { StyledText, Text, View } from 'components/common/Themed';
+import { StyledText, Text } from 'components/common/Text';
+import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';

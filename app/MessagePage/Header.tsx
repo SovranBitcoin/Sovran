@@ -1,6 +1,7 @@
 import React from 'react';
 import { Animated, Dimensions } from 'react-native';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';

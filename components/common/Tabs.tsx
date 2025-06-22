@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
+import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';

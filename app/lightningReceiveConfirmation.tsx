@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
@@ -422,92 +423,6 @@ export function LightningReceiveConfirmation({
     <Modal
       showClose
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
-      children={
-        <>
-          <TransactionHeader
-            transaction={{
-              ...getCurrentTransaction[0],
-              unit,
-              amount,
-              transactionType: 'receive',
-            }}
-          />
-          {!getCurrentTransaction[0].paid && !getCurrentTransaction[0].fromNIP05 && (
-            <PaymentInfo
-              showSection={false}
-              setUri={setUri}
-              data={[
-                { name: 'Lightning', value: request },
-                // { name: 'Ecash', value: paymentRequest },
-              ]}
-              unit={unit}
-              popupMessage={[
-                {
-                  name: 'lightning_address_copied',
-                  value: request,
-                },
-                // {
-                //   name: 'payment_request_copied',
-                //   value: paymentRequest,
-                // },
-              ]}
-            />
-          )}
-          {getCurrentTransaction[0].memo && (
-            <View
-              style={{
-                margin: 16,
-                marginTop: 12,
-                marginBottom: 0,
-              }}>
-              <Card message={getCurrentTransaction[0].memo} variant="info" />
-            </View>
-          )}
-          <TransactionMintRefresh
-            mintInfo={mintInfo}
-            transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
-            handleCheckStatus={handleCheckStatus}
-          />
-
-          <Section
-            special={false}
-            items={[
-              {
-                title: 'Request',
-                value: getCurrentTransaction[0].fromNIP05
-                  ? truncateMiddle(getCurrentTransaction[0].fromNIP05.split('@')[0], 4) +
-                    '@' +
-                    getCurrentTransaction[0].fromNIP05.split('@')[1]
-                  : truncateMiddle(request, 10),
-              },
-              {
-                title: 'Type',
-                value: 'Lightning • Receive',
-              },
-              {
-                title: 'Status',
-                value: (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text
-                      style={{
-                        color: greys(theme)[0],
-                        fontSize: 16,
-                        fontFamily: 'OverpassBold',
-                      }}>
-                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
-                    </Text>
-                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-                  </View>
-                ),
-              },
-              // {
-              //   title: 'Listening',
-              //   value: String(isListening),
-              // },
-            ]}
-          />
-        </>
-      }
       buttons={
         <View
           style={{
@@ -545,8 +460,90 @@ export function LightningReceiveConfirmation({
             }
           />
         </View>
-      }
-    />
+      }>
+      <TransactionHeader
+        transaction={{
+          ...getCurrentTransaction[0],
+          unit,
+          amount,
+          transactionType: 'receive',
+        }}
+      />
+      {!getCurrentTransaction[0].paid && !getCurrentTransaction[0].fromNIP05 && (
+        <PaymentInfo
+          showSection={false}
+          setUri={setUri}
+          data={[
+            { name: 'Lightning', value: request },
+            // { name: 'Ecash', value: paymentRequest },
+          ]}
+          unit={unit}
+          popupMessage={[
+            {
+              name: 'lightning_address_copied',
+              value: request,
+            },
+            // {
+            //   name: 'payment_request_copied',
+            //   value: paymentRequest,
+            // },
+          ]}
+        />
+      )}
+      {getCurrentTransaction[0].memo && (
+        <View
+          style={{
+            margin: 16,
+            marginTop: 12,
+            marginBottom: 0,
+          }}>
+          <Card message={getCurrentTransaction[0].memo} variant="info" />
+        </View>
+      )}
+      <TransactionMintRefresh
+        mintInfo={mintInfo}
+        transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
+        handleCheckStatus={handleCheckStatus}
+      />
+
+      <Section
+        special={false}
+        items={[
+          {
+            title: 'Request',
+            value: getCurrentTransaction[0].fromNIP05
+              ? truncateMiddle(getCurrentTransaction[0].fromNIP05.split('@')[0], 4) +
+                '@' +
+                getCurrentTransaction[0].fromNIP05.split('@')[1]
+              : truncateMiddle(request, 10),
+          },
+          {
+            title: 'Type',
+            value: 'Lightning • Receive',
+          },
+          {
+            title: 'Status',
+            value: (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text
+                  style={{
+                    color: greys(theme)[0],
+                    fontSize: 16,
+                    fontFamily: 'OverpassBold',
+                  }}>
+                  {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                </Text>
+                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+              </View>
+            ),
+          },
+          // {
+          //   title: 'Listening',
+          //   value: String(isListening),
+          // },
+        ]}
+      />
+    </Modal>
   );
 }
 

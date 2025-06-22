@@ -8,7 +8,7 @@ import {
 import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys, shades } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import Image from 'components/common/Image';
@@ -299,102 +299,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   const router = useSheetRouter('mint');
   return (
     <Wrapper
-      children={
-        <View>
-          <Text weight="bold" style={styles.sectionHeader}>
-            Send payment in
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.currencyScroll}>
-            {currencies.map((currency) => (
-              <LinearGradient
-                key={currency}
-                colors={
-                  selectedCurrency === currency
-                    ? ([
-                        opacity(shades[100], 0.88),
-                        opacity(shades[200], 0.88),
-                        opacity(shades[300], 0.88),
-                        opacity(shades[400], 0.88),
-                        opacity(shades[500], 0.88),
-                      ] as const)
-                    : [opacity(shades[100], 0), opacity(shades[100], 0)]
-                }
-                style={[
-                  styles.currencyButton,
-                  sovran(theme).borderSubtle,
-
-                  {
-                    marginRight: 8,
-                    borderRadius: 8,
-                    padding: 1,
-                    backgroundColor:
-                      selectedCurrency === currency ? greys(theme)[1900] : greys(theme)[2100],
-                  },
-                ]}>
-                <TouchableOpacity
-                  style={[
-                    styles.currencyButton,
-                    selectedCurrency === currency && styles.selectedCurrencyButton,
-                    {
-                      flex: 1,
-                    },
-                  ]}
-                  onPress={() => setSelectedCurrency(currency)}>
-                  <View style={styles.currencyContent}>
-                    {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
-                      <FlagIcon
-                        country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
-                        height={32}
-                        width={32}
-                      />
-                    ) : (
-                      <CurrencyIcon currency={currency.toLowerCase()} />
-                    )}
-                    <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
-                  </View>
-                </TouchableOpacity>
-              </LinearGradient>
-            ))}
-          </ScrollView>
-
-          <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
-            Send from
-          </Text>
-          <View style={styles.mintScroll}>
-            {filteredMints.map((mint) => {
-              return (
-                <MintItem
-                  key={mint.mintUrl}
-                  mint={{
-                    id: mint.mintUrl,
-                    name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
-                    iconUrl: mint.iconUrl,
-                  }}
-                  balance={{ amount: mint.amount, unit: mint.unit }}
-                  isSelected={selectedMint === mint.mintUrl}
-                  isLoading={mintState.loadingId === mint.mintUrl}
-                  globalLoading={mintState.loadingId !== null}
-                  selectedCurrency={selectedCurrency}
-                  theme={theme}
-                  onPress={() =>
-                    handleMintSelection(
-                      {
-                        id: mint.mintUrl,
-                        name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
-                        iconUrl: null,
-                      },
-                      { amount: mint.amount, unit: mint.unit }
-                    )
-                  }
-                />
-              );
-            })}
-          </View>
-        </View>
-      }
       buttons={
         <ButtonHandler
           buttons={[
@@ -416,8 +320,99 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
             },
           ]}
         />
-      }
-    />
+      }>
+      <View>
+        <Text weight="bold" style={styles.sectionHeader}>
+          Send payment in
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
+          {currencies.map((currency) => (
+            <LinearGradient
+              key={currency}
+              colors={
+                selectedCurrency === currency
+                  ? ([
+                      opacity(shades[100], 0.88),
+                      opacity(shades[200], 0.88),
+                      opacity(shades[300], 0.88),
+                      opacity(shades[400], 0.88),
+                      opacity(shades[500], 0.88),
+                    ] as const)
+                  : [opacity(shades[100], 0), opacity(shades[100], 0)]
+              }
+              style={[
+                styles.currencyButton,
+                sovran(theme).borderSubtle,
+
+                {
+                  marginRight: 8,
+                  borderRadius: 8,
+                  padding: 1,
+                  backgroundColor:
+                    selectedCurrency === currency ? greys(theme)[1900] : greys(theme)[2100],
+                },
+              ]}>
+              <TouchableOpacity
+                style={[
+                  styles.currencyButton,
+                  selectedCurrency === currency && styles.selectedCurrencyButton,
+                  {
+                    flex: 1,
+                  },
+                ]}
+                onPress={() => setSelectedCurrency(currency)}>
+                <View style={styles.currencyContent}>
+                  {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
+                    <FlagIcon
+                      country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
+                      height={32}
+                      width={32}
+                    />
+                  ) : (
+                    <CurrencyIcon currency={currency.toLowerCase()} />
+                  )}
+                  <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
+                </View>
+              </TouchableOpacity>
+            </LinearGradient>
+          ))}
+        </ScrollView>
+
+        <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
+          Send from
+        </Text>
+        <View style={styles.mintScroll}>
+          {filteredMints.map((mint) => {
+            return (
+              <MintItem
+                key={mint.mintUrl}
+                mint={{
+                  id: mint.mintUrl,
+                  name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
+                  iconUrl: mint.iconUrl,
+                }}
+                balance={{ amount: mint.amount, unit: mint.unit }}
+                isSelected={selectedMint === mint.mintUrl}
+                isLoading={mintState.loadingId === mint.mintUrl}
+                globalLoading={mintState.loadingId !== null}
+                selectedCurrency={selectedCurrency}
+                theme={theme}
+                onPress={() =>
+                  handleMintSelection(
+                    {
+                      id: mint.mintUrl,
+                      name: mint.mintUrl.replace('https://', '')?.split('/')?.[0],
+                      iconUrl: null,
+                    },
+                    { amount: mint.amount, unit: mint.unit }
+                  )
+                }
+              />
+            );
+          })}
+        </View>
+      </View>
+    </Wrapper>
   );
 }
 

@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useNostr } from 'helper/redux/nostr';
 import { useCashu } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';

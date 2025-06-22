@@ -4,7 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import CircularProgress from 'components/common/CircleProgress';
 
 import { useCashu } from 'helper/redux/cashu';

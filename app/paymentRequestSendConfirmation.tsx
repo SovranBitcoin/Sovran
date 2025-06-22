@@ -7,7 +7,7 @@ import { Button } from 'components/common/Button';
 import { ArrowIcon, CancelSendIcon } from 'assets/icons';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { useTypedRoute } from 'helper/navigation/index';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
@@ -59,56 +59,6 @@ function ModalScreen() {
     <Modal
       showClose
       title="Send Payment Request"
-      children={
-        <View style={transparentViewStyle}>
-          <TransactionHeader
-            pubkey={to}
-            transactionType="send"
-            amount={amount}
-            unit={unit}
-            request={request}
-          />
-
-          <Section
-            items={[
-              {
-                title: `Amount (${currency})`,
-                value: formatAmount(isSats ? 'btc' : unit),
-              },
-              {
-                title: 'Amount (USD)',
-                value: '≈' + formatAmount('usd'),
-              },
-            ]}
-          />
-
-          <Section
-            items={[
-              {
-                title: 'Mints',
-                value: decodedRequest?.mints?.join(', '),
-              },
-              {
-                title: 'Supported Unit',
-                value: decodedRequest?.unit,
-              },
-            ]}
-          />
-
-          <Section
-            items={[
-              {
-                title: 'Type',
-                value: 'Payment Request (ecash)',
-              },
-              {
-                title: 'Transaction Type',
-                value: 'Send',
-              },
-            ]}
-          />
-        </View>
-      }
       buttons={
         <View style={transparentViewStyle}>
           <Button
@@ -128,8 +78,56 @@ function ModalScreen() {
             loading={loading}
           />
         </View>
-      }
-    />
+      }>
+      <View style={transparentViewStyle}>
+        <TransactionHeader
+          pubkey={to}
+          transactionType="send"
+          amount={amount}
+          unit={unit}
+          request={request}
+        />
+
+        <Section
+          items={[
+            {
+              title: `Amount (${currency})`,
+              value: formatAmount(isSats ? 'btc' : unit),
+            },
+            {
+              title: 'Amount (USD)',
+              value: '≈' + formatAmount('usd'),
+            },
+          ]}
+        />
+
+        <Section
+          items={[
+            {
+              title: 'Mints',
+              value: decodedRequest?.mints?.join(', '),
+            },
+            {
+              title: 'Supported Unit',
+              value: decodedRequest?.unit,
+            },
+          ]}
+        />
+
+        <Section
+          items={[
+            {
+              title: 'Type',
+              value: 'Payment Request (ecash)',
+            },
+            {
+              title: 'Transaction Type',
+              value: 'Send',
+            },
+          ]}
+        />
+      </View>
+    </Modal>
   );
 }
 

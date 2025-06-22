@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { useSettings } from 'helper/redux/settings';
 import { memoizedGetTotalBalance } from 'helper/redux/cashu';

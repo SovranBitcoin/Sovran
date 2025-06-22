@@ -113,3 +113,5 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
     </Animated.View>
   );
 });
+
+Posts.displayName = 'Posts';

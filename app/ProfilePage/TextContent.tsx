@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import HighlightText from '@sanar/react-native-highlight-text';
 import { greys, shades } from 'helper/colors';

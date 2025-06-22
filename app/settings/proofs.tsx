@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'components/common/Button';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
+
 import Container from 'components/layout/Container';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';

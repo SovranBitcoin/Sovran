@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
@@ -35,7 +36,7 @@ const SERVICE_MENU_ITEMS = [
     id: 'giftcards',
     icon: 'ic:baseline-card-giftcard',
     label: 'Giftcards',
-    navigateTo: 'giftcards/welcome',
+    navigateTo: 'giftcards/all',
   },
   // {
   //   id: 'donate',

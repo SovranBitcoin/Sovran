@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';

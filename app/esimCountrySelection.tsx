@@ -5,7 +5,8 @@ import lookup from 'country-code-lookup';
 
 import { greys } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { greens, greys } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';

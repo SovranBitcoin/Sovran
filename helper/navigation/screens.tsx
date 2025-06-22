@@ -310,14 +310,14 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: '',
   },
   {
-    name: 'giftcards/welcome',
+    name: 'giftcards/all',
     title: 'Gift cards',
     options: {
       headerLargeTitle: true,
     },
   },
   {
-    name: 'giftcards/welcome2',
+    name: 'giftcards/giftcard',
     options: {
       headerLargeTitle: true,
     },

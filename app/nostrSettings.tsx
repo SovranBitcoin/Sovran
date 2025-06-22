@@ -1,7 +1,8 @@
 import 'react-native-get-random-values';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';

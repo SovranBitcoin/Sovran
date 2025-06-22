@@ -28,7 +28,8 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 // Components
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import Footer from './Footer';
 import Header from './Header';
 import TimelineItem from './TimeLine';
@@ -479,9 +480,6 @@ const KeyboardAvoidingComponent = () => {
 
 const createStyles = (theme) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-    },
     inner: {
       padding: 24,
       flex: 1,

@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { Animated, Platform, StyleSheet } from 'react-native';
 
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 

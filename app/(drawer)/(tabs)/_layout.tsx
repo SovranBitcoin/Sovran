@@ -10,7 +10,6 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { translateText } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -49,21 +48,14 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
             experimentalBlurMethod="dimezisBlurView"
             style={[
               {
-                width: '100%',
-                height: '100%',
-
-                // backgroundColor: "red",
                 borderRadius: 10000,
                 overflow: 'hidden',
                 position: 'absolute',
                 top: 8,
                 left: 18,
-                zIndex: 1000,
                 width: 64,
                 height: 64,
-                // backgroundColor: "red",
                 backgroundColor: opacity(greys(theme)[2100], 0.5),
-
                 zIndex: -2,
               },
             ]}></BlurView>
@@ -183,7 +175,7 @@ const TabLayout = () => {
 
   // Function to create tab screen options
   const createTabScreenOptions = (title, IconComponent) => ({
-    title: translateText({ id: null, children: title, lang: language }),
+    title,
     tabBarActiveTintColor: shades[500],
     tabBarInactiveTintColor: greys(theme)[600],
     headerTitleAlign: 'center',

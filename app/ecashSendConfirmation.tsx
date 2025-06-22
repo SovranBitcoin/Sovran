@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Share, StyleSheet, ScrollView } from 'react-native';
+import { Share, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -203,106 +204,6 @@ export function EcashSendConfirmation({
   return (
     <Modal
       showClose
-      children={
-        <>
-          <TransactionHeader
-            transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
-          />
-          {!getCurrentTransaction[0].paid && (
-            <PaymentInfo
-              setUri={setUri}
-              popupMessage="ecash_token_copied"
-              unit={unit}
-              data={formattedToken}
-              animated={isLongToken}
-              showSection={false}
-            />
-          )}
-          {getCurrentTransaction[0].memo && (
-            <View
-              style={{
-                margin: 16,
-                marginTop: 12,
-                marginBottom: 0,
-              }}>
-              <Card message={getCurrentTransaction[0].memo} variant="info" />
-            </View>
-          )}
-          <TransactionMintRefresh
-            transaction={{
-              ...getCurrentTransaction[0],
-              unit,
-              amount,
-              transactionType: 'send',
-            }}
-            mintInfo={mintInfo}
-            handleCheckStatus={handleCheckStatus}
-          />
-          {/* <Text
-            style={{
-              color: 'red',
-            }}>
-            {JSON.stringify(getCurrentTransaction[0], null, 2)}
-          </Text> */}
-          <MintQuoteTimeline
-            transaction={{
-              ...getCurrentTransaction[0],
-              unit,
-              amount,
-              transactionType: 'send',
-            }}
-            meltQuotes={getCurrentTransaction[0].proofStates}
-          />
-          <Section
-            items={[
-              {
-                title: 'Date',
-                value: convertTime(new Date(getCurrentTransaction[0]?.date)),
-              },
-              {
-                title: 'Type',
-                value:
-                  capitalize(String(getCurrentTransaction[0]?.type)) +
-                  ' • ' +
-                  capitalize(String(getCurrentTransaction[0]?.transactionType)),
-              },
-              {
-                title: 'Status',
-                value: (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text
-                      style={{
-                        color: greys(theme)[0],
-                        fontFamily: 'OverpassBold',
-                        fontSize: 16,
-                      }}>
-                      {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
-                    </Text>
-                    {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-                  </View>
-                ),
-              },
-              {
-                title: 'Token',
-                value: truncateMiddle(token, 6),
-              },
-            ]}
-          />
-
-          <ScrollView
-            horizontal
-            style={{
-              padding: 16,
-              margin: 16,
-              borderRadius: 8,
-              backgroundColor: greys(theme)[1800],
-            }}>
-            <Text mono>{getCurrentTransaction[0].toString()}</Text>
-          </ScrollView>
-
-          {/* <Text>{JSON.stringify(getCurrentTransaction?.[0], null, 2)}</Text> */}
-        </>
-      }
       buttons={
         <View
           style={{
@@ -380,22 +281,104 @@ export function EcashSendConfirmation({
             }
           />
         </View>
-      }
-    />
+      }>
+      <TransactionHeader
+        transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
+      />
+      {!getCurrentTransaction[0].paid && (
+        <PaymentInfo
+          setUri={setUri}
+          popupMessage="ecash_token_copied"
+          unit={unit}
+          data={formattedToken}
+          animated={isLongToken}
+          showSection={false}
+        />
+      )}
+      {getCurrentTransaction[0].memo && (
+        <View
+          style={{
+            margin: 16,
+            marginTop: 12,
+            marginBottom: 0,
+          }}>
+          <Card message={getCurrentTransaction[0].memo} variant="info" />
+        </View>
+      )}
+      <TransactionMintRefresh
+        transaction={{
+          ...getCurrentTransaction[0],
+          unit,
+          amount,
+          transactionType: 'send',
+        }}
+        mintInfo={mintInfo}
+        handleCheckStatus={handleCheckStatus}
+      />
+      {/* <Text
+            style={{
+              color: 'red',
+            }}>
+            {JSON.stringify(getCurrentTransaction[0], null, 2)}
+          </Text> */}
+      <MintQuoteTimeline
+        transaction={{
+          ...getCurrentTransaction[0],
+          unit,
+          amount,
+          transactionType: 'send',
+        }}
+        meltQuotes={getCurrentTransaction[0].proofStates}
+      />
+      <Section
+        items={[
+          {
+            title: 'Date',
+            value: convertTime(new Date(getCurrentTransaction[0]?.date)),
+          },
+          {
+            title: 'Type',
+            value:
+              capitalize(String(getCurrentTransaction[0]?.type)) +
+              ' • ' +
+              capitalize(String(getCurrentTransaction[0]?.transactionType)),
+          },
+          {
+            title: 'Status',
+            value: (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text
+                  style={{
+                    color: greys(theme)[0],
+                    fontFamily: 'OverpassBold',
+                    fontSize: 16,
+                  }}>
+                  {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                </Text>
+                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+              </View>
+            ),
+          },
+          {
+            title: 'Token',
+            value: truncateMiddle(token, 6),
+          },
+        ]}
+      />
+
+      <ScrollView
+        horizontal
+        style={{
+          padding: 16,
+          margin: 16,
+          borderRadius: 8,
+          backgroundColor: greys(theme)[1800],
+        }}>
+        <Text mono>{getCurrentTransaction[0].toString()}</Text>
+      </ScrollView>
+    </Modal>
   );
 }
-
-const createStyles = (theme) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: greys(theme)[2300],
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: greys(theme)[1000],
-    },
-  });
 
 function ModalScreen() {
   const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();

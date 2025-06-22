@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, Dimensions, ScrollView } from 'reac
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys, shades } from 'helper/colors';
 import { useTypedRoute } from 'helper/navigation';
 import Icon from 'assets/icons';

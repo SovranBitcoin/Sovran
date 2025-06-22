@@ -1,4 +1,4 @@
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/View';
 import React from 'react';
 import { View, Button } from 'react-native';
 import { useSheetRouteParams } from 'react-native-actions-sheet';

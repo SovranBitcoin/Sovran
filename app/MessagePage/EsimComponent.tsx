@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
 import { greys, shades } from 'helper/colors';

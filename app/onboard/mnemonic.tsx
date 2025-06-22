@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -299,8 +299,9 @@ const RecoveryScreen: React.FC<{}> = () => {
 
             {isVerifyMode && (
               <Text style={styles.subtitle}>
-                Please enter the missing words from your recovery phrase to verify you've saved it
-                correctly
+                {
+                  "Please enter the missing words from your recovery phrase to verify you've saved it correctly"
+                }
               </Text>
             )}
 

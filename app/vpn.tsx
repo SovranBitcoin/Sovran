@@ -3,7 +3,8 @@ import { StyleSheet, Alert } from 'react-native';
 import type { WireGuardStatus } from 'react-native-wireguard-vpn';
 import { greys } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
@@ -211,78 +212,6 @@ function ModalScreen() {
     <Modal
       showClose
       title={`VPN plan`}
-      children={
-        <>
-          <Section
-            special={false}
-            items={[
-              {
-                title: 'Location',
-                value: (
-                  <View
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: 'transparent',
-                    }}>
-                    <FlagIcon width={24} height={24} country={params.location} />
-                    <Text
-                      style={{
-                        marginLeft: 4,
-                        fontSize: 16,
-                      }}>
-                      {
-                        lookup.byIso(
-                          vpn?.find((v) => v.payment_request === params.payment_request).location
-                        ).country
-                      }
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                title: 'Payment Hash',
-                value: truncateMiddle(
-                  vpn?.find((v) => v.payment_request === params.payment_request)?.payment_hash,
-                  5
-                ),
-              },
-              {
-                title: 'Payment Request',
-                value: truncateMiddle(
-                  vpn?.find((v) => v.payment_request === params.payment_request)?.payment_request,
-                  5
-                ),
-              },
-              {
-                title: 'Duration',
-                value: vpn?.find((v) => v.payment_request === params.payment_request)?.duration,
-              },
-              {
-                title: 'Time Remaining',
-                value: remainingTime,
-              },
-              ...(vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
-                ? [
-                    {
-                      title: 'Valid until',
-                      value: new Date(
-                        vpn?.find(
-                          (v) => v.payment_request === params.payment_request
-                        )?.order?.expiry_date
-                      ).toLocaleString(),
-                    },
-                  ]
-                : []),
-              {
-                title: 'Provider',
-                value: 'LNVPN',
-              },
-            ]}
-          />
-        </>
-      }
       buttons={
         <View
           style={{
@@ -369,8 +298,76 @@ function ModalScreen() {
             ]}
           />
         </View>
-      }
-    />
+      }>
+      <Section
+        special={false}
+        items={[
+          {
+            title: 'Location',
+            value: (
+              <View
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'transparent',
+                }}>
+                <FlagIcon width={24} height={24} country={params.location} />
+                <Text
+                  style={{
+                    marginLeft: 4,
+                    fontSize: 16,
+                  }}>
+                  {
+                    lookup.byIso(
+                      vpn?.find((v) => v.payment_request === params.payment_request).location
+                    ).country
+                  }
+                </Text>
+              </View>
+            ),
+          },
+          {
+            title: 'Payment Hash',
+            value: truncateMiddle(
+              vpn?.find((v) => v.payment_request === params.payment_request)?.payment_hash,
+              5
+            ),
+          },
+          {
+            title: 'Payment Request',
+            value: truncateMiddle(
+              vpn?.find((v) => v.payment_request === params.payment_request)?.payment_request,
+              5
+            ),
+          },
+          {
+            title: 'Duration',
+            value: vpn?.find((v) => v.payment_request === params.payment_request)?.duration,
+          },
+          {
+            title: 'Time Remaining',
+            value: remainingTime,
+          },
+          ...(vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
+            ? [
+                {
+                  title: 'Valid until',
+                  value: new Date(
+                    vpn?.find(
+                      (v) => v.payment_request === params.payment_request
+                    )?.order?.expiry_date
+                  ).toLocaleString(),
+                },
+              ]
+            : []),
+          {
+            title: 'Provider',
+            value: 'LNVPN',
+          },
+        ]}
+      />
+    </Modal>
   );
 }
 

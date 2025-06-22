@@ -8,7 +8,7 @@ import { greys } from 'helper/colors';
 import { store } from 'helper/redux/store';
 import { useCashu } from 'helper/redux/cashu';
 import { Transaction } from 'components/layout/Transaction';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import Icon from 'assets/icons';
 
 interface Account {
@@ -35,7 +35,7 @@ const formatDate = (date: string): string => {
   }).format(new Date(date));
 };
 
-export const Transactions: React.FC<TransactionsProps> = React.memo(
+export const Transactions = React.memo(
   ({
     account,
     days = 1,
@@ -44,7 +44,7 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
     at = 'all',
     tab = 'All',
     showMore = true,
-  }) => {
+  }: TransactionsProps) => {
     const theme = useSelector(memoizedGetTheme);
     const navigation = useNavigation();
     const { transactions } = useCashu();
@@ -217,3 +217,5 @@ export const Transactions: React.FC<TransactionsProps> = React.memo(
     );
   }
 );
+
+Transactions.displayName = 'Transactions';

@@ -1,6 +1,7 @@
 import React, { useCallback, ReactNode } from 'react';
 import { Pressable, ViewStyle, ScrollView } from 'react-native';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 

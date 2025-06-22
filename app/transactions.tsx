@@ -1,4 +1,4 @@
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';

@@ -4,7 +4,7 @@ import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon, { SovranTextIcon } from 'assets/icons';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import { Cashews } from 'assets/images';

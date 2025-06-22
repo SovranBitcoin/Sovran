@@ -6,7 +6,7 @@ import { memoizedGetMints } from 'helper/redux/cashu/selectors';
 import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import Wrapper from '../wrapper';
 import { sovran } from '.';
@@ -627,92 +627,88 @@ export function MintAddMore({ onClose, payload }) {
             },
           ]}
         />
-      }
-      children={
-        <View
-          style={{
-            flex: 1,
-            height: '100%',
-          }}>
-          <Text weight="bold" style={styles.sectionHeader}>
-            Currency options
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.currencyScroll}>
-            {currencyOptions.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.currencyButton,
-                  sovran(theme).borderSubtle,
-                  ((option === 'BTC' && selectedCurrency === 'SAT') ||
-                    (option === 'All' && selectedCurrency === 'All') ||
-                    (option !== 'BTC' && option !== 'All' && selectedCurrency === option)) &&
-                    styles.selectedCurrencyButton,
-                ]}
-                onPress={() => {
-                  setSelectedCurrency(option === 'BTC' ? 'SAT' : option);
-                }}>
-                <View style={styles.currencyContent}>
-                  {option === 'USD' || option === 'EUR' || option === 'GBP' ? (
-                    <FlagIcon
-                      country={option === 'USD' ? 'US' : option === 'EUR' ? 'EU' : 'GB'}
-                      height={32}
-                      width={32}
-                    />
-                  ) : option === 'BTC' ? (
-                    <CurrencyIcon currency="sat" />
-                  ) : null}
-                  <Text style={styles.currencyText}>{option}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 0 }]}>
-            Recommended mints
-          </Text>
-          <Text style={[{ marginBottom: 12, color: greys(theme)[700] }]}>
-            Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
-            {allowedCurrencies.size === 1 ? ' supporting only SAT' : ''}
-          </Text>
-
-          <View>
-            {loadedMints.length > 0 ? (
-              loadedMints.map((mint, index) => {
-                const mintData = mintsData.get(mint.id);
-                // Skip mints with errors or that are still loading
-                if (!mintData || mintData.error) return null;
-
-                return (
-                  <AddMintItem
-                    index={index}
-                    key={mint.id}
-                    mint={mint}
-                    mintData={mintData}
-                    handleToggleMint={handleToggleMint}
-                    selectedMints={selectedMints}
+      }>
+      <View
+        style={{
+          flex: 1,
+          height: '100%',
+        }}>
+        <Text weight="bold" style={styles.sectionHeader}>
+          Currency options
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
+          {currencyOptions.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.currencyButton,
+                sovran(theme).borderSubtle,
+                ((option === 'BTC' && selectedCurrency === 'SAT') ||
+                  (option === 'All' && selectedCurrency === 'All') ||
+                  (option !== 'BTC' && option !== 'All' && selectedCurrency === option)) &&
+                  styles.selectedCurrencyButton,
+              ]}
+              onPress={() => {
+                setSelectedCurrency(option === 'BTC' ? 'SAT' : option);
+              }}>
+              <View style={styles.currencyContent}>
+                {option === 'USD' || option === 'EUR' || option === 'GBP' ? (
+                  <FlagIcon
+                    country={option === 'USD' ? 'US' : option === 'EUR' ? 'EU' : 'GB'}
+                    height={32}
+                    width={32}
                   />
-                );
-              })
-            ) : !hasMoreMintsToLoad ? (
-              <Text style={[styles.noResults, { marginTop: 20, textAlign: 'center' }]}>
-                No mints found for the selected criteria
-              </Text>
-            ) : null}
-
-            {/* Show a loading indicator at the bottom while more mints are loading */}
-            {hasMoreMintsToLoad && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={greens[300]} />
-                <Text style={styles.loadingText}>Loading more mints...</Text>
+                ) : option === 'BTC' ? (
+                  <CurrencyIcon currency="sat" />
+                ) : null}
+                <Text style={styles.currencyText}>{option}</Text>
               </View>
-            )}
-          </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 0 }]}>
+          Recommended mints
+        </Text>
+        <Text style={[{ marginBottom: 12, color: greys(theme)[700] }]}>
+          Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
+          {allowedCurrencies.size === 1 ? ' supporting only SAT' : ''}
+        </Text>
+
+        <View>
+          {loadedMints.length > 0 ? (
+            loadedMints.map((mint, index) => {
+              const mintData = mintsData.get(mint.id);
+              // Skip mints with errors or that are still loading
+              if (!mintData || mintData.error) return null;
+
+              return (
+                <AddMintItem
+                  index={index}
+                  key={mint.id}
+                  mint={mint}
+                  mintData={mintData}
+                  handleToggleMint={handleToggleMint}
+                  selectedMints={selectedMints}
+                />
+              );
+            })
+          ) : !hasMoreMintsToLoad ? (
+            <Text style={[styles.noResults, { marginTop: 20, textAlign: 'center' }]}>
+              No mints found for the selected criteria
+            </Text>
+          ) : null}
+
+          {/* Show a loading indicator at the bottom while more mints are loading */}
+          {hasMoreMintsToLoad && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={greens[300]} />
+              <Text style={styles.loadingText}>Loading more mints...</Text>
+            </View>
+          )}
         </View>
-      }></Wrapper>
+      </View>
+    </Wrapper>
   );
 }
 

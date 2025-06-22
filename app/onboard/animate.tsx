@@ -5,7 +5,7 @@ import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { getMint, restoreMint } from 'helper/cashu';
 import { createStyles } from './helper';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';

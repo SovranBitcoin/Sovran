@@ -2,7 +2,7 @@ import React, { memo, useEffect, useState, useMemo } from 'react';
 import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { useWindowDimensions, StyleSheet, ViewStyle } from 'react-native';
 import { greys, shades } from 'helper/colors';

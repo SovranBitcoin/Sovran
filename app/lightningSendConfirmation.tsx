@@ -3,14 +3,13 @@ import { formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp, sendLightning } from 'components/cashu';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { truncateMiddle } from 'helper/strings';
 import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -56,9 +55,9 @@ export function LightningSendConfirmation({
 
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 
-  const theme = useSelector(memoizedGetTheme);
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
+
   const handleMintSelected = async (mint, balance) => {
     try {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
@@ -142,58 +141,6 @@ export function LightningSendConfirmation({
     <Modal
       showClose
       title="Send Lightning"
-      children={
-        <View style={{ backgroundColor: 'transparent' }}>
-          <TransactionHeader transaction={transaction} />
-          {!transaction?.paid && (
-            <SelectedMintDisplay
-              onMintSelected={handleMintSelected}
-              pr={pr}
-              unit={unit}
-              loading={loading}
-            />
-          )}
-
-          {getDescription({ pr }) && (
-            <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
-              <Card message={getDescription({ pr })} variant="info" />
-            </View>
-          )}
-
-          {transaction?.paid && (
-            <TransactionMintRefresh
-              mintInfo={mintInfo}
-              transaction={{ ...transaction, transactionType: 'send' }}
-            />
-          )}
-
-          {/* <Section
-            items={[
-              {
-                title: 'Expires at',
-                value: getExpiry({ pr }),
-              },
-              {
-                title: 'Expires in',
-                value: getExpiresIn({ pr }),
-              },
-            ]}
-          /> */}
-
-          <Section
-            items={[
-              { title: 'Date', value: getTimestamp({ pr }) },
-              { title: 'Type', value: 'Send • Lightning' },
-              { title: 'Request', value: truncateMiddle(lud16 || pr, lud16 ? 10 : 5) },
-              { title: 'Quote', value: truncateMiddle(quoteId, 7) },
-              {
-                title: `Fee (${getCurrencyDisplay()})`,
-                value: formatAmount(feeReserve),
-              },
-            ]}
-          />
-        </View>
-      }
       buttons={
         <View
           style={{
@@ -248,14 +195,65 @@ export function LightningSendConfirmation({
             }
           />
         </View>
-      }
-    />
+      }>
+      <View style={{ backgroundColor: 'transparent' }}>
+        <TransactionHeader transaction={transaction} />
+        {!transaction?.paid && (
+          <SelectedMintDisplay
+            onMintSelected={handleMintSelected}
+            pr={pr}
+            unit={unit}
+            loading={loading}
+          />
+        )}
+
+        {getDescription({ pr }) && (
+          <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
+            <Card message={getDescription({ pr })} variant="info" />
+          </View>
+        )}
+
+        {transaction?.paid && (
+          <TransactionMintRefresh
+            mintInfo={mintInfo}
+            transaction={{ ...transaction, transactionType: 'send' }}
+          />
+        )}
+
+        {/* <Section
+            items={[
+              {
+                title: 'Expires at',
+                value: getExpiry({ pr }),
+              },
+              {
+                title: 'Expires in',
+                value: getExpiresIn({ pr }),
+              },
+            ]}
+          /> */}
+
+        <Section
+          items={[
+            { title: 'Date', value: getTimestamp({ pr }) },
+            { title: 'Type', value: 'Send • Lightning' },
+            { title: 'Request', value: truncateMiddle(lud16 || pr, lud16 ? 10 : 5) },
+            { title: 'Quote', value: truncateMiddle(quoteId, 7) },
+            {
+              title: `Fee (${getCurrencyDisplay()})`,
+              value: formatAmount(feeReserve),
+            },
+          ]}
+        />
+      </View>
+    </Modal>
   );
 }
 
 function ModalScreen() {
   const { pr, unit, pubkey, meltQuote, redirect, email, lud16 } =
     useTypedRoute<'lightningSendConfirmation'>();
+
   return (
     <LightningSendConfirmation
       pr={pr}

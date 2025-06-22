@@ -3,7 +3,8 @@ import { Pressable, StyleSheet } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Button } from 'components/common/Button';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
@@ -130,138 +131,6 @@ function ModalScreen() {
     <Modal
       showClose
       title={`Get vpn plan`}
-      children={
-        <>
-          <View
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              margin: 8,
-              padding: 8,
-              marginBottom: 0,
-              backgroundColor: greys(theme)[1800],
-              borderRadius: 12,
-              borderColor: greys(theme)[1300],
-              borderWidth: 0.2,
-            }}>
-            <FlagIcon width={32} height={32} country={country} />
-            <Text
-              weight="heavy"
-              size={20}
-              style={{
-                marginLeft: 8,
-                flex: 1, // Allows the text to take up available space
-                marginRight: 8, // Adds space between the text and the button
-              }}
-              numberOfLines={1} // Ensures the text will not wrap to the next line
-              ellipsizeMode="tail" // Truncates the text with an ellipsis if it's too long
-            >
-              {lookup.byIso(country).country}
-            </Text>
-            <View
-              style={{
-                alignItems: 'flex-end', // Aligns the button to the right
-                backgroundColor: 'transparent',
-              }}>
-              <Button
-                text={'Change'}
-                variant="primary"
-                // position="left"
-                noPadding
-                onPress={() => {
-                  navigation.navigate('esimCountrySelection', {
-                    countries: params?.countries,
-                    type: 'vpn',
-                  });
-                }}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: 16,
-                  // marginRight: -16, // idk why i need this
-                }}
-              />
-            </View>
-          </View>
-
-          <View
-            style={{
-              padding: 8,
-              margin: 8,
-              backgroundColor: greys(theme)[1800],
-              borderRadius: 16,
-              borderColor: greys(theme)[1300],
-              borderWidth: 0.2,
-              overflow: 'hidden',
-            }}>
-            {packages.map((pkg) => (
-              <Pressable
-                key={pkg.packageCode} // Added key prop here
-                onPress={() => {
-                  setSelectedPackage(pkg.packageCode);
-                }}
-                style={{
-                  backgroundColor:
-                    selectedPackage === pkg.packageCode ? greys(theme)[1500] : greys(theme)[1800],
-
-                  borderRadius: 16,
-                  padding: 8,
-                }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor: 'transparent',
-                    borderRadius: 16,
-                  }}>
-                  <View
-                    style={{
-                      backgroundColor: 'transparent',
-                      borderRadius: 16,
-                    }}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: 'transparent',
-                        borderRadius: 16,
-                      }}>
-                      <View
-                        style={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: 16,
-                          backgroundColor:
-                            selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[1400],
-                          borderColor:
-                            selectedPackage === pkg.packageCode ? shades[100] : greys(theme)[1000],
-                          borderWidth: 0.5,
-                        }}></View>
-                      <View
-                        style={{
-                          backgroundColor: 'transparent',
-                        }}>
-                        <Text
-                          weight="bold"
-                          size={16}
-                          style={{
-                            marginLeft: 8,
-                          }}>
-                          {pkg.duration}
-                        </Text>
-                        <Text style={{ marginLeft: 8 }}>{pkg.duration}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={{ marginLeft: 8 }}>{'$' + pkg.price}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      }
       buttons={
         <ButtonHandler
           buttons={[
@@ -274,8 +143,136 @@ function ModalScreen() {
             },
           ]}
         />
-      }
-    />
+      }>
+      <View
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          margin: 8,
+          padding: 8,
+          marginBottom: 0,
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 12,
+          borderColor: greys(theme)[1300],
+          borderWidth: 0.2,
+        }}>
+        <FlagIcon width={32} height={32} country={country} />
+        <Text
+          weight="heavy"
+          size={20}
+          style={{
+            marginLeft: 8,
+            flex: 1, // Allows the text to take up available space
+            marginRight: 8, // Adds space between the text and the button
+          }}
+          numberOfLines={1} // Ensures the text will not wrap to the next line
+          ellipsizeMode="tail" // Truncates the text with an ellipsis if it's too long
+        >
+          {lookup.byIso(country).country}
+        </Text>
+        <View
+          style={{
+            alignItems: 'flex-end', // Aligns the button to the right
+            backgroundColor: 'transparent',
+          }}>
+          <Button
+            text={'Change'}
+            variant="primary"
+            // position="left"
+            noPadding
+            onPress={() => {
+              navigation.navigate('esimCountrySelection', {
+                countries: params?.countries,
+                type: 'vpn',
+              });
+            }}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: 16,
+              // marginRight: -16, // idk why i need this
+            }}
+          />
+        </View>
+      </View>
+
+      <View
+        style={{
+          padding: 8,
+          margin: 8,
+          backgroundColor: greys(theme)[1800],
+          borderRadius: 16,
+          borderColor: greys(theme)[1300],
+          borderWidth: 0.2,
+          overflow: 'hidden',
+        }}>
+        {packages.map((pkg) => (
+          <Pressable
+            key={pkg.packageCode} // Added key prop here
+            onPress={() => {
+              setSelectedPackage(pkg.packageCode);
+            }}
+            style={{
+              backgroundColor:
+                selectedPackage === pkg.packageCode ? greys(theme)[1500] : greys(theme)[1800],
+
+              borderRadius: 16,
+              padding: 8,
+            }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'transparent',
+                borderRadius: 16,
+              }}>
+              <View
+                style={{
+                  backgroundColor: 'transparent',
+                  borderRadius: 16,
+                }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'transparent',
+                    borderRadius: 16,
+                  }}>
+                  <View
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 16,
+                      backgroundColor:
+                        selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[1400],
+                      borderColor:
+                        selectedPackage === pkg.packageCode ? shades[100] : greys(theme)[1000],
+                      borderWidth: 0.5,
+                    }}></View>
+                  <View
+                    style={{
+                      backgroundColor: 'transparent',
+                    }}>
+                    <Text
+                      weight="bold"
+                      size={16}
+                      style={{
+                        marginLeft: 8,
+                      }}>
+                      {pkg.duration}
+                    </Text>
+                    <Text style={{ marginLeft: 8 }}>{pkg.duration}</Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={{ marginLeft: 8 }}>{'$' + pkg.price}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </Modal>
   );
 }
 

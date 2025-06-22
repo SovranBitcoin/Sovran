@@ -3,7 +3,7 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 const Container: React.FC<{
   children: React.ReactNode;
   style?: any;

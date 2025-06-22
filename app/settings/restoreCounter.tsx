@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { Button } from 'components/common/Button';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import Container from 'components/layout/Container';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { restoreCounter } from 'helper/cashu/restore';

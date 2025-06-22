@@ -6,7 +6,7 @@ import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/
 import Icon from 'assets/icons';
 import { ActionSheetRef, registerSheet, useSheetRouter } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { addMints, useGetMintInfo } from 'helper/redux/cashu';
 import { Sheet } from 'components/layout/sheets/mints/sheet';
 import { MintSelect } from 'components/layout/sheets/mints/MintSelect';

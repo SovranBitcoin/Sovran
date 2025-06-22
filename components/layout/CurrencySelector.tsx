@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';

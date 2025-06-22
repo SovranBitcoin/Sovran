@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import Icon from 'assets/icons';
 import CachedImage from 'components/common/Image';
 import { useSelector } from 'react-redux';

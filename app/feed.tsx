@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
@@ -8,7 +9,7 @@ import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
 import { EventKind } from './Profile';
 import { useNostr } from 'helper/redux/nostr';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';

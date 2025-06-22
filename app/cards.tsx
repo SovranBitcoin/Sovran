@@ -9,8 +9,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 
 const TabTwoScreen = () => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-  return null;
+
   return (
     <View
       style={{
@@ -36,6 +35,7 @@ const TabTwoScreen = () => {
             }}>
             {[1, 2].map((acc, index) => (
               <View
+                key={acc}
                 style={{
                   flex: 1,
                   justifyContent: 'flex-start',

@@ -5,7 +5,7 @@ import { useNavigation } from 'expo-router';
 import { greys } from 'helper/colors';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';

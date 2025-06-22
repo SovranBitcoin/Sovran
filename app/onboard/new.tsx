@@ -15,7 +15,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, shades } from 'helper/colors';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useTypedNavigation } from 'helper/navigation';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';

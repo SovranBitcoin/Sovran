@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Animated, Dimensions, StatusBar, LogBox, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 
 // Import third-party libraries
 import 'intl';

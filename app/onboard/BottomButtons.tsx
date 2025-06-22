@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { greys, shades } from 'helper/colors';
 
 const BottomButtons = ({

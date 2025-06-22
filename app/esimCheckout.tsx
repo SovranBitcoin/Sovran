@@ -8,7 +8,8 @@ import opacity from 'hex-color-opacity';
 
 import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
 import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
@@ -168,27 +169,6 @@ function ModalScreen() {
     <Modal
       showBack
       title="Checkout"
-      children={
-        <>
-          <Section camera={false} items={getSectionItems()} />
-          <Section
-            camera={false}
-            items={[
-              {
-                title: 'Total due',
-                value: `$${params.price / 10000}`,
-              },
-            ]}
-          />
-          <Text weight="bold" size={16} style={styles.sectionTitle}>
-            Pay with
-          </Text>
-          <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
-          <View style={styles.cardContainer}>
-            <Card variant="warning" message="Ensure your phone supports eSIMs." theme={theme} />
-          </View>
-        </>
-      }
       buttons={
         <>
           {iosWarning ? (
@@ -209,8 +189,25 @@ function ModalScreen() {
             ]}
           />
         </>
-      }
-    />
+      }>
+      <Section camera={false} items={getSectionItems()} />
+      <Section
+        camera={false}
+        items={[
+          {
+            title: 'Total due',
+            value: `$${params.price / 10000}`,
+          },
+        ]}
+      />
+      <Text weight="bold" size={16} style={styles.sectionTitle}>
+        Pay with
+      </Text>
+      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      <View style={styles.cardContainer}>
+        <Card variant="warning" message="Ensure your phone supports eSIMs." theme={theme} />
+      </View>
+    </Modal>
   );
 }
 

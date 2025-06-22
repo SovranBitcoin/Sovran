@@ -10,7 +10,7 @@ import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { View } from 'components/common/Themed';
+import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 
 const BITREFILL_URL = 'https://embed.bitrefill.com';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { View, Text, SafeAreaView, StatusBar, StyleSheet, Dimensions } from 'react-native';
+import { View, SafeAreaView, StatusBar, StyleSheet, Dimensions } from 'react-native';
+import { Text } from 'components/common/Text';
 
 const Calculator = () => {
   const [display, setDisplay] = useState('0');

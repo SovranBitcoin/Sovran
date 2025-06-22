@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';

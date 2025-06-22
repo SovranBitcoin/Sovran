@@ -6,7 +6,8 @@ import lookup from 'country-code-lookup';
 
 import { greys, reds } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { Text, View } from 'components/common/Themed';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import { useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -153,99 +154,6 @@ function ModalScreen() {
     <Modal
       title="Data plan"
       showClose
-      children={
-        <>
-          <View style={styles.chartContainer}>
-            <DonutChartContainer
-              data={[
-                {
-                  amount: usageData.remaining.gb,
-                  label: 'Remaining',
-                  value: `${usageData.remaining.gb.toFixed(2)} GB`,
-                },
-                {
-                  amount: usageData.total.gb - usageData.remaining.gb,
-                  label: 'Used',
-                  value: `${usageData.total.gb.toFixed(2)} GB`,
-                },
-              ]}
-              titleText="Data Usage"
-              totalValueSuffix="GB"
-              disableItems={true}
-              isSpecialCase={true}
-            />
-          </View>
-
-          <Section
-            items={[
-              {
-                title: 'Location',
-                value: (
-                  <View style={styles.locationContainer}>
-                    <FlagIcon width={24} height={24} country={esim.package.location} />
-                    <Text style={styles.locationText}>
-                      {lookup.byIso(esim.package.location).country}
-                    </Text>
-                  </View>
-                ),
-              },
-              {
-                title: 'Data remaining',
-                value: `${usageData.remaining.gb} GB`,
-              },
-              {
-                title: 'Total data',
-                value: `${usageData.total.gb} GB`,
-              },
-              {
-                title: 'Validity',
-                value: `${esim.package.duration} days`,
-              },
-              {
-                title: 'Speed',
-                value: esim.package.speed,
-              },
-              {
-                title: 'Status',
-                value: esim?.order?.esimStatus,
-              },
-              {
-                title: 'SMDP Status',
-                value: esim?.order?.smdpStatus,
-              },
-            ]}
-          />
-
-          {esim?.order?.iccid && (
-            <Section
-              items={[
-                {
-                  title: 'ICCID',
-                  value: esim.order.iccid,
-                },
-              ]}
-            />
-          )}
-
-          {esim?.request && (
-            <Section
-              items={[
-                {
-                  title: 'Request',
-                  value: truncateMiddle(esim.request, 5),
-                },
-              ]}
-            />
-          )}
-
-          <View style={styles.warningContainer}>
-            <Text style={styles.warningText}>
-              If you delete an eSIM from your phone's settings, you'll lose access to it
-              permanently.
-            </Text>
-          </View>
-        </>
-      }
       buttons={
         <>
           <View
@@ -289,8 +197,98 @@ function ModalScreen() {
             />
           </View>
         </>
-      }
-    />
+      }>
+      <View style={styles.chartContainer}>
+        <DonutChartContainer
+          data={[
+            {
+              amount: usageData.remaining.gb,
+              label: 'Remaining',
+              value: `${usageData.remaining.gb.toFixed(2)} GB`,
+            },
+            {
+              amount: usageData.total.gb - usageData.remaining.gb,
+              label: 'Used',
+              value: `${usageData.total.gb.toFixed(2)} GB`,
+            },
+          ]}
+          titleText="Data Usage"
+          totalValueSuffix="GB"
+          disableItems={true}
+          isSpecialCase={true}
+        />
+      </View>
+
+      <Section
+        items={[
+          {
+            title: 'Location',
+            value: (
+              <View style={styles.locationContainer}>
+                <FlagIcon width={24} height={24} country={esim.package.location} />
+                <Text style={styles.locationText}>
+                  {lookup.byIso(esim.package.location).country}
+                </Text>
+              </View>
+            ),
+          },
+          {
+            title: 'Data remaining',
+            value: `${usageData.remaining.gb} GB`,
+          },
+          {
+            title: 'Total data',
+            value: `${usageData.total.gb} GB`,
+          },
+          {
+            title: 'Validity',
+            value: `${esim.package.duration} days`,
+          },
+          {
+            title: 'Speed',
+            value: esim.package.speed,
+          },
+          {
+            title: 'Status',
+            value: esim?.order?.esimStatus,
+          },
+          {
+            title: 'SMDP Status',
+            value: esim?.order?.smdpStatus,
+          },
+        ]}
+      />
+
+      {esim?.order?.iccid && (
+        <Section
+          items={[
+            {
+              title: 'ICCID',
+              value: esim.order.iccid,
+            },
+          ]}
+        />
+      )}
+
+      {esim?.request && (
+        <Section
+          items={[
+            {
+              title: 'Request',
+              value: truncateMiddle(esim.request, 5),
+            },
+          ]}
+        />
+      )}
+
+      <View style={styles.warningContainer}>
+        <Text style={styles.warningText}>
+          {
+            "If you delete an eSIM from your phone's settings, you'll lose access to it permanently."
+          }
+        </Text>
+      </View>
+    </Modal>
   );
 }
 

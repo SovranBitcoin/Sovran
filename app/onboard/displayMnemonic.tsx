@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import BottomButtons from './BottomButtons';
 

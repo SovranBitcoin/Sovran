@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
@@ -94,7 +95,7 @@ function ReactionProfiles({ reactions }: { reactions: any[] }) {
   return (
     <View style={styles.reactionRow}>
       {displayedReactions.map((reaction, index) => (
-        <UserReactionProfiles pubkey={reaction.pubkey} />
+        <UserReactionProfiles key={reaction.pubkey} pubkey={reaction.pubkey} />
       ))}
       {remainingCount > 0 && (
         <View style={[styles.profilePictureWrapper, styles.moreCircle, styles.overlappingProfile]}>

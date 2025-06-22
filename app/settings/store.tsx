@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import Container from 'components/layout/Container';
-import { Text } from 'components/common/Themed';
+import { Text } from 'components/common/Text';
 import * as Clipboard from 'expo-clipboard';
 import _ from 'lodash';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';

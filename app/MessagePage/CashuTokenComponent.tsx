@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades } from 'helper/colors';

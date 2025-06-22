@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { StyledText, Text } from 'components/common/Themed';
+import { StyledText, Text } from 'components/common/Text';
 import Icon from 'assets/icons';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
