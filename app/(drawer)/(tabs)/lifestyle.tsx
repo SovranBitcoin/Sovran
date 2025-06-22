@@ -38,12 +38,12 @@ const SERVICE_MENU_ITEMS = [
     label: 'Giftcards',
     navigateTo: 'giftcards/all',
   },
-  // {
-  //   id: 'donate',
-  //   icon: 'mdi:charity',
-  //   label: 'Donate',
-  //   navigateTo: 'donate/donate',
-  // },
+  {
+    id: 'donate',
+    icon: 'mdi:charity',
+    label: 'Donate',
+    navigateTo: 'donate/donate',
+  },
   {
     id: 'support',
     icon: 'mdi:help-circle',
@@ -112,9 +112,7 @@ const ServicesSection = () => {
       </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.filter((item) =>
-          item.id === 'giftcards' || item.id === 'vpn' || item.id === 'esims'
-            ? settings?.experimental
-            : true
+          ['giftcards', 'vpn', 'esims', 'dontate'].includes(item.id) ? settings?.experimental : true
         ).map((item) => (
           <MenuItem
             key={item.id}
