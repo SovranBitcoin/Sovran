@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { memoizedGetTheme, setExperimental } from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme, setExperimental } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
 import { Section as TableSection } from 'components/common/Section';
@@ -12,7 +12,6 @@ import CreditCardComponent from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
 import { greys, shades } from 'helper/colors';
 import Checkbox from 'expo-checkbox';
-import { RootState } from 'helper/redux/store/reducer';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { ScrollView } from 'react-native';
 import { Transaction } from 'components/layout/Transaction';
@@ -27,7 +26,7 @@ function chunkArray(array: any[], size: number) {
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const settings = useSelector((state: RootState) => state.settings.settings);
+  const settings = useSelector(memoizedGetSettings);
   const [isChecked, setIsChecked] = React.useState(settings?.experimental);
 
   const dispatch = useDispatch();

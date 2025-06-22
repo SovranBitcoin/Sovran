@@ -67,6 +67,7 @@ const RouteA = ({
       {payload?.buttons?.map((button) => {
         return (
           <Button
+            key={button.text}
             onPress={() => {
               navigation.navigate(button.page);
             }}

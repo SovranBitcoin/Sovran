@@ -1,4 +1,4 @@
-import { useState, createContext, useContext, useRef } from 'react';
+import React, { useState, createContext, useContext, useRef } from 'react';
 import { CashuMint, CashuWallet } from '@cashu/cashu-ts';
 
 const WalletsContext = createContext(null);

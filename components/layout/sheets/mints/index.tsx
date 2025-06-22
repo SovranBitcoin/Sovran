@@ -81,7 +81,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   actionSheetRef,
   style,
 }) => {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
@@ -422,7 +422,6 @@ const SelectedMintDisplay = ({
   loading,
   style,
 }: SelectedMintDisplayProps) => {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const actionSheetRef = useRef<ActionSheetRef>(null);
 
   return (

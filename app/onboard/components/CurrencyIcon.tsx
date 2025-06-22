@@ -1,5 +1,5 @@
-import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import React from 'react';
+import { CurrencyIcon, FlagIcon } from 'assets/icons';
 
 interface CurrencyIconProps {
   currency: string;

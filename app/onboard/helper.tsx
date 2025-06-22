@@ -1,5 +1,4 @@
 import { greys } from 'helper/colors';
-
 import { StyleSheet, Dimensions } from 'react-native';
 
 const calculatePosition = (index) => {

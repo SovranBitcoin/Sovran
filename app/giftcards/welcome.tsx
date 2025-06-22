@@ -1,8 +1,8 @@
+import React from 'react';
 import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import React from 'react';
 import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';

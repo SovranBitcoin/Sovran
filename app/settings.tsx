@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';
 
 import { greys, reds } from 'helper/colors';
@@ -17,7 +17,6 @@ import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { RootState } from 'helper/redux/store/reducer';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -172,7 +171,7 @@ const ModalScreen: React.FC<{}> = () => {
     }));
   };
 
-  const settings = useSelector((state: RootState) => state.settings.settings);
+  const settings = useSelector(memoizedGetSettings);
 
   return (
     <Container>

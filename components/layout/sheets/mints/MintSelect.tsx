@@ -21,6 +21,7 @@ import _ from 'lodash';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { store } from 'helper/redux/store';
 import { isProduction } from 'helper/version';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -217,7 +218,7 @@ const MintItem: React.FC<MintItemProps> = ({
 };
 
 export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);

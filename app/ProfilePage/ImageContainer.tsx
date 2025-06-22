@@ -1,3 +1,4 @@
+import React from 'react';
 import { greys } from 'helper/colors';
 import 'react-native-gesture-handler';
 import { useSelector } from 'react-redux';

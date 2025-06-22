@@ -1,6 +1,6 @@
+import React, { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import Container from 'components/layout/Container';
-import React, { useMemo, useState } from 'react';
 import { Text, View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -12,7 +12,7 @@ import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export default function ModalScreen() {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);

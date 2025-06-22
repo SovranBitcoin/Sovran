@@ -1,10 +1,16 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { setLanguage, setTheme, setDisplayBitcoin, setPasscode } from './actions';
-import { selectSettings, selectTheme, selectLanguage, selectDisplayBitcoin, selectPasscode } from './selectors';
+import {
+  selectTheme,
+  selectLanguage,
+  selectDisplayBitcoin,
+  selectPasscode,
+  memoizedGetSettings,
+} from './selectors';
 
 export const useSettings = () => {
   const dispatch = useDispatch();
-  const settings = useSelector(selectSettings);
+  const settings = useSelector(memoizedGetSettings);
   const theme = useSelector(selectTheme);
   const lang = useSelector(selectLanguage);
   const displayBtc = useSelector(selectDisplayBitcoin);

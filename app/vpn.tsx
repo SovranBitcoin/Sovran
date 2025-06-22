@@ -1,11 +1,10 @@
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Alert } from 'react-native';
 import type { WireGuardStatus } from 'react-native-wireguard-vpn';
-
 import { greys } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Text, View } from 'components/common/Themed';
 import { FlagIcon, ShareIcon } from 'assets/icons';
-import { useEffect, useState } from 'react';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';

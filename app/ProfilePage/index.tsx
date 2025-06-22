@@ -1,5 +1,5 @@
+import React, { useState } from 'react';
 import { View, ScrollView, Platform } from 'react-native';
-import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
 import { Text } from 'components/common/Themed';

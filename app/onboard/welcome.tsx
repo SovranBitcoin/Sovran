@@ -1,8 +1,8 @@
 import 'app/global';
+import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import React from 'react';
 import Icon, { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';

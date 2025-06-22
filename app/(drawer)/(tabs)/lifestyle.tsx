@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';
-import { RootState } from 'helper/redux/store/reducer';
+import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 
 // Constants
 const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
@@ -80,7 +80,7 @@ const MenuItem = ({ item, theme, onPress }) => {
 // Main section component
 const ServicesSection = () => {
   const navigation = useNavigation();
-  const theme = useSelector((state) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   const handleNavigation = (item) => {
@@ -91,7 +91,7 @@ const ServicesSection = () => {
     }
   };
 
-  const settings = useSelector((state: RootState) => state.settings.settings);
+  const settings = useSelector(memoizedGetSettings);
 
   return (
     <View
@@ -130,7 +130,7 @@ const ServicesSection = () => {
 
 // Root component
 const TabTwoScreen = () => {
-  const theme = useSelector((state) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   return (

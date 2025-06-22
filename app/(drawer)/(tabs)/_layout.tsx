@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +13,7 @@ import CachedImage from 'components/common/Image';
 import { translateText } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
@@ -156,7 +157,7 @@ const TabLayout = () => {
   const language = useSelector((state) => state.settings?.settings?.lang);
   const navigation = useNavigation();
   const { currentProfile } = useNostr();
-  const settings = useSelector((state) => state.settings.settings);
+  const settings = useSelector(memoizedGetSettings);
   const styles = createStyles(theme);
   const selectedMint = useSelector(memoizedGetSelectedMint);
 

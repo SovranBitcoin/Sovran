@@ -1,5 +1,5 @@
-import { StyleSheet, Linking } from 'react-native';
 import React, { useEffect, useState } from 'react';
+import { StyleSheet, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import lookup from 'country-code-lookup';

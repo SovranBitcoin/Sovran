@@ -1,9 +1,9 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { Dimensions, View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { greys, shades, white } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import React, { useState, useEffect, useRef } from 'react';
 import { CheckIcon } from 'assets/icons';
 import { Text } from 'components/common/Themed';
 import { useNostr } from 'helper/redux/nostr';

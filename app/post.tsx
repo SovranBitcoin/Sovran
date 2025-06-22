@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
@@ -6,7 +7,6 @@ import { EventKind } from './Profile';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { Post } from './ProfilePage/post';
-import React, { useMemo } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 

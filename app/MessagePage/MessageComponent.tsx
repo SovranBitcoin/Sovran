@@ -1,8 +1,8 @@
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
 import { greys, shades } from 'helper/colors';
-import React from 'react';
 
 const MessageComponent = ({ message, theme, isReceived }) => {
   const styles = createStyles(theme, isReceived);

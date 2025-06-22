@@ -1,8 +1,8 @@
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import React, { useEffect, useState } from 'react';
 import { Text } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useTypedRoute } from 'helper/navigation';

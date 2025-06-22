@@ -1,5 +1,5 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'components/common/Themed';
-import { useState, useEffect, useRef } from 'react';
 import 'react-native-gesture-handler';
 import { useVideoPlayer, VideoSource, VideoView } from 'expo-video';
 import { useSelector } from 'react-redux';

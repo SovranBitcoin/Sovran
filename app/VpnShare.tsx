@@ -1,3 +1,4 @@
+import React from 'react';
 import Modal from 'components/layout/Modal';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import * as FileSystem from 'expo-file-system';

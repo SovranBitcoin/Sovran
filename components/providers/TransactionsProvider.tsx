@@ -30,7 +30,11 @@ export const useTransactions = () => {
   return context;
 };
 
-export const TransactionProvider = ({ children }) => {
+interface TransactionProviderProps {
+  children: React.ReactElement;
+}
+
+export const TransactionProvider = ({ children }: TransactionProviderProps) => {
   const allTransactions = useSelector(memoizedGetTransactions({ id: 0 }));
   // Use a ref to hold the Map object to prevent unnecessary re-renders
   const activeConnectionsRef = useRef(new Map());

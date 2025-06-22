@@ -415,7 +415,7 @@ const Screen = () => {
 };
 
 const RouteA = ({ router }: RouteScreenProps<'sheet-with-router', 'route-a'>) => {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const { profiles, setCurrentProfile, currentProfile } = useNostr();
   const navigation = useTypedNavigation();
   const styles = createStyles(theme);
@@ -481,7 +481,7 @@ const RouteA = ({ router }: RouteScreenProps<'sheet-with-router', 'route-a'>) =>
 
 const RouteB = () => {
   const router = useSheetRouter('sheet-with-router');
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   return (
@@ -536,7 +536,7 @@ const RouteB = () => {
 
 const RouteC = () => {
   const router = useSheetRouter('sheet-with-router');
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [nsec, setNsec] = useState('');
   const [error, setError] = useState('');
@@ -638,7 +638,7 @@ const RouteC = () => {
 const RouteD = () => {
   const router = useSheetRouter('sheet-with-router');
   const params = useSheetRouteParams<'sheet-with-router', 'route-d'>();
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { profiles, setProfiles } = useNostr();
 
@@ -730,7 +730,7 @@ const RouteD = () => {
 
 const RouteE = () => {
   const router = useSheetRouter('sheet-with-router');
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [npub, setNpub] = useState('');
   const [error, setError] = useState('');

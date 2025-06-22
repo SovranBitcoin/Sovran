@@ -1,10 +1,10 @@
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Button } from 'components/common/Button';
 import { Text, View } from 'components/common/Themed';
 import { FlagIcon } from 'assets/icons';
-import { useEffect, useState } from 'react';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';

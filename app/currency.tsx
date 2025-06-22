@@ -41,8 +41,6 @@ function ModalScreen() {
   const { params } = useRoute();
   const navigation = useTypedNavigation();
 
-  if (!params) return null;
-
   const [amount, setAmount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
@@ -56,6 +54,10 @@ function ModalScreen() {
     // Amount must be greater than 0 to be valid
     setIsValidAmount(amount > 0);
   }, [amount]);
+
+  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
+  const [progress, setProgress] = useState<number>(0);
+  const [scanned, setScanned] = useState<boolean>(false);
 
   const handleMintSelected = async (mint, balance) => {
     try {
@@ -195,10 +197,6 @@ function ModalScreen() {
     }
   };
 
-  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
-  const [progress, setProgress] = useState<number>(0);
-  const [scanned, setScanned] = useState<boolean>(false);
-
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
@@ -283,6 +281,7 @@ function ModalScreen() {
       </View>
     );
   };
+  if (!params) return null;
 
   return (
     <Modal

@@ -11,6 +11,7 @@ import { useNostr } from 'helper/redux/nostr';
 import { View } from 'components/common/Themed';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });
@@ -35,7 +36,7 @@ const Feed = ({ theme, filters }) => {
 };
 
 const TabTwoScreen = () => {
-  const theme = useSelector((state) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { currentProfile } = useNostr();
   const pagerRef = useRef(null);

@@ -1,9 +1,9 @@
+import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, G, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import React, { useEffect, useRef } from 'react';
 import { Monicon as Icon } from '@monicon/native';
 
 // todo: remove all these icons and use <Icon name={name} size={size} color={color || greys(theme)[0]} /> instead.

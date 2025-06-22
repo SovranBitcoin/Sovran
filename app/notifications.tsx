@@ -10,6 +10,7 @@ import Image from 'components/common/Image';
 import PagerView from 'react-native-pager-view';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
   const filters = useMemo(
@@ -43,7 +44,7 @@ export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any
 }
 
 export function UserReactionProfiles({ pubkey, isOverlapping = true }: { pubkey: string }) {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   const filters = useMemo(

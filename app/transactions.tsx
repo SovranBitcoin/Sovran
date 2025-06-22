@@ -10,7 +10,6 @@ import Container from 'components/layout/Container';
 import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
 import { ScrollView } from 'react-native';
-
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 

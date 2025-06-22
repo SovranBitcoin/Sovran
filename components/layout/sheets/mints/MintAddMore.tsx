@@ -14,6 +14,7 @@ import { ScrollView } from 'react-native-actions-sheet';
 import { getMint, getWallet } from 'components/cashu';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { isProduction } from 'helper/version';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 interface MintCount {
   mintUrl: string;
@@ -344,7 +345,7 @@ function AddMintItem({
   handleToggleMint: (mintId: string) => void;
   selectedMints: Set<string>;
 }) {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
   if (!mintData || !mint) {
@@ -396,7 +397,7 @@ function AddMintItem({
 }
 
 export function MintAddMore({ onClose, payload }) {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   // Set default selected currency based on allowed currencies

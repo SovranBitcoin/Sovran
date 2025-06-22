@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Share, StyleSheet, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';

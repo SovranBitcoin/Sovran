@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Platform } from 'react-native';
-
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Text, View } from 'components/common/Themed';
@@ -13,7 +13,6 @@ import {
   setSelectedMint,
   useCashu,
 } from 'helper/redux/cashu';
-import React, { useState, useEffect } from 'react';
 import * as Device from 'expo-device';
 import opacity from 'hex-color-opacity';
 import { useDispatch, useSelector } from 'react-redux';

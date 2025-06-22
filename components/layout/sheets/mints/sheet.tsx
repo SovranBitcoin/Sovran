@@ -3,9 +3,10 @@ import ActionSheet from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { Dimensions } from 'react-native';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function Sheet({ initialRoute, routes, actionSheetRef }) {
-  const theme = useSelector((state: any) => state.settings?.settings?.theme);
+  const theme = useSelector(memoizedGetTheme);
 
   return (
     <ActionSheet

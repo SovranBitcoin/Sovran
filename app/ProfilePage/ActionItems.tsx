@@ -1,8 +1,8 @@
+import React, { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'components/common/Themed';
 import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { useEffect, useMemo, useState } from 'react';
 import { EventKind } from '../../app/Profile';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';

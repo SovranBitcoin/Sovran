@@ -1,6 +1,6 @@
+import React from 'react';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import { View } from 'react-native';
-import React from 'react';
 
 export function FlagIcon({ width, height, country }) {
   return (

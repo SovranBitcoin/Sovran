@@ -1,10 +1,10 @@
+import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import { Dimensions, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import React, { useState } from 'react';
 import Checkbox from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 

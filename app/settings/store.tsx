@@ -1,6 +1,6 @@
+import React from 'react';
 import { useSelector } from 'react-redux';
 import Container from 'components/layout/Container';
-import React from 'react';
 import { Text } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
 import _ from 'lodash';

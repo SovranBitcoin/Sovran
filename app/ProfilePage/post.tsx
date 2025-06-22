@@ -1,5 +1,5 @@
-import { View } from 'react-native';
 import React from 'react';
+import { View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { Text } from 'components/common/Themed';

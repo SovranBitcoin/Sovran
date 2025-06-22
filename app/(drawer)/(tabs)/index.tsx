@@ -11,7 +11,7 @@ import { Transactions } from 'components/layout/Transactions';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
@@ -23,6 +23,7 @@ import {
   appendTransactionsV2,
   memoizedGetSelectedMint,
   memoizedGetTransactionByMatcher,
+  TransactionData,
 } from 'helper/redux/cashu';
 import { isProduction } from 'helper/version';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
@@ -38,7 +39,7 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
   // TODO: get last transaction that is npubx.cash from fromNIP05
   const lastTransaction = memoizedGetTransactionByMatcher({
     profileId: currentProfile.id,
-    matcher: (txs) => {
+    matcher: (txs: TransactionData[]) => {
       const transactions = _.filter(txs, {
         fromNIP05: `${currentProfile?.npub}@npubx.cash`,
         type: 'lightning',
@@ -124,7 +125,7 @@ function TabOneScreen({
   const styles = createStyles(theme);
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
-  const settings = useSelector((state) => state.settings.settings);
+  const settings = useSelector(memoizedGetSettings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const navigation = useTypedNavigation();
 
