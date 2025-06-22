@@ -17,7 +17,7 @@ export function TransactionMintRefresh({
   mintInfo,
   transaction,
   handleCheckStatus,
-}: TransactionMintRefreshProps): React.ReactNode {
+}: TransactionMintRefreshProps) {
   const theme = useSelector(memoizedGetTheme);
   const [loading, setLoading] = useState(false);
 

@@ -35,7 +35,7 @@ export function SearchableList({
   searchPlaceholder,
   theme,
   itemStyle,
-}: SearchableListProps): JSX.Element {
+}: SearchableListProps) {
   // Extract item key generation logic
   const getItemKey = useCallback((item: DataItem): ItemId => {
     return typeof item === 'string' ? item : item.id;

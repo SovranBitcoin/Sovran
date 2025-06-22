@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { StyleProp, useWindowDimensions, ViewStyle } from 'react-native';
 import { Skeleton, SkeletonContainer } from 'react-native-skeleton-component';
 
 interface SkeletonProps {
@@ -7,7 +7,7 @@ interface SkeletonProps {
   height?: number;
   startColor: string;
   endColor: string;
-  style?: StyleSheet;
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -19,7 +19,7 @@ const MemoizedSkeleton = memo(({ width, height, endColor, startColor, style }: S
     highlightColor={startColor}
     speed={800}
     animation="pulse">
-    <Skeleton style={{ width, height, ...style }} />
+    <Skeleton style={[{ width, height }, style]} />
   </SkeletonContainer>
 ));
 

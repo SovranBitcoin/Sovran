@@ -21,7 +21,7 @@ interface VariantStyle {
   color: string;
 }
 
-export const Card = ({ title, message, variant, icon, onPress }: CardProps): React.ReactNode => {
+export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   const theme = useSelector(memoizedGetTheme);
 
   const variantStyles = useMemo<Record<VariantType, VariantStyle>>(

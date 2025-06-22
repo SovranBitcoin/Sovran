@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleProp, ViewStyle } from 'react-native';
 import { StyledText, Text, View } from 'components/common/Themed';
 import { formatCurrencyWrapper } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
@@ -15,6 +16,7 @@ interface AmountFormatterProps {
   size?: number;
   weight?: FontWeight;
   color?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -27,7 +29,7 @@ export function AmountFormatter({
   weight = 'heavy',
   color,
   style,
-}: AmountFormatterProps): React.ReactElement {
+}: AmountFormatterProps) {
   const theme = useSelector(memoizedGetTheme);
   const { settings } = useSettings();
   const currentColor = color || greys(theme)[0];
@@ -35,7 +37,7 @@ export function AmountFormatter({
 
   if (unit !== 'sat') {
     return (
-      <View className="flex-row items-center" style={{ backgroundColor: 'transparent', ...style }}>
+      <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
         <Text
           size={size}
           regular
@@ -51,11 +53,9 @@ export function AmountFormatter({
   }
 
   return (
-    <View className="flex-row items-center" style={{ backgroundColor: 'transparent', ...style }}>
+    <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
       {displayBtc === 0 && (
-        <View
-          className="flex-row items-center"
-          style={{ backgroundColor: 'transparent', ...style }}>
+        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
             <BtcIcon weight={weight} height={size} width={size} color={currentColor} />
@@ -75,9 +75,7 @@ export function AmountFormatter({
       )}
 
       {displayBtc === 1 && (
-        <View
-          className="flex-row items-center"
-          style={{ backgroundColor: 'transparent', ...style }}>
+        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <StyledText
             size={size}
             weight={weight}
@@ -95,9 +93,7 @@ export function AmountFormatter({
       )}
 
       {displayBtc === 2 && (
-        <View
-          className="flex-row items-center"
-          style={{ backgroundColor: 'transparent', ...style }}>
+        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <Text
             size={size}
             weight={weight}
@@ -112,9 +108,7 @@ export function AmountFormatter({
       )}
 
       {displayBtc === 3 && (
-        <View
-          className="flex-row items-center"
-          style={{ backgroundColor: 'transparent', ...style }}>
+        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
             <BtcIcon weight={weight} height={size} width={size} color={currentColor} />

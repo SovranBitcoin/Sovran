@@ -12,7 +12,7 @@ interface TransactionHeaderProps {
   transaction: TransactionData;
 }
 
-export function TransactionHeader({ transaction }: TransactionHeaderProps): React.ReactNode {
+export function TransactionHeader({ transaction }: TransactionHeaderProps) {
   const theme = useSelector(memoizedGetTheme);
 
   return (

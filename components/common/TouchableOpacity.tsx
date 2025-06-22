@@ -1,5 +1,5 @@
 import { runWithAnimationFrame } from 'app/onboard/new';
-import { useRef, FC } from 'react';
+import React, { useRef, FC } from 'react';
 import {
   TouchableOpacity as RNTouchableOpacity,
   TouchableOpacityProps,

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { Alert, Platform } from 'react-native';
 
-const handleException = (ex) => {
+const handleException = (ex: unknown) => {
   const NfcManager = require('react-native-nfc-manager').default;
   const NfcError = require('react-native-nfc-manager').NfcError;
 
@@ -17,7 +18,7 @@ const handleException = (ex) => {
   }
 };
 
-export async function write(value) {
+export async function write(value: string) {
   let result = false;
 
   try {

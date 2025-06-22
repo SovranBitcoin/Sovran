@@ -48,7 +48,7 @@ const createStyles = (theme: any) =>
 
 **Note:** Check `helper/colors` for the complete list of available theme colors.
 
-**Types:** For StyleSheet props use `style?: StyleProp<ViewStyle>` for React functions use `React.ReactNode`
+**Types:** For StyleSheet props use `style?: StyleProp<ViewStyle>`
 
 ```
 style={[

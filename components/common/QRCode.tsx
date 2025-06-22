@@ -1,8 +1,8 @@
+import React, { memo, useEffect, useState, useMemo } from 'react';
 import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/common/Themed';
-import { memo, useEffect, useState, useMemo } from 'react';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { useWindowDimensions, StyleSheet, ViewStyle } from 'react-native';
 import { greys, shades } from 'helper/colors';
@@ -59,7 +59,7 @@ export const QRCode = memo(function QRCode({
   animate = false,
   hasBackground = false,
   ...props
-}: QRCodeProps): JSX.Element {
+}: QRCodeProps) {
   const theme = useSelector(memoizedGetTheme);
   const { width: w } = useWindowDimensions();
   const width = Math.min(w, 600);
@@ -68,7 +68,7 @@ export const QRCode = memo(function QRCode({
     (): ViewStyle => ({
       ...(hasBackground ? {} : {}),
     }),
-    [hasBackground, theme]
+    [hasBackground]
   );
 
   return (
@@ -109,32 +109,20 @@ interface AnimatedQRCodeProps {
   hasBackground?: boolean;
 }
 
-type UnitType = string;
-
 /**
  * Animated QR code with currency/location logo
  */
 export const AnimatedQRCode = memo(function AnimatedQRCode({
   padding = 10,
   hasLogo = true,
-  variant = 'primary',
   unit,
   address,
   animate = false,
   hasBackground = true,
-}: AnimatedQRCodeProps): JSX.Element {
-  const theme = useSelector(memoizedGetTheme);
+}: AnimatedQRCodeProps) {
   const [index, setIndex] = useState<number>(0);
   const [parts, setParts] = useState<string[]>([]);
   const [fragmentLength, setFragmentLength] = useState<number>(0);
-
-  const colors = useMemo(
-    () =>
-      variant === 'primary'
-        ? [shades[100], shades[200], shades[300], shades[400], shades[500]]
-        : [greys(theme)[400], greys(theme)[100]],
-    [variant, theme]
-  );
 
   const styles = useMemo(() => createStyles(), []);
 
@@ -170,7 +158,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     return null;
   }, [animate, parts, fragmentLength, index, address]);
 
-  const renderLogo = (): JSX.Element | null => {
+  const renderLogo = () => {
     if (!hasLogo) return null;
 
     const isLocationUnit = unit.startsWith('location');

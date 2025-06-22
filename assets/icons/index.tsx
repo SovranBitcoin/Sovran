@@ -1,18 +1,17 @@
-import Svg, { Circle, Defs, Ellipse, G, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
-import { greys, shades, white } from 'helper/colors';
+import Svg, { Circle, Defs, G, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
+import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Monicon as Icon } from '@monicon/native';
-export { FlagIcon } from './flag';
 
 // todo: remove all these icons and use <Icon name={name} size={size} color={color || greys(theme)[0]} /> instead.
 
-import { useEffect, useRef } from 'react';
-import { Animated } from 'react-native';
+import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 import { View } from 'components/common/Themed';
+export { FlagIcon } from './flag';
 
 export const icons = [
   'material-symbols:report-rounded',
@@ -449,7 +448,17 @@ export function CloseIcon2({ color, width, height }) {
   );
 }
 
-export function LightningUnit({ style, color, width = '24', height = '24' }) {
+export function LightningUnit({
+  style,
+  color,
+  width = 24,
+  height = 24,
+}: {
+  style?: StyleProp<ViewStyle>;
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
   return (
     <Svg
       style={style}

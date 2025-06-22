@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import {
   SET_CURRENT_PROFILE,
   SET_SEARCH,

@@ -14,7 +14,7 @@ interface TabsProps {
   handleTabPress: (tab: string, index: number) => void;
 }
 
-export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps): JSX.Element {
+export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) {
   const theme = useSelector(memoizedGetTheme);
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
@@ -77,7 +77,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps):
             }}
             onPress={() => onTabPress(tab, index)}>
             <Text
-              numberOfLines={1}
               style={{
                 color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
                 fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',

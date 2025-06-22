@@ -49,5 +49,4 @@ const rootReducer = (state: RootState | undefined, action: AnyAction): RootState
   return appReducer(state, action);
 };
 
-
 export default rootReducer;

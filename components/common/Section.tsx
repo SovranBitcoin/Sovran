@@ -29,7 +29,7 @@ interface SectionProps {
   special?: boolean;
 }
 
-export function Section({ items, style, camera = false, special }: SectionProps): JSX.Element {
+export function Section({ items, style, camera = false, special }: SectionProps) {
   const theme = useSelector(memoizedGetTheme);
 
   const ContainerView = camera ? BlurView : View;
@@ -89,12 +89,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   );
 
   // Helper function to render the appropriate value content based on the item type
-  function renderValueContent(
-    item: SectionItem,
-    titleText: string,
-    theme: any,
-    special: boolean
-  ): JSX.Element {
+  function renderValueContent(item: SectionItem, titleText: string, theme: any, special?: boolean) {
     if (React.isValidElement(item.value)) {
       return (
         <View
@@ -213,12 +208,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   }
 
   // Helper function to render prefixed values (npub, creqA, etc.)
-  function renderPrefixedValue(
-    prefix: string,
-    value: string,
-    titleText: string,
-    theme: any
-  ): JSX.Element {
+  function renderPrefixedValue(prefix: string, value: string, titleText: string, theme: any) {
     return (
       <View
         className="flex flex-1 flex-col items-center justify-center bg-transparent"

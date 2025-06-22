@@ -1,3 +1,4 @@
+import React from 'react';
 import { View } from 'components/common/Themed';
 import Icon from 'assets/icons';
 import CachedImage from 'components/common/Image';

@@ -6,7 +6,12 @@ import { FlagIcon } from 'assets/icons';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
-const CircularProgress = ({ progress, country }) => {
+interface CircularProgressProps {
+  progress: number;
+  country: string;
+}
+
+const CircularProgress = ({ progress, country }: CircularProgressProps) => {
   const theme = useSelector(memoizedGetTheme);
 
   const size = 48;

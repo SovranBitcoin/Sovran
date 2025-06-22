@@ -1,5 +1,5 @@
 import { applyMiddleware, createStore } from 'redux';
-import { createMigrate, persistStore, persistReducer, MigrationManifest } from 'redux-persist';
+import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import _ from 'lodash/fp';

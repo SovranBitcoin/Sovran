@@ -60,7 +60,10 @@ export const parseWireGuardConfig = (lines: string[]): WireGuardConfig => {
     publicKey: kv['PublicKey'],
     serverAddress,
     serverPort: parseInt(serverPortStr || '51820', 10),
-    allowedIPs: (kv['AllowedIPs'] || '').split(',').map((s) => s.trim()).filter(Boolean),
+    allowedIPs: (kv['AllowedIPs'] || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     dns: kv['DNS'] ? [kv['DNS']] : undefined,
     mtu: kv['MTU'] ? parseInt(kv['MTU'], 10) : undefined,
     presharedKey: kv['PresharedKey'] || undefined,

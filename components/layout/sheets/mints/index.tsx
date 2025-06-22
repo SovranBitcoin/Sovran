@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Image, StyleSheet, ViewStyle } from 'react-native';
+import { View, Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
@@ -34,26 +34,7 @@ interface SelectedMintDisplayProps {
   unit?: string;
   onUnitUpdate?: (unit: string) => void;
   loading?: boolean;
-}
-
-interface Mint {
-  id: string;
-  name: string;
-  logo?: string;
-  supportedUnits: string[];
-}
-
-interface MintInfo {
-  icon_url: string;
-  nuts?: {
-    methods?: { unit: string }[];
-  }[];
-}
-
-interface ProcessedMintData {
-  info: MintInfo;
-  supportedUnits: string[];
-  isLoading: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function MintIcon({ mintInfo, size = 32 }) {
@@ -432,7 +413,7 @@ export { sovran };
 
 registerSheet('mint', MintSheet);
 
-const SelectedMintDisplay: React.FC<SelectedMintDisplayProps> = ({
+const SelectedMintDisplay = ({
   onMintSelected,
   onMintQuoteUpdate,
   onUnitUpdate,
@@ -440,7 +421,7 @@ const SelectedMintDisplay: React.FC<SelectedMintDisplayProps> = ({
   unit,
   loading,
   style,
-}) => {
+}: SelectedMintDisplayProps) => {
   const theme = useSelector((state: any) => state.settings?.settings?.theme);
   const actionSheetRef = useRef<ActionSheetRef>(null);
 

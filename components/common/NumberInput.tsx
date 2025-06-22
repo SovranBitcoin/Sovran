@@ -14,15 +14,13 @@ interface NumberInputProps {
   type?: TransactionType;
   currency?: string;
   value: number | string;
-  onChange?: (value: string) => void;
 }
 
 export function NumberInput({
   type = 'send',
   currency = '£',
   value,
-  onChange,
-}: NumberInputProps): JSX.Element {
+}: NumberInputProps): React.ReactNode {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const theme = useSelector(memoizedGetTheme);
 

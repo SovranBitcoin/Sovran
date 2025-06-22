@@ -74,17 +74,6 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
 
   return (
     <View style={styles.container}>
-      {/* <LinearGradient
-        colors={defaultColors}
-        style={{
-          width: '100%',
-          position: 'absolute',
-          top: -42,
-          left: 0,
-          right: 0,
-          height: 100,
-          pointerEvents: 'none',
-        }}></LinearGradient> */}
       <SelectedMintDisplay
         style={{
           width: Dimensions.get('window').width - 32 - 16 - 16 - 16 - 16 - 16 - 16,

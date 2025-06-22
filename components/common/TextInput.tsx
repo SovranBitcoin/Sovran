@@ -21,7 +21,7 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextC
 
 const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }) => {
   // Use useSelector hook for theme access to make component reactive to theme changes
-  const theme = useSelector((state) => memoizedGetTheme(state));
+  const theme = useSelector(memoizedGetTheme);
 
   return (
     <TextInputBase

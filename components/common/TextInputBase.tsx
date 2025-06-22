@@ -11,7 +11,7 @@ interface TextInputBaseProps {
 }
 
 const TextInputBase: FC<TextInputBaseProps> = ({ Component, style, ...props }) => {
-  const theme = useSelector((state) => memoizedGetTheme(state));
+  const theme = useSelector(memoizedGetTheme);
 
   // Instead of creating styles in each render, we can use inline styles
   // according to the refactoring guidelines

@@ -1,5 +1,4 @@
 import { Text as DefaultText, View as DefaultView, Pressable, TextStyle } from 'react-native';
-// import Colors from "helper/constants/Colors";
 import translations from 'helper/translations';
 import { useSelector } from 'react-redux';
 import { BlurView } from 'expo-blur';
@@ -184,6 +183,7 @@ type CustomTextProps = {
   heavy?: boolean;
   black?: boolean;
   mono?: boolean;
+  weight?: string;
 
   // Font family props
   overpass?: boolean;
