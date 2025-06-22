@@ -12,15 +12,15 @@ export const routes: Route[] = [
   },
 ];
 
-// Add TypeScript type definitions
 declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        email: RouteDefinition<
-          { onConfirm?: (email: string) => void },
-          { confirmed: boolean; email?: string }
-        >;
+        email: RouteDefinition<{
+          onConfirm?: (email: string) => void;
+          confirmed: boolean;
+          email?: string;
+        }>;
       };
     }>;
   }

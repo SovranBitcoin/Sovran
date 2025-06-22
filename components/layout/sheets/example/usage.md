@@ -76,10 +76,14 @@ import {
 } from 'react-native-actions-sheet';
 
 // Use the correct sheet name and route name in the type parameters
-const RouteA = ({ router, payload }: RouteScreenProps<'your-sheet-name', 'route-a'>) => {
+const RouteA = ({ 
+  router,
+  // payload, <- this is deprecated
+}: RouteScreenProps<'your-sheet-name', 'route-a'>) => {
   // Access another sheet reference if needed
   const ref = useSheetRef('another-sheet-name');
-
+  const payload = useSheetPayload('your-sheet-name');
+  
   return (
     <View>
       <Button

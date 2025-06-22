@@ -12,12 +12,14 @@ export const routes: Route[] = [
   },
 ];
 
-// Add TypeScript type definitions
 declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        'emoji-grid': RouteDefinition<{}, { selectedEmoji: string }>;
+        'emoji-grid': RouteDefinition<{ selectedEmoji: string }>;
+      };
+      payload: {
+        token: string;
       };
     }>;
   }

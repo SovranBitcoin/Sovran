@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, reds, shades } from 'helper/colors';
+import { greys, reds } from 'helper/colors';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 
-const RouteA = ({ router, payload }) => {
+const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const payload = useSheetPayload('button-handler');
+
   const [processingButtonIndex, setProcessingButtonIndex] = useState(null);
 
   const handleButtonPress = (onPress, index) => {
@@ -98,67 +100,5 @@ const RouteA = ({ router, payload }) => {
     </View>
   );
 };
-
-const createStyles = (theme: string) =>
-  StyleSheet.create({
-    headerText: {
-      fontFamily: 'OverpassBold',
-      textAlign: 'center',
-      marginTop: 16,
-      color: shades[500],
-      fontSize: 16,
-    },
-    contentContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingBottom: 40,
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: '50%',
-      transform: [
-        {
-          translateY: '-150%',
-        },
-      ],
-    },
-    iconButton: {
-      position: 'absolute',
-      top: 0,
-      zIndex: 10,
-    },
-    iconBackground: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: shades[500],
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-    },
-    pulseCircle: {
-      position: 'absolute',
-      width: 100,
-      height: 100,
-      top: 0,
-      borderRadius: 50,
-      backgroundColor: shades[400],
-    },
-    statusText: {
-      marginTop: 24,
-      color: greys(theme)[2300],
-      fontFamily: 'OverpassMedium',
-      fontSize: 16,
-    },
-    cancelButton: {
-      marginTop: 20,
-      width: 150,
-    },
-  });
 
 export default RouteA;

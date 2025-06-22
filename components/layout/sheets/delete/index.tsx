@@ -5,7 +5,7 @@ import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 
-function SheetWithRouter(props: any) {
+function SheetWithRouter() {
   const theme = useSelector(memoizedGetTheme);
   return (
     <ActionSheet

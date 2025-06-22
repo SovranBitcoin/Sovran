@@ -12,7 +12,7 @@ import opacity from 'hex-color-opacity';
 import { runWithAnimationFrame } from 'app/onboard/new';
 
 export interface ButtonHandlerButton {
-  testID: string | undefined;
+  testID?: string | undefined;
   disabled?: boolean;
   loading?: boolean;
   variant: 'primary' | 'secondary' | 'dangerous';
@@ -22,7 +22,7 @@ export interface ButtonHandlerButton {
 }
 
 interface ButtonHandlerProps {
-  context?: 'tab';
+  context?: 'tab' | 'sheet';
   buttons: ButtonHandlerButton[];
   style?: StyleProp<ViewStyle>;
   colors?: readonly [string, string, ...string[]];

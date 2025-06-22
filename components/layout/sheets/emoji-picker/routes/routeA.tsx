@@ -1,7 +1,7 @@
 import { greys } from 'helper/colors';
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
-import { ScrollView } from 'react-native-actions-sheet';
+import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View, Text } from 'components/common/Themed';
@@ -11,9 +11,11 @@ import { showSuccess } from 'helper/popup/popups';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/common/Card';
 
-const EmojiGrid = ({ router, payload }) => {
+const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
+
+  const payload = useSheetPayload('emoji-picker');
 
   const emojis = [
     { id: 'nut', emoji: '🥜' }, // peanut (inside joke in some bitcoin circles)
