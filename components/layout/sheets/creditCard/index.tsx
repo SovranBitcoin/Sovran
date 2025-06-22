@@ -1,7 +1,7 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { View, Text, Dimensions } from 'react-native';
+import { Dimensions } from 'react-native';
 import { CARD_HEIGHT } from 'components/common/NFCCard';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';

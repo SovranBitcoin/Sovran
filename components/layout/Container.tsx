@@ -3,7 +3,6 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { View } from 'components/common/Themed';
 const Container: React.FC<{
   children: React.ReactNode;

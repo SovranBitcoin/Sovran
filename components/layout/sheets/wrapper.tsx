@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';

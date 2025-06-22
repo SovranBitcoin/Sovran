@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { formatCurrency } from 'helper/currency';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash } from 'components/cashu';
 import Modal from 'components/layout/Modal';
@@ -13,11 +12,7 @@ import { showMessage } from 'helper/popup/popups';
 import { giveaways } from 'helper/cashu/secrets';
 import { useRoute } from '@react-navigation/native';
 import { useTypedNavigation } from 'helper/navigation';
-import {
-  memoizedGetMints,
-  memoizedGetTransactionByMatcher,
-  useGetMintInfo,
-} from 'helper/redux/cashu';
+import { memoizedGetMints, useGetMintInfo } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
@@ -25,8 +20,6 @@ import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
-import { View } from 'components/common/Themed';
-import _ from 'lodash';
 
 // Main component
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';

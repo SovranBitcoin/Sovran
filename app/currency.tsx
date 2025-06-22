@@ -1,17 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
-import {
-  decodeUrlOrAddress,
-  getInvoiceFromLnurl,
-  isLightningAddress,
-  isLnurl,
-  isLnurlOrAddress,
-} from 'helper/third-party/lnurl';
+
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { getMeltQuote, isValidLNURL, receiveLightning, sendEcash } from 'components/cashu';
+import { getMeltQuote, receiveLightning, sendEcash } from 'components/cashu';
 import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -20,23 +14,19 @@ import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
 import { View, Text } from 'components/common/Themed';
-import { isValidPaymentRequest } from 'helper/cashu/helper';
-import { barcodeHandler, handlePaymentRequest } from 'helper/payment-handler/handlers';
+import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
-import { SheetManager, SheetProvider } from 'react-native-actions-sheet';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
 import { maybeConvertNpub, npubToPublicKey, pubKeyTo02 } from 'helper/cashu/pay';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { runWithAnimationFrame } from './onboard/new';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { decode } from '@gandlaf21/bolt11-decode';
 import { requestInvoice, utils } from 'lnurl-pay';
 interface ScanningData {
   data: string;

@@ -1,16 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // Add UTC plugin
-import { Tabs } from 'components/common/Tabs';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, shades, greys, reds } from 'helper/colors';
+import { greens, greys, reds } from 'helper/colors';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
 import opacity from 'hex-color-opacity';
-import { Section } from 'components/common/Section';
-import Icons from 'assets/icons';
 
 const DonutChart = ({
   size = 96,

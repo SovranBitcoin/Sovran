@@ -1,5 +1,5 @@
 import '../../shim';
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,7 +7,6 @@ import {
   ScrollView,
   TextInput,
   Image,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -19,7 +18,6 @@ import Container from 'components/layout/Container';
 import { Text } from 'components/common/Themed';
 import { useTypedNavigation } from 'helper/navigation';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
-import { hexToBytes } from '@noble/hashes/utils';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
 import * as bip39 from '@scure/bip39';

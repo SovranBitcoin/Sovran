@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector } from 'react-redux';
 import {
   memoizedGetAllBalancesMultipleCurrencies,
   memoizedGetSelectedMint,
 } from 'helper/redux/cashu/selectors';
-import { getMint } from 'helper/cashu';
-import Icon, { CheckIcon, CurrencyIcon, DotsIcon, FlagIcon } from 'assets/icons';
+import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import Image from 'components/common/Image';
-import Wrapper, { SheetButton } from '../wrapper';
+import Wrapper from '../wrapper';
 import { showMessage } from 'helper/popup/popups';
 import { sovran } from '.';
 import opacity from 'hex-color-opacity';

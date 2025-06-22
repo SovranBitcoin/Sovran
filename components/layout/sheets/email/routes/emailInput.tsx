@@ -1,7 +1,7 @@
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import React, { useState } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
-import { RouteScreenProps, useSheetRef, ScrollView } from 'react-native-actions-sheet';
+import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';

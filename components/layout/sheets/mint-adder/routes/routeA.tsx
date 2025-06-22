@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, Button } from 'react-native';
 import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import MintAddMore from '../../mints/MintAddMore';
 

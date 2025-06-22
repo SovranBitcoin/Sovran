@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
+import { View, SectionList, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 

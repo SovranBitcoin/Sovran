@@ -3,7 +3,6 @@ import { StyleSheet } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
-import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';

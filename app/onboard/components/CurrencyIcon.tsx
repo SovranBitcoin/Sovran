@@ -1,7 +1,5 @@
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
-import { Text } from 'components/common/Themed';
 import React from 'react';
-import { View } from 'react-native';
 
 interface CurrencyIconProps {
   currency: string;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   SafeAreaView,
@@ -20,7 +20,6 @@ import Icon from 'assets/icons';
 import { showMessage } from 'helper/popup/popups';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
 
 const DERIVATION_PATH = `m/44'/129372'`;
 

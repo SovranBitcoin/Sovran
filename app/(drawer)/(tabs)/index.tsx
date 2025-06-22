@@ -1,14 +1,13 @@
 import 'app/global';
-import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
+import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
-import { RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
-import { View, Text } from 'components/common/Themed';
+import { View } from 'components/common/Themed';
 import { Transactions } from 'components/layout/Transactions';
-import { receiveEcash } from 'components/cashu';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { greys } from 'helper/colors';
@@ -21,7 +20,6 @@ import { AccountPagerView } from '../../../components/layout/AccountPagerView';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
 import {
-  appendTransaction,
   appendTransactionsV2,
   memoizedGetSelectedMint,
   memoizedGetTransactionByMatcher,
@@ -32,7 +30,6 @@ import _ from 'lodash';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
-import { SheetManager } from 'react-native-actions-sheet';
 
 export async function getProfile(currentProfile: any, listenToTransaction: any) {
   const sk = nip19.decode(currentProfile?.nsec).data;

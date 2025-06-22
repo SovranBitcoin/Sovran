@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
 import { formatCurrency } from 'helper/currency';
-import {
-  getDescription,
-  getExpiresIn,
-  getExpiry,
-  getTimestamp,
-  sendLightning,
-} from 'components/cashu';
+import { getDescription, getTimestamp, sendLightning } from 'components/cashu';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { View } from 'components/common/Themed';

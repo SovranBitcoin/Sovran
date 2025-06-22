@@ -8,21 +8,14 @@ import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet'
 import { useWallet } from 'helper/cashu/wallet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Card } from 'components/common/Card';
-import Image from 'components/common/Image';
 import { useSelector } from 'react-redux';
-import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
-import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import { nip19 } from 'nostr-tools';
 import Heatmap from 'components/layout/Heatmap';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
-import { showSuccess } from 'helper/popup/popups';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/layout/Transaction';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 const MintDetailPage = (props) => {
   const theme = useSelector(memoizedGetTheme);

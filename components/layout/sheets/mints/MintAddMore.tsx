@@ -8,16 +8,12 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Themed';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { addMintsAction } from 'helper/redux/cashu';
-import { store } from 'helper/redux/store';
-import Wrapper, { SheetButton } from '../wrapper';
+import Wrapper from '../wrapper';
 import { sovran } from '.';
 import { ScrollView } from 'react-native-actions-sheet';
 import { getMint, getWallet } from 'components/cashu';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import Container from 'components/layout/Container';
-import Modal from 'components/layout/Modal';
-import { isDev, isProduction, isTestFlight } from 'helper/version';
+import { isProduction } from 'helper/version';
 
 interface MintCount {
   mintUrl: string;

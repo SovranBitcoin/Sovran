@@ -1,12 +1,11 @@
 import { greys } from 'helper/colors';
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
-import { ScrollView, useSheetRef, useSheetRouteParams } from 'react-native-actions-sheet';
+import { ScrollView } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View, Text } from 'components/common/Themed';
 import chunk from 'lodash/chunk';
-import { ButtonHandler } from 'components/common/ButtonHandler';
 import { encode } from 'helper/third-party/emoji';
 import { showSuccess } from 'helper/popup/popups';
 import * as Clipboard from 'expo-clipboard';

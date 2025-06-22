@@ -1,13 +1,13 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { Image, ScrollView, Keyboard } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greens, greys, reds, shades } from 'helper/colors';
+import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
-import { NDKUser, NDKUserProfile } from '@nostr-dev-kit/ndk';
+import { NDKUser } from '@nostr-dev-kit/ndk';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
 import { View, Text } from 'components/common/Themed';
 import { SafeAreaView } from 'react-native-safe-area-context';

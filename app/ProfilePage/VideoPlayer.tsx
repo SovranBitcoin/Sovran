@@ -5,10 +5,8 @@ import { useVideoPlayer, VideoSource, VideoView } from 'expo-video';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Dimensions } from 'react-native';
 import Modal from 'components/layout/Modal';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Card } from 'components/common/Card';
 

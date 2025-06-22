@@ -13,7 +13,6 @@ import CachedImage from 'components/common/Image';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { Button } from 'components/common/Button';
 import { products } from './products';
-import { TextContent } from '../ProfilePage/TextContent';
 import { Card } from 'components/common/Card';
 import lookup from 'country-code-lookup';
 import RenderHtml from 'react-native-render-html';

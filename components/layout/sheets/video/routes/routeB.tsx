@@ -1,7 +1,7 @@
 import { Text } from 'components/common/Themed';
 import React from 'react';
 import { View, Button } from 'react-native';
-import { useSheetRouter, useSheetRouteParams } from 'react-native-actions-sheet';
+import { useSheetRouteParams } from 'react-native-actions-sheet';
 
 const RouteB = ({ router }) => {
   const params = useSheetRouteParams('video-sheet', 'route-b');

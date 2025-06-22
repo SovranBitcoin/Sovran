@@ -1,8 +1,8 @@
 import React from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { Text, View } from 'components/common/Themed';
-import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
+import { View } from 'components/common/Themed';
+import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';

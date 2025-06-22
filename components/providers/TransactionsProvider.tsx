@@ -2,8 +2,6 @@ import { useEffect, useState, createContext, useContext, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import {
-  CashuMint,
-  CashuWallet,
   getDecodedToken,
   injectWebSocketImpl,
   MintQuoteResponse,
@@ -19,7 +17,7 @@ import {
 } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
 import { publishWalletEvent } from 'helper/nostr/cashu';
-import { getMint, getWallet } from 'components/cashu';
+import { getWallet } from 'components/cashu';
 import _ from 'lodash';
 
 const TransactionContext = createContext(null);

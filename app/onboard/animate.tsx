@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Animated, ScrollView, Dimensions, Easing, Alert } from 'react-native';
+import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
@@ -11,13 +11,7 @@ import { createStyles } from './helper';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
-import {
-  addMints,
-  appendProofsV2,
-  increaseCounterV2,
-  setKeysets,
-  setSelectedMint,
-} from 'helper/redux/cashu';
+import { addMints, appendProofsV2, increaseCounterV2, setSelectedMint } from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { MintItem } from './MintItem';
@@ -29,7 +23,6 @@ import { getProfile } from './components/fetchAccountData';
 import { Currency } from './components/CurrencyIcon';
 import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { apple_mnemonic, giveaways } from 'helper/cashu/secrets';
 
 const { height } = Dimensions.get('window');
 

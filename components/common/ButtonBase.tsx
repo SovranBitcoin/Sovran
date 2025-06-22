@@ -1,19 +1,10 @@
-import {
-  StyleSheet,
-  View,
-  Pressable,
-  Animated,
-  useWindowDimensions,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
+import { View, Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
 import { useRef, useEffect, useState, ReactNode } from 'react';
 import { greys, black, shades, reds } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon from 'assets/icons';
-import { FontWeight } from '@shopify/react-native-skia';
 import { TouchableOpacity } from './TouchableOpacity';
 
 type ButtonVariant = 'primary' | 'secondary';

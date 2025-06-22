@@ -1,11 +1,8 @@
-import { StyleSheet, View, Dimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import CreditCardComponent, { CARD_HEIGHT } from 'components/common/NFCCard';
-import Modal from 'components/layout/Modal';
+import CreditCardComponent from 'components/common/NFCCard';
 import Swiper from 'react-native-web-infinite-swiper';
-import { Text } from 'components/common/Themed';
-import Container from 'components/layout/Container';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
 const TabTwoScreen = () => {

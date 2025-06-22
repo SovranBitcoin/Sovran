@@ -1,4 +1,4 @@
-import { Pressable, View, StyleSheet, Platform, Dimensions } from 'react-native';
+import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -9,7 +9,7 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { translateText, Text } from 'components/common/Themed';
+import { translateText } from 'components/common/Themed';
 import { greys, shades } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -18,7 +18,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import WalletHeader, { Background } from 'components/layout/WalletHeader';
+import { Background } from 'components/layout/WalletHeader';
 
 const Stack = createNativeStackNavigator();
 

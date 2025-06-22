@@ -1,16 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import 'react-native-get-random-values';
-import { Animated, Platform, StyleSheet, Text as RNText } from 'react-native';
+import { Animated, Platform, StyleSheet } from 'react-native';
 
 import { Text, View } from 'components/common/Themed';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 
 import { setSelectedMint } from 'helper/redux/cashu';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { sovran } from 'components/layout/sheets/mints';
 import { NonGestureView } from './NonGestureView';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 

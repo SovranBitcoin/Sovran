@@ -11,7 +11,6 @@ import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
 import { ScrollView } from 'react-native';
 
-import Modal from 'components/layout/Modal';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 

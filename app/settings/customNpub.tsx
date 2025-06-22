@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import React, { useState, useEffect, useRef } from 'react';
-import Icon, { CheckIcon } from 'assets/icons';
+import { CheckIcon } from 'assets/icons';
 import { Text } from 'components/common/Themed';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';

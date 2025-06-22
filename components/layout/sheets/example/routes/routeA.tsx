@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Button } from 'react-native';
-import { RouteScreenProps, useSheetRef, useSheetRouteParams } from 'react-native-actions-sheet';
+import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 
 const RouteA = ({ router, payload }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
   // when data is passed from .show() method, it will be available in the payload

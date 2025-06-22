@@ -1,12 +1,11 @@
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import React, { useState } from 'react';
-import { TextInput, StyleSheet, Keyboard } from 'react-native';
-import { RouteScreenProps, useSheetRef, ScrollView } from 'react-native-actions-sheet';
+import { TextInput, StyleSheet } from 'react-native';
+import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { View, Text } from 'components/common/Themed';
-import { ClickOutsideProvider, useClickOutside } from 'react-native-click-outside';
 
 const MessageInput = ({
   router,

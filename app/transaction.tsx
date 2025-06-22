@@ -8,7 +8,6 @@ import { EcashSendConfirmation } from './ecashSendConfirmation';
 import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
 import { LightningReceiveConfirmation } from './lightningReceiveConfirmation';
 import { LightningSendConfirmation } from './lightningSendConfirmation';
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 
 function ModalScreen() {
   const { id, transactionType } = useTypedRoute<'modal'>();

@@ -13,7 +13,6 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { getCountry } from './esimCountrySelection';
 import { fetchVpnInvoice } from 'helper/api/sovran';
 
 function ModalScreen() {

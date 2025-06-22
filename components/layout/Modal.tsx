@@ -19,7 +19,6 @@ import { CloseIcon, CloseIcon2 } from 'assets/icons';
 import { useNavigation } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { SheetProvider } from 'react-native-actions-sheet';
 
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 

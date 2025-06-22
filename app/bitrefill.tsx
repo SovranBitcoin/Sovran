@@ -10,7 +10,6 @@ import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import Modal from 'components/layout/Modal';
 import { View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 

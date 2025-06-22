@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { greys, reds } from 'helper/colors';
 import { TouchableOpacity } from './TouchableOpacity';

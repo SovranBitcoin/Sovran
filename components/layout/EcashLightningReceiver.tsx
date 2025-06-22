@@ -16,7 +16,6 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { useTypedNavigation } from 'helper/navigation';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/common/Card';
-import { SheetManager } from 'react-native-actions-sheet';
 import { useGetMintInfo } from 'helper/redux/cashu';
 import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';

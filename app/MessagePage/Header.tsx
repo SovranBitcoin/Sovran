@@ -1,8 +1,8 @@
 import React from 'react';
-import { Animated, Dimensions, Pressable } from 'react-native';
+import { Animated, Dimensions } from 'react-native';
 import { View, Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
-import Icon, { ArrowIcon, InfoIcon, VerifiedIcon } from 'assets/icons';
+import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import opacity from 'hex-color-opacity';
 import CachedImage from 'components/common/Image';

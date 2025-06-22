@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { ViewStyle } from 'react-native';
 import { StyledText, Text, View } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
@@ -7,7 +7,6 @@ import opacity from 'hex-color-opacity';
 import { BlurView } from 'expo-blur';
 
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { truncateMiddle } from 'helper/strings';
 

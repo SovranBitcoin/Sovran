@@ -3,7 +3,6 @@ import Container from 'components/layout/Container';
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'components/common/Themed';
 import * as Clipboard from 'expo-clipboard';
-import _ from 'lodash';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from 'app/Profile';

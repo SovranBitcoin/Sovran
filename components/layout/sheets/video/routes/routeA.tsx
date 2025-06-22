@@ -1,10 +1,7 @@
 import React from 'react';
-import { View, Button } from 'react-native';
-import { RouteScreenProps, useSheetRef, useSheetRouteParams } from 'react-native-actions-sheet';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { VideoScreen } from 'app/ProfilePage/VideoPlayer';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 const RouteA = ({ router }: RouteScreenProps<'video-sheet', 'route-a'>) => {

@@ -31,13 +31,12 @@ import { Card } from 'components/common/Card';
 import { useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, greys } from 'helper/colors';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import opacity from 'hex-color-opacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 interface MintQuoteTimelineProps {

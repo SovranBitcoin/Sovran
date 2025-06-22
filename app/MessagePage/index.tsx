@@ -36,7 +36,6 @@ import { Button } from 'components/common/Button';
 import ndk, { relays } from 'components/ndk';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from '../Profile';
-import { BITREFILL_NOSTR_PUBKEY } from '../bitrefill';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';

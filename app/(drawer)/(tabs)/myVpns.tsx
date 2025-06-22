@@ -4,7 +4,6 @@ import { useNavigation } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 
-import Modal from 'components/layout/Modal';
 import { Text, View } from 'components/common/Themed';
 import CircularProgress from 'components/common/CircleProgress';
 

@@ -1,8 +1,5 @@
-import { useEffect, useState, createContext, useContext, useRef } from 'react';
-import { store } from 'helper/redux/store';
+import { useState, createContext, useContext, useRef } from 'react';
 import { CashuMint, CashuWallet } from '@cashu/cashu-ts';
-import { showMessage } from 'helper/popup/popups';
-import { getWallet as loadWallet } from 'helper/cashu';
 
 const WalletsContext = createContext(null);
 

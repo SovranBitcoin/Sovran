@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { SheetProvider, useSheetRouter } from 'react-native-actions-sheet';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';

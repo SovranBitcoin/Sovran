@@ -7,7 +7,6 @@ import { greys } from 'helper/colors';
 import NumericKeyboard from 'components/passcode/NumericKeyboard';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
-import { Button } from 'components/common/Button';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { showMessage } from 'helper/popup/popups';
 

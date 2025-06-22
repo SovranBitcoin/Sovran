@@ -2,7 +2,7 @@ import { shades } from 'helper/colors';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
-import { CreditCard as CreditCardIcon, Wifi, CreditCard as CardIcon } from 'react-native-feather';
+import { Wifi, CreditCard as CardIcon } from 'react-native-feather';
 
 // Enum for card types
 const CardType = {
