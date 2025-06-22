@@ -91,7 +91,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       backgroundColor: 'transparent',

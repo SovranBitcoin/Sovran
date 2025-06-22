@@ -19,7 +19,6 @@ import { fetchQuote } from 'helper/api/sovran';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useNavigation();
   const { setEsims } = useEsims();
 
@@ -278,7 +277,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[2300],

@@ -31,7 +31,7 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
       const hashtagRegex = /#\w+/g;
       const hashtags = text.match(hashtagRegex) || [];
       return hashtags;
-    } catch (err) {
+    } catch {
       return [];
     }
   };
@@ -41,7 +41,7 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
       const mentionsRegex = /nostr:npub1\w+/g;
       const mentions = text.match(mentionsRegex) || [];
       return mentions;
-    } catch (err) {
+    } catch {
       return [];
     }
   };

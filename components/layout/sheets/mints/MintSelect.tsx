@@ -221,8 +221,6 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
-  const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-
   const [mintState, setMintState] = useState<MintState>({
     selected: null,
     loadingId: null,
@@ -267,7 +265,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           },
           balance
         );
-        setMintState((prev) => ({
+        setMintState(() => ({
           selected: {
             id: mint.id,
             name: mint.name,
@@ -277,7 +275,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           },
           loadingId: null,
         }));
-      } catch (error) {
+      } catch {
         setMintState((prev) => ({
           ...prev,
           loadingId: null,

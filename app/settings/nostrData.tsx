@@ -11,6 +11,7 @@ import { greys } from 'helper/colors';
 import Image from 'components/common/Image';
 import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -21,7 +22,7 @@ export default function ModalScreen() {
   const filters = useMemo(
     () => [
       {
-        // authors: [currentProfile?.pubkey],
+        authors: [currentProfile?.pubkey],
         kinds: [EventKind.Metadata, 37375],
         limit: 10,
       },
@@ -62,7 +63,7 @@ export default function ModalScreen() {
       if (event?.content) {
         return JSON.parse(event.content);
       }
-    } catch (e) {
+    } catch {
       return null;
     }
     return null;

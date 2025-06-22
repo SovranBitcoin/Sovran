@@ -141,7 +141,6 @@ const NpubSelector = ({
 }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const [modalVisible, setModalVisible] = useState(false);
   const { currentProfile } = useNostr();
   const [nameAvailability, setNameAvailability] = useState<{ name: string; available: boolean }[]>(
     []

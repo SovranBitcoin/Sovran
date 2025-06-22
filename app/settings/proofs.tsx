@@ -14,7 +14,6 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export default function ModalScreen() {
   const dispatch = useDispatch(); // Add dispatch hook
-  const [isLoading, setIsLoading] = useState(false);
   const [proofStates, setProofStates] = useState({});
   const [checkingSpent, setCheckingSpent] = useState(false);
   const [removingSpent, setRemovingSpent] = useState(false);

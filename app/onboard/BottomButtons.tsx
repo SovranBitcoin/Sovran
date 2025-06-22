@@ -79,7 +79,7 @@ const getButtonStyle = (variant, theme) => {
   return variantStyles[variant] || variantStyles.default;
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     bottomButtons: {
       width: '100%',

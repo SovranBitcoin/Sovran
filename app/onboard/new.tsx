@@ -200,7 +200,7 @@ const RecoveryScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { profiles, setProfiles, setCurrentProfile } = useNostr();
+  const { setProfiles, setCurrentProfile } = useNostr();
 
   // State
   const [selectedProfilePicture, setSelectedProfilePicture] = useState(profilePictures[0]);
@@ -325,7 +325,7 @@ const RecoveryScreen = () => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,

@@ -18,7 +18,6 @@ import { fetchVpnInvoice } from 'helper/api/sovran';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   const { params } = useRoute();
   const [country, setCountry] = useState('RU');
@@ -82,21 +81,9 @@ function ModalScreen() {
     }
   }, [params?.country]);
 
-  const handleCountryChange = (newCountry) => {
-    setCountry(newCountry);
-  };
-
-  const handleDataTypeChange = (newDataType) => {
-    setDataType(newDataType);
-  };
-
-  const handlePackageSelect = (packageCode) => {
-    setSelectedPackage(packageCode);
-  };
-
   const navigation = useNavigation();
 
-  const { setVpn, vpn } = useVpn();
+  const { setVpn } = useVpn();
 
   const handleContinue = async () => {
     const selectedPackageDuration = packages.find(
@@ -276,7 +263,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     minus: {
       fontFamily: 'OverpassBold',

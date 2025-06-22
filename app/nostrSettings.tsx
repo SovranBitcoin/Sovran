@@ -162,7 +162,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     minus: {
       fontFamily: 'OverpassBold',

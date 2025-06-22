@@ -24,7 +24,6 @@ interface WalletHeaderProps {
 
 export function Background() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   const defaultColors: readonly [string, string, ...string[]] = [
     greys(theme)[2300],

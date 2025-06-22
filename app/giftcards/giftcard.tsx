@@ -20,7 +20,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 
 const width = Dimensions.get('window').width;
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     productImage: {
       width: '100%',

@@ -4,19 +4,19 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { View } from 'components/common/View';
+
 const Container: React.FC<{
   children: React.ReactNode;
   style?: any;
   contentContainerStyle?: any;
   scroll?: boolean;
-}> = ({ children, style = {}, contentContainerStyle = {}, scroll = true }) => {
+}> = ({ children, style = {}, contentContainerStyle = {} }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const styles = createStyles();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: greys(theme)[2300], ...style }}>
       <View
-        // scrollEnabled={scroll}
         style={[
           styles.content,
           {
@@ -29,7 +29,7 @@ const Container: React.FC<{
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = () =>
   StyleSheet.create({
     content: {
       paddingHorizontal: 16,

@@ -198,7 +198,7 @@ function TabOneScreen({
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     scrollView: {
       marginTop: 0,

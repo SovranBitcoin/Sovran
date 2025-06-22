@@ -5,7 +5,6 @@ import { receiveEcash } from 'components/cashu';
 import Modal from 'components/layout/Modal';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
@@ -117,8 +116,6 @@ export function EcashReceiveConfirmation({
   ) => void;
   extraButtons?: ButtonHandlerButton[];
 }) {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const mints = useSelector(memoizedGetMints);
 

@@ -10,7 +10,7 @@ import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     productGrid: {
       flexDirection: 'row',

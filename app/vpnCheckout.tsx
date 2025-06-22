@@ -8,12 +8,7 @@ import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { FlagIcon } from 'assets/icons';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
-import {
-  memoizedGetBalance,
-  memoizedGetSelectedMint,
-  setSelectedMint,
-  useCashu,
-} from 'helper/redux/cashu';
+import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
 import * as Device from 'expo-device';
 import opacity from 'hex-color-opacity';
 import { useDispatch, useSelector } from 'react-redux';
@@ -31,11 +26,9 @@ export const LNVPN_PUBKEY = '06dde95f0268ce40128bf73ca6e85567b8567688ea52f24dcd5
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   const navigation = useNavigation();
   const { params } = useRoute();
-  const { proofs, keysets } = useCashu();
   const [unit, setUnit] = useState('sat');
   const [loading, setLoading] = useState(false);
   const [iosWarning, setIosWarning] = useState('');
@@ -239,7 +232,7 @@ function ModalScreen() {
 
 export default withSheetProvider(ModalScreen);
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     textInput: {
       backgroundColor: greys(theme)[1800],

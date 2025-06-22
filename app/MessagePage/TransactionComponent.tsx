@@ -56,7 +56,7 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,

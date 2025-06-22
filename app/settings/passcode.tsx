@@ -14,7 +14,7 @@ const PASSCODE_LENGTH = 4;
 
 const PasscodeSettings: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
-  const { setPasscode, passcode } = useSettings();
+  const { setPasscode } = useSettings();
   const navigation = useTypedNavigation();
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');

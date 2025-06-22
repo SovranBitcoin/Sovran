@@ -17,7 +17,7 @@ const videoSource: VideoSource = {
   assetId,
 };
 
-export function VideoScreen({ ...props }) {
+export function VideoScreen() {
   const theme = useSelector(memoizedGetTheme);
   const ref = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);

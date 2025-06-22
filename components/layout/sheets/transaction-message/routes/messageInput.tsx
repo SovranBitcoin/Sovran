@@ -8,10 +8,7 @@ import { greys } from 'helper/colors';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
-const MessageInput = ({
-  router,
-  payload,
-}: RouteScreenProps<'transaction-message', 'message-input'>) => {
+const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input'>) => {
   const [message, setMessage] = useState('');
   const sheetRef = useSheetRef('transaction-message');
   const theme = useSelector(memoizedGetTheme);

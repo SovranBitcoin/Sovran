@@ -6,9 +6,6 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
-  TextInput,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -461,24 +458,7 @@ export default function ModalScreen() {
   );
 }
 
-const KeyboardAvoidingComponent = () => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
-  return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.inner}>
-        <Text style={styles.header}>Header</Text>
-        <TextInput placeholder="Username" style={styles.textInput} />
-        <View style={styles.btnContainer}>
-          <Button title="Submit" onPress={() => null} />
-        </View>
-      </View>
-    </TouchableWithoutFeedback>
-  );
-};
-
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     inner: {
       padding: 24,

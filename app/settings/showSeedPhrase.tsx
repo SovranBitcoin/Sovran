@@ -39,7 +39,7 @@ const ShowSeedPhrase: React.FC = () => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     section: {
       paddingVertical: 14,

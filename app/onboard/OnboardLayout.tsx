@@ -171,7 +171,7 @@ export function OnboardingLayout({
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     titleText: {
       fontFamily: 'LexendBold',

@@ -8,20 +8,14 @@ import {
   Clipboard,
   ScrollView,
   Image,
-  TextInput,
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { showMessage } from 'helper/popup/popups';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-
-const DERIVATION_PATH = `m/44'/129372'`;
 
 const Profile = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -32,22 +26,6 @@ const Profile = () => {
     nsec: false,
     cashuMnemonic: false,
   });
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [displayName, setDisplayName] = useState(currentProfile?.name || '');
-  const [cashuMnemonic, setCashuMnemonic] = useState('');
-  const navigation = useNavigation();
-
-  function getRoot(profile) {
-    if (profile?.root?.xpriv) {
-      const root = HDKey.fromExtendedKey(profile.root.xpriv);
-      if (root) {
-        return root;
-      }
-    }
-
-    const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(profile?.mnemonic));
-    return root;
-  }
 
   const handleCopy = (text, messageKey) => {
     if (text) {
@@ -62,17 +40,6 @@ const Profile = () => {
       [field]: !prev[field],
     }));
   };
-
-  const renderDetail = (label, value, editable = false) => (
-    <View style={styles.detailContainer}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      {editable && isEditMode ? (
-        <TextInput style={styles.detailText} value={displayName} onChangeText={setDisplayName} />
-      ) : (
-        <Text style={styles.detailText}>{value || 'N/A'}</Text>
-      )}
-    </View>
-  );
 
   const renderCopyableDetail = (label, value, messageKey, fieldKey = null, description = null) => {
     const showEyeIcon = fieldKey !== null;
@@ -163,7 +130,7 @@ const Profile = () => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     content: {
       paddingHorizontal: 16,

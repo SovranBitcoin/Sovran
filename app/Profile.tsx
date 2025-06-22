@@ -64,7 +64,6 @@ const Screen = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const actionSheetRef = useRef<ActionSheetRef>(null);
-  const [isEditing, setIsEditing] = useState(false);
 
   const { profiles, setProfiles, currentProfile, setCurrentProfile } = useNostr();
   const dispatch = useDispatch();
@@ -636,7 +635,6 @@ const RouteC = () => {
 };
 
 const RouteD = () => {
-  const router = useSheetRouter('sheet-with-router');
   const params = useSheetRouteParams<'sheet-with-router', 'route-d'>();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);

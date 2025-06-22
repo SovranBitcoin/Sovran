@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
-import { Dimensions, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, ScrollView } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -138,9 +138,7 @@ Using ecash involves significant risks including legal, market, liquidity, count
 
 These Terms represent the entire agreement between you and Sovran.`;
 
-const createStyles = (theme) => {
-  const screenHeight = Dimensions.get('screen').height;
-
+const createStyles = (theme: string) => {
   return StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[1900],

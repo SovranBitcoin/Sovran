@@ -96,7 +96,7 @@ const VerifySeedPhrase = () => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       flex: 1,

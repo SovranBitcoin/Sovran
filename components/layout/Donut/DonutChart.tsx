@@ -138,7 +138,7 @@ const DonutChart = ({
 
 export default DonutChart;
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       flex: 1,

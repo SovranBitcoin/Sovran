@@ -54,7 +54,6 @@ const RenderContactItem = ({ item }: { item: any }) => {
 const Section = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useTypedNavigation();
   const { profiles, search, currentProfile, messages, contacts } = useNostr();
   const { transactions } = useCashu();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
@@ -433,7 +432,7 @@ const formatCustomDate = (date) => {
   }).format(date);
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[2300],

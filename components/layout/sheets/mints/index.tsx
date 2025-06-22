@@ -159,11 +159,6 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   );
 };
 
-// Theme type definition
-interface Theme {
-  isDark: boolean;
-}
-
 // Helper function for opacity
 const opacity = (color: string, alpha: number) => {
   // Extract color components and apply opacity

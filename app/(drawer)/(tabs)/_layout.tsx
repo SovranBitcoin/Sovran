@@ -108,7 +108,7 @@ const TabBarBackground = ({ theme }) => (
 );
 
 // Styles creator function
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     tabBarStyle: {
       position: 'absolute',
@@ -146,7 +146,6 @@ const createStyles = (theme) =>
 // Main component
 const TabLayout = () => {
   const theme = useSelector(memoizedGetTheme);
-  const language = useSelector((state) => state.settings?.settings?.lang);
   const navigation = useNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);

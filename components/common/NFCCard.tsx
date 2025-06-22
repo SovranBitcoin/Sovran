@@ -15,8 +15,6 @@ const CardType = {
 
 export const CreditCardComponent = ({
   cardholderName = 'KELBIE',
-  cardNumber = '4111 1111 1111 1111',
-  expiryDate = '12/25',
   cvv = '123',
   cardType = CardType.SOVRAN,
   colorScheme = {
@@ -26,20 +24,10 @@ export const CreditCardComponent = ({
     text: '#FFFFFF',
   },
   pattern = 'gradient',
-  showChip = true,
   showContactless = true,
   fontStyle = 'modern',
 }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
   const flipAnimation = useState(new Animated.Value(0))[0];
-
-  // Format card number to display with spaces
-  const formatCardNumber = (number) => {
-    return number
-      .replace(/\s/g, '')
-      .replace(/(.{4})/g, '$1 ')
-      .trim();
-  };
 
   const handleFlip = () => {
     SheetManager.show('credit-card-sheet', {
@@ -48,13 +36,6 @@ export const CreditCardComponent = ({
         // Process returned data here
       },
     });
-
-    // setIsFlipped(!isFlipped);
-    // Animated.timing(flipAnimation, {
-    //   toValue: isFlipped ? 0 : 1,
-    //   duration: 500,
-    //   useNativeDriver: true,
-    // }).start();
   };
 
   // Interpolate flip animation
@@ -79,40 +60,6 @@ export const CreditCardComponent = ({
       },
     ],
   };
-
-  // Get pattern style based on pattern type
-  const getPatternStyle = () => {
-    switch (pattern) {
-      case 'gradient':
-        return {
-          backgroundColor: colorScheme.primary,
-          backgroundImage: `linear-gradient(135deg, ${colorScheme.primary} 0%, ${colorScheme.secondary} 100%)`,
-        };
-      case 'dots':
-        return {
-          backgroundColor: colorScheme.primary,
-        };
-      case 'lines':
-        return {
-          backgroundColor: colorScheme.primary,
-        };
-      default:
-        return {
-          backgroundColor: colorScheme.primary,
-        };
-    }
-  };
-
-  // Component for chip
-  const CreditCardChip = () => (
-    <View style={[styles.chip, { backgroundColor: colorScheme.accent }]}>
-      <View style={styles.chipLines}>
-        <View style={styles.chipLine} />
-        <View style={styles.chipLine} />
-        <View style={styles.chipLine} />
-      </View>
-    </View>
-  );
 
   // Component for contactless
   const CreditCardContactless = () => (

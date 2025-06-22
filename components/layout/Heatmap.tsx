@@ -83,9 +83,6 @@ const DonutChart = ({
     };
   });
 
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
   return (
     <View style={[{ margin: 'auto', width: size, height: size }]}>
       <Canvas style={{ width: size, height: size }}>

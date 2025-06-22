@@ -46,7 +46,7 @@ const Footer = ({ theme, message, setMessage, handleSendDM, isFocused, setIsFocu
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = () =>
   StyleSheet.create({
     inputContainer: {
       position: 'relative',
@@ -54,10 +54,6 @@ const createStyles = (theme) =>
       flexDirection: 'row',
     },
     sendButton: {
-      // position: "absolute",
-      // right: 0,
-      // bottom: 16,
-      // height: "100%",
       alignItems: 'center',
       justifyContent: 'center',
       paddingLeft: 24,

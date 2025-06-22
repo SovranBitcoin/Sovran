@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -23,7 +22,6 @@ const MintDetailPage = (props) => {
   const styles = createStyles(theme);
   const router = useSheetRouter('mint');
   const params = useSheetRouteParams();
-  const [copiedItem, setCopiedItem] = useState(null);
   const navigation = useTypedNavigation();
 
   const { wallet, loading, error } = useWallet({
@@ -81,8 +79,8 @@ const MintDetailPage = (props) => {
   }
 
   const mintInfo = wallet.mintInfo._mintInfo;
-  const allowSetAsNPC = // reason: we want to allow websockets for the npubx.cash, otherwise it just complicates the codebase.
-    mintInfo?.nuts?.['17']?.supported?.[0]?.commands?.includes('bolt11_mint_quote');
+  // const allowSetAsNPC = // reason: we want to allow websockets for the npubx.cash, otherwise it just complicates the codebase.
+  //   mintInfo?.nuts?.['17']?.supported?.[0]?.commands?.includes('bolt11_mint_quote');
 
   return (
     <Wrapper
@@ -287,7 +285,7 @@ const MintDetailPage = (props) => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     scrollContainer: {
       flex: 1,

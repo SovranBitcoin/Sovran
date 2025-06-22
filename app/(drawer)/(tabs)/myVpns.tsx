@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 
@@ -16,11 +15,12 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 import { showMessage } from 'helper/popup/popups';
 import { fetchVpnCountries } from 'helper/api/sovran';
+import { useTypedNavigation } from 'helper/navigation';
 
 function TabTwoScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const { transactions: cashuTransactions } = useCashu();
   const { vpn } = useVpn();
   const [fetchingPackages, setFetchingPackages] = useState(false);
@@ -59,7 +59,7 @@ function TabTwoScreen() {
         return data;
       }
       return null;
-    } catch (error) {
+    } catch {
       showMessage('vpns_error', {}, { emoji: '🚨' });
       return null;
     }

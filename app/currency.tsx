@@ -36,7 +36,7 @@ interface ScanningData {
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const styles = createStyles();
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const { params } = useRoute();
@@ -335,7 +335,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = () =>
   StyleSheet.create({
     buttonContainer: {
       flexDirection: 'row',

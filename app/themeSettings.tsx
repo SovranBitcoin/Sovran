@@ -83,7 +83,6 @@ interface ThemeSettingsProps {}
 
 function ThemeSettings({}: ThemeSettingsProps) {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useNavigation();
   const [searchText, setSearchText] = useState('');
   const { setTheme } = useSettings();
@@ -126,7 +125,7 @@ function ThemeSettings({}: ThemeSettingsProps) {
 
 export default withSheetProvider(ThemeSettings);
 
-const createStyles = (theme) =>
+const createStyles = () =>
   StyleSheet.create({
     container: {
       backgroundColor: 'transparent',

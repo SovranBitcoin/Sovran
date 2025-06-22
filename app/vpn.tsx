@@ -7,12 +7,10 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import lookup from 'country-code-lookup';
-import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useVpn } from 'helper/redux/lnvpn';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -66,9 +64,6 @@ export function convertDataUsage(data) {
 }
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
   const { params } = useRoute();
   const navigation = useNavigation();
   const [query, setQuery] = useState();
@@ -373,7 +368,7 @@ function ModalScreen() {
 
 export default withSheetProvider(ModalScreen);
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     minus: {
       fontFamily: 'OverpassBold',

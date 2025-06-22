@@ -135,7 +135,6 @@ const ServicesSection = () => {
           />
         ))}
       </View>
-      {/* </Modal> */}
     </View>
   );
 };

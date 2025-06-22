@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
-import { memoizedGetSettings, memoizedGetTheme, useSettings } from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';
 
 import { greys, reds } from 'helper/colors';
@@ -121,13 +121,7 @@ export const RowButton: React.FC<{
 const ModalScreen: React.FC<{}> = () => {
   const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
-  const { setDisplayBitcoin } = useSettings();
   const styles = createStyles(theme);
-  const [form, setForm] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
-    listenForTransactions: false,
-  });
 
   const navigation = useTypedNavigation();
 
@@ -163,13 +157,6 @@ const ModalScreen: React.FC<{}> = () => {
         }
       }
     );
-  };
-
-  const handleTransactionSwitch = (value: boolean) => {
-    setForm((prevForm) => ({
-      ...prevForm,
-      listenForTransactions: value,
-    }));
   };
 
   const settings = useSelector(memoizedGetSettings);

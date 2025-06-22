@@ -294,7 +294,7 @@ function ModalScreen() {
 
 export default withSheetProvider(ModalScreen);
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     chartContainer: {
       marginBottom: 20,

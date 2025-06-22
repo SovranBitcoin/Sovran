@@ -106,7 +106,7 @@ const TabTwoScreen = () => {
   );
 };
 
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[2300],

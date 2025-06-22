@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 import { View } from 'components/common/View';
@@ -16,6 +15,7 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 import { fetchProducts } from 'helper/api/sovran';
+import { useTypedNavigation } from 'helper/navigation';
 
 // Separate component for eSIM item
 const EsimItem = ({ esim, navigation }) => {
@@ -105,7 +105,7 @@ const EsimSection = ({ title, esims, navigation }) => {
 function EsimsScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const { transactions: cashuTransactions } = useCashu();
   const { esims } = useEsims();
   const [fetchingPackages, setFetchingPackages] = useState(false);
@@ -267,7 +267,7 @@ function categorizeEsims(paidEsims, currentDate) {
 }
 
 // Styles
-const createStyles = (theme) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     modalContent: {
       flex: 1,
