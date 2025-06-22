@@ -14,7 +14,8 @@
     "submit:ios": "eas submit -p ios",
     "build:android:apk": "eas build -p android --profile preview",
     "submit:android": "eas submit -p android",
-    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\""
+    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
+    "lint": "expo lint"
   },
   "jest": {
     "preset": "jest-expo"
@@ -143,7 +144,7 @@
     "react-native-web": "^0.20.0",
     "react-native-web-infinite-swiper": "^1.0.1",
     "react-native-webview": "13.13.5",
-    "react-native-wireguard-vpn": "^1.0.15",
+    "react-native-wireguard-vpn": "^1.0.0",
     "react-navigation-shared-element": "^3.1.3",
     "react-redux": "^9.1.2",
     "readable-stream": "^1.0.33",
@@ -162,15 +163,15 @@
     "usehooks-ts": "^3.1.0",
     "util": "^0.10.4",
     "vm-browserify": "^0.0.4",
-    "webln": "^0.3.2",
-    "react-native-wireguard-vpn": "^1.0.0"
+    "webln": "^0.3.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@react-native-community/cli": "latest",
     "@types/lodash": "^4.17.10",
     "@types/react": "^19.1.2",
-    "eslint": "^8.57.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~9.2.0",
     "expo-atlas": "^0.4.0",
     "jest": "^29.2.1",
     "jest-expo": "~52.0.2",
