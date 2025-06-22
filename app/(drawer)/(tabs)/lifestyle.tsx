@@ -65,7 +65,7 @@ const SERVICE_MENU_ITEMS: MenuItemData[] = [
 ];
 
 interface MenuItemProps {
-  item: MenuItem;
+  item: MenuItemData;
   onPress: () => void;
 }
 
@@ -83,9 +83,11 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
           pointerEvents: item.empty ? 'none' : 'auto',
         },
       ]}>
-      <View style={styles.iconContainer}>
-        <Icon name={item.icon} size={32} color={greys(theme)[0]} />
-      </View>
+      {item.icon && (
+        <View style={styles.iconContainer}>
+          <Icon name={item.icon} size={32} color={greys(theme)[0]} />
+        </View>
+      )}
       <Text style={styles.gridText}>{item.label}</Text>
     </TouchableOpacity>
   );
