@@ -1,17 +1,15 @@
-import { Text as DefaultText, View as DefaultView, Pressable } from 'react-native';
+import { Text as DefaultText, View as DefaultView, Pressable, TextStyle } from 'react-native';
 // import Colors from "helper/constants/Colors";
 import translations from 'helper/translations';
 import { useSelector } from 'react-redux';
 import { BlurView } from 'expo-blur';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, greens } from 'helper/colors';
 import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import React from 'react';
 
-import { TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { greens } from 'helper/colors';
 import { Skeleton } from 'react-native-skeleton-component';
 
 interface GradientTextProps extends TextProps {

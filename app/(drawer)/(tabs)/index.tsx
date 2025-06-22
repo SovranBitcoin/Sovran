@@ -6,7 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
-import { View } from 'components/common/Themed';
+import { View, Text } from 'components/common/Themed';
 import { Transactions } from 'components/layout/Transactions';
 import { receiveEcash } from 'components/cashu';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
@@ -31,7 +31,6 @@ import { MintQuoteResponse } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { Text } from 'components/common/Themed';
 import { Card } from 'components/common/Card';
 import { SheetManager } from 'react-native-actions-sheet';
 

@@ -42,12 +42,12 @@ import { TransactionMintRefresh } from 'components/common/Transaction/Transactio
 
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { date: Date })[];
-  meltQuotes?: Array<{
+  meltQuotes?: {
     state: 'UNSPENT' | 'PENDING' | 'SPENT';
     addedAt?: number;
     amount: number;
     [key: string]: any;
-  }>;
+  }[];
   type: 'mint' | 'melt';
 }
 

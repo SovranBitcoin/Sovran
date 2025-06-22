@@ -1,6 +1,6 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector, useDispatch } from 'react-redux';
+import { memoizedGetTheme, setExperimental } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
 import { Section as TableSection } from 'components/common/Section';
@@ -12,8 +12,6 @@ import CreditCardComponent from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
 import { greys, shades } from 'helper/colors';
 import Checkbox from 'expo-checkbox';
-import { useDispatch } from 'react-redux';
-import { setExperimental } from 'helper/redux/settings';
 import { RootState } from 'helper/redux/store/reducer';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { ScrollView } from 'react-native';

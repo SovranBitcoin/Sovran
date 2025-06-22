@@ -1,9 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, ReactNode } from 'react';
 import { Pressable, ViewStyle, ScrollView } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
-import { ReactNode } from 'react';
 
 type ItemId = string | number;
 

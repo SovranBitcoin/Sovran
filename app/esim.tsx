@@ -1,6 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { Linking } from 'react-native';
-import { useEffect, useState } from 'react';
+import { StyleSheet, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
@@ -13,7 +12,6 @@ import { useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import DonutChartContainer from 'components/layout/Donut';
 import { truncateMiddle } from 'helper/strings';
-import React from 'react';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';

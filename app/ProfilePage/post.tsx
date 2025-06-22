@@ -12,7 +12,6 @@ import { GradientSkeleton } from 'components/common/GradientSkeleton';
 import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './helper';
 import { nip19 } from 'nostr-tools';
-dayjs.extend(relativeTime);
 
 import { ActionItems, usePostReactions } from './ActionItems';
 import { ExternalLink } from './ExternalLink';
@@ -23,6 +22,7 @@ import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { UserNameProfiles } from '../notifications';
 import { useTypedNavigation } from 'helper/navigation';
+dayjs.extend(relativeTime);
 
 export const PostQuote = React.memo(({ id }) => {
   const theme = useSelector(memoizedGetTheme);

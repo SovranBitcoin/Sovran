@@ -117,7 +117,7 @@ export default function ModalScreen() {
         limit: 1,
       },
     ],
-    [params?.pubkey],
+    [params?.pubkey]
   );
 
   const { events: profileEvents } = useSubscribe({ filters: profileFilters });

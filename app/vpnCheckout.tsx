@@ -13,7 +13,7 @@ import {
   setSelectedMint,
   useCashu,
 } from 'helper/redux/cashu';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Device from 'expo-device';
 import opacity from 'hex-color-opacity';
 import { useDispatch, useSelector } from 'react-redux';
@@ -22,7 +22,6 @@ import { useRoute } from '@react-navigation/native';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
-import React from 'react';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMeltQuote } from 'components/cashu';
 import { useNavigation } from 'expo-router';
@@ -13,7 +13,6 @@ import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/Themed';
 import { greys } from 'helper/colors';
-import { Dimensions } from 'react-native';
 
 const BITREFILL_URL = 'https://embed.bitrefill.com';
 const BITREFILL_NOSTR_PUBKEY = 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264';

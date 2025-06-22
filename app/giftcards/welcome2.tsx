@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -17,9 +17,7 @@ import { TextContent } from '../ProfilePage/TextContent';
 import { Card } from 'components/common/Card';
 import lookup from 'country-code-lookup';
 import RenderHtml from 'react-native-render-html';
-import { Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
-import { ScrollView } from 'react-native';
 
 const width = Dimensions.get('window').width;
 

@@ -37,5 +37,9 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, [setPricelist]);
 
-  return <PricelistContext.Provider value={{ btcPrice: pricelist?.usd?.btc }}>{children}</PricelistContext.Provider>;
+  return (
+    <PricelistContext.Provider value={{ btcPrice: pricelist?.usd?.btc }}>
+      {children}
+    </PricelistContext.Provider>
+  );
 };

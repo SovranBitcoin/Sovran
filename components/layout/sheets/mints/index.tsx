@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet, ViewStyle } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
@@ -12,6 +12,11 @@ import { Sheet } from 'components/layout/sheets/mints/sheet';
 import { MintSelect } from 'components/layout/sheets/mints/MintSelect';
 import MintAddMore from 'components/layout/sheets/mints/MintAddMore';
 import { store } from 'helper/redux/store';
+
+import MintDetailPage from './MintDetailsPage';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { AmountFormatter } from 'components/common/AmountFormatter';
+import { memoizedGetTheme } from 'helper/redux/settings';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -41,7 +46,7 @@ interface Mint {
 interface MintInfo {
   icon_url: string;
   nuts?: {
-    methods?: Array<{ unit: string }>;
+    methods?: { unit: string }[];
   }[];
 }
 
@@ -172,12 +177,6 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
     </TouchableOpacity>
   );
 };
-
-import { ViewStyle } from 'react-native';
-import MintDetailPage from './MintDetailsPage';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { AmountFormatter } from 'components/common/AmountFormatter';
-import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Theme type definition
 interface Theme {

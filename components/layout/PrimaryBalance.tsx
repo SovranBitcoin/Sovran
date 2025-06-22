@@ -1,13 +1,12 @@
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { View } from 'components/common/Themed';
+import { View, Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { useSettings } from 'helper/redux/settings';
 import { memoizedGetTotalBalance } from 'helper/redux/cashu';
 import Haptics from 'components/common/Haptics';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedPricelist } from 'helper/redux/pricelist';
-import { Text } from 'components/common/Themed';
 import { greens } from 'helper/colors';
 import opacity from 'hex-color-opacity';
 // Define proper interfaces

@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Linking, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Text, View } from 'components/common/Themed';
 import { greens, greys } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
 import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
 import { useWallet } from 'helper/cashu/wallet';
-import { StyleSheet } from 'react-native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Card } from 'components/common/Card';
 import Image from 'components/common/Image';

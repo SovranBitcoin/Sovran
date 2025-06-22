@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Dimensions } from 'react-native';
 
 interface WrapperProps {
   children: React.ReactNode;

@@ -1,14 +1,12 @@
 import { Button } from 'components/common/Button';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { greys, shades } from 'helper/colors';
-import { StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import React, { useState } from 'react';
 import Checkbox from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { ScrollView } from 'react-native';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 

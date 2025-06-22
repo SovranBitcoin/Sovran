@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { useState, useEffect } from 'react';
 import * as Device from 'expo-device';
 import lookup from 'country-code-lookup';
 import opacity from 'hex-color-opacity';

@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { nip19, SimplePool } from 'nostr-tools';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Icon, { PlusIcon, QRIcon, ImportIcon, CheckIcon } from 'assets/icons';
 import { setSearch, useNostr } from 'helper/redux/nostr';
 import { greys } from 'helper/colors';
 import { useDispatch, useSelector } from 'react-redux';
 import { Text } from 'components/common/Themed';
-import { ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -27,7 +26,6 @@ import ActionSheet, {
   RouteDefinition,
   SheetProps,
 } from 'react-native-actions-sheet';
-import React from 'react';
 import TextInput from 'components/common/TextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Image from 'components/common/Image';

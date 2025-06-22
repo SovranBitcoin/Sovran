@@ -1,12 +1,11 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import { Text, View, Animated } from 'react-native';
+import { Text, View, Animated, FlatList } from 'react-native';
 import 'react-native-gesture-handler';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { FlatList } from 'react-native';
 import { Post, PostSkeleton } from './post';
 import { useNostrEvents } from './helper';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';

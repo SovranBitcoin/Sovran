@@ -28,6 +28,10 @@ import { Card } from 'components/common/Card';
 import { View } from 'components/common/Themed';
 import _ from 'lodash';
 
+// Main component
+import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+
 // Types
 interface TokenProps {
   token: string;
@@ -103,10 +107,6 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
   const publicKeyBytes = schnorr.getPublicKey(privateKeyBytes);
   return Buffer.from(publicKeyBytes).toString('hex');
 };
-
-// Main component
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 
 export function EcashReceiveConfirmation({
   token,

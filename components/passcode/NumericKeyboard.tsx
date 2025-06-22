@@ -69,8 +69,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
         justifyContent: 'center',
         overflow: 'hidden',
         backgroundColor: greys(theme)[2300],
-      }}
-    >
+      }}>
       <Animated.View
         pointerEvents="none"
         style={{
@@ -96,8 +95,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
             color: 'white',
             fontWeight: 'bold',
             fontFamily: 'OverpassBold',
-          }}
-        >
+          }}>
           {value}
         </Text>
       )}

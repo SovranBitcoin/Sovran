@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { formatCurrency } from 'helper/currency';
 import { useNavigation } from 'expo-router';
 import Modal from 'components/layout/Modal';

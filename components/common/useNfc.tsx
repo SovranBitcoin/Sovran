@@ -1,5 +1,4 @@
-import { Alert } from 'react-native';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 const handleException = (ex) => {
   const NfcManager = require('react-native-nfc-manager').default;

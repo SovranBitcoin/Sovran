@@ -3,14 +3,18 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
 import { Text } from 'components/common/Themed';
-import { Easing, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import 'react-native-gesture-handler';
 import { useNostr } from 'helper/redux/nostr';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { EventKind } from '../../app/Profile';
 import { Cache } from 'react-native-cache';

@@ -26,8 +26,7 @@ export default function ModalScreen() {
         </Text>
         {connectionsWithTx.map(({ id, txs }) => (
           <View key={id} style={{ marginBottom: 24 }}>
-            <Text
-              style={{ color: greys(theme)[0], fontFamily: 'OverpassBold', marginBottom: 8 }}>
+            <Text style={{ color: greys(theme)[0], fontFamily: 'OverpassBold', marginBottom: 8 }}>
               {id}
             </Text>
             {txs.map((tx: any) => (

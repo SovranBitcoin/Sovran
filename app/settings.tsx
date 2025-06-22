@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';
@@ -13,7 +13,6 @@ import {
 } from '@expo/react-native-action-sheet';
 import { useTypedNavigation } from 'helper/navigation';
 import { truncateMiddle } from 'helper/strings';
-import { Linking } from 'react-native';
 import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';

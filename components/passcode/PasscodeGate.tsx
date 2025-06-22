@@ -12,9 +12,7 @@ const PasscodeGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [storedPasscode]);
 
   if (storedPasscode && !unlocked) {
-    return (
-      <PasscodeScreen passcode={storedPasscode} onSuccess={() => setUnlocked(true)} />
-    );
+    return <PasscodeScreen passcode={storedPasscode} onSuccess={() => setUnlocked(true)} />;
   }
 
   return <>{children}</>;

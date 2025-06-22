@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { greens, greys, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -7,7 +7,6 @@ import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Themed';
-import { useMemo } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { addMintsAction } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
@@ -326,7 +325,7 @@ interface Mint {
 interface MintInfo {
   icon_url: string;
   nuts?: {
-    methods?: Array<{ unit: string }>;
+    methods?: { unit: string }[];
   }[];
 }
 

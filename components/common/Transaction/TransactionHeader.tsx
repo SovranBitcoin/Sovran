@@ -3,10 +3,9 @@ import { useSelector } from 'react-redux';
 import { greens, greys, shades } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
-import { formatCurrency } from 'helper/currency';
+import { formatCurrency, CurrencyCode, Denomination } from 'helper/currency';
 import TransactionIcon from '../TransactionIcon';
 import { TransactionData } from 'helper/redux/cashu';
-import { CurrencyCode, Denomination } from 'helper/currency';
 
 interface TransactionHeaderProps {
   transaction: TransactionData;

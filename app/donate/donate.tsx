@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Linking } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -7,7 +7,6 @@ import { Text } from 'components/common/Themed';
 import { greys } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
-import { ScrollView } from 'react-native';
 
 // Organization interface
 interface Organization {

@@ -69,7 +69,13 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
 
           <View style={styles.footer}>
             <View>
-              <AmountFormatter amount={amount} unit={unit} size={24} weight="heavy" color={greys(theme)[0]} />
+              <AmountFormatter
+                amount={amount}
+                unit={unit}
+                size={24}
+                weight="heavy"
+                color={greys(theme)[0]}
+              />
               {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
             </View>
           </View>

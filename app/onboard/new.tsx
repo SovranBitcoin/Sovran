@@ -23,13 +23,13 @@ import { hexToBytes } from '@noble/hashes/utils';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
 import * as bip39 from '@scure/bip39';
-global.Buffer = require('buffer').Buffer;
 
 import { entropyToMnemonic } from 'bip39';
 import * as Crypto from 'expo-crypto';
 import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
+global.Buffer = require('buffer').Buffer;
 
 /**
  * Executes an async function within a requestAnimationFrame to improve UI responsiveness
