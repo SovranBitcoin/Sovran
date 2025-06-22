@@ -1,5 +1,5 @@
+import React, { useRef, useEffect, useState, ReactNode, useMemo } from 'react';
 import { View, Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
-import { useRef, useEffect, useState, ReactNode } from 'react';
 import { greys, black, shades, reds } from 'helper/colors';
 import { Text } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
@@ -7,7 +7,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
 
-type ButtonVariant = 'primary' | 'secondary';
+type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
 
 export interface ButtonBaseProps {
   testID?: string;
@@ -33,26 +33,29 @@ export const ButtonBase = ({
   noPadding = false,
   renderBackground,
   ...props
-}: ButtonBaseProps): JSX.Element => {
+}: ButtonBaseProps): React.ReactNode => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showLoading, setShowLoading] = useState<boolean>(false);
   const theme = useSelector(memoizedGetTheme);
   const scaleRef = useRef(new Animated.Value(1));
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const colorsMap: Record<string, string[]> = {
-    primary: [greys(theme)[0], greys(theme)[0]],
-    secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
-    transparent: ['transparent', 'transparent'],
-    dangerous: [reds[300]],
-  };
+  const colorsMap = useMemo(
+    () => ({
+      primary: [greys(theme)[0], greys(theme)[0]],
+      secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
+      transparent: ['transparent', 'transparent'],
+      dangerous: [reds[300]],
+    }),
+    [theme]
+  );
 
   const { width } = useWindowDimensions();
   const [colors, setColors] = useState<string[]>(colorsMap[variant]);
 
   useEffect(() => {
     setColors(colorsMap[variant]);
-  }, [variant, theme]);
+  }, [variant, theme, colorsMap]);
 
   useEffect(() => {
     return () => {

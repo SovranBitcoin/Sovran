@@ -47,3 +47,23 @@ const createStyles = (theme: any) =>
 - Complex: Create a `createStyles` function as shown in the example above
 
 **Note:** Check `helper/colors` for the complete list of available theme colors.
+
+**Types:** For StyleSheet props use `style?: StyleProp<ViewStyle>` for React functions use `React.ReactNode`
+
+```
+style={[
+  {
+    color: 'red',
+    ...style
+  },
+]}
+
+->
+
+style={[
+  {
+    color: 'red'
+  },
+  style,
+]}
+```

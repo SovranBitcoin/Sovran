@@ -1,3 +1,4 @@
+import React from 'react';
 import { Text, View } from 'components/common/Themed';
 import { useSelector } from 'react-redux';
 import { greens, greys, shades } from 'helper/colors';

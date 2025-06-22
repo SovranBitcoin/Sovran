@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
 import { View, Text } from 'components/common/Themed';
@@ -7,7 +7,6 @@ import { useSelector } from 'react-redux';
 import { TransactionData } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintIcon } from 'components/layout/sheets/mints';
-
 interface TransactionMintRefreshProps {
   mintInfo: any;
   transaction: TransactionData;

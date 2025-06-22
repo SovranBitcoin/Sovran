@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -11,6 +12,7 @@ import opacity from 'hex-color-opacity';
 import { runWithAnimationFrame } from 'app/onboard/new';
 
 export interface ButtonHandlerButton {
+  testID: string | undefined;
   disabled?: boolean;
   loading?: boolean;
   variant: 'primary' | 'secondary' | 'dangerous';
@@ -22,7 +24,7 @@ export interface ButtonHandlerButton {
 interface ButtonHandlerProps {
   context?: 'tab';
   buttons: ButtonHandlerButton[];
-  style?: StyleSheet;
+  style?: StyleProp<ViewStyle>;
   colors?: readonly [string, string, ...string[]];
 }
 
@@ -40,13 +42,15 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
   return (
     <LinearGradient
       colors={colors || defaultColors}
-      style={{
-        flexDirection: 'row',
-        padding: 8,
-        paddingBottom: 38,
-        marginBottom: context === 'tab' ? 48 : 0,
-        ...style,
-      }}>
+      style={[
+        {
+          flexDirection: 'row',
+          padding: 8,
+          paddingBottom: 38,
+          marginBottom: context === 'tab' ? 48 : 0,
+        },
+        style,
+      ]}>
       {buttons.slice(0, 2).map((button, index) => (
         <View key={index} className="flex-1 bg-transparent">
           <Button

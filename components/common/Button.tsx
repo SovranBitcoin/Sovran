@@ -1,3 +1,4 @@
+import React from 'react';
 import { Canvas, LinearGradient, Rect, vec } from '@shopify/react-native-skia';
 import { ButtonBase, ButtonBaseProps } from './ButtonBase';
 
