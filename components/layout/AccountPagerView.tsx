@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { useCameraPermissions } from 'expo-camera';
+import { useHandleCameraPermission } from 'helper/hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import { Platform, StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';
@@ -48,7 +48,7 @@ export function AccountPagerView({
   setAccount,
   account,
 }: AccountPagerViewProps): React.ReactElement {
-  const [hasPermission, requestPermission] = useCameraPermissions();
+  const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
@@ -93,10 +93,9 @@ export function AccountPagerView({
       return;
     }
 
-    if (page === 'camera' && !hasPermission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        showMessage('camera_permission_denied', {}, { emoji: '🚨' });
+    if (page === 'camera') {
+      const granted = await handlePermission();
+      if (!granted) {
         return;
       }
     }

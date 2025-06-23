@@ -20,11 +20,17 @@ const MESSAGE_EMOJIS = {
 
 type MessageText = string | React.ReactNode | ((params: any) => React.ReactNode);
 
+type MessageButton = {
+  text: string;
+  page?: string;
+  onPress?: () => void;
+};
+
 type MessageConfig = {
   title: string;
   text: MessageText;
   type: string;
-  buttons?: any; // Make button optional
+  buttons?: MessageButton[]; // Make button optional
 };
 
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
@@ -86,8 +92,24 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     type: MESSAGE_TYPES.ERROR,
   },
   camera_permission_denied: {
-    title: 'Camera Access Required',
-    text: 'Please enable camera access in your device settings to use this feature.',
+    title: 'Camera Permission Denied',
+    text: 'Camera access is denied. Please enable it in your device settings.',
+    type: MESSAGE_TYPES.ERROR,
+  },
+  camera_permission_granted: {
+    title: 'Camera Permission Granted',
+    text: 'Camera access has been granted.',
+    type: MESSAGE_TYPES.SUCCESS,
+  },
+  camera_permission_blocked: {
+    title: 'Camera Permission Blocked',
+    text: 'Camera access is blocked. Please enable it in your device settings.',
+    buttons: [
+      {
+        text: 'Open Settings',
+        page: 'settings',
+      },
+    ],
     type: MESSAGE_TYPES.ERROR,
   },
   sharing_unavailable: {
@@ -318,7 +340,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
 
 type ShowMessageOptions = {
-  buttons?: any;
+  buttons?: MessageButton[];
   emoji?: string;
   dismissable?: boolean;
   variant?: string;

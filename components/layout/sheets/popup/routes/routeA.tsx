@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
-import { RouteScreenProps } from 'react-native-actions-sheet';
+import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -8,22 +8,12 @@ import { greys } from 'helper/colors';
 import { Button } from 'components/common/Button';
 import { useTypedNavigation } from 'helper/navigation';
 
-const RouteA = ({
-  router,
-  payload,
-}: RouteScreenProps<'popup-sheet', 'route-a'> & {
-  payload: {
-    variant?: string;
-    emoji?: string;
-    message?: string;
-    submessage?: React.ReactNode;
-    buttons?: any;
-  };
-}) => {
+const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [progress] = useState(new Animated.Value(0));
 
+  const payload = useSheetPayload('popup-sheet');
   const isModal = payload?.variant === 'modal';
   const navigation = useTypedNavigation();
 
@@ -69,9 +59,14 @@ const RouteA = ({
           <Button
             key={button.text}
             onPress={() => {
-              navigation.navigate(button.page);
+              if (button.onPress) {
+                button.onPress();
+              } else if (button.page) {
+                navigation.navigate(button.page);
+              }
             }}
-            text={button.text}></Button>
+            text={button.text}
+            variant={'primary'}></Button>
         );
       })}
       {!isModal && (
