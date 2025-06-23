@@ -28,21 +28,39 @@ export function useHandleCameraPermission() {
         return true;
       }
 
-      showMessage('camera_permission_denied', {}, { emoji: '🚨' });
+      showMessage(
+        'camera_permission_denied',
+        {},
+        {
+          emoji: '🚨',
+          buttons: [
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                Linking.openURL('app-settings:');
+              },
+            },
+          ],
+        }
+      );
       return false;
     }
 
-    showMessage('camera_permission_blocked', {}, {
-      emoji: '🚨',
-      buttons: [
-        {
-          text: 'Open Settings',
-          onPress: () => {
-            Linking.openURL('app-settings:');
+    showMessage(
+      'camera_permission_blocked',
+      {},
+      {
+        emoji: '🚨',
+        buttons: [
+          {
+            text: 'Open Settings',
+            onPress: () => {
+              Linking.openURL('app-settings:');
+            },
           },
-        },
-      ],
-    });
+        ],
+      }
+    );
     return false;
   };
 

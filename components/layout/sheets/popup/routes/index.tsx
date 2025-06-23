@@ -16,6 +16,17 @@ declare module 'react-native-actions-sheet' {
       routes: {
         'route-a': RouteDefinition;
       };
+      payload: {
+        variant?: string;
+        emoji?: string;
+        message?: string;
+        submessage?: React.ReactNode;
+        buttons?: {
+          text: string;
+          page?: string;
+          onPress?: () => void;
+        }[];
+      };
     }>;
   }
 }

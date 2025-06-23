@@ -92,14 +92,8 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     type: MESSAGE_TYPES.ERROR,
   },
   camera_permission_denied: {
-    title: 'Camera Access Required',
-    text: 'Please enable camera access in your device settings to use this feature.',
-    buttons: [
-      {
-        text: 'Try Again',
-        page: 'camera',
-      },
-    ],
+    title: 'Camera Permission Denied',
+    text: 'Camera access is denied. Please enable it in your device settings.',
     type: MESSAGE_TYPES.ERROR,
   },
   camera_permission_granted: {
