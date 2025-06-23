@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
 import { showMessage } from 'helper/popup/popups';
-import * as Linking from 'expo-linking';
+import { Linking } from 'react-native';
 
 export function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -28,22 +28,14 @@ export function useHandleCameraPermission() {
         return true;
       }
 
-      showMessage('camera_permission_denied', {}, {
-        buttons: [
-          { text: 'Try Again', page: 'camera' },
-        ],
-        emoji: '🚨',
-      });
+      showMessage('camera_permission_denied', {}, { emoji: '🚨' });
       return false;
     }
 
     showMessage('camera_permission_blocked', {}, {
-      buttons: [
-        { text: 'Open Settings', page: 'settings' },
-      ],
       emoji: '🚨',
     });
-    Linking.openSettings();
+    Linking.openURL('app-settings:');
     return false;
   };
 
