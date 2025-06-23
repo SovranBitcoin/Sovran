@@ -72,7 +72,7 @@ const Camera: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const navigation = useNavigation();
   const { unit } = useTypedRoute<'camera'>();
-  const [hasPermission, requestPermission] = useCameraPermissions();
+  const [hasPermission] = useCameraPermissions();
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
   // Reset state when component comes into focus

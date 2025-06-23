@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'components/common/View';
-import DonutChartContainer from 'components/layout/Donut';
+import { DonutChartContainer } from 'components/layout/Donut';
 import { useSelector } from 'react-redux';
 import { memoizedGetAllBalances } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';

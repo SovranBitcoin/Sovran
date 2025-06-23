@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
 
 import { greys } from 'helper/colors';
 import { View } from 'components/common/View';
@@ -122,12 +121,3 @@ function ThemeSettings() {
 }
 
 export default withSheetProvider(ThemeSettings);
-
-const createStyles = () =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: 'transparent',
-      height: Dimensions.get('screen').height - 128,
-    },
-    content: {},
-  });

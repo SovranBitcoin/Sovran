@@ -48,7 +48,7 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
 
   const [showFullText, setShowFullText] = useState(false);
 
-  const { urls, nostrEvents, contentWithoutUrls } = extractUrls(content);
+  const { contentWithoutUrls } = extractUrls(content);
   const hashtags = extractHashtags(content);
   const mentions = extractMentions(content);
 

@@ -13,15 +13,15 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { NonGestureView } from './NonGestureView';
 
 // Define proper interfaces for our data types
-interface Account {
+interface AccountData {
   key: string;
   unit: string;
   type: string;
 }
 
 interface AccountProps {
-  accounts: Account[];
-  account: Account;
+  accounts: AccountData[];
+  account: AccountData;
   goToIndex: (index: number) => void;
 }
 

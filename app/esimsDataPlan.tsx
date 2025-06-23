@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Button } from 'components/common/Button';
@@ -41,7 +41,7 @@ function ModalScreen() {
     if (!countryParam && Localization.region) {
       setCountry(Localization.region);
     }
-  }, []);
+  }, [countryParam]);
 
   // Update state from route params
   useEffect(() => {
@@ -276,12 +276,5 @@ function ModalScreen() {
     </Modal>
   );
 }
-
-const createStyles = (theme: string) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: greys(theme)[2300],
-    },
-  });
 
 export default withSheetProvider(ModalScreen);

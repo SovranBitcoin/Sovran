@@ -151,7 +151,6 @@ function ModalScreen() {
     // Don't proceed if amount is invalid
     if (!isValidAmount) return;
 
-    let error = false;
     setLoading(true);
 
     try {
@@ -192,7 +191,6 @@ function ModalScreen() {
       }
     } catch (e) {
       showMessage(e?.message, { ...e?.params }, { emoji: '🚨' });
-      error = true;
       setLoading(false);
     } finally {
     }

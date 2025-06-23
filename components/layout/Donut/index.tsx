@@ -117,5 +117,3 @@ const createStyles = (theme: any) =>
       height: RADIUS * 2,
     },
   });
-
-export default DonutChartContainer;

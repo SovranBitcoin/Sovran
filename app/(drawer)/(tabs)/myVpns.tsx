@@ -174,7 +174,6 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
   const countryName = lookup.byIso(vpn.location)?.country;
 
   const handlePress = () => {
-    const { package: p, order: o } = vpn;
     navigation.navigate('vpn', {
       ...vpn,
     });

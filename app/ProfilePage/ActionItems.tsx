@@ -135,7 +135,7 @@ const ActionItem = ({ Icon, count, theme, size }) => (
   </View>
 );
 
-export function ActionItems({ id, reactionCount, repostCount, zapCount, size = 24 }) {
+export function ActionItems({ reactionCount, repostCount, zapCount, size = 24 }) {
   const theme = useSelector(memoizedGetTheme);
 
   function formatNumber(num) {

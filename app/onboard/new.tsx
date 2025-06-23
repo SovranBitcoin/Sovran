@@ -27,6 +27,8 @@ import * as Crypto from 'expo-crypto';
 import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
 
 /**

@@ -158,7 +158,7 @@ export default function ModalScreen() {
     navigation.setOptions({
       title: product?.brand?.name,
     });
-  }, [product]);
+  }, [product, navigation]);
 
   return (
     <Container>

@@ -34,7 +34,7 @@ export const MintItem = ({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [activeMintId, positionIndex]);
+  }, [activeMintId, positionIndex, scaleValue, translateXValue]);
 
   const mintProgress = getMintProgress(mint.mintUrl);
 

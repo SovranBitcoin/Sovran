@@ -396,7 +396,7 @@ function AddMintItem({
   );
 }
 
-function MintAddMore({ onClose, payload }) {
+export function MintAddMore({ onClose, payload }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
@@ -781,5 +781,3 @@ const createStyles = (theme: string) =>
       color: greys(theme)[400],
     },
   });
-
-export default MintAddMore;

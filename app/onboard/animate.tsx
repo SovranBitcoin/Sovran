@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
@@ -51,8 +51,6 @@ const ensureCompleteStep = (currentSteps, newStepsOrUpdater) => {
 };
 
 function findAndInsertAfter(array, itemToFind, itemToInsert) {
-  const _ = require('lodash');
-
   // Find the index of the item
   const index = _.findLastIndex(array, (item) => _.isEqual(item, itemToFind));
 
@@ -365,7 +363,7 @@ const ChainLoadingAnimation = () => {
         lineScaleY[index] = new Animated.Value(0);
       }
     });
-  }, [steps]);
+  }, [steps, lineScaleY]);
 
   // Scroll to active step
   useEffect(() => {
@@ -377,22 +375,25 @@ const ChainLoadingAnimation = () => {
   }, [activeStep, activeMints]);
 
   // Animate the connecting line between steps
-  const animateConnectingLine = (stepIndex) => {
-    setConnectingLines((prev) => ({
-      ...prev,
-      [stepIndex]: true,
-    }));
+  const animateConnectingLine = useCallback(
+    (stepIndex) => {
+      setConnectingLines((prev) => ({
+        ...prev,
+        [stepIndex]: true,
+      }));
 
-    Animated.timing(lineScaleY[stepIndex], {
-      toValue: 1,
-      duration: 600,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
-    }).start();
-  };
+      Animated.timing(lineScaleY[stepIndex], {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    },
+    [lineScaleY]
+  );
 
   // Handle profile animation
-  const handleProfileAnimation = () => {
+  const handleProfileAnimation = useCallback(() => {
     animateConnectingLine(activeStep);
 
     // Wait for line animation to complete before moving to next step
@@ -401,12 +402,12 @@ const ChainLoadingAnimation = () => {
       setCurrencyIndex(0);
       setActiveStep((prevStep) => prevStep + 1);
     }, 500);
-  };
+  }, [activeStep, animateConnectingLine]);
 
   const navigation = useTypedNavigation();
 
   // Handle completion
-  const handleComplete = () => {
+  const handleComplete = useCallback(() => {
     const profileSteps = _.filter(steps, { type: 'profile' });
     const uniqueProfiles = _.keyBy(profileSteps, 'id');
     const profiles = _.values(uniqueProfiles).map((profile) => profile.profile);
@@ -467,7 +468,7 @@ const ChainLoadingAnimation = () => {
         closeCurrentAndParents: true,
       }
     );
-  };
+  }, [navigation, steps]);
 
   // Corrected function for calculating global progress
   const calculateGlobalProgress = (currencyIndex, currencyProgress, totalCurrencies) => {
@@ -662,10 +663,18 @@ const ChainLoadingAnimation = () => {
         }, 1000);
       }
     });
-  }, [steps[activeStep]]);
+  }, [
+    steps[activeStep],
+    activeStep,
+    handleComplete,
+    handleProfileAnimation,
+    onMessage,
+    progressObject,
+    steps,
+  ]);
 
   // Get progress for a specific mint (global progress)
-  const getMintProgress = (mintUrl, unit) => {
+  const getMintProgress = (mintUrl: string) => {
     // We no longer need the unit parameter for global progress
     return progressObject[mintUrl]?.progress || 0;
   };

@@ -5,7 +5,7 @@ import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
-import Checkbox from 'expo-checkbox';
+import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.

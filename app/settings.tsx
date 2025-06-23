@@ -499,7 +499,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
 
 const ConnectedModalScreen = connectActionSheet(ModalScreen);
 
-const App: React.FC<{}> = () => (
+const App = () => (
   <ActionSheetProvider>
     <ConnectedModalScreen />
   </ActionSheetProvider>

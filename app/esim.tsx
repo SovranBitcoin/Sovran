@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import { useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import DonutChartContainer from 'components/layout/Donut';
+import { DonutChartContainer } from 'components/layout/Donut';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
@@ -68,64 +68,42 @@ function ModalScreen() {
     state.esim?.esims?.find((esim) => esim.request === params.request)
   );
 
-  const fetchAndUpdateEsims = async (esim) => {
-    try {
-      setLoadingEsim(true);
-      const orderData = await fetchOrderData({
-        request: esim.request,
-        packageCode: esim.package.packageCode,
-        slug: esim.package.slug,
-        iccid: esim.iccid,
-        type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
-      });
-      const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
-      if (orderNo) {
-        const esimData = await fetchEsimData(orderNo);
-        updateEsim(esim.request, esimData.obj.esimList[0]);
+  const fetchAndUpdateEsims = useCallback(
+    () => async (esim) => {
+      try {
+        setLoadingEsim(true);
+        const orderData = await fetchOrderData({
+          request: esim.request,
+          packageCode: esim.package.packageCode,
+          slug: esim.package.slug,
+          iccid: esim.iccid,
+          type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
+        });
+        const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
+        if (orderNo) {
+          const esimData = await fetchEsimData(orderNo);
+          updateEsim(esim.request, esimData.obj.esimList[0]);
+        }
+      } catch {
+      } finally {
+        setLoadingEsim(false);
       }
-    } catch {
-    } finally {
-      setLoadingEsim(false);
-    }
-  };
+    },
+    [updateEsim]
+  );
 
   useEffect(() => {
     if (esim) {
       fetchAndUpdateEsims(esim);
     }
-  }, [esim]);
-
-  const getDataUsageChartData = () => {
-    if (!esim) return [];
-
-    const usage = convertDataUsage({
-      ...esim.order,
-      ...esim,
-      ...esim.package,
-      package: JSON.stringify(esim.package),
-    });
-
-    const usedGB = usage.total.gb - usage.remaining.gb;
-    return [
-      {
-        amount: usage.total.gb.toFixed(2),
-        label: 'Remaining',
-        value: `${usedGB.toFixed(2)} GB`,
-      },
-      {
-        amount: usage.remaining.gb.toFixed(2),
-        label: 'Used',
-        value: `${usage.remaining.gb.toFixed(2)} GB`,
-      },
-    ];
-  };
+  }, [esim, fetchAndUpdateEsims]);
 
   const handleInstallEsim = () => {
     if (!esim?.order?.ac) return;
 
     Linking.openURL(
       'https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=' + esim.order.ac
-    ).catch((err) => {});
+    ).catch(() => {});
   };
 
   const handleShareEsim = () => {

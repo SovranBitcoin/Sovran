@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { nip19, SimplePool } from 'nostr-tools';
+import React from 'react';
+import { nip19 } from 'nostr-tools';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Icon, { QRIcon } from 'assets/icons';
-import { setSearch, useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'helper/redux/nostr';
 import { greys } from 'helper/colors';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -13,9 +13,6 @@ import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-
-import { ActionSheetRef } from 'react-native-actions-sheet';
-import { relays } from 'components/ndk';
 
 const npubs = [];
 
@@ -49,99 +46,9 @@ export const EventKind = {
 const Screen = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const actionSheetRef = useRef<ActionSheetRef>(null);
 
-  const { profiles, setProfiles, currentProfile, setCurrentProfile } = useNostr();
-  const dispatch = useDispatch();
+  const { profiles, currentProfile, setCurrentProfile } = useNostr();
   const navigation = useTypedNavigation();
-
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      const pool = new SimplePool();
-      const hexPubkeys = npubs.map((npub) => nip19.decode(npub).data);
-
-      const sub = pool.subscribeMany(
-        relays,
-        [
-          {
-            authors: [String(hexPubkeys[1])],
-            kinds: [EventKind.Metadata, EventKind.ContactList],
-          },
-          {
-            authors: [String(hexPubkeys[0])],
-            kinds: [EventKind.Metadata, EventKind.ContactList],
-          },
-        ],
-        {
-          onevent(event) {
-            if (event.kind === EventKind.Metadata) {
-              try {
-                const content = JSON.parse(event.content);
-                setProfiles(
-                  [...profiles, { ...content, id: profiles.length, pubkey: event.pubkey }]
-                    // remove duplicates
-                    .filter(
-                      (profile, index, self) =>
-                        index === self.findIndex((p) => p.pubkey === profile.pubkey)
-                    )
-                );
-                dispatch(
-                  setSearch([
-                    {
-                      pubkey: event.pubkey,
-                      profile: content,
-                      internal: true,
-                    },
-                  ])
-                );
-              } catch (error) {}
-            } else if (event.kind === EventKind.ContactList) {
-              try {
-                const contactPubkeys = event.tags
-                  .filter((tag) => tag[0] === 'p')
-                  .map((tag) => tag[1]);
-                fetchContactProfiles(contactPubkeys);
-              } catch (error) {}
-            }
-          },
-        }
-      );
-
-      return () => {
-        sub.close();
-        pool.close(relays);
-      };
-    };
-
-    const fetchContactProfiles = async (pubkeys) => {
-      const pool = new SimplePool();
-      const sub = pool.subscribeMany(
-        relays,
-        [
-          {
-            authors: [...new Set(pubkeys)],
-            kinds: [EventKind.Metadata],
-          },
-        ],
-        {
-          onevent(event) {
-            if (event.kind === EventKind.Metadata) {
-              try {
-                const content = JSON.parse(event.content);
-              } catch (error) {}
-            }
-          },
-        }
-      );
-
-      return () => {
-        sub.close();
-        pool.close(relays);
-      };
-    };
-
-    fetchProfiles();
-  }, []);
 
   function getName(profile) {
     const dn =

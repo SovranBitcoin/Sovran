@@ -27,8 +27,8 @@ function ModalScreen() {
       return;
     }
 
-    let { type, data: sk } = nip19.decode(nsec);
-    const pk = getPublicKey(sk);
+    let { data: sk } = nip19.decode(nsec);
+    const pk = getPublicKey(sk as Uint8Array);
     const npub = nip19.npubEncode(pk);
 
     // check npub matches currentProfile.npub

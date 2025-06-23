@@ -15,7 +15,7 @@ import MintDetailPage from './MintDetailsPage';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import MintAddMore from './MintAddMore';
+import { MintAddMore } from './MintAddMore';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;

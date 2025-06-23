@@ -57,7 +57,7 @@ export function isValidLNURL(url: string): boolean {
   try {
     decode(url);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -292,7 +292,7 @@ export async function monitorLightningPayment({
     }
   };
 
-  socket.onerror = (error) => {};
+  socket.onerror = () => {};
 
   return () => {
     const unsubscribeMessage = {
@@ -315,7 +315,7 @@ export async function startMonitoringLightningInvoice(invoice) {
     subId,
     bolt11Invoice: invoice,
     subscriptionKind: 'bolt11_mint_quote',
-    onUpdate: (payload) => {
+    onUpdate: () => {
       // Handler for updates
     },
   });

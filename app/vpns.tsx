@@ -56,7 +56,6 @@ function ModalScreen() {
   ]);
   // const [countries, setCountries] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(3);
-  const [loading, setLoading] = useState(false);
 
   // useEffect(() => {
   //   if (params.country) {
@@ -72,7 +71,7 @@ function ModalScreen() {
     if (params?.packageList) {
       setPackages(JSON.parse(params?.packageList));
     }
-  }, []);
+  }, [params?.packageList]);
 
   useEffect(() => {
     if (params?.country) {
@@ -124,8 +123,8 @@ function ModalScreen() {
               text: 'Continue',
               variant: 'primary',
               onPress: handleContinue,
-              loading: loading,
-              disabled: loading,
+              loading: false,
+              disabled: false,
             },
           ]}
         />
@@ -173,7 +172,7 @@ function ModalScreen() {
                 type: 'vpn',
               });
             }}
-            disabled={loading}
+            disabled={false}
             style={{
               width: '100%',
               padding: 16,

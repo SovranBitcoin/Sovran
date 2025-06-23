@@ -101,7 +101,6 @@ export const generatePublicKey = (hexPrivateKey: string): string => {
 export function EcashReceiveConfirmation({
   token,
   transaction,
-  showConfirmation,
   extraButtons = [],
 }: {
   token?: string;
