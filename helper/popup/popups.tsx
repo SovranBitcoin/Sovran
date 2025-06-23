@@ -90,6 +90,22 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'Please enable camera access in your device settings to use this feature.',
     type: MESSAGE_TYPES.ERROR,
   },
+  camera_permission_granted: {
+    title: 'Camera Permission Granted',
+    text: 'Camera access has been granted.',
+    type: MESSAGE_TYPES.SUCCESS,
+  },
+  camera_permission_blocked: {
+    title: 'Camera Permission Blocked',
+    text: 'Camera access is blocked. Please enable it in your device settings.',
+    buttons: [
+      {
+        text: 'Open Settings',
+        page: 'settings',
+      },
+    ],
+    type: MESSAGE_TYPES.ERROR,
+  },
   sharing_unavailable: {
     title: 'Sharing Unavailable',
     text: 'Sharing is not supported on your device.',
