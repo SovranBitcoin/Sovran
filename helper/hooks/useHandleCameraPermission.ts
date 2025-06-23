@@ -34,8 +34,15 @@ export function useHandleCameraPermission() {
 
     showMessage('camera_permission_blocked', {}, {
       emoji: '🚨',
+      buttons: [
+        {
+          text: 'Open Settings',
+          onPress: () => {
+            Linking.openURL('app-settings:');
+          },
+        },
+      ],
     });
-    Linking.openURL('app-settings:');
     return false;
   };
 

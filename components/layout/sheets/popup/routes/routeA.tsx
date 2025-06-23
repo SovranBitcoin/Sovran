@@ -17,7 +17,11 @@ const RouteA = ({
     emoji?: string;
     message?: string;
     submessage?: React.ReactNode;
-    buttons?: any;
+    buttons?: {
+      text: string;
+      page?: string;
+      onPress?: () => void;
+    }[];
   };
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -69,7 +73,11 @@ const RouteA = ({
           <Button
             key={button.text}
             onPress={() => {
-              navigation.navigate(button.page);
+              if (button.onPress) {
+                button.onPress();
+              } else if (button.page) {
+                navigation.navigate(button.page);
+              }
             }}
             text={button.text}></Button>
         );

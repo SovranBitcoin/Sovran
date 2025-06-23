@@ -20,11 +20,17 @@ const MESSAGE_EMOJIS = {
 
 type MessageText = string | React.ReactNode | ((params: any) => React.ReactNode);
 
+type MessageButton = {
+  text: string;
+  page?: string;
+  onPress?: () => void;
+};
+
 type MessageConfig = {
   title: string;
   text: MessageText;
   type: string;
-  buttons?: any; // Make button optional
+  buttons?: MessageButton[]; // Make button optional
 };
 
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
@@ -340,7 +346,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
 
 type ShowMessageOptions = {
-  buttons?: any;
+  buttons?: MessageButton[];
   emoji?: string;
   dismissable?: boolean;
   variant?: string;
