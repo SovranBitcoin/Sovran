@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   Alert,
@@ -13,6 +13,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { finalizeEvent, nip04, nip19, SimplePool } from 'nostr-tools';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import moment from 'moment';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
 // Custom hooks
 import { useNostr } from 'helper/redux/nostr';
@@ -32,11 +33,10 @@ import Header from './Header';
 import TimelineItem from './TimeLine';
 import { Button } from 'components/common/Button';
 import ndk, { relays } from 'components/ndk';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from '../Profile';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
+import { EventKind } from 'app/Profile';
 
 // Function to fetch Nostr profile
 export const fetchNostrProfile = async (npub) => {
@@ -81,6 +81,36 @@ async function sendDM(priv, pub, toPubkey, message, relays) {
   });
 }
 
+export function useNostrProfile(pubkey?: string) {
+  const [profile, setProfile] = useState(null);
+
+  const filters = useMemo(() => {
+    if (!pubkey) return [];
+    return [
+      {
+        authors: [convertNpub(pubkey)],
+        kinds: [EventKind.Metadata],
+        limit: 1,
+      },
+    ];
+  }, [pubkey]);
+
+  const { events } = useSubscribe({ filters });
+
+  useEffect(() => {
+    if (events?.length > 0) {
+      try {
+        const content = JSON.parse(events[0].content);
+        setProfile(content);
+      } catch (err) {
+        console.error('Failed to parse profile', err);
+      }
+    }
+  }, [events]);
+
+  return profile;
+}
+
 export default function ModalScreen() {
   // Hooks and state
   const theme = useSelector(memoizedGetTheme);
@@ -105,31 +135,7 @@ export default function ModalScreen() {
   const paddingAnim = useRef(new Animated.Value(1)).current;
   const paddingAnim2 = useRef(new Animated.Value(8)).current;
 
-  // Refresh user profile when opening the messages screen using Nostr subscription
-  const profileFilters = useMemo(
-    () => [
-      {
-        authors: [convertNpub(params.pubkey)],
-        kinds: [EventKind.Metadata],
-        limit: 1,
-      },
-    ],
-    [params?.pubkey]
-  );
-
-  const { events: profileEvents } = useSubscribe({ filters: profileFilters });
-
-  useEffect(() => {
-    if (profileEvents && profileEvents.length > 0) {
-      try {
-        const event = profileEvents[0];
-        const content = JSON.parse(event.content);
-        setSearch([{ pubkey: convertNpub(event.pubkey), profile: content }]);
-      } catch (err) {
-        console.error('Failed to parse profile', err);
-      }
-    }
-  }, [profileEvents, setSearch]);
+  useNostrProfile(params?.pubkey);
 
   // Handle animation effects
   useEffect(() => {
@@ -335,7 +341,6 @@ export default function ModalScreen() {
   const currentUserProfile = combinedSearchAndProfiles.find(
     (p) => convertNpub(p.pubkey) === convertNpub(params?.pubkey)
   );
-  // return <KeyboardAvoidingComponent />;
 
   return (
     <KeyboardAvoidingView

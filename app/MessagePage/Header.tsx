@@ -96,6 +96,15 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
               payload: {
                 buttons: [
                   {
+                    icon: 'la:user-minus',
+                    text: 'Feed',
+                    onPress: async () => {
+                      navigation.navigate('feed', {
+                        pubkey: params.pubkey,
+                      });
+                    },
+                  },
+                  {
                     icon: isContact ? 'la:user-minus' : 'la:user-plus',
                     text: isContact ? 'Remove Contact' : 'Add Contact',
                     onPress: async () => {

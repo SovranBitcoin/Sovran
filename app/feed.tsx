@@ -8,11 +8,11 @@ import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
 import { EventKind } from './Profile';
-import { useNostr } from 'helper/redux/nostr';
 import { View } from 'components/common/View';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTypedRoute } from 'helper/navigation';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });
@@ -37,36 +37,23 @@ const Feed = ({ theme, filters }) => {
 };
 
 const TabTwoScreen = () => {
+  const params = useTypedRoute();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const { currentProfile } = useNostr();
   const pagerRef = useRef(null);
-  const [selectedTab, setSelectedTab] = useState('Notifications');
-  const tabs = useMemo(() => ['Notifications'], []);
+  const [selectedTab, setSelectedTab] = useState('Feed');
+  const tabs = useMemo(() => ['Feed'], []);
 
-  const since = useMemo(() => Math.floor(Date.now() / 1000), []);
-  const day = useMemo(() => 24 * 60 * 60, []);
-
-  const followsFilter = useMemo(
-    () => ({
-      authors: [currentProfile?.pubkey],
-      kinds: [EventKind.ContactList],
-    }),
-    [currentProfile?.pubkey]
-  );
-
-  const { events } = useSubscribe({ filters: followsFilter });
   const filters = useMemo(
     () => ({
-      Notifications: [
+      Feed: [
         {
           kinds: [EventKind.TextNote, EventKind.Repost, 30023],
-          authors: ['1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2'],
-          '#t': ['sovran'],
+          authors: [params.pubkey],
         },
       ],
     }),
-    [events, since, day]
+    [params.pubkey]
   );
 
   const onPageSelected = useCallback(

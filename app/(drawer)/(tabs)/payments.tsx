@@ -9,7 +9,6 @@ import { formatCurrency } from 'helper/currency';
 import Modal from 'components/layout/Modal';
 import { VerifiedIcon } from 'assets/icons';
 import { greys } from 'helper/colors';
-import opacity from 'hex-color-opacity';
 import PagerView from 'react-native-pager-view';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import CachedImage from 'components/common/Image';
@@ -432,7 +431,6 @@ const createStyles = (theme: string) =>
       backgroundColor: 'transparent',
     },
     searchBlurView: {
-      borderRadius: 86,
       marginTop: 64,
       marginLeft: 24,
       marginBottom: 8,
@@ -440,18 +438,12 @@ const createStyles = (theme: string) =>
       overflow: 'hidden',
     },
     searchPressable: {
-      backgroundColor: opacity(greys(theme)[1800], 0.75),
-      borderWidth: 0.5,
-      borderColor: greys(theme)[1300],
-      shadowColor: greys(theme)[2300],
-      shadowOffset: { width: 1, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
-      padding: 8,
-      paddingLeft: 16,
-      width: '100%',
-      height: '100%',
-      borderRadius: 86,
+      flex: 1,
+      paddingRight: 30,
+      color: greys(theme)[100], // Add text color
+      backgroundColor: greys(theme)[1800], // Add background color
+      borderRadius: 16, // Add border radius for styling
+      padding: 16, // Add padding
     },
     searchPlaceholder: {
       position: 'absolute',

@@ -175,7 +175,7 @@ const TabLayout = () => {
                 style={[
                   styles.searchContainer,
                   {
-                    paddingRight: 48 + 4,
+                    paddingRight: 16,
                   },
                 ]}>
                 <SearchBar navigation={navigation} theme={theme} style={styles.searchBar} />

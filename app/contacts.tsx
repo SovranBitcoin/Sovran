@@ -180,10 +180,12 @@ function ModalScreen() {
                     style={{
                       flex: 1,
                       paddingRight: 30,
-                      color: greys(theme)[100], // Add text color
                       backgroundColor: greys(theme)[1800], // Add background color
-                      borderRadius: 8, // Add border radius for styling
-                      padding: 12, // Add padding
+                      borderRadius: 16, // Add border radius for styling
+                      padding: 14, // Add padding
+                      fontSize: 16,
+                      fontFamily: 'OverpassRegular',
+                      color: greys(theme)[0],
                     }}
                   />
                   {/* Clear button with absolute positioning */}
@@ -194,7 +196,7 @@ function ModalScreen() {
                         position: 'absolute',
                         right: 0,
                         zIndex: 1,
-                        padding: 10,
+                        padding: 14,
                       }}>
                       <Icon name="simple-line-icons:close" size={20} color={greys(theme)[100]} />
                     </TouchableOpacity>
