@@ -9,7 +9,8 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Card } from 'components/common/Card';
 
-const MessageInput = ({ router }: RouteScreenProps<'email-sheet', 'email'>) => {
+// eslint-disable-next-line no-empty-pattern
+const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
   const [message, setMessage] = useState('');
   const sheetRef = useSheetRef('transaction-message');
   const theme = useSelector(memoizedGetTheme);

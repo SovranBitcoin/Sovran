@@ -185,7 +185,11 @@ const createStyles = (theme: string) => {
   });
 };
 
-export default function TermsConditionsScreen({ onClose }) {
+interface TermsConditionsScreenProps {
+  onClose: () => void;
+}
+
+export default function TermsConditionsScreen({ onClose }: TermsConditionsScreenProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [isChecked, setIsChecked] = useState(false);

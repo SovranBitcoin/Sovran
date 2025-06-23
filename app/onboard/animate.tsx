@@ -215,7 +215,7 @@ const ChainLoadingAnimation = () => {
                 current: index + 1,
                 max: mintsToProcess.length,
               };
-            } catch (error) {
+            } catch {
               // Silently handle mint processing errors
             }
           }
@@ -308,7 +308,7 @@ const ChainLoadingAnimation = () => {
           );
           return { type: 'complete' };
       }
-    } catch (err) {
+    } catch {
       setSteps(
         ensureCompleteStep(
           steps,

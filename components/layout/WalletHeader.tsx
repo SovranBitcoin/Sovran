@@ -11,9 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 interface AccountType {
-  key: string;
   unit: string;
-  type: string;
 }
 
 interface WalletHeaderProps {
@@ -39,9 +37,6 @@ export function Background() {
       colors={defaultColors}
       style={{
         width: '100%',
-        // position: 'absolute',
-        // left: 0,
-        // right: 0,
         height: 100,
         pointerEvents: 'none',
       }}></LinearGradient>
@@ -61,15 +56,6 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
       setAccount(accounts[index]);
     }
   };
-
-  const defaultColors: readonly [string, string, ...string[]] = [
-    greys(theme)[2300],
-    opacity(greys(theme)[2300], 0.9),
-    opacity(greys(theme)[2300], 0.85),
-    opacity(greys(theme)[2300], 0.755),
-    opacity(greys(theme)[2300], 0.33),
-    opacity(greys(theme)[2300], 0),
-  ] as const;
 
   return (
     <View style={styles.container}>
@@ -94,22 +80,6 @@ const createStyles = (theme: string) =>
       height: 52,
       marginTop: 42,
       pointerEvents: 'box-none',
-
-      // height: 52,
-      // marginTop: 42,
-      // position: 'absolute',
-      // top: -2,
-      // left: 0,
-      // transform: [{ translateX: '-50%' }],
-      // left: 0,
-      // right: 0,
-      // width: 300,
-      // backgroundColor: 'red',
-      // flexDirection: 'row',
-      // alignItems: 'flex-start',
-      // justifyContent: 'flex-start',
-      // pointerEvents: 'box-none',
-      // marginTop: 28,
     },
     unitContainer: {
       alignItems: 'center',

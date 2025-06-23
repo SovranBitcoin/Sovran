@@ -41,7 +41,7 @@ export function AmountFormatter({
       <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
         <Text
           size={size}
-          regular
+          weight={weight}
           style={{
             color: currentColor,
             margin: 0,

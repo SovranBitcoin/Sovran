@@ -5,7 +5,7 @@ import { useNavigation } from 'expo-router';
 import { greys } from 'helper/colors';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { Text } from 'components/common/View';
+import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
@@ -17,7 +17,7 @@ import Icon from 'assets/icons';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 
 // Screen dimensions
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 const scanBoxSize = screenWidth * 0.8;
 
 // Type definitions
@@ -26,17 +26,6 @@ type BlurTint = 'light' | 'dark' | 'default';
 interface ScanningData {
   data: string;
   type?: string;
-}
-
-interface BarcodeHandlerParams {
-  scanning: ScanningData;
-  navigation: ReturnType<typeof useNavigation>;
-  urDecoder: URDecoder;
-  unit?: string;
-  selectedMint: any;
-  setProgress: React.Dispatch<React.SetStateAction<number>>;
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  setScanned: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface BlurredCircleButtonProps {
@@ -124,7 +113,7 @@ const Camera: React.FC = () => {
       setTimeout(() => {
         setFlashlightOn(false);
       }, 1000);
-    } catch (error) {
+    } catch {
       // Silent error handling - consider logging in production
     }
   }, []);

@@ -25,7 +25,7 @@ export function convertNpub(pubkey: string) {
   try {
     const npub = nip19.decode(pubkey);
     if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
-  } catch (error) {
+  } catch {
     return pubkey;
   }
   return maybeConvertNpub(pubkey)?.slice(2);
@@ -311,23 +311,6 @@ export const SearchBar = ({ theme, navigation }) => {
           <Text style={styles.searchPlaceholder}>Search for contacts</Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
-};
-
-const ContactList = ({ enrichedContacts, filteredProfiles, theme, navigation }) => {
-  const styles = createStyles(theme);
-  return (
-    <View style={styles.contactsContainer}>
-      {enrichedContacts.map((p) => (
-        <ContactItem
-          key={p.pubkey}
-          contact={p}
-          isVerified={filteredProfiles.some((profile) => profile.pubkey === p.pubkey)}
-          theme={theme}
-          navigation={navigation}
-        />
-      ))}
     </View>
   );
 };

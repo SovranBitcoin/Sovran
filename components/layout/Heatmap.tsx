@@ -121,7 +121,7 @@ interface Swap {
   time_taken: number;
 }
 
-const Heatmap = ({ mintInfo, mintUrl, wallet }: HeatmapProps) => {
+const Heatmap = ({ mintInfo, wallet }: HeatmapProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [data, setData] = useState<Record<string, Swap[]>>({});

@@ -10,14 +10,15 @@ import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 
-const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
+// eslint-disable-next-line no-empty-pattern
+const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
   const dispatch = useDispatch();
   const handleDeleteProfile = async () => {
     try {
       await dispatch(resetApp());
       await Updates.reloadAsync();
-    } catch (error) {}
+    } catch {}
   };
 
   return (

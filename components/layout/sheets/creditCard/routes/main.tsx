@@ -5,7 +5,8 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 
-const MainRoute = ({ router }: RouteScreenProps<'credit-card-sheet', 'main'>) => {
+// eslint-disable-next-line no-empty-pattern
+const MainRoute = ({}: RouteScreenProps<'credit-card-sheet', 'main'>) => {
   const theme = useSelector(memoizedGetTheme);
   return (
     <View

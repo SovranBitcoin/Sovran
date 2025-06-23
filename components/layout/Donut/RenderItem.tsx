@@ -34,11 +34,11 @@ const RenderItem = ({ item, index }: Props) => {
         const info = await mint.getInfo();
 
         setIconUrl(info?.icon_url); // Set the icon URL from the mint info
-      } catch (error) {}
+      } catch {}
     };
 
     fetchMintInfo();
-  }, [item.label]); // Ensure useEffect re-runs when item.label changes
+  }, [item.label, item.subtitle]); // Ensure useEffect re-runs when item.label changes
 
   return (
     <Animated.View

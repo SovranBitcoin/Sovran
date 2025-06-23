@@ -43,7 +43,7 @@ const useLinkPreview = (url) => {
           // Cache the fetched data
           await linkPreviewCache.set(url, JSON.stringify(data));
         }
-      } catch (err) {
+      } catch {
         setError('Failed to fetch link preview.');
       } finally {
         setLoading(false);

@@ -118,7 +118,7 @@ export const RowButton: React.FC<{
   );
 };
 
-const ModalScreen: React.FC<{}> = () => {
+const ModalScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
   const styles = createStyles(theme);

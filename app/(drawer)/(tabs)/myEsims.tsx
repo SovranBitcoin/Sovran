@@ -131,7 +131,7 @@ function EsimsScreen() {
         return data.obj.packageList;
       }
       return null;
-    } catch (error) {
+    } catch {
       showMessage('esim_error', {}, { emoji: '🚨' });
       return null;
     }

@@ -44,7 +44,7 @@ export const runWithAnimationFrame = <T extends any[]>(
     requestAnimationFrame(async () => {
       try {
         await callback(...args);
-      } catch (error) {
+      } catch {
       } finally {
         if (setIsSubmitting) {
           setIsSubmitting(false);

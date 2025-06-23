@@ -396,7 +396,7 @@ function AddMintItem({
   );
 }
 
-export function MintAddMore({ onClose, payload }) {
+function MintAddMore({ onClose, payload }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
@@ -409,7 +409,7 @@ export function MintAddMore({ onClose, payload }) {
     return 'All';
   });
   const [mintsData, setMintsData] = useState<Map<string, ProcessedMintData>>(new Map());
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [loadedMintIds, setLoadedMintIds] = useState<Set<string>>(new Set());
   const router = useSheetRouter('mint');
   const { mintCounts } = useRecommendedMints();
@@ -491,7 +491,7 @@ export function MintAddMore({ onClose, payload }) {
             newSet.add(mint.id);
             return newSet;
           });
-        } catch (err) {
+        } catch {
           setMintsData((prev) => {
             const newMap = new Map(prev);
             newMap.set(mint.id, {
@@ -517,7 +517,7 @@ export function MintAddMore({ onClose, payload }) {
     };
 
     fetchAllMintData();
-  }, [recommendedMints]);
+  }, [recommendedMints, loadedMintIds]);
 
   const handleToggleMint = (mintId: string) => {
     setSelectedMints((prev) => {
@@ -565,7 +565,7 @@ export function MintAddMore({ onClose, payload }) {
       // Check if mint supports the selected currency
       return mintData.supportedUnits.includes(selectedCurrency);
     });
-  }, [recommendedMints, selectedCurrency, mintsData, mints, allowedCurrencies]);
+  }, [recommendedMints, selectedCurrency, mintsData, mints]);
 
   // Get loaded mints that match the currency filter
   const loadedMints = useMemo(() => {

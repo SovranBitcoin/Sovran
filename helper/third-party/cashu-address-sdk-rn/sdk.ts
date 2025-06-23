@@ -1,4 +1,4 @@
-import { BalanceResponse, Signer, TokenReponse } from './types';
+import { Signer, TokenReponse } from './types';
 import { authedJsonRequest, createAuthHeader, createAuthTemplate } from './utils';
 
 export class NCSDK {
@@ -72,7 +72,7 @@ export class NCSDK {
     const signedAuthEvent = await this.signer.signEvent(authTemplate);
     const authHeader = createAuthHeader(signedAuthEvent);
     const res = await authedJsonRequest(url + (since ? `?since=${since}` : ''), authHeader);
-    const data = (await res.json()) as BalanceResponse;
+    const data = await res.json();
     if (data.error) {
       throw new Error(data.message);
     }

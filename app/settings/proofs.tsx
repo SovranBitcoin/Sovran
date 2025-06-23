@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'components/common/Button';
 import { View } from 'components/common/View';
@@ -47,46 +47,49 @@ export default function ModalScreen() {
   }, [allMints, allProofs, selectedMint]);
 
   // Function to check proof spent status for a specific mint
-  const checkProofSpentStatus = async (mintUrl) => {
-    const mintProofs = allProofs[mintUrl];
+  const checkProofSpentStatus = useCallback(
+    async (mintUrl) => {
+      const mintProofs = allProofs[mintUrl];
 
-    if (!mintProofs || mintProofs.length === 0) {
-      setError(`No proofs available for mint: ${mintUrl}`);
-      return;
-    }
-
-    setCheckingSpent(true);
-    setError(null);
-
-    try {
-      const wallet = await getWallet({ unit: 'sat', mintUrl, profile: currentProfile });
-
-      // Make sure proofs are in the correct format before checking
-      const validProofs = mintProofs.filter(
-        (proof) => proof && typeof proof === 'object' && proof.id && proof.C
-      );
-
-      if (validProofs.length === 0) {
-        throw new Error(`No valid proofs found for mint: ${mintUrl}`);
+      if (!mintProofs || mintProofs.length === 0) {
+        setError(`No proofs available for mint: ${mintUrl}`);
+        return;
       }
 
-      const states = await wallet.checkProofsStates(validProofs);
+      setCheckingSpent(true);
+      setError(null);
 
-      // Update proof states for this mint
-      setProofStates((prevStates) => ({
-        ...prevStates,
-        [mintUrl]: states,
-      }));
-    } catch (err) {
-      console.error(`Error checking spent status for ${mintUrl}:`, err);
-      setError(`Error for ${mintUrl}: ${err.message || JSON.stringify(err)}`);
-    } finally {
-      setCheckingSpent(false);
-    }
-  };
+      try {
+        const wallet = await getWallet({ unit: 'sat', mintUrl, profile: currentProfile });
+
+        // Make sure proofs are in the correct format before checking
+        const validProofs = mintProofs.filter(
+          (proof) => proof && typeof proof === 'object' && proof.id && proof.C
+        );
+
+        if (validProofs.length === 0) {
+          throw new Error(`No valid proofs found for mint: ${mintUrl}`);
+        }
+
+        const states = await wallet.checkProofsStates(validProofs);
+
+        // Update proof states for this mint
+        setProofStates((prevStates) => ({
+          ...prevStates,
+          [mintUrl]: states,
+        }));
+      } catch (err) {
+        console.error(`Error checking spent status for ${mintUrl}:`, err);
+        setError(`Error for ${mintUrl}: ${err.message || JSON.stringify(err)}`);
+      } finally {
+        setCheckingSpent(false);
+      }
+    },
+    [allProofs, currentProfile]
+  );
 
   // Function to check all mints
-  const checkAllMints = async () => {
+  const checkAllMints = useCallback(async () => {
     setCheckingSpent(true);
     setError(null);
 
@@ -100,7 +103,7 @@ export default function ModalScreen() {
     }
 
     setCheckingSpent(false);
-  };
+  }, [allMints, checkProofSpentStatus, setCheckingSpent, setError]);
 
   // Function to remove spent proofs for a specific mint
   const removeSpentProofsForMint = async (mintUrl) => {
@@ -135,7 +138,7 @@ export default function ModalScreen() {
         clearTimeout(timer);
       };
     }
-  }, [allMints.length]);
+  }, [allMints.length, checkAllMints, proofStates]);
 
   // Helper function to count spent proofs for a mint
   const getSpentProofCount = (mintUrl) => {

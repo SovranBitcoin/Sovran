@@ -15,7 +15,7 @@ interface CustomKeyboardProps {
 type KeyboardValue = string | number;
 
 const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loading = false }) => {
-  const [inputValue, setInputValue] = useState<string>('');
+  const [, setInputValue] = useState<string>('');
   const theme = useSelector(memoizedGetTheme);
 
   const handlePress = useCallback(
@@ -64,7 +64,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         return newValue;
       });
     },
-    [onKeyPress]
+    [onKeyPress, unit]
   );
 
   const renderButton = useCallback(

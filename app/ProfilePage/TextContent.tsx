@@ -18,7 +18,7 @@ export const extractUrls = (text) => {
     const contentWithoutUrls = text.replace(urlRegex, '').replace(nostrEvents, '');
 
     return { urls, nostrEvents, contentWithoutUrls };
-  } catch (err) {
+  } catch {
     return { urls: null, nostrEvents: null, contentWithoutUrls: text };
   }
 };

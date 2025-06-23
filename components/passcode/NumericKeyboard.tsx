@@ -104,7 +104,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
 };
 
 const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
-  const [inputValue, setInputValue] = useState('');
+  const [, setInputValue] = useState('');
   const theme = useSelector(memoizedGetTheme);
 
   const handlePress = useCallback(

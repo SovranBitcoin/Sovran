@@ -180,7 +180,6 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
     });
   };
 
-  const [expiryDate, setExpiryDate] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [remainingTime, setRemainingTime] = useState('VPN'); // Default text
 
@@ -188,7 +187,6 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
     const interval = setInterval(() => {
       const expiry = vpn?.order?.expiry_date;
       if (expiry) {
-        setExpiryDate(new Date(expiry).toISOString());
         const prog = calculateProgress(vpn?.order?.ordered_at, expiry);
         setProgress(prog);
 

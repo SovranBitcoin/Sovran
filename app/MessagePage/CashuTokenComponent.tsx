@@ -19,7 +19,7 @@ interface Props {
 }
 
 const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
-  const styles = createStyles(theme, isReceived);
+  const styles = createStyles(theme);
   const { transactions } = useCashu();
   const navigation = useTypedNavigation();
 
@@ -91,7 +91,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   );
 };
 
-const createStyles = (theme: string, isReceived: boolean) =>
+const createStyles = (theme: string) =>
   StyleSheet.create({
     wrapper: {
       marginVertical: 8,

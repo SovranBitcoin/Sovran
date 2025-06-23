@@ -4,7 +4,6 @@ import { store } from 'helper/redux/store';
 import { Button } from 'components/common/Button';
 import { Text } from 'components/common/Text';
 import Container from 'components/layout/Container';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { restoreCounter } from 'helper/cashu/restore';
 import { increaseCounterV2 } from 'helper/redux/cashu';
 import { runWithAnimationFrame } from '../onboard/new';
@@ -12,7 +11,6 @@ import { ScrollView } from 'react-native';
 
 export default function ModalScreen() {
   const [isLoading, setIsLoading] = useState(false);
-  const theme = useSelector(memoizedGetTheme);
   const keysets = useSelector((state) => state.cashu?.keysets);
   const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
 

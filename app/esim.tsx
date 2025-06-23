@@ -83,7 +83,7 @@ function ModalScreen() {
         const esimData = await fetchEsimData(orderNo);
         updateEsim(esim.request, esimData.obj.esimList[0]);
       }
-    } catch (error) {
+    } catch {
     } finally {
       setLoadingEsim(false);
     }

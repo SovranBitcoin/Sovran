@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { View, SafeAreaView, StatusBar, StyleSheet, Dimensions } from 'react-native';
+import { View, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 
 const Calculator = () => {
@@ -61,7 +61,7 @@ const Calculator = () => {
       // Show calculation above the result
       setCalculation(`${firstNum}${operator}${secondNum}=`);
       setEqualsPressed(true);
-    } catch (e) {
+    } catch {
       setDisplay('Error');
     }
   };
@@ -87,10 +87,6 @@ const Calculator = () => {
       setDisplay(display + '.');
     }
   };
-
-  // Calculate button dimensions based on screen width to maintain proportions
-  const screen = Dimensions.get('window');
-  const buttonSize = (screen.width - 50) / 4; // We'll keep this for reference but use fixed values in styles
 
   return (
     <SafeAreaView style={styles.container}>

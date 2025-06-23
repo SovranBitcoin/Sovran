@@ -109,8 +109,6 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
 }
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <View
       style={{

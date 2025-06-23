@@ -44,28 +44,28 @@ export const DonutChartContainer = ({
   const totalValue = useSharedValue(0);
   const decimals = useSharedValue<number[]>([]);
 
-  const generateData = () => {
-    const filteredData = data;
-
-    const total = filteredData.reduce((acc, item) => acc + item.amount, 0);
-    const percentages = filteredData.map((item) => Math.round((item.amount / total) * 100));
-    const generateDecimals = percentages.map((number) => Number(number.toFixed(0)) / 100);
-
-    totalValue.value = withTiming(total, { duration: 1000 });
-    decimals.value = [...generateDecimals];
-
-    const arrayOfObjects = filteredData.map((item, index) => ({
-      ...item,
-      percentage: percentages[index],
-      color: colors[index % colors.length],
-    }));
-
-    setChartData(arrayOfObjects);
-  };
-
   useEffect(() => {
+    const generateData = () => {
+      const filteredData = data;
+
+      const total = filteredData.reduce((acc, item) => acc + item.amount, 0);
+      const percentages = filteredData.map((item) => Math.round((item.amount / total) * 100));
+      const generateDecimals = percentages.map((number) => Number(number.toFixed(0)) / 100);
+
+      totalValue.value = withTiming(total, { duration: 1000 });
+      decimals.value = [...generateDecimals];
+
+      const arrayOfObjects = filteredData.map((item, index) => ({
+        ...item,
+        percentage: percentages[index],
+        color: colors[index % colors.length],
+      }));
+
+      setChartData(arrayOfObjects);
+    };
+
     generateData();
-  }, [data]);
+  }, [data, colors, decimals, totalValue]);
 
   const font = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 32);
   const smallFont = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 20);

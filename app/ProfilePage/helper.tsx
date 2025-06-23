@@ -54,15 +54,6 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
     [events]
   );
 
-  const { events: metadataEvents } = useNE({
-    filter: {
-      kinds: [EventKind.Metadata],
-      authors,
-      since: 0,
-    },
-  });
-
-  const metadata = metadataEvents.filter((event) => categorizeEvent(event).includes('metadata'));
   // Filter the events into posts, replies, and media
   const posts = sortedEvents
     .filter((event) => categorizeEvent(event).includes('post'))

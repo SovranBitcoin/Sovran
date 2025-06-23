@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet } from 'react-native';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash } from 'components/cashu';
 import Modal from 'components/layout/Modal';
-import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
@@ -38,7 +36,7 @@ export const getGiveaway = ({ token }: TokenProps) => {
     let parsed;
     try {
       parsed = JSON.parse(secret);
-    } catch (e) {
+    } catch {
       // If parsing fails, assume it's a hex string
       parsed = secret;
     }
@@ -229,31 +227,6 @@ export function EcashReceiveConfirmation({
     </Modal>
   );
 }
-
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    label: {
-      fontSize: 20,
-      fontFamily: 'OverpassHeavy',
-      color: greys(theme)[0],
-      marginLeft: 16,
-      textAlign: 'center',
-    },
-    description: {
-      fontSize: 14,
-      fontFamily: 'OverpassRegular',
-      color: greys(theme)[100],
-      marginLeft: 16,
-      marginBottom: 8,
-      marginTop: 8,
-      textAlign: 'center',
-    },
-    link: {
-      fontFamily: 'OverpassHeavy',
-      fontSize: 20,
-      marginBottom: -3,
-    },
-  });
 
 function ModalScreen() {
   const {

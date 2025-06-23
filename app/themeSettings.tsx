@@ -79,9 +79,7 @@ const themeNameMap = {
   // Add other themes here as needed
 };
 
-interface ThemeSettingsProps {}
-
-function ThemeSettings({}: ThemeSettingsProps) {
+function ThemeSettings() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
   const [searchText, setSearchText] = useState('');

@@ -129,7 +129,7 @@ export default function ModalScreen() {
         console.error('Failed to parse profile', err);
       }
     }
-  }, [profileEvents]);
+  }, [profileEvents, setSearch]);
 
   // Handle animation effects
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function ModalScreen() {
       duration: 300,
       useNativeDriver: false,
     }).start();
-  }, [isFocused]);
+  }, [isFocused, paddingAnim, paddingAnim2, scaleAnim]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -310,7 +310,7 @@ export default function ModalScreen() {
 
       Alert.alert('Success', 'Message sent successfully!');
       setMessage('');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to send message');
     }
   };

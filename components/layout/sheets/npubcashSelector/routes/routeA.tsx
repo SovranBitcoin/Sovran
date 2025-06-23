@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 
-const RouteA = ({ router }: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
+// eslint-disable-next-line no-empty-pattern
+const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
   const [selectedValue, setSelectedValue] = useState('option1');
   return (
     <View>

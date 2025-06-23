@@ -3,7 +3,7 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { useTypedRoute, useTypedNavigation } from 'helper/navigation';
+import { useTypedRoute } from 'helper/navigation';
 import { useCashu } from 'helper/redux/cashu';
 import { EcashSendConfirmation } from './ecashSendConfirmation';
 import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
@@ -12,7 +12,6 @@ import { LightningSendConfirmation } from './lightningSendConfirmation';
 
 function ModalScreen() {
   const { id, transactionType } = useTypedRoute<'modal'>();
-  const navigation = useTypedNavigation();
   const { transactions } = useCashu();
 
   const transaction = transactions.find(

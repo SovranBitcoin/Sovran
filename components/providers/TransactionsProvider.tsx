@@ -92,10 +92,13 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
   // Clean up connections when component unmounts
   useEffect(() => {
+    // Take a snapshot when the effect runs
+    const connectionsSnapshot = activeConnectionsRef.current;
+
     return () => {
-      // Close all active connections when provider unmounts
-      for (const [id, connection] of activeConnectionsRef.current.entries()) {
-        if (connection && connection.unsub) {
+      // Use the snapshot in the cleanup
+      for (const [id, connection] of connectionsSnapshot.entries()) {
+        if (connection?.unsub) {
           connection.unsub();
           removeConnection(id);
         }
@@ -218,7 +221,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                     }
                   }
                 },
-                (err) => {
+                () => {
                   unsub();
                   removeConnection(id);
                 }

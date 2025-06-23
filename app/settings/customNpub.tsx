@@ -120,10 +120,10 @@ const createStyles = (theme: any) =>
 
 const checkNameAvailability = async (name: string, domain: string) => {
   try {
-    const response = await fetch(`https://npubx.cash/.well-known/nostr.json?name=${name}`);
+    const response = await fetch(`${domain} /.well-known/nostr.json?name=${name}`);
     const data = await response.json();
     return !data.names || Object.keys(data.names).length === 0;
-  } catch (error) {
+  } catch {
     return false;
   }
 };
@@ -254,7 +254,6 @@ const NpubSelector = ({
     );
   };
 
-  const [selectedValue, setSelectedValue] = useState('sovran.id');
   return (
     <View style={styles.inputSelectorContainer}>
       <View
@@ -309,7 +308,7 @@ export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const [username, setUsername] = useState('');
-  const [selectedDomain, setSelectedDomain] = useState('@sovran.money');
+  const [selectedDomain, setSelectedDomain] = useState('https://npubx.cash');
 
   const handleBuy = () => {
     // Implement the buy functionality here

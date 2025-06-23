@@ -20,7 +20,7 @@ export function getLightningAmount({ pr }) {
   try {
     const decodedPR = decode(pr as string);
     return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -98,7 +98,7 @@ export async function checkSpecificTransaction({ quoteToCheck }) {
     }
 
     await updateStateAfterPayment(profileId, proofs, quote, mintUrl);
-  } catch (error) {
+  } catch {
     // Silent error handling
   }
 }
@@ -254,7 +254,7 @@ export async function sendMultiPathPayment({ pr }) {
       mintUrl: 'https://mint.103100.xyz',
       mpp: true,
     });
-  } catch (err) {
+  } catch {
     // Silent error handling
   }
 }

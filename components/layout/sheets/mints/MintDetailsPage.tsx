@@ -17,7 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/layout/Transaction';
 
-const MintDetailPage = (props) => {
+const MintDetailPage = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const router = useSheetRouter('mint');
@@ -28,10 +28,10 @@ const MintDetailPage = (props) => {
     mintUrl: params?.mintUrl,
   });
 
-  const handleCopy = async (text, itemName) => {
+  const handleCopy = async (text: string) => {
     try {
       await Clipboard.setStringAsync(text);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to copy to clipboard');
     }
   };
@@ -52,7 +52,7 @@ const MintDetailPage = (props) => {
         router?.close();
         break;
       default:
-        handleCopy(info, 'Contact Info');
+        handleCopy(info);
     }
   };
 

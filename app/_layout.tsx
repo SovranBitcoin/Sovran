@@ -127,7 +127,7 @@ function useNostrDMs(currentProfile, addMessage, messages) {
             id: event.id,
             sig: event.sig,
           });
-        } catch (err) {}
+        } catch {}
       });
     };
 

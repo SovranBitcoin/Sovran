@@ -8,13 +8,14 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { addMintsAction } from 'helper/redux/cashu';
-import { useSheetRef, useSheetRouter } from 'react-native-actions-sheet';
+import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import opacity from 'hex-color-opacity';
 
-export function RouteA({ payload }) {
+// eslint-disable-next-line no-empty-pattern
+function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
   const theme = useSelector(memoizedGetTheme);
-  const router = useSheetRouter('mint-accepter');
   const ref = useSheetRef('mint-accepter');
+  const payload = useSheetPayload('mint-accepter');
 
   return (
     <View

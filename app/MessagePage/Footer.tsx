@@ -5,7 +5,7 @@ import Icon from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { Button } from 'components/common/Button';
 
-const Footer = ({ theme, message, setMessage, handleSendDM, isFocused, setIsFocused }) => {
+const Footer = ({ theme, message, setMessage, handleSendDM, setIsFocused }) => {
   const styles = createStyles(theme);
 
   return (

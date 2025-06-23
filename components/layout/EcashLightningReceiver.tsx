@@ -1,13 +1,11 @@
-import { Dimensions, StyleSheet, View } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { greys, shades } from 'helper/colors';
 import { isValidEcashToken } from 'components/cashu';
 import Modal from 'components/layout/Modal';
 import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from '../layout/PaymentInfo';
 import { useNostr } from 'helper/redux/nostr';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { useCameraPermissions } from 'expo-camera';
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { checkIfAlreadyRedeemed } from 'helper/payment-handler/handlers';
@@ -21,9 +19,6 @@ import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 export const pool = new SimplePool();
-
-const screenWidth = Dimensions.get('window').width;
-const boxSize = (screenWidth - 128) / 4;
 
 type UnitType = 'sat' | string;
 
@@ -39,8 +34,7 @@ interface TokenHandlerParams {
 /**
  * Component for receiving Bitcoin or other cryptocurrency via Lightning or Ecash
  */
-const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, type }) => {
-  const theme = useSelector(memoizedGetTheme);
+const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
   const navigation = useTypedNavigation();
   const { currentProfile } = useNostr();
   const [hasPermission, requestPermission] = useCameraPermissions();
@@ -59,7 +53,6 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
       }
 
       if (!giveaway.condition()) {
-        const e = giveaway.error();
         showMessage('general_error', {}, { emoji: '🚨' });
         return;
       }
@@ -228,68 +221,3 @@ const EcashLightningReceiver: React.FC<EcashLightningReceiverProps> = ({ unit, t
 };
 
 export default EcashLightningReceiver;
-
-// Keeping styles for backward compatibility
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    cornerBox: {
-      position: 'absolute',
-      width: boxSize,
-      height: boxSize,
-      borderRadius: 16,
-      zIndex: 100,
-      backgroundColor: 'transparent',
-      overflow: 'hidden',
-    },
-    innerBorder: {
-      position: 'absolute',
-      borderWidth: 1,
-      borderColor: greys(theme)[0],
-      borderRadius: 16,
-      zIndex: 100,
-      backgroundColor: 'transparent',
-      width: screenWidth - 128,
-      height: screenWidth - 128,
-    },
-    barCodeScanner: {
-      position: 'absolute',
-      width: '100%',
-      height: '100%',
-    },
-    input: {
-      backgroundColor: greys(theme)[1800],
-      color: greys(theme)[0],
-      borderWidth: 1,
-      borderColor: greys(theme)[1300],
-      shadowColor: greys(theme)[2300],
-      shadowOffset: { width: 1, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
-      borderRadius: 86,
-      padding: 8,
-      margin: 16,
-      marginLeft: 16,
-      marginRight: 16,
-      marginTop: 8,
-      marginBottom: 8,
-      paddingLeft: 16,
-      fontFamily: 'OverpassBold',
-    },
-    pasteButton: {
-      position: 'absolute',
-      right: 16,
-      padding: 16,
-      top: 0,
-      bottom: 0,
-    },
-    pasteText: {
-      color: shades[100],
-      fontFamily: 'OverpassBold',
-    },
-    buttonRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 8,
-    },
-  });

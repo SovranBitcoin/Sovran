@@ -4,19 +4,18 @@ import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import Icon from 'assets/icons';
-import { ActionSheetRef, registerSheet, useSheetRouter } from 'react-native-actions-sheet';
+import { ActionSheetRef, registerSheet } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Text } from 'components/common/Text';
 import { addMints, useGetMintInfo } from 'helper/redux/cashu';
 import { Sheet } from 'components/layout/sheets/mints/sheet';
 import { MintSelect } from 'components/layout/sheets/mints/MintSelect';
-import MintAddMore from 'components/layout/sheets/mints/MintAddMore';
 import { store } from 'helper/redux/store';
-
 import MintDetailPage from './MintDetailsPage';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import MintAddMore from './MintAddMore';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -93,15 +92,6 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
     }
     actionSheetRef.current?.show();
   };
-
-  // Safely extract and process unit string
-  const mintUnitLower = unit ? unit.toLowerCase() : '';
-  const mintUnitUpper = unit ? unit.toUpperCase() : '';
-  const currencyValue = mintUnitLower === 'sat' ? 'BTC' : (mintUnitUpper as 'USD' | 'EUR' | 'GBP');
-  const denominationValue =
-    mintUnitLower === 'sat' ? 'sats' : (mintUnitLower as 'usd' | 'eur' | 'gbp');
-  const precision = mintUnitUpper === 'SAT' ? 0 : 2;
-  const currencyDisplay = mintUnitUpper === 'SAT' ? 'name' : 'symbol';
 
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
 
@@ -445,7 +435,6 @@ const MintSheet = ({
   unit,
   loading,
 }) => {
-  const router = useSheetRouter('mint');
   return (
     <Sheet
       actionSheetRef={actionSheetRef}

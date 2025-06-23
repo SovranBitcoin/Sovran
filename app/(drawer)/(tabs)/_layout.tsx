@@ -77,34 +77,19 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
 };
 
 const TabBarBackground = ({ theme }) => (
-  <>
-    <BlurView
-      tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-      intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          overflow: 'hidden',
-          borderRadius: 8,
-          top: -0.5,
-          opacity: 1,
-        },
-      ]}
-    />
-    {/* <View
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          backgroundColor: opacity(greys(theme)[2100], 0.5),
-          overflow: "hidden",
-          borderRadius: 8,
-
-          // borderWidth: 3,
-          // borderColor: greys(theme)[2300],
-        },
-      ]}
-    /> */}
-  </>
+  <BlurView
+    tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
+    intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
+    style={[
+      StyleSheet.absoluteFill,
+      {
+        overflow: 'hidden',
+        borderRadius: 8,
+        top: -0.5,
+        opacity: 1,
+      },
+    ]}
+  />
 );
 
 // Styles creator function

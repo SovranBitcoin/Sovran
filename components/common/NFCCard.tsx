@@ -23,7 +23,6 @@ export const CreditCardComponent = ({
     accent: '#FFCC70',
     text: '#FFFFFF',
   },
-  pattern = 'gradient',
   showContactless = true,
   fontStyle = 'modern',
 }) => {
@@ -32,7 +31,7 @@ export const CreditCardComponent = ({
   const handleFlip = () => {
     SheetManager.show('credit-card-sheet', {
       // Handle data returned when sheet is closed
-      onClose(data) {
+      onClose() {
         // Process returned data here
       },
     });

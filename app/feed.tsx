@@ -42,7 +42,7 @@ const TabTwoScreen = () => {
   const { currentProfile } = useNostr();
   const pagerRef = useRef(null);
   const [selectedTab, setSelectedTab] = useState('Notifications');
-  const tabs = ['Notifications'];
+  const tabs = useMemo(() => ['Notifications'], []);
 
   const since = useMemo(() => Math.floor(Date.now() / 1000), []);
   const day = useMemo(() => 24 * 60 * 60, []);

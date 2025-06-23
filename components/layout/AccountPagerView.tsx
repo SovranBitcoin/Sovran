@@ -35,9 +35,6 @@ interface ActionButton {
 
 interface AccountType {
   unit: string;
-  type: string;
-  accountIndex: number;
-  key: string;
 }
 
 interface AccountPagerViewProps {

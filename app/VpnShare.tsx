@@ -31,7 +31,7 @@ function ModalScreen() {
       // Open the sharing dialog to let the user choose where to save
       await Sharing.shareAsync(path);
       // showMessage("VPN configuration shared", path, null, null);
-    } catch (err) {
+    } catch {
       showMessage('download_failed', {}, { emoji: '🚨' });
     }
   };

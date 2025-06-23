@@ -16,7 +16,7 @@ import { withSheetProvider } from 'components/hocs/withSheetProvider';
 export const getCountry = (iso) => {
   try {
     return lookup.byIso(iso)?.country;
-  } catch (err) {
+  } catch {
     return undefined;
   }
 };
@@ -34,7 +34,7 @@ function ModalScreen() {
       try {
         const countryName = lookup.byIso(c)?.country || '';
         return countryName.toLowerCase().includes(searchText.toLowerCase());
-      } catch (err) {
+      } catch {
         return false;
       }
     })

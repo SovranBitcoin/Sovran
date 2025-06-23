@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Platform } from 'react-native';
-import { greys, shades } from 'helper/colors';
+import { Platform } from 'react-native';
+import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -63,7 +63,7 @@ function ModalScreen() {
           pubkey: LNVPN_PUBKEY,
         });
       }
-    } catch (error) {
+    } catch {
       showMessage('general_error', {}, { emoji: '❌' });
     } finally {
       setLoading(false);
@@ -83,15 +83,12 @@ function ModalScreen() {
 
   const profileId = useSelector((state: any) => state.nostr?.currentProfile?.id);
   const dispatch = useDispatch();
-  const handleMintSelected = async (
-    mint: {
-      id: string;
-      name: string;
-      iconUrl: string | null;
-      unit: string;
-    },
-    balance: { amount: number; unit: string } | undefined
-  ) => {
+  const handleMintSelected = async (mint: {
+    id: string;
+    name: string;
+    iconUrl: string | null;
+    unit: string;
+  }) => {
     try {
       // Update selected mint in Redux
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
@@ -231,47 +228,3 @@ function ModalScreen() {
 }
 
 export default withSheetProvider(ModalScreen);
-
-const createStyles = (theme: string) =>
-  StyleSheet.create({
-    textInput: {
-      backgroundColor: greys(theme)[1800],
-      borderWidth: 1,
-      borderColor: greys(theme)[1300],
-      shadowColor: greys(theme)[2300],
-      shadowOffset: { width: 1, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 6,
-      borderRadius: 86,
-      padding: 8,
-      color: greys(theme)[0],
-      marginBottom: 8,
-      paddingLeft: 16,
-      fontFamily: 'OverpassBold',
-    },
-    minus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#9A4141',
-      marginRight: 4,
-    },
-    plus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#499A41',
-      marginRight: 4,
-    },
-    container: {
-      backgroundColor: greys(theme)[2300],
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: greys(theme)[1000],
-    },
-    separator: {
-      marginVertical: 30,
-      height: 1,
-      width: '80%',
-    },
-  });

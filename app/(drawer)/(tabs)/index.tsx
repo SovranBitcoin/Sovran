@@ -25,15 +25,26 @@ import {
   memoizedGetTransactionByMatcher,
   TransactionData,
 } from 'helper/redux/cashu';
-import { isProduction } from 'helper/version';
-import { MintQuoteResponse } from '@cashu/cashu-ts';
+import { MintQuoteResponse, MintQuoteState } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
 
+interface NPUBQuote {
+  amount: number;
+  createdAt: number;
+  expiresAt: number;
+  locked: boolean;
+  mintUrl: string;
+  paidAt: number;
+  quoteId: string;
+  request: string;
+  state: MintQuoteState;
+}
+
 export async function getProfile(currentProfile: any, listenToTransaction: any) {
   const sk = nip19.decode(currentProfile?.nsec).data;
-  const signer = new NsecSigner(sk);
+  const signer = new NsecSigner(sk as Uint8Array);
   const sdk = new NCSDK('https://npubx.cash', signer);
 
   // TODO: get last transaction that is npubx.cash from fromNIP05
@@ -54,7 +65,9 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
   const lt = lastTransaction?.[lastTransaction?.length - 1];
 
   // this +1 is kinda hacky, lets remove that and instead filter quotes based on transactions in redux
-  const quotes = (await sdk.getQuotes({ since: new Date(lt?.date).getTime() / 1000 + 1 })).quotes;
+  const quotes: NPUBQuote[] = (
+    await sdk.getQuotes({ since: new Date(lt?.date).getTime() / 1000 + 1 })
+  ).quotes;
 
   if (quotes.length === 0) {
     showMessage('no_funds');
@@ -70,7 +83,7 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
       state: quote.state,
     };
 
-    const transaction = {
+    const transaction: TransactionData = {
       request: quote.request,
       amount: quote.amount,
       mintQuote,
@@ -95,8 +108,10 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
   listenToTransaction(transactions);
 }
 
-function TabOneScreen({
-  currencies = [
+function TabOneScreen() {
+  const supportedUnits = ['sat'];
+
+  const accounts = [
     {
       unit: 'sat',
     },
@@ -109,16 +124,10 @@ function TabOneScreen({
     {
       unit: 'gbp',
     },
-  ],
-}) {
-  const supportedUnits = isProduction ? ['sat'] : ['sat'];
+  ].filter((u) => supportedUnits.includes(u.unit));
 
-  const [accounts, setAccounts] = useState([
-    ...currencies.filter((u) => supportedUnits.includes(u.unit)),
-  ]);
   const [account, setAccount] = useState(accounts[0]);
 
-  const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {}, []);
 
   const theme = useSelector(memoizedGetTheme);
@@ -166,30 +175,15 @@ function TabOneScreen({
       <SafeAreaView style={styles.safeAreaView}>
         <ScrollView
           style={styles.scrollView}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-          <AccountPagerView
-            accounts={accounts}
-            setAccount={setAccount}
-            account={account}
-            setAccounts={setAccounts}
-          />
-          {new Date().getTime() > new Date('2025-06-18').getTime() && (
-            <View
-              style={{
-                margin: 16,
-                marginTop: -40,
-                marginBottom: 32,
-              }}>
-              <Card
-                message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
-                variant="info"
-              />
-            </View>
-          )}
-          <View
-            style={{
-              margin: 16,
-            }}>
+          refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
+          <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
+          <View className="m-4 mb-[32px] mt-[-32px]">
+            <Card
+              message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
+              variant="info"
+            />
+          </View>
+          <View className="m-4">
             <Transactions days={1} account={account} />
           </View>
         </ScrollView>

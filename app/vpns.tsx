@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Button } from 'components/common/Button';
@@ -22,7 +22,6 @@ function ModalScreen() {
   const { params } = useRoute();
   const [country, setCountry] = useState('RU');
 
-  const [dataType, setDataType] = useState('Local');
   const [packages, setPackages] = useState([
     {
       packageCode: 1,
@@ -111,7 +110,7 @@ function ModalScreen() {
         request: data.payment_request,
         price: packages.find((p) => p.packageCode === selectedPackage)?.price,
       });
-    } catch (error) {}
+    } catch {}
   };
 
   return (
@@ -262,34 +261,5 @@ function ModalScreen() {
     </Modal>
   );
 }
-
-const createStyles = (theme: string) =>
-  StyleSheet.create({
-    minus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#9A4141',
-      marginRight: 4,
-    },
-    plus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#499A41',
-      marginRight: 4,
-    },
-    container: {
-      backgroundColor: greys(theme)[2300],
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: greys(theme)[1000],
-    },
-    separator: {
-      marginVertical: 30,
-      height: 1,
-      width: '80%',
-    },
-  });
 
 export default withSheetProvider(ModalScreen);

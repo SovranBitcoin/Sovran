@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Alert } from 'react-native';
+import { Alert } from 'react-native';
 import type { WireGuardStatus } from 'react-native-wireguard-vpn';
-import { greys } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -66,8 +65,6 @@ export function convertDataUsage(data) {
 function ModalScreen() {
   const { params } = useRoute();
   const navigation = useNavigation();
-  const [query, setQuery] = useState();
-  const [fetchingPackages, setFetchingPackages] = useState(false);
   const { vpn, updateVpn } = useVpn();
   const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
 
@@ -104,7 +101,7 @@ function ModalScreen() {
         ordered_at: orderedAt.toISOString(),
         expiry_date: expiryDate.toISOString(),
       });
-    } catch (error) {
+    } catch {
       showMessage('activation_failed', {}, { emoji: '🚨' });
     }
   };
@@ -132,7 +129,7 @@ function ModalScreen() {
       // Open the sharing dialog to let the user choose where to save
       await Sharing.shareAsync(path);
       // showMessage("VPN configuration shared", path, null, null);
-    } catch (err) {
+    } catch {
       showMessage('download_failed', {}, { emoji: '🚨' });
     }
   };
@@ -367,32 +364,3 @@ function ModalScreen() {
 }
 
 export default withSheetProvider(ModalScreen);
-
-const createStyles = (theme: string) =>
-  StyleSheet.create({
-    minus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#9A4141',
-      marginRight: 4,
-    },
-    plus: {
-      fontFamily: 'OverpassBold',
-      fontSize: 32,
-      color: '#499A41',
-      marginRight: 4,
-    },
-    container: {
-      backgroundColor: greys(theme)[2300],
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: greys(theme)[1000],
-    },
-    separator: {
-      marginVertical: 30,
-      height: 1,
-      width: '80%',
-    },
-  });

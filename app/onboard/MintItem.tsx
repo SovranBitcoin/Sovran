@@ -36,7 +36,7 @@ export const MintItem = ({
     ]).start();
   }, [activeMintId, positionIndex]);
 
-  const mintProgress = getMintProgress(mint.mintUrl, mint.currencies[0].name);
+  const mintProgress = getMintProgress(mint.mintUrl);
 
   // Calculate z-index value for proper layering
   const zIndexValue = -Math.abs(positionIndex);

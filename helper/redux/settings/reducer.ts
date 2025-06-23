@@ -14,6 +14,7 @@ const initialState = {
     display_btc: 3,
     passcode: '',
     experimental: false,
+    termsAccepted: null,
   },
 };
 

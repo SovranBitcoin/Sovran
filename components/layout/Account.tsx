@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { Animated, Platform, StyleSheet } from 'react-native';
 
@@ -8,11 +8,9 @@ import { Text } from 'components/common/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 
-import { setSelectedMint } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { NonGestureView } from './NonGestureView';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 // Define proper interfaces for our data types
 interface Account {
@@ -21,28 +19,14 @@ interface Account {
   type: string;
 }
 
-interface Mint {
-  id: string;
-  name: string;
-  iconUrl: string | null;
-  unit: string;
-}
-
-interface Balance {
-  amount: number;
-  unit: string;
-}
-
 interface AccountProps {
   accounts: Account[];
   account: Account;
   goToIndex: (index: number) => void;
 }
 
-export function Account({ accounts, account, goToIndex }: AccountProps): React.ReactElement {
+export function Account({ accounts, account }: AccountProps): React.ReactElement {
   const theme = useSelector(memoizedGetTheme);
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
-  const dispatch = useDispatch();
   const styles = createStyles(theme);
 
   // Animation values
@@ -84,29 +68,9 @@ export function Account({ accounts, account, goToIndex }: AccountProps): React.R
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  const handleMintSelected = async (mint: Mint, balance?: Balance): Promise<void> => {
-    try {
-      // Update selected mint in Redux
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-
-      // Update account unit
-      const index = accounts.findIndex((a) => a.unit === mint.unit);
-      if (index !== -1) {
-        goToIndex(index);
-      }
-    } catch (error) {
-      console.error('Error selecting mint:', error);
-      throw error;
-    }
-  };
-
   // Memoize derived data
   const onchainAccounts = accounts.filter((acc) => acc.type === 'onchain');
   const ecashAccounts = accounts.filter((acc) => acc.type !== 'onchain');
-  const currentOnchainIndex = accounts.findIndex(
-    (a) => a.unit === account.unit && a.type === account.type && a.key === account.key
-  );
-  const isCurrentOnchain = account.type === 'onchain';
 
   // Function to render currency icon based on unit
   const renderCurrencyIcon = (): JSX.Element | null => {

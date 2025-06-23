@@ -47,14 +47,12 @@ const DonutChart = ({
   path.addCircle(radius, radius, innerRadius);
 
   const targetText = useDerivedValue(() => {
-    const remaining = chartData.find((item) => item.label === 'Remaining')?.amount || 0;
     const used = chartData.find((item) => item.label === 'Used')?.amount || 0;
     return isSpecialCase ? `${used} GB` : `${Math.round(totalValue.value)} ${totalValueSuffix}`;
   }, [chartData, isSpecialCase]);
 
   const targetText2 = useDerivedValue(() => {
     const remaining = chartData.find((item) => item.label === 'Remaining')?.amount || 0;
-    const used = chartData.find((item) => item.label === 'Used')?.amount || 0;
     return isSpecialCase
       ? `/ ${remaining} GB`
       : `${Math.round(totalValue.value)} ${totalValueSuffix}`;

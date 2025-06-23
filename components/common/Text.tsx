@@ -143,15 +143,9 @@ function getFamilyFromProps(props: CustomTextProps): string {
   return 'overpass'; // default
 }
 
-export function UntranslatedText({
-  size = 14,
-  italic = false,
-  overpass = true,
-  regular = true,
-  ...props
-}: CustomTextProps) {
+export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
   const theme = useSelector(memoizedGetTheme);
-  const { style, lightColor, darkColor, children, ...otherProps } = props;
+  const { style, children, ...otherProps } = props;
 
   const weight = getWeightFromProps(props);
   const family = getFamilyFromProps(props);
@@ -248,22 +242,6 @@ export function UntranslatedText({
     }
   }
 
-  // Filter out the weight and family props from otherProps
-  const {
-    thin,
-    extralight,
-    light,
-    medium,
-    semibold,
-    bold,
-    extrabold,
-    heavy,
-    black,
-    mono,
-    lexend,
-    ...cleanProps
-  } = otherProps;
-
   return (
     <DefaultText
       testID={props.testID}
@@ -276,7 +254,7 @@ export function UntranslatedText({
         style,
         ...(props?.color ? [{ color: props?.color }] : []),
       ]}
-      {...cleanProps}>
+      {...otherProps}>
       {children}
     </DefaultText>
   );
