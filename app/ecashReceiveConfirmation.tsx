@@ -21,6 +21,7 @@ import { Card } from 'components/common/Card';
 // Main component
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 
 // Types
 interface TokenProps {
@@ -244,6 +245,8 @@ export function EcashReceiveConfirmation({
           style={{}}
           camera={false}
         />
+
+        <TransactionDebugCode transaction={transaction} />
       </>
     </Modal>
   );

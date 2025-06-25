@@ -41,6 +41,7 @@ import { getRawExpiry } from 'components/cashu';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import Icon from 'assets/icons';
+import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -66,15 +67,12 @@ export function MintQuoteTimeline({
   const [loading, setLoading] = useState(false);
   const navigation = useTypedNavigation();
 
+  const expiryDate = transaction?.request ? getRawExpiry({ pr: transaction.request }) : null;
+  const isExpired = expiryDate && new Date() > expiryDate;
   const getTimeline = () => {
     if (type === 'mint') {
       const quotes = Object.fromEntries(mintQuotes.map((q) => [q.state, q]));
-      const states = ['UNPAID', 'PAID', 'ISSUED'];
-      const expiryDate = transaction?.request ? getRawExpiry({ pr: transaction.request }) : null;
-      const isExpired = expiryDate && new Date() > expiryDate;
-      if (isExpired) {
-        states.push('EXPIRED');
-      }
+      const states = ['UNPAID', ...(isExpired ? ['EXPIRED'] : ['PAID', 'ISSUED'])];
 
       let maxIndex = Math.max(-1, ...mintQuotes.map((q) => states.indexOf(q.state)));
       if (isExpired) {
@@ -124,7 +122,8 @@ export function MintQuoteTimeline({
   const hasIntermediarySteps =
     type === 'mint'
       ? mintQuotes.some((q) => q.state === 'UNPAID') && mintQuotes.some((q) => q.state === 'PAID')
-      : meltQuotes.some((q) => q.state === 'UNSPENT') && meltQuotes.some((q) => q.state === 'PENDING');
+      : meltQuotes.some((q) => q.state === 'UNSPENT') &&
+        meltQuotes.some((q) => q.state === 'PENDING');
 
   const shouldCollapse = collapsed && !hasIntermediarySteps;
 
@@ -165,11 +164,13 @@ export function MintQuoteTimeline({
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
-        {type === 'mint'
-          ? _.last(mintQuotes)?.state
-          : transaction?.isCancel
-          ? 'CANCELLED'
-          : _.last(meltQuotes)?.state}
+        {isExpired
+          ? 'EXPIRED'
+          : type === 'mint'
+            ? _.last(mintQuotes)?.state
+            : transaction?.isCancel
+              ? 'CANCELLED'
+              : _.last(meltQuotes)?.state}
       </Text>
 
       <View>
@@ -561,6 +562,11 @@ export function LightningReceiveConfirmation({
         transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
         handleCheckStatus={handleCheckStatus}
       />
+      <MintQuoteTimeline
+        transaction={getCurrentTransaction[0]}
+        type="mint"
+        mintQuotes={getCurrentTransaction[0].mintQuotes}
+      />
 
       <Section
         special={false}
@@ -593,12 +599,10 @@ export function LightningReceiveConfirmation({
               </View>
             ),
           },
-          // {
-          //   title: 'Listening',
-          //   value: String(isListening),
-          // },
         ]}
       />
+
+      <TransactionDebugCode transaction={getCurrentTransaction[0]} />
     </Modal>
   );
 }

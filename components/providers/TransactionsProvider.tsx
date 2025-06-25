@@ -19,6 +19,7 @@ import { showMessage } from 'helper/popup/popups';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { getWallet } from 'components/cashu';
 import _ from 'lodash';
+import { Alert } from 'react-native';
 
 const TransactionContext = createContext(null);
 
@@ -122,6 +123,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
           ...tx,
           status,
           ...additionalData,
+          mintQuotes: [...(tx.mintQuotes || []), ...(additionalData.mintQuotes || [])],
           proofStates: [...(tx.proofStates || []), ...(additionalData.proofStates || [])],
         }),
       })
@@ -279,28 +281,47 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
                     switch (update.state) {
                       case 'UNPAID':
-                        updateTransactionStatus(transaction, 'unpaid', {
-                          mintQuotes: [
-                            ...(transaction?.mintQuotes || []),
-                            {
-                              ...update,
-                              expiry: update.expiry ?? transaction.mintQuote.expiry,
-                              addedAt: Date.now(),
-                            },
-                          ],
-                        });
+                        Alert.alert(update.state);
+                        updateTransactionStatus(
+                          {
+                            request: transaction.request,
+                            type: transaction.type,
+                            transactionType: transaction.transactionType,
+                            quote: transaction.mintQuote.quote,
+                          },
+                          'unpaid',
+                          {
+                            mintQuotes: [
+                              {
+                                ...update,
+                                expiry: update.expiry ?? transaction.mintQuote.expiry,
+                                addedAt: Date.now(),
+                              },
+                            ],
+                          }
+                        );
                         break;
                       case 'ISSUED':
-                        updateTransactionStatus(transaction, 'issued', {
-                          mintQuotes: [
-                            ...(transaction?.mintQuotes || []),
-                            {
-                              ...update,
-                              expiry: update.expiry ?? transaction.mintQuote.expiry,
-                              addedAt: Date.now(),
-                            },
-                          ],
-                        });
+                        Alert.alert(update.state);
+
+                        updateTransactionStatus(
+                          {
+                            request: transaction.request,
+                            type: transaction.type,
+                            transactionType: transaction.transactionType,
+                            quote: transaction.mintQuote.quote,
+                          },
+                          'issued',
+                          {
+                            mintQuotes: [
+                              {
+                                ...update,
+                                expiry: update.expiry ?? transaction.mintQuote.expiry,
+                                addedAt: Date.now(),
+                              },
+                            ],
+                          }
+                        );
                         const allQuotesPaid = allTransactions.filter((t) =>
                           transactions.some((t2) => t.request === t2.request)
                         );
@@ -310,84 +331,80 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         }
                         break;
                       case 'PAID':
-                      const counter = memoizedGetCounterV2({
-                        profileId: store.getState().nostr.currentProfile.id,
-                        mintUrl,
-                        keysetId: w.keysetId,
-                      })(store.getState());
+                        Alert.alert(update.state);
 
-                      // Mint proofs
-                      const proofs = await w.mintProofs(
-                        transaction.amount,
-                        transaction.mintQuote.quote,
-                        {
-                          counter,
-                          keysetId: w.keysetId,
-                        }
-                      );
-
-                      // Increase counter
-                      store.dispatch(
-                        increaseCounterV2({
+                        const counter = memoizedGetCounterV2({
                           profileId: store.getState().nostr.currentProfile.id,
                           mintUrl,
                           keysetId: w.keysetId,
-                          amount: proofs.length,
-                        })
-                      );
+                        })(store.getState());
 
-                      // Add proofs to redux
-                      await store.dispatch(
-                        appendProofsV2({
-                          profileId: store.getState().nostr.currentProfile.id,
-                          mintUrl,
-                          proofs: proofs,
-                        })
-                      );
+                        // Mint proofs
+                        const proofs = await w.mintProofs(
+                          transaction.amount,
+                          transaction.mintQuote.quote,
+                          {
+                            counter,
+                            keysetId: w.keysetId,
+                          }
+                        );
 
-                      // Publish wallet event, this basically just makes sure we can restore our account via nostr
-                      const currentProfileId = store.getState().nostr.currentProfile.id;
-                      const existingTxs = memoizedGetTransactions({ id: currentProfileId })(
-                        store.getState()
-                      );
-                      publishWalletEvent([
-                        ...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl]),
-                      ]);
+                        // Increase counter
+                        store.dispatch(
+                          increaseCounterV2({
+                            profileId: store.getState().nostr.currentProfile.id,
+                            mintUrl,
+                            keysetId: w.keysetId,
+                            amount: proofs.length,
+                          })
+                        );
 
-                      // Update transaction status to paid
-                      showMessage('funds_sent', {
-                        amount: transaction.amount,
-                        unit: transaction.unit,
-                      });
+                        // Add proofs to redux
+                        await store.dispatch(
+                          appendProofsV2({
+                            profileId: store.getState().nostr.currentProfile.id,
+                            mintUrl,
+                            proofs: proofs,
+                          })
+                        );
 
-                      // We update the transaction status
-                      updateTransactionStatus(
-                        {
-                          request: transaction.request,
-                          type: transaction.type,
-                          transactionType: transaction.transactionType,
-                          quote: transaction.mintQuote.quote,
-                        },
-                        'paid',
-                        {
-                          paid: true,
-                          completedAt: Date.now(),
-                          mintQuotes: [
-                            ...(transaction?.mintQuotes || []),
-                            {
-                              ...update,
-                              expiry: update.expiry ?? transaction.mintQuote.expiry,
-                              addedAt: Date.now(),
-                            },
-                          ],
-                        }
-                      );
+                        // Publish wallet event, this basically just makes sure we can restore our account via nostr
+                        const currentProfileId = store.getState().nostr.currentProfile.id;
+                        const existingTxs = memoizedGetTransactions({ id: currentProfileId })(
+                          store.getState()
+                        );
+                        publishWalletEvent([
+                          ...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl]),
+                        ]);
 
-                      await store.dispatch(appendProofState({}));
+                        // Update transaction status to paid
+                        showMessage('funds_sent', {
+                          amount: transaction.amount,
+                          unit: transaction.unit,
+                        });
 
-                      // Important: We clean up the connection only if ALL quotes are paid
-                      // get txs from allTransactions and find ones where the request matches the current transaction
-                      break;
+                        // We update the transaction status
+                        updateTransactionStatus(
+                          {
+                            request: transaction.request,
+                            type: transaction.type,
+                            transactionType: transaction.transactionType,
+                            quote: transaction.mintQuote.quote,
+                          },
+                          'paid',
+                          {
+                            paid: true,
+                            completedAt: Date.now(),
+                            mintQuotes: [
+                              {
+                                ...update,
+                                expiry: update.expiry ?? transaction.mintQuote.expiry,
+                                addedAt: Date.now(),
+                              },
+                            ],
+                          }
+                        );
+                        break;
                     }
                   } catch (err) {
                     unsub();

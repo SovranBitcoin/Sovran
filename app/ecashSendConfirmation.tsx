@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Share, ScrollView } from 'react-native';
+import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { Spinner } from 'components/common/Spinner';
@@ -36,6 +36,7 @@ import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 
 export function EcashSendConfirmation({
   unit,
@@ -299,12 +300,6 @@ export function EcashSendConfirmation({
         mintInfo={mintInfo}
         handleCheckStatus={handleCheckStatus}
       />
-      {/* <Text
-            style={{
-              color: 'red',
-            }}>
-            {JSON.stringify(getCurrentTransaction[0], null, 2)}
-          </Text> */}
       <MintQuoteTimeline
         transaction={{
           ...getCurrentTransaction[0],
@@ -350,16 +345,7 @@ export function EcashSendConfirmation({
         ]}
       />
 
-      <ScrollView
-        horizontal
-        style={{
-          padding: 16,
-          margin: 16,
-          borderRadius: 8,
-          backgroundColor: greys(theme)[1800],
-        }}>
-        <Text mono>{getCurrentTransaction[0].toString()}</Text>
-      </ScrollView>
+      <TransactionDebugCode transaction={getCurrentTransaction[0]} />
     </Modal>
   );
 }

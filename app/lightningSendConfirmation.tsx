@@ -19,6 +19,7 @@ import { TransactionHeader } from 'components/common/Transaction/TransactionHead
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 
 export function LightningSendConfirmation({
   transaction,
@@ -255,6 +256,8 @@ export function LightningSendConfirmation({
           ]}
         />
       </View>
+
+      <TransactionDebugCode transaction={transaction} />
     </Modal>
   );
 }
