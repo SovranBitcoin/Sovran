@@ -171,10 +171,31 @@ export function EcashReceiveConfirmation({
       transparent={false}
       buttons={
         <ButtonHandler
-          buttons={
-            transaction?.paid
-              ? []
-              : [
+          buttons={[
+            ...(transaction.isCancel && transaction.transactionType === 'receive'
+              ? [
+                  {
+                    text: 'View Send Transaction',
+                    icon: null,
+                    variant: 'secondary',
+                    onPress: () => {
+                      navigation.navigate(
+                        'transaction',
+                        {
+                          id: transaction.request || transaction.token,
+                          transactionType: 'send',
+                        },
+                        {
+                          closeCurrentAndParents: true,
+                        }
+                      );
+                    },
+                  },
+                ]
+              : []),
+
+            ...(!transaction?.paid
+              ? [
                   {
                     text: 'Cancel',
                     icon: null,
@@ -188,9 +209,10 @@ export function EcashReceiveConfirmation({
                     onPress: handleRedeemPress,
                     loading: loading,
                   },
-                  ...extraButtons,
                 ]
-          }
+              : []),
+            ...extraButtons,
+          ]}
         />
       }>
       <>

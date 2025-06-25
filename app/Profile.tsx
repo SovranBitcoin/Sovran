@@ -14,8 +14,6 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 
-const npubs = [];
-
 export const EventKind = {
   Unknown: -1,
   Metadata: 0,

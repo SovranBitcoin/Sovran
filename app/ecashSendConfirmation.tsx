@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Share, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
@@ -23,7 +23,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'components/common/useNfc';
-import { useTransactions } from 'components/providers/TransactionsProvider';
+import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
@@ -68,20 +68,6 @@ export function EcashSendConfirmation({
     })
   );
 
-  const {
-    transactions,
-    listenToTransaction,
-    stopListening,
-    getActiveConnections,
-    activeConnections,
-  } = useTransactions();
-
-  useEffect(() => {
-    if (getCurrentTransaction?.[0]?.paid === false) {
-      listenToTransaction([getCurrentTransaction?.[0]]);
-    }
-  }, [getCurrentTransaction?.[0]]);
-
   const handleNFCSend = async () => {
     await write(token);
   };
@@ -117,9 +103,7 @@ export function EcashSendConfirmation({
   const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
   const isLongToken = formattedToken.length >= 500;
 
-  const isListening = activeConnections?.some(
-    (connection) => connection.id === getCurrentTransaction[0].token
-  );
+  const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const checkProofsSpent = async (token: string): Promise<boolean> => {
     try {

@@ -7,21 +7,17 @@ import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import TransactionIcon from 'components/common/TransactionIcon';
-import { useTransactions } from 'components/providers/TransactionsProvider';
+import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { useTypedNavigation } from 'helper/navigation';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/common/AmountFormatter';
-import { JSX } from 'react';
 import { TransactionData } from 'helper/redux/cashu';
 import { View } from 'components/common/View';
+import React from 'react';
 
 interface ConnectionData {
   id: string;
   [key: string]: any;
-}
-
-interface TransactionProps {
-  tx: TransactionData;
 }
 
 export function npubToPubkey(npub: string): string {
@@ -38,16 +34,10 @@ export function npubToPubkey(npub: string): string {
 
 const useTransaction = (tx: TransactionData) => {
   const navigation = useTypedNavigation();
-  const { activeConnections } = useTransactions();
-
   const isSend = tx.transactionType === 'send';
   const isReceive = tx.transactionType === 'receive';
 
-  const isListening = activeConnections?.some((connection: ConnectionData) =>
-    connection.id.includes(tx.request || tx.token)
-  );
-
-  const showLoading = isListening;
+  const { isListening } = useAutoListenBatch([tx], { enabled: false });
 
   const fiatAmount = formatCurrency(
     {
@@ -97,13 +87,13 @@ const useTransaction = (tx: TransactionData) => {
   return {
     isSend,
     isReceive,
-    showLoading,
+    showLoading: isListening,
     fiatAmount,
     handlePress,
   };
 };
 
-export function Transaction({ tx }: TransactionProps): JSX.Element {
+export const Transaction = React.memo(({ tx }) => {
   const theme = useSelector(memoizedGetTheme);
 
   const { isSend, isReceive, showLoading, fiatAmount, handlePress } = useTransaction(tx);
@@ -169,4 +159,6 @@ export function Transaction({ tx }: TransactionProps): JSX.Element {
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+Transaction.displayName = 'Transaction';

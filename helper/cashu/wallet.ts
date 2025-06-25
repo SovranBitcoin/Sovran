@@ -1,21 +1,17 @@
 import { CashuWallet } from '@cashu/cashu-ts';
 import { store } from 'helper/redux/store';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-import { getKeys } from './keys';
 import { getMint } from './mint';
 import { auditMint } from 'helper/api/sovran';
 import { memoizedGetCurrentProfile } from '../redux/nostr';
 import { setAudit } from 'helper/redux/cashu';
-import _ from 'lodash';
-import { wordlist } from '@scure/bip39/wordlists/english';
-import { mnemonicToSeed, mnemonicToSeedSync } from 'bip39';
+import { mnemonicToSeedSync } from 'bip39';
 import { useState, useEffect } from 'react';
 
 interface GetWalletParams {
   unit: string;
   mintUrl: string;
   profile: any;
+  forceRefresh?: boolean;
 }
 
 // wallet caches for all the mints

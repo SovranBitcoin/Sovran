@@ -43,7 +43,7 @@ export const useNostrEvents = (authors, ids, kinds, type) => {
         // since: ids?.length ? 0 : since - 24 * 60 * 60 * 1,
       },
     ],
-    []
+    [ids, authors, kinds]
   );
   const { events, isLoading } = useSubscribe({
     filters,

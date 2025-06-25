@@ -13,7 +13,6 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
 
   const isSmall = nostrData?.profile?.picture;
   const iconSize = isSmall ? 10 : 28;
-
   return (
     <View className="relative h-7 w-7 bg-transparent">
       <View
@@ -36,7 +35,7 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
               ? 'solar:key-bold'
               : transaction.fromNIP05
                 ? 'mdi:at'
-                : transaction.isCancel
+                : transaction.isCancel && transaction.isSend
                   ? 'mdi:cancel'
                   : transaction.isReceive
                     ? 'fluent:arrow-download-16-filled'

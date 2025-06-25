@@ -471,7 +471,7 @@ function ProfileImage({ profile, loading }) {
           {profile?.picture && !imageError ? (
             <Image
               source={{ uri: profile?.picture }}
-              onError={(e) => {
+              onError={() => {
                 setImageError(true);
               }}
               style={{

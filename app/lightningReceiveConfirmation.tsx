@@ -20,7 +20,7 @@ import {
   useGetMintInfo,
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
-import { useTransactions } from 'components/providers/TransactionsProvider';
+import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
@@ -29,7 +29,7 @@ import { TransactionHeader } from 'components/common/Transaction/TransactionHead
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/common/Card';
-import { useTypedRoute } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { greens, greys } from 'helper/colors';
@@ -39,7 +39,7 @@ import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
-
+import Icon from 'assets/icons';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { date: Date })[];
   meltQuotes?: {
@@ -51,41 +51,37 @@ interface MintQuoteTimelineProps {
   type: 'mint' | 'melt';
 }
 
-interface TimelineState {
-  label: string;
-  state: string;
-  timestamp?: number;
-  isActive?: boolean;
-  isCompleted?: boolean;
-}
-
-export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTimelineProps) {
+export function MintQuoteTimeline({
+  meltQuotes = [],
+  transaction,
+  handleCheckStatus,
+}: MintQuoteTimelineProps & {
+  handleCheckStatus?: (done: () => void) => void;
+}) {
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const navigation = useTypedNavigation();
 
   const getTimeline = (meltQuotes) => {
     const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
     const states = ['UNSPENT', 'PENDING', 'SPENT'];
 
-    // If transaction is cancelled, add CANCELLED as the final state
     if (transaction?.isCancel) {
       states.push('CANCELLED');
     }
 
     let maxIndex = Math.max(...meltQuotes.map((q) => states.indexOf(q.state)));
-
-    // If cancelled, the CANCELLED state becomes the current (final) state
     if (transaction?.isCancel) {
-      maxIndex = states.length - 1; // CANCELLED is the last state
+      maxIndex = states.length - 1;
     }
 
     return states.map((state, i) => {
-      // For CANCELLED state, create a synthetic entry if it doesn't exist in quotes
       if (state === 'CANCELLED' && !quotes[state]) {
         return {
           state,
-          complete: true, // CANCELLED state is always complete when present
-          isCurrent: transaction?.isCancel, // CANCELLED is current when transaction is cancelled
+          complete: true,
+          isCurrent: transaction?.isCancel,
         };
       }
 
@@ -100,11 +96,9 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
 
   const states = getTimeline(meltQuotes);
 
-  // Check if we have intermediary steps (both UNSPENT and PENDING)
   const hasIntermediarySteps =
     meltQuotes.some((q) => q.state === 'UNSPENT') && meltQuotes.some((q) => q.state === 'PENDING');
 
-  // If there are intermediary steps, always show expanded view
   const shouldCollapse = collapsed && !hasIntermediarySteps;
 
   const displayStates = shouldCollapse
@@ -117,10 +111,9 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
   const dotSize = barWidth;
   const dotSpacing = 8;
 
-  // Helper function to get bar color based on state
   const getBarColor = (item) => {
     if (item.state === 'CANCELLED') {
-      return '#ef4444'; // Red color for cancelled state
+      return '#ef4444';
     }
     return item.complete ? greens[300] : greys(theme)[400];
   };
@@ -157,41 +150,98 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
                 alignItems: 'center',
                 marginVertical: 0,
               }}>
-              <View
-                style={{
-                  width: barWidth,
-                  height: barHeight,
-                  backgroundColor: getBarColor(item),
-                  borderRadius: barWidth / 2,
-                  marginVertical: barMarginVertical,
-                  opacity: item.isCurrent ? 1 : 0.5,
+              <TouchableOpacity
+                onPress={() => {
+                  if (transaction.isCancel && item.state === 'CANCELLED') {
+                    navigation.navigate(
+                      'transaction',
+                      {
+                        id: transaction.request || transaction.token,
+                        transactionType: 'receive',
+                      },
+                      {
+                        closeCurrentAndParents: true,
+                      }
+                    );
+                  }
                 }}
-              />
-              <View
                 style={{
                   flex: 1,
+                  ...(transaction.isCancel && item.state === 'CANCELLED'
+                    ? {
+                        backgroundColor: greys(theme)[1300],
+                        borderColor: greys(theme)[1000],
+                        borderWidth: 0.33,
+                        borderRadius: 8,
+                      }
+                    : {}),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginVertical: barMarginVertical,
+                  overflow: 'hidden',
                 }}>
-                <Text
-                  size={16}
-                  bold
+                <View
                   style={{
-                    color: greys(theme)[0],
-                    marginStart: 12,
-                  }}>
-                  {item.state}
-                </Text>
-                {item.addedAt && (
+                    width: barWidth,
+                    height: barHeight,
+                    backgroundColor: getBarColor(item),
+                    borderRadius: barWidth / 2,
+                    // marginVertical: barMarginVertical,
+                    opacity: item.isCurrent ? 1 : 0.5,
+                  }}
+                />
+                <View style={{ flex: 1 }}>
                   <Text
-                    size={12}
+                    size={16}
                     bold
                     style={{
-                      color: greys(theme)[600],
+                      color: greys(theme)[0],
                       marginStart: 12,
                     }}>
-                    {convertTime(new Date(item.addedAt))}
+                    {item.state}
                   </Text>
+                  {item.addedAt ? (
+                    <Text
+                      size={12}
+                      bold
+                      style={{
+                        color: greys(theme)[600],
+                        marginStart: 12,
+                      }}>
+                      {convertTime(new Date(item.addedAt))}
+                    </Text>
+                  ) : transaction.isCancel ? (
+                    <Text
+                      size={12}
+                      bold
+                      style={{
+                        color: greys(theme)[600],
+                        marginStart: 12,
+                      }}>
+                      Open Transaction
+                    </Text>
+                  ) : null}
+                </View>
+                {transaction.isCancel && item.state === 'CANCELLED' && (
+                  <Icon
+                    style={{
+                      marginRight: 8,
+                    }}
+                    spin={
+                      loading
+                        ? {
+                            delay: 0,
+                            duration: 1500,
+                            outputRange: ['0deg', '360deg'],
+                            easing: 'easeOut',
+                          }
+                        : undefined
+                    }
+                    size={20}
+                    name="lucide:arrow-right"
+                  />
                 )}
-              </View>
+              </TouchableOpacity>
             </View>
 
             {shouldCollapse && index === 0 && states.length > 2 && (
@@ -219,7 +269,7 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
         ))}
       </View>
 
-      {/* Only show collapse button if there are no intermediary steps */}
+      {/* Collapse toggle */}
       {!hasIntermediarySteps && (
         <TouchableOpacity onPress={() => setCollapsed(!collapsed)}>
           <Text
@@ -241,7 +291,6 @@ export function MintQuoteTimeline({ meltQuotes = [], transaction }: MintQuoteTim
 
 export function LightningReceiveConfirmation({
   request,
-  paymentRequest = '',
   unit,
   amount,
   autoGoBackOnPaid = true,
@@ -298,42 +347,18 @@ export function LightningReceiveConfirmation({
     onClose();
   };
 
-  // Format currency display options
-  const getCurrencyOptions = (denominationType) => ({
-    locale: 'en-US',
-    precision: denominationType === 'btc' ? 8 : 2,
-    currencyDisplay: 'symbol',
-    denomination: denominationType,
-  });
-
-  // Currency data object
-  const getCurrencyData = () => ({
-    currency: unit === 'sat' ? 'BTC' : unit.toUpperCase(),
-    value: amount,
-    denomination: unit === 'sat' ? 'sats' : unit,
-  });
-
   const isBitcoin = unit === 'sat';
 
-  const { listenToTransaction, activeConnections } = useTransactions();
+  const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
-  useEffect(() => {
-    if (!getCurrentTransaction?.[0].paid) {
-      listenToTransaction([getCurrentTransaction?.[0]]);
-    }
-  }, [getCurrentTransaction?.[0].paid]);
-
-  const isListening = activeConnections?.some((connection) =>
-    connection.id.includes(getCurrentTransaction[0].request)
-  );
-
-  const handleCheckStatus = async (onClose, forceRefresh = false) => {
+  const handleCheckStatus = async (onClose, forceRefresh) => {
     try {
       const currentTx = getCurrentTransaction[0];
       const wallet = await getWallet({
         unit: currentTx.unit,
         mintUrl: currentTx.mintUrl,
         profile: null,
+        forceRefresh,
       });
       const activeKeyset = wallet.getActiveKeyset(
         wallet.keysets.filter((key) => key.unit === 'sat')

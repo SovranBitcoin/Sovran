@@ -63,7 +63,7 @@ export const usePostReactions = ({ id }) => {
         kinds: [EventKind.Reaction, EventKind.Repost, EventKind.ZapReceipt], // Include all event types
       },
     ],
-    []
+    [id]
   );
 
   // Fetch reactions, reposts, and zaps for the given post ID if toggle is enabled

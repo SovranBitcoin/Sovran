@@ -17,25 +17,12 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { BlurView } from 'expo-blur';
 import { EventKind } from '../../app/Profile';
-import { Cache } from 'react-native-cache';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Posts } from './posts';
-// import ndk from "components/ndk";
 import CachedImage from 'components/common/Image';
 import ndk from 'components/ndk';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 dayjs.extend(relativeTime);
-
-const myCache = new Cache({
-  // maxSize: 100,
-  namespace: 'posts',
-  policy: {
-    maxEntries: 100,
-    stdTTL: 60 * 5,
-  },
-  backend: AsyncStorage,
-});
 
 export async function getFollowedUsers(userPubkey, verbose = true) {
   // Instantiate the user
@@ -59,48 +46,15 @@ export async function getFollowedUsers(userPubkey, verbose = true) {
   });
 }
 
-export default function AboutPage(props) {
+const followed = 0;
+const followers = 0;
+
+export default function AboutPage(props: string) {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
   const { params } = useRoute();
   const [activeTab, setActiveTab] = useState(0);
   const p = [...search, ...profiles].find((p) => p.pubkey === params.pubkey);
-
-  const [followed, setFollowed] = useState(0);
-  const [followers, setFollowers] = useState(0);
-  const fetchFollowing = async () => {
-    const [f_, f2_] = await Promise.all([
-      myCache.get(`${p.pubkey}.followers`),
-      myCache.get(`${p.pubkey}.following`),
-    ]);
-
-    if (f_ && f2_) {
-      setFollowers(Number(f_));
-      setFollowed(Number(f2_));
-    } else {
-      ndk
-        .fetchEvents({
-          '#p': [p.pubkey],
-          kinds: [EventKind.ContactList],
-        })
-        .then((events) => {
-          let f = 0;
-          for (const event of events) {
-            f = f + 1;
-          }
-
-          setFollowers(f);
-
-          getFollowedUsers(p.pubkey, false).then((result) => {
-            if (result.length > 0) {
-              setFollowed(result.length);
-              myCache.set(`${p.pubkey}.following`, String(result.length));
-            }
-            myCache.set(`${p.pubkey}.followers`, String(f));
-          });
-        });
-    }
-  };
 
   // Underscore width and position shared values for animation
   const underscoreWidth = useSharedValue(0);

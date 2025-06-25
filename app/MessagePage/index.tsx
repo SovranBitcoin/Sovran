@@ -119,7 +119,7 @@ export default function ModalScreen() {
   const { params } = useRoute();
 
   const navigation = useNavigation();
-  const { profiles, search, setSearch, messages, addMessage, currentProfile } = useNostr();
+  const { profiles, search, messages, addMessage, currentProfile } = useNostr();
   const { transactions } = useCashu();
   const { esims } = useEsims();
   const { vpn } = useVpn();

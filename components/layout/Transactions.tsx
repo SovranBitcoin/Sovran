@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, SectionList, TouchableOpacity } from 'react-native';
+import { View, SectionList, TouchableOpacity, Dimensions } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 
@@ -112,6 +112,17 @@ export const Transactions = React.memo(
       [splitByStatus.confirmed, days, showMore]
     );
 
+    const allSections = useMemo(
+      () => [...pendingSections, ...confirmedSections],
+      [pendingSections, confirmedSections]
+    );
+
+    console.log(
+      2338273873,
+      JSON.stringify(transactions.slice(0, 3), null, 2),
+      JSON.stringify(allSections.slice(0, 2), null, 2)
+    );
+
     if (filteredTransactions.length === 0) {
       return (
         <View className="flex items-center">
@@ -178,12 +189,42 @@ export const Transactions = React.memo(
       );
     }
 
-    const allSections = [...pendingSections, ...confirmedSections];
+    const HEADER_HEIGHT = 30;
+    const ITEM_HEIGHT = 69;
+    const getItemLayout = (data, index) => {
+      let offset = 0;
+      let itemIndex = index;
+
+      for (let section of data) {
+        // Add header height for each section
+        offset += HEADER_HEIGHT;
+
+        if (itemIndex < section.data.length) {
+          // Item is in this section
+          offset += ITEM_HEIGHT * itemIndex;
+          return {
+            length: ITEM_HEIGHT,
+            offset,
+            index,
+          };
+        } else {
+          // Skip this whole section
+          itemIndex -= section.data.length;
+          offset += ITEM_HEIGHT * section.data.length;
+        }
+      }
+
+      // Fallback
+      return { length: ITEM_HEIGHT, offset: offset, index };
+    };
 
     return (
       <SectionList
+        style={{
+          minHeight: Dimensions.get('screen').height,
+        }}
         sections={allSections}
-        keyExtractor={(item, index) => item.request || item.token || item.txid || item.id}
+        keyExtractor={(item) => item.request || item.token}
         renderItem={({ item, section, index }) => {
           return (
             <View
@@ -195,24 +236,33 @@ export const Transactions = React.memo(
                   borderTopRightRadius: index === 0 ? 8 : 0,
                   borderBottomLeftRadius: index === section.data.length - 1 ? 8 : 0,
                   borderBottomRightRadius: index === section.data.length - 1 ? 8 : 0,
+                  height: ITEM_HEIGHT,
                 },
               ]}>
-              <Transaction key={item.request || item.token || item.txid || item.id} tx={item} />
+              <Transaction key={item.request || item.token} tx={item} />
             </View>
           );
         }}
         renderSectionHeader={({ section: { title } }) => (
-          <Text size={14} heavy color={greys(theme)[1000]} className="mb-1 mt-2">
+          <Text
+            size={14}
+            heavy
+            color={greys(theme)[1000]}
+            style={{
+              height: HEADER_HEIGHT,
+            }}
+            className="mb-1 mt-2">
             {title}
           </Text>
         )}
         contentContainerStyle={{
           width: '100%',
-          paddingBottom: 96,
+          paddingBottom: 1000,
         }}
-        initialNumToRender={10}
-        maxToRenderPerBatch={5}
-        windowSize={10}
+        maxToRenderPerBatch={1}
+        windowSize={2}
+        getItemLayout={getItemLayout}
+        initialNumToRender={3}
       />
     );
   }

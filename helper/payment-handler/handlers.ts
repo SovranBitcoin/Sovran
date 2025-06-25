@@ -7,10 +7,9 @@ import { memoizedGetBalance, memoizedGetTransactions } from '../redux/cashu';
 import { nip19 } from 'nostr-tools';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
-import { isLightningAddress, lnTrim } from 'helper/third-party/lnurl';
+import { lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
 import { showMessage } from '../popup/popups';
-import { decode } from '@gandlaf21/bolt11-decode';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
@@ -80,9 +79,9 @@ interface BarcodeHandlerProps {
   urDecoder: URDecoder;
   unit: string;
   selectedMint: any;
-  setProgress: (progress: number) => void;
+  setProgress?: (progress: number) => void;
   setLoading: (loading: boolean) => void;
-  setScanned: (scanned: boolean) => void;
+  setScanned?: (scanned: boolean) => void;
 }
 
 const handleUR = async ({
@@ -220,7 +219,7 @@ export const handleBarcode = async ({
   setScanned,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
-  if (!scanning.data.startsWith('ur:')) {
+  if (!scanning.data.startsWith('ur:') && setScanned) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
   }
@@ -238,6 +237,9 @@ export const handleBarcode = async ({
 
   switch (type) {
     case 'ur':
+      if (!setProgress) {
+        throw new Error('setProgress is required for handling UR');
+      }
       return handleUR({ scanning, urDecoder, unit, setProgress });
     case 'ecash':
       return handleEcash({ data: scanning.data, unit });

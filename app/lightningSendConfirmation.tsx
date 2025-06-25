@@ -197,7 +197,16 @@ export function LightningSendConfirmation({
         </View>
       }>
       <View style={{ backgroundColor: 'transparent' }}>
-        <TransactionHeader transaction={transaction} />
+        <TransactionHeader
+          transaction={{
+            ...transaction,
+            isSend: true,
+            unit,
+            amount,
+            transactionType: 'send',
+            type: 'lightning',
+          }}
+        />
         {!transaction?.paid && (
           <SelectedMintDisplay
             onMintSelected={handleMintSelected}

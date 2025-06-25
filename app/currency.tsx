@@ -56,9 +56,7 @@ function ModalScreen() {
     setIsValidAmount(amount > 0);
   }, [amount]);
 
-  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
-  const [progress, setProgress] = useState<number>(0);
-  const [scanned, setScanned] = useState<boolean>(false);
+  const urDecoder = new URDecoder();
 
   const handleMintSelected = async (mint, balance) => {
     try {
@@ -211,9 +209,7 @@ function ModalScreen() {
       urDecoder,
       unit,
       selectedMint,
-      setProgress,
       setLoading,
-      setScanned,
     });
   };
 

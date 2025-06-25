@@ -33,7 +33,7 @@ export interface TransactionData {
   mintQuote?: MintQuoteResponse;
 }
 
-class TransactionBuilder {
+export class TransactionBuilder {
   [key: string]: any;
 
   constructor(transaction: TransactionData) {
@@ -106,11 +106,11 @@ class TransactionBuilder {
   }
 
   get isSend() {
-    return this.transactionType === 'send';
+    return this?.transactionType === 'send';
   }
 
   get isReceive() {
-    return this.transactionType === 'receive';
+    return this?.transactionType === 'receive';
   }
 
   toString() {

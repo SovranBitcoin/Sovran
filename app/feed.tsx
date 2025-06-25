@@ -7,12 +7,12 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
-import { EventKind } from './Profile';
 import { View } from 'components/common/View';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
+import { EventKind } from './Profile';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });
@@ -22,7 +22,7 @@ const Feed = ({ theme, filters }) => {
     [events]
   );
   return isLoading ? (
-    <Text style={styles.loadingText}>Loading...</Text>
+    <Text>Loading...</Text>
   ) : (
     <FlashList
       data={sortedEvents}

@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext, useRef } from 'react';
+import { useEffect, useState, createContext, useContext, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import {
@@ -21,6 +21,44 @@ import { getWallet } from 'components/cashu';
 import _ from 'lodash';
 
 const TransactionContext = createContext(null);
+
+export const useAutoListenBatch = (transactions = [], options = { enabled: true }) => {
+  const { listenToTransaction, activeConnections } = useTransactions();
+  const hasStarted = useRef(false);
+
+  // Determine whether we are already listening
+  const isListening = useMemo(() => {
+    return (
+      transactions.length > 0 &&
+      transactions.every((tx) =>
+        activeConnections.some((conn) => conn.id.includes(tx.request || tx.token))
+      )
+    );
+  }, [transactions, activeConnections]);
+
+  // Precompute preconditions
+  const allUnpaid = transactions.every((tx) => tx.paid !== true);
+  const allInactive = transactions.every((tx) => {
+    const id = tx.request || tx.token;
+    return !activeConnections.some((conn) => conn.id.includes(id));
+  });
+
+  // Trigger listen ONLY if enabled is true
+  if (
+    options.enabled !== false &&
+    !hasStarted.current &&
+    transactions.length > 0 &&
+    allUnpaid &&
+    allInactive
+  ) {
+    listenToTransaction(transactions);
+    hasStarted.current = true;
+  }
+
+  return {
+    isListening,
+  };
+};
 
 export const useTransactions = () => {
   const context = useContext(TransactionContext);
