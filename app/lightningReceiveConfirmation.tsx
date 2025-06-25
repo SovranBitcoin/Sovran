@@ -37,11 +37,12 @@ import { publishWalletEvent } from 'helper/nostr/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
+import { getRawExpiry } from 'components/cashu';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import Icon from 'assets/icons';
 interface MintQuoteTimelineProps {
-  mintQuotes?: (MintQuoteResponse & { date: Date })[];
+  mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
     state: 'UNSPENT' | 'PENDING' | 'SPENT';
     addedAt?: number;
@@ -52,7 +53,9 @@ interface MintQuoteTimelineProps {
 }
 
 export function MintQuoteTimeline({
+  mintQuotes = [],
   meltQuotes = [],
+  type = 'melt',
   transaction,
   handleCheckStatus,
 }: MintQuoteTimelineProps & {
@@ -63,7 +66,29 @@ export function MintQuoteTimeline({
   const [loading, setLoading] = useState(false);
   const navigation = useTypedNavigation();
 
-  const getTimeline = (meltQuotes) => {
+  const getTimeline = () => {
+    if (type === 'mint') {
+      const quotes = Object.fromEntries(mintQuotes.map((q) => [q.state, q]));
+      const states = ['UNPAID', 'PAID', 'ISSUED'];
+      const expiryDate = transaction?.request ? getRawExpiry({ pr: transaction.request }) : null;
+      const isExpired = expiryDate && new Date() > expiryDate;
+      if (isExpired) {
+        states.push('EXPIRED');
+      }
+
+      let maxIndex = Math.max(-1, ...mintQuotes.map((q) => states.indexOf(q.state)));
+      if (isExpired) {
+        maxIndex = states.length - 1;
+      }
+
+      return states.map((state, i) => ({
+        state,
+        ...quotes[state],
+        complete: i <= maxIndex,
+        isCurrent: i === maxIndex,
+      }));
+    }
+
     const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
     const states = ['UNSPENT', 'PENDING', 'SPENT'];
 
@@ -94,10 +119,12 @@ export function MintQuoteTimeline({
     });
   };
 
-  const states = getTimeline(meltQuotes);
+  const states = getTimeline();
 
   const hasIntermediarySteps =
-    meltQuotes.some((q) => q.state === 'UNSPENT') && meltQuotes.some((q) => q.state === 'PENDING');
+    type === 'mint'
+      ? mintQuotes.some((q) => q.state === 'UNPAID') && mintQuotes.some((q) => q.state === 'PAID')
+      : meltQuotes.some((q) => q.state === 'UNSPENT') && meltQuotes.some((q) => q.state === 'PENDING');
 
   const shouldCollapse = collapsed && !hasIntermediarySteps;
 
@@ -112,13 +139,13 @@ export function MintQuoteTimeline({
   const dotSpacing = 8;
 
   const getBarColor = (item) => {
-    if (item.state === 'CANCELLED') {
+    if (item.state === 'CANCELLED' || item.state === 'EXPIRED') {
       return '#ef4444';
     }
     return item.complete ? greens[300] : greys(theme)[400];
   };
 
-  if (!meltQuotes.length) {
+  if (type === 'mint' ? !mintQuotes.length : !meltQuotes.length) {
     return null;
   }
 
@@ -138,7 +165,11 @@ export function MintQuoteTimeline({
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
-        {transaction?.isCancel ? 'CANCELLED' : _.last(meltQuotes)?.state}
+        {type === 'mint'
+          ? _.last(mintQuotes)?.state
+          : transaction?.isCancel
+          ? 'CANCELLED'
+          : _.last(meltQuotes)?.state}
       </Text>
 
       <View>

@@ -277,39 +277,39 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
                     if (!transaction) return;
 
-                    if (update.state === 'UNPAID') {
-                      updateTransactionStatus(transaction, 'unpaid', {
-                        mintQuotes: [
-                          ...(transaction?.mintQuotes || []),
-                          {
-                            ...update,
-                            addedAt: Date.now(),
-                          },
-                        ],
-                      });
-                    } else if (update.state === 'ISSUED') {
-                      updateTransactionStatus(transaction, 'issued', {
-                        mintQuotes: [
-                          ...(transaction?.mintQuotes || []),
-                          {
-                            ...update,
-                            addedAt: Date.now(),
-                          },
-                        ],
-                      });
-                      const allQuotesPaid = allTransactions.filter((t) =>
-                        transactions.some((t2) => t.request === t2.request)
-                      );
-                      if (allQuotesPaid) {
-                        unsub();
-                        removeConnection(id);
-                      }
-                    }
-
-                    const isPaid = update.state === 'PAID';
-
-                    // We only really care about paid events
-                    if (isPaid) {
+                    switch (update.state) {
+                      case 'UNPAID':
+                        updateTransactionStatus(transaction, 'unpaid', {
+                          mintQuotes: [
+                            ...(transaction?.mintQuotes || []),
+                            {
+                              ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
+                        break;
+                      case 'ISSUED':
+                        updateTransactionStatus(transaction, 'issued', {
+                          mintQuotes: [
+                            ...(transaction?.mintQuotes || []),
+                            {
+                              ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
+                        const allQuotesPaid = allTransactions.filter((t) =>
+                          transactions.some((t2) => t.request === t2.request)
+                        );
+                        if (allQuotesPaid) {
+                          unsub();
+                          removeConnection(id);
+                        }
+                        break;
+                      case 'PAID':
                       const counter = memoizedGetCounterV2({
                         profileId: store.getState().nostr.currentProfile.id,
                         mintUrl,
@@ -376,6 +376,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                             ...(transaction?.mintQuotes || []),
                             {
                               ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
                               addedAt: Date.now(),
                             },
                           ],
@@ -386,6 +387,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
                       // Important: We clean up the connection only if ALL quotes are paid
                       // get txs from allTransactions and find ones where the request matches the current transaction
+                      break;
                     }
                   } catch (err) {
                     unsub();
