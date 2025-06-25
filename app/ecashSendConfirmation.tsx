@@ -299,12 +299,7 @@ export function EcashSendConfirmation({
         mintInfo={mintInfo}
         handleCheckStatus={handleCheckStatus}
       />
-      {/* <Text
-            style={{
-              color: 'red',
-            }}>
-            {JSON.stringify(getCurrentTransaction[0], null, 2)}
-          </Text> */}
+
       <MintQuoteTimeline
         transaction={{
           ...getCurrentTransaction[0],
