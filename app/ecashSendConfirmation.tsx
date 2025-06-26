@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View } from 'components/common/View';
+import { View, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -280,15 +280,17 @@ export function EcashSendConfirmation({
           showSection={false}
         />
       )}
+      <Spacer size={12} />
       {getCurrentTransaction[0].memo && (
-        <View
-          style={{
-            margin: 16,
-            marginTop: 12,
-            marginBottom: 0,
-          }}>
-          <Card message={getCurrentTransaction[0].memo} variant="info" />
-        </View>
+        <>
+          <View
+            style={{
+              marginHorizontal: 16,
+            }}>
+            <Card message={getCurrentTransaction[0].memo} variant="info" />
+          </View>
+          <Spacer size={12} />
+        </>
       )}
       <TransactionMintRefresh
         transaction={{
@@ -300,6 +302,7 @@ export function EcashSendConfirmation({
         mintInfo={mintInfo}
         handleCheckStatus={handleCheckStatus}
       />
+      <Spacer size={12} />
       <MintQuoteTimeline
         transaction={{
           ...getCurrentTransaction[0],
@@ -309,6 +312,7 @@ export function EcashSendConfirmation({
         }}
         meltQuotes={getCurrentTransaction[0].proofStates}
       />
+      <Spacer size={12} />
       <Section
         items={[
           {
@@ -344,7 +348,7 @@ export function EcashSendConfirmation({
           },
         ]}
       />
-
+      <Spacer size={12} />
       <TransactionDebugCode transaction={getCurrentTransaction[0]} />
     </Modal>
   );

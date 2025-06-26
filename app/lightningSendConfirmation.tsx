@@ -3,7 +3,8 @@ import { formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp, sendLightning } from 'components/cashu';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
+
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
@@ -206,6 +207,7 @@ export function LightningSendConfirmation({
             amount,
             transactionType: 'send',
             type: 'lightning',
+            nostrPubkey: pubkey,
           }}
         />
         {!transaction?.paid && (
@@ -216,11 +218,15 @@ export function LightningSendConfirmation({
             loading={loading}
           />
         )}
+        <Spacer size={12} />
 
         {getDescription({ pr }) && (
-          <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
-            <Card message={getDescription({ pr })} variant="info" />
-          </View>
+          <>
+            <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
+              <Card message={getDescription({ pr })} variant="info" />
+            </View>
+            <Spacer size={12} />
+          </>
         )}
 
         {transaction?.paid && (
@@ -229,6 +235,7 @@ export function LightningSendConfirmation({
             transaction={{ ...transaction, transactionType: 'send' }}
           />
         )}
+        <Spacer size={12} />
 
         {/* <Section
             items={[
@@ -255,9 +262,10 @@ export function LightningSendConfirmation({
             },
           ]}
         />
-      </View>
+        <Spacer size={12} />
 
-      <TransactionDebugCode transaction={transaction} />
+        {transaction && <TransactionDebugCode transaction={transaction} />}
+      </View>
     </Modal>
   );
 }

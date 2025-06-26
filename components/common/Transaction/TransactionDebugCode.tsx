@@ -17,7 +17,7 @@ export function TransactionDebugCode({ transaction }: TransactionDebugCodeProps)
       horizontal
       style={{
         padding: 16,
-        margin: 16,
+        marginHorizontal: 16,
         borderRadius: 8,
         backgroundColor: greys(theme)[1800],
       }}>

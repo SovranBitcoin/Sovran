@@ -259,10 +259,10 @@ export const Transactions = React.memo(
           width: '100%',
           paddingBottom: 1000,
         }}
-        maxToRenderPerBatch={1}
-        windowSize={2}
+        maxToRenderPerBatch={3}
+        windowSize={5}
         getItemLayout={getItemLayout}
-        initialNumToRender={3}
+        initialNumToRender={10}
       />
     );
   }

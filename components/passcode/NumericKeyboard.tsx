@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
 import Haptics from 'components/common/Haptics';
 
 interface Props {
@@ -24,7 +23,7 @@ interface KeyButtonProps {
   theme: string;
 }
 
-const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
+const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
   const [size, setSize] = useState(0);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const scale = useRef(new Animated.Value(0)).current;
@@ -68,7 +67,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        backgroundColor: greys(theme)[2300],
+        // backgroundColor: greys(theme)[2300],
       }}>
       <Animated.View
         pointerEvents="none"
@@ -79,22 +78,33 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress, theme }) => {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: 'rgba(255,255,255,0.3)',
+          backgroundColor: 'rgba(255,255,255,1)',
           transform: [{ scale }],
           opacity,
-        }}
-      />
+        }}></Animated.View>
       {value === '<' ? (
-        <Text style={{ color: 'white', fontSize: 24 }}>⌫</Text>
+        <Text
+          style={{
+            color: 'white',
+            fontSize: 32,
+            textShadowColor: 'rgba(0,0,0,0.5)',
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 8,
+          }}>
+          ⌫
+        </Text>
       ) : (
         <Text
           style={{
             padding: 16,
             paddingHorizontal: 24,
-            fontSize: 24,
+            fontSize: 32,
             color: 'white',
             fontWeight: 'bold',
             fontFamily: 'OverpassBold',
+            textShadowColor: 'rgba(0,0,0,0.5)',
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 8,
           }}>
           {value}
         </Text>
@@ -126,9 +136,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   );
 
   const renderButton = useCallback(
-    (value: KeyVal) => (
-      <KeyButton key={String(value)} value={value} onPress={handlePress} theme={theme} />
-    ),
+    (value: KeyVal) => <KeyButton key={String(value)} value={value} onPress={handlePress} />,
     [handlePress, theme]
   );
 

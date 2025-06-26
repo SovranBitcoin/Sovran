@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
@@ -42,6 +42,7 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import opacity from 'hex-color-opacity';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -72,7 +73,7 @@ export function MintQuoteTimeline({
   const getTimeline = () => {
     if (type === 'mint') {
       const quotes = Object.fromEntries(mintQuotes.map((q) => [q.state, q]));
-      const states = ['UNPAID', ...(isExpired ? ['EXPIRED'] : ['PAID', 'ISSUED'])];
+      const states = ['CREATED', 'UNPAID', ...(isExpired ? ['EXPIRED'] : ['ISSUED', 'PAID'])];
 
       let maxIndex = Math.max(-1, ...mintQuotes.map((q) => states.indexOf(q.state)));
       if (isExpired) {
@@ -88,7 +89,7 @@ export function MintQuoteTimeline({
     }
 
     const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
-    const states = ['UNSPENT', 'PENDING', 'SPENT'];
+    const states = ['CREATED', 'UNSPENT', 'PENDING', 'SPENT'];
 
     if (transaction?.isCancel) {
       states.push('CANCELLED');
@@ -141,6 +142,7 @@ export function MintQuoteTimeline({
     if (item.state === 'CANCELLED' || item.state === 'EXPIRED') {
       return '#ef4444';
     }
+
     return item.complete ? greens[300] : greys(theme)[400];
   };
 
@@ -148,12 +150,21 @@ export function MintQuoteTimeline({
     return null;
   }
 
+  const getStateLabel = (s) => {
+    switch (s) {
+      case 'UNPAID':
+        return 'PENDING';
+      default:
+        return s;
+    }
+  };
+
   return (
     <View
       style={{
         backgroundColor: greys(theme)[1800],
         padding: 16,
-        margin: 16,
+        marginHorizontal: 16,
         borderRadius: 12,
       }}>
       <Text
@@ -164,15 +175,16 @@ export function MintQuoteTimeline({
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
-        {isExpired
-          ? 'EXPIRED'
-          : type === 'mint'
-            ? _.last(mintQuotes)?.state
-            : transaction?.isCancel
-              ? 'CANCELLED'
-              : _.last(meltQuotes)?.state}
+        {getStateLabel(
+          isExpired
+            ? 'EXPIRED'
+            : type === 'mint'
+              ? _.last(mintQuotes)?.state
+              : transaction?.isCancel
+                ? 'CANCELLED'
+                : _.last(meltQuotes)?.state
+        )}
       </Text>
-
       <View>
         {displayStates.map((item, index) => (
           <React.Fragment key={`${item.state}-${index}`}>
@@ -201,8 +213,8 @@ export function MintQuoteTimeline({
                   flex: 1,
                   ...(transaction.isCancel && item.state === 'CANCELLED'
                     ? {
-                        backgroundColor: greys(theme)[1300],
-                        borderColor: greys(theme)[1000],
+                        backgroundColor: opacity(greys(theme)[1900], 0.75),
+                        borderColor: greys(theme)[1300],
                         borderWidth: 0.33,
                         borderRadius: 8,
                       }
@@ -230,7 +242,7 @@ export function MintQuoteTimeline({
                       color: greys(theme)[0],
                       marginStart: 12,
                     }}>
-                    {item.state}
+                    {getStateLabel(item.state)}
                   </Text>
                   {item.addedAt ? (
                     <Text
@@ -241,6 +253,16 @@ export function MintQuoteTimeline({
                         marginStart: 12,
                       }}>
                       {convertTime(new Date(item.addedAt))}
+                    </Text>
+                  ) : transaction.date && item.state === 'CREATED' ? (
+                    <Text
+                      size={12}
+                      bold
+                      style={{
+                        color: greys(theme)[600],
+                        marginStart: 12,
+                      }}>
+                      {convertTime(new Date(transaction.date))}
                     </Text>
                   ) : transaction.isCancel ? (
                     <Text
@@ -547,26 +569,32 @@ export function LightningReceiveConfirmation({
           ]}
         />
       )}
+      <Spacer size={12} />
       {getCurrentTransaction[0].memo && (
-        <View
-          style={{
-            margin: 16,
-            marginTop: 12,
-            marginBottom: 0,
-          }}>
-          <Card message={getCurrentTransaction[0].memo} variant="info" />
-        </View>
+        <>
+          <View
+            style={{
+              marginHorizontal: 16,
+            }}>
+            <Card message={getCurrentTransaction[0].memo} variant="info" />
+          </View>
+          <Spacer size={12} />
+        </>
       )}
+
       <TransactionMintRefresh
         mintInfo={mintInfo}
         transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
         handleCheckStatus={handleCheckStatus}
       />
+      <Spacer size={12} />
+
       <MintQuoteTimeline
         transaction={getCurrentTransaction[0]}
         type="mint"
         mintQuotes={getCurrentTransaction[0].mintQuotes}
       />
+      <Spacer size={12} />
 
       <Section
         special={false}
@@ -601,6 +629,7 @@ export function LightningReceiveConfirmation({
           },
         ]}
       />
+      <Spacer size={12} />
 
       <TransactionDebugCode transaction={getCurrentTransaction[0]} />
     </Modal>

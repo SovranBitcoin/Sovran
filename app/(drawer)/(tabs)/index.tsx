@@ -6,7 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { ImageBackground } from 'expo-image';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
@@ -167,6 +167,7 @@ function TabOneScreen() {
 
   return (
     <ImageBackground
+      source={require('assets/images/bg4.png')}
       style={{
         flex: 1,
         width: '100%',
@@ -182,6 +183,7 @@ function TabOneScreen() {
               message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
               variant="info"
             />
+            <Spacer size={12} />
           </View>
           <View className="m-4">
             <Transactions days={1} account={account} />

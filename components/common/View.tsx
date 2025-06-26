@@ -9,4 +9,14 @@ const ViewComponent = React.forwardRef<RNView, ViewProps>(function ViewComponent
   return <RNView style={[style]} ref={ref} {...otherProps} />;
 });
 
+export const Spacer = ({ size }) => {
+  return (
+    <ViewComponent
+      style={{
+        height: size,
+      }}
+    />
+  );
+};
+
 export { ViewComponent as View };

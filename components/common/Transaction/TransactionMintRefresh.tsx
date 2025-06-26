@@ -27,7 +27,7 @@ export function TransactionMintRefresh({
       style={{
         backgroundColor: greys(theme)[1800],
       }}
-      className="mx-4 mb-0 mt-4 flex-row items-center justify-between rounded-lg p-4">
+      className="mx-4 mb-0 flex-row items-center justify-between rounded-lg p-4">
       <View className="flex-row items-center">
         <View>
           <MintIcon size={40} mintInfo={mintInfo} />

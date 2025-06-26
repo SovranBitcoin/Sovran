@@ -16,12 +16,12 @@ import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
-import { Card } from 'components/common/Card';
 
 // Main component
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { Spacer } from 'components/common/View';
 
 // Types
 interface TokenProps {
@@ -228,13 +228,14 @@ export function EcashReceiveConfirmation({
           }}
         />
 
-        {memo && <Card message={memo} variant="info" />}
+        {/* {memo && <Card message={memo} variant="info" />} */}
+        <Spacer size={12} />
 
-        {/* <Text>{JSON.stringify(getCurrentTransaction, null, 2)}</Text> */}
         <TransactionMintRefresh
           transaction={{ ...transaction, transactionType: 'receive' }}
           mintInfo={mintInfo}
         />
+        <Spacer size={12} />
 
         <Section
           items={[
@@ -245,6 +246,8 @@ export function EcashReceiveConfirmation({
           style={{}}
           camera={false}
         />
+
+        <Spacer size={12} />
 
         <TransactionDebugCode transaction={transaction} />
       </>

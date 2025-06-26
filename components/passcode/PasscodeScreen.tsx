@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -6,6 +6,8 @@ import { greys } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
 import CachedImage from '../common/Image';
 import { useNostr } from 'helper/redux/nostr';
+import { BlurView } from 'expo-blur';
+import { DeviceMotion } from 'expo-sensors';
 
 interface Props {
   passcode: string;
@@ -68,23 +70,65 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     currentProfile?.profile?.display_name ||
     currentProfile?.profile?.username;
 
+  const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  useEffect(() => {
+    DeviceMotion.setUpdateInterval(50);
+    const subscription = DeviceMotion.addListener((data) => {
+      const { rotation } = data;
+      if (rotation) {
+        const { beta = 0, gamma = 0 } = rotation;
+        // Apply a subtle multiplier for the parallax effect
+        Animated.spring(motion, {
+          toValue: {
+            x: gamma * 10, // left/right tilt
+            y: beta * 10, // up/down tilt
+          },
+          useNativeDriver: true,
+          bounciness: 100,
+          speed: 200,
+        }).start();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   return (
-    <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
-      {currentProfile?.picture && (
-        <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
-      )}
-      {name ? (
-        <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
-      ) : (
-        <Text style={styles.title}>Enter Passcode</Text>
-      )}
-      <View style={styles.dotsContainer}>
-        {Array.from({ length: passcode.length }).map((_, i) => (
-          <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
-        ))}
-      </View>
-      <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-    </Animated.View>
+    <BlurView style={styles.container}>
+      <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            height: '100%',
+            width: '100%',
+            transform: motion.getTranslateTransform(),
+          }}>
+          <CachedImage
+            source={require('assets/images/bg4.png')}
+            style={{
+              height: '100%',
+              width: '100%',
+              opacity: 0.8,
+              transform: [{ scale: 1.1 }],
+            }}
+          />
+        </Animated.View>
+        {currentProfile?.picture && (
+          <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
+        )}
+        {name ? (
+          <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
+        ) : (
+          <Text style={styles.title}>Enter Passcode</Text>
+        )}
+        <View style={styles.dotsContainer}>
+          {Array.from({ length: passcode.length }).map((_, i) => (
+            <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
+          ))}
+        </View>
+        <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
+      </Animated.View>
+    </BlurView>
   );
 };
 
@@ -101,18 +145,29 @@ const createStyles = (theme: any) =>
       height: 80,
       borderRadius: 40,
       marginBottom: 16,
+
+      shadowColor: 'red',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 3,
     },
     welcome: {
       color: greys(theme)[0],
       fontSize: 18,
       marginBottom: 16,
       fontFamily: 'OverpassBold',
+      textShadowColor: 'black',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 3,
     },
     title: {
       color: greys(theme)[0],
       fontSize: 20,
       marginBottom: 20,
       fontFamily: 'OverpassBold',
+      textShadowColor: 'black',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 10,
     },
     dotsContainer: {
       flexDirection: 'row',
@@ -125,6 +180,11 @@ const createStyles = (theme: any) =>
       borderWidth: 1,
       borderColor: greys(theme)[0],
       marginHorizontal: 6,
+
+      shadowColor: 'black',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 3,
     },
     dotActive: {
       width: 12,

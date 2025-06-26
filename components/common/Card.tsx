@@ -49,7 +49,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
         backgroundColor: currentStyle.backgroundColor,
         borderLeftColor: currentStyle.borderLeftColor,
       }}
-      className={`my-3 flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
+      className={`flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
       {title && (
         <Text
           className="pl-4 pr-1 pt-4 text-base font-medium"
