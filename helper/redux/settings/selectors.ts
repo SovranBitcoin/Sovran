@@ -1,6 +1,6 @@
 import { createSelector } from 'reselect';
 import { RootState } from '../store/reducer';
-import { computeGreys, shades as baseShades, greys } from 'helper/colors';
+import { shades as baseShades, greys } from 'helper/colors';
 import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 export const selectSettings = (state: RootState) => state.settings.settings;
@@ -43,19 +43,13 @@ export const memoizedGetTheme = createSelector(
     (state: RootState) => state.settings.settings.backgroundImage,
   ],
   (themeName: string, image) => {
-    console.log(
-      22387474,
-      image,
-      BACKGROUND_IMAGE_ATTRIBUTES[image],
-      computeGreys(greys('dark'), ' #FF5733 ')
-    );
     if (image) {
       return BACKGROUND_IMAGE_ATTRIBUTES[image];
     }
 
     return {
       shades: baseShades,
-      greys: computeGreys(themeName),
+      greys: greys(themeName),
     };
   }
 );
