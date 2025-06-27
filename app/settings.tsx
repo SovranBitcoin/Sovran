@@ -182,6 +182,12 @@ const ModalScreen = () => {
               navigation.navigate('themeSettings');
             }}
           />
+          <RowButton
+            label="Background Image"
+            onPress={() => {
+              navigation.navigate('backgroundImageSettings');
+            }}
+          />
           {/* <RowButton
           label="Language"
           onPress={() => {

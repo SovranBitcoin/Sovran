@@ -14,6 +14,11 @@ export const selectDisplayBitcoin = createSelector(
 
 export const selectPasscode = createSelector([selectSettings], (settings) => settings.passcode);
 
+export const selectBackgroundImage = createSelector(
+  [selectSettings],
+  (settings) => settings.backgroundImage
+);
+
 export const memoizedGetSettings = createSelector(
   [
     (state: RootState) => {
@@ -33,5 +38,16 @@ export const memoizedGetTheme = createSelector(
   ],
   (theme: string) => {
     return theme;
+  }
+);
+
+export const memoizedGetBackgroundImage = createSelector(
+  [
+    (state: RootState) => {
+      return state.settings.settings.backgroundImage;
+    },
+  ],
+  (image: string) => {
+    return image;
   }
 );

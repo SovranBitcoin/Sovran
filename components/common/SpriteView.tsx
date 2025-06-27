@@ -3,6 +3,8 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { SpriteView } from './Image';
 import { DeviceMotion } from 'expo-sensors';
+import { useSelector } from 'react-redux';
+import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 
 const AnimatedSpriteBackground = () => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -26,6 +28,16 @@ const AnimatedSpriteBackground = () => {
     return () => subscription.remove();
   }, []);
 
+  const backgroundImage = useSelector(memoizedGetBackgroundImage);
+
+  const sources: Record<string, any> = {
+    'bg.png': require('assets/images/backgrounds/bg.png'),
+    'bg2.png': require('assets/images/backgrounds/bg2.png'),
+    'bg3.png': require('assets/images/backgrounds/bg3.png'),
+    'bg4.png': require('assets/images/backgrounds/bg4.png'),
+    'bg_.png': require('assets/images/backgrounds/bg_.png'),
+  };
+
   return (
     <Animated.View
       style={[
@@ -34,7 +46,7 @@ const AnimatedSpriteBackground = () => {
           transform: motion.getTranslateTransform(),
         },
       ]}>
-      <SpriteView source={require('assets/images/bg2.png')} />
+      <SpriteView source={sources[backgroundImage] || sources['bg.png']} />
     </Animated.View>
   );
 };

@@ -5,12 +5,14 @@ import {
   TERMS_ACCEPTED,
   SET_EXPERIMENTAL,
   SET_PASSCODE,
+  SET_BACKGROUND_IMAGE,
 } from './actionTypes';
 
 const initialState = {
   settings: {
     lang: 'en',
     theme: 'dark',
+    backgroundImage: 'bg.png',
     display_btc: 3,
     passcode: '',
     experimental: false,
@@ -44,6 +46,15 @@ export const settingsReducer = (state = initialState, action) => {
         settings: {
           ...state.settings,
           theme: action.payload,
+        },
+      };
+    }
+    case SET_BACKGROUND_IMAGE: {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          backgroundImage: action.payload,
         },
       };
     }

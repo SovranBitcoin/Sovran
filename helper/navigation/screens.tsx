@@ -404,6 +404,10 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Theme',
   },
   {
+    name: 'backgroundImageSettings',
+    title: 'Background Image',
+  },
+  {
     name: 'ecashSendConfirmation',
     title: 'Send Ecash',
     options: {
