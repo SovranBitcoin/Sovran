@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Share, ScrollView } from 'react-native';
+import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View } from 'components/common/View';
+import { View, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -36,6 +36,7 @@ import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 
 export function EcashSendConfirmation({
   unit,
@@ -279,15 +280,17 @@ export function EcashSendConfirmation({
           showSection={false}
         />
       )}
+      <Spacer size={12} />
       {getCurrentTransaction[0].memo && (
-        <View
-          style={{
-            margin: 16,
-            marginTop: 12,
-            marginBottom: 0,
-          }}>
-          <Card message={getCurrentTransaction[0].memo} variant="info" />
-        </View>
+        <>
+          <View
+            style={{
+              marginHorizontal: 16,
+            }}>
+            <Card message={getCurrentTransaction[0].memo} variant="info" />
+          </View>
+          <Spacer size={12} />
+        </>
       )}
       <TransactionMintRefresh
         transaction={{
@@ -299,6 +302,7 @@ export function EcashSendConfirmation({
         mintInfo={mintInfo}
         handleCheckStatus={handleCheckStatus}
       />
+      <Spacer size={12} />
 
       <MintQuoteTimeline
         transaction={{
@@ -309,6 +313,7 @@ export function EcashSendConfirmation({
         }}
         meltQuotes={getCurrentTransaction[0].proofStates}
       />
+      <Spacer size={12} />
       <Section
         items={[
           {
@@ -344,17 +349,8 @@ export function EcashSendConfirmation({
           },
         ]}
       />
-
-      <ScrollView
-        horizontal
-        style={{
-          padding: 16,
-          margin: 16,
-          borderRadius: 8,
-          backgroundColor: greys(theme)[1800],
-        }}>
-        <Text mono>{getCurrentTransaction[0].toString()}</Text>
-      </ScrollView>
+      <Spacer size={12} />
+      <TransactionDebugCode transaction={getCurrentTransaction[0]} />
     </Modal>
   );
 }

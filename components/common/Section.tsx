@@ -43,7 +43,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
   return (
     <ContainerView
-      className="m-4 overflow-hidden rounded-lg"
+      className="mx-4 overflow-hidden rounded-lg"
       style={{
         backgroundColor: 'transparent',
         ...style,

@@ -18,6 +18,7 @@ import { useGetMintInfo } from 'helper/redux/cashu';
 import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { Spacer } from 'components/common/View';
 export const pool = new SimplePool();
 
 type UnitType = 'sat' | string;
@@ -169,14 +170,14 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
       <View>
         <View
           style={{
-            margin: 16,
+            marginHorizontal: 16,
             marginTop: 0,
-            marginBottom: 8,
           }}>
           <Card
             message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
             variant="warning"
           />
+          <Spacer size={12} />
         </View>
 
         {showLightningAddress && (
@@ -186,6 +187,7 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             unit="sat"
           />
         )}
+        <Spacer size={12} />
         <TransactionMintRefresh
           mintInfo={mintInfo}
           transaction={{
@@ -196,6 +198,8 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             callback();
           }}
         />
+        <Spacer size={12} />
+
         {/* {unit === 'sat' && (
           <View
             style={{

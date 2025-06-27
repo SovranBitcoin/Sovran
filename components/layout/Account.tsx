@@ -151,9 +151,9 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
 
       <View style={styles.absoluteBottomBorder} />
 
-      <View style={styles.absoluteRightBottomBorder}>
+      {/* <View style={styles.absoluteRightBottomBorder}>
         <View style={styles.bottomNegative}>{renderCurrencyIcon()}</View>
-      </View>
+      </View> */}
     </NonGestureView>
   );
 }
@@ -166,7 +166,7 @@ const PLATFORM_BOTTOM_OFFSET = Platform.OS === 'web' ? 28.8 : 64 + 28.8;
 const createStyles = (theme: string) =>
   StyleSheet.create({
     nonGestureView: {
-      backgroundColor: greys(theme)[2300], // Using a default theme value
+      // backgroundColor: greys(theme)[2300], // Using a default theme value
       overflow: 'hidden',
       zIndex: 1,
       height: 335,

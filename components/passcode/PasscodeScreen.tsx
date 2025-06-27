@@ -1,11 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { StyleSheet, Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
 import CachedImage from '../common/Image';
 import { useNostr } from 'helper/redux/nostr';
+import { BlurView } from 'expo-blur';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
+import AnimatedSpriteBackground from 'components/common/SpriteView';
 
 interface Props {
   passcode: string;
@@ -69,22 +73,29 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     currentProfile?.profile?.username;
 
   return (
-    <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
-      {currentProfile?.picture && (
-        <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
-      )}
-      {name ? (
-        <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
-      ) : (
-        <Text style={styles.title}>Enter Passcode</Text>
-      )}
-      <View style={styles.dotsContainer}>
-        {Array.from({ length: passcode.length }).map((_, i) => (
-          <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
-        ))}
-      </View>
-      <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-    </Animated.View>
+    <BlurView style={styles.container}>
+      <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
+        <AnimatedSpriteBackground />
+
+        {currentProfile?.picture && (
+          <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
+        )}
+
+        {name ? (
+          <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
+        ) : (
+          <Text style={styles.title}>Enter Passcode</Text>
+        )}
+
+        <View style={styles.dotsContainer}>
+          {Array.from({ length: passcode.length }).map((_, i) => (
+            <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
+          ))}
+        </View>
+
+        <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
+      </Animated.View>
+    </BlurView>
   );
 };
 
@@ -101,18 +112,29 @@ const createStyles = (theme: any) =>
       height: 80,
       borderRadius: 40,
       marginBottom: 16,
+
+      shadowColor: 'red',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 3,
     },
     welcome: {
       color: greys(theme)[0],
       fontSize: 18,
       marginBottom: 16,
       fontFamily: 'OverpassBold',
+      textShadowColor: 'black',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 3,
     },
     title: {
       color: greys(theme)[0],
       fontSize: 20,
       marginBottom: 20,
       fontFamily: 'OverpassBold',
+      textShadowColor: 'black',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 10,
     },
     dotsContainer: {
       flexDirection: 'row',
@@ -125,6 +147,11 @@ const createStyles = (theme: any) =>
       borderWidth: 1,
       borderColor: greys(theme)[0],
       marginHorizontal: 6,
+
+      shadowColor: 'black',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 3,
     },
     dotActive: {
       width: 12,

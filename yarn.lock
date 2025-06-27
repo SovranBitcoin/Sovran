@@ -6786,6 +6786,13 @@ expo-secure-store@~14.2.3:
   resolved "https://registry.npmjs.org/expo-secure-store/-/expo-secure-store-14.2.3.tgz"
   integrity sha512-hYBbaAD70asKTFd/eZBKVu+9RTo9OSTMMLqXtzDF8ndUGjpc6tmRCoZtrMHlUo7qLtwL5jm+vpYVBWI8hxh/1Q==
 
+expo-sensors@~14.1.4:
+  version "14.1.4"
+  resolved "https://registry.yarnpkg.com/expo-sensors/-/expo-sensors-14.1.4.tgz#a2d4d20354650371a37d6f0d334973f68cd44f9c"
+  integrity sha512-KHROi5C8dhXedMwx7fZ5eyv9p382F5XOIex4a+GpdOTL3OY4xyk08kt7x64FtMeeoT87gYD3mb9LrBpHyNubkg==
+  dependencies:
+    invariant "^2.2.4"
+
 expo-sharing@~13.1.5:
   version "13.1.5"
   resolved "https://registry.npmjs.org/expo-sharing/-/expo-sharing-13.1.5.tgz"

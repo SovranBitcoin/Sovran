@@ -80,6 +80,7 @@
     "expo-random": "^14.0.1",
     "expo-router": "~5.0.4",
     "expo-secure-store": "~14.2.3",
+    "expo-sensors": "~14.1.4",
     "expo-sharing": "~13.1.5",
     "expo-splash-screen": "~0.30.8",
     "expo-sqlite": "~15.2.9",

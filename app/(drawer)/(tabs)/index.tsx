@@ -5,12 +5,10 @@ import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
-import { ImageBackground } from 'expo-image';
 import { View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import { greys } from 'helper/colors';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
@@ -28,7 +26,9 @@ import {
 import { MintQuoteResponse, MintQuoteState } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { Card } from 'components/common/Card';
+import AnimatedSpriteBackground from 'components/common/SpriteView';
+import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
 
 interface NPUBQuote {
   amount: number;
@@ -166,29 +166,50 @@ function TabOneScreen() {
   }
 
   return (
-    <ImageBackground
+    <View
       style={{
         flex: 1,
         width: '100%',
         height: '100%',
       }}>
+      <AnimatedSpriteBackground />
+
       <SafeAreaView style={styles.safeAreaView}>
         <ScrollView
           style={styles.scrollView}
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          <View className="m-4 mb-[32px] mt-[-32px]">
+          {/* <View className="m-4 mb-[32px] mt-[-32px]">
             <Card
               message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
               variant="info"
             />
-          </View>
+            <Spacer size={12} />
+          </View> */}
           <View className="m-4">
             <Transactions days={1} account={account} />
           </View>
+          <LinearGradient
+            colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
+            start={{ x: 0.5, y: 1 }}
+            end={{ x: 0.5, y: 0 }}
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
+            ]}
+          />
         </ScrollView>
+        <LinearGradient
+          colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
+          start={{ x: 0.5, y: 1 }}
+          end={{ x: 0.5, y: 0 }}
+          style={[
+            StyleSheet.absoluteFill,
+            { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
+          ]}
+        />
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -197,11 +218,11 @@ const createStyles = (theme: string) =>
     scrollView: {
       marginTop: 0,
       marginBottom: -24,
-      backgroundColor: greys(theme)[2300],
+      // backgroundColor: greys(theme)[2300],
     },
     safeAreaView: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      // backgroundColor: greys(theme)[2300],
     },
     accountPagerView: {
       display: 'flex',
