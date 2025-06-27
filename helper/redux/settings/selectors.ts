@@ -1,5 +1,7 @@
 import { createSelector } from 'reselect';
 import { RootState } from '../store/reducer';
+import { shades as baseShades, greys } from 'helper/colors';
+import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 export const selectSettings = (state: RootState) => state.settings.settings;
 
@@ -37,12 +39,18 @@ export const memoizedGetSettings = createSelector(
 
 export const memoizedGetTheme = createSelector(
   [
-    (state: RootState) => {
-      return state.settings.settings.backgroundImage || state.settings.settings.theme;
-    },
+    (state: RootState) => state.settings.settings.theme,
+    (state: RootState) => state.settings.settings.backgroundImage,
   ],
-  (theme: string) => {
-    return theme;
+  (themeName: string, image) => {
+    if (image) {
+      return BACKGROUND_IMAGE_ATTRIBUTES[image];
+    }
+
+    return {
+      shades: baseShades,
+      greys: greys(themeName),
+    };
   }
 );
 

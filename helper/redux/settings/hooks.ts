@@ -7,19 +7,19 @@ import {
   setBackgroundImage,
 } from './actions';
 import {
-  selectTheme,
   selectLanguage,
   selectDisplayBitcoin,
   selectPasscode,
   selectBackgroundImage,
   selectBackgroundImageAttrs,
   memoizedGetSettings,
+  memoizedGetTheme,
 } from './selectors';
 
 export const useSettings = () => {
   const dispatch = useDispatch();
   const settings = useSelector(memoizedGetSettings);
-  const theme = useSelector(selectTheme);
+  const theme = useSelector(memoizedGetTheme);
   const lang = useSelector(selectLanguage);
   const displayBtc = useSelector(selectDisplayBitcoin);
   const passcode = useSelector(selectPasscode);

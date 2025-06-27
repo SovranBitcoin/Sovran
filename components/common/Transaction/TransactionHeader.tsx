@@ -2,7 +2,7 @@ import React from 'react';
 import { Text } from 'components/common/Text';
 import { View } from 'components/common/View';
 import { useSelector } from 'react-redux';
-import { greens, greys, shades } from 'helper/colors';
+import { greens } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { formatCurrency, CurrencyCode, Denomination } from 'helper/currency';
@@ -22,7 +22,7 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
         <View className="flex-row items-center bg-transparent">
           <Text
             size={transaction.isSend ? 32 : 24}
-            color={transaction.isSend ? shades[300] : greens[300]}
+            color={transaction.isSend ? theme.shades[300] : greens[300]}
             className="ml-2 mr-2">
             {transaction.isSend ? '-' : '+'}
           </Text>
@@ -31,12 +31,12 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
             unit={transaction?.unit}
             size={28}
             weight="heavy"
-            color={transaction.isReceive ? greens[300] : shades[300]}
+            color={transaction.isReceive ? greens[300] : theme.shades[300]}
           />
         </View>
-        <Text size={18} color={greys(theme)[100]} bold className="ml-8">
+        <Text size={18} color={theme.greys[100]} bold className="ml-8">
           {transaction?.amount < 0 ? '-' : ''}
-          <Text size={18} color={greys(theme)[100]} className="ml-2">
+          <Text size={18} color={theme.greys[100]} className="ml-2">
             {transaction?.amount < 0 ? '-' : ''}
             {formatCurrency(
               {
