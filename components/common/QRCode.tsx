@@ -5,7 +5,7 @@ import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/common/View';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { useWindowDimensions, StyleSheet, ViewStyle } from 'react-native';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import EQRCode from 'react-native-qrcode-svg';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -74,18 +74,20 @@ export const QRCode = memo(function QRCode({
   return (
     <View style={containerStyle}>
       <LinearGradient
-        colors={!animate ? [shades[200], shades[500]] : [greys(theme)[1500], greys(theme)[1500]]}
+        colors={
+          !animate ? [theme.shades[200], theme.shades[500]] : [theme.greys[1500], theme.greys[1500]]
+        }
         style={{
           ...(hasBackground
             ? {
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: theme.greys[2300],
                 padding: 16,
                 borderRadius: 16,
               }
             : {}),
         }}>
         <EQRCode
-          color={animate ? greys(theme)[0] : greys(theme)[0]}
+          color={animate ? theme.greys[0] : theme.greys[0]}
           backgroundColor={'transparent'}
           value={props.data}
           size={width - 2 * padding}
