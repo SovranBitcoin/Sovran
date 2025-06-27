@@ -31,7 +31,7 @@ export function Background() {
     opacity(greys(theme)[2300], 0.33),
     opacity(greys(theme)[2300], 0),
   ] as const;
-
+  return null;
   return (
     <LinearGradient
       colors={defaultColors}

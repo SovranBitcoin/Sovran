@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/common/QRCode';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { GradientSkeleton } from '../common/GradientSkeleton';
 import { greys, shades } from 'helper/colors';
@@ -186,6 +186,7 @@ export function PaymentInfo({
     <>
       {renderTabs()}
       {renderQRCode()}
+      <Spacer size={12} />
       {renderSection()}
     </>
   );

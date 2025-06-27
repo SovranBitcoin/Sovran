@@ -21,7 +21,8 @@ import { truncateMiddle } from 'helper/strings';
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
-import { Spacer } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
+import { Card } from 'components/common/Card';
 
 // Types
 interface TokenProps {
@@ -228,8 +229,17 @@ export function EcashReceiveConfirmation({
           }}
         />
 
-        {/* {memo && <Card message={memo} variant="info" />} */}
-        <Spacer size={12} />
+        {memo && (
+          <>
+            <View
+              style={{
+                marginHorizontal: 16,
+              }}>
+              <Card message={memo} variant="info" />
+            </View>
+            <Spacer size={12} />
+          </>
+        )}
 
         <TransactionMintRefresh
           transaction={{ ...transaction, transactionType: 'receive' }}
