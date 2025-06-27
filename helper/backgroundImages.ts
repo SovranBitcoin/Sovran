@@ -1,5 +1,5 @@
 import { BlurTint } from 'expo-blur';
-import { computeGreys, computeShades } from './colors';
+import { computeGreys, computeShades, computeTintedGreys } from './colors';
 
 export interface BackgroundImageAttributes {
   shades: Record<100 | 200 | 300 | 400 | 500, string>;
@@ -9,40 +9,58 @@ export interface BackgroundImageAttributes {
 }
 
 export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttributes> = {
-  'bg.png': {
-    shades: computeShades('#A855F7'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'prominent',
-  },
-  'bg2.png': {
-    shades: computeShades('#F97316'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'prominent',
-  },
-  'bg3.png': {
-    shades: computeShades('#38BDF8'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'prominent',
-  },
-  'bg4.png': {
-    shades: computeShades('#34D399'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'prominent',
-  },
-  'bg5.png': {
-    shades: computeShades('#C8348A'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'extraLight',
-  },
-  'bg6.png': {
-    shades: computeShades('#5E1B72'),
-    greys: computeGreys('dark'),
-    text: '#FFFFFF',
-    tint: 'extraLight',
-  },
+  'bg.png': (() => {
+    const s = computeShades('#A855F7');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'prominent',
+    };
+  })(),
+  'bg2.png': (() => {
+    const s = computeShades('#F97316');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'prominent',
+    };
+  })(),
+  'bg3.png': (() => {
+    const s = computeShades('#38BDF8');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'prominent',
+    };
+  })(),
+  'bg4.png': (() => {
+    const s = computeShades('#34D399');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'prominent',
+    };
+  })(),
+  'bg5.png': (() => {
+    const s = computeShades('#C8348A');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'extraLight',
+    };
+  })(),
+  'bg6.png': (() => {
+    const s = computeShades('#5E1B72');
+    return {
+      shades: s,
+      greys: computeTintedGreys('dark', s[300]),
+      text: '#FFFFFF',
+      tint: 'extraLight',
+    };
+  })(),
 };

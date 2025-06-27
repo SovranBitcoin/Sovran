@@ -821,3 +821,25 @@ export const computeGreys = (theme = 'dark', zero?: string) => {
   if (zero) g[0] = zero;
   return g;
 };
+
+export const tintGreys = (
+  greysObj: Record<number, string>,
+  shade300: string,
+  amount = 10,
+) => {
+  const { h, s } = rgbToHsl(...Object.values(hexToRgb(shade300)));
+  const tinted: Record<number, string> = {};
+  Object.entries(greysObj).forEach(([key, val]) => {
+    const { l } = rgbToHsl(...Object.values(hexToRgb(val)));
+    const { r, g, b } = hslToRgb(h, (s * amount) / 100, l);
+    tinted[Number(key)] = rgbToHex(r, g, b);
+  });
+  return tinted;
+};
+
+export const computeTintedGreys = (
+  theme = 'dark',
+  shade300: string,
+  zero?: string,
+  amount = 10,
+) => tintGreys(computeGreys(theme, zero), shade300, amount);
