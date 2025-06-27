@@ -11,6 +11,7 @@ import { Monicon as Icon } from '@monicon/native';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 import { View } from 'components/common/View';
+import { greys } from 'helper/colors';
 export { FlagIcon } from './flag';
 
 export const icons = [
@@ -499,14 +500,9 @@ export function ProfileIcon() {
   );
 }
 
-export function CurrencyIcon({
-  width = 36,
-  currency,
-  colors,
-}) {
+export function CurrencyIcon({ width = 36, currency, colors }) {
   const theme = useSelector(memoizedGetTheme);
-  const gradientColors =
-    colors ?? [theme.shades[100], theme.shades[300], theme.shades[500]];
+  const gradientColors = colors ?? [theme.shades[100], theme.shades[300], theme.shades[500]];
   if (currency === 'eur') {
     return (
       <View
@@ -1024,11 +1020,7 @@ export function ImportIcon({ style }) {
         fill={theme.greys[0]}
         d="m12 14l-.707.707l.707.707l.707-.707zm1-9a1 1 0 1 0-2 0zM6.293 9.707l5 5l1.414-1.414l-5-5zm6.414 5l5-5l-1.414-1.414l-5 5zM13 14V5h-2v9z"
       />
-      <Path
-        stroke={theme.greys[0]}
-        strokeWidth={2}
-        d="M5 16v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1"
-      />
+      <Path stroke={theme.greys[0]} strokeWidth={2} d="M5 16v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
     </Svg>
   );
 }
