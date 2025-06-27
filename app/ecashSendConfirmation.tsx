@@ -303,6 +303,7 @@ export function EcashSendConfirmation({
         handleCheckStatus={handleCheckStatus}
       />
       <Spacer size={12} />
+
       <MintQuoteTimeline
         transaction={{
           ...getCurrentTransaction[0],
