@@ -36,6 +36,7 @@ const AnimatedSpriteBackground = () => {
     'bg3.png': require('assets/images/backgrounds/bg3.png'),
     'bg4.png': require('assets/images/backgrounds/bg4.png'),
     'bg5.png': require('assets/images/backgrounds/bg5.png'),
+    'bg6.png': require('assets/images/backgrounds/bg6.png'),
   };
 
   if (!backgroundImage) return null;
@@ -56,7 +57,7 @@ const AnimatedSpriteBackground = () => {
       ) : (
         <Image
           source={sources[backgroundImage] || sources['bg5.png']}
-          style={StyleSheet.absoluteFillObject}
+          style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.1 }] }]}
         />
       )}
     </Animated.View>

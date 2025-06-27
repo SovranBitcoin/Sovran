@@ -1,6 +1,9 @@
 import { BlurTint, BlurView } from 'expo-blur';
 import React from 'react';
 import { View as RNView, ViewProps as RNViewProps, StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
+import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 
 type Props = RNViewProps & {
   blur?: boolean;
@@ -10,14 +13,11 @@ type Props = RNViewProps & {
 };
 
 export const View = React.forwardRef<RNView, Props>((props, ref) => {
-  const {
-    blur = false,
-    blurIntensity = 60,
-    blurTint = 'prominent',
-    style,
-    children,
-    ...rest
-  } = props;
+  const image = useSelector(memoizedGetBackgroundImage);
+
+  const { blur = false, blurIntensity = 60, blurTint, style, children, ...rest } = props;
+
+  const effectiveTint = blurTint || BACKGROUND_IMAGE_ATTRIBUTES[image]?.tint || 'prominent';
 
   if (!blur) {
     // 🔁 Normal unwrapped View – identical to before
@@ -31,7 +31,7 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
   // 🧊 Blur-enhanced View
   return (
     <RNView ref={ref} style={[style, styles.overflowHidden]} {...rest}>
-      <BlurView intensity={blurIntensity} tint={blurTint} style={StyleSheet.absoluteFill} />
+      <BlurView intensity={blurIntensity} tint={effectiveTint} style={[StyleSheet.absoluteFill]} />
       {children}
     </RNView>
   );

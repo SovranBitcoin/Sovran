@@ -19,6 +19,11 @@ export const selectBackgroundImage = createSelector(
   (settings) => settings.backgroundImage
 );
 
+export const selectBackgroundImageAttrs = createSelector(
+  [selectSettings],
+  (settings) => settings.backgroundImageAttrs
+);
+
 export const memoizedGetSettings = createSelector(
   [
     (state: RootState) => {
@@ -33,7 +38,7 @@ export const memoizedGetSettings = createSelector(
 export const memoizedGetTheme = createSelector(
   [
     (state: RootState) => {
-      return state.settings.settings.theme;
+      return state.settings.settings.backgroundImage || state.settings.settings.theme;
     },
   ],
   (theme: string) => {
@@ -50,4 +55,13 @@ export const memoizedGetBackgroundImage = createSelector(
   (image: string) => {
     return image;
   }
+);
+
+export const memoizedGetBackgroundImageAttrs = createSelector(
+  [
+    (state: RootState) => {
+      return state.settings.settings.backgroundImageAttrs;
+    },
+  ],
+  (attrs) => attrs
 );
