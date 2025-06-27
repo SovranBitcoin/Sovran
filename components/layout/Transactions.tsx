@@ -128,11 +128,11 @@ export const Transactions = React.memo(
     if (filteredTransactions.length === 0) {
       return (
         <View className="flex items-center">
-          <Icon name="fluent:clock-12-filled" color={greys(theme)[1000]} />
-          <Text heavy size={16} style={{ color: greys(theme)[1000] }}>
+          <Icon name="fluent:clock-12-filled" color={theme.greys[1000]} />
+          <Text heavy size={16} style={{ color: theme.greys[1000] }}>
             No Transactions
           </Text>
-          <Text color={greys(theme)[1200]} heavy size={16}>
+          <Text color={theme.greys[1200]} heavy size={16}>
             Your transactions will show up here
           </Text>
         </View>
@@ -145,13 +145,13 @@ export const Transactions = React.memo(
         return (
           <View>
             <View className="flex-row items-start">
-              <Text heavy size={16} color={greys(theme)[1000]} className="mt-2">
+              <Text heavy size={16} color={theme.greys[1000]} className="mt-2">
                 {label}
               </Text>
             </View>
             {sections.map((section) => (
               <View key={section.title}>
-                <Text size={14} heavy color={greys(theme)[1000]} className="mb-1">
+                <Text size={14} heavy color={theme.greys[1000]} className="mb-1">
                   {section.title}
                 </Text>
                 <View className="rounded-lg" blur>
@@ -180,8 +180,8 @@ export const Transactions = React.memo(
             }
             className="mt-4 flex items-center rounded-full border p-3"
             style={{
-              backgroundColor: greys(theme)[1800],
-              borderColor: greys(theme)[1500],
+              backgroundColor: theme.greys[1800],
+              borderColor: theme.greys[1500],
             }}>
             <Text size={14} bold>
               View all ({filteredTransactions.length})
@@ -232,7 +232,7 @@ export const Transactions = React.memo(
             <View
               style={[
                 {
-                  backgroundColor: greys(theme)[1800],
+                  backgroundColor: theme.greys[1800],
                   borderRadius: 8,
                   borderTopLeftRadius: index === 0 ? 8 : 0,
                   borderTopRightRadius: index === 0 ? 8 : 0,
@@ -249,7 +249,7 @@ export const Transactions = React.memo(
           <Text
             size={14}
             heavy
-            color={greys(theme)[1000]}
+            color={theme.greys[1000]}
             style={{
               height: HEADER_HEIGHT,
             }}

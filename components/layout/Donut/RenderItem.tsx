@@ -112,13 +112,13 @@ const createStyles = (theme: any) =>
     text: {
       fontSize: 16,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginLeft: 12,
     },
     smallText: {
       fontSize: 16,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[100],
+      color: theme.greys[100],
       marginLeft: 12,
     },
   });

@@ -48,21 +48,21 @@ export default function ModalScreen() {
           <Text size={16} style={styles.navButtonText}>
             Next
           </Text>
-          <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[0]} />
+          <Icon name="fa6-solid:chevron-right" size={20} color={theme.greys[0]} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     centeredContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     gradient: {
       position: 'absolute',

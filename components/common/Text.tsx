@@ -63,7 +63,7 @@ export const StyledText = ({
     );
   } else if (secondary) {
     return (
-      <GradientText gradientColors={[greys(theme)[700], greys(theme)[1000]]} style={style}>
+      <GradientText gradientColors={[theme.greys[700], theme.greys[1000]]} style={style}>
         {children}
       </GradientText>
     );
@@ -247,7 +247,7 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
       testID={props.testID}
       style={[
         {
-          color: greys(theme)[0],
+          color: theme.greys[0],
           fontFamily: fontFamily,
           fontSize: size,
         },

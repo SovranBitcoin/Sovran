@@ -3,7 +3,7 @@ import { Text } from 'components/common/Text';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 
 const MessageComponent = ({ message, theme, isReceived }) => {
   const styles = createStyles(theme, isReceived);
@@ -12,7 +12,7 @@ const MessageComponent = ({ message, theme, isReceived }) => {
     <View style={styles.wrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        colors={isReceived ? [theme.greys[1000], theme.greys[1200]] : [theme.shades[100], theme.shades[300]]}
         style={styles.container}>
         <Text style={styles.text}>{message.content}</Text>
         <View style={styles.footer}>
@@ -43,14 +43,14 @@ const createStyles = (theme, isReceived) =>
       [isReceived ? 'left' : 'right']: 16,
       width: 8,
       height: 8,
-      backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
+      backgroundColor: isReceived ? theme.greys[1200] : theme.shades[300],
       transform: [{ rotate: '45deg' }],
     },
     text: {
       fontFamily: 'OverpassHeavy',
       fontSize: 16,
       marginBottom: 8,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     footer: {
       flexDirection: 'row',
@@ -58,13 +58,13 @@ const createStyles = (theme, isReceived) =>
       alignItems: 'center',
     },
     timestamp: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,
     },
     status: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,

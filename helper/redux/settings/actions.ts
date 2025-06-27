@@ -12,7 +12,7 @@ export const setLanguage = (lang: string) => ({
   payload: lang,
 });
 
-export const setTheme = (theme: string) => ({
+export const setTheme = (theme: any) => ({
   type: SET_THEME,
   payload: theme,
 });

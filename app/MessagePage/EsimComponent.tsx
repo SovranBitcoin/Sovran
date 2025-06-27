@@ -3,13 +3,13 @@ import { View, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 
 const EsimComponent = ({ esim, theme, isReceived }) => {
   const styles = createStyles(theme);
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [theme.greys[1000], theme.greys[1200]]
+    : [theme.shades[100], theme.shades[300]];
   const arrowStyle = isReceived ? [styles.arrow, styles.receiveArrow] : styles.arrow;
   const containerStyle = [styles.transactionContainer, isReceived && styles.receivedContainer];
 
@@ -30,7 +30,7 @@ const EsimComponent = ({ esim, theme, isReceived }) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,
@@ -48,13 +48,13 @@ const createStyles = (theme: string) =>
       right: 16,
       width: 8,
       height: 8,
-      backgroundColor: shades[300],
+      backgroundColor: theme.shades[300],
       transform: [{ rotate: '45deg' }],
     },
     receiveArrow: {
       left: 16,
       right: 'auto',
-      backgroundColor: greys(theme)[1200],
+      backgroundColor: theme.greys[1200],
     },
     headerContainer: {
       backgroundColor: 'rgba(0,0,0,0.25)',
@@ -66,19 +66,19 @@ const createStyles = (theme: string) =>
       fontFamily: 'OverpassBold',
       fontSize: 14,
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     transactionText: {
       fontFamily: 'OverpassHeavy',
       fontSize: 16,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 8,
     },
     receivedContainer: {
       alignSelf: 'flex-start',
     },
     timestamp: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,

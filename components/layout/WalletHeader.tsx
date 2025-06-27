@@ -24,12 +24,12 @@ export function Background() {
   const theme = useSelector(memoizedGetTheme);
 
   const defaultColors: readonly [string, string, ...string[]] = [
-    greys(theme)[2300],
-    opacity(greys(theme)[2300], 0.9),
-    opacity(greys(theme)[2300], 0.85),
-    opacity(greys(theme)[2300], 0.755),
-    opacity(greys(theme)[2300], 0.33),
-    opacity(greys(theme)[2300], 0),
+    theme.greys[2300],
+    opacity(theme.greys[2300], 0.9),
+    opacity(theme.greys[2300], 0.85),
+    opacity(theme.greys[2300], 0.755),
+    opacity(theme.greys[2300], 0.33),
+    opacity(theme.greys[2300], 0),
   ] as const;
   return null;
   return (
@@ -71,7 +71,7 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       position: 'absolute',
@@ -92,6 +92,6 @@ const createStyles = (theme: string) =>
       marginBottom: 4,
     },
     unitText: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
     },
   });

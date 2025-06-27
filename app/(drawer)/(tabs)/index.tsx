@@ -211,16 +211,16 @@ function TabOneScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     scrollView: {
       marginTop: 0,
       marginBottom: -24,
-      // backgroundColor: greys(theme)[2300],
+      // backgroundColor: theme.greys[2300],
     },
     safeAreaView: {
       flex: 1,
-      // backgroundColor: greys(theme)[2300],
+      // backgroundColor: theme.greys[2300],
     },
     accountPagerView: {
       display: 'flex',

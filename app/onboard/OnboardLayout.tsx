@@ -44,7 +44,7 @@ export const NavigationFooter = ({
   style,
 }) => {
   const styles = createStyles(theme);
-  const iconColor = greys(theme)[0];
+  const iconColor = theme.greys[0];
 
   return (
     <View style={[styles.footerContainer, style]}>
@@ -78,7 +78,7 @@ export const ActionFooter = ({ actions, theme, style }) => {
           styles.actionButton,
           isPrimary && styles.primaryButton,
           {
-            backgroundColor: isPrimary ? greys(theme)[0] : 'transparent',
+            backgroundColor: isPrimary ? theme.greys[0] : 'transparent',
           },
         ];
 
@@ -87,7 +87,7 @@ export const ActionFooter = ({ actions, theme, style }) => {
             <Text
               size={16}
               style={{
-                color: isPrimary ? greys(theme)[2300] : greys(theme)[0],
+                color: isPrimary ? theme.greys[2300] : theme.greys[0],
                 fontFamily: 'LexendMedium',
               }}>
               {action.label}
@@ -107,7 +107,7 @@ export const HeaderSkipButton = ({ onPress, theme }) => (
     <Text size={16} style={{ marginRight: 8 }}>
       Skip
     </Text>
-    <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[0]} />
+    <Icon name="fa6-solid:chevron-right" size={20} color={theme.greys[0]} />
   </TouchableOpacity>
 );
 
@@ -171,7 +171,7 @@ export function OnboardingLayout({
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     titleText: {
       fontFamily: 'LexendBold',
@@ -202,7 +202,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     centeredContent: {
       justifyContent: 'center',

@@ -24,7 +24,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         padding: 8,
         paddingTop: 24,
       }}>
@@ -33,7 +33,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         style={{
           fontSize: 20,
           fontFamily: 'OverpassHeavy',
-          color: greys(theme)[0],
+          color: theme.greys[0],
           marginLeft: 16,
           textAlign: 'center',
           marginBottom: 16,
@@ -54,10 +54,10 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
       </Text>
       <ButtonHandler
         colors={[
-          opacity(greys(theme)[1800], 0),
-          opacity(greys(theme)[1800], 0.75),
-          opacity(greys(theme)[1800], 0.9),
-          greys(theme)[1800],
+          opacity(theme.greys[1800], 0),
+          opacity(theme.greys[1800], 0.75),
+          opacity(theme.greys[1800], 0.9),
+          theme.greys[1800],
         ]}
         buttons={[
           {

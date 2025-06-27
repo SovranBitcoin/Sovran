@@ -176,8 +176,8 @@ export default function ModalScreen() {
                 marginTop: 16,
                 padding: 10,
                 borderWidth: 1,
-                borderColor: greys(theme)[1800],
-                backgroundColor: greys(theme)[2000],
+                borderColor: theme.greys[1800],
+                backgroundColor: theme.greys[2000],
                 borderRadius: 8,
               }}>
               <View

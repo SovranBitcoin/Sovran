@@ -14,7 +14,7 @@ function SheetWithRouter() {
       initialRoute="route-a"
       containerStyle={{
         height: '90%',
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: theme.greys[2300],
         justifyContent: 'center',
         alignItems: 'center',
       }}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import { StyleSheet, Text, View, ScrollView } from 'react-native';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -138,10 +138,10 @@ Using ecash involves significant risks including legal, market, liquidity, count
 
 These Terms represent the entire agreement between you and Sovran.`;
 
-const createStyles = (theme: string) => {
+const createStyles = (theme: any) => {
   return StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[1900],
+      backgroundColor: theme.greys[1900],
       // height: screenHeight,
       flexDirection: 'column',
     },
@@ -149,13 +149,13 @@ const createStyles = (theme: string) => {
       textAlign: 'center',
       fontSize: 32,
       fontFamily: 'OverpassHeavy',
-      color: greys(theme)[100],
+      color: theme.greys[100],
       marginBottom: 16,
       paddingVertical: 8,
     },
     scrollContainer: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       borderRadius: 8,
       marginBottom: 16,
     },
@@ -166,7 +166,7 @@ const createStyles = (theme: string) => {
     termsText: {
       fontFamily: 'OverpassRegular',
       fontSize: 14,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       lineHeight: 22,
     },
     checkboxContainer: {
@@ -179,7 +179,7 @@ const createStyles = (theme: string) => {
       flex: 1,
       fontFamily: 'OverpassRegular',
       fontSize: 14,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginLeft: 8,
     },
   });
@@ -219,7 +219,7 @@ export default function TermsConditionsScreen({ onClose }: TermsConditionsScreen
             <Checkbox
               value={isChecked}
               onValueChange={toggleCheckbox}
-              color={isChecked ? shades[300] : undefined}
+              color={isChecked ? theme.shades[300] : undefined}
             />
             <Text id="terms-checkbox" style={styles.checkboxText}>
               I have read and agree to the Terms and Conditions

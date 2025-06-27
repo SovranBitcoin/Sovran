@@ -2,7 +2,6 @@ import React, { useCallback, ReactNode } from 'react';
 import { Pressable, ViewStyle, ScrollView } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 
 type ItemId = string | number;
@@ -22,7 +21,7 @@ interface SearchableListProps {
   getLabel: (item: DataItem) => string;
   onItemPress: (item: DataItem) => void;
   searchPlaceholder: string;
-  theme: string;
+  theme: any;
   itemStyle?: ViewStyle;
 }
 
@@ -49,14 +48,14 @@ export function SearchableList({
         key={getItemKey(item)}
         className="mb-2 flex-row items-center rounded-full p-2"
         style={{
-          backgroundColor: greys(theme)[1800],
-          borderColor: greys(theme)[1300],
+          backgroundColor: theme.greys[1800],
+          borderColor: theme.greys[1300],
           borderWidth: 0.2,
           ...itemStyle,
         }}
         onPress={() => onItemPress(item)}>
         {renderIcon(item)}
-        <Text weight="heavy" size={16} style={{ marginLeft: 8, color: greys(theme)[0] }}>
+        <Text weight="heavy" size={16} style={{ marginLeft: 8, color: theme.greys[0] }}>
           {getLabel(item)}
         </Text>
       </Pressable>
@@ -65,7 +64,7 @@ export function SearchableList({
   );
 
   return (
-    <View style={{ backgroundColor: greys(theme)[2300] }}>
+    <View style={{ backgroundColor: theme.greys[2300] }}>
       <TextInput placeholder={searchPlaceholder} value={searchText} onChangeText={onSearchChange} />
       <View className="h-4" style={{ backgroundColor: 'transparent' }} />
       <ScrollView>{data.map(renderItem)}</ScrollView>

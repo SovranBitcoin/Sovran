@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Text } from 'components/common/Text';
@@ -741,7 +741,7 @@ const ChainLoadingAnimation = () => {
                   handleProfileAnimation();
                 }, 1000);
               }}
-              style={[styles.addButtonContainer, { backgroundColor: shades[300] }]}>
+              style={[styles.addButtonContainer, { backgroundColor: theme.shades[300] }]}>
               <Icon size={32} name="ic:round-refresh" />
             </TouchableOpacity>
           </View>
@@ -812,7 +812,7 @@ const ChainLoadingAnimation = () => {
                   },
                 });
               }}
-              style={[styles.addButtonContainer, { backgroundColor: shades[300] }]}>
+              style={[styles.addButtonContainer, { backgroundColor: theme.shades[300] }]}>
               <Icon size={32} name="fluent:add-24-filled" />
             </TouchableOpacity>
           </View>
@@ -845,8 +845,8 @@ const ChainLoadingAnimation = () => {
         size={size}
         width={3}
         fill={currentProgress * 100}
-        tintColor={shades[300]}
-        backgroundColor={greys(theme)[1500]}
+        tintColor={theme.shades[300]}
+        backgroundColor={theme.greys[1500]}
         duration={600}
         easing={Easing.out(Easing.ease)}
         rotation={360}

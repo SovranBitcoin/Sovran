@@ -73,7 +73,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         key={String(value)}
         className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{
-          backgroundColor: greys(theme)[2300],
+          backgroundColor: theme.greys[2300],
           opacity: loading ? 0.5 : 1,
         }}
         disabled={loading}

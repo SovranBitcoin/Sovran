@@ -13,7 +13,7 @@ function CameraScreen() {
     <View
       style={{
         flex: 1,
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: theme.greys[2300],
         position: 'relative',
       }}>
       <Camera />

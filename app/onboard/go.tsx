@@ -1,5 +1,4 @@
 import React from 'react';
-import { shades } from 'helper/colors';
 import { OnboardingLayout } from './OnboardLayout';
 import { useTypedNavigation } from 'helper/navigation';
 
@@ -11,7 +10,7 @@ export default function ModalScreen() {
       title="READY TO"
       highlight="GO?"
       description="You're all set. Start sending and receiving bitcoin instantly. Stay private, stay sovereign."
-      highlightColors={[shades[300], shades[400]]}
+      highlightColors={[theme.shades[300], theme.shades[400]]}
       nextScreen="onboard/displayMnemonic"
       actions={[
         {

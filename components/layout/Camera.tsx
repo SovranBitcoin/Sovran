@@ -52,7 +52,7 @@ const BlurredCircleButton: React.FC<BlurredCircleButtonProps> = ({
     <BlurView intensity={intensity} tint={tint} style={[styles.blurContainer, style]}>
       <TouchableOpacity
         className="items-center rounded-lg p-4"
-        style={{ backgroundColor: opacity(greys(theme)[1800], 0.1) }}
+        style={{ backgroundColor: opacity(theme.greys[1800], 0.1) }}
         onPress={onPress}>
         {children}
       </TouchableOpacity>
@@ -175,7 +175,7 @@ const Camera: React.FC = () => {
       {/* Close button in top left */}
       <View className="absolute left-6 top-12 z-10">
         <BlurredCircleButton onPress={handleClosePress}>
-          <Icon name="material-symbols:close-rounded" color={greys(theme)[0]} />
+          <Icon name="material-symbols:close-rounded" color={theme.greys[0]} />
         </BlurredCircleButton>
       </View>
 
@@ -187,13 +187,13 @@ const Camera: React.FC = () => {
         <View style={styles.scanBoxBottomRight} />
         <View className="absolute bottom-0 self-center rounded-lg bg-black/50 p-2">
           {progress > 0 ? (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>
+            <Text style={{ color: theme.greys[0], fontSize: 16 }}>
               Progress: {Math.round(progress * 100)}%
             </Text>
           ) : loading ? (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>Loading...</Text>
+            <Text style={{ color: theme.greys[0], fontSize: 16 }}>Loading...</Text>
           ) : (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>Scanning...</Text>
+            <Text style={{ color: theme.greys[0], fontSize: 16 }}>Scanning...</Text>
           )}
         </View>
       </View>
@@ -201,16 +201,16 @@ const Camera: React.FC = () => {
       {/* Bottom buttons container */}
       <View className="absolute bottom-24 left-0 right-0 flex-row items-center justify-between px-8">
         <BlurredCircleButton onPress={handleClipboardPress}>
-          <Icon name="lets-icons:copy" color={greys(theme)[0]} />
+          <Icon name="lets-icons:copy" color={theme.greys[0]} />
         </BlurredCircleButton>
         <BlurredCircleButton onPress={handleGalleryPress}>
-          <Icon name="proicons:photo" color={greys(theme)[0]} />
+          <Icon name="proicons:photo" color={theme.greys[0]} />
         </BlurredCircleButton>
         <BlurredCircleButton onPress={toggleFlashlight}>
           {!flashlightOn ? (
-            <Icon name="mdi:lightbulb-on-outline" color={greys(theme)[0]} />
+            <Icon name="mdi:lightbulb-on-outline" color={theme.greys[0]} />
           ) : (
-            <Icon name="mdi:lightbulb-on" color={greys(theme)[0]} />
+            <Icon name="mdi:lightbulb-on" color={theme.greys[0]} />
           )}
         </BlurredCircleButton>
       </View>

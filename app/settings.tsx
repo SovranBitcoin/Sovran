@@ -62,7 +62,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
         <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
         <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
       </View>
-      <FeatherIcon color={greys(theme)[700]} name="chevron-right" size={22} />
+      <FeatherIcon color={theme.greys[700]} name="chevron-right" size={22} />
     </TouchableOpacity>
   );
 };
@@ -93,7 +93,7 @@ export const RowButton: React.FC<{
                 marginRight: 3,
                 fontFamily: 'OverpassBold',
               },
-              isDanger ? { color: reds[300] } : { color: greys(theme)[700] },
+              isDanger ? { color: reds[300] } : { color: theme.greys[700] },
             ]}>
             {value}
           </Text>
@@ -103,7 +103,7 @@ export const RowButton: React.FC<{
             style={{
               marginRight: !!onPress ? 0 : 8,
             }}
-            color={isDanger ? reds[300] : greys(theme)[700]}
+            color={isDanger ? reds[300] : theme.greys[700]}
             name="chevron-right"
             size={19}
           />
@@ -365,7 +365,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     headerTitle: {
       fontSize: 19,
       fontWeight: '600',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       flexGrow: 1,
       flexShrink: 1,
       flexBasis: 0,
@@ -379,7 +379,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       fontWeight: '500',
       textAlign: 'center',
-      color: greys(theme)[600],
+      color: theme.greys[600],
     },
     section: {
       paddingVertical: 12,
@@ -390,12 +390,12 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: isDanger ? reds[300] : greys(theme)[600],
+      color: isDanger ? reds[300] : theme.greys[600],
       textTransform: 'uppercase',
     },
     sectionBody: {
       borderRadius: 12,
-      shadowColor: greys(theme)[1000],
+      shadowColor: theme.greys[1000],
       shadowOffset: {
         width: 0,
         height: 1,
@@ -407,7 +407,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     profile: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -424,13 +424,13 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     profileName: {
       fontSize: 18,
       fontWeight: '600',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     profileHandle: {
       marginTop: 2,
       fontSize: 16,
       fontWeight: '400',
-      color: greys(theme)[700],
+      color: theme.greys[700],
     },
     row: {
       height: 44,
@@ -442,9 +442,9 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     rowWrapper: {
       paddingLeft: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderTopWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
     },
     rowFirst: {
       borderTopLeftRadius: 12,
@@ -453,12 +453,12 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     rowLabel: {
       fontSize: 16,
       letterSpacing: 0.24,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     rowValue: {
       fontSize: 16,
       letterSpacing: 0.24,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     rowLabelDanger: {
       color: reds[300],
@@ -480,23 +480,23 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     debugContainer: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       marginVertical: 8,
     },
     debugText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
     },
     changeProfileButton: {
       marginTop: 8,
       paddingVertical: 4,
       paddingHorizontal: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
       borderRadius: 4,
     },
     changeProfileText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
       fontWeight: '500',
       textAlign: 'center',

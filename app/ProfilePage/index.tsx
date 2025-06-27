@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Platform } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { Text } from 'components/common/Text';
 import Animated, {
   Easing,
@@ -136,7 +136,7 @@ export default function AboutPage(props: string) {
   return (
     <ScrollView
       style={{
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: theme.greys[2300],
         height: '100%',
       }}
       {...props}>
@@ -145,8 +145,8 @@ export default function AboutPage(props: string) {
           position: 'absolute',
           width: '100%',
           height: 120,
-          borderColor: greys(theme)[1300],
-          backgroundColor: greys(theme)[1800],
+          borderColor: theme.greys[1300],
+          backgroundColor: theme.greys[1800],
           borderWidth: 0.2,
           marginBottom: 12,
           top: -48,
@@ -163,7 +163,7 @@ export default function AboutPage(props: string) {
           height: 72,
           borderRadius: 1000,
           marginBottom: 0,
-          borderColor: greys(theme)[2300],
+          borderColor: theme.greys[2300],
           borderWidth: 3,
           top: 120 - 72 + 8,
           left: 16,
@@ -188,10 +188,10 @@ export default function AboutPage(props: string) {
         style={{
           width: '100%',
           height: 120,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: theme.greys[1800],
           marginBottom: 12,
           zIndex: 0,
-          borderColor: greys(theme)[2300],
+          borderColor: theme.greys[2300],
           borderWidth: 2,
         }}
         source={{ uri: p?.banner || p?.profile?.banner }}
@@ -212,7 +212,7 @@ export default function AboutPage(props: string) {
             height: 72,
             borderRadius: 1000,
             marginBottom: 0,
-            borderColor: greys(theme)[2300],
+            borderColor: theme.greys[2300],
             borderWidth: 2,
             zIndex: 10000000,
           }}
@@ -223,7 +223,7 @@ export default function AboutPage(props: string) {
             fontFamily: 'OverpassHeavy',
             fontSize: 20,
             textAlign: 'left',
-            color: greys(theme)[0],
+            color: theme.greys[0],
             marginBottom: 4,
           }}>
           {p?.displayName ||
@@ -239,7 +239,7 @@ export default function AboutPage(props: string) {
             fontSize: 14,
             textAlign: 'left',
             alignSelf: 'left',
-            color: greys(theme)[400],
+            color: theme.greys[400],
           }}>
           {p?.about || p?.profile?.about}
         </Text>
@@ -258,7 +258,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[400],
+                color: theme.greys[400],
               }}>
               {followers}
             </Text>
@@ -268,7 +268,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[700],
+                color: theme.greys[700],
                 marginLeft: 4,
               }}>
               Followers
@@ -285,7 +285,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[400],
+                color: theme.greys[400],
               }}>
               {followed}
             </Text>
@@ -295,7 +295,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[700],
+                color: theme.greys[700],
                 marginLeft: 4,
               }}>
               Following
@@ -320,7 +320,7 @@ export default function AboutPage(props: string) {
               style={{
                 fontFamily: 'OverpassBold',
                 fontSize: 16,
-                color: index === activeTab ? greys(theme)[0] : greys(theme)[700],
+                color: index === activeTab ? theme.greys[0] : theme.greys[700],
               }}>
               {tab}
             </Text>
@@ -333,7 +333,7 @@ export default function AboutPage(props: string) {
         style={[
           {
             height: 2,
-            backgroundColor: shades[300],
+            backgroundColor: theme.shades[300],
             marginBottom: 0,
           },
           animatedUnderscoreStyle,

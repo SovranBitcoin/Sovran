@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import lookup from 'country-code-lookup';
 
 const VpnComponent = ({ esim, theme, isReceived }) => {
@@ -13,7 +13,7 @@ const VpnComponent = ({ esim, theme, isReceived }) => {
     <View style={styles.transactionWrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        colors={isReceived ? [theme.greys[1000], theme.greys[1200]] : [theme.shades[100], theme.shades[300]]}
         style={styles.transactionContainer}>
         <View style={styles.labelContainer}>
           <Text style={styles.labelText}>You received a VPN</Text>
@@ -47,7 +47,7 @@ const createStyles = (theme, isReceived) =>
       left: isReceived ? 16 : 'auto',
       width: 8,
       height: 8,
-      backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
+      backgroundColor: isReceived ? theme.greys[1200] : theme.shades[300],
       transform: [{ rotate: '45deg' }],
     },
     labelContainer: {
@@ -61,16 +61,16 @@ const createStyles = (theme, isReceived) =>
       fontFamily: 'OverpassBold',
       fontSize: 14,
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     transactionText: {
       fontFamily: 'OverpassHeavy',
       fontSize: 16,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 8,
     },
     timestamp: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,

@@ -31,7 +31,7 @@ export const useSettings = () => {
     displayBtc,
     passcode,
     backgroundImage,
-    setTheme: (theme: string) => dispatch(setTheme(theme)),
+    setTheme: (theme: any) => dispatch(setTheme(theme)),
     setLanguage: (lang: string) => dispatch(setLanguage(lang)),
     setDisplayBitcoin: (display: number) => dispatch(setDisplayBitcoin(display)),
     setPasscode: (code: string) => dispatch(setPasscode(code)),

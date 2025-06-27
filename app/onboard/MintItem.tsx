@@ -83,7 +83,7 @@ export const MintItem = ({
               width: '100%',
               height: '100%',
               borderRadius: 100000,
-              backgroundColor: greys(theme)[2300],
+              backgroundColor: theme.greys[2300],
               opacity: calculateOpacity(positionIndex),
             }}
           />

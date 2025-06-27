@@ -3,16 +3,16 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCurrency } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 
 const TransactionComponent = ({ transaction, theme, isReceived }) => {
   const styles = createStyles(theme);
 
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [theme.greys[1000], theme.greys[1200]]
+    : [theme.shades[100], theme.shades[300]];
 
-  const arrowBackgroundColor = isReceived ? greys(theme)[1200] : shades[300];
+  const arrowBackgroundColor = isReceived ? theme.greys[1200] : theme.shades[300];
 
   const formattedAmount =
     transaction.unit &&
@@ -56,7 +56,7 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,
@@ -85,16 +85,16 @@ const createStyles = (theme: string) =>
       fontFamily: 'OverpassBold',
       fontSize: 14,
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     transactionText: {
       fontFamily: 'OverpassHeavy',
       fontSize: 16,
       marginBottom: 8,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     timestamp: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,

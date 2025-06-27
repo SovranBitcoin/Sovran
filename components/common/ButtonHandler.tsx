@@ -33,10 +33,10 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
   const theme = useSelector(memoizedGetTheme);
 
   const defaultColors: readonly [string, string, ...string[]] = [
-    opacity(greys(theme)[2300], 0),
-    opacity(greys(theme)[2300], 0.75),
-    opacity(greys(theme)[2300], 0.9),
-    greys(theme)[2300],
+    opacity(theme.greys[2300], 0),
+    opacity(theme.greys[2300], 0.75),
+    opacity(theme.greys[2300], 0.9),
+    theme.greys[2300],
   ] as const;
 
   return (

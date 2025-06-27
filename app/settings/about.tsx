@@ -17,7 +17,7 @@ export default function ModalScreen() {
         style={{
           fontSize: 16,
           fontWeight: 'bold',
-          color: greys(theme)[0],
+          color: theme.greys[0],
           marginBottom: 8,
         }}>
         {emoji} {title}
@@ -27,10 +27,10 @@ export default function ModalScreen() {
           <Text
             style={{
               fontSize: 14,
-              color: greys(theme)[400],
+              color: theme.greys[400],
               lineHeight: 20,
             }}>
-            • <Text style={{ fontWeight: '600', color: greys(theme)[0] }}>{item.title}</Text>:{' '}
+            • <Text style={{ fontWeight: '600', color: theme.greys[0] }}>{item.title}</Text>:{' '}
             {item.description}
           </Text>
         </View>
@@ -93,7 +93,7 @@ export default function ModalScreen() {
             style={{
               fontSize: 18,
               fontWeight: 'bold',
-              color: greys(theme)[0],
+              color: theme.greys[0],
               marginBottom: 8,
               textAlign: 'center',
             }}>

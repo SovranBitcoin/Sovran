@@ -27,7 +27,7 @@ const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }
     <TextInputBase
       Component={RNTextInput}
       style={style}
-      placeholderTextColor={placeholderTextColor || greys(theme)[600]}
+      placeholderTextColor={placeholderTextColor || theme.greys[600]}
       {...props}
     />
   );

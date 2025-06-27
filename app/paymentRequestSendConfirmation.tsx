@@ -70,7 +70,7 @@ function ModalScreen() {
             loading={false}
           />
           <Button
-            icon={<ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />}
+            icon={<ArrowIcon size={24} color={theme.greys[0]} rotate={0} />}
             onPress={handleSendPaymentRequest}
             text="Send"
             position="center"

@@ -108,7 +108,7 @@ const createStyles = (theme: any) =>
       justifyContent: 'center',
     },
     title: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 20,
       marginBottom: 20,
       fontFamily: 'OverpassBold',
@@ -123,14 +123,14 @@ const createStyles = (theme: any) =>
       height: 12,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: greys(theme)[0],
+      borderColor: theme.greys[0],
       marginHorizontal: 6,
     },
     dotActive: {
       width: 12,
       height: 12,
       borderRadius: 6,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
       marginHorizontal: 6,
     },
   });

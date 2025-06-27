@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useTypedRoute } from 'helper/navigation';
 import Icon from 'assets/icons';
 import { useNavigation } from 'expo-router';
@@ -20,17 +20,17 @@ import { SheetManager } from 'react-native-actions-sheet';
 
 const width = Dimensions.get('window').width;
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     productImage: {
       width: '100%',
       height: 200,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
     },
     productAmount: {
       padding: 24,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       alignItems: 'center',
       margin: 2,
@@ -38,7 +38,7 @@ const createStyles = (theme: string) =>
     productDetails: {
       marginTop: 8,
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       flexDirection: 'row',
       alignItems: 'center',
@@ -67,11 +67,11 @@ const AmountList = ({ packages, currency, styles, filterCondition, selectedAmoun
                 style={{
                   borderRadius: 8,
                   marginTop: 8,
-                  backgroundColor: isSelected ? 'transparent' : greys(theme)[1500],
+                  backgroundColor: isSelected ? 'transparent' : theme.greys[1500],
                 }}>
                 {isSelected ? (
                   <LinearGradient
-                    colors={[shades[100], shades[200], shades[300], shades[400], shades[500]]}
+                    colors={[theme.shades[100], theme.shades[200], theme.shades[300], theme.shades[400], theme.shades[500]]}
                     style={{ borderRadius: 8 }}>
                     <AmountItem value={pkg.value} currency={currency} styles={styles} />
                   </LinearGradient>
@@ -174,7 +174,7 @@ export default function ModalScreen() {
             <Text size={16} weight="bold">
               {selectedCountry ? lookup.byIso(selectedCountry)?.country : 'Select Country'}
             </Text>
-            <Icon name="fluent:chevron-down-12-filled" size={16} color={greys(theme)[0]} />
+            <Icon name="fluent:chevron-down-12-filled" size={16} color={theme.greys[0]} />
           </View>
         </TouchableOpacity>
 
@@ -212,14 +212,14 @@ export default function ModalScreen() {
                 tagsStyles={{
                   div: {
                     width: width - 48 - 16,
-                    color: greys(theme)[200],
+                    color: theme.greys[200],
                   },
                   p: {
                     margin: 0,
                     marginBottom: 8,
                   },
                   a: {
-                    color: shades[300],
+                    color: theme.shades[300],
                     textDecorationLine: 'none',
                   },
                   ul: {
@@ -237,13 +237,13 @@ export default function ModalScreen() {
                 tagsStyles={{
                   div: {
                     width: width - 48 - 16,
-                    color: greys(theme)[200],
+                    color: theme.greys[200],
                   },
                   p: {
                     margin: 0,
                   },
                   a: {
-                    color: shades[300],
+                    color: theme.shades[300],
                     textDecorationLine: 'none',
                   },
                   ul: {

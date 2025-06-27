@@ -66,7 +66,7 @@ export default function Modal({
   const [buttonHeight, setButtonHeight] = useState<number>(0);
 
   const titleOffset = showClose || showBack || typeof title !== 'string' ? 0 : 64;
-  const bgColor = transparent ? 'transparent' : (backgroundColor ?? greys(theme)[2300]);
+  const bgColor = transparent ? 'transparent' : (backgroundColor ?? theme.greys[2300]);
 
   useEffect(() => {
     const listener = scrollY.addListener(({ value }) => {
@@ -94,13 +94,13 @@ export default function Modal({
     if (showBack) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <CloseIcon2 width={24} height={24} color={greys(theme)[0]} />
+          <CloseIcon2 width={24} height={24} color={theme.greys[0]} />
         </TouchableOpacity>
       );
     } else if (showClose) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <CloseIcon width={24} height={24} color={greys(theme)[0]} />
+          <CloseIcon width={24} height={24} color={theme.greys[0]} />
         </TouchableOpacity>
       );
     }
@@ -132,7 +132,7 @@ export default function Modal({
           minHeight: headerHeight,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: opacity(greys(theme)[2300], 0.9),
+          backgroundColor: opacity(theme.greys[2300], 0.9),
         }}>
         <View className="w-full flex-row items-center justify-between bg-transparent">
           {renderHeaderButton()}
@@ -140,7 +140,7 @@ export default function Modal({
             style={{
               fontFamily: 'OverpassHeavy',
               fontSize: 18,
-              color: greys(theme)[0],
+              color: theme.greys[0],
               width: 'auto',
             }}>
             {title}

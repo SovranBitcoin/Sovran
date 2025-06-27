@@ -8,7 +8,7 @@ import { greys } from 'helper/colors';
 const AddCardRoute = ({ router }: RouteScreenProps<'credit-card-sheet', 'add-card'>) => {
   const theme = useSelector(memoizedGetTheme);
   return (
-    <View style={{ padding: 16, backgroundColor: greys(theme)[2300] }}>
+    <View style={{ padding: 16, backgroundColor: theme.greys[2300] }}>
       {router && (
         <Button
           title="Go Back"

@@ -78,7 +78,7 @@ export function NumberInput({
   };
 
   const getColorForType = (): string => {
-    if (!value) return greys(theme)[700];
+    if (!value) return theme.greys[700];
     return type === 'receive' ? greens[300] : shades[300];
   };
 

@@ -33,7 +33,7 @@ export function AmountFormatter({
 }: AmountFormatterProps) {
   const theme = useSelector(memoizedGetTheme);
   const { settings } = useSettings();
-  const currentColor = color || greys(theme)[0];
+  const currentColor = color || theme.greys[0];
   const displayBtc = settings.display_btc ?? 1;
 
   if (unit !== 'sat') {

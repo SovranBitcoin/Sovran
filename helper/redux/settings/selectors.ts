@@ -1,5 +1,6 @@
 import { createSelector } from 'reselect';
 import { RootState } from '../store/reducer';
+import { greys, shades } from 'helper/colors';
 
 export const selectSettings = (state: RootState) => state.settings.settings;
 
@@ -36,8 +37,12 @@ export const memoizedGetTheme = createSelector(
       return state.settings.settings.theme;
     },
   ],
-  (theme: string) => {
-    return theme;
+  (theme: any) => {
+    return {
+      name: theme,
+      greys: greys(theme),
+      shades,
+    };
   }
 );
 

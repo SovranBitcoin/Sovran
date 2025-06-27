@@ -3,7 +3,6 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { greys, shades } from 'helper/colors';
 import { Button } from 'components/common/Button';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { receiveEcash } from 'components/cashu';
@@ -14,7 +13,7 @@ import opacity from 'hex-color-opacity';
 
 interface Props {
   token: string;
-  theme: string;
+  theme: any;
   isReceived: boolean;
 }
 
@@ -49,8 +48,8 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   };
 
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [theme.greys[1000], theme.greys[1200]]
+    : [theme.shades[100], theme.shades[300]];
 
   return (
     <View style={[styles.wrapper, { alignSelf: isReceived ? 'flex-start' : 'flex-end' }]}>
@@ -58,7 +57,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
         style={[
           styles.arrow,
           {
-            backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
+            backgroundColor: isReceived ? theme.greys[1200] : theme.shades[300],
             left: isReceived ? 16 : 'auto',
             right: isReceived ? 'auto' : 16,
           },
@@ -75,7 +74,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
                 unit={unit}
                 size={24}
                 weight="heavy"
-                color={greys(theme)[0]}
+                color={theme.greys[0]}
               />
               {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
             </View>
@@ -91,7 +90,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     wrapper: {
       marginVertical: 8,
@@ -121,7 +120,7 @@ const createStyles = (theme: string) =>
       fontFamily: 'OverpassBold',
       fontSize: 14,
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     footer: {
       flexDirection: 'row',
@@ -131,15 +130,15 @@ const createStyles = (theme: string) =>
     memoText: {
       fontFamily: 'OverpassRegular',
       fontSize: 12,
-      color: greys(theme)[0],
-      backgroundColor: opacity(greys(theme)[0], 0.1),
+      color: theme.greys[0],
+      backgroundColor: opacity(theme.greys[0], 0.1),
       padding: 16,
       borderRadius: 8,
     },
     mintText: {
       fontFamily: 'OverpassBold',
       fontSize: 12,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
     },
   });

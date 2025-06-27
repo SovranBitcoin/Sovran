@@ -143,7 +143,7 @@ export function MintQuoteTimeline({
       return '#ef4444';
     }
 
-    return item.complete ? greens[300] : greys(theme)[400];
+    return item.complete ? greens[300] : theme.greys[400];
   };
 
   if (type === 'mint' ? !mintQuotes.length : !meltQuotes.length) {
@@ -162,7 +162,7 @@ export function MintQuoteTimeline({
   return (
     <View
       style={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         padding: 16,
         marginHorizontal: 16,
         borderRadius: 12,
@@ -171,7 +171,7 @@ export function MintQuoteTimeline({
         size={14}
         bold
         style={{
-          color: greys(theme)[400],
+          color: theme.greys[400],
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
@@ -213,8 +213,8 @@ export function MintQuoteTimeline({
                   flex: 1,
                   ...(transaction.isCancel && item.state === 'CANCELLED'
                     ? {
-                        backgroundColor: opacity(greys(theme)[1900], 0.75),
-                        borderColor: greys(theme)[1300],
+                        backgroundColor: opacity(theme.greys[1900], 0.75),
+                        borderColor: theme.greys[1300],
                         borderWidth: 0.33,
                         borderRadius: 8,
                       }
@@ -239,7 +239,7 @@ export function MintQuoteTimeline({
                     size={16}
                     bold
                     style={{
-                      color: greys(theme)[0],
+                      color: theme.greys[0],
                       marginStart: 12,
                     }}>
                     {getStateLabel(item.state)}
@@ -249,7 +249,7 @@ export function MintQuoteTimeline({
                       size={12}
                       bold
                       style={{
-                        color: greys(theme)[600],
+                        color: theme.greys[600],
                         marginStart: 12,
                       }}>
                       {convertTime(new Date(item.addedAt))}
@@ -259,7 +259,7 @@ export function MintQuoteTimeline({
                       size={12}
                       bold
                       style={{
-                        color: greys(theme)[600],
+                        color: theme.greys[600],
                         marginStart: 12,
                       }}>
                       {convertTime(new Date(transaction.date))}
@@ -269,7 +269,7 @@ export function MintQuoteTimeline({
                       size={12}
                       bold
                       style={{
-                        color: greys(theme)[600],
+                        color: theme.greys[600],
                         marginStart: 12,
                       }}>
                       Open Transaction
@@ -311,7 +311,7 @@ export function MintQuoteTimeline({
                     style={{
                       width: dotSize,
                       height: dotSize,
-                      backgroundColor: states[1].complete ? greens[300] : greys(theme)[400],
+                      backgroundColor: states[1].complete ? greens[300] : theme.greys[400],
                       borderRadius: dotSize / 3,
                       marginVertical: dotSpacing / 3,
                     }}
@@ -330,7 +330,7 @@ export function MintQuoteTimeline({
             size={14}
             bold
             style={{
-              color: greys(theme)[400],
+              color: theme.greys[400],
               marginBottom: 8,
               textTransform: 'uppercase',
               textAlign: 'right',
@@ -617,7 +617,7 @@ export function LightningReceiveConfirmation({
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text
                   style={{
-                    color: greys(theme)[0],
+                    color: theme.greys[0],
                     fontSize: 16,
                     fontFamily: 'OverpassBold',
                   }}>

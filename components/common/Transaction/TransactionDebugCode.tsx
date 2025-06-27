@@ -19,7 +19,7 @@ export function TransactionDebugCode({ transaction }: TransactionDebugCodeProps)
         padding: 16,
         marginHorizontal: 16,
         borderRadius: 8,
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
       }}>
       <Text mono>{transaction.toString()}</Text>
     </ScrollView>

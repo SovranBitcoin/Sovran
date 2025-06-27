@@ -40,7 +40,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         padding: 16,
         justifyContent: isModal ? 'center' : 'flex-end',
       }}>
@@ -88,7 +88,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     iconContainer: {
       flexDirection: 'column',
@@ -98,29 +98,29 @@ const createStyles = (theme: string) =>
     },
     icon: {
       fontSize: 30,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 10,
     },
     text: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
       fontSize: 20,
       fontFamily: 'OverpassBold',
     },
     subText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
       fontSize: 14,
       fontFamily: 'OverpassRegular',
     },
     progressBar: {
       height: '100%',
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
       borderRadius: 10000,
     },
     progressBarContainer: {
       height: 4,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       borderRadius: 10000,
       marginTop: 10,
       width: 30,

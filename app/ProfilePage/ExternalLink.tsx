@@ -62,7 +62,7 @@ const LinkImage = ({ theme, linkData }) =>
       style={{
         width: 'auto',
         height: 100,
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         borderRadius: 8,
       }}
       source={{ uri: linkData.images.find((image) => image.endsWith('.png')) }}
@@ -74,7 +74,7 @@ const LinkDetails = ({ theme, url, linkData }) => (
     <Text
       size={12}
       style={{
-        color: greys(theme)[600],
+        color: theme.greys[600],
         marginTop: 4,
       }}>
       {url}
@@ -82,14 +82,14 @@ const LinkDetails = ({ theme, url, linkData }) => (
     <Text
       weight="heavy"
       style={{
-        color: greys(theme)[0],
+        color: theme.greys[0],
       }}>
       {linkData?.title}
     </Text>
     <Text
       size={12}
       style={{
-        color: greys(theme)[400],
+        color: theme.greys[400],
       }}>
       {linkData?.description}
     </Text>
@@ -111,7 +111,7 @@ export const ExternalLink = ({ url }) => {
   return (
     <View
       style={{
-        backgroundColor: greys(theme)[1500],
+        backgroundColor: theme.greys[1500],
         borderRadius: 16,
         padding: 12,
         marginBottom: 12,

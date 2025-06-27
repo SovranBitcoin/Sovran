@@ -102,7 +102,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
           weight={isActive ? 'bold' : 'regular'}
           size={16}
           style={{
-            color: isActive ? greys(theme)[0] : greys(theme)[1500],
+            color: isActive ? theme.greys[0] : theme.greys[1500],
             marginLeft: 1,
             marginRight: 1,
             marginTop: 3,
@@ -136,7 +136,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
             weight="bold"
             size={10}
             style={{
-              color: greys(theme)[1000],
+              color: theme.greys[1000],
               marginLeft: 4,
               marginRight: 4,
               marginTop: 6,
@@ -163,10 +163,10 @@ const PLATFORM_BOTTOM_OFFSET = Platform.OS === 'web' ? 28.8 : 64 + 28.8;
 
 // Using function to create styles to respect the existing pattern
 // but with proper typing for theme
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     nonGestureView: {
-      // backgroundColor: greys(theme)[2300], // Using a default theme value
+      // backgroundColor: theme.greys[2300], // Using a default theme value
       overflow: 'hidden',
       zIndex: 1,
       height: 335,
@@ -191,7 +191,7 @@ const createStyles = (theme: string) =>
       backgroundColor: 'transparent',
     },
     accountUnitText: {
-      color: greys(theme)[200], // Using a default theme value
+      color: theme.greys[200], // Using a default theme value
     },
     maxWidthContainer: {
       width: '100%', // Fixed invalid CSS value
@@ -204,7 +204,7 @@ const createStyles = (theme: string) =>
     absoluteBottomBorder: {
       position: 'absolute',
       bottom: PLATFORM_BOTTOM_OFFSET,
-      borderBottomColor: greys(theme)[1300], // Using a default theme value
+      borderBottomColor: theme.greys[1300], // Using a default theme value
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 1,
@@ -216,7 +216,7 @@ const createStyles = (theme: string) =>
       position: 'absolute',
       right: -8,
       bottom: PLATFORM_BOTTOM_OFFSET,
-      borderBottomColor: greys(theme)[1300], // Using a default theme value
+      borderBottomColor: theme.greys[1300], // Using a default theme value
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 128,

@@ -80,9 +80,9 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                 marginRight: 12,
                 padding: 12,
                 borderRadius: 8,
-                backgroundColor: isSelected ? greys(theme)[1500] : greys(theme)[2300],
+                backgroundColor: isSelected ? theme.greys[1500] : theme.greys[2300],
                 borderWidth: 0.5,
-                borderColor: greys(theme)[1500],
+                borderColor: theme.greys[1500],
                 minWidth: 100,
               }}>
               <View style={styles.currencyContent}>
@@ -93,7 +93,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                 )}
                 <Text
                   style={{
-                    color: greys(theme)[0],
+                    color: theme.greys[0],
                     fontSize: 14,
                     fontFamily: 'OverpassBold',
                   }}>

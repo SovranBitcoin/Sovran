@@ -95,7 +95,7 @@ const Screen = () => {
   //         style={{
   //           borderRadius: 1000,
   //           padding: 8,
-  //           backgroundColor: greys(theme)[1000],
+  //           backgroundColor: theme.greys[1000],
   //         }}
   //       >
   //         <DotsIcon
@@ -115,17 +115,17 @@ const Screen = () => {
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={false}
         style={{
-          backgroundColor: greys(theme)[2100],
+          backgroundColor: theme.greys[2100],
         }}>
         <LinearGradient
           colors={[
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            opacity(greys(theme)[2100], 0),
+            theme.greys[2100],
+            theme.greys[2100],
+            theme.greys[2100],
+            theme.greys[2100],
+            theme.greys[2100],
+            theme.greys[2100],
+            opacity(theme.greys[2100], 0),
           ]}
           style={[styles.gradientContainer]}
           start={{ x: 0, y: 0 }}
@@ -179,7 +179,7 @@ const Screen = () => {
                     {getName(currentProfile)}
                   </Text>
                   <QRIcon
-                    color={greys(theme)[0]}
+                    color={theme.greys[0]}
                     style={{
                       width: 32,
                       height: 32,
@@ -192,8 +192,8 @@ const Screen = () => {
                     style={{
                       borderRadius: 1000,
                       padding: 32,
-                      backgroundColor: greys(theme)[2300],
-                      borderColor: greys(theme)[1300],
+                      backgroundColor: theme.greys[2300],
+                      borderColor: theme.greys[1300],
                       borderWidth: 0.2,
                     }}>
                     <QRIcon
@@ -219,7 +219,7 @@ const Screen = () => {
               navigation.navigate('index', {}, { current: 'drawer' });
             }}
             style={styles.menuButton}>
-            <Icon name="fluent:wallet-20-filled" color={greys(theme)[0]} />
+            <Icon name="fluent:wallet-20-filled" color={theme.greys[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Wallet
             </Text>
@@ -229,7 +229,7 @@ const Screen = () => {
               navigation.navigate('payments', {}, { current: 'drawer' });
             }}
             style={styles.menuButton}>
-            <Icon name="fluent:arrow-swap-16-filled" color={greys(theme)[0]} />
+            <Icon name="fluent:arrow-swap-16-filled" color={theme.greys[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Payments
             </Text>
@@ -239,7 +239,7 @@ const Screen = () => {
               navigation.navigate('myEsims', {}, { current: 'drawer' });
             }}
             style={styles.menuButton}>
-            <Icon name="fluent:sim-24-filled" color={greys(theme)[0]} />
+            <Icon name="fluent:sim-24-filled" color={theme.greys[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               eSIM
             </Text>
@@ -249,7 +249,7 @@ const Screen = () => {
               navigation.navigate('myVpns', {}, { current: 'drawer' });
             }}
             style={styles.menuButton}>
-            <Icon name="ic:baseline-vpn-lock" color={greys(theme)[0]} />
+            <Icon name="ic:baseline-vpn-lock" color={theme.greys[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               VPN
             </Text>
@@ -261,7 +261,7 @@ const Screen = () => {
             style={styles.menuButton}>
             <Icon
               name="clarity:internet-of-things-solid"
-              color={greys(theme)[0]}
+              color={theme.greys[0]}
               spin={{
                 duration: 2000,
                 delay: 4000,
@@ -277,7 +277,7 @@ const Screen = () => {
               navigation.navigate('settings', {}, { current: 'drawer' });
             }}
             style={styles.menuButton}>
-            <Icon name="material-symbols:settings-rounded" color={greys(theme)[0]} />
+            <Icon name="material-symbols:settings-rounded" color={theme.greys[0]} />
             <Text size={18} weight="bold" style={styles.menuText}>
               Settings
             </Text>
@@ -295,7 +295,7 @@ const createStyles = (theme: any) =>
       height: 32,
       borderRadius: 16,
       marginRight: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
       overflow: 'hidden',
     },
     modalProfilePicture: {
@@ -303,17 +303,17 @@ const createStyles = (theme: any) =>
       height: 64,
       borderRadius: 32,
       marginBottom: 16,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
     },
     name: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 8,
       marginTop: 16,
       textAlign: 'center',
     },
     about: {
       fontSize: 16,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
       marginBottom: 8,
     },
@@ -334,11 +334,11 @@ const createStyles = (theme: any) =>
     },
     contactName: {
       fontSize: 20,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     qrText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 24,
     },
     menuButton: {
@@ -351,7 +351,7 @@ const createStyles = (theme: any) =>
     },
     menuText: {
       marginLeft: 12,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     gradientContainer: {
       padding: 16,
@@ -361,8 +361,8 @@ const createStyles = (theme: any) =>
     container: {
       borderRadius: 12,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
-      backgroundColor: greys(theme)[1800],
+      borderColor: theme.greys[1500],
+      backgroundColor: theme.greys[1800],
       padding: 8,
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -377,7 +377,7 @@ const createStyles = (theme: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 12,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
       borderCurve: 'continuous',
     },
     iconLabel: {
@@ -388,16 +388,16 @@ const createStyles = (theme: any) =>
     },
     actionSheetContainer: {
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     headerText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 24,
       fontWeight: 'bold',
       marginBottom: 8,
     },
     subHeaderText: {
-      color: greys(theme)[400],
+      color: theme.greys[400],
       fontSize: 16,
       marginBottom: 24,
     },
@@ -410,7 +410,7 @@ const createStyles = (theme: any) =>
     communityBox: {
       width: '30%',
       aspectRatio: 1,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 12,
       padding: 12,
       justifyContent: 'center',
@@ -423,7 +423,7 @@ const createStyles = (theme: any) =>
       backgroundColor: opacity('#1e90ff', 0.1),
     },
     communityName: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
       textAlign: 'center',
     },
@@ -436,10 +436,10 @@ const createStyles = (theme: any) =>
       alignItems: 'center',
       padding: 12,
       // borderBottomWidth: 1,
-      // borderBottomColor: greys(theme)[1800],
+      // borderBottomColor: theme.greys[1800],
     },
     selectedProfileItem: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
     },
     actionSheetProfilePic: {
@@ -449,7 +449,7 @@ const createStyles = (theme: any) =>
       marginRight: 12,
     },
     profileName: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
       flex: 1,
     },
@@ -472,32 +472,32 @@ const createStyles = (theme: any) =>
       marginRight: 12,
     },
     createAccountText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
     editButton: {
       padding: 8,
     },
     editButtonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
     importButton: {
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       marginBottom: 12,
       alignItems: 'center',
     },
     importButtonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
     input: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       padding: 16,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
       marginBottom: 12,
     },
@@ -529,21 +529,21 @@ const createStyles = (theme: any) =>
       height: 80,
       borderRadius: 40,
       borderWidth: 4,
-      borderColor: greys(theme)[2300],
+      borderColor: theme.greys[2300],
     },
     followerCount: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
       marginBottom: 8,
       marginRight: 8,
     },
     defaultProfilePicture: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
       justifyContent: 'center',
       alignItems: 'center',
     },
     defaultProfileInitial: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 32,
       fontWeight: 'bold',
     },
@@ -553,12 +553,12 @@ const createStyles = (theme: any) =>
     displayName: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 0,
     },
     npub: {
       fontSize: 14,
-      color: greys(theme)[400],
+      color: theme.greys[400],
       marginBottom: 4,
     },
     continueButton: {
@@ -580,13 +580,13 @@ const createStyles = (theme: any) =>
       gap: 8,
     },
     tag: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       paddingVertical: 4,
       paddingHorizontal: 8,
       borderRadius: 12,
     },
     tagText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 12,
     },
   });

@@ -116,7 +116,7 @@ export function AccountPagerView({
         id: 'onchain_receive_button',
         children: 'Receive',
       },
-      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
+      icon: <ArrowIcon size={24} color={theme.greys[0]} rotate={180} />,
     },
     {
       page: 'camera',
@@ -128,7 +128,7 @@ export function AccountPagerView({
         <Icon
           name="stash:qr-code"
           size={24}
-          color={theme === 'light' ? greys(theme)[2300] : greys(theme)[0]}
+          color={theme.name === 'light' ? theme.greys[2300] : theme.greys[0]}
         />
       ),
     },
@@ -138,7 +138,7 @@ export function AccountPagerView({
         id: 'onchain_send_button',
         children: 'Send',
       },
-      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
+      icon: <ArrowIcon size={24} color={theme.greys[0]} rotate={0} />,
     },
   ];
 
@@ -164,7 +164,7 @@ export function AccountPagerView({
                 flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                // backgroundColor: greys(theme)[2300],
+                // backgroundColor: theme.greys[2300],
               }}>
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </View>
@@ -218,7 +218,7 @@ export function AccountPagerView({
                     blur={!isCamera}>
                     <View className="bg-transparent">{icon}</View>
                     {!isCamera && (
-                      <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
+                      <Text weight="bold" size={14} style={{ color: theme.greys[0] }}>
                         {text.children}
                       </Text>
                     )}
@@ -233,7 +233,7 @@ export function AccountPagerView({
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -283,17 +283,17 @@ const createStyles = (theme: string) =>
       borderRadius: 1000,
     },
     receiveIconView: {
-      // backgroundColor: greys(theme)[1800],
+      // backgroundColor: theme.greys[1800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
       // borderWidth: 0.3,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
     },
     sendIconView: {
-      // backgroundColor: greys(theme)[1800],
+      // backgroundColor: theme.greys[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
       // borderWidth: 0.3,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
     },
   });

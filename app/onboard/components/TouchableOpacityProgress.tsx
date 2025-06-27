@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { createStyles } from '../helper';
@@ -66,7 +65,7 @@ export function TouchableOpacityProgress({
                   isComplete
                     ? '#ED0C46'
                     : isActive && step.type === 'complete'
-                      ? shades[300]
+                      ? theme.shades[300]
                       : 'white'
                 }
               />

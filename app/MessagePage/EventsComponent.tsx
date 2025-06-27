@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { convertTime } from 'helper/time';
 
 const EVENT_TYPES = {
@@ -20,7 +20,7 @@ const EventComponent = ({ event, theme, isReceived = true }) => {
     <View style={styles.eventWrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        colors={isReceived ? [theme.greys[1000], theme.greys[1200]] : [theme.shades[100], theme.shades[300]]}
         style={styles.eventContainer}>
         <View style={styles.titleContainer}>
           <Text style={styles.titleText}>{eventTitle}</Text>
@@ -59,8 +59,8 @@ const createStyles = (theme, isReceived) =>
       position: 'absolute',
       bottom: -4,
       ...(isReceived
-        ? { left: 16, backgroundColor: greys(theme)[1200] }
-        : { right: 16, backgroundColor: shades[300] }),
+        ? { left: 16, backgroundColor: theme.greys[1200] }
+        : { right: 16, backgroundColor: theme.shades[300] }),
       width: 8,
       height: 8,
       transform: [{ rotate: '45deg' }],
@@ -75,13 +75,13 @@ const createStyles = (theme, isReceived) =>
       fontFamily: 'OverpassBold',
       fontSize: 14,
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     infoText: {
       fontFamily: 'OverpassBold',
       fontSize: 14,
       marginBottom: 4,
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     footer: {
       flexDirection: 'row',
@@ -89,7 +89,7 @@ const createStyles = (theme, isReceived) =>
       alignItems: 'center',
     },
     timestamp: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       opacity: 0.75,
       fontFamily: 'OverpassBold',
       fontSize: 12,

@@ -64,9 +64,9 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           onPress={handleGoBack}
           style={[
             styles.iconButton,
-            { marginLeft: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+            { marginLeft: 12, backgroundColor: opacity(theme.greys[2300], 0.25) },
           ]}>
-          <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
+          <ArrowIcon size={24} rotate={-135} color={theme.greys[0]} />
         </TouchableOpacity>
 
         {/* Profile Information */}
@@ -74,12 +74,12 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           {profileImage && (
             <Animated.View style={styles.profileImageContainer}>
               {isVerified && (
-                <View style={[styles.verifiedBadge, { backgroundColor: greys(theme)[2300] }]}>
-                  <VerifiedIcon fill={greys(theme)[100]} />
+                <View style={[styles.verifiedBadge, { backgroundColor: theme.greys[2300] }]}>
+                  <VerifiedIcon fill={theme.greys[100]} />
                 </View>
               )}
               <CachedImage
-                style={[styles.profileImage, { borderColor: greys(theme)[1300] }]}
+                style={[styles.profileImage, { borderColor: theme.greys[1300] }]}
                 source={{ uri: profileImage }}
               />
               <Animated.View style={styles.transparent}>
@@ -139,9 +139,9 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           }}
           style={[
             styles.iconButton,
-            { marginRight: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+            { marginRight: 12, backgroundColor: opacity(theme.greys[2300], 0.25) },
           ]}>
-          <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
+          <Icon name="material-symbols:info-rounded" size={24} color={theme.greys[0]} />
         </TouchableOpacity>
       </View>
     </Animated.View>

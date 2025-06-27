@@ -58,11 +58,11 @@ const Wrapper: React.FC<WrapperProps> = ({
   );
 };
 
-const createStyles = (theme: string, buttonHeight: number, containerHeight: number) =>
+const createStyles = (theme: any, buttonHeight: number, containerHeight: number) =>
   StyleSheet.create({
     actionSheetContainer: {
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     scrollContainer: {
       padding: 16,
@@ -77,7 +77,7 @@ const createStyles = (theme: string, buttonHeight: number, containerHeight: numb
       width: '100%',
     },
     sectionHeader: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 18,
       fontWeight: '600',
       marginBottom: 12,
@@ -86,14 +86,14 @@ const createStyles = (theme: string, buttonHeight: number, containerHeight: numb
       padding: 16,
       marginTop: 12,
       alignItems: 'center',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderBottomRightRadius: 1000,
       borderRadius: 1000,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
+      borderColor: theme.greys[1400],
     },
     buttonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
   });

@@ -187,20 +187,20 @@ function MainStack() {
       headerShown: true,
       headerTitle: screenName.title,
       headerTitleStyle: {
-        color: greys(theme)[0],
+        color: theme.greys[0],
       },
       headerBlurEffect: 'regular',
       headerTransparent: true,
       headerBackTitle: 'Back',
-      headerTintColor: greys(theme)[0],
+      headerTintColor: theme.greys[0],
       headerBackTitleStyle: {
         fontSize: 16,
       },
       headerStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[2300] : 'transparent',
+        backgroundColor: currentProfile.pubkey ? theme.greys[2300] : 'transparent',
       },
       headerLargeStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[2300] : 'transparent',
+        backgroundColor: currentProfile.pubkey ? theme.greys[2300] : 'transparent',
       },
       ...screenName.options,
     };
@@ -209,8 +209,8 @@ function MainStack() {
   return (
     <>
       <StatusBar
-        backgroundColor={greys(theme)[2300]}
-        barStyle={theme === 'light' ? 'dark-content' : 'light-content'}
+        backgroundColor={theme.greys[2300]}
+        barStyle={theme.name === 'light' ? 'dark-content' : 'light-content'}
       />
       <Stack
         screenOptions={{

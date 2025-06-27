@@ -18,7 +18,6 @@ Use the following pattern to access the current theme in your components:
 ```typescript
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { StyleSheet } from 'react-native';
 
 // Inside your component
@@ -29,8 +28,8 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      color: greys(theme)[0],
-      backgroundColor: greys(theme)[2300], // See helper/colors for available color options
+      color: theme.greys[0],
+      backgroundColor: theme.greys[2300], // See helper/colors for available color options
     },
   });
 ```
@@ -43,7 +42,7 @@ const createStyles = (theme: any) =>
 
 **Colors:** When you need theme-aware colors, use inline styles:
 
-- Simple: `style={{backgroundColor: greys(theme)[2300]}}`
+- Simple: `style={{backgroundColor: theme.greys[2300]}}`
 - Complex: Create a `createStyles` function as shown in the example above
 
 **Note:** Check `helper/colors` for the complete list of available theme colors.
