@@ -3,7 +3,7 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import HighlightText from '@sanar/react-native-highlight-text';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -66,12 +66,12 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
         style={{
           fontFamily: 'OverpassRegular',
           fontSize,
-          color: greys(theme)[0],
+          color: theme.greys[0],
           marginBottom: 8,
         }}
         highlightStyle={{
           fontFamily: 'OverpassHeavy',
-          color: shades[300],
+          color: theme.shades[300],
         }}
         searchWords={[...hashtags, ...mentions]}
         textToHighlight={
@@ -86,7 +86,7 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
             style={{
               fontFamily: 'OverpassBold',
               fontSize,
-              color: shades[300],
+              color: theme.shades[300],
               marginBottom: 4,
               textAlign: 'right',
             }}>

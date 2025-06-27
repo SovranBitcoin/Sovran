@@ -34,9 +34,9 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
             color={transaction.isReceive ? greens[300] : shades[300]}
           />
         </View>
-        <Text size={18} color={greys(theme)[100]} bold className="ml-8">
+        <Text size={18} color={theme.greys[100]} bold className="ml-8">
           {transaction?.amount < 0 ? '-' : ''}
-          <Text size={18} color={greys(theme)[100]} className="ml-2">
+          <Text size={18} color={theme.greys[100]} className="ml-2">
             {transaction?.amount < 0 ? '-' : ''}
             {formatCurrency(
               {

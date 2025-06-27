@@ -85,7 +85,7 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
       ]}>
       {item.icon && (
         <View style={styles.iconContainer}>
-          <Icon name={item.icon} size={32} color={greys(theme)[0]} />
+          <Icon name={item.icon} size={32} color={theme.greys[0]} />
         </View>
       )}
       <Text style={styles.gridText}>{item.label}</Text>
@@ -152,10 +152,10 @@ const TabTwoScreen = () => {
 };
 
 // Styles
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       flexDirection: 'column',
       flex: 1,
       margin: 0,
@@ -172,7 +172,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
       padding: 16,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
     },
     gridItem: {
       alignItems: 'center',
@@ -183,7 +183,7 @@ const createStyles = (theme: string) =>
     },
     gridText: {
       marginTop: 8,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       textAlign: 'center',
       fontSize: 11,
       fontFamily: 'OverpassHeavy',
@@ -193,7 +193,7 @@ const createStyles = (theme: string) =>
       height: 48,
       borderRadius: 1000,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
     },
     bitrefillIcon: {
       width: '100%',
@@ -208,8 +208,8 @@ const createStyles = (theme: string) =>
     innerContainer: {
       borderRadius: 12,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
-      backgroundColor: greys(theme)[1800],
+      borderColor: theme.greys[1500],
+      backgroundColor: theme.greys[1800],
       padding: 8,
     },
     textContainer: {
@@ -217,23 +217,23 @@ const createStyles = (theme: string) =>
     },
     titleText: {
       marginTop: 8,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       flexWrap: 'wrap',
     },
     subtitleText: {
       marginTop: 1,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       flexWrap: 'wrap',
     },
     button: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       borderRadius: 8,
       padding: 8,
       marginTop: 8,
     },
     buttonText: {
       textAlign: 'center',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       flexWrap: 'wrap',
     },
   });

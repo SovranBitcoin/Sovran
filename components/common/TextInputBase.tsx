@@ -19,16 +19,16 @@ const TextInputBase: FC<TextInputBaseProps> = ({ Component, style, ...props }) =
     <Component
       style={[
         {
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: theme.greys[1800],
           borderWidth: 1,
-          borderColor: greys(theme)[1300],
-          shadowColor: greys(theme)[2300],
+          borderColor: theme.greys[1300],
+          shadowColor: theme.greys[2300],
           shadowOffset: { width: 1, height: 4 },
           shadowOpacity: 0.25,
           shadowRadius: 6,
           borderRadius: 32,
           padding: 10,
-          color: greys(theme)[0],
+          color: theme.greys[0],
           paddingLeft: 16,
           fontFamily: 'OverpassBold',
           marginBottom: 0,

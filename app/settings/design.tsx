@@ -11,7 +11,7 @@ import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
 import { CreditCardComponent } from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { ScrollView } from 'react-native';
@@ -487,9 +487,9 @@ export default function ModalScreen() {
             <View key={rowIndex} className="mb-4 flex-row">
               {row.map((icon) => (
                 <View key={icon} className="m-4 flex-1 items-center">
-                  <Icon name={icon} size={48} color={greys(theme)[0]} />
+                  <Icon name={icon} size={48} color={theme.greys[0]} />
                   <Text
-                    style={{ color: greys(theme)[0] }}
+                    style={{ color: theme.greys[0] }}
                     className="mt-2 w-full truncate text-center text-xs">
                     {icon}
                   </Text>
@@ -514,7 +514,7 @@ export default function ModalScreen() {
           <Checkbox
             value={isChecked}
             onValueChange={toggleCheckbox}
-            color={isChecked ? shades[300] : undefined}
+            color={isChecked ? theme.shades[300] : undefined}
           />
           <Text
             id="terms-checkbox"
@@ -522,7 +522,7 @@ export default function ModalScreen() {
               flex: 1,
               fontFamily: 'OverpassRegular',
               fontSize: 14,
-              color: greys(theme)[0],
+              color: theme.greys[0],
               marginLeft: 8,
             }}>
             Toggle experimental features

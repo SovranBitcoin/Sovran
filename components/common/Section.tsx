@@ -37,7 +37,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
   // Memoize background color calculation
   const backgroundColor = useMemo(
-    () => (camera ? opacity(greys(theme)[1800], 0.75) : greys(theme)[1800]),
+    () => (camera ? opacity(theme.greys[1800], 0.75) : theme.greys[1800]),
     [camera, theme]
   );
 
@@ -73,7 +73,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
                 id={titleId}
                 bold
                 size={16}
-                color={greys(theme)[600]}
+                color={theme.greys[600]}
                 style={{
                   fontFamily: 'OverpassRegular',
                   marginRight: titleText === '' ? 0 : 8,
@@ -117,7 +117,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             mono
             size={18}
-            color={greys(theme)[100]}
+            color={theme.greys[100]}
             style={{
               textAlign: 'center',
             }}>
@@ -188,7 +188,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             bold
             size={12}
-            color={greys(theme)[100]}
+            color={theme.greys[100]}
             style={{
               textAlign: 'left',
               fontFamily: 'OverpassMono',
@@ -206,7 +206,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
-          color={greys(theme)[0]}
+          color={theme.greys[0]}
           style={{
             textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
             flex: 1,
@@ -237,7 +237,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           bold
           size={12}
-          color={greys(theme)[100]}
+          color={theme.greys[100]}
           style={{
             textAlign: 'center',
             fontFamily: 'OverpassMono',

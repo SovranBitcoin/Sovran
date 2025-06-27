@@ -463,7 +463,7 @@ export default function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     inner: {
       padding: 24,
@@ -491,14 +491,14 @@ const createStyles = (theme: string) =>
     noItemsText: {
       fontFamily: 'OverpassBold',
       fontSize: 14,
-      color: greys(theme)[700],
+      color: theme.greys[700],
       textAlign: 'center',
       marginVertical: 16,
     },
     dateHeaderText: {
       fontFamily: 'OverpassBold',
       fontSize: 14,
-      color: greys(theme)[700],
+      color: theme.greys[700],
       textAlign: 'center',
       marginVertical: 16,
     },

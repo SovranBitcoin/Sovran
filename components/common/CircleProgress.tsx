@@ -24,7 +24,7 @@ const CircularProgress = ({ progress, country }: CircularProgressProps) => {
     <View style={styles.container}>
       <Svg width={size} height={size} style={styles.svg}>
         <Circle
-          stroke={greys(theme)[1500]}
+          stroke={theme.greys[1500]}
           fill="none"
           cx={size / 2}
           cy={size / 2}

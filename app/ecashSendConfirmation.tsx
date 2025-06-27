@@ -333,7 +333,7 @@ export function EcashSendConfirmation({
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text
                   style={{
-                    color: greys(theme)[0],
+                    color: theme.greys[0],
                     fontFamily: 'OverpassBold',
                     fontSize: 16,
                   }}>

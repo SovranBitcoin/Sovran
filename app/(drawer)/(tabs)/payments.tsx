@@ -247,7 +247,7 @@ const Section = () => {
           onPageSelected={onPageSelected}
           style={{
             height: Dimensions.get('window').height,
-            backgroundColor: greys(theme)[2300],
+            backgroundColor: theme.greys[2300],
           }}
           initialPage={0}
           scrollEnabled={contacts.length > 0}>
@@ -260,7 +260,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: theme.greys[2300],
                 paddingBottom: 256,
               }}
             />
@@ -274,7 +274,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: theme.greys[2300],
                 paddingBottom: 256,
               }}
             />
@@ -288,7 +288,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: theme.greys[2300],
                 paddingBottom: 256,
               }}
             />
@@ -384,7 +384,7 @@ const ProfilePicture = ({ imageUri, isVerified, theme }) => {
     <View style={styles.profilePictureContainer}>
       {isVerified && (
         <View style={styles.verifiedIconContainer}>
-          <VerifiedIcon fill={greys(theme)[100]} />
+          <VerifiedIcon fill={theme.greys[100]} />
         </View>
       )}
       {imageUri ? (
@@ -414,10 +414,10 @@ const formatCustomDate = (date) => {
   }).format(date);
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       flexDirection: 'column',
       margin: 0,
       flex: 1,
@@ -440,8 +440,8 @@ const createStyles = (theme: string) =>
     searchPressable: {
       flex: 1,
       paddingRight: 30,
-      color: greys(theme)[100], // Add text color
-      backgroundColor: greys(theme)[1800], // Add background color
+      color: theme.greys[100], // Add text color
+      backgroundColor: theme.greys[1800], // Add background color
       borderRadius: 16, // Add border radius for styling
       padding: 16, // Add padding
     },
@@ -451,7 +451,7 @@ const createStyles = (theme: string) =>
       top: 14,
       fontSize: 16,
       fontFamily: 'OverpassRegular',
-      color: greys(theme)[1000],
+      color: theme.greys[1000],
     },
     tabContainer: {
       flexDirection: 'row',
@@ -462,31 +462,31 @@ const createStyles = (theme: string) =>
       fontFamily: 'OverpassHeavy',
       // paddingLeft: 16,
       // paddingRight: 16,
-      // backgroundColor: greys(theme)[2300],
+      // backgroundColor: theme.greys[2300],
       borderRadius: 24,
       // marginRight: 8,
       // borderWidth: 0.5,
-      // borderColor: greys(theme)[1300],
+      // borderColor: theme.greys[1300],
     },
     selectedTabButton: {
-      backgroundColor: greys(theme)[1300],
+      backgroundColor: theme.greys[1300],
       borderWidth: 0,
       borderRadius: 1000,
-      borderColor: greys(theme)[1300],
+      borderColor: theme.greys[1300],
     },
     tabText: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
       fontFamily: 'OverpassSemibold',
       fontSize: 14,
       textAlign: 'center',
     },
     selectedTabText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontFamily: 'OverpassHeavy',
     },
     contactsContainer: {
-      backgroundColor: greys(theme)[1800],
-      borderColor: greys(theme)[1300],
+      backgroundColor: theme.greys[1800],
+      borderColor: theme.greys[1300],
       borderWidth: 0.2,
       margin: 16,
       padding: 16,
@@ -513,21 +513,21 @@ const createStyles = (theme: string) =>
       flex: 1,
     },
     profileName: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontFamily: 'OverpassBold',
       fontSize: 16,
     },
     transactionInfo: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
     },
     date: {
       marginLeft: 8,
-      color: greys(theme)[400],
+      color: theme.greys[400],
       fontFamily: 'OverpassBold',
       fontSize: 16,
     },
     previewText: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
       fontFamily: 'OverpassRegular',
       fontSize: 16,
       marginTop: 2,
@@ -549,22 +549,22 @@ const createStyles = (theme: string) =>
       borderRadius: 100,
       height: 20,
       width: 20,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
     },
     profilePicture: {
       width: 48,
       height: 48,
       borderRadius: 1000,
-      borderColor: greys(theme)[1300],
+      borderColor: theme.greys[1300],
       borderWidth: 0.2,
     },
     placeholderCircle: {
       width: 48,
       height: 48,
       borderRadius: 1000,
-      borderColor: greys(theme)[2300],
+      borderColor: theme.greys[2300],
       borderWidth: 0.2,
-      backgroundColor: greys(theme)[1300],
+      backgroundColor: theme.greys[1300],
     },
   });
 

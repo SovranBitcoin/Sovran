@@ -305,7 +305,7 @@ function ModalScreen() {
             name="solar:key-bold"
             size={16}
             style={{
-              backgroundColor: greys(theme)[1200],
+              backgroundColor: theme.greys[1200],
               borderRadius: 100,
               padding: 8,
             }}

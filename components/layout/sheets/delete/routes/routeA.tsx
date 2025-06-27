@@ -22,7 +22,7 @@ const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) =>
   };
 
   return (
-    <View style={{ padding: 20, backgroundColor: greys(theme)[2300] }}>
+    <View style={{ padding: 20, backgroundColor: theme.greys[2300] }}>
       <Text style={{ fontSize: 18, marginBottom: 20 }}>
         Are you sure you want to delete your profile?
       </Text>

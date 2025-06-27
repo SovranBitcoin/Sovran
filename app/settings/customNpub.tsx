@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dimensions, View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { greys, shades, white } from 'helper/colors';
+import { greys, white } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -23,17 +23,17 @@ const createStyles = (theme: any) =>
       textAlign: 'center',
       fontSize: 32,
       fontFamily: 'OverpassHeavy',
-      color: shades[300],
+      color: theme.shades[300],
     },
     inputSelectorContainer: {
       borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       marginVertical: 8,
     },
     input: {
-      color: greys(theme)[100],
-      backgroundColor: greys(theme)[2300],
+      color: theme.greys[100],
+      backgroundColor: theme.greys[2300],
       padding: 8,
       paddingVertical: 16,
       borderRadius: 8,
@@ -41,13 +41,13 @@ const createStyles = (theme: any) =>
       fontSize: 16,
     },
     picker: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     costText: {
       textAlign: 'left',
       fontSize: 18,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     buttonContainer: {
       flexDirection: 'row',
@@ -81,10 +81,10 @@ const createStyles = (theme: any) =>
       marginTop: 10,
       padding: 10,
       borderRadius: 5,
-      backgroundColor: greys(theme)[200],
+      backgroundColor: theme.greys[200],
     },
     closeButtonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     nameAvailabilityContainer: {
@@ -96,11 +96,11 @@ const createStyles = (theme: any) =>
       justifyContent: 'space-between',
       padding: 16,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       marginBottom: 8,
     },
     nameAvailabilityText: {
-      color: greys(theme)[1000],
+      color: theme.greys[1000],
       fontSize: 14,
     },
     checkIconContainer: {
@@ -258,7 +258,7 @@ const NpubSelector = ({
     <View style={styles.inputSelectorContainer}>
       <View
         style={{
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: theme.greys[1800],
           padding: 8,
           borderRadius: 8,
           marginBottom: 8,
@@ -269,7 +269,7 @@ const NpubSelector = ({
           value={username}
           onChangeText={setUsername}
           style={styles.input}
-          placeholderTextColor={greys(theme)[100]}
+          placeholderTextColor={theme.greys[100]}
         />
         <ButtonHandler
           buttons={[
@@ -293,7 +293,7 @@ const NpubSelector = ({
               <Text style={styles.nameAvailabilityText}>{item.name}</Text>
               {selectedName === item.name && (
                 <View style={styles.checkIconContainer}>
-                  <CheckIcon color={greys(theme)[0]} style={{}} />
+                  <CheckIcon color={theme.greys[0]} style={{}} />
                 </View>
               )}
             </TouchableOpacity>

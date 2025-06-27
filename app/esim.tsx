@@ -272,7 +272,7 @@ function ModalScreen() {
 
 export default withSheetProvider(ModalScreen);
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     chartContainer: {
       marginBottom: 20,
@@ -288,7 +288,7 @@ const createStyles = (theme: string) =>
       fontSize: 16,
     },
     warningContainer: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderLeftWidth: 5,
       borderLeftColor: reds[300],
       padding: 15,

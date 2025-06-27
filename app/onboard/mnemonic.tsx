@@ -321,7 +321,7 @@ const RecoveryScreen: React.FC<{}> = () => {
                     ? `Enter word ${activeWordIndex + 1}`
                     : `Enter word ${activeWordIndex + 1} of 12`
                 }
-                placeholderTextColor={greys(theme)[700]}
+                placeholderTextColor={theme.greys[700]}
                 returnKeyType={
                   // if on last one
                   activeWordIndex === words.length - 1 ? 'done' : 'next'
@@ -413,18 +413,18 @@ const createStyles = (theme: any) =>
     },
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     title: {
       fontFamily: 'OverpassBold',
       fontSize: 20,
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 8,
     },
     subtitle: {
       fontFamily: 'OverpassRegular',
       fontSize: 16,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       marginBottom: 16,
     },
     gridContainer: {
@@ -443,7 +443,7 @@ const createStyles = (theme: any) =>
     },
     wordCell: {
       flex: 1,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       padding: 12,
       marginHorizontal: 4,
@@ -453,33 +453,33 @@ const createStyles = (theme: any) =>
       borderBottomColor: 'transparent',
     },
     activeWordCell: {
-      backgroundColor: greys(theme)[1500],
-      borderBottomColor: greys(theme)[700],
+      backgroundColor: theme.greys[1500],
+      borderBottomColor: theme.greys[700],
     },
     activeWordText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
     },
     invalidWordCell: {
-      backgroundColor: infuseColors(greys(theme)[2300], reds[300]),
+      backgroundColor: infuseColors(theme.greys[2300], reds[300]),
       borderBottomColor: reds[300],
     },
     validWordCell: {
-      backgroundColor: infuseColors(greys(theme)[2300], greens[300]),
+      backgroundColor: infuseColors(theme.greys[2300], greens[300]),
       borderBottomColor: greens[300],
     },
     wordNumber: {
-      color: greys(theme)[600],
+      color: theme.greys[600],
       fontSize: 12,
       marginBottom: 4,
       textAlign: 'left',
     },
     wordText: {
-      color: greys(theme)[600],
+      color: theme.greys[600],
       textAlign: 'center',
       fontSize: 14,
     },
     filledWordText: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
     },
     invalidWordText: {
       color: reds[300],
@@ -491,13 +491,13 @@ const createStyles = (theme: any) =>
       marginBottom: 8,
     },
     textInput: {
-      backgroundColor: greys(theme)[1800],
-      color: greys(theme)[0],
+      backgroundColor: theme.greys[1800],
+      color: theme.greys[0],
       borderRadius: 8,
       padding: 16,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
     },
   });
 

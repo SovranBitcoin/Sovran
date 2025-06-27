@@ -78,7 +78,7 @@ const DonutChart = ({
       <Canvas style={styles.container}>
         <Path
           path={path}
-          color={greys(theme)[2300]}
+          color={theme.greys[2300]}
           style="stroke"
           strokeJoin="round"
           strokeWidth={outerStrokeWidth}
@@ -111,14 +111,14 @@ const DonutChart = ({
           y={radius - fontSize.height / 1.5}
           text={titleText}
           font={smallFont}
-          color={greys(theme)[0]}
+          color={theme.greys[0]}
         />
         <Text
           x={textX}
           y={radius + fontSize.height / 2}
           text={targetText}
           font={font}
-          color={greys(theme)[0]}
+          color={theme.greys[0]}
         />
         {isSpecialCase && (
           <Text
@@ -126,7 +126,7 @@ const DonutChart = ({
             y={radius + smallFontSize.height / 0.425}
             text={targetText2}
             font={smallFont}
-            color={greys(theme)[100]}
+            color={theme.greys[100]}
           />
         )}
       </Canvas>
@@ -136,10 +136,10 @@ const DonutChart = ({
 
 export default DonutChart;
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
   });

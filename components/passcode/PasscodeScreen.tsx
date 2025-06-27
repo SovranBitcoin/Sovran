@@ -105,7 +105,7 @@ const createStyles = (theme: any) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     avatar: {
       width: 80,
@@ -119,7 +119,7 @@ const createStyles = (theme: any) =>
       shadowRadius: 3,
     },
     welcome: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 18,
       marginBottom: 16,
       fontFamily: 'OverpassBold',
@@ -128,7 +128,7 @@ const createStyles = (theme: any) =>
       textShadowRadius: 3,
     },
     title: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 20,
       marginBottom: 20,
       fontFamily: 'OverpassBold',
@@ -145,7 +145,7 @@ const createStyles = (theme: any) =>
       height: 12,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: greys(theme)[0],
+      borderColor: theme.greys[0],
       marginHorizontal: 6,
 
       shadowColor: 'black',
@@ -157,7 +157,7 @@ const createStyles = (theme: any) =>
       width: 12,
       height: 12,
       borderRadius: 6,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
       marginHorizontal: 6,
     },
   });

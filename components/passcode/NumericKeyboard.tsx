@@ -20,7 +20,7 @@ type KeyVal = string | number;
 interface KeyButtonProps {
   value: KeyVal;
   onPress: (value: KeyVal) => void;
-  theme: string;
+  theme: any;
 }
 
 const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
@@ -67,7 +67,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        // backgroundColor: greys(theme)[2300],
+        // backgroundColor: theme.greys[2300],
       }}>
       <Animated.View
         pointerEvents="none"

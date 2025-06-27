@@ -213,7 +213,7 @@ const Heatmap = ({ mintInfo, wallet }: HeatmapProps) => {
     if (successRate >= 0.3) return '#FF0000';
     if (successRate >= 0.1) return '#ED0C46';
     if (successRate >= 0) return '#ED0C46';
-    return greys(theme)[1500];
+    return theme.greys[1500];
   };
 
   if (!mintInfo || !wallet?.audits) {
@@ -345,18 +345,18 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
           {/* Subtle gradient overlay for depth */}
 
           <View style={styles.cardContent}>
-            <Text style={[styles.label, { color: greys(theme)[400] }]}>{stat.label}</Text>
+            <Text style={[styles.label, { color: theme.greys[400] }]}>{stat.label}</Text>
 
             <Text
               style={[
                 styles.value3,
                 stat.accent ? styles.accentValue : {},
-                { color: greys(theme)[0] },
+                { color: theme.greys[0] },
               ]}>
               {stat.value}
             </Text>
 
-            <Text style={[styles.description, { color: greys(theme)[600] }]}>
+            <Text style={[styles.description, { color: theme.greys[600] }]}>
               {stat.description}
             </Text>
           </View>
@@ -366,7 +366,7 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container3: {
       flexDirection: 'row',
@@ -384,13 +384,13 @@ const createStyles = (theme: string) =>
       padding: 16,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
       position: 'relative',
       overflow: 'hidden',
       minHeight: 90,
       justifyContent: 'space-between',
-      backgroundColor: greys(theme)[1800],
-      shadowColor: greys(theme)[1900],
+      backgroundColor: theme.greys[1800],
+      shadowColor: theme.greys[1900],
       flex: 1,
 
       // Subtle shadow for depth
@@ -409,7 +409,7 @@ const createStyles = (theme: string) =>
       left: 0,
       right: 0,
       height: 1,
-      backgroundColor: opacity(greys(theme)[1900], 0.1),
+      backgroundColor: opacity(theme.greys[1900], 0.1),
     },
 
     label: {
@@ -465,12 +465,12 @@ const createStyles = (theme: string) =>
       marginBottom: 8,
     },
     title: {
-      color: greys(theme)[600],
+      color: theme.greys[600],
       fontFamily: 'OverpassRegular',
       fontSize: 16,
     },
     value: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontFamily: 'OverpassBold',
       fontSize: 16,
     },
@@ -505,7 +505,7 @@ const createStyles = (theme: string) =>
     loadingText: {
       marginTop: 16,
       fontSize: 16,
-      color: greys(theme)[200],
+      color: theme.greys[200],
     },
     errorContainer: {
       flex: 1,
@@ -523,7 +523,7 @@ const createStyles = (theme: string) =>
     },
     errorSubtext: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       textAlign: 'center',
     },
     headerContainer: {
@@ -546,7 +546,7 @@ const createStyles = (theme: string) =>
       width: 84,
       height: 84,
       borderRadius: 100,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
     },
     logoText: {
       fontSize: 40,
@@ -556,27 +556,27 @@ const createStyles = (theme: string) =>
     mintTitle: {
       fontSize: 28,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
       marginBottom: 4,
     },
     mintVersion: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       textAlign: 'center',
     },
     descriptionContainer: {
       marginHorizontal: 16,
       marginBottom: 16,
       padding: 16,
-      backgroundColor: greys(theme)[700],
+      backgroundColor: theme.greys[700],
       borderRadius: 12,
       borderLeftWidth: 4,
       borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
-      color: greys(theme)[100],
+      color: theme.greys[100],
       lineHeight: 20,
     },
     actionButton: {
@@ -592,7 +592,7 @@ const createStyles = (theme: string) =>
     actionText: {
       fontSize: 16,
       fontWeight: '600',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     destructiveText: {

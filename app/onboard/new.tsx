@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation } from 'helper/navigation';
@@ -152,7 +152,7 @@ const NameInput = ({ name, setName, isSubmitting, styles, theme }) => (
       onChangeText={(newText) => setName(newText)}
       style={[styles.textInput, isSubmitting && styles.disabledControl]}
       editable={!isSubmitting}
-      placeholderTextColor={greys(theme)[600]}
+      placeholderTextColor={theme.greys[600]}
       value={name}
     />
     <Text weight="regular" size={12} style={styles.privacyNote}>
@@ -171,7 +171,7 @@ const ButtonBar = ({ handleCreateProfile, handleExistingAccount, isSubmitting, s
       disabled={isSubmitting}>
       {isSubmitting ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={greys(theme)[0]} />
+          <ActivityIndicator color={theme.greys[0]} />
           <Text weight="bold" size={16} style={[styles.createButtonText, { marginLeft: 8 }]}>
             Creating...
           </Text>
@@ -327,7 +327,7 @@ const RecoveryScreen = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,
@@ -335,16 +335,16 @@ const createStyles = (theme: string) =>
     container: {
       flex: 1,
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     headerTitle: {
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       marginBottom: 8,
       marginTop: 16,
     },
     headerSubtitle: {
-      color: greys(theme)[400],
+      color: theme.greys[400],
       marginBottom: 24,
     },
     profileImageContainer: {
@@ -355,7 +355,7 @@ const createStyles = (theme: string) =>
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
@@ -384,7 +384,7 @@ const createStyles = (theme: string) =>
       borderColor: 'transparent',
     },
     selectedProfileOption: {
-      borderColor: shades[300],
+      borderColor: theme.shades[300],
     },
     profileOptionImage: {
       width: 56,
@@ -395,31 +395,31 @@ const createStyles = (theme: string) =>
       marginTop: 16,
     },
     inputLabel: {
-      color: greys(theme)[200],
+      color: theme.greys[200],
       marginBottom: 8,
     },
     textInput: {
-      backgroundColor: greys(theme)[1800],
-      color: greys(theme)[0],
+      backgroundColor: theme.greys[1800],
+      color: theme.greys[0],
       borderRadius: 8,
       padding: 16,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: theme.greys[1500],
       marginBottom: 16,
     },
     privacyNote: {
-      color: greys(theme)[400],
+      color: theme.greys[400],
       marginBottom: 16,
       lineHeight: 18,
     },
     bottomButtons: {
       paddingHorizontal: 16,
       paddingBottom: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     createButton: {
-      backgroundColor: shades[300],
+      backgroundColor: theme.shades[300],
       padding: 16,
       borderRadius: 16,
       justifyContent: 'center',
@@ -427,25 +427,25 @@ const createStyles = (theme: string) =>
       marginBottom: 12,
     },
     createButtonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     existingButton: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       padding: 16,
       borderRadius: 16,
       justifyContent: 'center',
       alignItems: 'center',
     },
     existingButtonText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     disabledControl: {
       opacity: 0.6,
     },
     disabledButtonText: {
-      color: greys(theme)[400],
+      color: theme.greys[400],
     },
     loadingContainer: {
       flexDirection: 'row',

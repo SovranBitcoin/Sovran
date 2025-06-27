@@ -82,7 +82,7 @@ export default function BackgroundImageSettings() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     gridContainer: {
       flexDirection: 'row',
@@ -102,7 +102,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
     },
     selectedText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontFamily: 'OverpassBold',
     },
   });

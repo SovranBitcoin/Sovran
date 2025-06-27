@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
@@ -43,8 +43,8 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
             bottom: 33,
           }}>
           <BlurView
-            tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-            intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
+            tint={['light', 'beige'].includes(theme.name) ? 'light' : 'dark'}
+            intensity={['light', 'beige'].includes(theme.name) ? 7.5 : 75}
             experimentalBlurMethod="dimezisBlurView"
             style={[
               {
@@ -55,14 +55,14 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
                 left: 18,
                 width: 64,
                 height: 64,
-                backgroundColor: opacity(greys(theme)[2100], 0.5),
+                backgroundColor: opacity(theme.greys[2100], 0.5),
                 zIndex: -2,
               },
             ]}></BlurView>
         </View>
 
         <LinearGradient
-          colors={[greys(theme)[focused ? 0 : 1300], greys(theme)[focused ? 100 : 1500]]}
+          colors={[theme.greys[focused ? 0 : 1300], theme.greys[focused ? 100 : 1500]]}
           style={{
             padding: 16,
             borderRadius: 1000,
@@ -73,13 +73,13 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
     );
   }
 
-  return <IconComponent color={focused ? shades[300] : greys(theme)[1000]} />;
+  return <IconComponent color={focused ? theme.shades[300] : theme.greys[1000]} />;
 };
 
 const TabBarBackground = ({ theme }) => (
   <BlurView
-    tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-    intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
+    tint={['light', 'beige'].includes(theme.name) ? 'light' : 'dark'}
+    intensity={['light', 'beige'].includes(theme.name) ? 7.5 : 75}
     style={[
       StyleSheet.absoluteFill,
       {
@@ -93,7 +93,7 @@ const TabBarBackground = ({ theme }) => (
 );
 
 // Styles creator function
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     tabBarStyle: {
       position: 'absolute',
@@ -105,7 +105,7 @@ const createStyles = (theme: string) =>
       elevation: 0,
     },
     headerStyle: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       height: 0,
     },
     headerLeftContainer: {
@@ -115,7 +115,7 @@ const createStyles = (theme: string) =>
       marginRight: 8,
       padding: 8,
       borderRadius: 1000,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
     },
     searchContainer: {
       justifyContent: 'center',
@@ -151,7 +151,7 @@ const TabLayout = () => {
   const HeaderRight = () => (
     <Pressable style={{ opacity: 0 }} onPress={() => showMessage('not_implemented')}>
       <View style={styles.headerRightContainer}>
-        <Icon name="solar:card-bold" color={greys(theme)[0]} />
+        <Icon name="solar:card-bold" color={theme.greys[0]} />
         {/* <ProfileAvatar picture={currentProfile?.picture} /> */}
       </View>
     </Pressable>
@@ -160,8 +160,8 @@ const TabLayout = () => {
   // Function to create tab screen options
   const createTabScreenOptions = (title, IconComponent) => ({
     title,
-    tabBarActiveTintColor: shades[500],
-    tabBarInactiveTintColor: greys(theme)[600],
+    tabBarActiveTintColor: theme.shades[500],
+    tabBarInactiveTintColor: theme.greys[600],
     headerTitleAlign: 'center',
     headerTintColor: '#fff',
     tabBarLabel: '',

@@ -93,15 +93,15 @@ const TabTwoScreen = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       flex: 1,
       padding: 16,
     },
     loadingText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
       textAlign: 'center',
       marginTop: 20,
@@ -115,7 +115,7 @@ const createStyles = (theme: string) =>
     },
     pageContainer: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
       height: '100%',
       overflow: 'hidden',
     },

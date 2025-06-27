@@ -6,7 +6,6 @@ import * as Device from 'expo-device';
 import lookup from 'country-code-lookup';
 import opacity from 'hex-color-opacity';
 
-import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -150,8 +149,8 @@ function ModalScreen() {
       margin: 16,
     },
     warningContainer: {
-      backgroundColor: opacity(shades[200], 0.33),
-      borderColor: shades[200],
+      backgroundColor: opacity(theme.shades[200], 0.33),
+      borderColor: theme.shades[200],
       margin: 16,
       marginBottom: 8,
       padding: 8,
@@ -159,7 +158,7 @@ function ModalScreen() {
       borderWidth: 0.2,
     },
     warningText: {
-      color: shades[400],
+      color: theme.shades[400],
       marginTop: 8,
       fontSize: 14,
     },

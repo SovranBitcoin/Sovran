@@ -141,7 +141,7 @@ export function PaymentInfo({
     if (!selectedValue) {
       return (
         <View className="flex-row items-center justify-center bg-transparent">
-          <GradientSkeleton startColor={greys(theme)[1800]} endColor={greys(theme)[2300]} />
+          <GradientSkeleton startColor={theme.greys[1800]} endColor={theme.greys[2300]} />
         </View>
       );
     }
@@ -221,7 +221,7 @@ const TabButton = React.memo(
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: isActive ? greys(theme)[0] : greys(theme)[700],
+            color: isActive ? theme.greys[0] : theme.greys[700],
           }}>
           {label}
         </Text>

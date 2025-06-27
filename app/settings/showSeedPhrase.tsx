@@ -39,7 +39,7 @@ const ShowSeedPhrase: React.FC = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     section: {
       paddingVertical: 14,
@@ -50,20 +50,20 @@ const createStyles = (theme: string) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: greys(theme)[600],
+      color: theme.greys[600],
       textTransform: 'uppercase',
     },
     textArea: {
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
-      color: greys(theme)[0],
+      backgroundColor: theme.greys[1800],
+      color: theme.greys[0],
       fontSize: 16,
       fontFamily: 'OverpassMono',
     },
     blurredText: {
       color: 'transparent',
-      textShadowColor: greys(theme)[0],
+      textShadowColor: theme.greys[0],
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 8,
     },

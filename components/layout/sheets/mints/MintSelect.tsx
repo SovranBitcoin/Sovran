@@ -9,7 +9,7 @@ import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import Image from 'components/common/Image';
 import Wrapper from '../wrapper';
@@ -68,7 +68,7 @@ interface MintItemProps {
   isLoading: boolean;
   globalLoading: boolean;
   selectedCurrency: string;
-  theme: string;
+  theme: any;
   onPress: () => void;
 }
 
@@ -160,7 +160,7 @@ const MintItem: React.FC<MintItemProps> = ({
           sovran(theme).listItem,
           globalLoading && styles.disabledMintItem,
           {
-            backgroundColor: greys(theme)[2100],
+            backgroundColor: theme.greys[2100],
             marginVertical: 0,
           },
           isSelected && styles.selectedMintItem,
@@ -183,10 +183,10 @@ const MintItem: React.FC<MintItemProps> = ({
               right: -2,
             }}>
             {isLoading ? (
-              <ActivityIndicator animating size="small" color={greys(theme)[0]} />
+              <ActivityIndicator animating size="small" color={theme.greys[0]} />
             ) : isSelected ? (
               <View style={styles.checkIconContainer}>
-                <CheckIcon size={16} color={greys(theme)[0]} />
+                <CheckIcon size={16} color={theme.greys[0]} />
               </View>
             ) : null}
           </View>
@@ -205,8 +205,8 @@ const MintItem: React.FC<MintItemProps> = ({
             style={{
               padding: 8,
               backgroundColor: isSelected
-                ? opacity(greys(theme)[2000], 0.5)
-                : opacity(greys(theme)[1800], 0.75),
+                ? opacity(theme.greys[2000], 0.5)
+                : opacity(theme.greys[1800], 0.75),
               borderRadius: 10000,
             }}
             name="bx:dots-vertical-rounded"
@@ -347,7 +347,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
                   borderRadius: 8,
                   padding: 1,
                   backgroundColor:
-                    selectedCurrency === currency ? greys(theme)[1900] : greys(theme)[2100],
+                    selectedCurrency === currency ? theme.greys[1900] : theme.greys[2100],
                 },
               ]}>
               <TouchableOpacity
@@ -414,10 +414,10 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     sectionHeader: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 18,
       fontWeight: '600',
       marginBottom: 4,
@@ -437,10 +437,10 @@ const createStyles = (theme: string) =>
       gap: 8,
     },
     selectedCurrencyButton: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
     },
     currencyText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
       fontFamily: 'OverpassBold',
     },
@@ -450,17 +450,17 @@ const createStyles = (theme: string) =>
       alignItems: 'center',
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       marginBottom: 8,
     },
     selectedMintItem: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
     },
     mintIcon: {
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: greys(theme)[400],
+      backgroundColor: theme.greys[400],
     },
     mintDetails: {
       flex: 1,
@@ -468,15 +468,15 @@ const createStyles = (theme: string) =>
       marginRight: 12,
     },
     mintName: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
     mintBalance: {
-      color: greys(theme)[400],
+      color: theme.greys[400],
       fontSize: 14,
     },
     checkIconContainer: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 1000,
       marginLeft: 8,
     },

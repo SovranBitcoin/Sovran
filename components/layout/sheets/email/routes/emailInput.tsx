@@ -37,7 +37,7 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
       style={{
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         padding: 16,
       }}>
       <Text style={styles.title}>Input Email</Text>
@@ -50,14 +50,14 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
         multiline
         numberOfLines={4}
         placeholder="satoshi@gmx.com"
-        placeholderTextColor={greys(theme)[1000]}
+        placeholderTextColor={theme.greys[1000]}
         value={message}
         onChangeText={setMessage}
         textAlignVertical="top"
       />
 
       <ButtonHandler
-        colors={[greys(theme)[1800], greys(theme)[1800]]}
+        colors={[theme.greys[1800], theme.greys[1800]]}
         context="sheet"
         buttons={[
           {
@@ -76,7 +76,7 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       padding: 16,
@@ -89,7 +89,7 @@ const createStyles = (theme: string) =>
     },
     subtitle: {
       fontSize: 16,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       marginBottom: 24,
     },
     inputContainer: {
@@ -99,9 +99,9 @@ const createStyles = (theme: string) =>
     },
     textInput: {
       borderWidth: 0.5,
-      borderColor: greys(theme)[2300],
-      backgroundColor: greys(theme)[2000],
-      color: greys(theme)[200],
+      borderColor: theme.greys[2300],
+      backgroundColor: theme.greys[2000],
+      color: theme.greys[200],
       borderRadius: 8,
       padding: 12,
       fontSize: 16,

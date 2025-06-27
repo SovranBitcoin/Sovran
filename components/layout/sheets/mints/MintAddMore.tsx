@@ -373,14 +373,14 @@ function AddMintItem({
             <View
               key={unit}
               style={{
-                backgroundColor: greys(theme)[1500],
+                backgroundColor: theme.greys[1500],
                 paddingHorizontal: 8,
                 paddingVertical: 4,
                 borderRadius: 4,
                 marginRight: 4,
                 marginBottom: 4,
               }}>
-              <Text weight="bold" style={{ fontSize: 12, color: greys(theme)[0] }}>
+              <Text weight="bold" style={{ fontSize: 12, color: theme.greys[0] }}>
                 {unit}
               </Text>
             </View>
@@ -670,7 +670,7 @@ export function MintAddMore({ onClose, payload }) {
         <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 0 }]}>
           Recommended mints
         </Text>
-        <Text style={[{ marginBottom: 12, color: greys(theme)[700] }]}>
+        <Text style={[{ marginBottom: 12, color: theme.greys[700] }]}>
           Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
           {allowedCurrencies.size === 1 ? ' supporting only SAT' : ''}
         </Text>
@@ -712,13 +712,13 @@ export function MintAddMore({ onClose, payload }) {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     noResults: {
-      color: greys(theme)[700],
+      color: theme.greys[700],
     },
     sectionHeader: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 18,
       fontWeight: '600',
       marginBottom: 12,
@@ -730,7 +730,7 @@ const createStyles = (theme: string) =>
       marginRight: 12,
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       minWidth: 100,
     },
     currencyContent: {
@@ -740,10 +740,10 @@ const createStyles = (theme: string) =>
       gap: 8,
     },
     selectedCurrencyButton: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
     },
     currencyText: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 14,
       fontFamily: 'OverpassBold',
     },
@@ -752,14 +752,14 @@ const createStyles = (theme: string) =>
       alignItems: 'center',
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       marginBottom: 8,
     },
     mintIcon: {
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: greys(theme)[400],
+      backgroundColor: theme.greys[400],
     },
     mintDetails: {
       flex: 1,
@@ -767,7 +767,7 @@ const createStyles = (theme: string) =>
       marginRight: 12,
     },
     mintName: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 16,
     },
     loadingContainer: {
@@ -778,6 +778,6 @@ const createStyles = (theme: string) =>
     },
     loadingText: {
       marginLeft: 8,
-      color: greys(theme)[400],
+      color: theme.greys[400],
     },
   });

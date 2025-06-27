@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 
 const BottomButtons = ({
   buttons,
@@ -69,22 +69,22 @@ const getSpacingStyle = (vertical, index, isLastButton) => {
 // Helper function to get button style based on variant
 const getButtonStyle = (variant, theme) => {
   const variantStyles = {
-    primary: { backgroundColor: shades[300] },
-    secondary: { backgroundColor: greys(theme)[1200] },
-    tertiary: { backgroundColor: greys(theme)[1800] },
-    info: { backgroundColor: shades[300] },
-    default: { backgroundColor: greys(theme)[1800] },
+    primary: { backgroundColor: theme.shades[300] },
+    secondary: { backgroundColor: theme.greys[1200] },
+    tertiary: { backgroundColor: theme.greys[1800] },
+    info: { backgroundColor: theme.shades[300] },
+    default: { backgroundColor: theme.greys[1800] },
   };
 
   return variantStyles[variant] || variantStyles.default;
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     bottomButtons: {
       width: '100%',
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     horizontalButtons: {
       flexDirection: 'row',

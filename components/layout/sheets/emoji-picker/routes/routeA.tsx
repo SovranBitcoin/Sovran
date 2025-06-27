@@ -70,17 +70,17 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       marginHorizontal: 16,
       marginBottom: 0,
       borderRadius: 16,
       overflow: 'hidden',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     title: {
-      color: greys(theme)[0],
+      color: theme.greys[0],
       fontSize: 18,
       fontWeight: '600',
     },
@@ -97,7 +97,7 @@ const createStyles = (theme: string) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       padding: 12,
     },

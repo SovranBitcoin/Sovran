@@ -14,7 +14,7 @@ function EmailSheet(props: any) {
       routes={routes}
       initialRoute="email"
       containerStyle={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

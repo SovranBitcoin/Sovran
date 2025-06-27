@@ -4,7 +4,7 @@ import { Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'r
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Button } from 'components/common/Button';
 import { useSelector } from 'react-redux';
@@ -93,7 +93,7 @@ function ModalScreen() {
             <TextInput
               placeholder={''}
               editable={false}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={theme.greys[1000]}
               value={currentProfile?.npub}
             />
             <Text
@@ -107,7 +107,7 @@ function ModalScreen() {
             <TextInput
               placeholder={''}
               editable={false}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={theme.greys[1000]}
               value={currentProfile?.pubkey}
             />
             <Text
@@ -120,14 +120,14 @@ function ModalScreen() {
             </Text>
             <TextInput
               placeholder={''}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={theme.greys[1000]}
               editable={currentProfile?.nsec ? false : true}
               onChangeText={(text) => setNsec(text)}
               value={currentProfile?.nsec}
             />
             <View
               style={{
-                backgroundColor: shades[200],
+                backgroundColor: theme.shades[200],
                 padding: 16,
                 borderRadius: 16,
               }}>
@@ -162,7 +162,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     minus: {
       fontFamily: 'OverpassBold',
@@ -177,12 +177,12 @@ const createStyles = (theme: string) =>
       marginRight: 4,
     },
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
     title: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: greys(theme)[1000],
+      color: theme.greys[1000],
     },
     separator: {
       marginVertical: 30,
@@ -199,7 +199,7 @@ const createStyles = (theme: string) =>
     innerBorder: {
       position: 'absolute',
       borderWidth: 2,
-      borderColor: greys(theme)[0],
+      borderColor: theme.greys[0],
       borderRadius: 32,
       zIndex: 100,
       backgroundColor: 'transparent',
@@ -215,7 +215,7 @@ const createStyles = (theme: string) =>
       height: 64,
       borderRadius: 32,
       marginBottom: 16,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: theme.greys[0],
     },
   });
 

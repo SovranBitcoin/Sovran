@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
-import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -108,15 +107,15 @@ function ModalScreen() {
           {iosWarning ? (
             <View
               style={{
-                backgroundColor: opacity(shades[200], 0.33),
-                borderColor: shades[200],
+                backgroundColor: opacity(theme.shades[200], 0.33),
+                borderColor: theme.shades[200],
                 margin: 16,
                 marginBottom: 8,
                 padding: 8,
                 borderRadius: 8,
                 borderWidth: 0.2,
               }}>
-              <Text size={14} style={{ color: shades[400], marginTop: 8 }}>
+              <Text size={14} style={{ color: theme.shades[400], marginTop: 8 }}>
                 {iosWarning}
               </Text>
             </View>

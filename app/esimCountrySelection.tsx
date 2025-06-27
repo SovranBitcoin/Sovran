@@ -91,7 +91,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       backgroundColor: 'transparent',
@@ -105,9 +105,9 @@ const createStyles = (theme: string) =>
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 16,
-      borderColor: greys(theme)[1300],
+      borderColor: theme.greys[1300],
       borderWidth: 0.2,
     },
     countryName: {

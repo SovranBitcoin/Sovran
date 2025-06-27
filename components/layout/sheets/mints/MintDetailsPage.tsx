@@ -60,7 +60,7 @@ const MintDetailPage = () => {
     return (
       <Wrapper>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={greys(theme)[0]} />
+          <ActivityIndicator size="large" color={theme.greys[0]} />
           <Text style={styles.loadingText}>Loading mint details...</Text>
         </View>
       </Wrapper>
@@ -108,16 +108,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: theme.greys[1800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: theme.greys[1500],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="material-symbols:update-rounded" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="material-symbols:update-rounded" size={24} color={theme.greys[700]} />
+            <Text style={{ color: theme.greys[700], marginLeft: 8 }} bold size={16}>
               Realtime Updates
             </Text>
           </View>
@@ -127,16 +127,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: theme.greys[1800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: theme.greys[1500],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="ic:round-cloud-sync" size={24} color={theme.greys[700]} />
+            <Text style={{ color: theme.greys[700], marginLeft: 8 }} bold size={16}>
               Restore Money
             </Text>
           </View>
@@ -145,16 +145,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: theme.greys[1800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: theme.greys[1500],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="uil:invoice" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="uil:invoice" size={24} color={theme.greys[700]} />
+            <Text style={{ color: theme.greys[700], marginLeft: 8 }} bold size={16}>
               Payment Requests
             </Text>
           </View>
@@ -164,16 +164,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: theme.greys[1800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: theme.greys[1500],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="ic:round-cloud-sync" size={24} color={theme.greys[700]} />
+            <Text style={{ color: theme.greys[700], marginLeft: 8 }} bold size={16}>
               Restore Money
             </Text>
           </View>
@@ -182,16 +182,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: theme.greys[1800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: theme.greys[1500],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="solar:key-bold" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="solar:key-bold" size={24} color={theme.greys[700]} />
+            <Text style={{ color: theme.greys[700], marginLeft: 8 }} bold size={16}>
               P2PK
             </Text>
           </View>
@@ -221,34 +221,34 @@ const MintDetailPage = () => {
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <CurrencyIcon colors={[greys(theme)[700]]} width={20} currency={'nostr'} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <CurrencyIcon colors={[theme.greys[700]]} width={20} currency={'nostr'} />
+                      <Text style={{ marginLeft: 8, color: theme.greys[100] }} bold>
                         {truncateMiddle(contact.info, 10)}
                       </Text>
                     </View>
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[700]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Icon name="hugeicons:new-twitter" size={20} color={theme.greys[700]} />
+                      <Text style={{ marginLeft: 8, color: theme.greys[100] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="mdi:at" size={20} color={greys(theme)[700]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Icon name="mdi:at" size={20} color={theme.greys[700]} />
+                      <Text style={{ marginLeft: 8, color: theme.greys[100] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   ) : (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Text style={{ marginLeft: 8, color: theme.greys[100] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   )
                 }
-                // label={<Icon name="prime:twitter" size={24} color={greys(theme)[700]} />}
+                // label={<Icon name="prime:twitter" size={24} color={theme.greys[700]} />}
                 // label={contact.method.toUpperCase()}
                 // sublabel={contact.method.toUpperCase()}
                 onPress={() => handleContactPress(contact.method, contact.info)}
@@ -285,7 +285,7 @@ const MintDetailPage = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     scrollContainer: {
       flex: 1,
@@ -299,7 +299,7 @@ const createStyles = (theme: string) =>
     loadingText: {
       marginTop: 16,
       fontSize: 16,
-      color: greys(theme)[2],
+      color: theme.greys[2],
     },
     errorContainer: {
       flex: 1,
@@ -317,7 +317,7 @@ const createStyles = (theme: string) =>
     },
     errorSubtext: {
       fontSize: 14,
-      color: greys(theme)[2],
+      color: theme.greys[2],
       textAlign: 'center',
     },
     headerContainer: {
@@ -349,27 +349,27 @@ const createStyles = (theme: string) =>
     mintTitle: {
       fontSize: 28,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
       marginBottom: 4,
     },
     mintVersion: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: theme.greys[200],
       textAlign: 'center',
     },
     descriptionContainer: {
       marginHorizontal: 16,
       marginBottom: 16,
       padding: 16,
-      backgroundColor: greys(theme)[8],
+      backgroundColor: theme.greys[8],
       borderRadius: 12,
       borderLeftWidth: 4,
       borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
-      color: greys(theme)[1],
+      color: theme.greys[1],
       lineHeight: 20,
     },
     actionButton: {
@@ -385,7 +385,7 @@ const createStyles = (theme: string) =>
     actionText: {
       fontSize: 16,
       fontWeight: '600',
-      color: greys(theme)[0],
+      color: theme.greys[0],
       textAlign: 'center',
     },
     destructiveText: {

@@ -46,11 +46,11 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
       }}>
       <View
         style={{
-          backgroundColor: greys(theme)[1500],
+          backgroundColor: theme.greys[1500],
           padding: 16,
           borderRadius: 16,
         }}>
@@ -74,12 +74,12 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
               disabled={isDisabled}>
               <View
                 style={{
-                  backgroundColor: opacity(greys(theme)[700], 0.25),
+                  backgroundColor: opacity(theme.greys[700], 0.25),
                   borderRadius: 1000,
                   padding: 4,
                 }}>
                 <Icon
-                  color={isDangerous ? reds[300] : greys(theme)[0]}
+                  color={isDangerous ? reds[300] : theme.greys[0]}
                   name={button.icon}
                   size={32}
                 />
@@ -87,7 +87,7 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
               <Text
                 style={{
                   marginLeft: 16,
-                  color: isDangerous ? reds[300] : greys(theme)[0],
+                  color: isDangerous ? reds[300] : theme.greys[0],
                 }}
                 size={18}
                 weight="bold">

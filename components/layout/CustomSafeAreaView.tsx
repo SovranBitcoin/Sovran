@@ -20,7 +20,7 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme.greys[2300],
     },
   });
 

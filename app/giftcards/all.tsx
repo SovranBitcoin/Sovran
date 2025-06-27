@@ -10,7 +10,7 @@ import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     productGrid: {
       flexDirection: 'row',
@@ -20,7 +20,7 @@ const createStyles = (theme: string) =>
     },
     productCard: {
       width: '48%',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       alignItems: 'flex-start',
       marginBottom: 8,
@@ -30,7 +30,7 @@ const createStyles = (theme: string) =>
     productImage: {
       width: '100%',
       height: 100,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: theme.greys[1500],
       borderRadius: 8,
     },
     productInfo: {
@@ -40,7 +40,7 @@ const createStyles = (theme: string) =>
     },
     searchButton: {
       width: '100%',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme.greys[1800],
       borderRadius: 8,
       alignItems: 'center',
       marginBottom: 8,

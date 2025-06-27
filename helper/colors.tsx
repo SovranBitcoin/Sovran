@@ -6,6 +6,103 @@ export const shades = {
   500: '#BF004E',
 };
 
+const SHADE_DIFFS = {
+  100: { h: 22.73, s: 0.096, l: 0.139 },
+  200: { h: 13.39, s: 0.096, l: 0.116 },
+  400: { h: -6.96, s: 0.087, l: -0.08 },
+  500: { h: -9.04, s: 0.096, l: -0.114 },
+};
+
+const clamp = (value: number, min = 0, max = 1) =>
+  Math.min(max, Math.max(min, value));
+
+const hexToRgb = (hex: string) => {
+  const normalized = hex.replace('#', '');
+  const num = parseInt(normalized, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+};
+
+const rgbToHex = ({ r, g, b }: { r: number; g: number; b: number }) =>
+  `#${[r, g, b]
+    .map((x) => Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`;
+
+const rgbToHsl = ({ r, g, b }: { r: number; g: number; b: number }) => {
+  (r /= 255), (g /= 255), (b /= 255);
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
+  let h = 0,
+    s = 0,
+    l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s, l };
+};
+
+const hslToRgb = ({ h, s, l }: { h: number; s: number; l: number }) => {
+  h /= 360;
+  let r: number, g: number, b: number;
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return {
+    r: Math.round(r * 255),
+    g: Math.round(g * 255),
+    b: Math.round(b * 255),
+  };
+};
+
+export const computeShades = (base300: string) => {
+  const base = rgbToHsl(hexToRgb(base300));
+  const apply = ({ h, s, l }: { h: number; s: number; l: number }) => {
+    const newH = (base.h + h + 360) % 360;
+    const newS = clamp(base.s + s);
+    const newL = clamp(base.l + l);
+    return rgbToHex(hslToRgb({ h: newH, s: newS, l: newL }));
+  };
+
+  return {
+    100: apply(SHADE_DIFFS[100]),
+    200: apply(SHADE_DIFFS[200]),
+    300: base300,
+    400: apply(SHADE_DIFFS[400]),
+    500: apply(SHADE_DIFFS[500]),
+  };
+};
+
 export const reds = {
   300: shades[300],
 };
@@ -38,7 +135,7 @@ export const blues = {
   300: '#0CED3E',
 };
 
-export const greys = (t = 'dark') => {
+const baseGreys = (t = 'dark') => {
   switch (t) {
     case 'neon-dream': {
       return {
@@ -694,6 +791,14 @@ export const greys = (t = 'dark') => {
       };
     }
   }
+};
+
+export const greys = (t = 'dark', zero?: string) => {
+  const colors = baseGreys(t);
+  if (zero !== undefined) {
+    return { ...colors, 0: zero };
+  }
+  return colors;
 };
 
 export const background = '#FFFFFF';
