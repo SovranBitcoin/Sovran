@@ -1,0 +1,105 @@
+import React, { useState } from 'react';
+import { useNavigation } from 'expo-router';
+import { useSelector } from 'react-redux';
+import { StyleSheet, Pressable, Dimensions, ScrollView } from 'react-native';
+import Container from 'components/layout/Container';
+import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
+import { Tabs } from 'components/common/Tabs';
+import { memoizedGetTheme, useSettings, memoizedGetBackgroundImage } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import Image from 'components/common/Image';
+
+const CATEGORIES = [
+  'Glow',
+  'Lava',
+  'Lights',
+  'Snake',
+  'Cyberpunk 2.0',
+  'Abstract',
+  'Lines',
+  'Minimal',
+  'Pride',
+  'Cyberpunk',
+  'Colours',
+  'Glass',
+  'Gradients',
+];
+
+const images = {
+  Glow: ['bg.png'],
+  Lava: ['bg2.png'],
+  Lights: ['bg3.png'],
+  Snake: ['bg4.png'],
+};
+
+export default function BackgroundImageSettings() {
+  const theme = useSelector(memoizedGetTheme);
+  const navigation = useNavigation();
+  const { setBackgroundImage } = useSettings();
+  const current = useSelector(memoizedGetBackgroundImage);
+  const [tab, setTab] = useState(CATEGORIES[0]);
+  const styles = createStyles(theme);
+
+  const width = (Dimensions.get('window').width - 48) / 2;
+  const height = width / 2;
+
+  const sources: Record<string, any> = {
+    'bg.png': require('assets/images/backgrounds/bg.png'),
+    'bg2.png': require('assets/images/backgrounds/bg2.png'),
+    'bg3.png': require('assets/images/backgrounds/bg3.png'),
+    'bg4.png': require('assets/images/backgrounds/bg4.png'),
+  };
+
+  return (
+    <Container>
+      <Tabs tabs={CATEGORIES} selectedTab={tab} handleTabPress={setTab} />
+      <ScrollView contentContainerStyle={styles.gridContainer}>
+        {images[tab]?.map((img) => (
+          <Pressable
+            key={img}
+            style={[styles.imageWrapper, { width, height }]}
+            onPress={() => {
+              setBackgroundImage(img);
+              navigation.goBack();
+            }}>
+            <Image
+              source={sources[img]}
+              style={[StyleSheet.absoluteFillObject, { borderRadius: 8 }]}
+            />
+            {current === img && (
+              <View style={styles.overlay}>
+                <Text style={styles.selectedText}>Selected</Text>
+              </View>
+            )}
+          </Pressable>
+        ))}
+      </ScrollView>
+    </Container>
+  );
+}
+
+const createStyles = (theme: string) =>
+  StyleSheet.create({
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      padding: 16,
+    },
+    imageWrapper: {
+      marginBottom: 16,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selectedText: {
+      color: greys(theme)[0],
+      fontFamily: 'OverpassBold',
+    },
+  });

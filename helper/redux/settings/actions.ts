@@ -4,6 +4,7 @@ import {
   SET_THEME,
   SET_EXPERIMENTAL,
   SET_PASSCODE,
+  SET_BACKGROUND_IMAGE,
 } from './actionTypes';
 
 export const setLanguage = (lang: string) => ({
@@ -29,4 +30,9 @@ export const setExperimental = (experimental: boolean) => ({
 export const setPasscode = (passcode: string) => ({
   type: SET_PASSCODE,
   payload: passcode,
+});
+
+export const setBackgroundImage = (image: string) => ({
+  type: SET_BACKGROUND_IMAGE,
+  payload: image,
 });
