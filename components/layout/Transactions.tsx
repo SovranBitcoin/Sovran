@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, SectionList, TouchableOpacity, Dimensions } from 'react-native';
+import { SectionList, TouchableOpacity, Dimensions } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 
@@ -10,6 +10,8 @@ import { useCashu } from 'helper/redux/cashu';
 import { Transaction } from 'components/layout/Transaction';
 import { Text } from 'components/common/Text';
 import Icon from 'assets/icons';
+
+import { View } from 'components/common/View';
 
 interface Account {
   unit: string;
@@ -152,7 +154,7 @@ export const Transactions = React.memo(
                 <Text size={14} heavy color={greys(theme)[1000]} className="mb-1">
                   {section.title}
                 </Text>
-                <View className="rounded-lg" style={{ backgroundColor: greys(theme)[1800] }}>
+                <View className="rounded-lg" blur>
                   {section.data.map((tx) => (
                     <Transaction
                       key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}

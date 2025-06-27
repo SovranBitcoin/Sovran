@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
@@ -16,6 +16,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintAddMore } from './MintAddMore';
+import { View } from 'components/common/View';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -96,34 +97,33 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
 
   return (
-    <TouchableOpacity
-      style={[
-        sovran(theme).listItem,
-        { alignSelf: 'center' },
-        style,
-        {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-        },
-      ]}
-      onPress={handlePress}
-      onPressIn={() => {}}
-      onPressOut={() => {}}>
+    <TouchableOpacity onPress={handlePress} onPressIn={() => {}} onPressOut={() => {}}>
       <View
-        style={{
-          flexDirection: 'row',
-        }}>
-        <MintIcon mintInfo={mintInfo} />
+        style={[
+          sovran(theme).listItem,
+          { alignSelf: 'center' },
+          style,
+          {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+          },
+        ]}
+        blur>
         <View
           style={{
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            marginRight: 10,
+            flexDirection: 'row',
           }}>
-          <Text style={styles.name}>
-            {mintInfo?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
-          </Text>
-          {/* <Text style={styles.balance}>
+          <MintIcon mintInfo={mintInfo} />
+          <View
+            style={{
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              marginRight: 10,
+            }}>
+            <Text style={styles.name}>
+              {mintInfo?.name || selectedMint?.replace('https://', '')?.split('/')?.[0]}
+            </Text>
+            {/* <Text style={styles.balance}>
           {formatCurrency(
             {
               currency: currencyValue,
@@ -138,13 +138,14 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
             }
           )}
         </Text> */}
-          <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
+            <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
+          </View>
         </View>
+        <View style={styles.chevronContainer}>
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+        </View>
+        {/* <Text style={styles.dot}>•</Text> */}
       </View>
-      <View style={styles.chevronContainer}>
-        <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
-      </View>
-      {/* <Text style={styles.dot}>•</Text> */}
     </TouchableOpacity>
   );
 };
@@ -165,7 +166,7 @@ const baseStyles = (theme: string) => ({
   // Base container styles
   container: {
     padding: 8,
-    backgroundColor: greys(theme)[1800],
+    // backgroundColor: greys(theme)[1800],
     borderColor: greys(theme)[1300],
     borderWidth: 0.2,
     borderRadius: 8,
