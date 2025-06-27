@@ -7,7 +7,7 @@
     "scheme": "sovran",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/backgrounds/bg_.png",
+      "image": "./assets/images/bg_.png",
       "backgroundColor": "#000000",
       "resizeMode": "contain"
     },

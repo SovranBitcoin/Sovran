@@ -82,7 +82,7 @@ function ThemeSettings() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
   const [searchText, setSearchText] = useState('');
-  const { setTheme } = useSettings();
+  const { setTheme, setBackgroundImage } = useSettings();
 
   const filteredThemes = themes.filter((theme) =>
     theme.toLowerCase().includes(searchText.toLowerCase())
@@ -91,6 +91,7 @@ function ThemeSettings() {
 
   const handleThemePress = (themeName: string) => {
     setTheme(themeName);
+    setBackgroundImage('');
     navigation.goBack();
   };
 

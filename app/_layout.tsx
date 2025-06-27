@@ -152,7 +152,7 @@ function MySplashScreen({ opacity }) {
           width: Dimensions.get('window').width,
           height: Dimensions.get('window').height,
         }}
-        source={require('assets/images/backgrounds/bg_.png')}
+        source={require('assets/images/bg_.png')}
       />
     </Animated.View>
   );

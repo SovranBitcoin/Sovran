@@ -214,7 +214,7 @@ export function AccountPagerView({
                       isReceive && styles.receiveIconView,
                       isSend && styles.sendIconView,
                     ]}
-                    blurTint="prominent"
+                    blurTint="systemChromeMaterialLight"
                     blur={!isCamera}>
                     <View className="bg-transparent">{icon}</View>
                     {!isCamera && (
@@ -286,14 +286,14 @@ const createStyles = (theme: string) =>
       // backgroundColor: greys(theme)[1800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      borderWidth: 0.3,
+      // borderWidth: 0.3,
       borderColor: greys(theme)[1500],
     },
     sendIconView: {
       // backgroundColor: greys(theme)[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      borderWidth: 0.3,
+      // borderWidth: 0.3,
       borderColor: greys(theme)[1500],
     },
   });

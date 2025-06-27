@@ -27,8 +27,6 @@ import { MintQuoteResponse, MintQuoteState } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
-import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
 
 interface NPUBQuote {
   amount: number;
@@ -189,7 +187,7 @@ function TabOneScreen() {
           <View className="m-4">
             <Transactions days={1} account={account} />
           </View>
-          <LinearGradient
+          {/* <LinearGradient
             colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
             start={{ x: 0.5, y: 1 }}
             end={{ x: 0.5, y: 0 }}
@@ -197,9 +195,9 @@ function TabOneScreen() {
               StyleSheet.absoluteFill,
               { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
             ]}
-          />
+          /> */}
         </ScrollView>
-        <LinearGradient
+        {/* <LinearGradient
           colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
           start={{ x: 0.5, y: 1 }}
           end={{ x: 0.5, y: 0 }}
@@ -207,7 +205,7 @@ function TabOneScreen() {
             StyleSheet.absoluteFill,
             { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
           ]}
-        />
+        /> */}
       </SafeAreaView>
     </View>
   );
