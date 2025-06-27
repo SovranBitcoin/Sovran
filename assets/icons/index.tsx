@@ -502,9 +502,11 @@ export function ProfileIcon() {
 export function CurrencyIcon({
   width = 36,
   currency,
-  colors = [theme.shades[100], theme.shades[300], theme.shades[500]],
+  colors,
 }) {
   const theme = useSelector(memoizedGetTheme);
+  const gradientColors =
+    colors ?? [theme.shades[100], theme.shades[300], theme.shades[500]];
   if (currency === 'eur') {
     return (
       <View
@@ -650,7 +652,7 @@ export function CurrencyIcon({
           }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              {colors.map((color, index) => (
+              {gradientColors.map((color, index) => (
                 <Stop key={index} offset={`${index * 25}%`} stopColor={color} />
               ))}
               {/* <Stop offset="50%" stopColor={greys('dark')[0]} /> */}
@@ -861,6 +863,7 @@ export function FalseIcon() {
 }
 
 export function TrueIcon() {
+  const theme = useSelector(memoizedGetTheme);
   return (
     <Svg width="21" height="20" viewBox="0 0 21 20" fill="none">
       <Path
