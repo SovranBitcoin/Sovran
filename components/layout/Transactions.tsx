@@ -145,13 +145,13 @@ export const Transactions = React.memo(
         return (
           <View>
             <View className="flex-row items-start">
-              <Text heavy size={16} color={greys(theme)[1000]} className="mt-2">
+              <Text heavy size={16} color={greys(theme)[200]} className="mt-2">
                 {label}
               </Text>
             </View>
             {sections.map((section) => (
               <View key={section.title}>
-                <Text size={14} heavy color={greys(theme)[1000]} className="mb-1">
+                <Text size={14} heavy color={greys(theme)[200]} className="mb-1">
                   {section.title}
                 </Text>
                 <View className="rounded-lg" blur>

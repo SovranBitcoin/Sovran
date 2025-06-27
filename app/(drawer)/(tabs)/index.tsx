@@ -32,7 +32,6 @@ import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 import opacity from 'hex-color-opacity';
 
 interface NPUBQuote {
@@ -172,6 +171,8 @@ function TabOneScreen() {
     return <Welcome />;
   }
 
+  console.log(23982737, theme.greys);
+
   return (
     <View
       style={{
@@ -196,13 +197,14 @@ function TabOneScreen() {
           <View className="m-4">
             <Transactions days={1} account={account} />
           </View>
-          {BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary && (
+          {theme.shades && (
             <LinearGradient
               colors={[
-                BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
-                BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
-                opacity(BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary, 0),
-                opacity(BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary, 0),
+                theme.greys[700],
+                theme.greys[700],
+                theme.greys[700],
+                opacity(theme.greys[700], 0),
+                opacity(theme.greys[700], 0),
               ]}
               start={{ x: 0.5, y: 1 }}
               end={{ x: 0.5, y: 0 }}
@@ -213,13 +215,14 @@ function TabOneScreen() {
             />
           )}
         </ScrollView>
-        {BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary && (
+        {theme.greys && (
           <LinearGradient
             colors={[
-              BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
-              BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
-              opacity(BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary, 0),
-              opacity(BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary, 0),
+              theme.greys[700],
+              theme.greys[700],
+              theme.greys[700],
+              opacity(theme.greys[700], 0),
+              opacity(theme.greys[700], 0),
             ]}
             start={{ x: 0.5, y: 1 }}
             end={{ x: 0.5, y: 0 }}

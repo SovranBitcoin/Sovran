@@ -13,7 +13,15 @@ type ShadeKey = 100 | 200 | 300 | 400 | 500;
  */
 const hexToRgb = (hex: string) => {
   const clean = hex.replace('#', '');
-  const bigint = parseInt(clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean, 16);
+  const bigint = parseInt(
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean,
+    16
+  );
   return {
     r: (bigint >> 16) & 255,
     g: (bigint >> 8) & 255,
@@ -110,7 +118,7 @@ export const computeShades = (base300: string) => {
   const baseHsl = rgbToHsl(...Object.values(hexToRgb(base300)));
   const result: Record<ShadeKey, string> = { 300: base300 } as Record<ShadeKey, string>;
 
-  (Object.keys(BASE_SHADE_DELTAS) as Array<Exclude<ShadeKey, 300>>).forEach((key) => {
+  (Object.keys(BASE_SHADE_DELTAS) as Exclude<ShadeKey, 300>[]).forEach((key) => {
     const delta = BASE_SHADE_DELTAS[key];
     const h = (baseHsl.h + delta.h + 360) % 360;
     const s = Math.max(0, Math.min(100, baseHsl.s + delta.s));
@@ -816,8 +824,22 @@ export const white = '#FFFFFF';
 
 export const black = '#181412'; // off black
 
-export const computeGreys = (theme = 'dark', zero?: string) => {
-  const g = greys(theme);
-  if (zero) g[0] = zero;
-  return g;
-};
+export function computeGreys(
+  theme: string,
+  primaryColor = '#FF0000',
+  saturation = 15,
+  minLightness = 12
+) {
+  const tinted: Record<string, string> = {};
+  const { h: primaryHue } = rgbToHsl(...Object.values(hexToRgb(primaryColor)));
+
+  for (const [key, hex] of Object.entries(greys(theme))) {
+    const { r, g, b } = hexToRgb(hex);
+    const { l } = rgbToHsl(r, g, b);
+    const adjustedL = Math.max(l, minLightness); // avoid fully black shades
+    const { r: newR, g: newG, b: newB } = hslToRgb(primaryHue, saturation, adjustedL);
+    tinted[key] = rgbToHex(newR, newG, newB);
+  }
+
+  return tinted;
+}

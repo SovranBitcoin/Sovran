@@ -17,13 +17,12 @@ import {
   memoizedGetBalance,
   memoizedGetSelectedMint,
 } from 'helper/redux/cashu';
-import { greys, shades } from 'helper/colors';
-import { memoizedGetBackgroundImage, memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
-import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
@@ -51,14 +50,8 @@ export function AccountPagerView({
 }: AccountPagerViewProps): React.ReactElement {
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
-  const image = useSelector(memoizedGetBackgroundImage);
 
-  const styles = createStyles(
-    theme,
-    BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
-      ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
-      : shades[200]
-  );
+  const styles = createStyles(theme.greys, theme.shades);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -215,12 +208,7 @@ export function AccountPagerView({
                 style={[isCamera && styles.cameraGradient]}
                 colors={
                   isCamera
-                    ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
-                      ? [
-                          BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary,
-                          BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
-                        ]
-                      : [shades[200], shades[400]]
+                    ? [theme.shades[200], theme.shades[400]]
                     : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
                 }>
                 <View style={styles.iconContainer}>
@@ -249,7 +237,7 @@ export function AccountPagerView({
   );
 }
 
-const createStyles = (theme: string, shadow = shades[200]) =>
+const createStyles = (greys: string, shades) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -260,13 +248,13 @@ const createStyles = (theme: string, shadow = shades[200]) =>
     cameraButton: {
       maxWidth: 64,
       zIndex: 10000,
-      shadowColor: shadow,
+      shadowColor: shades[300],
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.75,
       shadowRadius: 8,
       elevation: 5,
       borderRadius: 10000,
-      borderColor: shadow,
+      borderColor: shades[200],
       borderWidth: 0.5,
     },
     receiveButton: {
@@ -303,13 +291,13 @@ const createStyles = (theme: string, shadow = shades[200]) =>
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
       // borderWidth: 0.3,
-      borderColor: greys(theme)[1500],
+      borderColor: greys[1500],
     },
     sendIconView: {
       // backgroundColor: greys(theme)[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
       // borderWidth: 0.3,
-      borderColor: greys(theme)[1500],
+      borderColor: greys[1500],
     },
   });

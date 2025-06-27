@@ -41,8 +41,8 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
   },
   'bg6.png': {
     shades: computeShades('#5E1B72'),
-    greys: computeGreys('dark'),
+    greys: computeGreys('dark', '#5E1B72'),
     text: '#FFFFFF',
-    tint: 'extraLight',
+    tint: 'prominent',
   },
 };
