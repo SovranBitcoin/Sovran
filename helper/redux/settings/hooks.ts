@@ -12,6 +12,7 @@ import {
   selectDisplayBitcoin,
   selectPasscode,
   selectBackgroundImage,
+  selectBackgroundImageAttrs,
   memoizedGetSettings,
 } from './selectors';
 
@@ -23,6 +24,7 @@ export const useSettings = () => {
   const displayBtc = useSelector(selectDisplayBitcoin);
   const passcode = useSelector(selectPasscode);
   const backgroundImage = useSelector(selectBackgroundImage);
+  const backgroundImageAttrs = useSelector(selectBackgroundImageAttrs);
 
   return {
     settings,
@@ -31,6 +33,7 @@ export const useSettings = () => {
     displayBtc,
     passcode,
     backgroundImage,
+    backgroundImageAttrs,
     setTheme: (theme: string) => dispatch(setTheme(theme)),
     setLanguage: (lang: string) => dispatch(setLanguage(lang)),
     setDisplayBitcoin: (display: number) => dispatch(setDisplayBitcoin(display)),
