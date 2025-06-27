@@ -177,15 +177,20 @@ export const Transactions = React.memo(
               navigation.navigate('transactions', {
                 account,
               })
-            }
-            className="mt-4 flex items-center rounded-full border p-3"
-            style={{
-              backgroundColor: greys(theme)[1800],
-              borderColor: greys(theme)[1500],
-            }}>
-            <Text size={14} bold>
-              View all ({filteredTransactions.length})
-            </Text>
+            }>
+            <View
+              blur
+              className="mt-4 flex items-center rounded-full border p-3"
+              style={
+                {
+                  // backgroundColor: greys(theme)[1800],
+                  // borderColor: greys(theme)[1500],
+                }
+              }>
+              <Text size={14} bold>
+                View all ({filteredTransactions.length})
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       );

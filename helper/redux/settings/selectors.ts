@@ -38,7 +38,7 @@ export const memoizedGetSettings = createSelector(
 export const memoizedGetTheme = createSelector(
   [
     (state: RootState) => {
-      return state.settings.settings.theme;
+      return state.settings.settings.backgroundImage || state.settings.settings.theme;
     },
   ],
   (theme: string) => {

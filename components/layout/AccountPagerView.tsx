@@ -18,11 +18,12 @@ import {
   memoizedGetSelectedMint,
 } from 'helper/redux/cashu';
 import { greys, shades } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetBackgroundImage, memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
+import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
@@ -50,7 +51,14 @@ export function AccountPagerView({
 }: AccountPagerViewProps): React.ReactElement {
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const image = useSelector(memoizedGetBackgroundImage);
+
+  const styles = createStyles(
+    theme,
+    BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
+      ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
+      : shades[200]
+  );
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -205,7 +213,16 @@ export function AccountPagerView({
               onPress={() => handleButtonPress(page, account.unit)}>
               <LinearGradient
                 style={[isCamera && styles.cameraGradient]}
-                colors={isCamera ? [shades[200], shades[400]] : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
+                colors={
+                  isCamera
+                    ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary
+                      ? [
+                          BACKGROUND_IMAGE_ATTRIBUTES[image]?.primary,
+                          BACKGROUND_IMAGE_ATTRIBUTES[image]?.secondary,
+                        ]
+                      : [shades[200], shades[400]]
+                    : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
+                }>
                 <View style={styles.iconContainer}>
                   <View
                     style={[
@@ -214,7 +231,6 @@ export function AccountPagerView({
                       isReceive && styles.receiveIconView,
                       isSend && styles.sendIconView,
                     ]}
-                    blurTint="systemChromeMaterialLight"
                     blur={!isCamera}>
                     <View className="bg-transparent">{icon}</View>
                     {!isCamera && (
@@ -233,7 +249,7 @@ export function AccountPagerView({
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: string, shadow = shades[200]) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -244,13 +260,13 @@ const createStyles = (theme: string) =>
     cameraButton: {
       maxWidth: 64,
       zIndex: 10000,
-      shadowColor: shades[200],
+      shadowColor: shadow,
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.75,
       shadowRadius: 8,
       elevation: 5,
       borderRadius: 10000,
-      borderColor: shades[200],
+      borderColor: shadow,
       borderWidth: 0.5,
     },
     receiveButton: {

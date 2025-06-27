@@ -1,10 +1,10 @@
-import { BlurTint } from 'expo-blur'
+import { BlurTint } from 'expo-blur';
 
 export interface BackgroundImageAttributes {
-  primary: string
-  secondary: string
-  text: string
-  tint: BlurTint
+  primary: string;
+  secondary: string;
+  text: string;
+  tint: BlurTint;
 }
 
 export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttributes> = {
@@ -13,10 +13,15 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
   'bg3.png': { primary: '#38BDF8', secondary: '#0C4A6E', text: '#FFFFFF', tint: 'prominent' },
   'bg4.png': { primary: '#34D399', secondary: '#064E3B', text: '#FFFFFF', tint: 'prominent' },
   'bg5.png': {
-    primary: '#3B82F6',
-    secondary: '#1E3A8A',
+    primary: '#C8348A',
+    secondary: '#AB99E3',
     text: '#FFFFFF',
-    tint: 'systemChromeMaterialLight',
+    tint: 'extraLight',
   },
-  'static.png': { primary: '#FFFFFF', secondary: '#000000', text: '#FFFFFF', tint: 'prominent' },
-}
+  'bg6.png': {
+    primary: '#5E1B72',
+    secondary: '#6B4D9A',
+    text: '#FFFFFF',
+    tint: 'extraLight',
+  },
+};

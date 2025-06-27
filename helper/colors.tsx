@@ -39,6 +39,7 @@ export const blues = {
 };
 
 export const greys = (t = 'dark') => {
+  console.log(t);
   switch (t) {
     case 'neon-dream': {
       return {
@@ -80,7 +81,6 @@ export const greys = (t = 'dark') => {
         0: '#FFFFFF',
       };
     }
-
     case 'digital-oasis': {
       return {
         2300: '#002B1F',
@@ -141,7 +141,6 @@ export const greys = (t = 'dark') => {
         0: '#FFFFFF',
       };
     }
-
     case 'volcanic-crimson': {
       return {
         2300: '#2A0000',
@@ -202,7 +201,6 @@ export const greys = (t = 'dark') => {
         0: '#FFFFFF',
       };
     }
-
     case 'twilight-amber': {
       return {
         2300: '#331C00', // Very dark amber

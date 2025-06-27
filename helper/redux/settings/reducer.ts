@@ -6,8 +6,8 @@ import {
   SET_EXPERIMENTAL,
   SET_PASSCODE,
   SET_BACKGROUND_IMAGE,
-} from './actionTypes'
-import { BACKGROUND_IMAGE_ATTRIBUTES } from '../../backgroundImages'
+} from './actionTypes';
+import { BACKGROUND_IMAGE_ATTRIBUTES } from '../../backgroundImages';
 
 const initialState = {
   settings: {
@@ -52,14 +52,14 @@ export const settingsReducer = (state = initialState, action) => {
       };
     }
     case SET_BACKGROUND_IMAGE: {
+      console.log(action.payload, BACKGROUND_IMAGE_ATTRIBUTES[action.payload]);
       return {
         ...state,
         settings: {
           ...state.settings,
           backgroundImage: action.payload,
           backgroundImageAttrs:
-            BACKGROUND_IMAGE_ATTRIBUTES[action.payload] ||
-            state.settings.backgroundImageAttrs,
+            BACKGROUND_IMAGE_ATTRIBUTES[action.payload] || state.settings.backgroundImageAttrs,
         },
       };
     }
