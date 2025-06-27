@@ -172,7 +172,7 @@ function TabOneScreen() {
         width: '100%',
         height: '100%',
       }}>
-      <AnimatedSpriteBackground />
+      {theme === 'image' && <AnimatedSpriteBackground />}
 
       <SafeAreaView style={styles.safeAreaView}>
         <ScrollView
@@ -189,8 +189,21 @@ function TabOneScreen() {
           <View className="m-4">
             <Transactions days={1} account={account} />
           </View>
+          {theme === 'image' && (
+            <LinearGradient
+              colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']}
+              start={{ x: 0.5, y: 1 }}
+              end={{ x: 0.5, y: 0 }}
+              style={[
+                StyleSheet.absoluteFill,
+                { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
+              ]}
+            />
+          )}
+        </ScrollView>
+        {theme === 'image' && (
           <LinearGradient
-            colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
+            colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']}
             start={{ x: 0.5, y: 1 }}
             end={{ x: 0.5, y: 0 }}
             style={[
@@ -198,16 +211,7 @@ function TabOneScreen() {
               { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
             ]}
           />
-        </ScrollView>
-        <LinearGradient
-          colors={['#131213', '#131213', opacity('#131213', 0.5), 'transparent']} // purple-dark to transparent
-          start={{ x: 0.5, y: 1 }}
-          end={{ x: 0.5, y: 0 }}
-          style={[
-            StyleSheet.absoluteFill,
-            { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
-          ]}
-        />
+        )}
       </SafeAreaView>
     </View>
   );
@@ -218,11 +222,11 @@ const createStyles = (theme: string) =>
     scrollView: {
       marginTop: 0,
       marginBottom: -24,
-      // backgroundColor: greys(theme)[2300],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
     },
     safeAreaView: {
       flex: 1,
-      // backgroundColor: greys(theme)[2300],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
     },
     accountPagerView: {
       display: 'flex',

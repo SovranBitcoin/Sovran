@@ -672,6 +672,10 @@ export const greys = (t = 'dark') => {
       };
     }
 
+    case 'image': {
+      return greys('dark');
+    }
+
     case 'dark':
     default: {
       return {

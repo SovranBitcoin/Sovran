@@ -32,6 +32,7 @@ const themes = [
   'crimson-night',
   'twilight-amber',
   'velvet-emerald',
+  'image',
   // "volcanic-crimson",
   // "urban-concrete",
   // "celestial-aura",
@@ -60,6 +61,7 @@ const themeNameMap = {
   'crimson-night': 'Crimson Night',
   'twilight-amber': 'Twilight Amber',
   'velvet-emerald': 'Velvet Emerald',
+  image: 'Image',
 
   'volcanic-crimson': 'Volcanic Crimson',
   'urban-concrete': 'Urban Concrete',

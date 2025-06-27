@@ -166,7 +166,7 @@ const PLATFORM_BOTTOM_OFFSET = Platform.OS === 'web' ? 28.8 : 64 + 28.8;
 const createStyles = (theme: string) =>
   StyleSheet.create({
     nonGestureView: {
-      // backgroundColor: greys(theme)[2300], // Using a default theme value
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
       overflow: 'hidden',
       zIndex: 1,
       height: 335,

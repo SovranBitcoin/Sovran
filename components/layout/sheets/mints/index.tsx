@@ -108,7 +108,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
             justifyContent: 'space-between',
           },
         ]}
-        blur>
+        blur={theme === 'image'}>
         <View
           style={{
             flexDirection: 'row',
@@ -166,7 +166,7 @@ const baseStyles = (theme: string) => ({
   // Base container styles
   container: {
     padding: 8,
-    // backgroundColor: greys(theme)[1800],
+    backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
     borderColor: greys(theme)[1300],
     borderWidth: 0.2,
     borderRadius: 8,
@@ -387,11 +387,12 @@ const sovran = (theme: string) => ({
 
   // Background variations
   backgroundSubtle: {
-    backgroundColor: opacity(greys(theme)[1800], 0.75),
+    backgroundColor:
+      theme === 'image' ? opacity(greys(theme)[1800], 0.5) : opacity(greys(theme)[1800], 0.75),
   } as ViewStyle,
 
   backgroundSolid: {
-    backgroundColor: greys(theme)[1800],
+    backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
   } as ViewStyle,
 });
 
@@ -484,7 +485,7 @@ export const createStyles = (theme: string) =>
       paddingVertical: 6,
       paddingHorizontal: 6,
       borderRadius: 100000,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       marginBottom: 8,
     },
     icon: {
@@ -525,7 +526,7 @@ export const createStyles = (theme: string) =>
     },
     actionSheetContainer: {
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
     },
     scrollContainer: {
       padding: 16,
@@ -533,7 +534,7 @@ export const createStyles = (theme: string) =>
     },
     buttonContainer: {
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
     },
     sectionHeader: {
       color: greys(theme)[0],
@@ -548,7 +549,7 @@ export const createStyles = (theme: string) =>
       marginRight: 12,
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       minWidth: 100,
     },
     currencyContent: {
@@ -573,7 +574,7 @@ export const createStyles = (theme: string) =>
       alignItems: 'center',
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       marginBottom: 8,
     },
     selectedMintItem: {
@@ -600,7 +601,7 @@ export const createStyles = (theme: string) =>
     },
     button: {
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       borderRadius: 8,
       marginTop: 16,
       alignItems: 'center',

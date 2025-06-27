@@ -164,7 +164,7 @@ export function AccountPagerView({
                 flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                // backgroundColor: greys(theme)[2300],
+                backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[2300],
               }}>
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </View>
@@ -215,7 +215,7 @@ export function AccountPagerView({
                       isSend && styles.sendIconView,
                     ]}
                     blurTint="prominent"
-                    blur={!isCamera}>
+                    blur={theme === 'image' && !isCamera}>
                     <View className="bg-transparent">{icon}</View>
                     {!isCamera && (
                       <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
@@ -283,14 +283,14 @@ const createStyles = (theme: string) =>
       borderRadius: 1000,
     },
     receiveIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
       borderWidth: 0.3,
       borderColor: greys(theme)[1500],
     },
     sendIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: theme === 'image' ? 'transparent' : greys(theme)[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
       borderWidth: 0.3,
