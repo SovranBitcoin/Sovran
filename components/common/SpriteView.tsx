@@ -35,13 +35,12 @@ const AnimatedSpriteBackground = () => {
     'bg2.png': require('assets/images/backgrounds/bg2.png'),
     'bg3.png': require('assets/images/backgrounds/bg3.png'),
     'bg4.png': require('assets/images/backgrounds/bg4.png'),
-    'bg_.png': require('assets/images/backgrounds/bg_.png'),
-    'static.png': require('../../Test.png'),
+    'bg5.png': require('assets/images/backgrounds/bg5.png'),
   };
 
   if (!backgroundImage) return null;
 
-  const dynamicImages = ['bg.png', 'bg2.png', 'bg3.png', 'bg4.png', 'bg_.png'];
+  const dynamicImages = ['bg.png', 'bg2.png', 'bg3.png', 'bg4.png'];
   const isDynamic = dynamicImages.includes(backgroundImage);
 
   return (
@@ -56,7 +55,7 @@ const AnimatedSpriteBackground = () => {
         <SpriteView source={sources[backgroundImage] || sources['bg.png']} />
       ) : (
         <Image
-          source={sources[backgroundImage] || sources['static.png']}
+          source={sources[backgroundImage] || sources['bg5.png']}
           style={StyleSheet.absoluteFillObject}
         />
       )}
