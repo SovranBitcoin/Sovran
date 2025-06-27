@@ -1,7 +1,7 @@
 // components/common/AnimatedSpriteBackground.tsx
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
-import { SpriteView } from './Image';
+import Image, { SpriteView } from './Image';
 import { DeviceMotion } from 'expo-sensors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBackgroundImage } from 'helper/redux/settings';
@@ -36,7 +36,13 @@ const AnimatedSpriteBackground = () => {
     'bg3.png': require('assets/images/backgrounds/bg3.png'),
     'bg4.png': require('assets/images/backgrounds/bg4.png'),
     'bg_.png': require('assets/images/backgrounds/bg_.png'),
+    'static.png': require('../../Test.png'),
   };
+
+  if (!backgroundImage) return null;
+
+  const dynamicImages = ['bg.png', 'bg2.png', 'bg3.png', 'bg4.png', 'bg_.png'];
+  const isDynamic = dynamicImages.includes(backgroundImage);
 
   return (
     <Animated.View
@@ -46,7 +52,14 @@ const AnimatedSpriteBackground = () => {
           transform: motion.getTranslateTransform(),
         },
       ]}>
-      <SpriteView source={sources[backgroundImage] || sources['bg.png']} />
+      {isDynamic ? (
+        <SpriteView source={sources[backgroundImage] || sources['bg.png']} />
+      ) : (
+        <Image
+          source={sources[backgroundImage] || sources['static.png']}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
     </Animated.View>
   );
 };

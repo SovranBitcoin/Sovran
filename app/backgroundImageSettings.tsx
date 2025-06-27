@@ -15,6 +15,7 @@ const CATEGORIES = [
   'Lava',
   'Lights',
   'Snake',
+  'Static',
   'Cyberpunk 2.0',
   'Abstract',
   'Lines',
@@ -31,6 +32,7 @@ const images = {
   Lava: ['bg2.png'],
   Lights: ['bg3.png'],
   Snake: ['bg4.png'],
+  Static: ['static.png'],
 };
 
 export default function BackgroundImageSettings() {
@@ -49,6 +51,7 @@ export default function BackgroundImageSettings() {
     'bg2.png': require('assets/images/backgrounds/bg2.png'),
     'bg3.png': require('assets/images/backgrounds/bg3.png'),
     'bg4.png': require('assets/images/backgrounds/bg4.png'),
+    'static.png': require('../Test.png'),
   };
 
   return (
