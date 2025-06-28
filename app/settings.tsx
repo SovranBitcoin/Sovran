@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { StyleSheet, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -18,6 +18,7 @@ import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { View } from 'components/common/View';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -79,7 +80,7 @@ export const RowButton: React.FC<{
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme, isDanger);
   return (
-    <View style={styles.rowWrapper}>
+    <View blur style={styles.rowWrapper}>
       <TouchableOpacity
         onPress={onPress}
         style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
@@ -100,7 +101,7 @@ export const RowButton: React.FC<{
           </Text>
         )}
         {onPress ? (
-          rightIcon ?? (
+          (rightIcon ?? (
             <FeatherIcon
               style={{
                 marginRight: !!onPress ? 0 : 8,
@@ -109,7 +110,7 @@ export const RowButton: React.FC<{
               name="chevron-right"
               size={19}
             />
-          )
+          ))
         ) : (
           <View
             style={{

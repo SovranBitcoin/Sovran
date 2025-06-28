@@ -51,7 +51,7 @@ export function AccountPagerView({
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
 
-  const styles = createStyles(theme.greys, theme.shades);
+  const styles = createStyles(theme.id, theme.greys, theme.shades);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -237,7 +237,7 @@ export function AccountPagerView({
   );
 }
 
-const createStyles = (greys: string, shades) =>
+const createStyles = (theme, greys: string, shades) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -287,17 +287,17 @@ const createStyles = (greys: string, shades) =>
       borderRadius: 1000,
     },
     receiveIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: greys[1800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      // borderWidth: 0.3,
+      borderWidth: 0.3,
       borderColor: greys[1500],
     },
     sendIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: greys[1800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      // borderWidth: 0.3,
+      borderWidth: 0.3,
       borderColor: greys[1500],
     },
   });

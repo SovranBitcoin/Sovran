@@ -148,7 +148,12 @@ export const Transactions = React.memo(
                 <Text size={14} heavy color={greys(theme)[200]} className="mb-1">
                   {section.title}
                 </Text>
-                <View className="rounded-lg" blur>
+                <View
+                  style={{
+                    backgroundColor: greys(theme)[2000],
+                  }}
+                  className="rounded-lg"
+                  blur>
                   {section.data.map((tx) => (
                     <Transaction
                       key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
@@ -175,12 +180,10 @@ export const Transactions = React.memo(
             <View
               blur
               className="mt-4 flex items-center rounded-full border p-3"
-              style={
-                {
-                  // backgroundColor: greys(theme)[1800],
-                  // borderColor: greys(theme)[1500],
-                }
-              }>
+              style={{
+                backgroundColor: greys(theme)[1800],
+                borderColor: greys(theme)[1500],
+              }}>
               <Text size={14} bold>
                 View all ({filteredTransactions.length})
               </Text>

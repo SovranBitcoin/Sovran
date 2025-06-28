@@ -20,7 +20,7 @@ import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { Spacer } from 'components/common/View';
 import { RowButton, Section } from 'app/settings';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -198,9 +198,32 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             data={`${currentProfile.npub}@npubx.cash`}
             popupMessage="lightning_address_copied"
             unit="sat"
+            showSection={false}
           />
         )}
-        <Spacer size={12} />
+        {showLightningAddress && (
+          <View
+            style={{
+              marginHorizontal: 16,
+            }}>
+            <Section title="RECEIVE ADDRESS">
+              <RowButton
+                label={
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
+                    <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      {truncateMiddle(currentProfile.npub, 8)}@npubx.cash
+                    </Text>
+                  </View>
+                }
+                isFirst
+                onPress={handleCopyLightningAddress}
+                rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
+              />
+            </Section>
+          </View>
+        )}
+        {/* <Spacer size={12} /> */}
         <TransactionMintRefresh
           mintInfo={mintInfo}
           transaction={{
@@ -211,24 +234,6 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             callback();
           }}
         />
-        <Spacer size={12} />
-
-        {showLightningAddress && (
-          <Section title="Contact">
-            <RowButton
-              label={
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
-                  <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
-                    {truncateMiddle(currentProfile.npub, 10)}@npubx.cash
-                  </Text>
-                </View>
-              }
-              onPress={handleCopyLightningAddress}
-              rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
-            />
-          </Section>
-        )}
 
         {/* {unit === 'sat' && (
           <View

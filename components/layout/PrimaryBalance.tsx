@@ -45,6 +45,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           colorBlur={opacity(greens[500], 0.2)}
           style={{
             borderColor: opacity(greens[500], 0.5),
+            backgroundColor: opacity(greens[500], 0.1),
             borderWidth: 0.2,
             padding: 8,
             borderRadius: 100,

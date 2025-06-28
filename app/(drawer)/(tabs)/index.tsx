@@ -33,6 +33,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
+import { greys } from 'helper/colors';
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -179,7 +180,7 @@ function TabOneScreen() {
         width: '100%',
         height: '100%',
       }}>
-      <AnimatedSpriteBackground />
+      <AnimatedSpriteBackground backgroundColor={greys(theme)[2300]} />
 
       <SafeAreaView style={styles.safeAreaView}>
         <ScrollView

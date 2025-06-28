@@ -106,6 +106,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
           {
             flexDirection: 'row',
             justifyContent: 'space-between',
+            backgroundColor: theme.greys[1800],
           },
         ]}
         blur>
