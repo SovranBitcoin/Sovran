@@ -33,7 +33,6 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -200,11 +199,11 @@ function TabOneScreen() {
           {theme.shades && (
             <LinearGradient
               colors={[
-                theme.greys[700],
-                theme.greys[700],
-                theme.greys[700],
-                opacity(theme.greys[700], 0),
-                opacity(theme.greys[700], 0),
+                theme.greys[2300],
+                theme.greys[2300],
+                theme.greys[2300],
+                opacity(theme.greys[2300], 0),
+                opacity(theme.greys[2300], 0),
               ]}
               start={{ x: 0.5, y: 1 }}
               end={{ x: 0.5, y: 0 }}
@@ -218,11 +217,11 @@ function TabOneScreen() {
         {theme.greys && (
           <LinearGradient
             colors={[
-              theme.greys[700],
-              theme.greys[700],
-              theme.greys[700],
-              opacity(theme.greys[700], 0),
-              opacity(theme.greys[700], 0),
+              theme.greys[2300],
+              theme.greys[2300],
+              theme.greys[2300],
+              opacity(theme.greys[2300], 0),
+              opacity(theme.greys[2300], 0),
             ]}
             start={{ x: 0.5, y: 1 }}
             end={{ x: 0.5, y: 0 }}

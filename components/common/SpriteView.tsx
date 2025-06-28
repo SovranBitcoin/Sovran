@@ -37,6 +37,9 @@ const AnimatedSpriteBackground = () => {
     'bg4.png': require('assets/images/backgrounds/bg4.png'),
     'bg5.png': require('assets/images/backgrounds/bg5.png'),
     'bg6.png': require('assets/images/backgrounds/bg6.png'),
+    'bg7.png': require('assets/images/backgrounds/bg7.png'),
+    'bg8.png': require('assets/images/backgrounds/bg8.png'),
+    'bg9.png': require('assets/images/backgrounds/bg9.png'),
   };
 
   if (!backgroundImage) return null;
