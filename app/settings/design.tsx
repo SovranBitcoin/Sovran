@@ -433,6 +433,19 @@ export default function ModalScreen() {
         <Section title="Title">
           <RowButton label="Label" value={'Optional Value'} onPress={() => {}} />
           <RowButton label="Label" isDanger value={'Optional Value'} onPress={() => {}} />
+          {/* Example with a custom right icon and label */}
+          <RowButton
+            label={
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
+                <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                  npub1example@npubx.cash
+                </Text>
+              </View>
+            }
+            onPress={() => {}}
+            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
+          />
         </Section>
 
         {/* This is usually added at the bottom of model pages, is shows 2 buttons at once, if 3 buttons are added then it will show a popup to show more options */}
