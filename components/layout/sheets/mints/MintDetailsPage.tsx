@@ -16,6 +16,7 @@ import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/layout/Transaction';
+import React from 'react';
 
 const MintDetailPage = () => {
   const theme = useSelector(memoizedGetTheme);

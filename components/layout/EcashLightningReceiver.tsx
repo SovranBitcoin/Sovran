@@ -19,6 +19,8 @@ import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { Spacer } from 'components/common/View';
+import { Section } from 'components/common/Section';
+import { truncateMiddle } from 'helper/strings';
 export const pool = new SimplePool();
 
 type UnitType = 'sat' | string;
@@ -185,8 +187,17 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             data={`${currentProfile.npub}@npubx.cash`}
             popupMessage="lightning_address_copied"
             unit="sat"
+            showSection={false}
           />
         )}
+        <Section
+          items={[
+            {
+              title: '',
+              value: `${truncateMiddle(currentProfile.npub, 10)}@npubx.cash`,
+            },
+          ]}
+        />
         <Spacer size={12} />
         <TransactionMintRefresh
           mintInfo={mintInfo}
