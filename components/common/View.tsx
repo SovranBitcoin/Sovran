@@ -15,11 +15,14 @@ type Props = RNViewProps & {
 export const View = React.forwardRef<RNView, Props>((props, ref) => {
   const image = useSelector(memoizedGetBackgroundImage);
 
-  const { blur = false, blurIntensity = 60, blurTint, style, children, ...rest } = props;
+  const { blur = false, blurIntensity = 70, blurTint, style, children, ...rest } = props;
 
   const effectiveTint = blurTint || BACKGROUND_IMAGE_ATTRIBUTES[image]?.tint || 'prominent';
 
-  if (!blur) {
+  const flattenedStyle = StyleSheet.flatten(style);
+  const { backgroundColor, ...cleanStyle } = flattenedStyle || {};
+
+  if (!blur || !image) {
     // 🔁 Normal unwrapped View – identical to before
     return (
       <RNView ref={ref} style={style} {...rest}>
@@ -30,7 +33,7 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
 
   // 🧊 Blur-enhanced View
   return (
-    <RNView ref={ref} style={[style, styles.overflowHidden]} {...rest}>
+    <RNView ref={ref} style={[cleanStyle, styles.overflowHidden]} {...rest}>
       <BlurView intensity={blurIntensity} tint={effectiveTint} style={[StyleSheet.absoluteFill]} />
       {children}
     </RNView>

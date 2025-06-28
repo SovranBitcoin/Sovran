@@ -145,7 +145,7 @@ export function AccountPagerView({
 
   return (
     <View className="bg-transparent">
-      <View className="flex h-[300px] w-full">
+      <View className="flex h-[370px] w-full">
         <Swiper
           controlsEnabled={false}
           loop
@@ -183,7 +183,7 @@ export function AccountPagerView({
           padding: 0,
           margin: 0,
           zIndex: 3,
-          height: 130,
+          height: 250,
           backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,
@@ -258,10 +258,10 @@ const createStyles = (greys: string, shades) =>
       borderWidth: 0.5,
     },
     receiveButton: {
-      marginRight: -8,
+      marginRight: -12,
     },
     sendButton: {
-      marginLeft: -8,
+      marginLeft: -12,
     },
     cameraGradient: {
       padding: 8,

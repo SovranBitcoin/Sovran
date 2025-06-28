@@ -16,6 +16,7 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
   return (
     <View className="relative h-7 w-7 bg-transparent">
       <View
+        blur={isSmall}
         className={isSmall ? 'absolute -bottom-2 -right-2 z-10 rounded-full' : ''}
         style={
           isSmall

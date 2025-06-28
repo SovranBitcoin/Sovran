@@ -119,12 +119,6 @@ export const Transactions = React.memo(
       [pendingSections, confirmedSections]
     );
 
-    console.log(
-      2338273873,
-      JSON.stringify(transactions.slice(0, 3), null, 2),
-      JSON.stringify(allSections.slice(0, 2), null, 2)
-    );
-
     if (filteredTransactions.length === 0) {
       return (
         <View className="flex items-center">

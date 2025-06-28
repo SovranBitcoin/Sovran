@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { Text } from 'react-native';
 import { greys, reds } from 'helper/colors';
 import { TouchableOpacity } from './TouchableOpacity';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { View } from 'components/common/View';
 
 type VariantType = 'warning' | 'info';
 
@@ -43,32 +44,34 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   const currentStyle = useMemo(() => variantStyles[variant], [variantStyles, variant]);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={{
-        backgroundColor: currentStyle.backgroundColor,
-        borderLeftColor: currentStyle.borderLeftColor,
-      }}
-      className={`flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
-      {title && (
-        <Text
-          className="pl-4 pr-1 pt-4 text-base font-medium"
-          style={{
-            color: greys(theme)[600],
-            fontFamily: 'OverpassHeavy',
-          }}>
-          {title}
-        </Text>
-      )}
-      <Text
-        className="p-4 pr-1 text-base font-medium"
+    <TouchableOpacity onPress={onPress}>
+      <View
+        blur
         style={{
-          color: currentStyle.color,
-          marginRight: 8,
-        }}>
-        {message}
-      </Text>
-      {icon && <View className="p-4 pl-1">{icon}</View>}
+          backgroundColor: currentStyle.backgroundColor,
+          borderLeftColor: currentStyle.borderLeftColor,
+        }}
+        className={`flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
+        {title && (
+          <Text
+            className="pl-4 pr-1 pt-4 text-base font-medium"
+            style={{
+              color: greys(theme)[600],
+              fontFamily: 'OverpassHeavy',
+            }}>
+            {title}
+          </Text>
+        )}
+        <Text
+          className="p-4 pr-1 text-base font-medium"
+          style={{
+            color: currentStyle.color,
+            marginRight: 8,
+          }}>
+          {message}
+        </Text>
+        {icon && <View className="p-4 pl-1">{icon}</View>}
+      </View>
     </TouchableOpacity>
   );
 };

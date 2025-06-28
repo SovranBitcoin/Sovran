@@ -31,15 +31,18 @@ export function Background() {
     opacity(greys(theme)[2300], 0.33),
     opacity(greys(theme)[2300], 0),
   ] as const;
-  return null;
+
   return (
     <LinearGradient
-      colors={defaultColors}
+      colors={[theme.greys[2300], opacity(theme.greys[2300], 0)]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
       style={{
         width: '100%',
         height: 100,
         pointerEvents: 'none',
-      }}></LinearGradient>
+      }}
+    />
   );
 }
 
@@ -76,10 +79,11 @@ const createStyles = (theme: string) =>
     container: {
       position: 'absolute',
       transform: [{ translateX: '-50%' }],
-      width: Dimensions.get('window').width,
+      width: 0,
       height: 52,
       marginTop: 42,
       pointerEvents: 'box-none',
+      backgroundColor: 'red',
     },
     unitContainer: {
       alignItems: 'center',
