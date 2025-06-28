@@ -73,7 +73,7 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
     );
   }
 
-  return <IconComponent color={focused ? shades[300] : greys(theme)[1000]} />;
+  return <IconComponent color={focused ? theme.shades[300] : opacity(greys(theme)[100], 0.25)} />;
 };
 
 const TabBarBackground = ({ theme }) => (

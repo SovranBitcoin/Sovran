@@ -161,6 +161,7 @@ export function MintQuoteTimeline({
 
   return (
     <View
+      blur
       style={{
         backgroundColor: greys(theme)[1800],
         padding: 16,

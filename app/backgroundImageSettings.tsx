@@ -10,29 +10,14 @@ import { memoizedGetTheme, useSettings, memoizedGetBackgroundImage } from 'helpe
 import { greys } from 'helper/colors';
 import Image from 'components/common/Image';
 
-const CATEGORIES = [
-  'Glow',
-  'Lava',
-  'Lights',
-  'Snake',
-  'Static',
-  'Cyberpunk 2.0',
-  'Abstract',
-  'Lines',
-  'Minimal',
-  'Pride',
-  'Cyberpunk',
-  'Colours',
-  'Glass',
-  'Gradients',
-];
+const CATEGORIES = ['Static'];
 
 const images = {
   Glow: ['bg.png'],
   Lava: ['bg2.png'],
   Lights: ['bg3.png'],
   Snake: ['bg4.png'],
-  Static: ['bg5.png', 'bg6.png', 'bg7.png', 'bg8.png', 'bg9.png'],
+  Static: ['bg5.png', 'bg6.png', 'bg7.png', 'bg8.png', 'bg9.png', 'bg10.png', 'bg11.gif'],
 };
 
 export default function BackgroundImageSettings() {
@@ -56,6 +41,9 @@ export default function BackgroundImageSettings() {
     'bg7.png': require('assets/images/backgrounds/bg7.png'),
     'bg8.png': require('assets/images/backgrounds/bg8.png'),
     'bg9.png': require('assets/images/backgrounds/bg9.png'),
+    'bg10.png': require('assets/images/backgrounds/bg10.png'),
+
+    'bg11.gif': require('assets/images/backgrounds/bg11.gif'),
   };
 
   return (

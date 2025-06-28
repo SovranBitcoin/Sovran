@@ -49,6 +49,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         ...style,
       }}>
       <View
+        blur
         style={{
           borderRadius: 8,
           flexDirection: 'column',
