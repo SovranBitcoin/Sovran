@@ -193,28 +193,28 @@ function TabOneScreen() {
             />
             <Spacer size={12} />
           </View> */}
-          <View className="m-4">
+          <View
+            className="p-4"
+            style={{
+              backgroundColor: theme.greys[2300],
+            }}>
+            {theme.shades && (
+              <LinearGradient
+                colors={[
+                  theme.greys[2300],
+                  opacity(theme.greys[2300], 0.85),
+                  opacity(theme.greys[2300], 0),
+                  opacity(theme.greys[2300], 0),
+                ]}
+                start={{ x: 0.5, y: 1 }}
+                end={{ x: 0.5, y: 0 }}
+                style={[StyleSheet.absoluteFill, { top: -224, height: 224 }]}
+              />
+            )}
             <Transactions days={1} account={account} />
           </View>
-          {theme.shades && (
-            <LinearGradient
-              colors={[
-                theme.greys[2300],
-                theme.greys[2300],
-                theme.greys[2300],
-                opacity(theme.greys[2300], 0),
-                opacity(theme.greys[2300], 0),
-              ]}
-              start={{ x: 0.5, y: 1 }}
-              end={{ x: 0.5, y: 0 }}
-              style={[
-                StyleSheet.absoluteFill,
-                { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
-              ]}
-            />
-          )}
         </ScrollView>
-        {theme.greys && (
+        {/* {theme.greys && (
           <LinearGradient
             colors={[
               theme.greys[2300],
@@ -230,7 +230,7 @@ function TabOneScreen() {
               { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
             ]}
           />
-        )}
+        )} */}
       </SafeAreaView>
     </View>
   );
@@ -249,7 +249,7 @@ const createStyles = (theme: string) =>
     },
     accountPagerView: {
       display: 'flex',
-      height: 300,
+      // height: 550,
       width: '100%',
     },
   });

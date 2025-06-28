@@ -24,8 +24,9 @@ export function TransactionMintRefresh({
 
   return (
     <View
+      blur
       style={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: theme.greys[1800],
       }}
       className="mx-4 mb-0 flex-row items-center justify-between rounded-lg p-4">
       <View className="flex-row items-center">

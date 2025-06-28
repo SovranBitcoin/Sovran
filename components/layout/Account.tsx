@@ -149,7 +149,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         </View>
       </View>
 
-      <View style={styles.absoluteBottomBorder} />
+      {/* <View style={styles.absoluteBottomBorder} /> */}
 
       {/* <View style={styles.absoluteRightBottomBorder}>
         <View style={styles.bottomNegative}>{renderCurrencyIcon()}</View>

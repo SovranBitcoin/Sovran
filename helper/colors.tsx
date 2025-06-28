@@ -1,3 +1,5 @@
+import { BACKGROUND_IMAGE_ATTRIBUTES } from './backgroundImages';
+
 export const shades = {
   100: '#FF5841',
   200: '#FF353C',
@@ -163,7 +165,10 @@ export const blues = {
 };
 
 export const greys = (t = 'dark') => {
-  console.log(t);
+  if (BACKGROUND_IMAGE_ATTRIBUTES?.[t?.id]) {
+    return BACKGROUND_IMAGE_ATTRIBUTES[t?.id].greys;
+  }
+
   switch (t) {
     case 'neon-dream': {
       return {
@@ -827,18 +832,41 @@ export const black = '#181412'; // off black
 export function computeGreys(
   theme: string,
   primaryColor = '#FF0000',
-  saturation = 15,
+  maxSaturation = 25,
   minLightness = 12
 ) {
-  const tinted: Record<string, string> = {};
-  const { h: primaryHue } = rgbToHsl(...Object.values(hexToRgb(primaryColor)));
+  const baseGreys = greys(theme);
+  const baseLightnessMap: Record<string, number> = {};
+  for (const [key, hex] of Object.entries(baseGreys)) {
+    baseLightnessMap[key] = rgbToHsl(...Object.values(hexToRgb(hex))).l;
+  }
 
-  for (const [key, hex] of Object.entries(greys(theme))) {
-    const { r, g, b } = hexToRgb(hex);
-    const { l } = rgbToHsl(r, g, b);
-    const adjustedL = Math.max(l, minLightness); // avoid fully black shades
-    const { r: newR, g: newG, b: newB } = hslToRgb(primaryHue, saturation, adjustedL);
-    tinted[key] = rgbToHex(newR, newG, newB);
+  const originalL2300 = baseLightnessMap['2300'];
+  const {
+    h: primaryHue,
+    s: baseS,
+    l: primaryLightness,
+  } = rgbToHsl(...Object.values(hexToRgb(primaryColor)));
+
+  const lightnessValues = Object.values(baseLightnessMap);
+  const minL = Math.min(...lightnessValues);
+  const maxL = Math.max(...lightnessValues);
+
+  const scaleLightness = (l: number) =>
+    originalL2300 + ((l - minL) / (maxL - minL)) * (100 - originalL2300);
+
+  const scaleSaturation = (l: number) =>
+    Math.min(
+      maxSaturation,
+      maxSaturation * ((l - minL) / (maxL - minL)) ** 1.2 // curved scale to boost higher L
+    );
+
+  const tinted: Record<string, string> = {};
+  for (const [key, origL] of Object.entries(baseLightnessMap)) {
+    const newL = Math.max(scaleLightness(origL), minLightness);
+    const newS = scaleSaturation(origL);
+    const { r, g, b } = hslToRgb(primaryHue, newS, newL);
+    tinted[key] = rgbToHex(r, g, b);
   }
 
   return tinted;
