@@ -26,7 +26,7 @@ interface AmountFormatterProps {
 export function AmountFormatter({
   amount,
   unit,
-  size = 37,
+  size = 42,
   weight = 'heavy',
   color,
   style,

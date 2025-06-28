@@ -7,6 +7,7 @@ import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 
 type Props = RNViewProps & {
   blur?: boolean;
+  colorBlur?: string;
   blurIntensity?: number;
   blurTint?: BlurTint;
   children?: React.ReactNode;
@@ -34,7 +35,18 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
   // 🧊 Blur-enhanced View
   return (
     <RNView ref={ref} style={[cleanStyle, styles.overflowHidden]} {...rest}>
+      {rest.colorBlur && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: rest.colorBlur,
+            },
+          ]}
+        />
+      )}
       <BlurView intensity={blurIntensity} tint={effectiveTint} style={[StyleSheet.absoluteFill]} />
+
       {children}
     </RNView>
   );

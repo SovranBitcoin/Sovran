@@ -17,7 +17,7 @@ export function useHandleCameraPermission() {
     if (!permission) return false;
 
     if (permission.granted) {
-      showMessage('camera_permission_granted');
+      // showMessage('camera_permission_granted');
       return true;
     }
 

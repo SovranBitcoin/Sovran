@@ -42,8 +42,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       {btcPrice?.usd?.btc && (
         <View
           blur
+          colorBlur={opacity(greens[500], 0.2)}
           style={{
-            backgroundColor: opacity(greens[400], 0.1),
             borderColor: opacity(greens[500], 0.5),
             borderWidth: 0.2,
             padding: 8,
