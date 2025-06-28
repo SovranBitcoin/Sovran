@@ -74,7 +74,8 @@ export const RowButton: React.FC<{
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
-}> = ({ label, value, onPress, isFirst, isLast, isDanger }) => {
+  rightIcon?: React.ReactNode;
+}> = ({ label, value, onPress, isFirst, isLast, isDanger, rightIcon }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme, isDanger);
   return (
@@ -99,14 +100,16 @@ export const RowButton: React.FC<{
           </Text>
         )}
         {onPress ? (
-          <FeatherIcon
-            style={{
-              marginRight: !!onPress ? 0 : 8,
-            }}
-            color={isDanger ? reds[300] : greys(theme)[700]}
-            name="chevron-right"
-            size={19}
-          />
+          rightIcon ?? (
+            <FeatherIcon
+              style={{
+                marginRight: !!onPress ? 0 : 8,
+              }}
+              color={isDanger ? reds[300] : greys(theme)[700]}
+              name="chevron-right"
+              size={19}
+            />
+          )
         ) : (
           <View
             style={{

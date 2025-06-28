@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { isValidEcashToken } from 'components/cashu';
@@ -19,6 +19,13 @@ import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { Spacer } from 'components/common/View';
+import { RowButton, Section } from 'app/settings';
+import Icon, { CurrencyIcon } from 'assets/icons';
+import { Text } from 'components/common/Text';
+import { useSelector } from 'react-redux';
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { greys } from 'helper/colors';
+import { truncateMiddle } from 'helper/strings';
 export const pool = new SimplePool();
 
 type UnitType = 'sat' | string;
@@ -38,6 +45,7 @@ interface TokenHandlerParams {
 const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
   const navigation = useTypedNavigation();
   const { currentProfile } = useNostr();
+  const theme = useSelector(memoizedGetTheme);
   const [hasPermission, requestPermission] = useCameraPermissions();
 
   /**
@@ -120,6 +128,11 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
     });
   };
 
+  const handleCopyLightningAddress = useCallback(async () => {
+    await Clipboard.setStringAsync(`${currentProfile.npub}@npubx.cash`);
+    showMessage('lightning_address_copied');
+  }, [currentProfile.npub]);
+
   const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;
   const showLightningAddress = Boolean(currentProfile?.npub && unit === 'sat');
 
@@ -199,6 +212,23 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
           }}
         />
         <Spacer size={12} />
+
+        {showLightningAddress && (
+          <Section title="Contact">
+            <RowButton
+              label={
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
+                  <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                    {truncateMiddle(currentProfile.npub, 10)}@npubx.cash
+                  </Text>
+                </View>
+              }
+              onPress={handleCopyLightningAddress}
+              rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
+            />
+          </Section>
+        )}
 
         {/* {unit === 'sat' && (
           <View
