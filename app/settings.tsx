@@ -80,7 +80,14 @@ export const RowButton: React.FC<{
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme, isDanger);
   return (
-    <View blur style={styles.rowWrapper}>
+    <View
+      blur
+      style={[
+        styles.rowWrapper,
+        {
+          borderTopWidth: !isFirst && 1,
+        },
+      ]}>
       <TouchableOpacity
         onPress={onPress}
         style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
@@ -447,7 +454,6 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     rowWrapper: {
       paddingLeft: 16,
       backgroundColor: greys(theme)[1800],
-      borderTopWidth: 1,
       borderColor: greys(theme)[1500],
     },
     rowFirst: {
