@@ -98,10 +98,10 @@ function ThemeSettings() {
   const renderThemeIcon = (themeName: string) => (
     <View
       style={{
-        backgroundColor: greys(themeName)[600],
+        backgroundColor: greys(themeName)[300],
         borderRadius: 100,
       }}>
-      <ThemeIcon color={greys(themeName)[1800]} />
+      <ThemeIcon color={greys(themeName)[800]} />
     </View>
   );
 

@@ -15,8 +15,8 @@ export function ImageContainer({ url }) {
         height: 250,
         marginBottom: 8,
         borderRadius: 8,
-        backgroundColor: greys(theme)[1500],
-        borderColor: greys(theme)[1300],
+        backgroundColor: greys(theme)[700],
+        borderColor: greys(theme)[600],
         borderWidth: 0.5,
       }}
       source={{ uri: url }}

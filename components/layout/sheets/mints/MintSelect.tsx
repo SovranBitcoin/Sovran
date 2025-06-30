@@ -139,11 +139,11 @@ const MintItem: React.FC<MintItemProps> = ({
       colors={
         isSelected
           ? [
-              opacity(shades[100], 0.88),
+              opacity(shades[200], 0.88),
               opacity(shades[200], 0.88),
               opacity(shades[300], 0.88),
-              opacity(shades[400], 0.88),
-              opacity(shades[500], 0.88),
+              opacity(shades[200], 0.88),
+              opacity(shades[300], 0.88),
             ]
           : []
       }
@@ -160,7 +160,7 @@ const MintItem: React.FC<MintItemProps> = ({
           sovran(theme).listItem,
           globalLoading && styles.disabledMintItem,
           {
-            backgroundColor: greys(theme)[2100],
+            backgroundColor: greys(theme)[900],
             marginVertical: 0,
           },
           isSelected && styles.selectedMintItem,
@@ -205,8 +205,8 @@ const MintItem: React.FC<MintItemProps> = ({
             style={{
               padding: 8,
               backgroundColor: isSelected
-                ? opacity(greys(theme)[2000], 0.5)
-                : opacity(greys(theme)[1800], 0.75),
+                ? opacity(greys(theme)[900], 0.5)
+                : opacity(greys(theme)[800], 0.75),
               borderRadius: 10000,
             }}
             name="bx:dots-vertical-rounded"
@@ -330,13 +330,13 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
               colors={
                 selectedCurrency === currency
                   ? ([
-                      opacity(shades[100], 0.88),
+                      opacity(shades[200], 0.88),
                       opacity(shades[200], 0.88),
                       opacity(shades[300], 0.88),
-                      opacity(shades[400], 0.88),
-                      opacity(shades[500], 0.88),
+                      opacity(shades[200], 0.88),
+                      opacity(shades[300], 0.88),
                     ] as const)
-                  : [opacity(shades[100], 0), opacity(shades[100], 0)]
+                  : [opacity(shades[200], 0), opacity(shades[200], 0)]
               }
               style={[
                 styles.currencyButton,
@@ -347,7 +347,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
                   borderRadius: 8,
                   padding: 1,
                   backgroundColor:
-                    selectedCurrency === currency ? greys(theme)[1900] : greys(theme)[2100],
+                    selectedCurrency === currency ? greys(theme)[900] : greys(theme)[900],
                 },
               ]}>
               <TouchableOpacity
@@ -437,7 +437,7 @@ const createStyles = (theme: string) =>
       gap: 8,
     },
     selectedCurrencyButton: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
     },
     currencyText: {
       color: greys(theme)[0],
@@ -450,17 +450,17 @@ const createStyles = (theme: string) =>
       alignItems: 'center',
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       marginBottom: 8,
     },
     selectedMintItem: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
     },
     mintIcon: {
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: greys(theme)[400],
+      backgroundColor: greys(theme)[200],
     },
     mintDetails: {
       flex: 1,
@@ -472,11 +472,11 @@ const createStyles = (theme: string) =>
       fontSize: 16,
     },
     mintBalance: {
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontSize: 14,
     },
     checkIconContainer: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 1000,
       marginLeft: 8,
     },

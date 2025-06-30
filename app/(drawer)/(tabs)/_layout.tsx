@@ -55,14 +55,14 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
                 left: 18,
                 width: 64,
                 height: 64,
-                backgroundColor: opacity(greys(theme)[2100], 0.5),
+                backgroundColor: opacity(greys(theme)[900], 0.5),
                 zIndex: -2,
               },
             ]}></BlurView>
         </View>
 
         <LinearGradient
-          colors={[greys(theme)[focused ? 0 : 1300], greys(theme)[focused ? 100 : 1500]]}
+          colors={[greys(theme)[focused ? 0 : 600], greys(theme)[focused ? 100 : 700]]}
           style={{
             padding: 16,
             borderRadius: 1000,
@@ -73,7 +73,7 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
     );
   }
 
-  return <IconComponent color={focused ? theme.shades[300] : opacity(greys(theme)[100], 0.25)} />;
+  return <IconComponent color={focused ? theme.shades[300] : opacity(greys(theme)[50], 0.25)} />;
 };
 
 const TabBarBackground = ({ theme }) => (
@@ -105,7 +105,7 @@ const createStyles = (theme: string) =>
       elevation: 0,
     },
     headerStyle: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       height: 0,
     },
     headerLeftContainer: {
@@ -115,7 +115,7 @@ const createStyles = (theme: string) =>
       marginRight: 8,
       padding: 8,
       borderRadius: 1000,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
     },
     searchContainer: {
       justifyContent: 'center',
@@ -160,8 +160,8 @@ const TabLayout = () => {
   // Function to create tab screen options
   const createTabScreenOptions = (title, IconComponent) => ({
     title,
-    tabBarActiveTintColor: shades[500],
-    tabBarInactiveTintColor: greys(theme)[600],
+    tabBarActiveTintColor: shades[300],
+    tabBarInactiveTintColor: greys(theme)[300],
     headerTitleAlign: 'center',
     headerTintColor: '#fff',
     tabBarLabel: '',

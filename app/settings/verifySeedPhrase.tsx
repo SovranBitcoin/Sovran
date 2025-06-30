@@ -100,7 +100,7 @@ const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     content: {
       paddingHorizontal: 16,
@@ -111,7 +111,7 @@ const createStyles = (theme: string) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: greys(theme)[600],
+      color: greys(theme)[300],
       textTransform: 'uppercase',
     },
     wordContainer: {
@@ -120,7 +120,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
     },
     wordButton: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       padding: 8,
       margin: 4,
       borderRadius: 8,
@@ -136,7 +136,7 @@ const createStyles = (theme: string) =>
     selectedWordsContainer: {
       marginVertical: 8,
       padding: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
     },
     selectedWordsText: {

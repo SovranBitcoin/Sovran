@@ -22,7 +22,7 @@ function CreditCardSheet(props: any) {
       initialRoute="main"
       containerStyle={{
         height: height - CARD_HEIGHT - 64 - 8,
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
       }}
       gestureEnabled={true}
       {...props}

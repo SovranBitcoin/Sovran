@@ -210,15 +210,15 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
               <RowButton
                 label={
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
-                    <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
-                      {truncateMiddle(currentProfile.npub, 8)}@npubx.cash
+                    <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
+                    <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                      {truncateMiddle(currentProfile.npub, 7)}@npubx.cash
                     </Text>
                   </View>
                 }
                 isFirst
                 onPress={handleCopyLightningAddress}
-                rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
+                rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
               />
             </Section>
           </View>

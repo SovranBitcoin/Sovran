@@ -213,13 +213,13 @@ const Heatmap = ({ mintInfo, wallet }: HeatmapProps) => {
     if (successRate >= 0.3) return '#FF0000';
     if (successRate >= 0.1) return '#ED0C46';
     if (successRate >= 0) return '#ED0C46';
-    return greys(theme)[1500];
+    return greys(theme)[700];
   };
 
   if (!mintInfo || !wallet?.audits) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={greens[500]} />
+        <ActivityIndicator size="large" color={greens[300]} />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -345,7 +345,7 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
           {/* Subtle gradient overlay for depth */}
 
           <View style={styles.cardContent}>
-            <Text style={[styles.label, { color: greys(theme)[400] }]}>{stat.label}</Text>
+            <Text style={[styles.label, { color: greys(theme)[200] }]}>{stat.label}</Text>
 
             <Text
               style={[
@@ -356,7 +356,7 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
               {stat.value}
             </Text>
 
-            <Text style={[styles.description, { color: greys(theme)[600] }]}>
+            <Text style={[styles.description, { color: greys(theme)[300] }]}>
               {stat.description}
             </Text>
           </View>
@@ -384,13 +384,13 @@ const createStyles = (theme: string) =>
       padding: 16,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: greys(theme)[700],
       position: 'relative',
       overflow: 'hidden',
       minHeight: 90,
       justifyContent: 'space-between',
-      backgroundColor: greys(theme)[1800],
-      shadowColor: greys(theme)[1900],
+      backgroundColor: greys(theme)[800],
+      shadowColor: greys(theme)[900],
       flex: 1,
 
       // Subtle shadow for depth
@@ -409,7 +409,7 @@ const createStyles = (theme: string) =>
       left: 0,
       right: 0,
       height: 1,
-      backgroundColor: opacity(greys(theme)[1900], 0.1),
+      backgroundColor: opacity(greys(theme)[900], 0.1),
     },
 
     label: {
@@ -465,7 +465,7 @@ const createStyles = (theme: string) =>
       marginBottom: 8,
     },
     title: {
-      color: greys(theme)[600],
+      color: greys(theme)[300],
       fontFamily: 'OverpassRegular',
       fontSize: 16,
     },
@@ -505,7 +505,7 @@ const createStyles = (theme: string) =>
     loadingText: {
       marginTop: 16,
       fontSize: 16,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
     },
     errorContainer: {
       flex: 1,
@@ -523,7 +523,7 @@ const createStyles = (theme: string) =>
     },
     errorSubtext: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       textAlign: 'center',
     },
     headerContainer: {
@@ -562,25 +562,25 @@ const createStyles = (theme: string) =>
     },
     mintVersion: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       textAlign: 'center',
     },
     descriptionContainer: {
       marginHorizontal: 16,
       marginBottom: 16,
       padding: 16,
-      backgroundColor: greys(theme)[700],
+      backgroundColor: greys(theme)[400],
       borderRadius: 12,
       borderLeftWidth: 4,
       borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
-      color: greys(theme)[100],
+      color: greys(theme)[50],
       lineHeight: 20,
     },
     actionButton: {
-      backgroundColor: greens[500],
+      backgroundColor: greens[300],
       borderRadius: 8,
       marginVertical: 2,
     },
@@ -603,7 +603,7 @@ const createStyles = (theme: string) =>
     },
     copiedText: {
       fontSize: 12,
-      color: greens[400],
+      color: greens[200],
       fontWeight: '600',
     },
     container2: {

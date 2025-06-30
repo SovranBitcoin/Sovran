@@ -44,7 +44,7 @@ export const ButtonBase = ({
   const colorsMap = useMemo(
     () => ({
       primary: [greys(theme)[0], greys(theme)[0]],
-      secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
+      secondary: [greys(theme)[600], greys(theme)[700], greys(theme)[800]],
       transparent: ['transparent', 'transparent'],
       dangerous: [reds[300]],
     }),
@@ -128,7 +128,7 @@ export const ButtonBase = ({
             {
               ...(noPadding ? { margin: 0 } : {}),
               opacity: disabled || isLoading ? 0.5 : 1,
-              borderColor: variant === 'primary' ? greys(theme)[100] : greys(theme)[1000],
+              borderColor: variant === 'primary' ? greys(theme)[50] : greys(theme)[500],
               width: !text ? 48 : undefined,
               height: !text ? 48 : undefined,
               backgroundColor: colorsMap[variant][1],
@@ -159,7 +159,7 @@ export const ButtonBase = ({
             <Text
               className="py-3 text-center text-base"
               style={{
-                color: variant === 'primary' ? black : greys(theme)[100],
+                color: variant === 'primary' ? black : greys(theme)[50],
                 fontFamily: 'OverpassBold',
                 width: !shouldShowLoading && text ? 'auto' : 0,
               }}>

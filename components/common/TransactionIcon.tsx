@@ -21,12 +21,12 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
         style={
           isSmall
             ? {
-                backgroundColor: greys(theme)[1500],
+                backgroundColor: greys(theme)[700],
                 borderRadius: 100,
                 height: iconSize + 6,
                 width: iconSize + 6,
                 padding: 3,
-                borderColor: greys(theme)[1300],
+                borderColor: greys(theme)[600],
               }
             : {}
         }>
@@ -42,7 +42,7 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
                     ? 'fluent:arrow-download-16-filled'
                     : 'fluent:arrow-upload-16-filled'
           }
-          color={greys(theme)[100]}
+          color={greys(theme)[50]}
           size={iconSize}
         />
       </View>
@@ -52,7 +52,7 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
             width: 28,
             height: 28,
             borderRadius: 1000,
-            borderColor: greys(theme)[1500],
+            borderColor: greys(theme)[700],
             borderWidth: 1,
           }}
           source={{ uri: nostrData?.profile?.picture }}

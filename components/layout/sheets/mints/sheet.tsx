@@ -15,7 +15,7 @@ export function Sheet({ initialRoute, routes, actionSheetRef }) {
       backgroundInteractionEnabled={false}
       gestureEnabled={true}
       containerStyle={{
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
         height: Dimensions.get('window').height - 39,
       }}
       routes={routes}

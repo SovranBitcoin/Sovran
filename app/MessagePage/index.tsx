@@ -491,14 +491,14 @@ const createStyles = (theme: string) =>
     noItemsText: {
       fontFamily: 'OverpassBold',
       fontSize: 14,
-      color: greys(theme)[700],
+      color: greys(theme)[400],
       textAlign: 'center',
       marginVertical: 16,
     },
     dateHeaderText: {
       fontFamily: 'OverpassBold',
       fontSize: 14,
-      color: greys(theme)[700],
+      color: greys(theme)[400],
       textAlign: 'center',
       marginVertical: 16,
     },

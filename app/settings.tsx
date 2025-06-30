@@ -63,7 +63,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
         <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
         <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
       </View>
-      <FeatherIcon color={greys(theme)[700]} name="chevron-right" size={22} />
+      <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
     </TouchableOpacity>
   );
 };
@@ -102,7 +102,7 @@ export const RowButton: React.FC<{
                 marginRight: 3,
                 fontFamily: 'OverpassBold',
               },
-              isDanger ? { color: reds[300] } : { color: greys(theme)[700] },
+              isDanger ? { color: reds[300] } : { color: greys(theme)[400] },
             ]}>
             {value}
           </Text>
@@ -113,7 +113,7 @@ export const RowButton: React.FC<{
               style={{
                 marginRight: !!onPress ? 0 : 8,
               }}
-              color={isDanger ? reds[300] : greys(theme)[700]}
+              color={isDanger ? reds[300] : greys(theme)[400]}
               name="chevron-right"
               size={19}
             />
@@ -390,7 +390,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       fontWeight: '500',
       textAlign: 'center',
-      color: greys(theme)[600],
+      color: greys(theme)[300],
     },
     section: {
       paddingVertical: 12,
@@ -401,12 +401,12 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: isDanger ? reds[300] : greys(theme)[600],
+      color: isDanger ? reds[300] : greys(theme)[300],
       textTransform: 'uppercase',
     },
     sectionBody: {
       borderRadius: 12,
-      shadowColor: greys(theme)[1000],
+      shadowColor: greys(theme)[500],
       shadowOffset: {
         width: 0,
         height: 1,
@@ -418,7 +418,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     profile: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -441,7 +441,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginTop: 2,
       fontSize: 16,
       fontWeight: '400',
-      color: greys(theme)[700],
+      color: greys(theme)[400],
     },
     row: {
       height: 44,
@@ -453,8 +453,8 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     rowWrapper: {
       paddingLeft: 16,
-      backgroundColor: greys(theme)[1800],
-      borderColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[800],
+      borderColor: greys(theme)[700],
     },
     rowFirst: {
       borderTopLeftRadius: 12,
@@ -490,7 +490,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     debugContainer: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       marginVertical: 8,
     },
@@ -502,7 +502,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginTop: 8,
       paddingVertical: 4,
       paddingHorizontal: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       borderRadius: 4,
     },
     changeProfileText: {

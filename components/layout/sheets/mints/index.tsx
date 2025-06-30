@@ -106,7 +106,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
           {
             flexDirection: 'row',
             justifyContent: 'space-between',
-            backgroundColor: theme.greys[1800],
+            backgroundColor: theme.greys[800],
           },
         ]}
         blur>
@@ -143,7 +143,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
           </View>
         </View>
         <View style={styles.chevronContainer}>
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[700]} />
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[400]} />
         </View>
         {/* <Text style={styles.dot}>•</Text> */}
       </View>
@@ -167,8 +167,8 @@ const baseStyles = (theme: string) => ({
   // Base container styles
   container: {
     padding: 8,
-    // backgroundColor: greys(theme)[1800],
-    borderColor: greys(theme)[1300],
+    // backgroundColor: greys(theme)[800],
+    borderColor: greys(theme)[600],
     borderWidth: 0.2,
     borderRadius: 8,
   } as ViewStyle,
@@ -288,17 +288,17 @@ const baseStyles = (theme: string) => ({
   // Border variations
   borderSubtle: {
     borderWidth: 0.2,
-    borderColor: greys(theme)[1300],
+    borderColor: greys(theme)[600],
   } as ViewStyle,
 
   borderMedium: {
     borderWidth: 0.5,
-    borderColor: greys(theme)[1400],
+    borderColor: greys(theme)[600],
   } as ViewStyle,
 
   borderProminent: {
     borderWidth: 1,
-    borderColor: greys(theme)[1500],
+    borderColor: greys(theme)[700],
   } as ViewStyle,
 
   // Layout variations
@@ -378,21 +378,21 @@ const sovran = (theme: string) => ({
 
   selectionControlActive: {
     backgroundColor: shades[200],
-    borderColor: shades[100],
+    borderColor: shades[200],
   } as ViewStyle,
 
   selectionControlInactive: {
-    backgroundColor: greys(theme)[1400],
-    borderColor: greys(theme)[1000],
+    backgroundColor: greys(theme)[600],
+    borderColor: greys(theme)[500],
   } as ViewStyle,
 
   // Background variations
   backgroundSubtle: {
-    backgroundColor: opacity(greys(theme)[1800], 0.75),
+    backgroundColor: opacity(greys(theme)[800], 0.75),
   } as ViewStyle,
 
   backgroundSolid: {
-    backgroundColor: greys(theme)[1800],
+    backgroundColor: greys(theme)[800],
   } as ViewStyle,
 });
 
@@ -485,7 +485,7 @@ export const createStyles = (theme: string) =>
       paddingVertical: 6,
       paddingHorizontal: 6,
       borderRadius: 100000,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       marginBottom: 8,
     },
     icon: {
@@ -497,21 +497,21 @@ export const createStyles = (theme: string) =>
       width: 32,
       height: 32,
       borderRadius: 12,
-      backgroundColor: greys(theme)[1000],
+      backgroundColor: greys(theme)[500],
     },
     name: {
-      color: greys(theme)[100],
+      color: greys(theme)[50],
       fontSize: 12,
       fontFamily: 'OverpassBold',
       marginLeft: -2,
     },
     dot: {
-      color: greys(theme)[700],
+      color: greys(theme)[400],
       fontSize: 16,
       marginHorizontal: 8,
     },
     balance: {
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       fontSize: 12,
       fontFamily: 'OverpassBold',
     },
@@ -526,7 +526,7 @@ export const createStyles = (theme: string) =>
     },
     actionSheetContainer: {
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     scrollContainer: {
       padding: 16,
@@ -534,7 +534,7 @@ export const createStyles = (theme: string) =>
     },
     buttonContainer: {
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     sectionHeader: {
       color: greys(theme)[0],
@@ -549,7 +549,7 @@ export const createStyles = (theme: string) =>
       marginRight: 12,
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       minWidth: 100,
     },
     currencyContent: {
@@ -559,7 +559,7 @@ export const createStyles = (theme: string) =>
       gap: 8,
     },
     selectedCurrencyButton: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
     },
     currencyText: {
       color: greys(theme)[0],
@@ -574,17 +574,17 @@ export const createStyles = (theme: string) =>
       alignItems: 'center',
       padding: 12,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       marginBottom: 8,
     },
     selectedMintItem: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
     },
     mintIcon: {
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: greys(theme)[400],
+      backgroundColor: greys(theme)[200],
     },
     mintDetails: {
       flex: 1,
@@ -596,12 +596,12 @@ export const createStyles = (theme: string) =>
       fontSize: 16,
     },
     mintBalance: {
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontSize: 14,
     },
     button: {
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       marginTop: 16,
       alignItems: 'center',

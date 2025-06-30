@@ -15,7 +15,7 @@ const Container: React.FC<{
   const styles = createStyles();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: greys(theme)[2300], ...style }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: greys(theme)[950], ...style }}>
       <View
         style={[
           styles.content,

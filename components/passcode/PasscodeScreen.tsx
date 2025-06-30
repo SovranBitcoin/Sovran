@@ -75,7 +75,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   return (
     <BlurView style={styles.container}>
       <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
-        <AnimatedSpriteBackground backgroundColor={greys(theme)[2300]} />
+        <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
 
         {currentProfile?.picture && (
           <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
@@ -105,7 +105,7 @@ const createStyles = (theme: any) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     avatar: {
       width: 80,

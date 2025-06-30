@@ -26,7 +26,7 @@ export function TransactionMintRefresh({
     <View
       blur
       style={{
-        backgroundColor: theme.greys[1800],
+        backgroundColor: theme.greys[800],
       }}
       className="mx-4 mb-0 flex-row items-center justify-between rounded-lg p-4">
       <View className="flex-row items-center">
@@ -43,7 +43,7 @@ export function TransactionMintRefresh({
                 ? 'Received with'
                 : 'Receiving with'}
           </Text>
-          <Text regular size={16} color={greys(theme)[100]}>
+          <Text regular size={16} color={greys(theme)[50]}>
             {mintInfo?.name}
           </Text>
         </View>

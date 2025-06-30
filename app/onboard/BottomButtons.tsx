@@ -70,10 +70,10 @@ const getSpacingStyle = (vertical, index, isLastButton) => {
 const getButtonStyle = (variant, theme) => {
   const variantStyles = {
     primary: { backgroundColor: shades[300] },
-    secondary: { backgroundColor: greys(theme)[1200] },
-    tertiary: { backgroundColor: greys(theme)[1800] },
+    secondary: { backgroundColor: greys(theme)[500] },
+    tertiary: { backgroundColor: greys(theme)[800] },
     info: { backgroundColor: shades[300] },
-    default: { backgroundColor: greys(theme)[1800] },
+    default: { backgroundColor: greys(theme)[800] },
   };
 
   return variantStyles[variant] || variantStyles.default;
@@ -84,7 +84,7 @@ const createStyles = (theme: string) =>
     bottomButtons: {
       width: '100%',
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     horizontalButtons: {
       flexDirection: 'row',

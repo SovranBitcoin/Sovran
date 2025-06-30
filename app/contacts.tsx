@@ -134,15 +134,15 @@ function ModalScreen() {
   const showNoResults = hasSearched && !loading && searchResults.length === 0;
 
   // Set default values for SkeletonContainer props to avoid using defaultProps
-  const skeletonBgColor = greys(theme)[1800];
-  const skeletonHighlightColor = greys(theme)[1300];
+  const skeletonBgColor = greys(theme)[800];
+  const skeletonHighlightColor = greys(theme)[600];
   const skeletonSpeed = 800;
   const skeletonAnimation = loading ? 'pulse' : 'none';
 
   return (
     <SafeAreaView
       style={{
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
         flex: 1,
       }}>
       <SkeletonContainer
@@ -153,13 +153,13 @@ function ModalScreen() {
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
             style={{
-              backgroundColor: greys(theme)[2300],
+              backgroundColor: greys(theme)[950],
             }}
             onScrollBeginDrag={handleScroll}
             scrollEventThrottle={16}>
             <View
               style={{
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: greys(theme)[950],
                 paddingHorizontal: 16,
               }}>
               <View
@@ -176,11 +176,11 @@ function ModalScreen() {
                     value={searchQuery}
                     onChangeText={handleSearchQueryChange}
                     placeholder="Search users..."
-                    placeholderTextColor={greys(theme)[1000]}
+                    placeholderTextColor={greys(theme)[500]}
                     style={{
                       flex: 1,
                       paddingRight: 30,
-                      backgroundColor: greys(theme)[1800], // Add background color
+                      backgroundColor: greys(theme)[800], // Add background color
                       borderRadius: 16, // Add border radius for styling
                       padding: 14, // Add padding
                       fontSize: 16,
@@ -198,14 +198,14 @@ function ModalScreen() {
                         zIndex: 1,
                         padding: 14,
                       }}>
-                      <Icon name="simple-line-icons:close" size={20} color={greys(theme)[100]} />
+                      <Icon name="simple-line-icons:close" size={20} color={greys(theme)[50]} />
                     </TouchableOpacity>
                   )}
                 </View>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                   <Text
                     style={{
-                      color: greys(theme)[100],
+                      color: greys(theme)[50],
                       marginLeft: 12,
                       fontSize: 16,
                     }}>
@@ -221,7 +221,7 @@ function ModalScreen() {
                     <Text
                       loading={loading}
                       style={{
-                        color: greys(theme)[700],
+                        color: greys(theme)[400],
                         fontSize: 14,
                         fontFamily: 'OverpassBold',
                       }}>
@@ -271,17 +271,17 @@ function NoResultsFound({ theme }) {
           width: 80,
           height: 80,
           borderRadius: 40,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 24,
         }}>
-        <Icon name="nonicons:error-16" size={40} color={greys(theme)[700]} />
+        <Icon name="nonicons:error-16" size={40} color={greys(theme)[400]} />
       </View>
 
       <Text
         style={{
-          color: greys(theme)[100],
+          color: greys(theme)[50],
           fontSize: 20,
           fontFamily: 'OverpassBold',
           marginBottom: 12,
@@ -292,7 +292,7 @@ function NoResultsFound({ theme }) {
 
       <Text
         style={{
-          color: greys(theme)[700],
+          color: greys(theme)[400],
           fontSize: 16,
           textAlign: 'center',
           marginBottom: 28,
@@ -302,7 +302,7 @@ function NoResultsFound({ theme }) {
 
       <View
         style={{
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           borderRadius: 12,
           padding: 16,
           width: '100%',
@@ -310,7 +310,7 @@ function NoResultsFound({ theme }) {
         }}>
         <Text
           style={{
-            color: greys(theme)[200],
+            color: greys(theme)[100],
             fontSize: 16,
             fontFamily: 'OverpassBold',
             marginBottom: 12,
@@ -318,20 +318,20 @@ function NoResultsFound({ theme }) {
           Try adjusting your search:
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="lucide:pencil-line" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="lucide:pencil-line" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Check your spelling
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="solar:key-bold" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="solar:key-bold" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Try using a complete public key
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="mdi:at" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="mdi:at" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Use a different NIP-05 identifier
           </Text>
         </View>
@@ -354,17 +354,17 @@ function EmptyStateView({ theme }) {
           width: 80,
           height: 80,
           borderRadius: 40,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 24,
         }}>
-        <Icon name="majesticons:search-line" size={40} color={greys(theme)[700]} />
+        <Icon name="majesticons:search-line" size={40} color={greys(theme)[400]} />
       </View>
 
       <Text
         style={{
-          color: greys(theme)[100],
+          color: greys(theme)[50],
           fontSize: 20,
           fontFamily: 'OverpassBold',
           marginBottom: 12,
@@ -375,7 +375,7 @@ function EmptyStateView({ theme }) {
 
       <Text
         style={{
-          color: greys(theme)[700],
+          color: greys(theme)[400],
           fontSize: 16,
           textAlign: 'center',
           marginBottom: 28,
@@ -385,7 +385,7 @@ function EmptyStateView({ theme }) {
 
       <View
         style={{
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           borderRadius: 12,
           padding: 16,
           width: '100%',
@@ -393,7 +393,7 @@ function EmptyStateView({ theme }) {
         }}>
         <Text
           style={{
-            color: greys(theme)[200],
+            color: greys(theme)[100],
             fontSize: 16,
             fontFamily: 'OverpassBold',
             marginBottom: 4,
@@ -401,20 +401,20 @@ function EmptyStateView({ theme }) {
           Search Tips:
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="ph:user-bold" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="ph:user-bold" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Search by username or display name
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="solar:key-bold" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="solar:key-bold" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Search by public key
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="mdi:at" size={20} color={greys(theme)[600]} />
-          <Text style={{ color: greys(theme)[400], fontSize: 14, flex: 1, paddingLeft: 8 }}>
+          <Icon name="mdi:at" size={20} color={greys(theme)[300]} />
+          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
             Search by NIP-05 identifier
           </Text>
         </View>
@@ -433,7 +433,7 @@ function SearchResult({ result, onPress, loading }) {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 8,
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         borderRadius: 8,
         marginBottom: 8,
       }}>
@@ -441,7 +441,7 @@ function SearchResult({ result, onPress, loading }) {
         <ProfileImage loading={loading} profile={result?.profile} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text loading={loading} style={{ fontWeight: 'bold', color: greys(theme)[100] }}>
+        <Text loading={loading} style={{ fontWeight: 'bold', color: greys(theme)[50] }}>
           {result?.profile?.displayName || result?.profile?.name}
         </Text>
         {result?.profile?.nip05 && (
@@ -486,11 +486,11 @@ function ProfileImage({ profile, loading }) {
                 width: 48,
                 height: 48,
                 borderRadius: 24,
-                backgroundColor: greys(theme)[2300],
+                backgroundColor: greys(theme)[950],
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Icon name="ph:user-bold" size={24} color={greys(theme)[700]} />
+              <Icon name="ph:user-bold" size={24} color={greys(theme)[400]} />
             </View>
           )}
         </>

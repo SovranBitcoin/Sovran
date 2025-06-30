@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: greys('dark')[2300],
+    backgroundColor: greys('dark')[950],
     paddingBottom: 16,
   },
   title: {
@@ -175,12 +175,12 @@ const styles = StyleSheet.create({
   },
   instructions: {
     fontSize: 16,
-    color: greys('dark')[200],
+    color: greys('dark')[100],
     marginBottom: 16,
     lineHeight: 22,
   },
   warningContainer: {
-    backgroundColor: infuseColors(greys('dark')[2300], reds[300]),
+    backgroundColor: infuseColors(greys('dark')[950], reds[300]),
     borderRadius: 8,
     padding: 12,
     marginBottom: 20,
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   },
   wordCell: {
     flex: 1,
-    backgroundColor: greys('dark')[1800],
+    backgroundColor: greys('dark')[800],
     borderRadius: 8,
     padding: 12,
     marginHorizontal: 4,
@@ -212,31 +212,31 @@ const styles = StyleSheet.create({
     borderLeftColor: greens[300],
   },
   wordNumber: {
-    color: greys('dark')[600],
+    color: greys('dark')[300],
     fontSize: 12,
     marginBottom: 4,
     textAlign: 'left',
   },
   wordText: {
-    color: greys('dark')[200],
+    color: greys('dark')[100],
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
   },
   securityTipsContainer: {
-    backgroundColor: greys('dark')[1800],
+    backgroundColor: greys('dark')[800],
     borderRadius: 8,
     padding: 16,
     marginTop: 8,
   },
   securityTipsTitle: {
-    color: greys('dark')[200],
+    color: greys('dark')[100],
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
   securityTipText: {
-    color: greys('dark')[400],
+    color: greys('dark')[200],
     fontSize: 14,
     marginVertical: 4,
   },

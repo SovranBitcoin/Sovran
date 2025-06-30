@@ -14,7 +14,7 @@ const TabTwoScreen = () => {
     <View
       style={{
         flex: 1,
-        backgroundColor: greys(theme)[1500],
+        backgroundColor: greys(theme)[700],
       }}>
       <View className="bg-transparent">
         <View style={{ height: 500 }}>
@@ -40,7 +40,7 @@ const TabTwoScreen = () => {
                   flex: 1,
                   justifyContent: 'flex-start',
                   alignItems: 'center',
-                  backgroundColor: greys(theme)[1500],
+                  backgroundColor: greys(theme)[700],
                   marginTop: 32,
                 }}>
                 <CreditCardComponent />
@@ -56,7 +56,7 @@ const TabTwoScreen = () => {
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       flex: 1,
       padding: 16,
     },
@@ -64,12 +64,12 @@ const createStyles = (theme: any) =>
       marginTop: 8,
     },
     eventCard: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       padding: 8,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: greys(theme)[700],
     },
     eventContent: {
       color: greys(theme)[0],
@@ -77,7 +77,7 @@ const createStyles = (theme: any) =>
       marginBottom: 8,
     },
     eventDate: {
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontSize: 12,
     },
     loadingText: {
@@ -87,20 +87,20 @@ const createStyles = (theme: any) =>
       marginTop: 20,
     },
     reactionCount: {
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       fontSize: 14,
       marginBottom: 8,
       marginTop: 12,
     },
     reactionCard: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 50,
       padding: 8,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 8,
       borderWidth: 1,
-      borderColor: greys(theme)[1500],
+      borderColor: greys(theme)[700],
     },
     reactionContent: {
       flexDirection: 'row',
@@ -122,17 +122,17 @@ const createStyles = (theme: any) =>
       height: 40,
       borderRadius: 20,
       borderWidth: 2, // Optional: Add a border for better visibility
-      borderColor: greys(theme)[1000],
+      borderColor: greys(theme)[500],
     },
     moreCircle: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: greys(theme)[1000],
+      borderColor: greys(theme)[500],
     },
     moreText: {
       color: greys(theme)[0],

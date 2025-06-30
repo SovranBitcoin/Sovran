@@ -116,7 +116,7 @@ function ModalScreen() {
         height: Dimensions.get('window').height,
         width: Dimensions.get('window').width,
         marginTop: 83,
-        backgroundColor: greys('dark')[2300],
+        backgroundColor: greys('dark')[950],
       }}>
       <BitrefillWidget />
     </View>
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   webView: {
     width: 'auto',
     height: 'auto',
-    backgroundColor: greys('dark')[2300],
+    backgroundColor: greys('dark')[950],
   },
 });
 

@@ -62,7 +62,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     gradient: {
       position: 'absolute',

@@ -93,7 +93,7 @@ function ModalScreen() {
             <TextInput
               placeholder={''}
               editable={false}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={greys(theme)[500]}
               value={currentProfile?.npub}
             />
             <Text
@@ -107,7 +107,7 @@ function ModalScreen() {
             <TextInput
               placeholder={''}
               editable={false}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={greys(theme)[500]}
               value={currentProfile?.pubkey}
             />
             <Text
@@ -120,7 +120,7 @@ function ModalScreen() {
             </Text>
             <TextInput
               placeholder={''}
-              placeholderTextColor={greys(theme)[1000]}
+              placeholderTextColor={greys(theme)[500]}
               editable={currentProfile?.nsec ? false : true}
               onChangeText={(text) => setNsec(text)}
               value={currentProfile?.nsec}
@@ -177,12 +177,12 @@ const createStyles = (theme: string) =>
       marginRight: 4,
     },
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     title: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: greys(theme)[1000],
+      color: greys(theme)[500],
     },
     separator: {
       marginVertical: 30,

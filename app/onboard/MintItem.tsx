@@ -51,7 +51,7 @@ export const MintItem = ({
         height: 100,
         marginRight: -100,
         zIndex: zIndexValue,
-        backgroundColor: theme ? theme[2300] : '#222',
+        backgroundColor: theme ? theme[950] : '#222',
       }}>
       <View
         style={{
@@ -83,7 +83,7 @@ export const MintItem = ({
               width: '100%',
               height: '100%',
               borderRadius: 100000,
-              backgroundColor: greys(theme)[2300],
+              backgroundColor: greys(theme)[950],
               opacity: calculateOpacity(positionIndex),
             }}
           />

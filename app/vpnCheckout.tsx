@@ -116,7 +116,7 @@ function ModalScreen() {
                 borderRadius: 8,
                 borderWidth: 0.2,
               }}>
-              <Text size={14} style={{ color: shades[400], marginTop: 8 }}>
+              <Text size={14} style={{ color: shades[200], marginTop: 8 }}>
                 {iosWarning}
               </Text>
             </View>

@@ -17,7 +17,17 @@ const images = {
   Lava: ['bg2.png'],
   Lights: ['bg3.png'],
   Snake: ['bg4.png'],
-  Static: ['bg5.png', 'bg6.png', 'bg7.png', 'bg8.png', 'bg9.png', 'bg10.png', 'bg11.gif'],
+  Static: [
+    'bg5.png',
+    'bg6.png',
+    'bg7.png',
+    'bg8.png',
+    'bg9.png',
+    'bg10.png',
+    'bg11.gif',
+    'bg12.png',
+    'bg14.png',
+  ],
 };
 
 export default function BackgroundImageSettings() {
@@ -44,6 +54,9 @@ export default function BackgroundImageSettings() {
     'bg10.png': require('assets/images/backgrounds/bg10.png'),
 
     'bg11.gif': require('assets/images/backgrounds/bg11.gif'),
+    'bg12.png': require('assets/images/backgrounds/bg12.png'),
+
+    'bg14.png': require('assets/images/backgrounds/bg14.png'),
   };
 
   return (

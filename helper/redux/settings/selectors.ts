@@ -43,12 +43,12 @@ export const memoizedGetTheme = createSelector(
     (state: RootState) => state.settings.settings.backgroundImage,
   ],
   (themeName: string, image) => {
-    console.log(1809273, image);
     if (image) {
       return BACKGROUND_IMAGE_ATTRIBUTES[image];
     }
 
     return {
+      id: themeName,
       shades: baseShades,
       greys: greys(themeName),
     };

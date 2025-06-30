@@ -64,7 +64,7 @@ const makeBackgroundAttributes = ({
     isArray && darkenAmount != null
       ? {
           ...greysBase,
-          2300: darken(darkenAmount, pickByStrategy(base, strategy)),
+          950: darken(darkenAmount, pickByStrategy(base, strategy)),
         }
       : greysBase;
 
@@ -119,6 +119,16 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
   'bg11.gif': makeBackgroundAttributes({
     id: 'bg11.gif',
     base: ['#687cbd', '#7dbce1', '#8156aa', '#af6bbb', '#9f90ca'],
+    darkenAmount: 0.05,
+  }),
+  'bg12.png': makeBackgroundAttributes({
+    id: 'bg12.png',
+    base: ['#79874f', '#0c0943', '#811669', '#1c7a94', '#111c82'],
+    darkenAmount: 0.1,
+  }),
+  'bg14.png': makeBackgroundAttributes({
+    id: 'bg14.png',
+    base: ['#335f00', '#092a00', '#7ba901', '#99c4ea', '#1587f0'],
     darkenAmount: 0.05,
   }),
 };

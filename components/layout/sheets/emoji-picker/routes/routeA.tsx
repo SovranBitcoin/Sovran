@@ -77,7 +77,7 @@ const createStyles = (theme: string) =>
       marginBottom: 0,
       borderRadius: 16,
       overflow: 'hidden',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     title: {
       color: greys(theme)[0],
@@ -97,7 +97,7 @@ const createStyles = (theme: string) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       padding: 12,
     },

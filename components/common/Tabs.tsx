@@ -70,16 +70,16 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
               justifyContent: 'center',
               alignItems: 'center',
               ...(selectedTab === tab && {
-                backgroundColor: greys(theme)[1300],
+                backgroundColor: greys(theme)[600],
                 borderWidth: 0,
                 borderRadius: 1000,
-                borderColor: greys(theme)[1300],
+                borderColor: greys(theme)[600],
               }),
             }}
             onPress={() => onTabPress(tab, index)}>
             <Text
               style={{
-                color: selectedTab === tab ? greys(theme)[0] : greys(theme)[200],
+                color: selectedTab === tab ? greys(theme)[0] : greys(theme)[100],
                 fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
                 fontSize: 14,
                 textAlign: 'center',
@@ -92,7 +92,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
                   marginLeft: 4,
                   fontSize: 12,
                   fontFamily: 'OverpassBold',
-                  color: greys(theme)[600],
+                  color: greys(theme)[300],
                 }}>
                 {`(${amounts[index]})`}
               </Text>

@@ -13,7 +13,7 @@ const MainRoute = ({}: RouteScreenProps<'credit-card-sheet', 'main'>) => {
       style={{
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
       }}></View>
   );
 };

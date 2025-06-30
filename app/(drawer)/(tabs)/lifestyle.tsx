@@ -155,7 +155,7 @@ const TabTwoScreen = () => {
 const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       flexDirection: 'column',
       flex: 1,
       margin: 0,
@@ -172,7 +172,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
       padding: 16,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
     },
     gridItem: {
       alignItems: 'center',
@@ -183,7 +183,7 @@ const createStyles = (theme: string) =>
     },
     gridText: {
       marginTop: 8,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       textAlign: 'center',
       fontSize: 11,
       fontFamily: 'OverpassHeavy',
@@ -193,7 +193,7 @@ const createStyles = (theme: string) =>
       height: 48,
       borderRadius: 1000,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
+      borderColor: greys(theme)[700],
     },
     bitrefillIcon: {
       width: '100%',
@@ -208,8 +208,8 @@ const createStyles = (theme: string) =>
     innerContainer: {
       borderRadius: 12,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
-      backgroundColor: greys(theme)[1800],
+      borderColor: greys(theme)[700],
+      backgroundColor: greys(theme)[800],
       padding: 8,
     },
     textContainer: {
@@ -222,11 +222,11 @@ const createStyles = (theme: string) =>
     },
     subtitleText: {
       marginTop: 1,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       flexWrap: 'wrap',
     },
     button: {
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       borderRadius: 8,
       padding: 8,
       marginTop: 8,

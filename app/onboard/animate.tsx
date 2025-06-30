@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
@@ -51,6 +51,8 @@ const ensureCompleteStep = (currentSteps, newStepsOrUpdater) => {
 };
 
 function findAndInsertAfter(array, itemToFind, itemToInsert) {
+  const _ = require('lodash');
+
   // Find the index of the item
   const index = _.findLastIndex(array, (item) => _.isEqual(item, itemToFind));
 
@@ -213,7 +215,7 @@ const ChainLoadingAnimation = () => {
                 current: index + 1,
                 max: mintsToProcess.length,
               };
-            } catch {
+            } catch (error) {
               // Silently handle mint processing errors
             }
           }
@@ -275,6 +277,8 @@ const ChainLoadingAnimation = () => {
             const { value: restoredMint } = result;
             const proofs = Object.values(restoredMint).flatMap((mint) => mint?.proofs || []);
 
+            console.log('restoredMint', restoredMint);
+
             mints.push({
               profileId: mint.id,
               mintUrl,
@@ -306,7 +310,7 @@ const ChainLoadingAnimation = () => {
           );
           return { type: 'complete' };
       }
-    } catch {
+    } catch (err) {
       setSteps(
         ensureCompleteStep(
           steps,
@@ -363,7 +367,7 @@ const ChainLoadingAnimation = () => {
         lineScaleY[index] = new Animated.Value(0);
       }
     });
-  }, [steps, lineScaleY]);
+  }, [steps]);
 
   // Scroll to active step
   useEffect(() => {
@@ -375,25 +379,22 @@ const ChainLoadingAnimation = () => {
   }, [activeStep, activeMints]);
 
   // Animate the connecting line between steps
-  const animateConnectingLine = useCallback(
-    (stepIndex) => {
-      setConnectingLines((prev) => ({
-        ...prev,
-        [stepIndex]: true,
-      }));
+  const animateConnectingLine = (stepIndex) => {
+    setConnectingLines((prev) => ({
+      ...prev,
+      [stepIndex]: true,
+    }));
 
-      Animated.timing(lineScaleY[stepIndex], {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }).start();
-    },
-    [lineScaleY]
-  );
+    Animated.timing(lineScaleY[stepIndex], {
+      toValue: 1,
+      duration: 600,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  };
 
   // Handle profile animation
-  const handleProfileAnimation = useCallback(() => {
+  const handleProfileAnimation = () => {
     animateConnectingLine(activeStep);
 
     // Wait for line animation to complete before moving to next step
@@ -402,12 +403,12 @@ const ChainLoadingAnimation = () => {
       setCurrencyIndex(0);
       setActiveStep((prevStep) => prevStep + 1);
     }, 500);
-  }, [activeStep, animateConnectingLine]);
+  };
 
   const navigation = useTypedNavigation();
 
   // Handle completion
-  const handleComplete = useCallback(() => {
+  const handleComplete = () => {
     const profileSteps = _.filter(steps, { type: 'profile' });
     const uniqueProfiles = _.keyBy(profileSteps, 'id');
     const profiles = _.values(uniqueProfiles).map((profile) => profile.profile);
@@ -443,6 +444,7 @@ const ChainLoadingAnimation = () => {
         }
         if (!_.isEmpty(keysets)) {
           _.forEach(keysets, (value, key) => {
+            console.log('add keyset', key, value);
             store.dispatch(
               increaseCounterV2({
                 profileId,
@@ -468,7 +470,7 @@ const ChainLoadingAnimation = () => {
         closeCurrentAndParents: true,
       }
     );
-  }, [navigation, steps]);
+  };
 
   // Corrected function for calculating global progress
   const calculateGlobalProgress = (currencyIndex, currencyProgress, totalCurrencies) => {
@@ -619,6 +621,7 @@ const ChainLoadingAnimation = () => {
               },
             });
 
+            console.log('KEYSET_COMPLETE123123123', currentMint?.currencies, result?.value?.unit);
             setCurrencyIndex(
               currentMint?.currencies?.findIndex((c) => c?.name === result?.value?.unit)
             );
@@ -663,18 +666,10 @@ const ChainLoadingAnimation = () => {
         }, 1000);
       }
     });
-  }, [
-    steps[activeStep],
-    activeStep,
-    handleComplete,
-    handleProfileAnimation,
-    onMessage,
-    progressObject,
-    steps,
-  ]);
+  }, [steps[activeStep]]);
 
   // Get progress for a specific mint (global progress)
-  const getMintProgress = (mintUrl: string) => {
+  const getMintProgress = (mintUrl, unit) => {
     // We no longer need the unit parameter for global progress
     return progressObject[mintUrl]?.progress || 0;
   };
@@ -713,6 +708,7 @@ const ChainLoadingAnimation = () => {
     if (!currentMintInfo) return '';
 
     const currencies = currentMintInfo.mint.currencies;
+    console.log(123213123, currencies, currencyIndex);
     if (currencyIndex < currencies.length) {
       return currencies[currencyIndex].name;
     }
@@ -846,7 +842,7 @@ const ChainLoadingAnimation = () => {
         width={3}
         fill={currentProgress * 100}
         tintColor={shades[300]}
-        backgroundColor={greys(theme)[1500]}
+        backgroundColor={greys(theme)[700]}
         duration={600}
         easing={Easing.out(Easing.ease)}
         rotation={360}

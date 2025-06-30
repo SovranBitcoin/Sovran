@@ -19,7 +19,7 @@ export const CreditCardComponent = ({
   cardType = CardType.SOVRAN,
   colorScheme = {
     primary: shades[300],
-    secondary: shades[500],
+    secondary: shades[300],
     accent: '#FFCC70',
     text: '#FFFFFF',
   },

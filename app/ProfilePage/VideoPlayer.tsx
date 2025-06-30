@@ -35,7 +35,7 @@ export function VideoScreen({ videoSource }: VideoScreenProps) {
         height: 300,
         borderRadius: 16,
         marginVertical: 8,
-        backgroundColor: greys(theme)[1500],
+        backgroundColor: greys(theme)[700],
       }}
       ref={ref}
       player={player}

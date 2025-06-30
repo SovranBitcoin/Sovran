@@ -36,7 +36,7 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
       style={{
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         padding: 16,
       }}>
       <Text style={styles.title}>Add a note</Text>
@@ -48,13 +48,13 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
         multiline
         numberOfLines={4}
         placeholder="Enter your message here (optional)"
-        placeholderTextColor={greys(theme)[1000]}
+        placeholderTextColor={greys(theme)[500]}
         value={message}
         onChangeText={setMessage}
         textAlignVertical="top"
       />
       <ButtonHandler
-        colors={[greys(theme)[1800], greys(theme)[1800]]}
+        colors={[greys(theme)[800], greys(theme)[800]]}
         context="sheet"
         buttons={[
           {
@@ -86,7 +86,7 @@ const createStyles = (theme: string) =>
     },
     subtitle: {
       fontSize: 16,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       marginBottom: 24,
     },
     inputContainer: {
@@ -96,9 +96,9 @@ const createStyles = (theme: string) =>
     },
     textInput: {
       borderWidth: 0.5,
-      borderColor: greys(theme)[2300],
-      backgroundColor: greys(theme)[2000],
-      color: greys(theme)[200],
+      borderColor: greys(theme)[950],
+      backgroundColor: greys(theme)[900],
+      color: greys(theme)[100],
       borderRadius: 8,
       padding: 12,
       fontSize: 16,

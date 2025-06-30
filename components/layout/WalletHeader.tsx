@@ -24,17 +24,17 @@ export function Background() {
   const theme = useSelector(memoizedGetTheme);
 
   const defaultColors: readonly [string, string, ...string[]] = [
-    greys(theme)[2300],
-    opacity(greys(theme)[2300], 0.9),
-    opacity(greys(theme)[2300], 0.85),
-    opacity(greys(theme)[2300], 0.755),
-    opacity(greys(theme)[2300], 0.33),
-    opacity(greys(theme)[2300], 0),
+    greys(theme)[950],
+    opacity(greys(theme)[950], 0.9),
+    opacity(greys(theme)[950], 0.85),
+    opacity(greys(theme)[950], 0.755),
+    opacity(greys(theme)[950], 0.33),
+    opacity(greys(theme)[950], 0),
   ] as const;
 
   return (
     <LinearGradient
-      colors={[theme.greys[2300], opacity(theme.greys[2300], 0)]}
+      colors={[theme.greys[950], opacity(theme.greys[950], 0)]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={{
@@ -96,6 +96,6 @@ const createStyles = (theme: string) =>
       marginBottom: 4,
     },
     unitText: {
-      color: greys(theme)[200],
+      color: greys(theme)[100],
     },
   });

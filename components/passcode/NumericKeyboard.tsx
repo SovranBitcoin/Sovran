@@ -67,7 +67,7 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        // backgroundColor: greys(theme)[2300],
+        // backgroundColor: greys(theme)[950],
       }}>
       <Animated.View
         pointerEvents="none"

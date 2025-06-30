@@ -13,7 +13,7 @@ function EmojiPickerSheet(props: any) {
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="emoji-grid"
-      containerStyle={{ backgroundColor: greys(theme)[2300] }}
+      containerStyle={{ backgroundColor: greys(theme)[950] }}
       {...props}
     />
   );

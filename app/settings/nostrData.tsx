@@ -106,7 +106,7 @@ export default function ModalScreen() {
         {/* Toggle Button */}
         <View className="mb-4 flex flex-row justify-end">
           <TouchableOpacity
-            style={{ backgroundColor: greys(theme)[2300] }}
+            style={{ backgroundColor: greys(theme)[950] }}
             className="rounded-lg px-4 py-2"
             onPress={toggleView}>
             <Text className="text-white">{showJson ? 'Show Pretty View' : 'Show JSON View'}</Text>
@@ -114,7 +114,7 @@ export default function ModalScreen() {
         </View>
 
         {/* Metadata Section */}
-        <View style={{ backgroundColor: greys(theme)[2300] }} className="mb-4 rounded-lg px-4 py-3">
+        <View style={{ backgroundColor: greys(theme)[950] }} className="mb-4 rounded-lg px-4 py-3">
           <Text className="text-lg font-bold text-white">Profile Metadata</Text>
         </View>
 
@@ -122,7 +122,7 @@ export default function ModalScreen() {
           metadataEvents.map((event, index) => (
             <View
               key={`metadata-${index}`}
-              style={{ backgroundColor: greys(theme)[1800] }}
+              style={{ backgroundColor: greys(theme)[800] }}
               className="relative mb-4 rounded-lg p-4">
               {showJson ? (
                 // JSON View
@@ -134,7 +134,7 @@ export default function ModalScreen() {
                       Metadata JSON Response
                     </Text>
                     <TouchableOpacity
-                      style={{ backgroundColor: greys(theme)[2300] }}
+                      style={{ backgroundColor: greys(theme)[950] }}
                       className="rounded px-2 py-2"
                       onPress={() => copyToClipboardKind([event])}>
                       <Text style={{ color: greys(theme)[0] }} className="text-xs text-white">
@@ -158,7 +158,7 @@ export default function ModalScreen() {
                       Profile Info
                     </Text>
                     <TouchableOpacity
-                      style={{ backgroundColor: greys(theme)[2300] }}
+                      style={{ backgroundColor: greys(theme)[950] }}
                       className="rounded px-2 py-2"
                       onPress={() => copyToClipboardKind([event])}>
                       <Text style={{ color: greys(theme)[0] }} className="text-xs text-white">
@@ -174,7 +174,7 @@ export default function ModalScreen() {
                         <View className="mb-4 flex items-center justify-center">
                           <View
                             className="h-24 w-24 overflow-hidden rounded-full"
-                            style={{ backgroundColor: greys(theme)[1500] }}>
+                            style={{ backgroundColor: greys(theme)[700] }}>
                             <Image
                               source={{ uri: parseProfileContent(event).picture }}
                               style={{ height: 100, width: 100 }}
@@ -184,7 +184,7 @@ export default function ModalScreen() {
                       )}
 
                       <View className="mt-2">
-                        <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                        <Text style={{ color: greys(theme)[300] }} className="text-sm">
                           Name
                         </Text>
                         <Text style={{ color: greys(theme)[0] }} className="text-lg font-semibold">
@@ -194,7 +194,7 @@ export default function ModalScreen() {
 
                       {parseProfileContent(event).about && (
                         <View className="mt-2">
-                          <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                          <Text style={{ color: greys(theme)[300] }} className="text-sm">
                             About
                           </Text>
                           <Text style={{ color: greys(theme)[0] }}>
@@ -205,7 +205,7 @@ export default function ModalScreen() {
 
                       <View className="mt-4 flex flex-row justify-between">
                         <View className="flex-1">
-                          <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                          <Text style={{ color: greys(theme)[300] }} className="text-sm">
                             Public Key
                           </Text>
                           <Text style={{ color: greys(theme)[0] }} className="font-mono text-xs">
@@ -214,7 +214,7 @@ export default function ModalScreen() {
                           </Text>
                         </View>
                         <View className="flex-1">
-                          <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                          <Text style={{ color: greys(theme)[300] }} className="text-sm">
                             Created
                           </Text>
                           <Text style={{ color: greys(theme)[0] }} className="text-xs">
@@ -229,13 +229,13 @@ export default function ModalScreen() {
             </View>
           ))
         ) : (
-          <View style={{ backgroundColor: greys(theme)[1800] }} className="mb-4 rounded-lg p-4">
+          <View style={{ backgroundColor: greys(theme)[800] }} className="mb-4 rounded-lg p-4">
             <Text style={{ color: greys(theme)[0] }}>No metadata events found</Text>
           </View>
         )}
 
         {/* Cashu Wallet Section */}
-        <View style={{ backgroundColor: greys(theme)[2300] }} className="mb-4 rounded-lg px-4 py-3">
+        <View style={{ backgroundColor: greys(theme)[950] }} className="mb-4 rounded-lg px-4 py-3">
           <Text className="text-lg font-bold text-white">Cashu Wallet Info</Text>
         </View>
 
@@ -243,7 +243,7 @@ export default function ModalScreen() {
           kind37375Events.map((event, index) => (
             <View
               key={`wallet-${index}`}
-              style={{ backgroundColor: greys(theme)[1800] }}
+              style={{ backgroundColor: greys(theme)[800] }}
               className="relative mb-4 rounded-lg p-4">
               {showJson ? (
                 // JSON View
@@ -255,7 +255,7 @@ export default function ModalScreen() {
                       Kind 37375 JSON Response
                     </Text>
                     <TouchableOpacity
-                      style={{ backgroundColor: greys(theme)[2300] }}
+                      style={{ backgroundColor: greys(theme)[950] }}
                       className="rounded px-2 py-2"
                       onPress={() => copyToClipboardKind([event])}>
                       <Text style={{ color: greys(theme)[0] }} className="text-xs text-white">
@@ -279,7 +279,7 @@ export default function ModalScreen() {
                       {extractImportantTags(event).name || 'Wallet Info'}
                     </Text>
                     <TouchableOpacity
-                      style={{ backgroundColor: greys(theme)[2300] }}
+                      style={{ backgroundColor: greys(theme)[950] }}
                       className="rounded px-2 py-2"
                       onPress={() => copyToClipboardKind([event])}>
                       <Text style={{ color: greys(theme)[0] }} className="text-xs text-white">
@@ -300,7 +300,7 @@ export default function ModalScreen() {
 
                     {extractImportantTags(event).d && (
                       <View className="mb-2">
-                        <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                        <Text style={{ color: greys(theme)[300] }} className="text-sm">
                           Wallet ID
                         </Text>
                         <Text style={{ color: greys(theme)[0] }} className="font-mono">
@@ -311,7 +311,7 @@ export default function ModalScreen() {
 
                     {extractImportantTags(event).unit && (
                       <View className="mb-2">
-                        <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                        <Text style={{ color: greys(theme)[300] }} className="text-sm">
                           Unit
                         </Text>
                         <Text style={{ color: greys(theme)[0] }}>
@@ -324,16 +324,16 @@ export default function ModalScreen() {
                     {Array.isArray(extractImportantTags(event).mint) &&
                       extractImportantTags(event).mint.length > 0 && (
                         <View className="mt-4">
-                          <Text style={{ color: greys(theme)[600] }} className="mb-1 text-sm">
+                          <Text style={{ color: greys(theme)[300] }} className="mb-1 text-sm">
                             Configured Mints
                           </Text>
                           {(extractImportantTags(event).mint as string[]).map((mint, mintIndex) => (
                             <View
                               key={`mint-${mintIndex}`}
-                              style={{ backgroundColor: greys(theme)[1500] }}
+                              style={{ backgroundColor: greys(theme)[700] }}
                               className="mb-2 rounded p-2">
                               <Text
-                                style={{ color: greys(theme)[200] }}
+                                style={{ color: greys(theme)[100] }}
                                 className="font-mono text-xs">
                                 {mint}
                               </Text>
@@ -346,14 +346,14 @@ export default function ModalScreen() {
                     {Array.isArray(extractImportantTags(event).relay) &&
                       extractImportantTags(event).relay.length > 0 && (
                         <View className="mt-4">
-                          <Text style={{ color: greys(theme)[600] }} className="mb-1 text-sm">
+                          <Text style={{ color: greys(theme)[300] }} className="mb-1 text-sm">
                             Connected Relays (
                             {(extractImportantTags(event).relay as string[]).length})
                           </Text>
                           <View
-                            style={{ backgroundColor: greys(theme)[1500] }}
+                            style={{ backgroundColor: greys(theme)[700] }}
                             className="rounded p-2">
-                            <Text style={{ color: greys(theme)[200] }} className="text-xs">
+                            <Text style={{ color: greys(theme)[100] }} className="text-xs">
                               {(extractImportantTags(event).relay as string[])
                                 .slice(0, 3)
                                 .join(', ')}
@@ -367,7 +367,7 @@ export default function ModalScreen() {
 
                     <View className="mt-4 flex flex-row justify-between">
                       <View className="flex-1">
-                        <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                        <Text style={{ color: greys(theme)[300] }} className="text-sm">
                           Event ID
                         </Text>
                         <Text style={{ color: greys(theme)[0] }} className="font-mono text-xs">
@@ -375,7 +375,7 @@ export default function ModalScreen() {
                         </Text>
                       </View>
                       <View className="flex-1">
-                        <Text style={{ color: greys(theme)[600] }} className="text-sm">
+                        <Text style={{ color: greys(theme)[300] }} className="text-sm">
                           Created
                         </Text>
                         <Text style={{ color: greys(theme)[0] }} className="text-xs">
@@ -389,7 +389,7 @@ export default function ModalScreen() {
             </View>
           ))
         ) : (
-          <View style={{ backgroundColor: greys(theme)[1800] }} className="mb-4 rounded-lg p-4">
+          <View style={{ backgroundColor: greys(theme)[800] }} className="mb-4 rounded-lg p-4">
             <Text style={{ color: greys(theme)[0] }}>No wallet events found</Text>
           </View>
         )}

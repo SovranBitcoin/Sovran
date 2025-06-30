@@ -159,7 +159,7 @@ function ModalScreen() {
       borderWidth: 0.2,
     },
     warningText: {
-      color: shades[400],
+      color: shades[200],
       marginTop: 8,
       fontSize: 14,
     },

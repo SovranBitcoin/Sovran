@@ -30,7 +30,7 @@ const createStyles = (theme: any) =>
     container: {
       flex: 1,
       color: greys(theme)[0],
-      backgroundColor: greys(theme)[2300], // See helper/colors for available color options
+      backgroundColor: greys(theme)[950], // See helper/colors for available color options
     },
   });
 ```
@@ -43,7 +43,7 @@ const createStyles = (theme: any) =>
 
 **Colors:** When you need theme-aware colors, use inline styles:
 
-- Simple: `style={{backgroundColor: greys(theme)[2300]}}`
+- Simple: `style={{backgroundColor: greys(theme)[950]}}`
 - Complex: Create a `createStyles` function as shown in the example above
 
 **Note:** Check `helper/colors` for the complete list of available theme colors.

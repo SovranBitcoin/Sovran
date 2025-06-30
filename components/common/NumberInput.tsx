@@ -78,7 +78,7 @@ export function NumberInput({
   };
 
   const getColorForType = (): string => {
-    if (!value) return greys(theme)[700];
+    if (!value) return greys(theme)[400];
     return type === 'receive' ? greens[300] : shades[300];
   };
 
@@ -101,7 +101,7 @@ export function NumberInput({
           <StyledText
             style={{
               fontFamily: 'OverpassRegular',
-              color: value ? shades[100] : greys()[400],
+              color: value ? shades[200] : greys()[200],
               fontSize: 28,
               marginRight: 4,
               marginTop: 12,

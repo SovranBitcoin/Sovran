@@ -52,7 +52,7 @@ const BlurredCircleButton: React.FC<BlurredCircleButtonProps> = ({
     <BlurView intensity={intensity} tint={tint} style={[styles.blurContainer, style]}>
       <TouchableOpacity
         className="items-center rounded-lg p-4"
-        style={{ backgroundColor: opacity(greys(theme)[1800], 0.1) }}
+        style={{ backgroundColor: opacity(greys(theme)[800], 0.1) }}
         onPress={onPress}>
         {children}
       </TouchableOpacity>

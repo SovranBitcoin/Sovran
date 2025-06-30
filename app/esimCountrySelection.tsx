@@ -105,9 +105,9 @@ const createStyles = (theme: string) =>
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 16,
-      borderColor: greys(theme)[1300],
+      borderColor: greys(theme)[600],
       borderWidth: 0.2,
     },
     countryName: {

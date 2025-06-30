@@ -141,7 +141,7 @@ These Terms represent the entire agreement between you and Sovran.`;
 const createStyles = (theme: string) => {
   return StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[1900],
+      backgroundColor: greys(theme)[900],
       // height: screenHeight,
       flexDirection: 'column',
     },
@@ -149,13 +149,13 @@ const createStyles = (theme: string) => {
       textAlign: 'center',
       fontSize: 32,
       fontFamily: 'OverpassHeavy',
-      color: greys(theme)[100],
+      color: greys(theme)[50],
       marginBottom: 16,
       paddingVertical: 8,
     },
     scrollContainer: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       borderRadius: 8,
       marginBottom: 16,
     },

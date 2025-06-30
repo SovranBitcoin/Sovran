@@ -62,14 +62,14 @@ const Profile = () => {
                 <Icon
                   name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
                   size={16}
-                  color={greys(theme)[700]}
+                  color={greys(theme)[400]}
                 />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => handleCopy(value, messageKey)}>
-              <Icon name="lets-icons:copy" size={16} color={greys(theme)[700]} />
+              <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
             </TouchableOpacity>
           </View>
         </View>
@@ -141,7 +141,7 @@ const createStyles = (theme: string) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: greys(theme)[600],
+      color: greys(theme)[300],
       textTransform: 'uppercase',
     },
     profilePictureContainer: {
@@ -156,13 +156,13 @@ const createStyles = (theme: string) =>
     detailContainer: {
       marginVertical: 8,
       padding: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
     },
     detailLabel: {
       fontSize: 14,
       fontWeight: '600',
-      color: greys(theme)[700],
+      color: greys(theme)[400],
     },
     detailText: {
       fontSize: 16,
@@ -171,12 +171,12 @@ const createStyles = (theme: string) =>
     descriptionText: {
       fontSize: 12,
       fontStyle: 'italic',
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       marginTop: 4,
     },
     editModeText: {
       fontSize: 12,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       marginBottom: 4,
     },
     sensitiveField: {
@@ -190,7 +190,7 @@ const createStyles = (theme: string) =>
     },
     iconButton: {
       padding: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       borderRadius: 4,
       marginLeft: 4,
     },

@@ -118,7 +118,7 @@ const createStyles = (theme: any) =>
     smallText: {
       fontSize: 16,
       fontFamily: 'OverpassBold',
-      color: greys(theme)[100],
+      color: greys(theme)[50],
       marginLeft: 12,
     },
   });

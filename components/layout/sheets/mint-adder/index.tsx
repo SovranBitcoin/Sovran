@@ -18,7 +18,7 @@ function SheetWithRouter() {
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="route-a"
-      containerStyle={{ height: '90%', backgroundColor: greys(theme)[2300] }}
+      containerStyle={{ height: '90%', backgroundColor: greys(theme)[950] }}
       gestureEnabled={true}
     />
   );

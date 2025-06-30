@@ -403,6 +403,26 @@ export default function ModalScreen() {
         <Text black lexend size={16}>
           LexendBlack
         </Text>
+
+        {Object.keys(theme.greys).map((grey) => {
+          return (
+            <View
+              style={{
+                backgroundColor: greys(theme)[grey],
+                height: 64,
+              }}>
+              <Text>{greys(theme)[grey]}</Text>
+            </View>
+          );
+        })}
+
+        <View
+          style={{
+            backgroundColor: greys(theme)[950],
+            width: 32,
+            height: 32,
+          }}></View>
+
         <CreditCardComponent />
 
         {/* info message */}
@@ -437,14 +457,14 @@ export default function ModalScreen() {
           <RowButton
             label={
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[700]} />
-                <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
+                <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
                   npub1example@npubx.cash
                 </Text>
               </View>
             }
             onPress={() => {}}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[700]} />}
+            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
           />
         </Section>
 
