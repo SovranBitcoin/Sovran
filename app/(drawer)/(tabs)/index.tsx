@@ -17,7 +17,6 @@ import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
-import { AccountPagerView } from '../../../components/layout/AccountPagerView';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
 import {
@@ -32,6 +31,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
+import { AccountPagerView } from 'components/layout/AccountPagerView';
 interface NPUBQuote {
   amount: number;
   createdAt: number;
