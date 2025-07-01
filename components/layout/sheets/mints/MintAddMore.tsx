@@ -668,7 +668,7 @@ export function MintAddMore({ onClose, payload }) {
         </ScrollView>
 
         <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 0 }]}>
-          Recommended mints
+          Discovered mints
         </Text>
         <Text style={[{ marginBottom: 12, color: greys(theme)[400] }]}>
           Found {filteredMints.length} {filteredMints.length === 1 ? 'mint' : 'mints'}
