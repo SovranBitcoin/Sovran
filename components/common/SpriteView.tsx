@@ -48,6 +48,9 @@ const AnimatedSpriteBackground = ({ backgroundColor }) => {
     'bg12.png': require('assets/images/backgrounds/bg12.png'),
 
     'bg14.png': require('assets/images/backgrounds/bg14.png'),
+    'bg15.png': require('assets/images/backgrounds/bg15.png'),
+    'bg16.png': require('assets/images/backgrounds/bg16.png'),
+    'bg17.png': require('assets/images/backgrounds/bg17.png'),
   };
 
   if (!backgroundImage)

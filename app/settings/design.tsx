@@ -11,7 +11,7 @@ import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
 import { CreditCardComponent } from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
-import { greys, shades } from 'helper/colors';
+import { greys, hexToRgb, rgbToHsl, shades } from 'helper/colors';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { ScrollView } from 'react-native';
@@ -412,6 +412,9 @@ export default function ModalScreen() {
                 height: 64,
               }}>
               <Text>{greys(theme)[grey]}</Text>
+              <Text>
+                {JSON.stringify(rgbToHsl(...Object.values(hexToRgb(greys(theme)[grey]))))}
+              </Text>
             </View>
           );
         })}

@@ -691,7 +691,7 @@ export function computeGreys(
   maxSaturation = 25,
   minLightness = 12
 ) {
-  const baseGreys = greys(theme);
+  return greys(theme);
   const baseLightnessMap: Record<string, number> = {};
   for (const [key, hex] of Object.entries(baseGreys)) {
     baseLightnessMap[key] = rgbToHsl(...Object.values(hexToRgb(hex))).l;
