@@ -49,10 +49,10 @@ function ModalScreen() {
 
   return (
     <Modal
-      backgroundColor={greys(theme)[1800]}
+      backgroundColor={greys(theme)[800]}
       title=""
       childrenStyles={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
       }}>
       {parentPosts && <ParentPosts parentPosts={parentPosts} />}
       <Post active post={event} parentPosts={parentPosts} />

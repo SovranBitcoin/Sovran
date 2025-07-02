@@ -40,7 +40,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         padding: 16,
         justifyContent: isModal ? 'center' : 'flex-end',
       }}>
@@ -120,7 +120,7 @@ const createStyles = (theme: string) =>
     },
     progressBarContainer: {
       height: 4,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       borderRadius: 10000,
       marginTop: 10,
       width: 30,

@@ -3,7 +3,6 @@ import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import { View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
@@ -18,7 +17,6 @@ import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
-import { AccountPagerView } from '../../../components/layout/AccountPagerView';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
 import {
@@ -33,6 +31,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
+import { AccountPagerView } from 'components/layout/AccountPagerView';
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -179,9 +178,9 @@ function TabOneScreen() {
         width: '100%',
         height: '100%',
       }}>
-      <AnimatedSpriteBackground />
+      <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
 
-      <SafeAreaView style={styles.safeAreaView}>
+      <View style={styles.safeAreaView}>
         <ScrollView
           style={styles.scrollView}
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
@@ -196,42 +195,25 @@ function TabOneScreen() {
           <View
             className="p-4"
             style={{
-              backgroundColor: theme.greys[2300],
+              backgroundColor: theme.greys[950],
             }}>
             {theme.shades && (
               <LinearGradient
                 colors={[
-                  theme.greys[2300],
-                  opacity(theme.greys[2300], 0.85),
-                  opacity(theme.greys[2300], 0),
-                  opacity(theme.greys[2300], 0),
+                  theme.greys[950],
+                  opacity(theme.greys[950], 0.5),
+                  opacity(theme.greys[950], 0),
+                  opacity(theme.greys[950], 0),
                 ]}
                 start={{ x: 0.5, y: 1 }}
                 end={{ x: 0.5, y: 0 }}
-                style={[StyleSheet.absoluteFill, { top: -224, height: 224 }]}
+                style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
               />
             )}
             <Transactions days={1} account={account} />
           </View>
         </ScrollView>
-        {/* {theme.greys && (
-          <LinearGradient
-            colors={[
-              theme.greys[2300],
-              theme.greys[2300],
-              theme.greys[2300],
-              opacity(theme.greys[2300], 0),
-              opacity(theme.greys[2300], 0),
-            ]}
-            start={{ x: 0.5, y: 1 }}
-            end={{ x: 0.5, y: 0 }}
-            style={[
-              StyleSheet.absoluteFill,
-              { transform: [{ scale: 1.1 }], paddingTop: '100%', zIndex: -1 },
-            ]}
-          />
-        )} */}
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -240,12 +222,9 @@ const createStyles = (theme: string) =>
   StyleSheet.create({
     scrollView: {
       marginTop: 0,
-      marginBottom: -24,
-      // backgroundColor: greys(theme)[2300],
     },
     safeAreaView: {
       flex: 1,
-      // backgroundColor: greys(theme)[2300],
     },
     accountPagerView: {
       display: 'flex',

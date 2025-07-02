@@ -288,7 +288,7 @@ const createStyles = (theme: string) =>
       fontSize: 16,
     },
     warningContainer: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderLeftWidth: 5,
       borderLeftColor: reds[300],
       padding: 15,

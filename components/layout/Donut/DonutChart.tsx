@@ -78,7 +78,7 @@ const DonutChart = ({
       <Canvas style={styles.container}>
         <Path
           path={path}
-          color={greys(theme)[2300]}
+          color={greys(theme)[950]}
           style="stroke"
           strokeJoin="round"
           strokeWidth={outerStrokeWidth}
@@ -126,7 +126,7 @@ const DonutChart = ({
             y={radius + smallFontSize.height / 0.425}
             text={targetText2}
             font={smallFont}
-            color={greys(theme)[100]}
+            color={greys(theme)[50]}
           />
         )}
       </Canvas>
@@ -140,6 +140,6 @@ const createStyles = (theme: string) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
   });

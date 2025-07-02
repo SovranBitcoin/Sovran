@@ -28,14 +28,14 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   const variantStyles = useMemo<Record<VariantType, VariantStyle>>(
     () => ({
       warning: {
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         borderLeftColor: reds[300],
         color: reds[300],
       },
       info: {
-        backgroundColor: greys(theme)[1800],
-        borderLeftColor: greys(theme)[200],
-        color: greys(theme)[200],
+        backgroundColor: greys(theme)[800],
+        borderLeftColor: greys(theme)[100],
+        color: greys(theme)[100],
       },
     }),
     [theme]
@@ -56,7 +56,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
           <Text
             className="pl-4 pr-1 pt-4 text-base font-medium"
             style={{
-              color: greys(theme)[600],
+              color: greys(theme)[300],
               fontFamily: 'OverpassHeavy',
             }}>
             {title}

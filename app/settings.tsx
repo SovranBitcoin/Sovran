@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { StyleSheet, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -18,6 +18,7 @@ import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { View } from 'components/common/View';
 
 const name = Application.applicationName;
 const version = Application.nativeApplicationVersion;
@@ -62,7 +63,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
         <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
         <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
       </View>
-      <FeatherIcon color={greys(theme)[700]} name="chevron-right" size={22} />
+      <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
     </TouchableOpacity>
   );
 };
@@ -74,11 +75,19 @@ export const RowButton: React.FC<{
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
-}> = ({ label, value, onPress, isFirst, isLast, isDanger }) => {
+  rightIcon?: React.ReactNode;
+}> = ({ label, value, onPress, isFirst, isLast, isDanger, rightIcon }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme, isDanger);
   return (
-    <View style={styles.rowWrapper}>
+    <View
+      blur
+      style={[
+        styles.rowWrapper,
+        {
+          borderTopWidth: !isFirst && 1,
+        },
+      ]}>
       <TouchableOpacity
         onPress={onPress}
         style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
@@ -93,20 +102,22 @@ export const RowButton: React.FC<{
                 marginRight: 3,
                 fontFamily: 'OverpassBold',
               },
-              isDanger ? { color: reds[300] } : { color: greys(theme)[700] },
+              isDanger ? { color: reds[300] } : { color: greys(theme)[400] },
             ]}>
             {value}
           </Text>
         )}
         {onPress ? (
-          <FeatherIcon
-            style={{
-              marginRight: !!onPress ? 0 : 8,
-            }}
-            color={isDanger ? reds[300] : greys(theme)[700]}
-            name="chevron-right"
-            size={19}
-          />
+          (rightIcon ?? (
+            <FeatherIcon
+              style={{
+                marginRight: !!onPress ? 0 : 8,
+              }}
+              color={isDanger ? reds[300] : greys(theme)[400]}
+              name="chevron-right"
+              size={19}
+            />
+          ))
         ) : (
           <View
             style={{
@@ -379,7 +390,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       fontWeight: '500',
       textAlign: 'center',
-      color: greys(theme)[600],
+      color: greys(theme)[300],
     },
     section: {
       paddingVertical: 12,
@@ -390,12 +401,12 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       fontSize: 13,
       letterSpacing: 0.33,
       fontWeight: '500',
-      color: isDanger ? reds[300] : greys(theme)[600],
+      color: isDanger ? reds[300] : greys(theme)[300],
       textTransform: 'uppercase',
     },
     sectionBody: {
       borderRadius: 12,
-      shadowColor: greys(theme)[1000],
+      shadowColor: greys(theme)[500],
       shadowOffset: {
         width: 0,
         height: 1,
@@ -407,7 +418,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     profile: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-start',
@@ -430,7 +441,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginTop: 2,
       fontSize: 16,
       fontWeight: '400',
-      color: greys(theme)[700],
+      color: greys(theme)[400],
     },
     row: {
       height: 44,
@@ -442,9 +453,8 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     rowWrapper: {
       paddingLeft: 16,
-      backgroundColor: greys(theme)[1800],
-      borderTopWidth: 1,
-      borderColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[800],
+      borderColor: greys(theme)[700],
     },
     rowFirst: {
       borderTopLeftRadius: 12,
@@ -480,7 +490,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
     },
     debugContainer: {
       padding: 12,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       marginVertical: 8,
     },
@@ -492,7 +502,7 @@ const createStyles = (theme: any, isDanger?: boolean) =>
       marginTop: 8,
       paddingVertical: 4,
       paddingHorizontal: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       borderRadius: 4,
     },
     changeProfileText: {

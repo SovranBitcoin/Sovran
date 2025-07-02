@@ -2,7 +2,7 @@ import React, { useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useHandleCameraPermission } from 'helper/hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -51,7 +51,7 @@ export function AccountPagerView({
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
 
-  const styles = createStyles(theme.greys, theme.shades);
+  const styles = createStyles(theme.id, theme.greys, theme.shades);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -129,7 +129,7 @@ export function AccountPagerView({
         <Icon
           name="stash:qr-code"
           size={24}
-          color={theme === 'light' ? greys(theme)[2300] : greys(theme)[0]}
+          color={theme === 'light' ? greys(theme)[950] : greys(theme)[0]}
         />
       ),
     },
@@ -143,9 +143,11 @@ export function AccountPagerView({
     },
   ];
 
+  const height = 350;
+
   return (
     <View className="bg-transparent">
-      <View className="flex h-[370px] w-full">
+      <View className={`flex h-[${height}px] w-full`}>
         <Swiper
           controlsEnabled={false}
           loop
@@ -165,7 +167,7 @@ export function AccountPagerView({
                 flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                // backgroundColor: greys(theme)[2300],
+                // backgroundColor: greys(theme)[950],
               }}>
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </View>
@@ -177,67 +179,76 @@ export function AccountPagerView({
           position: 'absolute',
           width: '100%',
           flexDirection: 'row',
-          alignItems: 'center',
           justifyContent: 'space-around',
-          top: Platform.OS === 'web' ? 223 : 159,
           padding: 0,
           margin: 0,
           zIndex: 3,
-          height: 250,
+          height,
           backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,
         }}>
-        {actionButtons.map(({ page, text, icon }) => {
-          const isCamera = page === 'camera';
-          const isReceive = page === 'receive';
-          const isSend = page === 'currency';
+        <View
+          style={{
+            position: 'absolute',
+            width: '100%',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            backgroundColor: 'transparent',
+            bottom: 0,
+          }}>
+          {actionButtons.map(({ page, text, icon }) => {
+            const isCamera = page === 'camera';
+            const isReceive = page === 'receive';
+            const isSend = page === 'currency';
 
-          return (
-            <TouchableOpacity
-              testID={text.children.toLowerCase()}
-              key={page}
-              style={[
-                styles.touchableOpacity,
-                isCamera && styles.cameraButton,
-                isReceive && styles.receiveButton,
-                isSend && styles.sendButton,
-              ]}
-              onPress={() => handleButtonPress(page, account.unit)}>
-              <LinearGradient
-                style={[isCamera && styles.cameraGradient]}
-                colors={
-                  isCamera
-                    ? [theme.shades[200], theme.shades[400]]
-                    : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
-                }>
-                <View style={styles.iconContainer}>
-                  <View
-                    style={[
-                      styles.iconView,
-                      isCamera && styles.cameraIconView,
-                      isReceive && styles.receiveIconView,
-                      isSend && styles.sendIconView,
-                    ]}
-                    blur={!isCamera}>
-                    <View className="bg-transparent">{icon}</View>
-                    {!isCamera && (
-                      <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
-                        {text.children}
-                      </Text>
-                    )}
+            return (
+              <TouchableOpacity
+                testID={text.children.toLowerCase()}
+                key={page}
+                style={[
+                  styles.touchableOpacity,
+                  isCamera && styles.cameraButton,
+                  isReceive && styles.receiveButton,
+                  isSend && styles.sendButton,
+                ]}
+                onPress={() => handleButtonPress(page, account.unit)}>
+                <LinearGradient
+                  style={[isCamera && styles.cameraGradient]}
+                  colors={
+                    isCamera
+                      ? [theme.shades[100], theme.shades[300]]
+                      : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
+                  }>
+                  <View style={styles.iconContainer}>
+                    <View
+                      style={[
+                        styles.iconView,
+                        isCamera && styles.cameraIconView,
+                        isReceive && styles.receiveIconView,
+                        isSend && styles.sendIconView,
+                      ]}
+                      blur={!isCamera}>
+                      <View className="bg-transparent">{icon}</View>
+                      {!isCamera && (
+                        <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
+                          {text.children}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          );
-        })}
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
 
-const createStyles = (greys: string, shades) =>
+const createStyles = (theme, greys: string, shades) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -254,7 +265,7 @@ const createStyles = (greys: string, shades) =>
       shadowRadius: 8,
       elevation: 5,
       borderRadius: 10000,
-      borderColor: shades[200],
+      borderColor: shades[100],
       borderWidth: 0.5,
     },
     receiveButton: {
@@ -287,17 +298,17 @@ const createStyles = (greys: string, shades) =>
       borderRadius: 1000,
     },
     receiveIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: greys[800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      // borderWidth: 0.3,
-      borderColor: greys[1500],
+      borderWidth: 0.3,
+      borderColor: greys[700],
     },
     sendIconView: {
-      // backgroundColor: greys(theme)[1800],
+      backgroundColor: greys[800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      // borderWidth: 0.3,
-      borderColor: greys[1500],
+      borderWidth: 0.3,
+      borderColor: greys[700],
     },
   });

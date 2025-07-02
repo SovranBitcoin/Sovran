@@ -9,10 +9,10 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
   const styles = createStyles(theme);
 
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [greys(theme)[500], greys(theme)[500]]
+    : [shades[50], shades[300]];
 
-  const arrowBackgroundColor = isReceived ? greys(theme)[1200] : shades[300];
+  const arrowBackgroundColor = isReceived ? greys(theme)[500] : shades[300];
 
   const formattedAmount =
     transaction.unit &&

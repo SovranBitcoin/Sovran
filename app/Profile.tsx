@@ -95,7 +95,7 @@ const Screen = () => {
   //         style={{
   //           borderRadius: 1000,
   //           padding: 8,
-  //           backgroundColor: greys(theme)[1000],
+  //           backgroundColor: greys(theme)[500],
   //         }}
   //       >
   //         <DotsIcon
@@ -115,17 +115,17 @@ const Screen = () => {
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={false}
         style={{
-          backgroundColor: greys(theme)[2100],
+          backgroundColor: greys(theme)[900],
         }}>
         <LinearGradient
           colors={[
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            greys(theme)[2100],
-            opacity(greys(theme)[2100], 0),
+            greys(theme)[900],
+            greys(theme)[900],
+            greys(theme)[900],
+            greys(theme)[900],
+            greys(theme)[900],
+            greys(theme)[900],
+            opacity(greys(theme)[900], 0),
           ]}
           style={[styles.gradientContainer]}
           start={{ x: 0, y: 0 }}
@@ -192,8 +192,8 @@ const Screen = () => {
                     style={{
                       borderRadius: 1000,
                       padding: 32,
-                      backgroundColor: greys(theme)[2300],
-                      borderColor: greys(theme)[1300],
+                      backgroundColor: greys(theme)[950],
+                      borderColor: greys(theme)[600],
                       borderWidth: 0.2,
                     }}>
                     <QRIcon
@@ -295,7 +295,7 @@ const createStyles = (theme: any) =>
       height: 32,
       borderRadius: 16,
       marginRight: 8,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       overflow: 'hidden',
     },
     modalProfilePicture: {
@@ -361,8 +361,8 @@ const createStyles = (theme: any) =>
     container: {
       borderRadius: 12,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1500],
-      backgroundColor: greys(theme)[1800],
+      borderColor: greys(theme)[700],
+      backgroundColor: greys(theme)[800],
       padding: 8,
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -377,7 +377,7 @@ const createStyles = (theme: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 12,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       borderCurve: 'continuous',
     },
     iconLabel: {
@@ -388,7 +388,7 @@ const createStyles = (theme: any) =>
     },
     actionSheetContainer: {
       padding: 16,
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     headerText: {
       color: greys(theme)[0],
@@ -397,7 +397,7 @@ const createStyles = (theme: any) =>
       marginBottom: 8,
     },
     subHeaderText: {
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontSize: 16,
       marginBottom: 24,
     },
@@ -410,7 +410,7 @@ const createStyles = (theme: any) =>
     communityBox: {
       width: '30%',
       aspectRatio: 1,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 12,
       padding: 12,
       justifyContent: 'center',
@@ -436,10 +436,10 @@ const createStyles = (theme: any) =>
       alignItems: 'center',
       padding: 12,
       // borderBottomWidth: 1,
-      // borderBottomColor: greys(theme)[1800],
+      // borderBottomColor: greys(theme)[800],
     },
     selectedProfileItem: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
     },
     actionSheetProfilePic: {
@@ -484,7 +484,7 @@ const createStyles = (theme: any) =>
     },
     importButton: {
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       marginBottom: 12,
       alignItems: 'center',
@@ -494,7 +494,7 @@ const createStyles = (theme: any) =>
       fontSize: 16,
     },
     input: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       padding: 16,
       color: greys(theme)[0],
@@ -529,7 +529,7 @@ const createStyles = (theme: any) =>
       height: 80,
       borderRadius: 40,
       borderWidth: 4,
-      borderColor: greys(theme)[2300],
+      borderColor: greys(theme)[950],
     },
     followerCount: {
       color: greys(theme)[0],
@@ -538,7 +538,7 @@ const createStyles = (theme: any) =>
       marginRight: 8,
     },
     defaultProfilePicture: {
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -558,7 +558,7 @@ const createStyles = (theme: any) =>
     },
     npub: {
       fontSize: 14,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       marginBottom: 4,
     },
     continueButton: {
@@ -580,7 +580,7 @@ const createStyles = (theme: any) =>
       gap: 8,
     },
     tag: {
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       paddingVertical: 4,
       paddingHorizontal: 8,
       borderRadius: 12,

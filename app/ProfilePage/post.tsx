@@ -37,7 +37,7 @@ export const PostQuote = React.memo(({ id }) => {
   return (
     <View
       style={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         borderRadius: 8,
         padding: 8,
         marginBottom: 8,
@@ -58,7 +58,7 @@ export const PostQuote = React.memo(({ id }) => {
           <Text>{profile?.displayName}</Text>
           <Text
             style={{
-              color: greys(theme)[200],
+              color: greys(theme)[100],
             }}>
             {'  '}•{'  '}
             {timeAgo}
@@ -80,15 +80,15 @@ export function PostSkeleton() {
       style={{
         padding: 12,
         borderBottomWidth: 1,
-        borderColor: greys(theme)[1800],
+        borderColor: greys(theme)[800],
         width: '100%',
         flex: 1,
       }}>
       <View style={{ flexDirection: 'row' }}>
         {/* Profile Picture */}
         <GradientSkeleton
-          startColor={greys(theme)[1500]}
-          endColor={greys(theme)[1300]}
+          startColor={greys(theme)[700]}
+          endColor={greys(theme)[600]}
           width={48}
           height={48}
           borderRadius={24}
@@ -104,16 +104,16 @@ export function PostSkeleton() {
               alignContent: 'center',
             }}>
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={100}
               height={16}
               borderRadius={8}
               marginBottom={4}
             />
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={50}
               height={14}
               borderRadius={7}
@@ -124,24 +124,24 @@ export function PostSkeleton() {
 
           {/* Post Content */}
           <GradientSkeleton
-            startColor={greys(theme)[1500]}
-            endColor={greys(theme)[1300]}
+            startColor={greys(theme)[700]}
+            endColor={greys(theme)[600]}
             width={'100%'}
             height={16}
             borderRadius={8}
             marginBottom={8}
           />
           <GradientSkeleton
-            startColor={greys(theme)[1500]}
-            endColor={greys(theme)[1300]}
+            startColor={greys(theme)[700]}
+            endColor={greys(theme)[600]}
             width={'90%'}
             height={16}
             borderRadius={8}
             marginBottom={8}
           />
           <GradientSkeleton
-            startColor={greys(theme)[1500]}
-            endColor={greys(theme)[1300]}
+            startColor={greys(theme)[700]}
+            endColor={greys(theme)[600]}
             width={'80%'}
             height={16}
             borderRadius={8}
@@ -150,12 +150,12 @@ export function PostSkeleton() {
 
           {/* Post Media */}
           <GradientSkeleton
-            startColor={greys(theme)[1500]}
-            endColor={greys(theme)[1300]}
+            startColor={greys(theme)[700]}
+            endColor={greys(theme)[600]}
             width={'100%'}
             height={250}
             borderRadius={8}
-            backgroundColor={greys(theme)[1500]}
+            backgroundColor={greys(theme)[700]}
             marginBottom={8}
           />
           <View
@@ -164,8 +164,8 @@ export function PostSkeleton() {
               justifyContent: 'space-between',
             }}>
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={32}
               height={16}
               borderRadius={8}
@@ -173,8 +173,8 @@ export function PostSkeleton() {
               // style={{flex: 1, marginHorizontal: 10}}
             />
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={32}
               height={16}
               borderRadius={8}
@@ -182,8 +182,8 @@ export function PostSkeleton() {
               // style={{flex: 1, marginHorizontal: 10}}
             />
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={32}
               height={16}
               borderRadius={8}
@@ -191,8 +191,8 @@ export function PostSkeleton() {
               // style={{flex: 1, marginHorizontal: 10}}
             />
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={32}
               height={16}
               borderRadius={8}
@@ -279,14 +279,14 @@ function RepostText({ pubkey, repostCounter }) {
         alignItems: 'center',
         marginBottom: 12,
       }}>
-      <RepostIcon width={16} height={16} color={greys(theme)[700]} />
+      <RepostIcon width={16} height={16} color={greys(theme)[400]} />
 
       <UserNameProfiles
         pubkey={pubkey}
         style={{
           fontFamily: 'OverpassBold',
           fontSize: 14,
-          color: greys(theme)[700],
+          color: greys(theme)[400],
         }}
       />
       {repostCounter > 1 ? (
@@ -294,7 +294,7 @@ function RepostText({ pubkey, repostCounter }) {
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: greys(theme)[700],
+            color: greys(theme)[400],
           }}>
           {` and ${repostCounter - 1} other ${
             repostCounter - 1 > 1 ? 'people' : 'person'
@@ -305,7 +305,7 @@ function RepostText({ pubkey, repostCounter }) {
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: greys(theme)[700],
+            color: greys(theme)[400],
           }}>
           {' reposted'}
         </Text>
@@ -324,7 +324,7 @@ export function ProfileIcon({ pubkey }) {
       style={{
         width: 48,
         height: 48,
-        backgroundColor: greys(theme)[1500],
+        backgroundColor: greys(theme)[700],
         borderRadius: 16111,
         marginRight: 8,
         overflow: 'hidden',
@@ -335,8 +335,8 @@ export function ProfileIcon({ pubkey }) {
         <>
           {imageLoading && (
             <GradientSkeleton
-              startColor={greys(theme)[1500]}
-              endColor={greys(theme)[1300]}
+              startColor={greys(theme)[700]}
+              endColor={greys(theme)[600]}
               width={48}
               height={48}
               style={{
@@ -360,7 +360,7 @@ export function ProfileIcon({ pubkey }) {
         <Text
           style={{
             fontSize: 20,
-            color: greys(theme)[200],
+            color: greys(theme)[100],
             fontFamily: 'OverpassBold',
           }}>
           {(profile?.displayName || profile?.name || 'A')?.[0]?.toUpperCase()}
@@ -392,8 +392,8 @@ function PostTop({ post, font }) {
       }}>
       {!displayName ? (
         <GradientSkeleton
-          startColor={greys(theme)[1500]}
-          endColor={greys(theme)[1300]}
+          startColor={greys(theme)[700]}
+          endColor={greys(theme)[600]}
           width={100}
           height={16}
           style={{
@@ -415,7 +415,7 @@ function PostTop({ post, font }) {
         style={{
           fontFamily: 'OverpassRegular',
           fontSize: 14,
-          color: greys(theme)[400],
+          color: greys(theme)[200],
         }}>
         {' '}
         • {timeAgo}
@@ -461,10 +461,10 @@ export const Post = React.memo(
           }}
           key={index}
           style={{
-            backgroundColor: greys(theme)[2300],
+            backgroundColor: greys(theme)[950],
             padding: 12,
             borderBottomWidth: 1,
-            borderColor: greys(theme)[1300],
+            borderColor: greys(theme)[600],
           }}>
           {post.kind === 6 && <RepostText pubkey={post.pubkey} repostCounter={repostCount} />}
           <View

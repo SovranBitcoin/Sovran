@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState, ReactNode, useMemo } from 'react';
-import { View, Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
+import { Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
 import { greys, black, shades, reds } from 'helper/colors';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
+import { View } from 'components/common/View';
 
 type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
 
@@ -43,7 +44,7 @@ export const ButtonBase = ({
   const colorsMap = useMemo(
     () => ({
       primary: [greys(theme)[0], greys(theme)[0]],
-      secondary: [greys(theme)[1400], greys(theme)[1500], greys(theme)[1800]],
+      secondary: [greys(theme)[600], greys(theme)[700], greys(theme)[800]],
       transparent: ['transparent', 'transparent'],
       dangerous: [reds[300]],
     }),
@@ -118,51 +119,54 @@ export const ButtonBase = ({
       <TouchableOpacity
         testID={props?.testID}
         disabled={isDisabled}
-        className="m-1 mb-2 items-center justify-center overflow-hidden rounded-full border border-[0.33px] py-1"
-        style={[
-          {
-            ...(noPadding ? { margin: 0 } : {}),
-            opacity: disabled || isLoading ? 0.5 : 1,
-            borderColor: variant === 'primary' ? greys(theme)[100] : greys(theme)[1000],
-            width: !text ? 48 : undefined,
-            height: !text ? 48 : undefined,
-          },
-          style,
-        ]}
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}>
-        <View className="flex flex-row items-center justify-center">
-          {shouldShowLoading ? (
-            <Icon
-              size={16}
-              name="ant-design:loading-outlined"
-              color={shades[300]}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
-          ) : (
-            icon && (
-              <View style={{ marginRight: text ? 8 : 0 }}>
-                <Text>{icon}</Text>
-              </View>
-            )
-          )}
-          <Text
-            className="py-3 text-center text-base"
-            style={{
-              color: variant === 'primary' ? black : greys(theme)[100],
-              fontFamily: 'OverpassBold',
-              width: !shouldShowLoading && text ? 'auto' : 0,
-            }}>
-            {text}
-          </Text>
+        <View
+          className="m-1 mb-2 items-center justify-center overflow-hidden rounded-full border border-[0.33px] py-1"
+          style={[
+            {
+              ...(noPadding ? { margin: 0 } : {}),
+              opacity: disabled || isLoading ? 0.5 : 1,
+              borderColor: variant === 'primary' ? greys(theme)[50] : greys(theme)[500],
+              width: !text ? 48 : undefined,
+              height: !text ? 48 : undefined,
+              backgroundColor: colorsMap[variant][1],
+            },
+            style,
+          ]}
+          blur={variant !== 'primary'}>
+          <View className="flex flex-row items-center justify-center">
+            {shouldShowLoading ? (
+              <Icon
+                size={16}
+                name="ant-design:loading-outlined"
+                color={shades[300]}
+                spin={{
+                  delay: 0,
+                  duration: 1000,
+                  outputRange: ['0deg', '360deg'],
+                  easing: 'linear',
+                }}
+              />
+            ) : (
+              icon && (
+                <View style={{ marginRight: text ? 8 : 0 }}>
+                  <Text>{icon}</Text>
+                </View>
+              )
+            )}
+            <Text
+              className="py-3 text-center text-base"
+              style={{
+                color: variant === 'primary' ? black : greys(theme)[50],
+                fontFamily: 'OverpassBold',
+                width: !shouldShowLoading && text ? 'auto' : 0,
+              }}>
+              {text}
+            </Text>
+          </View>
         </View>
-        {renderBackground && renderBackground(colors, width)}
       </TouchableOpacity>
     </Animated.View>
   );

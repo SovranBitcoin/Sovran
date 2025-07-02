@@ -16,7 +16,7 @@ interface GradientTextProps extends TextProps {
 const GradientText = ({
   children,
   style,
-  gradientColors = [shades[200], shades[500]],
+  gradientColors = [shades[200], shades[300]],
   ...rest
 }: GradientTextProps) => {
   return (
@@ -63,7 +63,7 @@ export const StyledText = ({
     );
   } else if (secondary) {
     return (
-      <GradientText gradientColors={[greys(theme)[700], greys(theme)[1000]]} style={style}>
+      <GradientText gradientColors={[greys(theme)[400], greys(theme)[500]]} style={style}>
         {children}
       </GradientText>
     );

@@ -5,8 +5,9 @@ import Image, { SpriteView } from './Image';
 import { DeviceMotion } from 'expo-sensors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBackgroundImage } from 'helper/redux/settings';
+import { View } from './View';
 
-const AnimatedSpriteBackground = () => {
+const AnimatedSpriteBackground = ({ backgroundColor }) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   useEffect(() => {
@@ -43,9 +44,17 @@ const AnimatedSpriteBackground = () => {
     'bg10.png': require('assets/images/backgrounds/bg10.png'),
 
     'bg11.gif': require('assets/images/backgrounds/bg11.gif'),
+
+    'bg12.png': require('assets/images/backgrounds/bg12.png'),
+
+    'bg14.png': require('assets/images/backgrounds/bg14.png'),
+    'bg15.png': require('assets/images/backgrounds/bg15.png'),
+    'bg16.png': require('assets/images/backgrounds/bg16.png'),
+    'bg17.png': require('assets/images/backgrounds/bg17.png'),
   };
 
-  if (!backgroundImage) return null;
+  if (!backgroundImage)
+    return <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>;
 
   const dynamicImages = ['bg.png', 'bg2.png', 'bg3.png', 'bg4.png'];
   const isDynamic = dynamicImages.includes(backgroundImage);

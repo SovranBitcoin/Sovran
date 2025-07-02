@@ -8,7 +8,7 @@ export default function ModalScreen() {
       title="BITCOIN THAT"
       highlight="FEELS LIKE CASH"
       description="Send and receive instantly, with zero fees and full privacy—anytime, anywhere."
-      highlightColors={[greens[300], greens[400]]}
+      highlightColors={[greens[300], greens[200]]}
       nextScreen="onboard/nostr"
     />
   );

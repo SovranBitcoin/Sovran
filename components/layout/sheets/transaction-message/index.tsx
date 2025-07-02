@@ -14,7 +14,7 @@ function TransactionMessageSheet(props: any) {
       routes={routes}
       initialRoute="message-input"
       containerStyle={{
-        backgroundColor: greys(theme)[1800],
+        backgroundColor: greys(theme)[800],
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

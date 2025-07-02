@@ -27,7 +27,7 @@ export default function ModalScreen() {
           <Text
             style={{
               fontSize: 14,
-              color: greys(theme)[400],
+              color: greys(theme)[200],
               lineHeight: 20,
             }}>
             • <Text style={{ fontWeight: '600', color: greys(theme)[0] }}>{item.title}</Text>:{' '}

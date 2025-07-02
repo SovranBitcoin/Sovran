@@ -10,7 +10,7 @@ export function Spinner({ size = 8, style }: { size?: number; style?: any }) {
     <Icon
       name="ant-design:loading-outlined"
       size={size}
-      color={greys(theme)[100]}
+      color={greys(theme)[50]}
       style={style}
       spin={{
         delay: 0,

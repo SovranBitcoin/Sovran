@@ -13,7 +13,7 @@ const VpnComponent = ({ esim, theme, isReceived }) => {
     <View style={styles.transactionWrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        colors={isReceived ? [greys(theme)[500], greys(theme)[500]] : [shades[200], shades[300]]}
         style={styles.transactionContainer}>
         <View style={styles.labelContainer}>
           <Text style={styles.labelText}>You received a VPN</Text>
@@ -47,7 +47,7 @@ const createStyles = (theme, isReceived) =>
       left: isReceived ? 16 : 'auto',
       width: 8,
       height: 8,
-      backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
+      backgroundColor: isReceived ? greys(theme)[500] : shades[300],
       transform: [{ rotate: '45deg' }],
     },
     labelContainer: {

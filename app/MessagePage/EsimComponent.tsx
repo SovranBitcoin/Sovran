@@ -8,8 +8,8 @@ import { greys, shades } from 'helper/colors';
 const EsimComponent = ({ esim, theme, isReceived }) => {
   const styles = createStyles(theme);
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [greys(theme)[500], greys(theme)[500]]
+    : [shades[200], shades[300]];
   const arrowStyle = isReceived ? [styles.arrow, styles.receiveArrow] : styles.arrow;
   const containerStyle = [styles.transactionContainer, isReceived && styles.receivedContainer];
 
@@ -54,7 +54,7 @@ const createStyles = (theme: string) =>
     receiveArrow: {
       left: 16,
       right: 'auto',
-      backgroundColor: greys(theme)[1200],
+      backgroundColor: greys(theme)[500],
     },
     headerContainer: {
       backgroundColor: 'rgba(0,0,0,0.25)',

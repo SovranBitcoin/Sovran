@@ -192,7 +192,7 @@ function EsimsScreen() {
       style={{
         paddingTop: 96,
         flex: 1,
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
       }}>
       <Text
         size={32}
@@ -283,8 +283,8 @@ const createStyles = (theme: string) =>
       marginBottom: 16,
       padding: 12,
       borderRadius: 16,
-      backgroundColor: greys(theme)[1800],
-      borderColor: greys(theme)[1300],
+      backgroundColor: greys(theme)[800],
+      borderColor: greys(theme)[600],
       borderWidth: 0.2,
     },
     progressContainer: {
@@ -300,7 +300,7 @@ const createStyles = (theme: string) =>
     },
     countryText: {
       fontSize: 14,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
     },
     remainingDataText: {
       fontSize: 18,
@@ -320,11 +320,11 @@ const createStyles = (theme: string) =>
       fontSize: 16,
       fontFamily: 'OverpassHeavy',
       marginBottom: 8,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
     },
     noItemsText: {
       fontSize: 14,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       marginBottom: 16,
     },
   });

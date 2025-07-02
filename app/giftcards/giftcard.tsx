@@ -25,12 +25,12 @@ const createStyles = (theme: string) =>
     productImage: {
       width: '100%',
       height: 200,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
     },
     productAmount: {
       padding: 24,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       alignItems: 'center',
       margin: 2,
@@ -38,7 +38,7 @@ const createStyles = (theme: string) =>
     productDetails: {
       marginTop: 8,
       padding: 16,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       flexDirection: 'row',
       alignItems: 'center',
@@ -67,11 +67,11 @@ const AmountList = ({ packages, currency, styles, filterCondition, selectedAmoun
                 style={{
                   borderRadius: 8,
                   marginTop: 8,
-                  backgroundColor: isSelected ? 'transparent' : greys(theme)[1500],
+                  backgroundColor: isSelected ? 'transparent' : greys(theme)[700],
                 }}>
                 {isSelected ? (
                   <LinearGradient
-                    colors={[shades[100], shades[200], shades[300], shades[400], shades[500]]}
+                    colors={[shades[200], shades[200], shades[300], shades[200], shades[300]]}
                     style={{ borderRadius: 8 }}>
                     <AmountItem value={pkg.value} currency={currency} styles={styles} />
                   </LinearGradient>
@@ -212,7 +212,7 @@ export default function ModalScreen() {
                 tagsStyles={{
                   div: {
                     width: width - 48 - 16,
-                    color: greys(theme)[200],
+                    color: greys(theme)[100],
                   },
                   p: {
                     margin: 0,
@@ -237,7 +237,7 @@ export default function ModalScreen() {
                 tagsStyles={{
                   div: {
                     width: width - 48 - 16,
-                    color: greys(theme)[200],
+                    color: greys(theme)[100],
                   },
                   p: {
                     margin: 0,

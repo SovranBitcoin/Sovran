@@ -42,9 +42,10 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       {btcPrice?.usd?.btc && (
         <View
           blur
-          colorBlur={opacity(greens[500], 0.2)}
+          colorBlur={opacity(greens[300], 0.2)}
           style={{
-            borderColor: opacity(greens[500], 0.5),
+            borderColor: opacity(greens[300], 0.5),
+            backgroundColor: opacity(greens[300], 0.1),
             borderWidth: 0.2,
             padding: 8,
             borderRadius: 100,
@@ -54,7 +55,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             bold
             size={12}
             style={{
-              color: greens[400],
+              color: greens[200],
             }}>
             ≈ ${((btcPrice?.usd?.btc / 100_000_000) * balance).toFixed(2)}
           </Text>

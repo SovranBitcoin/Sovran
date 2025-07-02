@@ -64,7 +64,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           onPress={handleGoBack}
           style={[
             styles.iconButton,
-            { marginLeft: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+            { marginLeft: 12, backgroundColor: opacity(greys(theme)[950], 0.25) },
           ]}>
           <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
         </TouchableOpacity>
@@ -74,12 +74,12 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           {profileImage && (
             <Animated.View style={styles.profileImageContainer}>
               {isVerified && (
-                <View style={[styles.verifiedBadge, { backgroundColor: greys(theme)[2300] }]}>
-                  <VerifiedIcon fill={greys(theme)[100]} />
+                <View style={[styles.verifiedBadge, { backgroundColor: greys(theme)[950] }]}>
+                  <VerifiedIcon fill={greys(theme)[50]} />
                 </View>
               )}
               <CachedImage
-                style={[styles.profileImage, { borderColor: greys(theme)[1300] }]}
+                style={[styles.profileImage, { borderColor: greys(theme)[600] }]}
                 source={{ uri: profileImage }}
               />
               <Animated.View style={styles.transparent}>
@@ -139,7 +139,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
           }}
           style={[
             styles.iconButton,
-            { marginRight: 12, backgroundColor: opacity(greys(theme)[2300], 0.25) },
+            { marginRight: 12, backgroundColor: opacity(greys(theme)[950], 0.25) },
           ]}>
           <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
         </TouchableOpacity>

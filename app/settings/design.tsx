@@ -11,7 +11,7 @@ import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
 import { CreditCardComponent } from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
-import { greys, shades } from 'helper/colors';
+import { greys, hexToRgb, rgbToHsl, shades } from 'helper/colors';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { ScrollView } from 'react-native';
@@ -403,6 +403,29 @@ export default function ModalScreen() {
         <Text black lexend size={16}>
           LexendBlack
         </Text>
+
+        {Object.keys(theme.greys).map((grey) => {
+          return (
+            <View
+              style={{
+                backgroundColor: greys(theme)[grey],
+                height: 64,
+              }}>
+              <Text>{greys(theme)[grey]}</Text>
+              <Text>
+                {JSON.stringify(rgbToHsl(...Object.values(hexToRgb(greys(theme)[grey]))))}
+              </Text>
+            </View>
+          );
+        })}
+
+        <View
+          style={{
+            backgroundColor: greys(theme)[950],
+            width: 32,
+            height: 32,
+          }}></View>
+
         <CreditCardComponent />
 
         {/* info message */}
@@ -433,6 +456,19 @@ export default function ModalScreen() {
         <Section title="Title">
           <RowButton label="Label" value={'Optional Value'} onPress={() => {}} />
           <RowButton label="Label" isDanger value={'Optional Value'} onPress={() => {}} />
+          {/* Example with a custom right icon and label */}
+          <RowButton
+            label={
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
+                <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                  npub1example@npubx.cash
+                </Text>
+              </View>
+            }
+            onPress={() => {}}
+            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
+          />
         </Section>
 
         {/* This is usually added at the bottom of model pages, is shows 2 buttons at once, if 3 buttons are added then it will show a popup to show more options */}

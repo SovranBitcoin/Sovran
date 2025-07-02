@@ -20,7 +20,7 @@ const EventComponent = ({ event, theme, isReceived = true }) => {
     <View style={styles.eventWrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[1000], greys(theme)[1200]] : [shades[100], shades[300]]}
+        colors={isReceived ? [greys(theme)[500], greys(theme)[500]] : [shades[200], shades[300]]}
         style={styles.eventContainer}>
         <View style={styles.titleContainer}>
           <Text style={styles.titleText}>{eventTitle}</Text>
@@ -59,7 +59,7 @@ const createStyles = (theme, isReceived) =>
       position: 'absolute',
       bottom: -4,
       ...(isReceived
-        ? { left: 16, backgroundColor: greys(theme)[1200] }
+        ? { left: 16, backgroundColor: greys(theme)[500] }
         : { right: 16, backgroundColor: shades[300] }),
       width: 8,
       height: 8,

@@ -87,7 +87,7 @@ export const ActionFooter = ({ actions, theme, style }) => {
             <Text
               size={16}
               style={{
-                color: isPrimary ? greys(theme)[2300] : greys(theme)[0],
+                color: isPrimary ? greys(theme)[950] : greys(theme)[0],
                 fontFamily: 'LexendMedium',
               }}>
               {action.label}
@@ -202,7 +202,7 @@ const createStyles = (theme: string) =>
       justifyContent: 'center',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     centeredContent: {
       justifyContent: 'center',

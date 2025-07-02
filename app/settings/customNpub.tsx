@@ -28,12 +28,12 @@ const createStyles = (theme: any) =>
     inputSelectorContainer: {
       borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
       marginVertical: 8,
     },
     input: {
-      color: greys(theme)[100],
-      backgroundColor: greys(theme)[2300],
+      color: greys(theme)[50],
+      backgroundColor: greys(theme)[950],
       padding: 8,
       paddingVertical: 16,
       borderRadius: 8,
@@ -81,7 +81,7 @@ const createStyles = (theme: any) =>
       marginTop: 10,
       padding: 10,
       borderRadius: 5,
-      backgroundColor: greys(theme)[200],
+      backgroundColor: greys(theme)[100],
     },
     closeButtonText: {
       color: greys(theme)[0],
@@ -96,11 +96,11 @@ const createStyles = (theme: any) =>
       justifyContent: 'space-between',
       padding: 16,
       borderRadius: 8,
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       marginBottom: 8,
     },
     nameAvailabilityText: {
-      color: greys(theme)[1000],
+      color: greys(theme)[500],
       fontSize: 14,
     },
     checkIconContainer: {
@@ -258,7 +258,7 @@ const NpubSelector = ({
     <View style={styles.inputSelectorContainer}>
       <View
         style={{
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           padding: 8,
           borderRadius: 8,
           marginBottom: 8,
@@ -269,7 +269,7 @@ const NpubSelector = ({
           value={username}
           onChangeText={setUsername}
           style={styles.input}
-          placeholderTextColor={greys(theme)[100]}
+          placeholderTextColor={greys(theme)[50]}
         />
         <ButtonHandler
           buttons={[

@@ -109,16 +109,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="material-symbols:update-rounded" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="material-symbols:update-rounded" size={24} color={greys(theme)[400]} />
+            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
               Realtime Updates
             </Text>
           </View>
@@ -128,16 +128,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[400]} />
+            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
               Restore Money
             </Text>
           </View>
@@ -146,16 +146,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="uil:invoice" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="uil:invoice" size={24} color={greys(theme)[400]} />
+            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
               Payment Requests
             </Text>
           </View>
@@ -165,16 +165,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[400]} />
+            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
               Restore Money
             </Text>
           </View>
@@ -183,16 +183,16 @@ const MintDetailPage = () => {
               flexDirection: 'row',
               paddingVertical: 8,
               paddingHorizontal: 8,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               borderRadius: 12,
               borderWidth: 0.5,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
               alignItems: 'center',
               marginRight: 8,
               marginBottom: 8,
             }}>
-            <Icon name="solar:key-bold" size={24} color={greys(theme)[700]} />
-            <Text style={{ color: greys(theme)[700], marginLeft: 8 }} bold size={16}>
+            <Icon name="solar:key-bold" size={24} color={greys(theme)[400]} />
+            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
               P2PK
             </Text>
           </View>
@@ -222,34 +222,34 @@ const MintDetailPage = () => {
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <CurrencyIcon colors={[greys(theme)[700]]} width={20} currency={'nostr'} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <CurrencyIcon colors={[greys(theme)[400]]} width={20} currency={'nostr'} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
                         {truncateMiddle(contact.info, 10)}
                       </Text>
                     </View>
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[700]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[400]} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="mdi:at" size={20} color={greys(theme)[700]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Icon name="mdi:at" size={20} color={greys(theme)[400]} />
+                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   ) : (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginLeft: 8, color: greys(theme)[100] }} bold>
+                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
                     </View>
                   )
                 }
-                // label={<Icon name="prime:twitter" size={24} color={greys(theme)[700]} />}
+                // label={<Icon name="prime:twitter" size={24} color={greys(theme)[400]} />}
                 // label={contact.method.toUpperCase()}
                 // sublabel={contact.method.toUpperCase()}
                 onPress={() => handleContactPress(contact.method, contact.info)}
@@ -356,7 +356,7 @@ const createStyles = (theme: string) =>
     },
     mintVersion: {
       fontSize: 14,
-      color: greys(theme)[200],
+      color: greys(theme)[100],
       textAlign: 'center',
     },
     descriptionContainer: {
@@ -374,7 +374,7 @@ const createStyles = (theme: string) =>
       lineHeight: 20,
     },
     actionButton: {
-      backgroundColor: greens[500],
+      backgroundColor: greens[300],
       borderRadius: 8,
       marginVertical: 2,
     },
@@ -397,7 +397,7 @@ const createStyles = (theme: string) =>
     },
     copiedText: {
       fontSize: 12,
-      color: greens[400],
+      color: greens[200],
       fontWeight: '600',
     },
     container2: {

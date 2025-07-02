@@ -11,7 +11,7 @@ export default function ModalScreen() {
       title="READY TO"
       highlight="GO?"
       description="You're all set. Start sending and receiving bitcoin instantly. Stay private, stay sovereign."
-      highlightColors={[shades[300], shades[400]]}
+      highlightColors={[shades[300], shades[200]]}
       nextScreen="onboard/displayMnemonic"
       actions={[
         {

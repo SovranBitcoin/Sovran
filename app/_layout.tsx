@@ -197,10 +197,10 @@ function MainStack() {
         fontSize: 16,
       },
       headerStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[2300] : 'transparent',
+        backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
       },
       headerLargeStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[2300] : 'transparent',
+        backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
       },
       ...screenName.options,
     };
@@ -209,7 +209,7 @@ function MainStack() {
   return (
     <>
       <StatusBar
-        backgroundColor={greys(theme)[2300]}
+        backgroundColor={greys(theme)[950]}
         barStyle={theme === 'light' ? 'dark-content' : 'light-content'}
       />
       <Stack

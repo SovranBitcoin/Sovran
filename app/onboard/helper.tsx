@@ -41,7 +41,7 @@ const createStyles = (theme: any) =>
       zIndex: 10,
     },
     message: {
-      color: greys(theme)[600],
+      color: greys(theme)[300],
       fontSize: 10,
       fontWeight: '500',
       textAlign: 'left',
@@ -183,7 +183,7 @@ const createStyles = (theme: any) =>
     },
     mintUrl: {
       fontSize: 12,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontWeight: '500',
       marginBottom: 8,
     },
@@ -240,7 +240,7 @@ const createStyles = (theme: any) =>
     remainingSteps: {
       position: 'absolute',
       bottom: 64,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       fontSize: 16,
       fontWeight: '500',
       textAlign: 'center',

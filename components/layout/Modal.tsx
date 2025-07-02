@@ -66,7 +66,7 @@ export default function Modal({
   const [buttonHeight, setButtonHeight] = useState<number>(0);
 
   const titleOffset = showClose || showBack || typeof title !== 'string' ? 0 : 64;
-  const bgColor = transparent ? 'transparent' : (backgroundColor ?? greys(theme)[2300]);
+  const bgColor = transparent ? 'transparent' : (backgroundColor ?? greys(theme)[950]);
 
   useEffect(() => {
     const listener = scrollY.addListener(({ value }) => {
@@ -132,7 +132,7 @@ export default function Modal({
           minHeight: headerHeight,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: opacity(greys(theme)[2300], 0.9),
+          backgroundColor: opacity(greys(theme)[950], 0.9),
         }}>
         <View className="w-full flex-row items-center justify-between bg-transparent">
           {renderHeaderButton()}

@@ -62,7 +62,7 @@ const createStyles = (theme: string, buttonHeight: number, containerHeight: numb
   StyleSheet.create({
     actionSheetContainer: {
       height: '100%',
-      backgroundColor: greys(theme)[2300],
+      backgroundColor: greys(theme)[950],
     },
     scrollContainer: {
       padding: 16,
@@ -86,11 +86,11 @@ const createStyles = (theme: string, buttonHeight: number, containerHeight: numb
       padding: 16,
       marginTop: 12,
       alignItems: 'center',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderBottomRightRadius: 1000,
       borderRadius: 1000,
       borderWidth: 0.5,
-      borderColor: greys(theme)[1400],
+      borderColor: greys(theme)[600],
     },
     buttonText: {
       color: greys(theme)[0],

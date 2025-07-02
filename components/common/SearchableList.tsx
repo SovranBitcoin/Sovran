@@ -49,8 +49,8 @@ export function SearchableList({
         key={getItemKey(item)}
         className="mb-2 flex-row items-center rounded-full p-2"
         style={{
-          backgroundColor: greys(theme)[1800],
-          borderColor: greys(theme)[1300],
+          backgroundColor: greys(theme)[800],
+          borderColor: greys(theme)[600],
           borderWidth: 0.2,
           ...itemStyle,
         }}
@@ -65,7 +65,7 @@ export function SearchableList({
   );
 
   return (
-    <View style={{ backgroundColor: greys(theme)[2300] }}>
+    <View style={{ backgroundColor: greys(theme)[950] }}>
       <TextInput placeholder={searchPlaceholder} value={searchText} onChangeText={onSearchChange} />
       <View className="h-4" style={{ backgroundColor: 'transparent' }} />
       <ScrollView>{data.map(renderItem)}</ScrollView>

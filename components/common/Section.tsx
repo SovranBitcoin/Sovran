@@ -37,7 +37,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
   // Memoize background color calculation
   const backgroundColor = useMemo(
-    () => (camera ? opacity(greys(theme)[1800], 0.75) : greys(theme)[1800]),
+    () => (camera ? opacity(greys(theme)[800], 0.75) : greys(theme)[800]),
     [camera, theme]
   );
 
@@ -74,7 +74,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
                 id={titleId}
                 bold
                 size={16}
-                color={greys(theme)[600]}
+                color={greys(theme)[300]}
                 style={{
                   fontFamily: 'OverpassRegular',
                   marginRight: titleText === '' ? 0 : 8,
@@ -118,7 +118,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             mono
             size={18}
-            color={greys(theme)[100]}
+            color={greys(theme)[50]}
             style={{
               textAlign: 'center',
             }}>
@@ -132,7 +132,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             <StyledText
               primary
               style={{
-                color: shades[100],
+                color: shades[200],
                 fontFamily: 'OverpassHeavy',
                 fontSize: 24,
                 textAlign: 'center',
@@ -189,7 +189,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             bold
             size={12}
-            color={greys(theme)[100]}
+            color={greys(theme)[50]}
             style={{
               textAlign: 'left',
               fontFamily: 'OverpassMono',
@@ -238,7 +238,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           bold
           size={12}
-          color={greys(theme)[100]}
+          color={greys(theme)[50]}
           style={{
             textAlign: 'center',
             fontFamily: 'OverpassMono',

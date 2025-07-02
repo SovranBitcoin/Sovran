@@ -56,7 +56,7 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
             style={{
               width: '100%',
               flex: 1,
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
             }}>
             <PostSkeleton />
           </View>
@@ -70,7 +70,7 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
           style={{
             width: '100%',
             flex: 1,
-            backgroundColor: greys(theme)[1800],
+            backgroundColor: greys(theme)[800],
           }}>
           <PostSkeleton />
         </View>
@@ -81,19 +81,19 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
               fetchMore();
             }}
             style={{
-              backgroundColor: greys(theme)[1800],
+              backgroundColor: greys(theme)[800],
               padding: 8,
               borderRadius: 8,
               marginTop: 16,
               marginBottom: 48,
               borderWidth: 1,
-              borderColor: greys(theme)[1500],
+              borderColor: greys(theme)[700],
             }}>
             <Text
               style={{
                 textAlign: 'center',
                 fontFamily: 'OverpassBold',
-                color: greys(theme)[700],
+                color: greys(theme)[400],
               }}>
               Load more from
             </Text>
@@ -101,7 +101,7 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
               style={{
                 textAlign: 'center',
                 fontFamily: 'OverpassRegular',
-                color: greys(theme)[700],
+                color: greys(theme)[400],
               }}>
               {new Date(nextDateRange.since * 1000).toLocaleDateString('en-GB') +
                 ' - ' +

@@ -134,7 +134,7 @@ const createStyles = (theme: any) =>
     },
     organizationTile: {
       width: '48%',
-      backgroundColor: greys(theme)[1800],
+      backgroundColor: greys(theme)[800],
       borderRadius: 8,
       alignItems: 'flex-start',
       marginBottom: 16,
@@ -143,7 +143,7 @@ const createStyles = (theme: any) =>
     tileImage: {
       width: '100%',
       aspectRatio: 1,
-      backgroundColor: greys(theme)[1500],
+      backgroundColor: greys(theme)[700],
     },
     tileTitleContainer: {
       padding: 8,
@@ -154,11 +154,11 @@ const createStyles = (theme: any) =>
     },
     tileAbout: {
       fontSize: 12,
-      color: greys(theme)[400],
+      color: greys(theme)[200],
       marginTop: 4,
     },
     websiteLink: {
-      color: greys(theme)[600],
+      color: greys(theme)[300],
       fontSize: 12,
       marginTop: 4,
     },

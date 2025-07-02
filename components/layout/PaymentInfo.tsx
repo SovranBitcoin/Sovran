@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/common/QRCode';
-import { Spacer, View } from 'components/common/View';
+import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { GradientSkeleton } from '../common/GradientSkeleton';
 import { greys, shades } from 'helper/colors';
@@ -141,7 +141,7 @@ export function PaymentInfo({
     if (!selectedValue) {
       return (
         <View className="flex-row items-center justify-center bg-transparent">
-          <GradientSkeleton startColor={greys(theme)[1800]} endColor={greys(theme)[2300]} />
+          <GradientSkeleton startColor={greys(theme)[800]} endColor={greys(theme)[950]} />
         </View>
       );
     }
@@ -165,20 +165,23 @@ export function PaymentInfo({
     if (!selectedValue || !showSection) return null;
 
     return (
-      <Section
-        special={true}
-        style={{
-          marginLeft: 16,
-          marginRight: 16,
-          marginBottom: 0,
-        }}
-        items={[
-          {
-            title: '',
-            value: link || selectedValue,
-          },
-        ]}
-      />
+      <>
+        <Spacer size={12} />
+        <Section
+          special={true}
+          style={{
+            marginLeft: 16,
+            marginRight: 16,
+            marginBottom: 0,
+          }}
+          items={[
+            {
+              title: '',
+              value: link || selectedValue,
+            },
+          ]}
+        />
+      </>
     );
   };
 
@@ -186,7 +189,6 @@ export function PaymentInfo({
     <>
       {renderTabs()}
       {renderQRCode()}
-      <Spacer size={12} />
       {renderSection()}
     </>
   );
@@ -221,7 +223,7 @@ const TabButton = React.memo(
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: isActive ? greys(theme)[0] : greys(theme)[700],
+            color: isActive ? greys(theme)[0] : greys(theme)[400],
           }}>
           {label}
         </Text>

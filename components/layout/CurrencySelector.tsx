@@ -80,9 +80,9 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                 marginRight: 12,
                 padding: 12,
                 borderRadius: 8,
-                backgroundColor: isSelected ? greys(theme)[1500] : greys(theme)[2300],
+                backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
                 borderWidth: 0.5,
-                borderColor: greys(theme)[1500],
+                borderColor: greys(theme)[700],
                 minWidth: 100,
               }}>
               <View style={styles.currencyContent}>

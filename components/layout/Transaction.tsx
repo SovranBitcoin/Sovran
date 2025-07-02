@@ -2,7 +2,7 @@ import { UntranslatedText } from 'components/common/Text';
 import { formatCurrency } from 'helper/currency';
 import Icon from 'assets/icons';
 import { convertTime } from 'helper/time';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -107,7 +107,7 @@ export const Transaction = React.memo(({ tx }) => {
 
       <View className="ml-3 flex-grow flex-col bg-transparent">
         <View className="flex flex-row items-end justify-between bg-transparent">
-          <UntranslatedText color={greys(theme)[0]} bold size={14}>
+          <UntranslatedText color={theme.greys[0]} bold size={14}>
             {tx.transactionType[0].toUpperCase() + tx.transactionType.slice(1)}
           </UntranslatedText>
           <View className="flex flex-row items-center bg-transparent">
@@ -126,17 +126,17 @@ export const Transaction = React.memo(({ tx }) => {
 
         <View className="flex flex-row justify-between bg-transparent">
           <View className="flex flex-row items-center">
-            <UntranslatedText regular size={10} color={greys(theme)[200]}>
+            <UntranslatedText regular size={10} color={theme.greys[100]}>
               {tx?.date ? convertTime(new Date(tx.date)) : 'Unconfirmed'}
             </UntranslatedText>
             <View className="pl-1">
               {tx?.paid ? (
-                <Icon size={10} name="simple-line-icons:check" color={greys(theme)[200]} />
+                <Icon size={10} name="simple-line-icons:check" color={theme.greys[100]} />
               ) : showLoading ? (
                 <Icon
                   size={10}
                   name="ant-design:loading-outlined"
-                  color={greys(theme)[100]}
+                  color={theme.greys[50]}
                   spin={{
                     delay: 0,
                     duration: 1000,
@@ -152,7 +152,7 @@ export const Transaction = React.memo(({ tx }) => {
             className="font-overpass-heavy self-end text-right text-xs"
             bold
             size={10}
-            color={greys(theme)[200]}>
+            color={theme.greys[100]}>
             {fiatAmount}
           </UntranslatedText>
         </View>

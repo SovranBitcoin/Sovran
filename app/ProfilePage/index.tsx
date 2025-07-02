@@ -136,7 +136,7 @@ export default function AboutPage(props: string) {
   return (
     <ScrollView
       style={{
-        backgroundColor: greys(theme)[2300],
+        backgroundColor: greys(theme)[950],
         height: '100%',
       }}
       {...props}>
@@ -145,8 +145,8 @@ export default function AboutPage(props: string) {
           position: 'absolute',
           width: '100%',
           height: 120,
-          borderColor: greys(theme)[1300],
-          backgroundColor: greys(theme)[1800],
+          borderColor: greys(theme)[600],
+          backgroundColor: greys(theme)[800],
           borderWidth: 0.2,
           marginBottom: 12,
           top: -48,
@@ -163,7 +163,7 @@ export default function AboutPage(props: string) {
           height: 72,
           borderRadius: 1000,
           marginBottom: 0,
-          borderColor: greys(theme)[2300],
+          borderColor: greys(theme)[950],
           borderWidth: 3,
           top: 120 - 72 + 8,
           left: 16,
@@ -188,10 +188,10 @@ export default function AboutPage(props: string) {
         style={{
           width: '100%',
           height: 120,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           marginBottom: 12,
           zIndex: 0,
-          borderColor: greys(theme)[2300],
+          borderColor: greys(theme)[950],
           borderWidth: 2,
         }}
         source={{ uri: p?.banner || p?.profile?.banner }}
@@ -212,7 +212,7 @@ export default function AboutPage(props: string) {
             height: 72,
             borderRadius: 1000,
             marginBottom: 0,
-            borderColor: greys(theme)[2300],
+            borderColor: greys(theme)[950],
             borderWidth: 2,
             zIndex: 10000000,
           }}
@@ -239,7 +239,7 @@ export default function AboutPage(props: string) {
             fontSize: 14,
             textAlign: 'left',
             alignSelf: 'left',
-            color: greys(theme)[400],
+            color: greys(theme)[200],
           }}>
           {p?.about || p?.profile?.about}
         </Text>
@@ -258,7 +258,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[400],
+                color: greys(theme)[200],
               }}>
               {followers}
             </Text>
@@ -268,7 +268,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[700],
+                color: greys(theme)[400],
                 marginLeft: 4,
               }}>
               Followers
@@ -285,7 +285,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[400],
+                color: greys(theme)[200],
               }}>
               {followed}
             </Text>
@@ -295,7 +295,7 @@ export default function AboutPage(props: string) {
                 fontSize: 14,
                 textAlign: 'left',
                 alignSelf: 'left',
-                color: greys(theme)[700],
+                color: greys(theme)[400],
                 marginLeft: 4,
               }}>
               Following
@@ -320,7 +320,7 @@ export default function AboutPage(props: string) {
               style={{
                 fontFamily: 'OverpassBold',
                 fontSize: 16,
-                color: index === activeTab ? greys(theme)[0] : greys(theme)[700],
+                color: index === activeTab ? greys(theme)[0] : greys(theme)[400],
               }}>
               {tab}
             </Text>

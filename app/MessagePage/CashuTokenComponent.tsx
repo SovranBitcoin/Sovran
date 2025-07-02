@@ -49,8 +49,8 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   };
 
   const gradientColors = isReceived
-    ? [greys(theme)[1000], greys(theme)[1200]]
-    : [shades[100], shades[300]];
+    ? [greys(theme)[500], greys(theme)[500]]
+    : [shades[200], shades[300]];
 
   return (
     <View style={[styles.wrapper, { alignSelf: isReceived ? 'flex-start' : 'flex-end' }]}>
@@ -58,7 +58,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
         style={[
           styles.arrow,
           {
-            backgroundColor: isReceived ? greys(theme)[1200] : shades[300],
+            backgroundColor: isReceived ? greys(theme)[500] : shades[300],
             left: isReceived ? 16 : 'auto',
             right: isReceived ? 'auto' : 16,
           },

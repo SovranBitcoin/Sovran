@@ -124,7 +124,7 @@ function ModalScreen() {
       onPress={() => setSelectedPackage(pkg.packageCode)}
       style={{
         backgroundColor:
-          selectedPackage === pkg.packageCode ? greys(theme)[1500] : greys(theme)[1800],
+          selectedPackage === pkg.packageCode ? greys(theme)[700] : greys(theme)[800],
         borderRadius: 16,
         padding: 8,
       }}>
@@ -150,8 +150,8 @@ function ModalScreen() {
                 height: 16,
                 borderRadius: 16,
                 backgroundColor:
-                  selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[1400],
-                borderColor: selectedPackage === pkg.packageCode ? shades[100] : greys(theme)[1000],
+                  selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[600],
+                borderColor: selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[500],
                 borderWidth: 0.5,
               }}
             />
@@ -212,9 +212,9 @@ function ModalScreen() {
           margin: 8,
           padding: 8,
           marginBottom: 0,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           borderRadius: 12,
-          borderColor: greys(theme)[1300],
+          borderColor: greys(theme)[600],
           borderWidth: 0.2,
         }}>
         <FlagIcon width={32} height={32} country={country} />
@@ -265,9 +265,9 @@ function ModalScreen() {
         style={{
           padding: 8,
           margin: 8,
-          backgroundColor: greys(theme)[1800],
+          backgroundColor: greys(theme)[800],
           borderRadius: 16,
-          borderColor: greys(theme)[1300],
+          borderColor: greys(theme)[600],
           borderWidth: 0.2,
           overflow: 'hidden',
         }}>
