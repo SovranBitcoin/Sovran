@@ -24,8 +24,6 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
 
-const height = 350;
-
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
   text: {
@@ -55,7 +53,7 @@ export function AccountPagerView({
 
   const styles = createStyles(theme.id, theme.greys, theme.shades);
   const navigation = useTypedNavigation();
-  
+
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
@@ -149,7 +147,7 @@ export function AccountPagerView({
 
   return (
     <View className="bg-transparent">
-      <View className={`flex h-[${height}px] w-full`}>
+      <View className={`flex h-[350px] w-full`}>
         <Swiper
           controlsEnabled={false}
           loop
@@ -185,7 +183,7 @@ export function AccountPagerView({
           padding: 0,
           margin: 0,
           zIndex: 3,
-          height,
+          height: 350,
           backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,
@@ -303,14 +301,12 @@ const createStyles = (theme, greys: string, shades) =>
       backgroundColor: greys[800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      borderWidth: 0.3,
       borderColor: greys[700],
     },
     sendIconView: {
       backgroundColor: greys[800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      borderWidth: 0.3,
       borderColor: greys[700],
     },
   });
