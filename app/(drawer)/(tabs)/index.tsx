@@ -203,7 +203,6 @@ function TabOneScreen() {
                   theme.greys[950],
                   opacity(theme.greys[950], 0.5),
                   opacity(theme.greys[950], 0),
-                  opacity(theme.greys[950], 0),
                 ]}
                 start={{ x: 0.5, y: 1 }}
                 end={{ x: 0.5, y: 0 }}

@@ -9,7 +9,7 @@ import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import Image from 'components/common/Image';
 import Wrapper from '../wrapper';
@@ -139,11 +139,11 @@ const MintItem: React.FC<MintItemProps> = ({
       colors={
         isSelected
           ? [
-              opacity(shades[200], 0.88),
-              opacity(shades[200], 0.88),
-              opacity(shades[300], 0.88),
-              opacity(shades[200], 0.88),
-              opacity(shades[300], 0.88),
+              opacity(theme.shades[200], 0.88),
+              opacity(theme.shades[200], 0.88),
+              opacity(theme.shades[300], 0.88),
+              opacity(theme.shades[200], 0.88),
+              opacity(theme.shades[300], 0.88),
             ]
           : []
       }
@@ -330,13 +330,13 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
               colors={
                 selectedCurrency === currency
                   ? ([
-                      opacity(shades[200], 0.88),
-                      opacity(shades[200], 0.88),
-                      opacity(shades[300], 0.88),
-                      opacity(shades[200], 0.88),
-                      opacity(shades[300], 0.88),
+                      opacity(theme.shades[200], 0.88),
+                      opacity(theme.shades[200], 0.88),
+                      opacity(theme.shades[300], 0.88),
+                      opacity(theme.shades[200], 0.88),
+                      opacity(theme.shades[300], 0.88),
                     ] as const)
-                  : [opacity(shades[200], 0), opacity(shades[200], 0)]
+                  : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
               }
               style={[
                 styles.currencyButton,
