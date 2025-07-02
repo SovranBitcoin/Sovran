@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
@@ -32,6 +32,7 @@ import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/layout/AccountPagerView';
+import { Card } from 'components/common/Card';
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -185,13 +186,13 @@ function TabOneScreen() {
           style={styles.scrollView}
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          {/* <View className="m-4 mb-[32px] mt-[-32px]">
+          <View className="mx-4">
+            <Spacer size={12} />
             <Card
               message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
               variant="info"
             />
-            <Spacer size={12} />
-          </View> */}
+          </View>
           <View
             className="p-4"
             style={{
