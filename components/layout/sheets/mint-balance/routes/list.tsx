@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { ScrollView, useSheetRef } from 'react-native-actions-sheet';
+import {
+  ScrollView,
+  useSheetRef,
+  useSheetPayload,
+} from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -18,6 +22,7 @@ import { AmountFormatter } from 'components/common/AmountFormatter';
 import { showMessage } from 'helper/popup/popups';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { useTypedNavigation } from 'helper/navigation';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -65,6 +70,8 @@ const ListRoute = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const sheetRef = useSheetRef('mint-balance');
+  const payload = useSheetPayload('mint-balance');
+  const navigation = useTypedNavigation();
 
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const dispatch = useDispatch();
@@ -104,6 +111,13 @@ const ListRoute = () => {
     setLoadingId(mint.mintUrl);
     dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
     setLoadingId(null);
+
+    navigation.navigate('currency', {
+      to: 'ecashSendConfirmation',
+      unit: mint.unit.toLowerCase(),
+      type: payload?.accountType,
+      accountIndex: payload?.accountIndex,
+    });
 
     sheetRef.current?.hide({
       id: mint.mintUrl,

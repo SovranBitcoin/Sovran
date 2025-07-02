@@ -16,6 +16,10 @@ declare module 'react-native-actions-sheet' {
       routes: {
         list: RouteDefinition;
       };
+      payload: {
+        accountType: string;
+        accountIndex: number;
+      };
     }>;
   }
 }

@@ -85,18 +85,13 @@ export function AccountPagerView({
 
     if (page === 'currency' && balance <= 0) {
       SheetManager.show('mint-balance', {
+        payload: { accountType: account.type, accountIndex: account.accountIndex },
         onClose: (mint?: { id: string; unit: string }) => {
           if (mint?.id) {
             const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
             if (idx !== -1) {
               setAccount(accounts[idx]);
             }
-            navigation.navigate(page, {
-              to: 'ecashSendConfirmation',
-              unit: mint.unit.toLowerCase(),
-              type: account.type,
-              accountIndex: account.accountIndex,
-            });
           }
         },
       });
