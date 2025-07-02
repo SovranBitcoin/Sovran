@@ -9,79 +9,54 @@ import { Tabs } from 'components/common/Tabs';
 import { memoizedGetTheme, useSettings, memoizedGetBackgroundImage } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import Image from 'components/common/Image';
+import { BACKGROUND_IMAGES, BackgroundImageMeta } from 'helper/backgroundImages';
 
-const CATEGORIES = ['Static'];
+const categories = Array.from(
+  new Set(Object.values(BACKGROUND_IMAGES).map((b) => b.category))
+);
 
-const images = {
-  Glow: ['bg.png'],
-  Lava: ['bg2.png'],
-  Lights: ['bg3.png'],
-  Snake: ['bg4.png'],
-  Static: [
-    'bg5.png',
-    'bg6.png',
-    'bg7.png',
-    'bg8.png',
-    'bg9.png',
-    'bg10.png',
-    'bg11.gif',
-    'bg12.png',
-    'bg14.png',
-    'bg15.png',
-    'bg16.png',
-    'bg17.png',
-  ],
-};
+const imagesByCategory: Record<string, BackgroundImageMeta[]> = categories.reduce(
+  (acc, category) => {
+    acc[category] = Object.values(BACKGROUND_IMAGES).filter(
+      (b) => b.category === category
+    );
+    return acc;
+  },
+  {} as Record<string, BackgroundImageMeta[]>
+);
 
 export default function BackgroundImageSettings() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
   const { setBackgroundImage } = useSettings();
   const current = useSelector(memoizedGetBackgroundImage);
-  const [tab, setTab] = useState(CATEGORIES[0]);
+  const [tab, setTab] = useState(categories[0]);
   const styles = createStyles(theme);
 
   const width = (Dimensions.get('window').width - 48) / 2;
   const height = width / 2;
 
-  const sources: Record<string, any> = {
-    'bg.png': require('assets/images/backgrounds/bg.png'),
-    'bg2.png': require('assets/images/backgrounds/bg2.png'),
-    'bg3.png': require('assets/images/backgrounds/bg3.png'),
-    'bg4.png': require('assets/images/backgrounds/bg4.png'),
-    'bg5.png': require('assets/images/backgrounds/bg5.png'),
-    'bg6.png': require('assets/images/backgrounds/bg6.png'),
-    'bg7.png': require('assets/images/backgrounds/bg7.png'),
-    'bg8.png': require('assets/images/backgrounds/bg8.png'),
-    'bg9.png': require('assets/images/backgrounds/bg9.png'),
-    'bg10.png': require('assets/images/backgrounds/bg10.png'),
-
-    'bg11.gif': require('assets/images/backgrounds/bg11.gif'),
-    'bg12.png': require('assets/images/backgrounds/bg12.png'),
-
-    'bg14.png': require('assets/images/backgrounds/bg14.png'),
-    'bg15.png': require('assets/images/backgrounds/bg15.png'),
-    'bg16.png': require('assets/images/backgrounds/bg16.png'),
-    'bg17.png': require('assets/images/backgrounds/bg17.png'),
-  };
 
   return (
     <Container>
-      <Tabs tabs={CATEGORIES} selectedTab={tab} handleTabPress={setTab} />
+      <Tabs tabs={categories} selectedTab={tab} handleTabPress={setTab} />
       <ScrollView contentContainerStyle={styles.gridContainer}>
-        {images[tab]?.map((img) => (
+        {imagesByCategory[tab]?.map((img) => (
           <Pressable
-            key={img}
+            key={img.id}
             style={[styles.imageWrapper, { width, height }]}
             onPress={() => {
-              setBackgroundImage(img);
+              setBackgroundImage(img.id);
               navigation.goBack();
             }}>
             <Image
-              source={sources[img]}
+              source={img.source}
               style={[StyleSheet.absoluteFillObject, { borderRadius: 8 }]}
             />
-            {current === img && (
+            <View style={styles.label}>
+              <Text style={styles.nameText}>{img.name}</Text>
+            </View>
+            {current === img.id && (
               <View style={styles.overlay}>
                 <Text style={styles.selectedText}>Selected</Text>
               </View>
@@ -111,6 +86,19 @@ const createStyles = (theme: string) =>
       backgroundColor: 'rgba(0,0,0,0.4)',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    label: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingVertical: 2,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      alignItems: 'center',
+    },
+    nameText: {
+      color: greys(theme)[0],
+      fontSize: 12,
     },
     selectedText: {
       color: greys(theme)[0],
