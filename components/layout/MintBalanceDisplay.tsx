@@ -20,10 +20,20 @@ interface Props {
     mint: { id: string; name: string; iconUrl: string | null; unit: string },
     balance: { amount: number; unit: string }
   ) => void | Promise<void>;
+  /**
+   * When true, prevent selecting mints that have no balance.
+   * Defaults to true.
+   */
+  requireBalance?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) => {
+const MintBalanceDisplay: React.FC<Props> = ({
+  unit,
+  onMintSelected,
+  requireBalance = true,
+  style,
+}) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -33,9 +43,9 @@ const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) =>
 
   const handlePress = () => {
     SheetManager.show('mint-balance', {
-      payload: { navigate: false },
+      payload: { navigate: false, requireBalance },
       onClose: (mint?: { id: string; unit: string }) => {
-        if (mint && onMintSelected) {
+        if (mint?.id && onMintSelected) {
           const amt = memoizedGetBalance(unit, mint.id)(store.getState());
           onMintSelected(mint, { amount: amt, unit });
         }

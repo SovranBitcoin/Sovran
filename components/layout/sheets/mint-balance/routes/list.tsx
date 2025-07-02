@@ -92,7 +92,7 @@ const ListRoute = () => {
       return;
     }
 
-    if (mint.amount === 0) {
+    if (payload?.requireBalance && mint.amount === 0) {
       showMessage('insufficient_balance', {
         amount: mint.amount,
         unit: mint.unit,

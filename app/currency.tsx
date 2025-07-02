@@ -299,7 +299,14 @@ function ModalScreen() {
         }
         onChange={setAmount}
       />
-      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
+      <MintBalanceDisplay
+        onMintSelected={handleMintSelected}
+        unit={unit}
+        requireBalance={
+          params?.to === 'ecashSendConfirmation' ||
+          params?.to === 'lightningSendConfirmation'
+        }
+      />
       {params.to === 'ecashSendConfirmation' && params?.profile && (
         <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
           <Icon
