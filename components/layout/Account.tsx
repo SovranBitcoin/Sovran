@@ -9,7 +9,7 @@ import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'as
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 
 import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetBackgroundImage, memoizedGetTheme } from 'helper/redux/settings';
 import { NonGestureView } from './NonGestureView';
 
 // Define proper interfaces for our data types
@@ -113,6 +113,8 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
     });
   };
 
+  const image = useSelector(memoizedGetBackgroundImage);
+
   return (
     <NonGestureView key={account.key} index={0} style={styles.nonGestureView}>
       <View style={styles.transparentBackground}>
@@ -149,17 +151,15 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         </View>
       </View>
 
-      {/* <View style={styles.absoluteBottomBorder} /> */}
-
-      {/* <View style={styles.absoluteRightBottomBorder}>
-        <View style={styles.bottomNegative}>{renderCurrencyIcon()}</View>
-      </View> */}
+      <View style={styles.absoluteRightBottomBorder}>
+        <View style={styles.bottomNegative}>{!image && renderCurrencyIcon()}</View>
+      </View>
     </NonGestureView>
   );
 }
 
 // Use a constant for platform-specific values
-const PLATFORM_BOTTOM_OFFSET = Platform.OS === 'web' ? 28.8 : 64 + 28.8;
+const PLATFORM_BOTTOM_OFFSET = 24;
 
 // Using function to create styles to respect the existing pattern
 // but with proper typing for theme
@@ -214,17 +214,20 @@ const createStyles = (theme: string) =>
     },
     absoluteRightBottomBorder: {
       position: 'absolute',
-      right: -8,
       bottom: PLATFORM_BOTTOM_OFFSET,
       borderBottomColor: greys(theme)[600], // Using a default theme value
       borderBottomWidth: 0.2,
       zIndex: -1,
-      height: 128,
+      height: 300,
       backgroundColor: 'transparent',
       overflow: 'hidden',
+      width: '100%',
     },
     bottomNegative: {
-      bottom: -16,
+      position: 'absolute',
+      bottom: 0,
       backgroundColor: 'transparent',
+      borderRadius: 10000,
+      right: 0,
     },
   });

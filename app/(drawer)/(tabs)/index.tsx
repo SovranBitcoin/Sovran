@@ -190,7 +190,7 @@ function TabOneScreen() {
             <Spacer size={12} />
             <Card
               message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
-              variant="info"
+              variant="warning"
             />
           </View>
           <View
