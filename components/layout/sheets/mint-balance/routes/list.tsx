@@ -28,6 +28,7 @@ interface MintItemProps {
   onPress: () => void;
   isLoading: boolean;
   globalLoading: boolean;
+  requireBalance?: boolean;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
@@ -37,11 +38,18 @@ const MintItem: React.FC<MintItemProps> = ({
   onPress,
   isLoading,
   globalLoading,
+  requireBalance = true,
 }) => {
   const styles = createStyles(theme);
   return (
     <TouchableOpacity onPress={onPress} disabled={globalLoading}>
-      <View blur style={[styles.mintItem, balance.amount === 0 && styles.zeroBalance]}>
+      <View
+        blur
+        style={[
+          styles.mintItem,
+          balance.amount === 0 && requireBalance && styles.zeroBalance,
+        ]}
+      >
         {mint.iconUrl ? (
           <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
         ) : (
@@ -196,6 +204,7 @@ const ListRoute = () => {
               theme={theme}
               isLoading={loadingId === mint.mintUrl}
               globalLoading={loadingId !== null}
+              requireBalance={payload?.requireBalance}
               onPress={() => handleMintSelect(mint.mintUrl)}
             />
           ))}
