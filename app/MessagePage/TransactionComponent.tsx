@@ -3,16 +3,16 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCurrency } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys } from 'helper/colors';
 
 const TransactionComponent = ({ transaction, theme, isReceived }) => {
   const styles = createStyles(theme);
 
   const gradientColors = isReceived
     ? [greys(theme)[500], greys(theme)[500]]
-    : [shades[50], shades[300]];
+    : [theme.shades[200], theme.shades[300]];
 
-  const arrowBackgroundColor = isReceived ? greys(theme)[500] : shades[300];
+  const arrowBackgroundColor = isReceived ? greys(theme)[500] : theme.shades[300];
 
   const formattedAmount =
     transaction.unit &&
