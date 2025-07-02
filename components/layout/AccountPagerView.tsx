@@ -24,6 +24,8 @@ import { showMessage } from 'helper/popup/popups';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
 
+const height = 350;
+
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
   text: {
@@ -142,8 +144,6 @@ export function AccountPagerView({
       icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
     },
   ];
-
-  const height = 350;
 
   return (
     <View className="bg-transparent">
