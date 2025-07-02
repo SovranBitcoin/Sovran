@@ -350,7 +350,7 @@ const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 120,
+  version: 121,
   migrate: createMigrate(migrations, { debug: true }),
 };
 

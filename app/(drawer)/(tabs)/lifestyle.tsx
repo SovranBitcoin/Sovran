@@ -59,6 +59,12 @@ const SERVICE_MENU_ITEMS: MenuItemData[] = [
     navigateTo: 'userMessages',
     params: { pubkey: SUPPORT_PUBKEY },
   },
+  {
+    id: 'routstr',
+    icon: 'mdi:robot',
+    label: 'AI Chat',
+    navigateTo: 'routstr',
+  },
   // Empty placeholders to maintain grid layout
   { id: 'empty1', empty: true },
   { id: 'empty2', empty: true },
@@ -126,7 +132,9 @@ const ServicesSection = () => {
       </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.filter((item) =>
-          ['giftcards', 'vpn', 'esims', 'donate'].includes(item.id) ? settings?.experimental : true
+          ['giftcards', 'vpn', 'esims', 'donate', 'routstr'].includes(item.id)
+            ? settings?.experimental
+            : true
         ).map((item) => (
           <MenuItem
             key={item.id}

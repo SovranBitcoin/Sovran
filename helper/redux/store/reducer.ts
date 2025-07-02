@@ -7,6 +7,7 @@ import { pricelistReducer } from '../pricelist/reducer';
 import { vpnReducer } from '../lnvpn/reducer';
 import { esimReducer } from '../esim/reducer';
 import { nostrReducer } from '../nostr/reducer';
+import { routstrReducer } from '../routstr/reducer';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
@@ -20,6 +21,7 @@ const appReducer = combineReducers({
   vpns: vpnReducer,
   esim: esimReducer,
   nostr: nostrReducer,
+  routstr: routstrReducer,
 });
 
 // Define RootState from the appReducer
