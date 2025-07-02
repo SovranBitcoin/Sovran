@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -6,17 +6,17 @@ import lookup from 'country-code-lookup';
 
 import { greys, reds } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
 import { useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { DonutChartContainer } from 'components/layout/Donut';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
 import { fetchOrderData, fetchEsimData } from 'helper/api/sovran';
+import { DonutChartContainer } from 'components/layout/Donut';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {
@@ -68,35 +68,27 @@ function ModalScreen() {
     state.esim?.esims?.find((esim) => esim.request === params.request)
   );
 
-  const fetchAndUpdateEsims = useCallback(
-    () => async (esim) => {
-      try {
-        setLoadingEsim(true);
-        const orderData = await fetchOrderData({
-          request: esim.request,
-          packageCode: esim.package.packageCode,
-          slug: esim.package.slug,
-          iccid: esim.iccid,
-          type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
-        });
-        const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
-        if (orderNo) {
-          const esimData = await fetchEsimData(orderNo);
-          updateEsim(esim.request, esimData.obj.esimList[0]);
-        }
-      } catch {
-      } finally {
-        setLoadingEsim(false);
+  const fetchAndUpdateEsims = async (esim) => {
+    console.log(esim);
+    try {
+      setLoadingEsim(true);
+      const orderData = await fetchOrderData({
+        request: esim.request,
+        packageCode: esim.package.packageCode,
+        slug: esim.package.slug,
+        iccid: esim.iccid,
+        type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
+      });
+      const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
+      if (orderNo) {
+        const esimData = await fetchEsimData({ orderNo });
+        updateEsim(esim.request, esimData.obj.esimList[0]);
       }
-    },
-    [updateEsim]
-  );
-
-  useEffect(() => {
-    if (esim) {
-      fetchAndUpdateEsims(esim);
+    } catch {
+    } finally {
+      setLoadingEsim(false);
     }
-  }, [esim, fetchAndUpdateEsims]);
+  };
 
   const handleInstallEsim = () => {
     if (!esim?.order?.ac) return;
@@ -236,6 +228,7 @@ function ModalScreen() {
           },
         ]}
       />
+      <Spacer size={12} />
 
       {esim?.order?.iccid && (
         <Section
@@ -247,6 +240,7 @@ function ModalScreen() {
           ]}
         />
       )}
+      <Spacer size={12} />
 
       {esim?.request && (
         <Section
@@ -258,6 +252,7 @@ function ModalScreen() {
           ]}
         />
       )}
+      <Spacer size={12} />
 
       <View style={styles.warningContainer}>
         <Text style={styles.warningText}>
