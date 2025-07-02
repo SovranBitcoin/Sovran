@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import Image from 'components/common/Image';
 import { AmountFormatter } from 'components/common/AmountFormatter';
+import { showMessage } from 'helper/popup/popups';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -63,16 +64,26 @@ const ListRoute = () => {
 
   const handleMintSelect = (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
-    if (mint) {
-      sheetRef.current?.hide({
-        id: mint.mintUrl,
-        name: mint.mintUrl.replace('https://', '').split('/')[0],
-        iconUrl: mint.iconUrl,
-        unit: mint.unit,
-      });
-    } else {
+    if (!mint) {
       sheetRef.current?.hide();
+      return;
     }
+
+    if (mint.amount === 0) {
+      showMessage('insufficient_balance', {
+        amount: mint.amount,
+        unit: mint.unit,
+        fee: 0,
+      });
+      return;
+    }
+
+    sheetRef.current?.hide({
+      id: mint.mintUrl,
+      name: mint.mintUrl.replace('https://', '').split('/')[0],
+      iconUrl: mint.iconUrl,
+      unit: mint.unit,
+    });
   };
 
   const displayCurrency = (c: string) => (c === 'SAT' ? 'BTC' : c);
