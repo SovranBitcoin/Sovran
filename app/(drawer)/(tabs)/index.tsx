@@ -196,12 +196,12 @@ function TabOneScreen() {
           <View
             className="p-4"
             style={{
-              backgroundColor: theme.greys[950],
+              backgroundColor: opacity(theme.greys[950], 0.99),
             }}>
             {theme.shades && (
               <LinearGradient
                 colors={[
-                  theme.greys[950],
+                  opacity(theme.greys[950], 0.99),
                   opacity(theme.greys[950], 0.5),
                   opacity(theme.greys[950], 0),
                 ]}

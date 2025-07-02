@@ -143,7 +143,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
           </View>
         </View>
         <View style={styles.chevronContainer}>
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[400]} />
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
         </View>
         {/* <Text style={styles.dot}>•</Text> */}
       </View>

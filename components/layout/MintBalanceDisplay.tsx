@@ -3,8 +3,7 @@ import { StyleProp, ViewStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { memoizedGetSelectedMint, memoizedGetBalance } from 'helper/redux/cashu';
-import { useGetMintInfo } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint, memoizedGetBalance, useGetMintInfo } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { View } from 'components/common/View';
@@ -59,10 +58,14 @@ const MintBalanceDisplay: React.FC<Props> = ({
         blur
         style={[
           sovran(theme).listItem,
-          { alignSelf: 'center', flexDirection: 'row', justifyContent: 'space-between', backgroundColor: greys(theme)[800] },
+          {
+            alignSelf: 'center',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            backgroundColor: greys(theme)[800],
+          },
           style,
-        ]}
-      >
+        ]}>
         <View style={{ flexDirection: 'row' }}>
           <MintIcon mintInfo={mintInfo} />
           <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginRight: 10 }}>
@@ -73,7 +76,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
           </View>
         </View>
         <View style={styles.chevronContainer}>
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[400]} />
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
         </View>
       </View>
     </TouchableOpacity>
