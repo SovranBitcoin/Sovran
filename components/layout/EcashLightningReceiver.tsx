@@ -25,7 +25,6 @@ import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-import { Section } from 'components/common/Section';
 import { truncateMiddle } from 'helper/strings';
 export const pool = new SimplePool();
 
@@ -224,15 +223,6 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             </Section>
           </View>
         )}
-        <Section
-          items={[
-            {
-              title: '',
-              value: `${truncateMiddle(currentProfile.npub, 10)}@npubx.cash`,
-            },
-          ]}
-        />
-        <Spacer size={12} />
         <TransactionMintRefresh
           mintInfo={mintInfo}
           transaction={{
