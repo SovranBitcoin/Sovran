@@ -108,14 +108,16 @@ const ListRoute = () => {
 
     setLoadingId(mint.mintUrl);
     dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (payload?.navigate) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-    navigation.navigate('currency', {
-      to: 'ecashSendConfirmation',
-      unit: mint.unit.toLowerCase(),
-      type: payload?.accountType,
-      accountIndex: payload?.accountIndex,
-    });
+      navigation.navigate('currency', {
+        to: 'ecashSendConfirmation',
+        unit: mint.unit.toLowerCase(),
+        type: payload?.accountType,
+        accountIndex: payload?.accountIndex,
+      });
+    }
 
     sheetRef.current?.hide({
       id: mint.mintUrl,

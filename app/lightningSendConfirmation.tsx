@@ -8,7 +8,7 @@ import { Spacer, View } from 'components/common/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
-import SelectedMintDisplay from 'components/layout/sheets/mints';
+import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
 import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Card } from 'components/common/Card';
@@ -211,12 +211,7 @@ export function LightningSendConfirmation({
           }}
         />
         {!transaction?.paid && (
-          <SelectedMintDisplay
-            onMintSelected={handleMintSelected}
-            pr={pr}
-            unit={unit}
-            loading={loading}
-          />
+          <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
         )}
         <Spacer size={12} />
 
