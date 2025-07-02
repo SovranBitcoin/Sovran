@@ -207,45 +207,33 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
 export const BACKGROUND_IMAGES: Record<string, BackgroundImageMeta> = {
   'bg.png': {
     id: 'bg.png',
-    name: 'Glow',
+    name: 'Eternal Pines',
     category: 'Dynamic',
     source: require('assets/images/backgrounds/bg.png'),
   },
   'bg2.png': {
     id: 'bg2.png',
-    name: 'Lava',
+    name: 'Eternal Jungle',
     category: 'Dynamic',
     source: require('assets/images/backgrounds/bg2.png'),
   },
   'bg3.png': {
     id: 'bg3.png',
-    name: 'Lights',
+    name: 'Cabin in the Light',
     category: 'Dynamic',
     source: require('assets/images/backgrounds/bg3.png'),
   },
   'bg4.png': {
     id: 'bg4.png',
-    name: 'Snake',
+    name: 'Ebb and Glow',
     category: 'Dynamic',
     source: require('assets/images/backgrounds/bg4.png'),
-  },
-  'bg5.png': {
-    id: 'bg5.png',
-    name: 'Static 1',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg5.png'),
   },
   'bg6.png': {
     id: 'bg6.png',
     name: 'Static 2',
     category: 'Static',
     source: require('assets/images/backgrounds/bg6.png'),
-  },
-  'bg7.png': {
-    id: 'bg7.png',
-    name: 'Static 3',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg7.png'),
   },
   'bg8.png': {
     id: 'bg8.png',
@@ -258,42 +246,6 @@ export const BACKGROUND_IMAGES: Record<string, BackgroundImageMeta> = {
     name: 'Static 5',
     category: 'Static',
     source: require('assets/images/backgrounds/bg9.png'),
-  },
-  'bg10.png': {
-    id: 'bg10.png',
-    name: 'Static 6',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg10.png'),
-  },
-  'bg11.gif': {
-    id: 'bg11.gif',
-    name: 'Static 7',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg11.gif'),
-  },
-  'bg12.png': {
-    id: 'bg12.png',
-    name: 'Static 8',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg12.png'),
-  },
-  'bg14.png': {
-    id: 'bg14.png',
-    name: 'Static 9',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg14.png'),
-  },
-  'bg15.png': {
-    id: 'bg15.png',
-    name: 'Static 10',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg15.png'),
-  },
-  'bg16.png': {
-    id: 'bg16.png',
-    name: 'Static 11',
-    category: 'Static',
-    source: require('assets/images/backgrounds/bg16.png'),
   },
   'bg17.png': {
     id: 'bg17.png',
