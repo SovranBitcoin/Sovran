@@ -29,6 +29,7 @@ export default function RoutstrChat() {
     createSession,
     addMessage,
     setCurrentSession,
+    lastToken,
   } = useRoutstr();
   const [input, setInput] = useState('');
 
@@ -71,10 +72,7 @@ export default function RoutstrChat() {
         },
         body: JSON.stringify({
           model: 'gpt-4',
-          messages: [
-            ...currentSession.messages,
-            { role: 'user', content: input },
-          ],
+          messages: [...currentSession.messages, { role: 'user', content: input }],
         }),
       });
       const data = await res.json();
@@ -89,7 +87,9 @@ export default function RoutstrChat() {
 
   const renderItem = ({ item }) => (
     <View style={styles.messageItem}>
-      <Text>{item.role === 'user' ? 'You' : 'AI'}: {item.content}</Text>
+      <Text>
+        {item.role === 'user' ? 'You' : 'AI'}: {item.content}
+      </Text>
     </View>
   );
 
@@ -109,9 +109,7 @@ export default function RoutstrChat() {
           style={styles.iconButton}
         />
       </View>
-      <Text
-        style={styles.balance}
-        onPress={() => navigation.navigate('routstr/balance')}>
+      <Text style={styles.balance} onPress={() => navigation.navigate('routstr/balance')}>
         Balance: {routstrBalance} sats
       </Text>
       <FlatList
@@ -121,17 +119,8 @@ export default function RoutstrChat() {
         style={styles.list}
       />
       <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-        />
-        <Button
-          variant="primary"
-          onPress={handleSend}
-          text="Send"
-          style={{ marginLeft: 8 }}
-        />
+        <TextInput style={styles.input} value={input} onChangeText={setInput} />
+        <Button variant="primary" onPress={handleSend} text="Send" style={{ marginLeft: 8 }} />
       </View>
     </Container>
   );

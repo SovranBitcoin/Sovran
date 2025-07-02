@@ -110,6 +110,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
+    name: 'routstr',
+    options: {
+      presentation: 'card',
+    },
+  },
+  {
     name: 'esim',
     options: {
       presentation: 'modal',
