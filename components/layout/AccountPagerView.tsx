@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useHandleCameraPermission } from 'helper/hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import { StyleSheet } from 'react-native';
@@ -20,8 +20,6 @@ import {
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
-import { setSelectedMint } from 'helper/redux/cashu';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
@@ -57,9 +55,7 @@ export function AccountPagerView({
 
   const styles = createStyles(theme.id, theme.greys, theme.shades);
   const navigation = useTypedNavigation();
-  const dispatch = useDispatch();
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
-
+  
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
@@ -91,7 +87,6 @@ export function AccountPagerView({
       SheetManager.show('mint-balance', {
         onClose: (mint?: { id: string; unit: string }) => {
           if (mint?.id) {
-            dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
             const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
             if (idx !== -1) {
               setAccount(accounts[idx]);

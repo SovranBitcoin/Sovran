@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { ScrollView, useSheetRef } from 'react-native-actions-sheet';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
@@ -16,20 +16,33 @@ import opacity from 'hex-color-opacity';
 import Image from 'components/common/Image';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { showMessage } from 'helper/popup/popups';
+import { setSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
   balance: { amount: number; unit: string };
   theme: string;
   onPress: () => void;
+  isLoading: boolean;
+  globalLoading: boolean;
 }
 
-const MintItem: React.FC<MintItemProps> = ({ mint, balance, theme, onPress }) => {
+const MintItem: React.FC<MintItemProps> = ({
+  mint,
+  balance,
+  theme,
+  onPress,
+  isLoading,
+  globalLoading,
+}) => {
   const styles = createStyles(theme);
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={[styles.mintItem, balance.amount === 0 && styles.zeroBalance]}>
+      style={[styles.mintItem, balance.amount === 0 && styles.zeroBalance]}
+      disabled={globalLoading}
+    >
       {mint.iconUrl ? (
         <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
       ) : (
@@ -41,6 +54,9 @@ const MintItem: React.FC<MintItemProps> = ({ mint, balance, theme, onPress }) =>
           <AmountFormatter size={14} amount={balance.amount} unit={balance.unit} />
         </Text>
       </View>
+      <View style={{ width: 16 }}>
+        {isLoading && <ActivityIndicator size="small" color={greys(theme)[0]} />}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -51,10 +67,17 @@ const ListRoute = () => {
   const sheetRef = useSheetRef('mint-balance');
 
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  const dispatch = useDispatch();
+  const profileId = useSelector(memoizedGetCurrentProfile).id;
 
-  const currencies: string[] = _.uniq(balances.map((b) => b.unit?.toUpperCase())).filter(Boolean);
+  const currencies: string[] = _.uniq(
+    balances.map((b) => b.unit?.toUpperCase())
+  ).filter(Boolean);
 
-  const [selectedCurrency, setSelectedCurrency] = useState<string>((currencies[0] || 'SAT') as string);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(
+    (currencies[0] || 'SAT') as string
+  );
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const filteredMints = useMemo(() => {
     return balances
@@ -62,7 +85,7 @@ const ListRoute = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [balances, selectedCurrency]);
 
-  const handleMintSelect = (mintUrl: string) => {
+  const handleMintSelect = async (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
     if (!mint) {
       sheetRef.current?.hide();
@@ -77,6 +100,10 @@ const ListRoute = () => {
       });
       return;
     }
+
+    setLoadingId(mint.mintUrl);
+    dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
+    setLoadingId(null);
 
     sheetRef.current?.hide({
       id: mint.mintUrl,
@@ -152,6 +179,8 @@ const ListRoute = () => {
               }}
               balance={{ amount: mint.amount, unit: mint.unit }}
               theme={theme}
+              isLoading={loadingId === mint.mintUrl}
+              globalLoading={loadingId !== null}
               onPress={() => handleMintSelect(mint.mintUrl)}
             />
           ))}
