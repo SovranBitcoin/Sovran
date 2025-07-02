@@ -17,8 +17,9 @@ declare module 'react-native-actions-sheet' {
         list: RouteDefinition;
       };
       payload: {
-        accountType: string;
-        accountIndex: number;
+        accountType?: string;
+        accountIndex?: number;
+        navigate?: boolean;
       };
     }>;
   }

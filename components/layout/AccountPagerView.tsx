@@ -83,7 +83,7 @@ export function AccountPagerView({
 
     if (page === 'currency' && balance <= 0) {
       SheetManager.show('mint-balance', {
-        payload: { accountType: account.type, accountIndex: account.accountIndex },
+        payload: { accountType: account.type, accountIndex: account.accountIndex, navigate: true },
         onClose: (mint?: { id: string; unit: string }) => {
           if (mint?.id) {
             const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());

@@ -16,7 +16,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
-import SelectedMintDisplay from 'components/layout/sheets/mints';
+import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'components/hocs/withSheetProvider';
@@ -214,7 +214,7 @@ function ModalScreen() {
         }}>
         Pay with
       </Text>
-      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
       <View style={{ margin: 16 }}>
         <Card
           variant="warning"
