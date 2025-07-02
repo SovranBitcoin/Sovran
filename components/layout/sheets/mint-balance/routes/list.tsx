@@ -1,10 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import {
-  ScrollView,
-  useSheetRef,
-  useSheetPayload,
-} from 'react-native-actions-sheet';
+import { StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -15,14 +11,15 @@ import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import _ from 'lodash';
-import { GradientBorderView } from '@good-react-native/gradient-border';
-import opacity from 'hex-color-opacity';
 import Image from 'components/common/Image';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { showMessage } from 'helper/popup/popups';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { useTypedNavigation } from 'helper/navigation';
+import opacity from 'hex-color-opacity';
+import { LinearGradient } from 'expo-linear-gradient';
+import { View } from 'components/common/View';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -75,9 +72,7 @@ const ListRoute = () => {
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
 
-  const currencies: string[] = _.uniq(
-    balances.map((b) => b.unit?.toUpperCase())
-  ).filter(Boolean);
+  const currencies: string[] = _.uniq(balances.map((b) => b.unit?.toUpperCase())).filter(Boolean);
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     (currencies[0] || 'SAT') as string
@@ -149,29 +144,24 @@ const ListRoute = () => {
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
           {currencies.map((currency) => (
-            <TouchableOpacity key={currency} onPress={() => setSelectedCurrency(currency)}>
-              <GradientBorderView
-                gradientProps={{
-                  colors:
-                    selectedCurrency === currency
-                      ? [
-                          opacity(greys(theme)[200], 0.88),
-                          opacity(greys(theme)[300], 0.88),
-                          opacity(greys(theme)[200], 0.88),
-                          opacity(greys(theme)[300], 0.88),
-                        ]
-                      : [opacity(greys(theme)[200], 0), opacity(greys(theme)[200], 0)],
-                }}
-                style={{ borderWidth: selectedCurrency === currency ? 1 : 0, borderRadius: 8, marginRight: 8 }}
-              >
+            <LinearGradient
+              key={currency}
+              colors={
+                selectedCurrency === currency
+                  ? [opacity(theme.shades[200], 1), opacity(theme.shades[400], 1)]
+                  : [opacity(theme.greys[600], 1), opacity(theme.greys[700], 1)]
+              }
+              style={[
+                styles.currencyButton,
+                { marginRight: 8, borderRadius: 8, padding: 1, backgroundColor: greys(theme)[900] },
+              ]}>
+              <TouchableOpacity key={currency} onPress={() => setSelectedCurrency(currency)}>
                 <View
-                  blur
                   style={[
                     styles.currencyContent,
                     styles.currencyButton,
-                    selectedCurrency === currency && styles.selectedCurrencyButton,
-                  ]}
-                >
+                    styles.selectedCurrencyButton,
+                  ]}>
                   {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                     <FlagIcon
                       country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
@@ -183,12 +173,14 @@ const ListRoute = () => {
                   )}
                   <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
                 </View>
-              </GradientBorderView>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </LinearGradient>
           ))}
         </ScrollView>
 
-        <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>Send from</Text>
+        <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
+          Send from
+        </Text>
         <View style={styles.mintScroll}>
           {filteredMints.map((mint) => (
             <MintItem
@@ -234,7 +226,7 @@ const createStyles = (theme: string) =>
       gap: 8,
     },
     selectedCurrencyButton: {
-      backgroundColor: greys(theme)[700],
+      backgroundColor: greys(theme)[800],
     },
     currencyText: {
       color: greys(theme)[0],
@@ -246,7 +238,7 @@ const createStyles = (theme: string) =>
       flexDirection: 'row',
       alignItems: 'center',
       padding: 12,
-      borderRadius: 8,
+      borderRadius: 16,
       backgroundColor: greys(theme)[800],
       marginBottom: 8,
     },
