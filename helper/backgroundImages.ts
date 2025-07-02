@@ -1,4 +1,5 @@
 import { BlurTint } from 'expo-blur';
+import { ImageSource } from 'expo-image';
 import { computeGreys, computeShades, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from './colors';
 import { darken, getLuminance, parseToHsl } from 'polished';
 
@@ -9,6 +10,13 @@ export interface BackgroundImageAttributes {
   text: string;
   tint: BlurTint;
   dominantColors?: string[];
+}
+
+export interface BackgroundImageMeta {
+  id: string;
+  name: string;
+  category: string;
+  source: ImageSource;
 }
 
 type GreyStrategy = 'darkest' | 'brightest' | 'pastel';
@@ -194,4 +202,55 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
     base: ['#013F4D', '#030D10', '#045F6E', '#012032', '#018F8A'],
     darkenAmount: 0,
   }),
+};
+
+export const BACKGROUND_IMAGES: Record<string, BackgroundImageMeta> = {
+  'bg.png': {
+    id: 'bg.png',
+    name: 'Eternal Pines',
+    category: 'Dynamic',
+    source: require('assets/images/backgrounds/bg.png'),
+  },
+  'bg2.png': {
+    id: 'bg2.png',
+    name: 'Eternal Jungle',
+    category: 'Dynamic',
+    source: require('assets/images/backgrounds/bg2.png'),
+  },
+  'bg3.png': {
+    id: 'bg3.png',
+    name: 'Cabin in the Light',
+    category: 'Dynamic',
+    source: require('assets/images/backgrounds/bg3.png'),
+  },
+  'bg4.png': {
+    id: 'bg4.png',
+    name: 'Ebb and Glow',
+    category: 'Dynamic',
+    source: require('assets/images/backgrounds/bg4.png'),
+  },
+  'bg6.png': {
+    id: 'bg6.png',
+    name: 'Static 2',
+    category: 'Static',
+    source: require('assets/images/backgrounds/bg6.png'),
+  },
+  'bg8.png': {
+    id: 'bg8.png',
+    name: 'Static 4',
+    category: 'Static',
+    source: require('assets/images/backgrounds/bg8.png'),
+  },
+  'bg9.png': {
+    id: 'bg9.png',
+    name: 'Static 5',
+    category: 'Static',
+    source: require('assets/images/backgrounds/bg9.png'),
+  },
+  'bg17.png': {
+    id: 'bg17.png',
+    name: 'Static 12',
+    category: 'Static',
+    source: require('assets/images/backgrounds/bg17.png'),
+  },
 };

@@ -5,6 +5,7 @@ import Image, { SpriteView } from './Image';
 import { DeviceMotion } from 'expo-sensors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBackgroundImage } from 'helper/redux/settings';
+import { BACKGROUND_IMAGES } from 'helper/backgroundImages';
 import { View } from './View';
 
 const AnimatedSpriteBackground = ({ backgroundColor }) => {
@@ -31,32 +32,12 @@ const AnimatedSpriteBackground = ({ backgroundColor }) => {
 
   const backgroundImage = useSelector(memoizedGetBackgroundImage);
 
-  const sources: Record<string, any> = {
-    'bg.png': require('assets/images/backgrounds/bg.png'),
-    'bg2.png': require('assets/images/backgrounds/bg2.png'),
-    'bg3.png': require('assets/images/backgrounds/bg3.png'),
-    'bg4.png': require('assets/images/backgrounds/bg4.png'),
-    'bg5.png': require('assets/images/backgrounds/bg5.png'),
-    'bg6.png': require('assets/images/backgrounds/bg6.png'),
-    'bg7.png': require('assets/images/backgrounds/bg7.png'),
-    'bg8.png': require('assets/images/backgrounds/bg8.png'),
-    'bg9.png': require('assets/images/backgrounds/bg9.png'),
-    'bg10.png': require('assets/images/backgrounds/bg10.png'),
-
-    'bg11.gif': require('assets/images/backgrounds/bg11.gif'),
-
-    'bg12.png': require('assets/images/backgrounds/bg12.png'),
-
-    'bg14.png': require('assets/images/backgrounds/bg14.png'),
-    'bg15.png': require('assets/images/backgrounds/bg15.png'),
-    'bg16.png': require('assets/images/backgrounds/bg16.png'),
-    'bg17.png': require('assets/images/backgrounds/bg17.png'),
-  };
-
   if (!backgroundImage)
     return <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>;
 
-  const dynamicImages = ['bg.png', 'bg2.png', 'bg3.png', 'bg4.png'];
+  const dynamicImages = Object.values(BACKGROUND_IMAGES)
+    .filter((img) => img.category !== 'Static')
+    .map((img) => img.id);
   const isDynamic = dynamicImages.includes(backgroundImage);
 
   return (
@@ -68,10 +49,18 @@ const AnimatedSpriteBackground = ({ backgroundColor }) => {
         },
       ]}>
       {isDynamic ? (
-        <SpriteView source={sources[backgroundImage] || sources['bg.png']} />
+        <SpriteView
+          source={
+            BACKGROUND_IMAGES[backgroundImage]?.source ||
+            BACKGROUND_IMAGES['bg.png'].source
+          }
+        />
       ) : (
         <Image
-          source={sources[backgroundImage] || sources['bg5.png']}
+          source={
+            BACKGROUND_IMAGES[backgroundImage]?.source ||
+            BACKGROUND_IMAGES['bg5.png'].source
+          }
           style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
         />
       )}
