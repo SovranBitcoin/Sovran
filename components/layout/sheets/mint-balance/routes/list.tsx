@@ -110,7 +110,7 @@ const ListRoute = () => {
 
     setLoadingId(mint.mintUrl);
     dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
-    setLoadingId(null);
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     navigation.navigate('currency', {
       to: 'ecashSendConfirmation',
@@ -125,6 +125,8 @@ const ListRoute = () => {
       iconUrl: mint.iconUrl,
       unit: mint.unit,
     });
+
+    setLoadingId(null);
   };
 
   const displayCurrency = (c: string) => (c === 'SAT' ? 'BTC' : c);
