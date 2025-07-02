@@ -190,18 +190,18 @@ function TabOneScreen() {
             <Spacer size={12} />
             <Card
               message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
-              variant="info"
+              variant="warning"
             />
           </View>
           <View
             className="p-4"
             style={{
-              backgroundColor: theme.greys[950],
+              backgroundColor: opacity(theme.greys[950], 0.99),
             }}>
             {theme.shades && (
               <LinearGradient
                 colors={[
-                  theme.greys[950],
+                  opacity(theme.greys[950], 0.99),
                   opacity(theme.greys[950], 0.5),
                   opacity(theme.greys[950], 0),
                 ]}

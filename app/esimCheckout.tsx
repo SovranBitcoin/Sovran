@@ -8,7 +8,7 @@ import opacity from 'hex-color-opacity';
 
 import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
@@ -191,6 +191,8 @@ function ModalScreen() {
         </>
       }>
       <Section camera={false} items={getSectionItems()} />
+      <Spacer size={12} />
+
       <Section
         camera={false}
         items={[
@@ -200,6 +202,7 @@ function ModalScreen() {
           },
         ]}
       />
+      <Spacer size={12} />
       <Text weight="bold" size={16} style={styles.sectionTitle}>
         Pay with
       </Text>

@@ -20,6 +20,7 @@ declare module 'react-native-actions-sheet' {
         accountType?: string;
         accountIndex?: number;
         navigate?: boolean;
+        requireBalance?: boolean;
       };
     }>;
   }

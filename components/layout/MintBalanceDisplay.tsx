@@ -3,8 +3,7 @@ import { StyleProp, ViewStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { memoizedGetSelectedMint, memoizedGetBalance } from 'helper/redux/cashu';
-import { useGetMintInfo } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint, memoizedGetBalance, useGetMintInfo } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { View } from 'components/common/View';
@@ -20,10 +19,20 @@ interface Props {
     mint: { id: string; name: string; iconUrl: string | null; unit: string },
     balance: { amount: number; unit: string }
   ) => void | Promise<void>;
+  /**
+   * When true, prevent selecting mints that have no balance.
+   * Defaults to true.
+   */
+  requireBalance?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) => {
+const MintBalanceDisplay: React.FC<Props> = ({
+  unit,
+  onMintSelected,
+  requireBalance = true,
+  style,
+}) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -33,9 +42,9 @@ const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) =>
 
   const handlePress = () => {
     SheetManager.show('mint-balance', {
-      payload: { navigate: false },
+      payload: { navigate: false, requireBalance },
       onClose: (mint?: { id: string; unit: string }) => {
-        if (mint && onMintSelected) {
+        if (mint?.id && onMintSelected) {
           const amt = memoizedGetBalance(unit, mint.id)(store.getState());
           onMintSelected(mint, { amount: amt, unit });
         }
@@ -49,10 +58,14 @@ const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) =>
         blur
         style={[
           sovran(theme).listItem,
-          { alignSelf: 'center', flexDirection: 'row', justifyContent: 'space-between', backgroundColor: greys(theme)[800] },
+          {
+            alignSelf: 'center',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            backgroundColor: greys(theme)[800],
+          },
           style,
-        ]}
-      >
+        ]}>
         <View style={{ flexDirection: 'row' }}>
           <MintIcon mintInfo={mintInfo} />
           <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginRight: 10 }}>
@@ -63,7 +76,7 @@ const MintBalanceDisplay: React.FC<Props> = ({ unit, onMintSelected, style }) =>
           </View>
         </View>
         <View style={styles.chevronContainer}>
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[400]} />
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
         </View>
       </View>
     </TouchableOpacity>

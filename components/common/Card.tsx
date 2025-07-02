@@ -5,6 +5,7 @@ import { TouchableOpacity } from './TouchableOpacity';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View } from 'components/common/View';
+import opacity from 'hex-color-opacity';
 
 type VariantType = 'warning' | 'info';
 
@@ -47,6 +48,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
     <TouchableOpacity onPress={onPress}>
       <View
         blur
+        colorBlur={opacity(currentStyle.backgroundColor, 0.2)}
         style={{
           backgroundColor: currentStyle.backgroundColor,
           borderLeftColor: currentStyle.borderLeftColor,

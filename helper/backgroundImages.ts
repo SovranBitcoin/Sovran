@@ -154,7 +154,7 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
   'bg9.png': makeBackgroundAttributes({
     id: 'bg9.png',
     base: ['#0C051C', '#3F92B2', '#0D1240', '#2C2575', '#4C75B0'],
-    darkenAmount: 0.05,
+    darkenAmount: 0.025,
   }),
   'bg10.png': makeBackgroundAttributes({
     id: 'bg10.png',

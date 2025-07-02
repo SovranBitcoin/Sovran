@@ -39,7 +39,7 @@ export interface SearchResult {
 }
 
 export const fetchProducts = async () => {
-  const res = await fetch(`${BASE_URL}/api/products`);
+  const res = await fetch(`${BASE_URL}/products`);
   return res.json() as Promise<{ success: boolean; obj?: { packageList: ProductPackage[] } }>;
 };
 
