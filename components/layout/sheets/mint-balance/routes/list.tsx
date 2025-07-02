@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { ScrollView } from 'react-native-actions-sheet';
+import { ScrollView, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -9,48 +9,45 @@ import { Text } from 'components/common/Text';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import Wrapper from '../../wrapper';
+import { ButtonHandler } from 'components/common/ButtonHandler';
 import _ from 'lodash';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import Image from 'components/common/Image';
-import { formatCurrency } from 'helper/currency';
+import { AmountFormatter } from 'components/common/AmountFormatter';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
   balance: { amount: number; unit: string };
-  selectedCurrency: string;
   theme: string;
+  onPress: () => void;
 }
 
-const MintItem: React.FC<MintItemProps> = ({ mint, balance, selectedCurrency, theme }) => {
+const MintItem: React.FC<MintItemProps> = ({ mint, balance, theme, onPress }) => {
   const styles = createStyles(theme);
-  const formattedBalance = formatCurrency(
-    {
-      currency: selectedCurrency === 'SAT' ? 'BTC' : (selectedCurrency as 'USD' | 'EUR' | 'GBP'),
-      value: balance.amount,
-      denomination: (selectedCurrency.toLowerCase() === 'sat' ? 'sats' : selectedCurrency.toLowerCase()) as
-        | 'btc'
-        | 'sats'
-        | 'usd'
-        | 'eur'
-        | 'gbp',
-    },
-    { locale: 'en-US', precision: selectedCurrency === 'SAT' ? 0 : 2, currencyDisplay: selectedCurrency === 'SAT' ? 'name' : 'symbol' }
-  );
   return (
-    <View style={[styles.mintItem, balance.amount === 0 && styles.zeroBalance]}>
-      {mint.iconUrl ? <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} /> : <Image style={styles.mintIcon} />}
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.mintItem, balance.amount === 0 && styles.zeroBalance]}>
+      {mint.iconUrl ? (
+        <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
+      ) : (
+        <Image style={styles.mintIcon} />
+      )}
       <View style={styles.mintDetails}>
         <Text style={styles.mintName}>{mint.name}</Text>
-        <Text style={styles.mintBalance}>{formattedBalance}</Text>
+        <Text style={styles.mintBalance}>
+          <AmountFormatter size={14} amount={balance.amount} unit={balance.unit} />
+        </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const ListRoute = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
+  const sheetRef = useSheetRef('mint-balance');
 
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
@@ -64,10 +61,36 @@ const ListRoute = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [balances, selectedCurrency]);
 
+  const handleMintSelect = (mintUrl: string) => {
+    const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
+    if (mint) {
+      sheetRef.current?.hide({
+        id: mint.mintUrl,
+        name: mint.mintUrl.replace('https://', '').split('/')[0],
+        iconUrl: mint.iconUrl,
+        unit: mint.unit,
+      });
+    } else {
+      sheetRef.current?.hide();
+    }
+  };
+
   const displayCurrency = (c: string) => (c === 'SAT' ? 'BTC' : c);
 
   return (
-    <Wrapper buttons={null}>
+    <Wrapper
+      buttons={
+        <ButtonHandler
+          context="sheet"
+          buttons={[
+            {
+              text: 'Close',
+              variant: 'secondary',
+              onPress: () => sheetRef.current?.hide(),
+            },
+          ]}
+        />
+      }>
       <View>
         <Text weight="bold" style={styles.sectionHeader}>
           Send payment in
@@ -117,8 +140,8 @@ const ListRoute = () => {
                 iconUrl: mint.iconUrl,
               }}
               balance={{ amount: mint.amount, unit: mint.unit }}
-              selectedCurrency={selectedCurrency}
               theme={theme}
+              onPress={() => handleMintSelect(mint.mintUrl)}
             />
           ))}
         </View>

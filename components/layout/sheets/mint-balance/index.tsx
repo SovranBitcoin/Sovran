@@ -13,6 +13,7 @@ function MintBalanceSheet(props: any) {
       routes={routes}
       initialRoute="list"
       containerStyle={{ backgroundColor: greys(theme)[950], height: '90%' }}
+      gestureEnabled={true}
       {...props}
     />
   );
