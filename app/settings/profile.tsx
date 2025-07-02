@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   SafeAreaView,
-  View,
   Text,
   TouchableOpacity,
   Clipboard,
@@ -16,6 +15,7 @@ import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { showMessage } from 'helper/popup/popups';
+import { View } from 'components/common/View';
 
 const Profile = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -46,7 +46,7 @@ const Profile = () => {
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
 
     return (
-      <View style={styles.detailContainer}>
+      <View blur style={styles.detailContainer}>
         <Text style={styles.detailLabel}>{label}</Text>
         <View style={styles.sensitiveField}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -56,20 +56,20 @@ const Profile = () => {
           </ScrollView>
           <View style={styles.iconContainer}>
             {showEyeIcon && (
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => toggleFieldVisibility(fieldKey)}>
-                <Icon
-                  name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
-                  size={16}
-                  color={greys(theme)[400]}
-                />
+              <TouchableOpacity onPress={() => toggleFieldVisibility(fieldKey)}>
+                <View blur style={styles.iconButton}>
+                  <Icon
+                    name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
+                    size={16}
+                    color={greys(theme)[400]}
+                  />
+                </View>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => handleCopy(value, messageKey)}>
-              <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
+            <TouchableOpacity onPress={() => handleCopy(value, messageKey)}>
+              <View blur style={styles.iconButton}>
+                <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
+              </View>
             </TouchableOpacity>
           </View>
         </View>

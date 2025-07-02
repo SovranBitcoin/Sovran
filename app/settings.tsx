@@ -50,20 +50,21 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
     <TouchableOpacity
       onPress={() => {
         navigation.navigate('settings/profile');
-      }}
-      style={styles.profile}>
-      <Image
-        alt=""
-        source={{
-          uri: currentProfile?.picture,
-        }}
-        style={styles.profileAvatar}
-      />
-      <View style={styles.profileBody}>
-        <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
-        <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
+      }}>
+      <View blur style={styles.profile}>
+        <Image
+          alt=""
+          source={{
+            uri: currentProfile?.picture,
+          }}
+          style={styles.profileAvatar}
+        />
+        <View style={styles.profileBody}>
+          <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
+          <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
+        </View>
+        <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
       </View>
-      <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
     </TouchableOpacity>
   );
 };
@@ -185,7 +186,7 @@ const ModalScreen = () => {
         /> */}
         </Section>
         <Section title="Preferences">
-          <RowButton label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
+          <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
           <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
           <RowButton
             label="Theme"
@@ -210,6 +211,7 @@ const ModalScreen = () => {
         </Section>
         <Section title="App Information">
           <RowButton
+            isFirst
             label="About This Release"
             onPress={() => {
               navigation.navigate('settings/about');
@@ -241,14 +243,12 @@ const ModalScreen = () => {
             onPress={() => {
               navigation.navigate('settings/verifySeedPhrase');
             }}
-            isFirst
           />
           <RowButton
             label="Passcode"
             onPress={() => {
               navigation.navigate('settings/passcode');
             }}
-            isFirst
           />
         </Section>
         {/* <Section title="npubx.cash Settings">

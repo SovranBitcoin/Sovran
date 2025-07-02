@@ -14,7 +14,7 @@ import { FlagIcon } from 'assets/icons';
 import { getLightningAmount, getMeltQuote } from 'components/cashu';
 import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
-import SelectedMintDisplay from 'components/layout/sheets/mints';
+import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { Card } from 'components/common/Card';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -203,7 +203,7 @@ function ModalScreen() {
       <Text weight="bold" size={16} style={styles.sectionTitle}>
         Pay with
       </Text>
-      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
       <View style={styles.cardContainer}>
         <Card variant="warning" message="Ensure your phone supports eSIMs." theme={theme} />
       </View>

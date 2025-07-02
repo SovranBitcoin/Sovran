@@ -6,6 +6,7 @@ import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { Spacer } from 'components/common/View';
 
 interface WrapperProps {
   children: React.ReactNode;
@@ -46,7 +47,10 @@ const Wrapper: React.FC<WrapperProps> = ({
     <View
       onLayout={(event) => setContainerHeight(event.nativeEvent.layout.height)}
       style={[styles.actionSheetContainer, containerStyle]}>
-      <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>{children}</ScrollView>
+      <ScrollView style={[styles.scrollContainer, scrollContainerStyle]}>
+        {children}
+        <Spacer size={buttonHeight} />
+      </ScrollView>
       {buttons && (
         <View
           style={styles.buttonContainer}
@@ -67,7 +71,7 @@ const createStyles = (theme: string, buttonHeight: number, containerHeight: numb
     scrollContainer: {
       padding: 16,
       height: '100%',
-      marginBottom: buttonHeight,
+      backgroundColor: 'transparent',
     },
     buttonContainer: {
       padding: 0,

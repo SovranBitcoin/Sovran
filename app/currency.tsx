@@ -10,7 +10,8 @@ import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
-import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
+import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
+import { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
 import { View } from 'components/common/View';
@@ -298,7 +299,7 @@ function ModalScreen() {
         }
         onChange={setAmount}
       />
-      <SelectedMintDisplay onMintSelected={handleMintSelected} unit={unit} loading={loading} />
+      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
       {params.to === 'ecashSendConfirmation' && params?.profile && (
         <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
           <Icon

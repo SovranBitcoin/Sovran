@@ -20,11 +20,9 @@ import {
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
-import { showMessage } from 'helper/popup/popups';
+import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
-
-const height = 350;
 
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
@@ -84,15 +82,17 @@ export function AccountPagerView({
     const balance = memoizedGetBalance(accountUnit)(store.getState());
 
     if (page === 'currency' && balance <= 0) {
-      showMessage(
-        'insufficient_balance',
-        {
-          amount: balance,
-          unit: accountUnit,
-          fee: 0,
+      SheetManager.show('mint-balance', {
+        payload: { accountType: account.type, accountIndex: account.accountIndex, navigate: true },
+        onClose: (mint?: { id: string; unit: string }) => {
+          if (mint?.id) {
+            const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
+            if (idx !== -1) {
+              setAccount(accounts[idx]);
+            }
+          }
         },
-        { emoji: '🚨' }
-      );
+      });
       return;
     }
 
@@ -147,7 +147,7 @@ export function AccountPagerView({
 
   return (
     <View className="bg-transparent">
-      <View className={`flex h-[${height}px] w-full`}>
+      <View className={`flex h-[350px] w-full`}>
         <Swiper
           controlsEnabled={false}
           loop
@@ -183,7 +183,7 @@ export function AccountPagerView({
           padding: 0,
           margin: 0,
           zIndex: 3,
-          height,
+          height: 350,
           backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,
@@ -301,14 +301,12 @@ const createStyles = (theme, greys: string, shades) =>
       backgroundColor: greys[800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      borderWidth: 0.3,
       borderColor: greys[700],
     },
     sendIconView: {
       backgroundColor: greys[800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      borderWidth: 0.3,
       borderColor: greys[700],
     },
   });
