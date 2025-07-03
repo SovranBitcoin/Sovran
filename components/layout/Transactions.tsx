@@ -58,7 +58,7 @@ export const Transactions = React.memo(
       ]);
     }, [allSections]);
 
-    if (filteredCount === 0) {
+    if (filteredCount === 0 && showMore) {
       return (
         <View className="flex items-center">
           <Icon name="fluent:clock-12-filled" color={theme.greys[500]} />
