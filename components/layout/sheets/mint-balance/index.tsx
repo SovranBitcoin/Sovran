@@ -6,7 +6,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { Dimensions } from 'react-native';
 
-function MintBalanceSheet({ context, ...props }: { context: 'global' | 'modal' }) {
+function MintBalanceSheet(props: any) {
   const theme = useSelector(memoizedGetTheme);
   return (
     <ActionSheet
@@ -15,7 +15,7 @@ function MintBalanceSheet({ context, ...props }: { context: 'global' | 'modal' }
       initialRoute="list"
       containerStyle={{
         backgroundColor: greys(theme)[950],
-        height: context === 'modal' ? '90%' : Dimensions.get('window').height - 39,
+        height: Dimensions.get('window').height - 39,
       }}
       gestureEnabled={true}
       {...props}
@@ -24,4 +24,4 @@ function MintBalanceSheet({ context, ...props }: { context: 'global' | 'modal' }
 }
 
 export default ({ context }: { context: 'global' | 'modal' }) =>
-  registerSheet(sheetName, (props: any) => <MintBalanceSheet context={context} {...props} />, context);
+  registerSheet(sheetName, MintBalanceSheet, context);
