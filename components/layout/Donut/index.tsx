@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import DonutChart from './DonutChart';
 import { useFont } from '@shopify/react-native-skia';
@@ -32,12 +32,13 @@ export const DonutChartContainer = ({
   data,
   titleText,
   totalValueSuffix,
-  colors = Object.values(shades),
+  colors: colorsProp,
   disableItems = false,
   isSpecialCase = false,
 }: DonutChartContainerProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
+  const colors = useMemo(() => colorsProp ?? Object.values(shades), [colorsProp]);
   const [chartData, setChartData] = useState<(DonutData & { percentage: number; color: string })[]>(
     []
   );
@@ -65,7 +66,7 @@ export const DonutChartContainer = ({
     };
 
     generateData();
-  }, [data, colors, decimals, totalValue]);
+  }, [data, colors]);
 
   const font = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 32);
   const smallFont = useFont(require('../../../assets/fonts/Overpass/overpass-bold.otf'), 20);
