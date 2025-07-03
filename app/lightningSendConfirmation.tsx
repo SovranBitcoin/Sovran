@@ -62,8 +62,6 @@ export function LightningSendConfirmation({
 
   const handleMintSelected = async (mint, balance) => {
     try {
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-
       if (pr) {
         // Avoid UI bugs with setTimeout
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -79,9 +77,13 @@ export function LightningSendConfirmation({
         });
 
         if (result?.params?.meltQuote) {
+          dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
           setMeltQuote(result.params.meltQuote);
           setUnit(result.params.unit);
         }
+      } else {
+        dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+        setUnit(mint.unit.toLowerCase());
       }
     } catch (error) {
       showMessage('general_error', {}, { emoji: '🚨' });
@@ -211,7 +213,11 @@ export function LightningSendConfirmation({
           }}
         />
         {!transaction?.paid && (
-          <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
+          <MintBalanceDisplay
+            onMintSelected={handleMintSelected}
+            unit={unit}
+            updateSelectedMint={false}
+          />
         )}
         <Spacer size={12} />
 

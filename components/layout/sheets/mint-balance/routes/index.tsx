@@ -21,6 +21,10 @@ declare module 'react-native-actions-sheet' {
         accountIndex?: number;
         navigate?: boolean;
         requireBalance?: boolean;
+        updateSelectedMint?: boolean;
+        onMintPress?: (
+          mint: { id: string; unit: string; name: string; iconUrl: string | null }
+        ) => void | Promise<void>;
       };
     }>;
   }
