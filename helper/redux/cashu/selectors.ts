@@ -23,8 +23,8 @@ export interface TransactionData {
   from?: string;
   to?: string;
   fromNIP05?: string;
-  status?: { block_time: number; [key: string]: any };
-  nostr?: { pubkey: string; [key: string]: any };
+  status?: { block_time: number;[key: string]: any };
+  nostr?: { pubkey: string;[key: string]: any };
   mintUrl?: string;
 
   isSend?: boolean;
@@ -222,7 +222,7 @@ export const memoizedGetProofs = (unit) =>
     [
       (state: RootState) =>
         state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
-          state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
+        state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
       (state: RootState) =>
         state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
@@ -320,11 +320,11 @@ export const memoizedGetBalance = (unit, mintUrl = null) =>
     [
       (state: RootState) =>
         state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
-          mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
+        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
       (state: RootState) =>
         state.cashu?.keysets?.[
-          mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
+        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
         ],
     ],
     (proofs, keysets) => {

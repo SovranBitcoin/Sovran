@@ -6,6 +6,8 @@ import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
 import { Spacer, View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
+import { useCashu } from 'helper/redux/cashu';
+import { useTransactionsData } from 'helper/hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import {
@@ -136,6 +138,14 @@ function TabOneScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
+  const { transactions } = useCashu();
+  const txData = useTransactionsData({
+    transactions,
+    account,
+    days: 1,
+    showMore: true,
+  });
+
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
@@ -210,7 +220,15 @@ function TabOneScreen() {
                 style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
               />
             )}
-            <Transactions days={1} account={account} />
+            <Transactions
+              account={account}
+              showMore={true}
+              pendingSections={txData.pendingSections}
+              confirmedSections={txData.confirmedSections}
+              allSections={txData.allSections}
+              filteredCount={txData.filteredTransactions.length}
+              morePendingCount={txData.morePendingCount}
+            />
           </View>
         </ScrollView>
       </View>

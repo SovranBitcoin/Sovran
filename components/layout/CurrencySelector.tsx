@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
@@ -7,6 +7,7 @@ import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { isProduction } from 'helper/version';
+import { View } from 'components/common/View';
 
 // Define interface for balance items
 interface BalanceItem {
@@ -73,32 +74,33 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
           const isSelected = selectedCurrency === currency;
 
           return (
-            <TouchableOpacity
-              key={currency}
-              onPress={() => handleCurrencyChange(currency)}
-              style={{
-                marginRight: 12,
-                padding: 12,
-                borderRadius: 8,
-                backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
-                borderWidth: 0.5,
-                borderColor: greys(theme)[700],
-                minWidth: 100,
-              }}>
-              <View style={styles.currencyContent}>
-                {currencyItem.country ? (
-                  <FlagIcon country={currencyItem.country} height={32} width={32} />
-                ) : (
-                  <CurrencyIcon currency={currency.toLowerCase()} />
-                )}
-                <Text
-                  style={{
-                    color: greys(theme)[0],
-                    fontSize: 14,
-                    fontFamily: 'OverpassBold',
-                  }}>
-                  {currency}
-                </Text>
+            <TouchableOpacity key={currency} onPress={() => handleCurrencyChange(currency)}>
+              <View
+                blur
+                style={{
+                  marginRight: 12,
+                  padding: 12,
+                  borderRadius: 8,
+                  backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
+                  borderWidth: 0.5,
+                  borderColor: greys(theme)[700],
+                  minWidth: 100,
+                }}>
+                <View style={styles.currencyContent}>
+                  {currencyItem.country ? (
+                    <FlagIcon country={currencyItem.country} height={32} width={32} />
+                  ) : (
+                    <CurrencyIcon currency={currency.toLowerCase()} />
+                  )}
+                  <Text
+                    style={{
+                      color: greys(theme)[0],
+                      fontSize: 14,
+                      fontFamily: 'OverpassBold',
+                    }}>
+                    {currency}
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
           );
