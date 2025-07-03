@@ -61,34 +61,30 @@ export function LightningSendConfirmation({
   const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
 
   const handleMintSelected = async (mint, balance) => {
-    try {
-      if (pr) {
-        // Avoid UI bugs with setTimeout
-        await new Promise((resolve) => setTimeout(resolve, 0));
+    if (pr) {
+      // Avoid UI bugs with setTimeout
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-        const result = await handleBarcode({
-          scanning: { data: pr },
-          selectedMint: mint.id,
-          unit: mint.unit.toLowerCase(),
-          setProgress: () => {},
-          setLoading: () => {},
-          setScanned: () => {},
-          urDecoder: null,
-        });
+      const result = await handleBarcode({
+        scanning: { data: pr },
+        selectedMint: mint.id,
+        unit: mint.unit.toLowerCase(),
+        setProgress: () => {},
+        setLoading: () => {},
+        setScanned: () => {},
+        urDecoder: null,
+      });
 
-        if (result?.params?.meltQuote) {
-          dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-          setMeltQuote(result.params.meltQuote);
-          setUnit(result.params.unit);
-        }
-      } else {
-        dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-        setUnit(mint.unit.toLowerCase());
+      if (!result?.params?.meltQuote) {
+        throw new Error('mint_change_failed');
       }
-    } catch (error) {
-      showMessage('general_error', {}, { emoji: '🚨' });
 
-      throw error;
+      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+      setMeltQuote(result.params.meltQuote);
+      setUnit(result.params.unit);
+    } else {
+      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+      setUnit(mint.unit.toLowerCase());
     }
   };
 

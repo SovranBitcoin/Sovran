@@ -139,7 +139,11 @@ const ListRoute = () => {
         unit: mint.unit,
       });
     } catch (e) {
-      showMessage('general_error', {}, { emoji: '🚨' });
+      if (!(e instanceof Error) || e.message !== 'mint_change_failed') {
+        showMessage('general_error', {}, { emoji: '🚨' }, () => {
+          sheetRef.current?.hide();
+        });
+      }
     } finally {
       setLoadingId(null);
     }
