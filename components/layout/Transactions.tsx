@@ -1,5 +1,6 @@
 import React from 'react';
-import { SectionList, TouchableOpacity, Dimensions } from 'react-native';
+import { TouchableOpacity, Dimensions } from 'react-native';
+import { LegendList } from '@legendapp/list';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -122,57 +123,61 @@ export const Transactions = React.memo(
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
-    const getItemLayout = (data: Section[], index: number) => {
-      let offset = 0;
-      let itemIndex = index;
 
-      for (let section of data) {
-        offset += HEADER_HEIGHT;
-        if (itemIndex < section.data.length) {
-          offset += ITEM_HEIGHT * itemIndex;
-          return { length: ITEM_HEIGHT, offset, index };
-        } else {
-          itemIndex -= section.data.length;
-          offset += ITEM_HEIGHT * section.data.length;
-        }
-      }
-      return { length: ITEM_HEIGHT, offset: offset, index };
-    };
+    const flattenedData = React.useMemo(() => {
+      return allSections.flatMap((section) => [
+        { type: 'header' as const, title: section.title },
+        ...section.data.map((tx) => ({ type: 'item' as const, tx })),
+      ]);
+    }, [allSections]);
 
     return (
-      <SectionList
+      <LegendList
         style={{ minHeight: Dimensions.get('screen').height }}
-        sections={allSections}
-        keyExtractor={(item) => item.request || item.token || Math.random().toString()}
-        renderItem={({ item, section, index }) => (
-          <View
-            style={{
-              backgroundColor: theme.greys[800],
-              borderRadius: 8,
-              borderTopLeftRadius: index === 0 ? 8 : 0,
-              borderTopRightRadius: index === 0 ? 8 : 0,
-              borderBottomLeftRadius: index === section.data.length - 1 ? 8 : 0,
-              borderBottomRightRadius: index === section.data.length - 1 ? 8 : 0,
-              height: ITEM_HEIGHT,
-            }}>
-            <Transaction key={item.request || item.token} tx={item} />
-          </View>
-        )}
-        renderSectionHeader={({ section: { title } }) => (
-          <Text
-            size={14}
-            heavy
-            color={theme.greys[500]}
-            style={{ height: HEADER_HEIGHT }}
-            className="mb-1 mt-2">
-            {title}
-          </Text>
-        )}
+        data={flattenedData}
+        estimatedItemSize={80}
+        recycleItems
+        maintainVisibleContentPosition
+        keyExtractor={(item, index) =>
+          item.type === 'header'
+            ? `h-${item.title}-${index}`
+            : item.tx.request || item.tx.token || `${index}`
+        }
+        renderItem={({ item, index }) => {
+          if (item.type === 'header') {
+            return (
+              <Text
+                size={14}
+                heavy
+                color={theme.greys[500]}
+                style={{ height: HEADER_HEIGHT }}
+                className="mb-1 mt-2">
+                {item.title}
+              </Text>
+            );
+          }
+
+          const prev = flattenedData[index - 1];
+          const next = flattenedData[index + 1];
+          const isFirst = !prev || prev.type === 'header';
+          const isLast = !next || next.type === 'header';
+
+          return (
+            <View
+              style={{
+                backgroundColor: theme.greys[800],
+                borderRadius: 8,
+                borderTopLeftRadius: isFirst ? 8 : 0,
+                borderTopRightRadius: isFirst ? 8 : 0,
+                borderBottomLeftRadius: isLast ? 8 : 0,
+                borderBottomRightRadius: isLast ? 8 : 0,
+                height: ITEM_HEIGHT,
+              }}>
+              <Transaction key={item.tx.request || item.tx.token} tx={item.tx} />
+            </View>
+          );
+        }}
         contentContainerStyle={{ width: '100%', paddingBottom: 1000 }}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        getItemLayout={getItemLayout}
-        initialNumToRender={10}
       />
     );
   }
