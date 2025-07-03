@@ -6,6 +6,8 @@ import { useTypedRoute } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useState } from 'react';
 import { Transactions } from 'components/layout/Transactions';
+import { useCashu } from 'helper/redux/cashu';
+import { useTransactionsData } from 'helper/hooks/useTransactionsData';
 import Container from 'components/layout/Container';
 import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
@@ -42,10 +44,26 @@ function ModalScreen() {
     setType('all');
   };
 
+  const { transactions } = useCashu();
+  const txData = useTransactionsData({
+    transactions,
+    account: { ...account, unit: selectedCurrency },
+    filter,
+    type,
+    at,
+    tab,
+    showMore: false,
+  });
+
   return (
     <Container>
       <ScrollView>
-        <Tabs tabs={['All', 'Confirmed', 'Pending']} selectedTab={tab} handleTabPress={setTab} />
+        <Tabs
+          tabs={['All', 'Confirmed', 'Pending']}
+          selectedTab={tab}
+          handleTabPress={setTab}
+          amounts={[txData.counts.all, txData.counts.confirmed, txData.counts.pending]}
+        />
 
         <View
           style={{
@@ -175,11 +193,12 @@ function ModalScreen() {
             ...account,
             unit: selectedCurrency,
           }}
-          filter={filter}
-          type={type}
-          at={at}
-          tab={tab}
           showMore={false}
+          pendingSections={txData.pendingSections}
+          confirmedSections={txData.confirmedSections}
+          allSections={txData.allSections}
+          filteredCount={txData.filteredTransactions.length}
+          morePendingCount={txData.morePendingCount}
         />
       </ScrollView>
     </Container>
