@@ -303,6 +303,7 @@ function ModalScreen() {
       <MintBalanceDisplay
         onMintSelected={handleMintSelected}
         unit={unit}
+        context="modal"
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }

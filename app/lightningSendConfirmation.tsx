@@ -213,6 +213,7 @@ export function LightningSendConfirmation({
             onMintSelected={handleMintSelected}
             unit={unit}
             updateSelectedMint={false}
+            context="modal"
           />
         )}
         <Spacer size={12} />

@@ -29,6 +29,10 @@ interface Props {
    * Defaults to true.
    */
   updateSelectedMint?: boolean;
+  /**
+   * Context to launch the sheet in. Defaults to 'global'.
+   */
+  context?: 'global' | 'modal';
   style?: StyleProp<ViewStyle>;
 }
 
@@ -37,6 +41,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
   onMintSelected,
   requireBalance = true,
   updateSelectedMint = true,
+  context = 'global',
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -48,6 +53,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
 
   const handlePress = () => {
     SheetManager.show('mint-balance', {
+      context,
       payload: {
         navigate: false,
         requireBalance,
