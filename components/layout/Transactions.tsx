@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Dimensions } from 'react-native';
+import { Dimensions, TouchableOpacity } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useSelector } from 'react-redux';
 import { useNavigation } from 'expo-router';
@@ -33,6 +33,7 @@ interface Props {
 
 export const Transactions = React.memo(
   ({
+    header,
     account,
     showMore,
     pendingSections,
@@ -43,6 +44,16 @@ export const Transactions = React.memo(
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
     const navigation = useNavigation();
+
+    const HEADER_HEIGHT = 30;
+    const ITEM_HEIGHT = 69;
+
+    const flattenedData = React.useMemo(() => {
+      return allSections.flatMap((section) => [
+        { type: 'header' as const, title: section.title },
+        ...section.data.map((tx) => ({ type: 'item' as const, tx })),
+      ]);
+    }, [allSections]);
 
     if (filteredCount === 0) {
       return (
@@ -73,10 +84,7 @@ export const Transactions = React.memo(
                 <Text size={14} heavy color={theme.greys[100]} className="mb-1">
                   {section.title}
                 </Text>
-                <View
-                  style={{ backgroundColor: theme.greys[900] }}
-                  className="rounded-lg"
-                  blur>
+                <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
                   {section.data.map((tx) => (
                     <Transaction
                       key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
@@ -94,7 +102,8 @@ export const Transactions = React.memo(
         <View className="w-full pb-24">
           {renderStatus('Pending transactions', pendingSections)}
           {morePendingCount > 0 && (
-            <TouchableOpacity onPress={() => navigation.navigate('transactions', { account, tab: 'Pending' })}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('transactions', { account, tab: 'Pending' })}>
               <View
                 blur
                 className="mt-4 flex items-center rounded-full border p-3"
@@ -107,7 +116,7 @@ export const Transactions = React.memo(
           )}
           {renderStatus('Confirmed transactions', confirmedSections)}
           <TouchableOpacity
-            onPress={() => navigation.navigate('transactions', { account })}>
+            onPress={() => navigation.navigate('transactions', { account, tab: 'Confirmed' })}>
             <View
               blur
               className="mt-4 flex items-center rounded-full border p-3"
@@ -121,28 +130,18 @@ export const Transactions = React.memo(
       );
     }
 
-    const HEADER_HEIGHT = 30;
-    const ITEM_HEIGHT = 69;
-
-    const flattenedData = React.useMemo(() => {
-      return allSections.flatMap((section) => [
-        { type: 'header' as const, title: section.title },
-        ...section.data.map((tx) => ({ type: 'item' as const, tx })),
-      ]);
-    }, [allSections]);
-
     return (
       <LegendList
-        style={{ minHeight: Dimensions.get('screen').height }}
+        style={{ height: Dimensions.get('screen').height, overflow: 'hidden' }}
         data={flattenedData}
-        estimatedItemSize={80}
+        estimatedItemSize={ITEM_HEIGHT}
+        scrollEnabled
         recycleItems
         maintainVisibleContentPosition
-        keyExtractor={(item, index) =>
-          item.type === 'header'
-            ? `h-${item.title}-${index}`
-            : item.tx.request || item.tx.token || `${index}`
-        }
+        ListHeaderComponent={header}
+        // keyExtractor={(item, index) =>
+        //   item.type === 'header' ? `h-${item.title}-${index}` : item.tx.request || item.tx.token
+        // }
         renderItem={({ item, index }) => {
           if (item.type === 'header') {
             return (
@@ -164,6 +163,7 @@ export const Transactions = React.memo(
 
           return (
             <View
+              blur
               style={{
                 backgroundColor: theme.greys[800],
                 borderRadius: 8,
@@ -177,7 +177,7 @@ export const Transactions = React.memo(
             </View>
           );
         }}
-        contentContainerStyle={{ width: '100%', paddingBottom: 1000 }}
+        contentContainerStyle={{ width: '100%', paddingBottom: 250 }}
       />
     );
   }
