@@ -47,6 +47,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         width: isScrollable ? undefined : '100%',
       }}>
       <View
+        blur
         style={[
           sovran(theme).listItem,
           {
@@ -59,44 +60,49 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         ]}>
         {tabs.map((tab, index) => (
           <TouchableOpacity
-            key={tab}
             style={{
-              paddingVertical: 10,
-              paddingHorizontal: 16,
-              borderRadius: 24,
               flex: isScrollable ? 0 : 1,
-              flexShrink: 0,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              ...(selectedTab === tab && {
-                backgroundColor: greys(theme)[600],
-                borderWidth: 0,
-                borderRadius: 1000,
-                borderColor: greys(theme)[600],
-              }),
             }}
+            key={tab}
             onPress={() => onTabPress(tab, index)}>
-            <Text
+            <View
+              blur={selectedTab === tab}
               style={{
-                color: selectedTab === tab ? greys(theme)[0] : greys(theme)[100],
-                fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
-                fontSize: 14,
-                textAlign: 'center',
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 24,
+                flexShrink: 0,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                ...(selectedTab === tab && {
+                  backgroundColor: greys(theme)[600],
+                  borderWidth: 0,
+                  borderRadius: 1000,
+                  borderColor: greys(theme)[600],
+                }),
               }}>
-              {tab}
-            </Text>
-            {amounts?.[index] ? (
               <Text
                 style={{
-                  marginLeft: 4,
-                  fontSize: 12,
-                  fontFamily: 'OverpassBold',
-                  color: greys(theme)[300],
+                  color: selectedTab === tab ? greys(theme)[0] : greys(theme)[100],
+                  fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
+                  fontSize: 14,
+                  textAlign: 'center',
                 }}>
-                {`(${amounts[index]})`}
+                {tab}
               </Text>
-            ) : null}
+              {amounts?.[index] ? (
+                <Text
+                  style={{
+                    marginLeft: 4,
+                    fontSize: 12,
+                    fontFamily: 'OverpassBold',
+                    color: greys(theme)[300],
+                  }}>
+                  {`(${amounts[index]})`}
+                </Text>
+              ) : null}
+            </View>
           </TouchableOpacity>
         ))}
       </View>

@@ -45,11 +45,7 @@ const MintItem: React.FC<MintItemProps> = ({
     <TouchableOpacity onPress={onPress} disabled={globalLoading}>
       <View
         blur
-        style={[
-          styles.mintItem,
-          balance.amount === 0 && requireBalance && styles.zeroBalance,
-        ]}
-      >
+        style={[styles.mintItem, balance.amount === 0 && requireBalance && styles.zeroBalance]}>
         {mint.iconUrl ? (
           <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
         ) : (
