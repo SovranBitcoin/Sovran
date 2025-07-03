@@ -23,6 +23,7 @@ interface Section {
 
 interface Props {
   header?: React.ReactNode;
+  listKey?: string;
   account: Account;
   showMore: boolean;
   pendingSections: Section[];
@@ -35,6 +36,7 @@ interface Props {
 export const Transactions = React.memo(
   ({
     header,
+    listKey,
     account,
     showMore,
     pendingSections,
@@ -133,6 +135,7 @@ export const Transactions = React.memo(
 
     return (
       <LegendList
+        key={listKey}
         style={{ height: Dimensions.get('screen').height, overflow: 'hidden' }}
         data={flattenedData}
         estimatedItemSize={ITEM_HEIGHT}
@@ -140,11 +143,9 @@ export const Transactions = React.memo(
         recycleItems
         maintainVisibleContentPosition
         ListHeaderComponent={header}
-        keyExtractor={(item, index) =>
-          item.type === 'header'
-            ? `h-${item.title}-${index}`
-            : item.tx.request || item.tx.token || item.tx.txid || item.tx.id || `${index}`
-        }
+        // keyExtractor={(item, index) =>
+        //   item.type === 'header' ? `h-${item.title}-${index}` : item.tx.request || item.tx.token
+        // }
         renderItem={({ item, index }) => {
           if (item.type === 'header') {
             return (
