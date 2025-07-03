@@ -24,7 +24,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 
-registerAllSheets({ context: undefined });
+registerAllSheets({ context: 'modal' });
 
 const headerHeight = Constants.statusBarHeight ?? 0;
 
