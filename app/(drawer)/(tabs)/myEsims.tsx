@@ -69,16 +69,20 @@ const EsimItem = ({ esim, navigation }) => {
   };
 
   return (
-    <Pressable style={styles.esimItem} onPress={handlePress}>
-      <View style={styles.progressContainer}>
-        <CircularProgress country={esim.package.location} progress={getDataUsagePercentage()} />
-      </View>
-      <View style={styles.esimInfo}>
-        <Text style={styles.countryText}>{countryName}</Text>
-        <Text style={styles.remainingDataText}>
-          {remainingData ? `${remainingData} remaining` : 'Not activated'}
-        </Text>
-        <Text style={styles.expirationText}>{remainingData ? `Expires ${expiresOn}` : 'eSIM'}</Text>
+    <Pressable onPress={handlePress}>
+      <View blur style={styles.esimItem}>
+        <View style={styles.progressContainer}>
+          <CircularProgress country={esim.package.location} progress={getDataUsagePercentage()} />
+        </View>
+        <View style={styles.esimInfo}>
+          <Text style={styles.countryText}>{countryName}</Text>
+          <Text style={styles.remainingDataText}>
+            {remainingData ? `${remainingData} remaining` : 'Not activated'}
+          </Text>
+          <Text style={styles.expirationText}>
+            {remainingData ? `Expires ${expiresOn}` : 'eSIM'}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

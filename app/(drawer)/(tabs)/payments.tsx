@@ -226,7 +226,7 @@ const Section = () => {
       childrenStyles={styles.modalContent}>
       <View
         style={{
-          paddingHorizontal: 16,
+          paddingHorizontal: 12,
         }}>
         <Tabs
           tabs={tabs}

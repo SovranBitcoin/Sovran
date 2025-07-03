@@ -24,6 +24,11 @@ interface Props {
    * Defaults to true.
    */
   requireBalance?: boolean;
+  /**
+   * When false, the sheet will not automatically update the selected mint.
+   * Defaults to true.
+   */
+  updateSelectedMint?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -31,6 +36,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
   unit,
   onMintSelected,
   requireBalance = true,
+  updateSelectedMint = true,
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -42,9 +48,14 @@ const MintBalanceDisplay: React.FC<Props> = ({
 
   const handlePress = () => {
     SheetManager.show('mint-balance', {
-      payload: { navigate: false, requireBalance },
+      payload: {
+        navigate: false,
+        requireBalance,
+        updateSelectedMint,
+        onMintPress: updateSelectedMint ? undefined : onMintSelected,
+      },
       onClose: (mint?: { id: string; unit: string }) => {
-        if (mint?.id && onMintSelected) {
+        if (mint?.id && onMintSelected && updateSelectedMint) {
           const amt = memoizedGetBalance(unit, mint.id)(store.getState());
           onMintSelected(mint, { amount: amt, unit });
         }

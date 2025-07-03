@@ -1,3 +1,4 @@
+import React from 'react';
 import { SheetProvider } from 'react-native-actions-sheet';
 
 export const withSheetProvider = (WrappedComponent) => {

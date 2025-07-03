@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // Add UTC plugin
@@ -8,6 +8,7 @@ import { greens, greys, reds } from 'helper/colors';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
 import opacity from 'hex-color-opacity';
+import { View } from 'components/common/View';
 
 const DonutChart = ({
   size = 96,
@@ -344,7 +345,7 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
         <View key={index} style={[styles.statCard]}>
           {/* Subtle gradient overlay for depth */}
 
-          <View style={styles.cardContent}>
+          <View blur style={styles.cardContent}>
             <Text style={[styles.label, { color: greys(theme)[200] }]}>{stat.label}</Text>
 
             <Text

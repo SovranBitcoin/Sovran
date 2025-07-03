@@ -11,7 +11,7 @@ import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
 import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
-import { sovran } from 'components/layout/sheets/mints';
+import SelectedMintDisplay, { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
 import { View } from 'components/common/View';
@@ -299,12 +299,12 @@ function ModalScreen() {
         }
         onChange={setAmount}
       />
+      <SelectedMintDisplay unit={unit} />
       <MintBalanceDisplay
         onMintSelected={handleMintSelected}
         unit={unit}
         requireBalance={
-          params?.to === 'ecashSendConfirmation' ||
-          params?.to === 'lightningSendConfirmation'
+          params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }
       />
       {params.to === 'ecashSendConfirmation' && params?.profile && (

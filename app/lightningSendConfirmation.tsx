@@ -61,32 +61,30 @@ export function LightningSendConfirmation({
   const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
 
   const handleMintSelected = async (mint, balance) => {
-    try {
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    if (pr) {
+      // Avoid UI bugs with setTimeout
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      if (pr) {
-        // Avoid UI bugs with setTimeout
-        await new Promise((resolve) => setTimeout(resolve, 0));
+      const result = await handleBarcode({
+        scanning: { data: pr },
+        selectedMint: mint.id,
+        unit: mint.unit.toLowerCase(),
+        setProgress: () => {},
+        setLoading: () => {},
+        setScanned: () => {},
+        urDecoder: null,
+      });
 
-        const result = await handleBarcode({
-          scanning: { data: pr },
-          selectedMint: mint.id,
-          unit: mint.unit.toLowerCase(),
-          setProgress: () => {},
-          setLoading: () => {},
-          setScanned: () => {},
-          urDecoder: null,
-        });
-
-        if (result?.params?.meltQuote) {
-          setMeltQuote(result.params.meltQuote);
-          setUnit(result.params.unit);
-        }
+      if (!result?.params?.meltQuote) {
+        throw new Error('mint_change_failed');
       }
-    } catch (error) {
-      showMessage('general_error', {}, { emoji: '🚨' });
 
-      throw error;
+      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+      setMeltQuote(result.params.meltQuote);
+      setUnit(result.params.unit);
+    } else {
+      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+      setUnit(mint.unit.toLowerCase());
     }
   };
 
@@ -211,7 +209,11 @@ export function LightningSendConfirmation({
           }}
         />
         {!transaction?.paid && (
-          <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
+          <MintBalanceDisplay
+            onMintSelected={handleMintSelected}
+            unit={unit}
+            updateSelectedMint={false}
+          />
         )}
         <Spacer size={12} />
 

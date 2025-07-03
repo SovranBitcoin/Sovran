@@ -45,11 +45,7 @@ const MintItem: React.FC<MintItemProps> = ({
     <TouchableOpacity onPress={onPress} disabled={globalLoading}>
       <View
         blur
-        style={[
-          styles.mintItem,
-          balance.amount === 0 && requireBalance && styles.zeroBalance,
-        ]}
-      >
+        style={[styles.mintItem, balance.amount === 0 && requireBalance && styles.zeroBalance]}>
         {mint.iconUrl ? (
           <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
         ) : (
@@ -110,26 +106,43 @@ const ListRoute = () => {
     }
 
     setLoadingId(mint.mintUrl);
-    dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
-    if (payload?.navigate) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+    try {
+      if (payload?.onMintPress) {
+        await payload.onMintPress({
+          id: mint.mintUrl,
+          name: mint.mintUrl.replace('https://', '').split('/')[0],
+          iconUrl: mint.iconUrl,
+          unit: mint.unit,
+        });
+      } else if (payload?.updateSelectedMint !== false) {
+        dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
+      }
+      if (payload?.navigate) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-      navigation.navigate('currency', {
-        to: 'ecashSendConfirmation',
-        unit: mint.unit.toLowerCase(),
-        type: payload?.accountType,
-        accountIndex: payload?.accountIndex,
+        navigation.navigate('currency', {
+          to: 'ecashSendConfirmation',
+          unit: mint.unit.toLowerCase(),
+          type: payload?.accountType,
+          accountIndex: payload?.accountIndex,
+        });
+      }
+
+      sheetRef.current?.hide({
+        id: mint.mintUrl,
+        name: mint.mintUrl.replace('https://', '').split('/')[0],
+        iconUrl: mint.iconUrl,
+        unit: mint.unit,
       });
+    } catch (e) {
+      if (!(e instanceof Error) || e.message !== 'mint_change_failed') {
+        showMessage('general_error', {}, { emoji: '🚨' }, () => {
+          sheetRef.current?.hide();
+        });
+      }
+    } finally {
+      setLoadingId(null);
     }
-
-    sheetRef.current?.hide({
-      id: mint.mintUrl,
-      name: mint.mintUrl.replace('https://', '').split('/')[0],
-      iconUrl: mint.iconUrl,
-      unit: mint.unit,
-    });
-
-    setLoadingId(null);
   };
 
   const displayCurrency = (c: string) => (c === 'SAT' ? 'BTC' : c);
