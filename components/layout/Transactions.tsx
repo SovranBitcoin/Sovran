@@ -22,6 +22,8 @@ interface Section {
 }
 
 interface Props {
+  header?: React.ReactNode;
+  listKey?: string;
   account: Account;
   showMore: boolean;
   pendingSections: Section[];
@@ -34,6 +36,7 @@ interface Props {
 export const Transactions = React.memo(
   ({
     header,
+    listKey,
     account,
     showMore,
     pendingSections,
@@ -132,6 +135,7 @@ export const Transactions = React.memo(
 
     return (
       <LegendList
+        key={listKey}
         style={{ height: Dimensions.get('screen').height, overflow: 'hidden' }}
         data={flattenedData}
         estimatedItemSize={ITEM_HEIGHT}

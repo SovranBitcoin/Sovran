@@ -54,16 +54,29 @@ function ModalScreen() {
     showMore: false,
   });
 
+  const totalCounts = useTransactionsData({
+    transactions,
+    account: { ...account, unit: selectedCurrency },
+    filter: 'all',
+    type: 'all',
+    at: 'all',
+    tab: 'All',
+    showMore: false,
+  }).counts;
+
+  const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
+
   return (
     <Container>
       <Transactions
+        listKey={listKey}
         header={
           <>
             <Tabs
               tabs={['All', 'Confirmed', 'Pending']}
               selectedTab={tab}
               handleTabPress={setTab}
-              amounts={[txData.counts.all, txData.counts.confirmed, txData.counts.pending]}
+              amounts={[totalCounts.all, totalCounts.confirmed, totalCounts.pending]}
             />
 
             <View
