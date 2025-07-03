@@ -3,8 +3,9 @@ import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Dimensions } from 'react-native';
+import { greys } from 'helper/colors';
 
 function MintBalanceSheet(props: any) {
   const theme = useSelector(memoizedGetTheme);
@@ -15,8 +16,9 @@ function MintBalanceSheet(props: any) {
       initialRoute="list"
       containerStyle={{
         backgroundColor: greys(theme)[950],
-        height: Dimensions.get('window').height - 39,
+        height: Dimensions.get('screen').height - 32,
       }}
+      safeAreaInsets={{ ...useSafeAreaInsets(), bottom: 0, top: 0 }}
       gestureEnabled={true}
       {...props}
     />
