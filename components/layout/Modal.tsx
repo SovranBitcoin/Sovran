@@ -24,7 +24,9 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 
-registerAllSheets({ context: undefined });
+// Register all action sheets within the modal context so that
+// sheets opened from a modal are scoped correctly
+registerAllSheets({ context: 'modal' });
 
 const headerHeight = Constants.statusBarHeight ?? 0;
 
