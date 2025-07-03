@@ -11,7 +11,7 @@ import { Monicon as Icon } from '@monicon/native';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 import { View } from 'components/common/View';
-import { greys } from 'helper/colors';
+import { greys, shades } from 'helper/colors';
 export { FlagIcon } from './flag';
 
 export const icons = [
@@ -502,7 +502,7 @@ export function ProfileIcon() {
 
 export function CurrencyIcon({ width = 36, currency, colors }) {
   const theme = useSelector(memoizedGetTheme);
-  const gradientColors = colors ?? [theme.shades[200], theme.shades[300], theme.shades[300]];
+  const gradientColors = colors ?? [shades[200], shades[300], shades[300]];
   if (currency === 'eur') {
     return (
       <View
@@ -617,9 +617,9 @@ export function CurrencyIcon({ width = 36, currency, colors }) {
           }}>
           <Defs>
             <LinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor={theme.shades[200]} />
-              <Stop offset="50%" stopColor={theme.shades[300]} />
-              <Stop offset="100%" stopColor={theme.shades[400]} />
+              <Stop offset="0%" stopColor={shades[200]} />
+              <Stop offset="50%" stopColor={shades[300]} />
+              <Stop offset="100%" stopColor={shades[400]} />
             </LinearGradient>
           </Defs>
           <Path

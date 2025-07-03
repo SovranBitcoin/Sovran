@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -68,27 +68,41 @@ function ModalScreen() {
     state.esim?.esims?.find((esim) => esim.request === params.request)
   );
 
-  const fetchAndUpdateEsims = async (esim) => {
-    console.log(esim);
-    try {
-      setLoadingEsim(true);
-      const orderData = await fetchOrderData({
-        request: esim.request,
-        packageCode: esim.package.packageCode,
-        slug: esim.package.slug,
-        iccid: esim.iccid,
-        type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
-      });
-      const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
-      if (orderNo) {
-        const esimData = await fetchEsimData({ orderNo });
-        updateEsim(esim.request, esimData.obj.esimList[0]);
+  const fetchAndUpdateEsims = useCallback(
+    async (esim) => {
+      console.log(esim);
+      try {
+        setLoadingEsim(true);
+        const orderData = await fetchOrderData({
+          request: esim.request,
+          packageCode: esim.package.packageCode,
+          slug: esim.package.slug,
+          iccid: esim.iccid,
+          type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
+        });
+        const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
+        if (orderNo) {
+          const esimData = await fetchEsimData({ orderNo });
+          updateEsim(esim.request, esimData.obj.esimList[0]);
+        }
+      } catch {
+      } finally {
+        setLoadingEsim(false);
       }
-    } catch {
-    } finally {
-      setLoadingEsim(false);
+    },
+    [updateEsim]
+  );
+
+  useEffect(() => {
+    if (esim) {
+      try {
+        fetchAndUpdateEsims(esim);
+      } catch {
+      } finally {
+        setLoadingEsim(false);
+      }
     }
-  };
+  }, [esim, fetchAndUpdateEsims]);
 
   const handleInstallEsim = () => {
     if (!esim?.order?.ac) return;
