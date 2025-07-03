@@ -64,12 +64,9 @@ function ModalScreen() {
     showMore: false,
   }).counts;
 
-  const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
-
   return (
     <Container>
       <Transactions
-        listKey={listKey}
         header={
           <>
             <Tabs
