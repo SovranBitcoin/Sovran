@@ -1,5 +1,5 @@
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greens, greys } from 'helper/colors';
 import Wrapper from '../wrapper';
@@ -200,17 +200,26 @@ const MintDetailPage = () => {
 
         {/* Description Card */}
         {mintInfo.description && (
-          <Card theme={theme} variant="info" message={mintInfo.description} />
+          <>
+            <Card theme={theme} variant="info" message={mintInfo.description} />
+            <Spacer size={12} />
+          </>
         )}
 
         {/* Long Description */}
         {mintInfo.description_long && (
-          <Card theme={theme} variant="warning" message={mintInfo.description_long} />
+          <>
+            <Card theme={theme} variant="warning" message={mintInfo.description_long} />
+            <Spacer size={12} />
+          </>
         )}
 
         {/* Message of the Day */}
         {mintInfo.motd && (
-          <Card theme={theme} variant="warning" message={`Message: ${mintInfo.motd}`} />
+          <>
+            <Card theme={theme} variant="warning" message={`Message: ${mintInfo.motd}`} />
+            <Spacer size={12} />
+          </>
         )}
 
         {/* Contact Section */}
@@ -218,6 +227,7 @@ const MintDetailPage = () => {
           <Section title="Contact">
             {mintInfo.contact.map((contact, index) => (
               <RowButton
+                isFirst={index === 0}
                 key={index}
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
