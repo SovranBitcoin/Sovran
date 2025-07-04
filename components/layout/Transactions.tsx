@@ -94,6 +94,43 @@ export const Transactions = React.memo(
                       tx={tx}
                     />
                   ))}
+                  {morePendingCount > 0 && label === 'Pending transactions' && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('transactions', { account, tab: 'Pending' })
+                      }>
+                      <View
+                        blur
+                        className=" mt-4 flex items-center rounded-lg  border p-3"
+                        style={{
+                          backgroundColor: theme.greys[800],
+                          borderColor: theme.greys[700],
+                        }}>
+                        <Text size={14} bold>
+                          {morePendingCount} more pending transaction
+                          {morePendingCount > 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  {label === 'Confirmed transactions' && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('transactions', { account, tab: 'Confirmed' })
+                      }>
+                      <View
+                        blur
+                        className="mt-4 flex items-center rounded-lg border p-3"
+                        style={{
+                          backgroundColor: theme.greys[800],
+                          borderColor: theme.greys[700],
+                        }}>
+                        <Text size={14} bold>
+                          View all ({filteredCount})
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ))}
@@ -104,31 +141,8 @@ export const Transactions = React.memo(
       return (
         <View className="w-full pb-24">
           {renderStatus('Pending transactions', pendingSections)}
-          {morePendingCount > 0 && (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('transactions', { account, tab: 'Pending' })}>
-              <View
-                blur
-                className="mt-4 flex items-center rounded-full border p-3"
-                style={{ backgroundColor: theme.greys[800], borderColor: theme.greys[700] }}>
-                <Text size={14} bold>
-                  {morePendingCount} more pending transaction{morePendingCount > 1 ? 's' : ''}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
+
           {renderStatus('Confirmed transactions', confirmedSections)}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('transactions', { account, tab: 'Confirmed' })}>
-            <View
-              blur
-              className="mt-4 flex items-center rounded-full border p-3"
-              style={{ backgroundColor: theme.greys[800], borderColor: theme.greys[700] }}>
-              <Text size={14} bold>
-                View all ({filteredCount})
-              </Text>
-            </View>
-          </TouchableOpacity>
         </View>
       );
     }
