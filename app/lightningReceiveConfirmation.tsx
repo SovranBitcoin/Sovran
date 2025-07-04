@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { Spinner } from 'components/common/Spinner';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
@@ -20,7 +19,6 @@ import {
   useGetMintInfo,
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
-import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
@@ -404,7 +402,7 @@ export function LightningReceiveConfirmation({
 
   const isBitcoin = unit === 'sat';
 
-  const { isListening } = useAutoListenBatch(getCurrentTransaction);
+  // const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const handleCheckStatus = async (onClose, forceRefresh) => {
     try {
@@ -416,7 +414,7 @@ export function LightningReceiveConfirmation({
         forceRefresh,
       });
       const activeKeyset = wallet.getActiveKeyset(
-        wallet.keysets.filter((key) => key.unit === 'sat')
+        wallet.keysets.filter((key) => key.unit === currentTx.unit)
       );
       const keysetId = activeKeyset.id;
       wallet.keysetId = keysetId;
@@ -624,7 +622,7 @@ export function LightningReceiveConfirmation({
                   }}>
                   {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                 </Text>
-                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+                {/* {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />} */}
               </View>
             ),
           },

@@ -58,21 +58,25 @@ export const Transactions = React.memo(
       ]);
     }, [allSections]);
 
-    if (filteredCount === 0 && showMore) {
-      return (
-        <View className="flex items-center">
-          <Icon name="fluent:clock-12-filled" color={theme.greys[500]} />
-          <Text heavy size={16} style={{ color: theme.greys[500] }}>
-            No Transactions
-          </Text>
-          <Text color={theme.greys[500]} heavy size={16}>
-            Your transactions will show up here
-          </Text>
-        </View>
-      );
-    }
-
     if (showMore) {
+      if (filteredCount === 0) {
+        return (
+          <View
+            className="flex items-center"
+            style={{
+              minHeight: Dimensions.get('screen').height / 2,
+            }}>
+            <Icon name="fluent:clock-12-filled" color={theme.greys[500]} />
+            <Text heavy size={16} style={{ color: theme.greys[500] }}>
+              No Transactions
+            </Text>
+            <Text color={theme.greys[500]} heavy size={16}>
+              Your transactions will show up here
+            </Text>
+          </View>
+        );
+      }
+
       const renderStatus = (label: string, sections: Section[]) => {
         if (sections.length === 0) return null;
         return (

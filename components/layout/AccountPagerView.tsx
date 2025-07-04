@@ -154,6 +154,9 @@ export function AccountPagerView({
     <View className="bg-transparent">
       <View className={`flex h-[350px] w-full`}>
         <Swiper
+          containerStyle={{
+            height: 350,
+          }}
           controlsEnabled={false}
           loop
           infinite
@@ -188,7 +191,8 @@ export function AccountPagerView({
           padding: 0,
           margin: 0,
           zIndex: 3,
-          height: 350,
+          marginTop: 350,
+          height: 0,
           backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,

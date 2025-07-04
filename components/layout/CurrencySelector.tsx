@@ -6,8 +6,10 @@ import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { isProduction } from 'helper/version';
 import { View } from 'components/common/View';
+import { LinearGradient } from 'expo-linear-gradient';
+import { sovran } from './sheets/mints';
+import opacity from 'hex-color-opacity';
 
 // Define interface for balance items
 interface BalanceItem {
@@ -25,7 +27,7 @@ interface CurrencySelectorProps {
   onCurrencyChange: (currency: string) => void;
 }
 
-const SUPPORTED_CURRENCIES = isProduction ? ['SAT'] : ['SAT'];
+const SUPPORTED_CURRENCIES = ['SAT', 'USD', 'EUR', 'GBP'];
 
 const CurrencySelector: React.FC<CurrencySelectorProps> = ({
   selectedCurrency,
@@ -75,33 +77,56 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
 
           return (
             <TouchableOpacity key={currency} onPress={() => handleCurrencyChange(currency)}>
-              <View
-                blur
-                style={{
-                  marginRight: 12,
-                  padding: 12,
-                  borderRadius: 8,
-                  backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                  minWidth: 100,
-                }}>
-                <View style={styles.currencyContent}>
-                  {currencyItem.country ? (
-                    <FlagIcon country={currencyItem.country} height={32} width={32} />
-                  ) : (
-                    <CurrencyIcon currency={currency.toLowerCase()} />
-                  )}
-                  <Text
-                    style={{
-                      color: greys(theme)[0],
-                      fontSize: 14,
-                      fontFamily: 'OverpassBold',
-                    }}>
-                    {currency}
-                  </Text>
+              <LinearGradient
+                key={currency}
+                colors={
+                  selectedCurrency === currency
+                    ? ([
+                        opacity(theme.shades[200], 0.88),
+                        opacity(theme.shades[200], 0.88),
+                        opacity(theme.shades[300], 0.88),
+                        opacity(theme.shades[200], 0.88),
+                        opacity(theme.shades[300], 0.88),
+                      ] as const)
+                    : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
+                }
+                style={[
+                  sovran(theme).borderSubtle,
+
+                  {
+                    marginRight: 8,
+                    borderRadius: 8,
+                    padding: 1,
+                    backgroundColor:
+                      selectedCurrency === currency ? greys(theme)[900] : greys(theme)[900],
+                  },
+                ]}>
+                <View
+                  style={{
+                    padding: 12,
+                    borderRadius: 8,
+                    backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
+                    borderWidth: 0.5,
+                    borderColor: greys(theme)[700],
+                    minWidth: 100,
+                  }}>
+                  <View style={styles.currencyContent}>
+                    {currencyItem.country ? (
+                      <FlagIcon country={currencyItem.country} height={32} width={32} />
+                    ) : (
+                      <CurrencyIcon currency={currency.toLowerCase()} />
+                    )}
+                    <Text
+                      style={{
+                        color: greys(theme)[0],
+                        fontSize: 14,
+                        fontFamily: 'OverpassBold',
+                      }}>
+                      {currency}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </LinearGradient>
             </TouchableOpacity>
           );
         })}

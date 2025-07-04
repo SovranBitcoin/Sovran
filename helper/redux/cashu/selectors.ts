@@ -152,7 +152,7 @@ export const memoizedGetSupportedUnits = createSelector(
       state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
   ],
   (keysets) => {
-    return [...new Set(keysets?.map((keyset) => keyset.unit) || ['sat'])];
+    return [...new Set(keysets?.map((keyset) => keyset.unit) || ['sat', 'usd', 'eur', 'gbp'])];
   }
 );
 
@@ -275,7 +275,7 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
         const uniqueUnits = [...new Set(mintKeysets.map((ks) => ks.unit))];
 
         // If no units found, default to "sat"
-        const units = uniqueUnits.length > 0 ? uniqueUnits : ['sat'];
+        const units = uniqueUnits.length > 0 ? uniqueUnits : ['sat', 'usd', 'eur', 'gbp'];
 
         // Get proofs for this mint (or empty array if none)
         const proofs = proofsByMint[mint] || [];

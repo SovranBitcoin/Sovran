@@ -1,10 +1,8 @@
 import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
-import { bytesToHex } from '@noble/hashes/utils';
 import { store } from 'helper/redux/store';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
-import { memoizedGetAllBalances } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 const cache = new Cache({

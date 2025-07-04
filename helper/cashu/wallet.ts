@@ -6,6 +6,7 @@ import { memoizedGetCurrentProfile } from '../redux/nostr';
 import { setAudit } from 'helper/redux/cashu';
 import { mnemonicToSeedSync } from 'bip39';
 import { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 
 interface GetWalletParams {
   unit: string;
@@ -37,8 +38,8 @@ export function getUsedProofs(currentProofs, keepProofs) {
 }
 
 export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams) {
-  if (walletCache[mintUrl] && !forceRefresh) {
-    return walletCache[mintUrl];
+  if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {
+    return walletCache[mintUrl][unit];
   }
 
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
@@ -64,6 +65,7 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   const wallet = new CashuWallet(mint, {
     ...(shouldRefresh ? { keys, keysets, mintInfo } : { keys, keysets, mintInfo }),
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
+    unit
   });
 
   wallet.audits = audits;
@@ -83,7 +85,13 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
     return { keep, send, used };
   };
 
-  walletCache[mintUrl] = wallet;
+  walletCache = {
+    [mintUrl]: {
+      [unit]: wallet,
+      ...walletCache?.[mintUrl]
+    },
+    ...walletCache
+  }
 
   return wallet;
 }

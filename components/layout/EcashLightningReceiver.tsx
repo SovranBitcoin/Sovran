@@ -183,17 +183,19 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
         </View>
       }>
       <View>
-        <View
-          style={{
-            marginHorizontal: 16,
-            marginTop: 0,
-          }}>
-          <Card
-            message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
-            variant="warning"
-          />
-          <Spacer size={12} />
-        </View>
+        {showLightningAddress && (
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 0,
+            }}>
+            <Card
+              message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
+              variant="warning"
+            />
+            <Spacer size={12} />
+          </View>
+        )}
 
         {showLightningAddress && (
           <PaymentInfo
@@ -226,16 +228,18 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
           </View>
         )}
 
-        <TransactionMintRefresh
-          mintInfo={mintInfo}
-          transaction={{
-            transactionType: 'receive',
-          }}
-          handleCheckStatus={async (callback) => {
-            await getProfile(currentProfile, listenToTransaction);
-            callback();
-          }}
-        />
+        {showLightningAddress && (
+          <TransactionMintRefresh
+            mintInfo={mintInfo}
+            transaction={{
+              transactionType: 'receive',
+            }}
+            handleCheckStatus={async (callback) => {
+              await getProfile(currentProfile, listenToTransaction);
+              callback();
+            }}
+          />
+        )}
 
         {/* {unit === 'sat' && (
           <View

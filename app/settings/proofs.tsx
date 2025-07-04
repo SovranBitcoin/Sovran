@@ -29,6 +29,7 @@ export default function ModalScreen() {
   const allMints = useSelector((state) => state.cashu?.profiles?.[profileId]?.mints || []);
   const allProofs = useSelector((state) => state.cashu?.profiles?.[profileId]?.proofs || {});
 
+  console.log(JSON.stringify(allProofs, null, 2));
   // Prepare data structure for display
   useEffect(() => {
     const mintsData = [];

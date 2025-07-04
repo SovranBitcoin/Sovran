@@ -6,7 +6,13 @@ import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
 import { Spacer, View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
-import { useCashu } from 'helper/redux/cashu';
+import {
+  useCashu,
+  appendTransactionsV2,
+  memoizedGetSelectedMint,
+  memoizedGetTransactionByMatcher,
+  TransactionData,
+} from 'helper/redux/cashu';
 import { useTransactionsData } from 'helper/hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
@@ -21,12 +27,6 @@ import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
-import {
-  appendTransactionsV2,
-  memoizedGetSelectedMint,
-  memoizedGetTransactionByMatcher,
-  TransactionData,
-} from 'helper/redux/cashu';
 import { MintQuoteResponse, MintQuoteState } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -114,7 +114,7 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
 }
 
 function TabOneScreen() {
-  const supportedUnits = ['sat'];
+  const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
 
   const accounts = [
     {

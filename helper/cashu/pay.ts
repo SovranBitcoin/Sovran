@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { AppError, getRawExpiry } from 'components/cashu';
-import { getKeys, getWallet } from '.';
+import { getWallet } from '.';
 import {
   appendProofsV2,
   appendTransaction,
@@ -9,23 +9,27 @@ import {
   memoizedGetSelectedMint,
   memoizedGetTransactions,
   removeProofs,
+  memoizedGetBalance,
+  memoizedGetProofs,
+  updateTransaction,
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
-import { MeltQuoteResponse, MintQuoteResponse, Proof, Token } from '@cashu/cashu-ts';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import {
+  MeltQuoteResponse,
+  MintQuoteResponse,
+  Proof,
+  Token,
   getDecodedToken,
   getEncodedToken,
   PaymentRequest,
   PaymentRequestTransport,
   PaymentRequestTransportType,
 } from '@cashu/cashu-ts';
-import { memoizedGetBalance, memoizedGetProofs, updateTransaction } from 'helper/redux/cashu';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { giveaways } from './secrets';
 import { publishWalletEvent } from '../nostr/cashu';
 import { nip19 } from 'nostr-tools';
 import { v4 as uuidv4 } from 'uuid';
-import { showMessage } from '../popup/popups';
 import { SheetManager } from 'react-native-actions-sheet';
 import { getUsedProofs } from './wallet';
 
@@ -284,6 +288,7 @@ export async function receiveLightning({
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
 
+  Alert.alert('a', JSON.stringify(unit, selectedMint));
   const wallet = await getWallet({
     unit,
     mintUrl: selectedMint,
@@ -603,11 +608,11 @@ export async function receiveEcash({
       fromNIP05,
       ...(giveaway
         ? {
-            p2pk: {
-              pubkey: giveaway.public_key,
-              privkey: giveaway.private_key,
-            },
-          }
+          p2pk: {
+            pubkey: giveaway.public_key,
+            privkey: giveaway.private_key,
+          },
+        }
         : {}),
     };
 

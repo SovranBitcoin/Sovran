@@ -13,7 +13,6 @@ import { sovran } from '.';
 import { ScrollView } from 'react-native-actions-sheet';
 import { getMint, getWallet } from 'components/cashu';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { isProduction } from 'helper/version';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 interface MintCount {
@@ -419,7 +418,7 @@ export function MintAddMore({ onClose, payload }) {
     () =>
       new Set(
         payload?.currencies?.map((curr) => curr.toUpperCase()) ||
-          (isProduction ? ['SAT'] : ['SAT']).map((curr) => curr.toUpperCase())
+          ['SAT', 'USD', 'EUR', 'GBP'].map((curr) => curr.toUpperCase())
       ),
     [payload]
   );
