@@ -107,8 +107,9 @@ export const Transactions = React.memo(
                           borderColor: theme.greys[700],
                         }}>
                         <Text size={14} bold>
-                          {morePendingCount} more pending transaction
-                          {morePendingCount > 1 ? 's' : ''}
+                          View pending transaction{morePendingCount > 1 ? 's' : ''} {'('}
+                          {morePendingCount}
+                          {')'}
                         </Text>
                       </View>
                     </TouchableOpacity>
