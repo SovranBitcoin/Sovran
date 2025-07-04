@@ -186,12 +186,12 @@ function ModalScreen() {
         <DonutChartContainer
           data={[
             {
-              amount: usageData.remaining.gb,
+              amount: Number(usageData.remaining.gb),
               label: 'Remaining',
               value: `${usageData.remaining.gb.toFixed(2)} GB`,
             },
             {
-              amount: usageData.total.gb - usageData.remaining.gb,
+              amount: Number(Number(usageData.total.gb - usageData.remaining.gb).toFixed(2)),
               label: 'Used',
               value: `${usageData.total.gb.toFixed(2)} GB`,
             },

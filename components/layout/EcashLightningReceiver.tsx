@@ -26,6 +26,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { truncateMiddle } from 'helper/strings';
+
 export const pool = new SimplePool();
 
 type UnitType = 'sat' | string;
@@ -139,6 +140,7 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
   const mintInfo = useGetMintInfo({ mintUrl: 'https://mint.minibits.cash/Bitcoin' });
 
   const { listenToTransaction } = useTransactions();
+
   return (
     <Modal
       showClose
@@ -223,6 +225,7 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             </Section>
           </View>
         )}
+
         <TransactionMintRefresh
           mintInfo={mintInfo}
           transaction={{

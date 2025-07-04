@@ -11,6 +11,7 @@ interface TransactionDebugCodeProps {
 }
 
 export function TransactionDebugCode({ transaction }: TransactionDebugCodeProps) {
+  return null;
   const theme = useSelector(memoizedGetTheme);
   return (
     <ScrollView horizontal>
