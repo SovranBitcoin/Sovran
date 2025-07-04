@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { AppError } from 'components/cashu';
+import { AppError, getRawExpiry } from 'components/cashu';
 import { getKeys, getWallet } from '.';
 import {
   appendProofsV2,
@@ -113,6 +113,16 @@ export async function sendLightning({
 }): Promise<LightningSendTransaction> {
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
+
+  let expiry: Date | null = null;
+  try {
+    expiry = getRawExpiry({ pr });
+  } catch {
+    throw new AppError('invalid_invoice', 'Invalid payment request');
+  }
+  if (expiry && new Date(Date.now() + 60_000) > expiry) {
+    throw new AppError('invoice_expired', 'Invoice expired');
+  }
 
   // Retry logic for wallet operations
   const attemptSend = async (forceRefresh = false): Promise<LightningSendTransaction> => {
