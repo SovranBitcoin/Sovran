@@ -290,7 +290,7 @@ export function SovranIcon({ width = 32, height = 32, transform = [{ scale: 1.5 
   return (
     <CachedImage
       style={{ width, height, transform }}
-      source={require('assets/images/sovran_transparent.png')}
+      source={require('assets/images/icon_t.png')}
     />
   );
 }

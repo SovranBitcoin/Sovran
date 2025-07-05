@@ -1,7 +1,18 @@
 import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 import { store } from 'helper/redux/store';
+import { Cache } from 'react-native-cache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+
+const cache = new Cache({
+  namespace: 'last-wallet-event',
+  policy: {
+    maxEntries: 50,
+    stdTTL: 60 * 5, // 5 minutes
+  },
+  backend: AsyncStorage,
+});
 
 interface NostrEvent {
   kind: number;

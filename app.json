@@ -4,14 +4,17 @@
     "slug": "sovran",
     "version": "0.0.24",
     "orientation": "portrait",
-    "scheme": "sovran",
+    "scheme": [
+      "sovran",
+      "cashu"
+    ],
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/bg_.png",
       "backgroundColor": "#000000",
       "resizeMode": "contain"
     },
-    "icon": "./assets/images/sovran_black.png",
+    "icon": "./assets/images/icon_.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -26,7 +29,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/sovran_black.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
