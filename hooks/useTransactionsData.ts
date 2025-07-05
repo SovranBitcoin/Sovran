@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { TransactionData } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
+import { getRawExpiry } from 'components/cashu';
 
 interface Account {
   unit: string;
@@ -37,6 +38,16 @@ export function useTransactionsData({
   tab = 'All',
   showMore = true,
 }: Options) {
+  const isExpiredLightning = (tx: TransactionData) => {
+    if (tx.type !== 'lightning' || !tx.request || tx.paid) return false;
+    try {
+      const expiry = getRawExpiry({ pr: tx.request });
+      return expiry ? new Date() > expiry : false;
+    } catch {
+      return false;
+    }
+  };
+
   const filterFn = useMemo(
     () => (tx: TransactionData) => {
       if (tx.unit !== account.unit) return false;
@@ -55,6 +66,7 @@ export function useTransactionsData({
     () =>
       transactions
         .filter(filterFn)
+        .filter((tx) => !isExpiredLightning(tx))
         .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()),
     [transactions, filterFn]
   );
