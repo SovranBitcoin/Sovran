@@ -76,7 +76,11 @@ const ListRoute = () => {
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
 
-  const currencies: string[] = _.uniq(balances.map((b) => b.unit?.toUpperCase())).filter(Boolean);
+  const currencies: string[] = _.uniq(balances.map((b) => b.unit?.toUpperCase()))
+    .filter(Boolean)
+    .filter((unit) => {
+      return ['SAT', 'USD', 'EUR', 'GBP'].includes(unit);
+    });
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     (currencies[0] || 'SAT') as string
