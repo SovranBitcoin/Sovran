@@ -107,7 +107,6 @@ type CustomTextProps = {
 
   // Font family props
   overpass?: boolean;
-  lexend?: boolean;
 
   // Style props
   italic?: boolean;
@@ -139,7 +138,6 @@ function getWeightFromProps(props: CustomTextProps): string {
 }
 
 function getFamilyFromProps(props: CustomTextProps): string {
-  if (props.lexend) return 'lexend';
   return 'overpass'; // default
 }
 
@@ -193,45 +191,9 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
         default:
           weightSuffix = 'Regular';
       }
-    } else {
-      // lexend
-      switch (weight) {
-        case 'thin':
-          weightSuffix = 'Thin';
-          break;
-        case 'extralight':
-          weightSuffix = 'ExtraLight';
-          break;
-        case 'light':
-          weightSuffix = 'Light';
-          break;
-        case 'regular':
-          weightSuffix = 'Regular';
-          break;
-        case 'medium':
-          weightSuffix = 'Medium';
-          break;
-        case 'semibold':
-          weightSuffix = 'SemiBold';
-          break;
-        case 'bold':
-          weightSuffix = 'Bold';
-          break;
-        case 'extrabold':
-          weightSuffix = 'ExtraBold';
-          break;
-        case 'heavy':
-          weightSuffix = 'Black'; // Lexend doesn't have Heavy, map to Black
-          break;
-        case 'black':
-          weightSuffix = 'Black';
-          break;
-        default:
-          weightSuffix = 'Regular';
-      }
     }
 
-    // Add italic suffix for Overpass (Lexend doesn't seem to have italic variants in your list)
+    // Add italic suffix for Overpass
     const italicSuffix = italic && family === 'overpass' ? 'Italic' : '';
 
     // Handle special case for Overpass regular italic

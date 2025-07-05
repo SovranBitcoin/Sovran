@@ -7,7 +7,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useSelector } from 'react-redux';
 
-import { useClientOnlyValue } from 'components/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
 import { greys, shades } from 'helper/colors';
@@ -18,6 +17,7 @@ import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
+import { useClientOnlyValue } from 'helper/hooks/useClientOnlyValue';
 
 const Tab = createBottomTabNavigator();
 

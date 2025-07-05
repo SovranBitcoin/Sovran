@@ -375,35 +375,6 @@ export default function ModalScreen() {
 
         <View style={{ margin: 8 }}></View>
 
-        {/* Lexend isn't really used in this project, only in onboarding flows */}
-        <Text thin lexend size={16}>
-          LexendThin
-        </Text>
-        <Text extralight lexend size={16}>
-          LexendExtraLight
-        </Text>
-        <Text light lexend size={16}>
-          LexendLight
-        </Text>
-        <Text regular lexend size={16}>
-          LexendRegular
-        </Text>
-        <Text medium lexend size={16}>
-          LexendMedium
-        </Text>
-        <Text semibold lexend size={16}>
-          LexendSemiBold
-        </Text>
-        <Text bold lexend size={16}>
-          LexendBold
-        </Text>
-        <Text extrabold lexend size={16}>
-          LexendExtraBold
-        </Text>
-        <Text black lexend size={16}>
-          LexendBlack
-        </Text>
-
         {Object.keys(theme.greys).map((grey) => {
           return (
             <View
