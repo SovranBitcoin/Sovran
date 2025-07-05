@@ -9,7 +9,7 @@ import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
 import { View } from 'components/common/View';
 import { Tabs } from 'components/common/Tabs';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { EventKind } from './Profile';

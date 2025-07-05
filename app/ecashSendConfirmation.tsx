@@ -26,7 +26,7 @@ import { write } from 'components/common/useNfc';
 import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';

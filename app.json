@@ -10,11 +10,11 @@
     ],
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/bg_.png",
+      "image": "./assets/images/splash.png",
       "backgroundColor": "#000000",
       "resizeMode": "contain"
     },
-    "icon": "./assets/images/icon_.png",
+    "icon": "./assets/images/sovran_black.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -29,7 +29,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/sovran_black.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [

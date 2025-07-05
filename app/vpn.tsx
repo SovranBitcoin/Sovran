@@ -14,15 +14,15 @@ import { truncateMiddle } from 'helper/strings';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { activateVpn } from 'helper/api/sovran';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { activateVpn } from 'helper/apiClient';
 import {
   initializeVpn,
   connectVpn,
   disconnectVpn,
   getVpnStatus,
   parseWireGuardConfig,
-} from 'helper/vpn/wireguard';
+} from 'helper/wireguard';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes
@@ -69,41 +69,47 @@ function ModalScreen() {
   const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
 
   const activateVPN = async () => {
-    try {
-      const data = await activateVpn({
-        paymentHash: params.payment_hash,
-        location: params.cc,
-      });
+    const result = await activateVpn({
+      paymentHash: params.payment_hash,
+      location: params.cc,
+    });
 
-      const orderedAt = new Date();
-      let expiryDate;
-      switch (params.duration) {
-        case '1 hour':
-          expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
-          break;
-        case '1 day':
-          expiryDate = new Date(orderedAt.getTime() + 24 * 60 * 60 * 1000);
-          break;
-        case '1 week':
-          expiryDate = new Date(orderedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-          break;
-        case '1 month':
-          expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 1));
-          break;
-        case '3 months':
-          expiryDate = new Date(orderedAt.setMonth(orderedAt.getMonth() + 3));
-          break;
-        default:
-          expiryDate = orderedAt;
-      }
-      updateVpn(params.payment_request, {
-        ...data,
-        ordered_at: orderedAt.toISOString(),
-        expiry_date: expiryDate.toISOString(),
-      });
-    } catch {
+    if (result.isErr()) {
       showMessage('activation_failed', {}, { emoji: '🚨' });
+      return;
     }
+
+    const data = result.value;
+    const orderedAt = new Date();
+    let expiryDate: Date;
+
+    switch (params.duration) {
+      case '1 hour':
+        expiryDate = new Date(orderedAt.getTime() + 60 * 60 * 1000);
+        break;
+      case '1 day':
+        expiryDate = new Date(orderedAt.getTime() + 24 * 60 * 60 * 1000);
+        break;
+      case '1 week':
+        expiryDate = new Date(orderedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '1 month':
+        expiryDate = new Date(orderedAt.getTime());
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+        break;
+      case '3 months':
+        expiryDate = new Date(orderedAt.getTime());
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+        break;
+      default:
+        expiryDate = orderedAt;
+    }
+
+    updateVpn(params.payment_request, {
+      ...data,
+      ordered_at: orderedAt.toISOString(),
+      expiry_date: expiryDate.toISOString(),
+    });
   };
 
   const downloadAndShareVPN = async () => {

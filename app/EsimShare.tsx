@@ -6,7 +6,7 @@ import { useTypedRoute } from 'helper/navigation';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/View';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const { esimCode, esimLink, location } = useTypedRoute<'esimShare'>();

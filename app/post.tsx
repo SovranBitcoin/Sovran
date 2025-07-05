@@ -8,7 +8,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { Post } from './ProfilePage/post';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ParentPosts({ parentPosts }) {
   return (

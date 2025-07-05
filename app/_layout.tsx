@@ -13,9 +13,7 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-gesture-handler';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Provider, useSelector } from 'react-redux';
-import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Easing } from 'react-native-reanimated';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { SheetProvider } from 'react-native-actions-sheet';
@@ -41,60 +39,19 @@ import { WalletsProvider } from 'components/providers/WalletsProviders';
 import { PricelistProvider } from 'components/providers/PricelistProvider';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
+import { useFonts } from 'hooks/useFonts';
 
 registerAllSheets({ context: 'global' });
 
 // Configure constants
 const RELAY_URLS = relays;
 
-// const SENTRY_DSN =
-//   'https://50c53b9362d6d884a469eb0214dbdf94@o4508635578236928.ingest.de.sentry.io/4508635580530768';
-
 // Initialize global configurations
 LogBox.ignoreAllLogs();
 dayjs.extend(relativeTime);
 
-// Initialize Sentry
-// Sentry.init({
-//   dsn: SENTRY_DSN,
-//   sendDefaultPii: true,
-// });
-
 // Initialize QueryClient
 const queryClient = new QueryClient();
-
-// Font mapping
-const FONTS = {
-  OverpassBold: require('../assets/fonts/Overpass/overpass-bold.otf'),
-  OverpassBoldItalic: require('../assets/fonts/Overpass/overpass-bold-italic.otf'),
-  OverpassExtraboldItalic: require('../assets/fonts/Overpass/overpass-extrabold-italic.otf'),
-  OverpassExtrabold: require('../assets/fonts/Overpass/overpass-extrabold.otf'),
-  OverpassExtralightItalic: require('../assets/fonts/Overpass/overpass-extralight-italic.otf'),
-  OverpassExtralight: require('../assets/fonts/Overpass/overpass-extralight.otf'),
-  OverpassHeavyItalic: require('../assets/fonts/Overpass/overpass-heavy-italic.otf'),
-  OverpassHeavy: require('../assets/fonts/Overpass/overpass-heavy.otf'),
-  OverpassItalic: require('../assets/fonts/Overpass/overpass-italic.otf'),
-  OverpassLightItalic: require('../assets/fonts/Overpass/overpass-light-italic.otf'),
-  OverpassLight: require('../assets/fonts/Overpass/overpass-light.otf'),
-  OverpassRegular: require('../assets/fonts/Overpass/overpass-regular.otf'),
-  OverpassSemiboldItalic: require('../assets/fonts/Overpass/overpass-semibold-italic.otf'),
-  OverpassSemibold: require('../assets/fonts/Overpass/overpass-semibold.otf'),
-  OverpassThinItalic: require('../assets/fonts/Overpass/overpass-thin-italic.otf'),
-  OverpassThin: require('../assets/fonts/Overpass/overpass-thin.otf'),
-  OverpassMono: require('../assets/fonts/Overpass/OverpassMono-VariableFont_wght.ttf'),
-  ChivoMono: require('../assets/fonts/Overpass/ChivoMono-VariableFont_wght.ttf'),
-  Merienda: require('../assets/fonts/Overpass/Merienda-VariableFont_wght.ttf'),
-  LexendThin: require('../assets/fonts/Lexend/Lexend-Thin.ttf'),
-  LexendSemiBold: require('../assets/fonts/Lexend/Lexend-SemiBold.ttf'),
-  LexendRegular: require('../assets/fonts/Lexend/Lexend-Regular.ttf'),
-  LexendMedium: require('../assets/fonts/Lexend/Lexend-Medium.ttf'),
-  LexendLight: require('../assets/fonts/Lexend/Lexend-Light.ttf'),
-  LexendExtraLight: require('../assets/fonts/Lexend/Lexend-ExtraLight.ttf'),
-  LexendExtraBold: require('../assets/fonts/Lexend/Lexend-ExtraBold.ttf'),
-  LexendBold: require('../assets/fonts/Lexend/Lexend-Bold.ttf'),
-  LexendBlack: require('../assets/fonts/Lexend/Lexend-Black.ttf'),
-  ...FontAwesome.font,
-};
 
 /**
  * Handles DM message fetching and decryption
@@ -152,7 +109,7 @@ function MySplashScreen({ opacity }) {
           width: Dimensions.get('window').width,
           height: Dimensions.get('window').height,
         }}
-        source={require('assets/images/bg_.png')}
+        source={require('assets/images/splash.png')}
       />
     </Animated.View>
   );
@@ -248,7 +205,7 @@ export default function RootLayout() {
   const scaleRef = useRef(new Animated.Value(1));
 
   // Load fonts
-  const [fontsLoaded, fontsError] = useFonts(FONTS);
+  const [fontsLoaded, fontsError] = useFonts();
 
   // Handle font loading errors
   useEffect(() => {

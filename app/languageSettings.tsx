@@ -7,7 +7,7 @@ import { FlagIcon } from 'assets/icons';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { SearchableList } from 'components/common/SearchableList';
 import Container from 'components/layout/Container';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 // Maps for language handling
 const isoToLanguageMap = {

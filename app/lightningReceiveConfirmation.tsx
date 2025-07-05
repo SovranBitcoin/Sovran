@@ -22,7 +22,7 @@ import { useNavigation } from 'expo-router';
 import { getWallet } from 'helper/cashu';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';

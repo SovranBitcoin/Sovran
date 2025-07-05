@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useTypedRoute } from 'helper/navigation';
 import { useCashu } from 'helper/redux/cashu';
 import { EcashSendConfirmation } from './ecashSendConfirmation';

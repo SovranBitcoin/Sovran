@@ -10,7 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import Image from 'components/common/Image';
 import PagerView from 'react-native-pager-view';
 import { Tabs } from 'components/common/Tabs';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {

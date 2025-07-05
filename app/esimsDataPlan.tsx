@@ -14,8 +14,8 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { fetchQuote } from 'helper/api/sovran';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { fetchQuote } from 'helper/apiClient';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -70,51 +70,63 @@ function ModalScreen() {
     }
   }, [country, packages]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setLoading(true);
     const currentPackage = packages.find((p) => p.packageCode === selectedPackage);
+    if (!currentPackage) {
+      setLoading(false);
+      // optionally show an error toast or alert
+      return;
+    }
 
-    fetchQuote({ packageCode: currentPackage.packageCode, iccid, type })
-      .then((data) => {
-        const esim = {
-          package: {
-            packageCode: currentPackage.packageCode,
-            slug: currentPackage.slug,
-            name: currentPackage.name,
-            price: currentPackage.price,
-            currencyCode: currentPackage.currencyCode,
-            volume: currentPackage.volume,
-            smsStatus: currentPackage.smsStatus,
-            dataType: currentPackage.dataType,
-            unusedValidTime: currentPackage.unusedValidTime,
-            duration: currentPackage.duration,
-            durationUnit: currentPackage.durationUnit,
-            location: currentPackage.location,
-            description: currentPackage.description,
-            activeType: currentPackage.activeType,
-            favorite: currentPackage.favourite,
-            retailPrice: currentPackage.retailPrice,
-            speed: currentPackage.speed,
-          },
-          sats: data.sats,
-          request: data.request,
-          type: type,
-          iccid: iccid,
-        };
+    const result = await fetchQuote({ packageCode: currentPackage.packageCode, iccid, type });
 
-        setEsims(esim);
+    if (result.isOk()) {
+      const data = result.value;
 
-        navigation.navigate('esimCheckout', {
-          sats: esim.sats,
-          request: esim.request,
-          type: esim.type,
-          iccid: esim.iccid,
-          ...esim.package,
-        });
-      })
-      .finally(() => {
-        setLoading(false);
+      const esim = {
+        package: {
+          packageCode: currentPackage.packageCode,
+          slug: currentPackage.slug,
+          name: currentPackage.name,
+          price: currentPackage.price,
+          currencyCode: currentPackage.currencyCode,
+          volume: currentPackage.volume,
+          smsStatus: currentPackage.smsStatus,
+          dataType: currentPackage.dataType,
+          unusedValidTime: currentPackage.unusedValidTime,
+          duration: currentPackage.duration,
+          durationUnit: currentPackage.durationUnit,
+          location: currentPackage.location,
+          description: currentPackage.description,
+          activeType: currentPackage.activeType,
+          favorite: currentPackage.favourite,
+          retailPrice: currentPackage.retailPrice,
+          speed: currentPackage.speed,
+        },
+        sats: data.sats,
+        request: data.request,
+        type,
+        iccid,
+      };
+
+      setEsims(esim);
+
+      navigation.navigate('esimCheckout', {
+        sats: esim.sats,
+        request: esim.request,
+        type: esim.type,
+        iccid: esim.iccid,
+        ...esim.package,
       });
+    } else if (result.isErr()) {
+      const error = result.error;
+      // Show an alert/toast or log
+      console.error('Quote fetch failed:', error.message);
+      // optionally alert user
+    }
+
+    setLoading(false);
   };
 
   // Render a single package item

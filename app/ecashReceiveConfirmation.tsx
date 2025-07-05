@@ -9,11 +9,11 @@ import { showMessage } from 'helper/popup/popups';
 import { giveaways } from 'helper/cashu/secrets';
 import { useRoute } from '@react-navigation/native';
 import { useTypedNavigation } from 'helper/navigation';
-import { memoizedGetMints, useGetMintInfo } from 'helper/redux/cashu';
+import { memoizedGetMints, TransactionBuilder, useGetMintInfo } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
 
@@ -270,7 +270,18 @@ function ModalScreen() {
     params: { token },
   } = useRoute() as { params: { token: string } };
 
-  return <EcashReceiveConfirmation token={token} />;
+  return (
+    <EcashReceiveConfirmation
+      token={token}
+      transaction={
+        new TransactionBuilder({
+          token,
+          transactionType: 'receive',
+          type: 'ecash',
+        })
+      }
+    />
+  );
 }
 
 export default withSheetProvider(ModalScreen);

@@ -12,7 +12,7 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 export const EventKind = {
   Unknown: -1,

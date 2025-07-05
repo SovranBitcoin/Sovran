@@ -14,8 +14,8 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { fetchOrderData, fetchEsimData } from 'helper/api/sovran';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { fetchOrderData, fetchEsimData } from 'helper/apiClient';
 import { DonutChartContainer } from 'components/layout/Donut';
 
 // Move utility function outside of component
@@ -70,25 +70,33 @@ function ModalScreen() {
 
   const fetchAndUpdateEsims = useCallback(
     async (esim) => {
-      console.log(esim);
-      try {
-        setLoadingEsim(true);
-        const orderData = await fetchOrderData({
-          request: esim.request,
-          packageCode: esim.package.packageCode,
-          slug: esim.package.slug,
-          iccid: esim.iccid,
-          type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
-        });
-        const orderNo = orderData?.obj?.orderNo || esim.order.orderNo;
+      setLoadingEsim(true);
+
+      const orderResult = await fetchOrderData({
+        request: esim.request,
+        packageCode: esim.package.packageCode,
+        slug: esim.package.slug,
+        iccid: esim.iccid,
+        type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
+      });
+
+      if (orderResult.isOk()) {
+        const orderNo = orderResult.value?.obj?.orderNo || esim.order.orderNo;
+
         if (orderNo) {
-          const esimData = await fetchEsimData({ orderNo });
-          updateEsim(esim.request, esimData.obj.esimList[0]);
+          const esimResult = await fetchEsimData({ orderNo });
+
+          if (esimResult.isOk() && esimResult.value?.obj?.esimList?.[0]) {
+            updateEsim(esim.request, esimResult.value.obj.esimList[0]);
+          } else {
+            console.warn('Failed to fetch esim data', esimResult);
+          }
         }
-      } catch {
-      } finally {
-        setLoadingEsim(false);
+      } else {
+        console.warn('Failed to fetch order data', orderResult);
       }
+
+      setLoadingEsim(false);
     },
     [updateEsim]
   );

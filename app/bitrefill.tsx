@@ -9,7 +9,7 @@ import { store } from 'helper/redux/store';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 

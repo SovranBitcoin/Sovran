@@ -9,7 +9,7 @@ import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/View';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const { vpnCode, location, config, hash } = useTypedRoute<'vpnShare'>();

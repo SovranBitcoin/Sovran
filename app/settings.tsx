@@ -17,7 +17,7 @@ import { truncateMiddle } from 'helper/strings';
 import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
 
 const name = Application.applicationName;

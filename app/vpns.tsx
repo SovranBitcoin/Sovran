@@ -13,8 +13,8 @@ import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { fetchVpnInvoice } from 'helper/api/sovran';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { fetchVpnInvoice } from 'helper/apiClient';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -84,14 +84,16 @@ function ModalScreen() {
   const { setVpn } = useVpn();
 
   const handleContinue = async () => {
-    const selectedPackageDuration = packages.find(
-      (p) => p.packageCode === selectedPackage
-    )?.duration;
-    const selectedPackageDurationCode = packages.find(
-      (p) => p.packageCode === selectedPackage
-    )?.duration_code;
-    try {
-      const data = await fetchVpnInvoice({ duration: selectedPackageDurationCode });
+    const selected = packages.find((p) => p.packageCode === selectedPackage);
+    if (!selected) return;
+
+    const selectedPackageDuration = selected.duration;
+    const selectedPackageDurationCode = selected.duration_code;
+
+    const result = await fetchVpnInvoice({ duration: selectedPackageDurationCode });
+
+    if (result.isOk()) {
+      const data = result.value;
 
       setVpn({
         location: country,
@@ -107,9 +109,13 @@ function ModalScreen() {
         duration: selectedPackageDuration,
         hash: data.payment_hash,
         request: data.payment_request,
-        price: packages.find((p) => p.packageCode === selectedPackage)?.price,
+        price: selected.price,
       });
-    } catch {}
+    } else {
+      console.error('Failed to fetch VPN invoice:', result.error.message);
+      // Optional: handle error UX
+      // e.g., showToast('Failed to fetch invoice, try again')
+    }
   };
 
   return (

@@ -13,7 +13,7 @@ import {
   memoizedGetTransactionByMatcher,
   TransactionData,
 } from 'helper/redux/cashu';
-import { useTransactionsData } from 'helper/hooks/useTransactionsData';
+import { useTransactionsData } from 'hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import {

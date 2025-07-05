@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useSelector } from 'react-redux';
 
-import { useClientOnlyValue } from 'components/useClientOnlyValue';
+import { useClientOnlyValue } from 'hooks/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
 import { greys, shades } from 'helper/colors';

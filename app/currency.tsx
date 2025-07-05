@@ -26,7 +26,7 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { requestInvoice, utils } from 'lnurl-pay';

@@ -14,7 +14,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
 import { showMessage } from 'helper/popup/popups';
-import { fetchVpnCountries } from 'helper/api/sovran';
+import { fetchVpnCountries } from 'helper/apiClient';
 import { useTypedNavigation } from 'helper/navigation';
 
 function TabTwoScreen() {
@@ -51,18 +51,16 @@ function TabTwoScreen() {
   ];
 
   const fetchPackages = async () => {
-    try {
-      const data = await fetchVpnCountries();
+    const result = await fetchVpnCountries();
 
-      if (data) {
-        setFetchingPackages(data);
-        return data;
-      }
-      return null;
-    } catch {
+    if (result.isErr()) {
       showMessage('vpns_error', {}, { emoji: '🚨' });
       return null;
     }
+
+    const data = result.value;
+    setFetchingPackages(data);
+    return data;
   };
 
   const handleGetDataPress = async () => {

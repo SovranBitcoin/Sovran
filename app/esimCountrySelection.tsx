@@ -11,7 +11,7 @@ import { FlagIcon } from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 export const getCountry = (iso) => {
   try {

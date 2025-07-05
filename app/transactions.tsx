@@ -7,12 +7,12 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import React, { useState } from 'react';
 import { Transactions } from 'components/layout/Transactions';
 import { useCashu } from 'helper/redux/cashu';
-import { useTransactionsData } from 'helper/hooks/useTransactionsData';
+import { useTransactionsData } from 'hooks/useTransactionsData';
 import Container from 'components/layout/Container';
 import CurrencySelector from 'components/layout/CurrencySelector';
 import Icon from 'assets/icons';
 import { Tabs } from 'components/common/Tabs';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

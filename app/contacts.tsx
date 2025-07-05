@@ -14,8 +14,8 @@ import { Text } from 'components/common/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
-import { searchUsers as apiSearchUsers } from 'helper/api/sovran';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { searchUsers as apiSearchUsers } from 'helper/apiClient';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -36,22 +36,23 @@ function ModalScreen() {
     }));
 
   // New function to search using the API instead of DVM
-  const searchUsers = async (query) => {
+  const searchUsers = async (query: string) => {
     if (!query.trim()) return;
 
     setLoading(true);
     setHasSearched(true); // Set this to true when search is initiated
 
-    try {
-      const data = await apiSearchUsers({ query, limit: 10 });
+    const result = await apiSearchUsers({ query, limit: 10 });
+
+    if (result.isOk()) {
+      const data = result.value;
 
       if (data.results && Array.isArray(data.results)) {
-        const formattedResults = data.results.map((result) => {
-          const pubkey = JSON.parse(result.profileEvent).pubkey;
-          const user = new NDKUser({
-            pubkey: pubkey,
-          });
-          user.profile = result;
+        const formattedResults = data.results.map((res) => {
+          const pubkey = JSON.parse(res.profileEvent).pubkey;
+          const user = new NDKUser({ pubkey });
+          user.profile = res;
+
           return {
             pubkey: user.pubkey,
             profile: {
@@ -61,6 +62,7 @@ function ModalScreen() {
           };
         });
 
+        // Create a map to deduplicate and store in Redux
         for (const result of formattedResults) {
           const newResults = [{ pubkey: result?.pubkey, profile: result }];
           const uniqueResults = [
@@ -73,14 +75,14 @@ function ModalScreen() {
       } else {
         setSearchResults([]);
       }
-    } catch (error) {
-      console.error('Error searching users:', error);
+    } else {
+      console.error('Error searching users:', result.error);
       setSearchResults([]);
-    } finally {
-      setTimeout(() => {
-        setLoading(false);
-      }, 1000);
     }
+
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
   };
 
   const handleSearchQueryChange = (input) => {

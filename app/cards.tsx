@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import CreditCardComponent from 'components/common/NFCCard';
 import Swiper from 'react-native-web-infinite-swiper';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 const TabTwoScreen = () => {

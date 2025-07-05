@@ -12,7 +12,7 @@ import { useTypedRoute } from 'helper/navigation/index';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryptedDirectMessage';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
 
 function ModalScreen() {

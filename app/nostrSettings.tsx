@@ -12,7 +12,7 @@ import { getPublicKey, nip19 } from 'nostr-tools';
 import CachedImage from 'components/common/Image';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

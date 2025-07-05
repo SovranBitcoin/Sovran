@@ -8,7 +8,7 @@ import { useSelector } from 'react-redux';
 import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/common/SearchableList';
 import Container from 'components/layout/Container';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 
 // An array of available themes
 const themes = [

@@ -19,7 +19,7 @@ import { Card } from 'components/common/Card';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
-import { withSheetProvider } from 'components/hocs/withSheetProvider';
+import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 function ModalScreen() {

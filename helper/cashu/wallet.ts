@@ -1,12 +1,11 @@
 import { CashuWallet } from '@cashu/cashu-ts';
 import { store } from 'helper/redux/store';
 import { getMint } from './mint';
-import { auditMint } from 'helper/api/sovran';
+import { auditMint } from 'helper/apiClient';
 import { memoizedGetCurrentProfile } from '../redux/nostr';
 import { setAudit } from 'helper/redux/cashu';
 import { mnemonicToSeedSync } from 'bip39';
 import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
 
 interface GetWalletParams {
   unit: string;
@@ -65,17 +64,22 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   const wallet = new CashuWallet(mint, {
     ...(shouldRefresh ? { keys, keysets, mintInfo } : { keys, keysets, mintInfo }),
     bip39seed: mnemonicToSeedSync(cashuMnemonic),
-    unit
+    unit,
   });
 
   wallet.audits = audits;
 
   const isAuditStale = Date.now() - lastFetched > 24 * 60 * 60 * 1000;
   if (forceRefresh || !audits || isAuditStale) {
-    auditMint({ mintUrl }).then((a) => {
-      const auditWithTimestamp = { ...a, lastFetched: Date.now() };
-      store.dispatch(setAudit({ mintUrl, audit: auditWithTimestamp }));
-      wallet.audits = auditWithTimestamp;
+    auditMint({ mintUrl }).then((res) => {
+      if (res.isOk()) {
+        const data = res.value;
+        const auditWithTimestamp = { ...data, lastFetched: Date.now() };
+        store.dispatch(setAudit({ mintUrl, audit: auditWithTimestamp }));
+        wallet.audits = auditWithTimestamp;
+      } else {
+        console.error(`Audit fetch failed for ${mintUrl}:`, res.error.message);
+      }
     });
   }
 
@@ -88,10 +92,10 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   walletCache = {
     [mintUrl]: {
       [unit]: wallet,
-      ...walletCache?.[mintUrl]
+      ...walletCache?.[mintUrl],
     },
-    ...walletCache
-  }
+    ...walletCache,
+  };
 
   return wallet;
 }

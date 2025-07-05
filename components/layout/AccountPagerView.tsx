@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { useHandleCameraPermission } from 'helper/hooks/useHandleCameraPermission';
+import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import { StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';

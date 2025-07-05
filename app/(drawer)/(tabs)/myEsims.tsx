@@ -14,7 +14,7 @@ import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
-import { fetchProducts } from 'helper/api/sovran';
+import { fetchProducts } from 'helper/apiClient';
 import { useTypedNavigation } from 'helper/navigation';
 
 // Separate component for eSIM item
@@ -126,19 +126,23 @@ function EsimsScreen() {
   const categorizedEsims = categorizeEsims(paidEsims, currentDate);
 
   // Fetch packages from API
-  const fetchPackages = async () => {
-    try {
-      const data = await fetchProducts();
 
-      if (data.success && data.obj?.packageList) {
-        setPackageList(data.obj.packageList);
-        return data.obj.packageList;
-      }
-      return null;
-    } catch {
+  const fetchPackages = async () => {
+    const result = await fetchProducts();
+
+    if (result.isErr()) {
       showMessage('esim_error', {}, { emoji: '🚨' });
       return null;
     }
+
+    const data = result.value;
+
+    if (data.success && data.obj?.packageList) {
+      setPackageList(data.obj.packageList);
+      return data.obj.packageList;
+    }
+
+    return null; // API responded but doesn't contain expected data
   };
 
   // Initial fetch on component mount
