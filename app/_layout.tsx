@@ -40,6 +40,7 @@ import { PricelistProvider } from 'components/providers/PricelistProvider';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
 import { useFonts } from 'helper/hooks/useFonts';
+import { useDeeplink } from 'helper/hooks/useDeeplink';
 
 registerAllSheets({ context: 'global' });
 
@@ -200,9 +201,11 @@ function MainStack() {
  * Main application component
  */
 export default function RootLayout() {
-  const { init: initializeNDK } = useNDK();
   const [appIsReady, setAppIsReady] = useState(false);
   const scaleRef = useRef(new Animated.Value(1));
+  const { init: initializeNDK } = useNDK();
+
+  useDeeplink();
 
   // Load fonts
   const [fontsLoaded, fontsError] = useFonts();
