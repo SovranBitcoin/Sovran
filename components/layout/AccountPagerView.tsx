@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useHandleCameraPermission } from 'helper/hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
@@ -77,6 +77,10 @@ export function AccountPagerView({
   const goToIndex = (index: number): void => {
     swiperRef.current?.goTo(index);
   };
+
+  useEffect(() => {
+    goToIndex(accounts.findIndex((a) => a.unit === account.unit));
+  }, [account]);
 
   const handleButtonPress = async (page: string, accountUnit: string) => {
     const balance = memoizedGetBalance(accountUnit)(store.getState());
