@@ -154,12 +154,13 @@ export const Transactions = React.memo(
 
     return (
       <LegendList
+        waitForInitialLayout={false}
         key={listKey}
         style={{ height: Dimensions.get('screen').height, overflow: 'hidden' }}
         data={flattenedData}
         estimatedItemSize={ITEM_HEIGHT}
         scrollEnabled
-        recycleItems
+        // recycleItems
         maintainVisibleContentPosition
         ListHeaderComponent={header}
         // keyExtractor={(item, index) =>

@@ -96,9 +96,9 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                   {
                     marginRight: 8,
                     borderRadius: 8,
-                    padding: 1,
+                    padding: 0.5,
                     backgroundColor:
-                      selectedCurrency === currency ? greys(theme)[900] : greys(theme)[900],
+                      selectedCurrency === currency ? greys(theme)[900] : greys(theme)[700],
                   },
                 ]}>
                 <View
