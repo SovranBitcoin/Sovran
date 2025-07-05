@@ -1,5 +1,12 @@
 import 'app/global';
-import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
+import React, {
+  memo,
+  useCallback,
+  useState,
+  useLayoutEffect,
+  useEffect,
+} from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -10,6 +17,7 @@ import {
   useCashu,
   appendTransactionsV2,
   memoizedGetSelectedMint,
+  memoizedGetAllBalancesMultipleCurrencies,
   memoizedGetTransactionByMatcher,
   TransactionData,
 } from 'helper/redux/cashu';
@@ -149,6 +157,7 @@ function TabOneScreen() {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
+  const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const navigation = useTypedNavigation();
 
   useLayoutEffect(() => {
@@ -160,6 +169,36 @@ function TabOneScreen() {
   }, [navigation, account, accounts]);
 
   const image = useSelector(memoizedGetBackgroundImage);
+
+  const availableUnits = React.useMemo(
+    () =>
+      balances
+        .filter((b) => b.mintUrl === selectedMint)
+        .map((b) => b.unit.toLowerCase()),
+    [balances, selectedMint]
+  );
+
+  useEffect(() => {
+    if (!availableUnits.includes(account.unit)) {
+      const first = availableUnits[0];
+      const found = accounts.find((a) => a.unit === first);
+      if (found) {
+        setAccount(found);
+      }
+    }
+  }, [availableUnits]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!availableUnits.includes(account.unit)) {
+        const first = availableUnits[0];
+        const found = accounts.find((a) => a.unit === first);
+        if (found) {
+          setAccount(found);
+        }
+      }
+    }, [availableUnits, account.unit])
+  );
 
   if (!settings?.termsAccepted) {
     return (
