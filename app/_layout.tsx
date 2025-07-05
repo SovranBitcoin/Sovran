@@ -41,6 +41,7 @@ import { WalletsProvider } from 'components/providers/WalletsProviders';
 import { PricelistProvider } from 'components/providers/PricelistProvider';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
+import { useCashuDeeplink } from 'helper/hooks/useCashuDeeplink';
 
 registerAllSheets({ context: 'global' });
 
@@ -246,6 +247,8 @@ export default function RootLayout() {
   const { init: initializeNDK } = useNDK();
   const [appIsReady, setAppIsReady] = useState(false);
   const scaleRef = useRef(new Animated.Value(1));
+
+  useCashuDeeplink();
 
   // Load fonts
   const [fontsLoaded, fontsError] = useFonts(FONTS);
