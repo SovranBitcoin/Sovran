@@ -174,8 +174,13 @@ function ModalScreen() {
           break;
         case 'ecashSendConfirmation':
           // check balance
-          if (unit === 'sat' ? balance < amount : balance < amount) {
-            showMessage('insufficient_balance', { amount, unit, fee: 0 }, { emoji: '🚨' });
+          if (unit === 'sat' ? balance < amount : balance < amount * 100) {
+            showMessage(
+              'insufficient_balance',
+              { amount: unit === 'sat' ? amount : amount * 100, unit, fee: 0 },
+              { emoji: '🚨' }
+            );
+            setLoading(false);
             return;
           }
           SheetManager.show('transaction-message', {
