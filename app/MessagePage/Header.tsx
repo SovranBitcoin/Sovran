@@ -96,7 +96,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
               payload: {
                 buttons: [
                   {
-                    icon: 'la:user-minus',
+                    icon: 'majesticons:text',
                     text: 'Feed',
                     onPress: async () => {
                       navigation.navigate('feed', {
