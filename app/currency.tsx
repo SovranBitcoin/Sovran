@@ -43,7 +43,7 @@ function ModalScreen() {
   const { params } = useRoute();
   const navigation = useTypedNavigation();
 
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState(params?.amount || 0);
   const [loading, setLoading] = useState(false);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
@@ -53,7 +53,6 @@ function ModalScreen() {
 
   // Validate the amount whenever it changes
   useEffect(() => {
-    // Amount must be greater than 0 to be valid
     setIsValidAmount(amount > 0);
   }, [amount]);
 
@@ -102,6 +101,7 @@ function ModalScreen() {
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,
+      paymentRequest: params.paymentRequest,
       ...(params?.profile?.pubkey || params?.profile?.npub
         ? {
             p2pk: {
@@ -116,6 +116,7 @@ function ModalScreen() {
       ...params,
       token: transaction.token,
       amount: unit === 'sat' ? amount : amount * 100,
+      paymentRequest: params.paymentRequest,
     });
   };
 
@@ -206,6 +207,14 @@ function ModalScreen() {
     }
   };
 
+  useEffect(() => {
+    if (params?.paymentRequest && params?.amount) {
+      setIsValidAmount(true);
+      handleNext();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
@@ -228,6 +237,26 @@ function ModalScreen() {
   const renderButtons = () => {
     const isP2PK = params?.profile && params.to === 'ecashSendConfirmation';
     if (params.to === 'ecashSendConfirmation') {
+      // When triggered by a payment request only show the Next button
+      if (params?.paymentRequest) {
+        return (
+          <View style={styles.buttonContainer}>
+            <ButtonHandler
+              buttons={[
+                {
+                  text: 'Next',
+                  icon: 'lucide:arrow-right',
+                  variant: 'primary',
+                  onPress: handleNext,
+                  loading: loading,
+                  disabled: !isValidAmount,
+                },
+              ]}
+            />
+          </View>
+        );
+      }
+
       return (
         <View style={styles.buttonContainer}>
           <ButtonHandler
@@ -248,7 +277,7 @@ function ModalScreen() {
                 variant: 'primary',
                 onPress: handleNext,
                 loading: loading,
-                disabled: !isValidAmount, // Disable the button when amount is invalid
+                disabled: !isValidAmount,
               },
               ...(isP2PK
                 ? []
@@ -296,7 +325,9 @@ function ModalScreen() {
       title="Select Amount"
       buttons={
         <>
-          <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
+          {!params?.amount && (
+            <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
+          )}
           {renderButtons()}
         </>
       }>
@@ -308,11 +339,13 @@ function ModalScreen() {
             ? 'send'
             : 'receive'
         }
-        onChange={setAmount}
+        onChange={params?.amount ? undefined : setAmount}
       />
       <MintBalanceDisplay
         onMintSelected={handleMintSelected}
         unit={unit}
+        allowedMints={params?.mints}
+        allowedUnits={params?.allowedUnits}
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }

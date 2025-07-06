@@ -72,6 +72,7 @@ const useTransaction = (tx: TransactionData) => {
             unit: tx.unit,
             token: tx.token,
             amount: tx.amount,
+            paymentRequest: tx.paymentRequest,
           });
           return;
         }

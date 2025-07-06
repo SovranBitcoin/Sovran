@@ -45,6 +45,7 @@ export const useSendEncryptedDirectMessage = () => {
       unit: decodedRequest.unit as string,
       amount: decodedRequest.amount as number,
       to: pubkey,
+      paymentRequest: request,
     });
 
     const decodedToken = getDecodedToken(transaction.token);

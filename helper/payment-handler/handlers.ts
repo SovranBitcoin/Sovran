@@ -244,9 +244,19 @@ export const handleBarcode = async ({
     case 'ecash':
       return handleEcash({ data: scanning.data, unit });
     case 'paymentRequest':
-      return handlePaymentRequest({
-        request: scanning.data,
-      });
+      const decodedPaymentRequest = decodePaymentRequest(scanning.data);
+
+      return {
+        screen: 'currency',
+        params: {
+          unit: decodedPaymentRequest.unit,
+          amount: decodedPaymentRequest.amount,
+          mints: decodedPaymentRequest.mints,
+          allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
+          paymentRequest: scanning.data,
+          to: 'ecashSendConfirmation',
+        },
+      };
     case 'lightning':
       return handleLightning({
         data: scanning.data,

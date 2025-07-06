@@ -78,6 +78,7 @@ interface BaseEcashTransaction extends BaseTransaction {
 
 interface EcashSendTransaction extends BaseEcashTransaction {
   transactionType: 'send';
+  paymentRequest?: string;
   proofs: {
     keep: Proof[];
     send: Proof[];
@@ -371,12 +372,14 @@ export async function sendEcash({
   memo,
   to,
   p2pk,
+  paymentRequest,
 }: {
   amount: number;
   unit: string;
   memo?: string;
   to?: string;
   p2pk?: { pubkey?: string; privkey?: string };
+  paymentRequest?: string;
 }): Promise<EcashSendTransaction> {
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
@@ -463,6 +466,7 @@ export async function sendEcash({
       transactionType: 'send',
       unit,
       paid: false,
+      ...(paymentRequest ? { paymentRequest } : {}),
       nostr: {
         pubkey: to,
       },
