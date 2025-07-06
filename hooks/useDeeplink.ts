@@ -13,9 +13,13 @@ export const useDeeplink = () => {
   useEffect(() => {
     const urDecoder = new URDecoder();
 
+    const supportedSchemes = ['test://', 'sovran://', 'cashu://'];
+
     const handleUrl = async ({ url }: { url: string }) => {
-      if (!url || !url.startsWith('test://')) return;
-      const data = decodeURIComponent(url.replace('test://', ''));
+      if (!url) return;
+      const scheme = supportedSchemes.find((s) => url.startsWith(s));
+      if (!scheme) return;
+      const data = decodeURIComponent(url.replace(scheme, ''));
       await barcodeHandler({
         scanning: { data },
         navigation,

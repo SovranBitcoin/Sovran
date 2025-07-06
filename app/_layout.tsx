@@ -40,6 +40,7 @@ import { PricelistProvider } from 'components/providers/PricelistProvider';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
+import { useDeeplink } from 'hooks/useDeeplink';
 
 registerAllSheets({ context: 'global' });
 
@@ -206,6 +207,9 @@ export default function RootLayout() {
 
   // Load fonts
   const [fontsLoaded, fontsError] = useFonts();
+
+  // Set up deeplink handler
+  useDeeplink();
 
   // Handle font loading errors
   useEffect(() => {
