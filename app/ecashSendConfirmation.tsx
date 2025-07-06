@@ -112,10 +112,6 @@ export function EcashSendConfirmation({
       const { pubkey } = data as { pubkey: string };
 
       const decodedToken = getDecodedToken(token);
-      if (decodedToken.unit.toLowerCase() !== decoded.unit.toLowerCase()) {
-        showMessage('unit_mismatch', {}, { emoji: '🚨' });
-        return;
-      }
 
       await sendGiftWrappedEncryptedDirectMessage({
         message: JSON.stringify({

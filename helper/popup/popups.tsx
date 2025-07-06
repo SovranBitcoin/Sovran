@@ -218,11 +218,6 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'The payment request does not specify a mint.',
     type: MESSAGE_TYPES.ERROR,
   },
-  unit_mismatch: {
-    title: 'Currency Mismatch',
-    text: 'The payment request currency does not match the token currency.',
-    type: MESSAGE_TYPES.ERROR,
-  },
 
   // eSIM Related
   esim_error: {

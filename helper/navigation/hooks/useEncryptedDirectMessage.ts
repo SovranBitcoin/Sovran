@@ -49,9 +49,6 @@ export const useSendEncryptedDirectMessage = () => {
     });
 
     const decodedToken = getDecodedToken(transaction.token);
-    if (decodedToken.unit.toLowerCase() !== decodedRequest.unit.toLowerCase()) {
-      throw new Error('unit_mismatch');
-    }
 
     sendGiftWrappedEncryptedDirectMessage({
       message: JSON.stringify({
