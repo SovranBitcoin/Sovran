@@ -385,6 +385,13 @@ export async function sendEcash({
   const selectedMint = memoizedGetSelectedMint(state);
   const profile = memoizedGetCurrentProfile(state);
 
+  if (paymentRequest) {
+    const decoded = decodePaymentRequest(paymentRequest);
+    if (decoded.unit.toLowerCase() !== unit.toLowerCase()) {
+      throw new AppError('unit_mismatch', 'unit_mismatch');
+    }
+  }
+
   // Retry logic for wallet operations
   const attemptSend = async (forceRefresh = false): Promise<EcashSendTransaction> => {
     const currentProofs = memoizedGetProofs(unit)(state);
