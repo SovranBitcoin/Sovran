@@ -206,7 +206,11 @@ function ModalScreen() {
       <Text weight="bold" size={16} style={styles.sectionTitle}>
         Pay with
       </Text>
-      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
+      <MintBalanceDisplay
+        onMintSelected={handleMintSelected}
+        unit={unit}
+        context="modal"
+      />
       <View style={styles.cardContainer}>
         <Card variant="warning" message="Ensure your phone supports eSIMs." theme={theme} />
       </View>

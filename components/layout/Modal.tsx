@@ -22,9 +22,12 @@ import { useNavigation } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
+import { SheetProvider } from 'react-native-actions-sheet';
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 
-registerAllSheets({ context: undefined });
+// Register all action sheets within the modal context so that
+// sheets opened from a modal are scoped correctly
+registerAllSheets({ context: 'modal' });
 
 const headerHeight = Constants.statusBarHeight ?? 0;
 
@@ -155,16 +158,18 @@ export default function Modal({
     React.isValidElement(children) ? children : <View>{children}</View>;
 
   return (
-    <View
-      style={[
-        {
-          position: 'relative',
-          display: 'flex',
-          flex: 1,
-          backgroundColor: bgColor,
-        },
-        childrenStyles,
-      ]}>
+    <SheetProvider context="modal">
+      <View
+        style={[
+          {
+            position: 'relative',
+            display: 'flex',
+            flex: 1,
+            backgroundColor: bgColor,
+          },
+          childrenStyles,
+        ]}
+      >
       {renderHeader()}
 
       <FlatList
@@ -202,5 +207,6 @@ export default function Modal({
         {buttons}
       </View>
     </View>
+    </SheetProvider>
   );
 }

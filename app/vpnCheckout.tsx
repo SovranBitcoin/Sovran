@@ -214,7 +214,11 @@ function ModalScreen() {
         }}>
         Pay with
       </Text>
-      <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
+      <MintBalanceDisplay
+        onMintSelected={handleMintSelected}
+        unit={unit}
+        context="modal"
+      />
       <View style={{ margin: 16 }}>
         <Card
           variant="warning"
