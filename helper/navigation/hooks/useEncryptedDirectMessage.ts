@@ -2,20 +2,9 @@ import { sendEcash } from 'helper/cashu/pay';
 import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
 import { NDKEvent, NDKKind, ProfilePointer } from '@nostr-dev-kit/ndk';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { nip19, nip59, SimplePool } from 'nostr-tools';
+import { nip19, nip59 } from 'nostr-tools';
 import { useSelector } from 'react-redux';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-
-const getRelayPool = function () {
-  if (!_pool) {
-    _pool = new SimplePool();
-    return _pool as SimplePool;
-  }
-
-  return _pool as SimplePool;
-};
-
-const relays = ['wss://relay.minibits.cash', 'wss://relay.primal.net', 'wss://relay.damus.io'];
 
 export const useSendEncryptedDirectMessage = () => {
   const { ndk } = useNDK();
