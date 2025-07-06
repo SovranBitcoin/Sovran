@@ -102,6 +102,7 @@ function ModalScreen() {
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,
+      paymentRequest: params.paymentRequest,
       ...(params?.profile?.pubkey || params?.profile?.npub
         ? {
             p2pk: {

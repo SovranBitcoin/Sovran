@@ -79,6 +79,9 @@ export function EcashSendConfirmation({
     })
   );
 
+  const resolvedPaymentRequest =
+    paymentRequest || getCurrentTransaction[0]?.paymentRequest;
+
   const handleNFCSend = async () => {
     await write(token);
   };
@@ -97,10 +100,11 @@ export function EcashSendConfirmation({
   };
 
   const handleSendNostr = async () => {
-    if (!paymentRequest) return;
+    const request = resolvedPaymentRequest;
+    if (!request) return;
     try {
       setSendingNostr(true);
-      const decoded = decodePaymentRequest(paymentRequest);
+      const decoded = decodePaymentRequest(request);
       const receiverTarget = decoded.getTransport(
         PaymentRequestTransportType.NOSTR
       ).target;
@@ -281,7 +285,7 @@ export function EcashSendConfirmation({
                       variant: 'secondary',
                       onPress: handleNFCSend,
                     },
-                    ...(paymentRequest
+                    ...(resolvedPaymentRequest
                       ? [
                           {
                             text: 'Send via Nostr',
