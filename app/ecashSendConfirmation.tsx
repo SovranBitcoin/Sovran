@@ -106,8 +106,16 @@ export function EcashSendConfirmation({
       ).target;
       const { data } = nip19.decode(receiverTarget);
       const { pubkey } = data as { pubkey: string };
+
+      const decodedToken = getDecodedToken(token);
+
       await sendGiftWrappedEncryptedDirectMessage({
-        message: token,
+        message: JSON.stringify({
+          mint: decodedToken.mint,
+          unit: decodedToken.unit,
+          proofs: decodedToken.proofs,
+          id: decoded.id,
+        }),
         recipient: pubkey,
         nsec: currentProfile.nsec,
       });
