@@ -126,7 +126,7 @@ export function EcashReceiveConfirmation({
   const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
-    navigation.navigate('Tabs', { screen: 'index' });
+    navigation.goBack();
   };
 
   const handleRedeem = async () => {

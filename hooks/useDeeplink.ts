@@ -1,37 +1,64 @@
-import { useEffect } from 'react';
-import { Linking } from 'react-native';
-import { useNavigation } from 'expo-router';
-import { URDecoder } from '@gandlaf21/bc-ur';
+import { useEffect, useState } from 'react';
+import * as Linking from 'expo-linking';
+import { barcodeHandler } from 'helper/payment-handler/handlers';
 import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { barcodeHandler } from 'helper/payment-handler/handlers';
+import { useNavigation } from 'expo-router';
+import { URDecoder } from '@gandlaf21/bc-ur';
 
 export const useDeeplink = () => {
-  const navigation = useNavigation();
   const selectedMint = useSelector(memoizedGetSelectedMint);
+  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
+  const navigation = useNavigation();
+  const url = Linking.useURL();
 
   useEffect(() => {
-    const urDecoder = new URDecoder();
+    (async () => {
+      if (url) {
+        const parsed = Linking.parse(url);
 
-    const handleUrl = async ({ url }: { url: string }) => {
-      if (!url || !url.startsWith('test://')) return;
-      const data = decodeURIComponent(url.replace('test://', ''));
-      await barcodeHandler({
-        scanning: { data },
-        navigation,
-        urDecoder,
-        unit: 'sat',
-        selectedMint,
-        setLoading: () => { },
-      });
-    };
+        if (parsed.hostname !== 'expo-development-client' && parsed.hostname) {
+          try {
+            await barcodeHandler({
+              scanning: { data: parsed.hostname },
+              navigation,
+              urDecoder,
+              unit: 'sat',
+              selectedMint,
+              setLoading: () => { },
+            });
+          } catch (err) { }
+        }
+      }
+    })();
+  }, [url]);
 
-    const subscription = Linking.addEventListener('url', handleUrl);
+  // useEffect(() => {
+  //   const urDecoder = new URDecoder();
 
-    Linking.getInitialURL().then((url) => {
-      if (url) handleUrl({ url });
-    });
+  //   const supportedSchemes = ['test://', 'sovran://', 'cashu://'];
 
-    return () => subscription.remove();
-  }, [navigation, selectedMint]);
+  //   const handleUrl = async ({ url }: { url: string }) => {
+  //     if (!url) return;
+  //     const scheme = supportedSchemes.find((s) => url.startsWith(s));
+  //     if (!scheme) return;
+  //     const data = decodeURIComponent(url.replace(scheme, ''));
+  //     await barcodeHandler({
+  //       scanning: { data },
+  //       navigation,
+  //       urDecoder,
+  //       unit: 'sat',
+  //       selectedMint,
+  //       setLoading: () => { },
+  //     });
+  //   };
+
+  //   const subscription = Linking.addEventListener('url', handleUrl);
+
+  //   Linking.getInitialURL().then((url) => {
+  //     if (url) handleUrl({ url });
+  //   });
+
+  //   return () => subscription.remove();
+  // }, [navigation, selectedMint]);
 };

@@ -35,6 +35,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/layout/AccountPagerView';
 import { Card } from 'components/common/Card';
+import { useDeeplink } from 'hooks/useDeeplink';
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -160,6 +161,8 @@ function TabOneScreen() {
   }, [navigation, account, accounts]);
 
   const image = useSelector(memoizedGetBackgroundImage);
+
+  useDeeplink();
 
   if (!settings?.termsAccepted) {
     return (
