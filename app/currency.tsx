@@ -209,7 +209,7 @@ function ModalScreen() {
   };
 
   useEffect(() => {
-    if (params?.paymentRequest) {
+    if (params?.paymentRequest && params?.amount) {
       setIsValidAmount(true);
       handleNext();
     }
@@ -238,6 +238,26 @@ function ModalScreen() {
   const renderButtons = () => {
     const isP2PK = params?.profile && params.to === 'ecashSendConfirmation';
     if (params.to === 'ecashSendConfirmation') {
+      // When triggered by a payment request only show the Next button
+      if (params?.paymentRequest) {
+        return (
+          <View style={styles.buttonContainer}>
+            <ButtonHandler
+              buttons={[
+                {
+                  text: 'Next',
+                  icon: 'lucide:arrow-right',
+                  variant: 'primary',
+                  onPress: handleNext,
+                  loading: loading,
+                  disabled: !isValidAmount,
+                },
+              ]}
+            />
+          </View>
+        );
+      }
+
       return (
         <View style={styles.buttonContainer}>
           <ButtonHandler
@@ -258,7 +278,7 @@ function ModalScreen() {
                 variant: 'primary',
                 onPress: handleNext,
                 loading: loading,
-                disabled: !isValidAmount, // Disable the button when amount is invalid
+                disabled: !isValidAmount,
               },
               ...(isP2PK
                 ? []
