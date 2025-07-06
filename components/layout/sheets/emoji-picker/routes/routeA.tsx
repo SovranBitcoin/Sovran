@@ -4,7 +4,7 @@ import { TouchableOpacity, StyleSheet } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';
@@ -47,7 +47,9 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
       <Text weight="bold" style={[styles.title, { marginTop: 24 }]}>
         Encode as Emoji
       </Text>
+      <Spacer size={12} />
       <Card message={"These encoded emoji's don't work on every platform."} variant="info" />
+      <Spacer size={12} />
       <ScrollView contentContainerStyle={styles.gridContainer}>
         {emojiRows.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.row}>
