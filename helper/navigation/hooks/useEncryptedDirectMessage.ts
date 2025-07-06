@@ -5,6 +5,7 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { nip19, nip59 } from 'nostr-tools';
 import { useSelector } from 'react-redux';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 
 export const useSendEncryptedDirectMessage = () => {
   const { ndk } = useNDK();
@@ -17,27 +18,20 @@ export const useSendEncryptedDirectMessage = () => {
     message: string;
     recipient: string;
   }) => {
-    console.log(message, recipient);
-    try {
-      const privKeyBytes: Uint8Array = nip19.decode(currentProfile.nsec).data as Uint8Array;
+    const privKeyBytes: Uint8Array = nip19.decode(currentProfile.nsec).data as Uint8Array;
 
-      console.log(privKeyBytes);
-      const directMessageEvent = {
-        created_at: Math.ceil(Date.now() / 1000),
-        kind: NDKKind.EncryptedDirectMessage,
-        tags: [['p', recipient]],
-        content: message,
-      };
-      console.log(directMessageEvent);
+    const directMessageEvent = {
+      created_at: Math.ceil(Date.now() / 1000),
+      kind: NDKKind.EncryptedDirectMessage,
+      tags: [['p', recipient]],
+      content: message,
+    };
 
-      const wrappedEvent = nip59.wrapEvent(directMessageEvent, privKeyBytes, recipient);
+    const wrappedEvent = nip59.wrapEvent(directMessageEvent, privKeyBytes, recipient);
 
-      const e = new NDKEvent(ndk, { ...wrappedEvent });
+    const e = new NDKEvent(ndk, { ...wrappedEvent });
 
-      e.publish();
-    } catch (err) {
-      console.log('ERROR123', err);
-    }
+    e.publish();
   };
 
   const sendPaymentRequest = async ({ request }: { request: string }) => {
@@ -54,7 +48,8 @@ export const useSendEncryptedDirectMessage = () => {
     });
 
     const decodedToken = getDecodedToken(transaction.token);
-    sendEncryptedDirectMessage({
+
+    sendGiftWrappedEncryptedDirectMessage({
       message: JSON.stringify({
         mint: decodedToken.mint,
         unit: decodedToken.unit,
@@ -62,6 +57,7 @@ export const useSendEncryptedDirectMessage = () => {
         id: decodedRequest.id,
       }),
       recipient: pubkey,
+      nsec: currentProfile.nsec,
     });
   };
 
