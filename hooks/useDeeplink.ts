@@ -5,8 +5,10 @@ import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { URDecoder } from '@gandlaf21/bc-ur';
+import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 export const useDeeplink = () => {
+  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const navigation = useNavigation();
@@ -14,7 +16,7 @@ export const useDeeplink = () => {
 
   useEffect(() => {
     (async () => {
-      if (url) {
+      if (url && currentProfile.pubkey) {
         const parsed = Linking.parse(url);
 
         if (parsed.hostname !== 'expo-development-client' && parsed.hostname) {
@@ -31,7 +33,7 @@ export const useDeeplink = () => {
         }
       }
     })();
-  }, [url]);
+  }, [url, currentProfile.pubkey]);
 
   // useEffect(() => {
   //   const urDecoder = new URDecoder();
