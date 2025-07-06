@@ -3,11 +3,14 @@ const { withMonicon } = require('@monicon/metro');
 const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
-config.resolver.unstable_conditionNames = [ 'browser', 'require', 'react-native', ]
+config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
 
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'majesticons:text',
+    'la:user-plus',
+    'la:user-minus',
     'uil:invoice',
     'material-symbols:update-rounded',
     'ic:round-cloud-sync',
@@ -80,7 +83,7 @@ const configWithMonicon = withMonicon(config, {
     'fluent:add-24-filled',
     'material-symbols:refresh-rounded',
     'ic:round-refresh',
-  ]
+  ],
 });
 
 // Then apply NativeWind
