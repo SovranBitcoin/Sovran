@@ -30,6 +30,7 @@ interface Props {
    */
   updateSelectedMint?: boolean;
   allowedMints?: string[];
+  allowedUnits?: string[];
   style?: StyleProp<ViewStyle>;
 }
 
@@ -39,6 +40,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
   requireBalance = true,
   updateSelectedMint = true,
   allowedMints,
+  allowedUnits,
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -55,6 +57,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
         requireBalance,
         updateSelectedMint,
         allowedMints,
+        allowedUnits,
         onMintPress: updateSelectedMint ? undefined : onMintSelected,
       },
       onClose: (mint?: { id: string; unit: string }) => {

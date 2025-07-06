@@ -252,6 +252,7 @@ export const handleBarcode = async ({
           unit: decodedPaymentRequest.unit,
           amount: decodedPaymentRequest.amount,
           mints: decodedPaymentRequest.mints,
+          allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
           paymentRequest: scanning.data,
           to: 'ecashSendConfirmation',
         },

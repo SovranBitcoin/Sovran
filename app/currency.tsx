@@ -56,7 +56,6 @@ function ModalScreen() {
     setIsValidAmount(amount > 0);
   }, [amount]);
 
-
   const urDecoder = new URDecoder();
 
   const handleMintSelected = async (mint, balance) => {
@@ -346,6 +345,7 @@ function ModalScreen() {
         onMintSelected={handleMintSelected}
         unit={unit}
         allowedMints={params?.mints}
+        allowedUnits={params?.allowedUnits}
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }

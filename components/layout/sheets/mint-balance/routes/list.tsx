@@ -72,6 +72,8 @@ const ListRoute = () => {
   const payload = useSheetPayload('mint-balance');
   const navigation = useTypedNavigation();
 
+  console.log(payload);
+
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const allowedBalances = useMemo(
     () =>
@@ -83,12 +85,13 @@ const ListRoute = () => {
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
 
-  const currencies: string[] = _.uniq(
-    allowedBalances.map((b) => b.unit?.toUpperCase())
-  )
+  const currencies: string[] = _.uniq(allowedBalances.map((b) => b.unit?.toUpperCase()))
     .filter(Boolean)
     .filter((unit) => {
       return ['SAT', 'USD', 'EUR', 'GBP'].includes(unit);
+    })
+    .filter((unit) => {
+      return payload?.allowedUnits ? payload?.allowedUnits?.includes(unit) : true;
     });
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
