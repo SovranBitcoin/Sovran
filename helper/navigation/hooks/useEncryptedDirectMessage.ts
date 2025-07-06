@@ -1,11 +1,21 @@
 import { sendEcash } from 'helper/cashu/pay';
 import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
-import { bytesToHex } from '@noble/hashes/utils';
-import { NDKEvent, NDKKind, NDKPrivateKeySigner, ProfilePointer } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind, ProfilePointer } from '@nostr-dev-kit/ndk';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { nip04, nip19 } from 'nostr-tools';
+import { nip19, nip59, SimplePool } from 'nostr-tools';
 import { useSelector } from 'react-redux';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+
+const getRelayPool = function () {
+  if (!_pool) {
+    _pool = new SimplePool();
+    return _pool as SimplePool;
+  }
+
+  return _pool as SimplePool;
+};
+
+const relays = ['wss://relay.minibits.cash', 'wss://relay.primal.net', 'wss://relay.damus.io'];
 
 export const useSendEncryptedDirectMessage = () => {
   const { ndk } = useNDK();
@@ -18,17 +28,27 @@ export const useSendEncryptedDirectMessage = () => {
     message: string;
     recipient: string;
   }) => {
-    const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
-    ndk.signer = new NDKPrivateKeySigner(bytesToHex(privKeyBytes));
-    const event = new NDKEvent(ndk);
-    ndk.connect();
-    event.kind = NDKKind.EncryptedDirectMessage;
-    event.content = await nip04.encrypt(bytesToHex(privKeyBytes), recipient, message);
-    event.tags = [['p', recipient]];
-    event.sign();
+    console.log(message, recipient);
     try {
-      await event.publish();
-    } catch (e) {}
+      const privKeyBytes: Uint8Array = nip19.decode(currentProfile.nsec).data as Uint8Array;
+
+      console.log(privKeyBytes);
+      const directMessageEvent = {
+        created_at: Math.ceil(Date.now() / 1000),
+        kind: NDKKind.EncryptedDirectMessage,
+        tags: [['p', recipient]],
+        content: message,
+      };
+      console.log(directMessageEvent);
+
+      const wrappedEvent = nip59.wrapEvent(directMessageEvent, privKeyBytes, recipient);
+
+      const e = new NDKEvent(ndk, { ...wrappedEvent });
+
+      e.publish();
+    } catch (err) {
+      console.log('ERROR123', err);
+    }
   };
 
   const sendPaymentRequest = async ({ request }: { request: string }) => {
@@ -38,13 +58,13 @@ export const useSendEncryptedDirectMessage = () => {
 
     const pubkey: string = (result.data as ProfilePointer).pubkey;
 
-    const token = await sendEcash({
+    const transaction = await sendEcash({
       unit: decodedRequest.unit as string,
       amount: decodedRequest.amount as number,
       to: pubkey,
     });
 
-    const decodedToken = getDecodedToken(token);
+    const decodedToken = getDecodedToken(transaction.token);
     sendEncryptedDirectMessage({
       message: JSON.stringify({
         mint: decodedToken.mint,
