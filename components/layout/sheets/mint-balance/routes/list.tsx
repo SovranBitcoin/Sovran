@@ -73,13 +73,10 @@ const ListRoute = () => {
   const navigation = useTypedNavigation();
 
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  const VALID_UNITS = ['sat', 'usd', 'eur', 'gbp'];
   const allowedBalances = useMemo(
     () =>
-      balances.filter(
-        (b) =>
-          VALID_UNITS.includes(String(b.unit).toLowerCase()) &&
-          (payload?.allowedMints ? payload.allowedMints.includes(b.mintUrl) : true)
+      balances.filter((b) =>
+        payload?.allowedMints ? payload.allowedMints.includes(b.mintUrl) : true
       ),
     [balances, payload?.allowedMints]
   );
