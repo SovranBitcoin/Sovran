@@ -198,12 +198,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'paymentRequestSendConfirmation',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'lightningReceiveConfirmation',
     options: {
       presentation: 'modal',

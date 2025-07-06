@@ -73,10 +73,19 @@ const ListRoute = () => {
   const navigation = useTypedNavigation();
 
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  const allowedBalances = useMemo(
+    () =>
+      balances.filter((b) =>
+        payload?.allowedMints ? payload.allowedMints.includes(b.mintUrl) : true
+      ),
+    [balances, payload?.allowedMints]
+  );
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
 
-  const currencies: string[] = _.uniq(balances.map((b) => b.unit?.toUpperCase()))
+  const currencies: string[] = _.uniq(
+    allowedBalances.map((b) => b.unit?.toUpperCase())
+  )
     .filter(Boolean)
     .filter((unit) => {
       return ['SAT', 'USD', 'EUR', 'GBP'].includes(unit);
@@ -88,10 +97,10 @@ const ListRoute = () => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const filteredMints = useMemo(() => {
-    return balances
+    return allowedBalances
       .filter((b) => b.unit?.toUpperCase() === selectedCurrency)
       .sort((a, b) => b.amount - a.amount);
-  }, [balances, selectedCurrency]);
+  }, [allowedBalances, selectedCurrency]);
 
   const handleMintSelect = async (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);

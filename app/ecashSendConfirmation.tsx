@@ -10,7 +10,14 @@ import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import {
+  getDecodedToken,
+  getEncodedTokenV4,
+  decodePaymentRequest,
+  PaymentRequestTransportType,
+} from '@cashu/cashu-ts';
+import { nip19 } from 'nostr-tools';
+import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import _, { capitalize } from 'lodash';
 import {
   memoizedGetTransactionByMatcher,
@@ -42,17 +49,20 @@ export function EcashSendConfirmation({
   unit,
   amount,
   token,
+  paymentRequest,
   extraButtons = [],
 }: {
   unit: string;
   amount: number;
   token: string;
+  paymentRequest?: string;
   extraButtons?: ButtonHandlerButton[];
 }) {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [sendingNostr, setSendingNostr] = useState(false);
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
 
@@ -84,6 +94,26 @@ export function EcashSendConfirmation({
       message: 'cashu://' + token,
     });
     onClose();
+  };
+
+  const handleSendNostr = async () => {
+    if (!paymentRequest) return;
+    try {
+      setSendingNostr(true);
+      const decoded = decodePaymentRequest(paymentRequest);
+      const receiverTarget = decoded.getTransport(
+        PaymentRequestTransportType.NOSTR
+      ).target;
+      const { data } = nip19.decode(receiverTarget);
+      const { pubkey } = data as { pubkey: string };
+      await sendGiftWrappedEncryptedDirectMessage({
+        message: token,
+        recipient: pubkey,
+        nsec: currentProfile.nsec,
+      });
+    } finally {
+      setSendingNostr(false);
+    }
   };
 
   const handleCancelSend = async (onClose) => {
@@ -243,6 +273,17 @@ export function EcashSendConfirmation({
                       variant: 'secondary',
                       onPress: handleNFCSend,
                     },
+                    ...(paymentRequest
+                      ? [
+                          {
+                            text: 'Send via Nostr',
+                            icon: 'mdi:send',
+                            variant: 'primary',
+                            loading: sendingNostr,
+                            onPress: handleSendNostr,
+                          },
+                        ]
+                      : []),
                     // {
                     //   text: 'Check Status',
                     //   icon: 'humbleicons:refresh',
@@ -356,8 +397,16 @@ export function EcashSendConfirmation({
 }
 
 function ModalScreen() {
-  const { unit, amount, token } = useTypedRoute<'ecashSendConfirmation'>();
-  return <EcashSendConfirmation unit={unit} amount={amount} token={token} />;
+  const { unit, amount, token, paymentRequest } =
+    useTypedRoute<'ecashSendConfirmation'>();
+  return (
+    <EcashSendConfirmation
+      unit={unit}
+      amount={amount}
+      token={token}
+      paymentRequest={paymentRequest}
+    />
+  );
 }
 
 export default withSheetProvider(ModalScreen);

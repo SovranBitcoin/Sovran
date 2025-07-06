@@ -11,6 +11,7 @@ export type NavigationParams = {
     unit: string;
     amount: number;
     token: string;
+    paymentRequest?: string;
   };
   lightningReceiveConfirmation: {
     request: string;
