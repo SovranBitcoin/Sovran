@@ -27,6 +27,7 @@ const MintDetailPage = () => {
 
   const { wallet, loading, error } = useWallet({
     mintUrl: params?.mintUrl,
+    forceRefresh: true,
   });
 
   const handleCopy = async (text: string) => {

@@ -18,8 +18,11 @@ export const useDeeplink = () => {
     (async () => {
       if (url && currentProfile.pubkey) {
         const parsed = Linking.parse(url);
-
-        if (parsed.hostname !== 'expo-development-client' && parsed.hostname) {
+        if (
+          ['cashu', 'sovran'].includes(parsed.scheme) &&
+          parsed.hostname !== 'expo-development-client' &&
+          parsed.hostname
+        ) {
           try {
             await barcodeHandler({
               scanning: { data: parsed.hostname },
