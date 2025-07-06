@@ -14,23 +14,40 @@ import { useSendEncryptedDirectMessage } from 'helper/navigation/hooks/useEncryp
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
+import { TransactionBuilder } from 'helper/redux/cashu';
 
 function ModalScreen() {
+  const { request, unit, amount, to } = useTypedRoute<'paymentRequestSendConfirmation'>();
+  return (
+    <PaymentRequestSendConfirmation
+      transaction={
+        new TransactionBuilder({
+          request,
+          unit,
+          amount,
+          to,
+          transactionType: 'send',
+        })
+      }
+    />
+  );
+}
+
+function PaymentRequestSendConfirmation({ transaction }) {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
-  const { request, unit, amount, to } = useTypedRoute<'paymentRequestSendConfirmation'>();
   const [loading, setLoading] = useState(false);
   const { sendPaymentRequest } = useSendEncryptedDirectMessage();
 
-  const isSats = unit === 'sat';
-  const currency = isSats ? 'BTC' : unit.toUpperCase();
-  const denomination = isSats ? 'sats' : unit;
+  const isSats = transaction.unit === 'sat';
+  const currency = isSats ? 'BTC' : transaction.unit.toUpperCase();
+  const denomination = isSats ? 'sats' : transaction.unit;
 
   const formatAmount = (displayDenomination) => {
     return formatCurrency(
       {
         currency,
-        value: amount,
+        value: transaction.amount,
         denomination,
       },
       {
@@ -44,16 +61,16 @@ function ModalScreen() {
 
   const handleSendPaymentRequest = async () => {
     setLoading(true);
-    await sendPaymentRequest({ request });
+    await sendPaymentRequest({ request: transaction.request });
     setLoading(false);
   };
 
   const handleCancel = () => {
-    navigation.navigate('Tabs', { screen: 'index' });
+    navigation.goBack();
   };
 
   const transparentViewStyle = { backgroundColor: 'transparent' };
-  const decodedRequest = decodePaymentRequest(request);
+  const decodedRequest = decodePaymentRequest(transaction.request);
 
   return (
     <Modal
@@ -80,13 +97,7 @@ function ModalScreen() {
         </View>
       }>
       <View style={transparentViewStyle}>
-        <TransactionHeader
-          pubkey={to}
-          transactionType="send"
-          amount={amount}
-          unit={unit}
-          request={request}
-        />
+        <TransactionHeader transaction={transaction} />
 
         <Section
           items={[
