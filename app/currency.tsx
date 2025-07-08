@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
@@ -55,6 +55,7 @@ function ModalScreen() {
       params?.mints ? params.mints.includes(selectedMint) : true,
     [params?.mints, selectedMint]
   );
+  const autoNextRef = useRef(false);
 
   // Validate the amount whenever it changes
   useEffect(() => {
@@ -213,7 +214,9 @@ function ModalScreen() {
   };
 
   useEffect(() => {
+    if (autoNextRef.current) return;
     if (params?.paymentRequest && params?.amount && isMintValid) {
+      autoNextRef.current = true;
       setIsValidAmount(true);
       handleNext();
     }
