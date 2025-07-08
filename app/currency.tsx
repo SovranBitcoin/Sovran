@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
@@ -50,6 +50,11 @@ function ModalScreen() {
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+  const isMintValid = useMemo(
+    () =>
+      params?.mints ? params.mints.includes(selectedMint) : true,
+    [params?.mints, selectedMint]
+  );
 
   // Validate the amount whenever it changes
   useEffect(() => {
@@ -208,12 +213,12 @@ function ModalScreen() {
   };
 
   useEffect(() => {
-    if (params?.paymentRequest && params?.amount) {
+    if (params?.paymentRequest && params?.amount && isMintValid) {
       setIsValidAmount(true);
       handleNext();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isMintValid]);
 
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
@@ -249,7 +254,7 @@ function ModalScreen() {
                   variant: 'primary',
                   onPress: handleNext,
                   loading: loading,
-                  disabled: !isValidAmount,
+                  disabled: !isValidAmount || !isMintValid,
                 },
               ]}
             />
@@ -277,7 +282,7 @@ function ModalScreen() {
                 variant: 'primary',
                 onPress: handleNext,
                 loading: loading,
-                disabled: !isValidAmount,
+                disabled: !isValidAmount || !isMintValid,
               },
               ...(isP2PK
                 ? []
@@ -310,7 +315,7 @@ function ModalScreen() {
               variant: 'primary',
               loading: loading,
               onPress: handleNext,
-              disabled: !isValidAmount, // Disable the button when amount is invalid
+              disabled: !isValidAmount || !isMintValid, // Disable the button when amount is invalid or mint is not valid
             },
           ]}
         />
@@ -346,6 +351,7 @@ function ModalScreen() {
         unit={unit}
         allowedMints={params?.mints}
         allowedUnits={params?.allowedUnits}
+        requireValidMint={!!params?.paymentRequest}
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }
