@@ -46,6 +46,8 @@ import { getPublicKey, nip19 } from 'nostr-tools';
 import { v4 as uuidv4 } from 'uuid';
 import { SheetManager } from 'react-native-actions-sheet';
 import { bytesToHex } from '@noble/hashes/utils';
+import { toResult, toResultSync } from 'helper/toResult';
+import { ok, err, Result } from 'neverthrow';
 
 // TYPES
 
@@ -267,21 +269,29 @@ export async function getMeltQuote({
   unit: string;
   mintUrl: string;
   mppAmount?: number;
-}): Promise<MeltQuoteResponse> {
-  const wallet = await getWallet({ unit, mintUrl, profile: null });
+}): Promise<Result<MeltQuoteResponse, Error>> {
+  const walletRes = await toResult(
+    getWallet({ unit, mintUrl, profile: null })
+  );
+  if (walletRes.isErr()) return err(walletRes.error);
+  const wallet = walletRes.value;
   const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
   const keysetId = activeKeyset.id;
   wallet.keysetId = keysetId;
 
   const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
 
-  const meltQuote = await wallet.mint.createMeltQuote({
-    request: pr,
-    unit,
-    ...options,
-  });
+  const meltQuoteRes = await toResult(
+    wallet.mint.createMeltQuote({
+      request: pr,
+      unit,
+      ...options,
+    })
+  );
 
-  return meltQuote;
+  if (meltQuoteRes.isErr()) return err(meltQuoteRes.error);
+
+  return ok(meltQuoteRes.value);
 }
 
 export async function sendLightning({

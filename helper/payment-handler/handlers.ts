@@ -134,11 +134,15 @@ const handleLightning = async ({
   }
 
   if (amount) {
-    const meltQuote = await getMeltQuote({
+    const meltQuoteRes = await getMeltQuote({
       pr: lnurl,
       unit,
       mintUrl: selectedMint,
     });
+    if (meltQuoteRes.isErr()) {
+      return err('general_error');
+    }
+    const meltQuote = meltQuoteRes.value;
     const totalAmount = amount + meltQuote.fee_reserve;
     if (balance !== undefined && balance < totalAmount) {
       return err('insufficient_balance');

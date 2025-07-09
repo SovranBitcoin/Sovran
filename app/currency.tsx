@@ -66,16 +66,10 @@ function ModalScreen() {
   const urDecoder = new URDecoder();
 
   const handleMintSelected = async (mint, balance) => {
-    try {
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-      const newUnit = mint.unit.toLowerCase();
-      setUnit(newUnit);
-      navigation.setParams({ ...params, unit: newUnit });
-    } catch (error) {
-      showMessage('general_error', {}, { emoji: '🚨' });
-
-      throw error;
-    }
+    dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    const newUnit = mint.unit.toLowerCase();
+    setUnit(newUnit);
+    navigation.setParams({ ...params, unit: newUnit });
   };
 
   const handleLightningReceive = async ({ memo }) => {
