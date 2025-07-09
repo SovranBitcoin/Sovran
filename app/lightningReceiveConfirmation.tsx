@@ -20,6 +20,7 @@ import {
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { getWallet, getRawExpiry } from 'helper/cashuClient';
+import { toResult } from 'helper/toResult';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -404,21 +405,32 @@ export function LightningReceiveConfirmation({
   // const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const handleCheckStatus = async (onClose, forceRefresh) => {
-    try {
-      const currentTx = getCurrentTransaction[0];
-      const wallet = await getWallet({
-        unit: currentTx.unit,
-        mintUrl: currentTx.mintUrl,
-        profile: null,
-        forceRefresh,
-      });
-      const activeKeyset = wallet.getActiveKeyset(
-        wallet.keysets.filter((key) => key.unit === currentTx.unit)
-      );
-      const keysetId = activeKeyset.id;
-      wallet.keysetId = keysetId;
+    const currentTx = getCurrentTransaction[0];
+    const walletRes = await getWallet({
+      unit: currentTx.unit,
+      mintUrl: currentTx.mintUrl,
+      profile: null,
+      forceRefresh,
+    });
+    if (walletRes.isErr()) {
+      if (walletRes.error.message === 'keyset id inactive.') {
+        handleCheckStatus(onClose, true);
+      }
+      return;
+    }
+    const wallet = walletRes.value;
+    const activeKeyset = wallet.getActiveKeyset(
+      wallet.keysets.filter((key) => key.unit === currentTx.unit)
+    );
+    const keysetId = activeKeyset.id;
+    wallet.keysetId = keysetId;
 
-      const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
+    const statusRes = await toResult(wallet.checkMintQuote(currentTx.mintQuote?.quote));
+    if (statusRes.isErr()) {
+      showMessage(statusRes.error.message);
+      return;
+    }
+    const status = statusRes.value;
 
       if (status.state === 'PAID') {
         const profileId = store.getState().nostr?.currentProfile?.id;
@@ -486,12 +498,6 @@ export function LightningReceiveConfirmation({
       } else {
         showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
-    } catch (error) {
-      if (error.message === 'keyset id inactive.') {
-        handleCheckStatus(onClose, true);
-      } else {
-      }
-    }
   };
 
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });

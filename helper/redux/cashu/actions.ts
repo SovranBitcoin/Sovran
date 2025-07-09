@@ -1,4 +1,5 @@
 import { getMint } from 'helper/cashuClient';
+import { toResult } from 'helper/toResult';
 import {
   ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,
@@ -175,72 +176,68 @@ export const ensureProfileExistsAction = (profileId: number) => ({
 
 export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
   return async (dispatch) => {
-    try {
-      const mint = getMint({ mintUrl });
-
-      // Fetch the keyset from the provided mintUrl if not found in cache
-      const keysets = (await (await mint).getKeySets()).keysets;
-      const keys = (await (await mint).getKeys()).keysets;
-
-      // Step 2: Set the keysets in the store
-      dispatch(
-        setKeysets({
-          mintUrl,
-          keysets,
-        })
-      );
-
-      dispatch(
-        setKeys({
-          mintUrl,
-          keys,
-        })
-      );
-
-      const mintInfo = await (await mint).getInfo();
-
-      dispatch(
-        setInfo({
-          mintUrl,
-          mintInfo,
-        })
-      );
-
-      return { success: true };
-    } catch (error) {
-      // You might want to dispatch an error action here
+    const mintRes = await getMint({ mintUrl, forceRefresh: true });
+    if (mintRes.isErr()) {
       return { success: false };
     }
+    const mint = mintRes.value;
+
+    const keysetsRes = await toResult(mint.getKeySets());
+    const keysRes = await toResult(mint.getKeys());
+    if (keysetsRes.isErr() || keysRes.isErr()) {
+      return { success: false };
+    }
+
+    dispatch(
+      setKeysets({
+        mintUrl,
+        keysets: keysetsRes.value.keysets,
+      })
+    );
+
+    dispatch(
+      setKeys({
+        mintUrl,
+        keys: keysRes.value.keysets,
+      })
+    );
+
+    const mintInfoRes = await toResult(mint.getInfo());
+    if (mintInfoRes.isErr()) {
+      return { success: false };
+    }
+
+    dispatch(
+      setInfo({
+        mintUrl,
+        mintInfo: mintInfoRes.value,
+      })
+    );
+
+    return { success: true };
   };
 };
 
 export const addMintsAction = ({ profileId, mintUrls }) => {
   return async (dispatch) => {
-    try {
-      // First update all mints (fetch and store keysets and info)
-      const updatePromises = mintUrls.map((mintUrl) => dispatch(updateMint({ mintUrl })));
+    // First update all mints (fetch and store keysets and info)
+    const updatePromises = mintUrls.map((mintUrl) => dispatch(updateMint({ mintUrl })));
 
-      // Wait for all updates to complete
-      const results = await Promise.all(updatePromises);
+    const results = await Promise.all(updatePromises);
 
-      // Check if all updates were successful
-      const allSuccessful = results.every((result) => result.success);
+    const allSuccessful = results.every((result) => result.success);
 
-      if (allSuccessful) {
-        // Add all mints to the profile
-        dispatch(
-          addMints({
-            profileId,
-            mints: mintUrls,
-          })
-        );
+    if (allSuccessful) {
+      dispatch(
+        addMints({
+          profileId,
+          mints: mintUrls,
+        })
+      );
 
-        return { success: true };
-      } else {
-        return { success: false, error: 'Some mint updates failed' };
-      }
-    } catch (error) {
-      return { success: false };
+      return { success: true };
+    } else {
+      return { success: false, error: 'Some mint updates failed' };
     }
   };
 };

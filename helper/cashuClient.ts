@@ -129,20 +129,15 @@ interface GetMintParams {
   forceRefresh?: boolean;
 }
 
-interface GetKeysParams {
-  unit: string;
-  mintUrl: string;
-  forceRefresh?: boolean;
-}
 
 // wallet caches for all the mints
 let walletCache: { [key: string]: CashuWallet } = {};
 
 // MAIN UTILITIES
 
-export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams) {
+export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams): Promise<Result<CashuWallet, Error>> {
   if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {
-    return walletCache[mintUrl][unit];
+    return ok(walletCache[mintUrl][unit]);
   }
 
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
@@ -154,10 +149,12 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   const lastFetched = audits?.lastFetched ?? 0;
   const shouldRefresh = forceRefresh || !mintInfo || !keys || !keysets;
 
-  const mint = await getMint({
+  const mintRes = await getMint({
     mintUrl,
     forceRefresh: shouldRefresh,
   });
+  if (mintRes.isErr()) return err(mintRes.error);
+  const mint = mintRes.value;
 
   mintInfo = store.getState().cashu?.info?.[mintUrl];
   keys = store.getState().cashu?.keys?.[mintUrl];
@@ -201,61 +198,33 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
     ...walletCache,
   };
 
-  return wallet;
+  return ok(wallet);
 }
 
-export async function getMint({ mintUrl, forceRefresh = false }: GetMintParams) {
+export async function getMint({ mintUrl, forceRefresh = false }: GetMintParams): Promise<Result<CashuMint, Error>> {
   const mint = new CashuMint(mintUrl);
 
   if (forceRefresh) {
-    const mintInfo = await mint.getInfo();
+    const infoRes = await toResult(mint.getInfo());
+    if (infoRes.isErr()) return err(infoRes.error);
+
+    const keysetsRes = await toResult(mint.getKeySets());
+    if (keysetsRes.isErr()) return err(keysetsRes.error);
+
+    const keysRes = await toResult(mint.getKeys());
+    if (keysRes.isErr()) return err(keysRes.error);
 
     store.dispatch(
       setInfo({
         mintUrl,
-        mintInfo,
+        mintInfo: infoRes.value,
       })
     );
-    store.dispatch(setKeysets({ mintUrl, keysets: (await mint.getKeySets()).keysets }));
-    store.dispatch(setKeys({ mintUrl, keys: (await mint.getKeys()).keysets }));
+    store.dispatch(setKeysets({ mintUrl, keysets: keysetsRes.value.keysets }));
+    store.dispatch(setKeys({ mintUrl, keys: keysRes.value.keysets }));
   }
 
-  return mint;
-}
-
-export async function getKeys({
-  unit,
-  mintUrl,
-  forceRefresh = false,
-}: GetKeysParams): Promise<MintKeyset | undefined> {
-  const mint = getMint({ mintUrl });
-
-  // check if keysets and keys are already cached
-  if (store.getState().cashu.keysets[mintUrl] && !forceRefresh) {
-    return store.getState().cashu.keysets[mintUrl].find((k) => k.unit === unit);
-  }
-
-  const keysets = (await (await mint).getKeySets()).keysets;
-  const keys = (await (await mint).getKeys()).keysets;
-
-  const key = keysets.find((k) => k.unit === unit);
-
-  // Store the keyset in cache
-  store.dispatch(
-    setKeysets({
-      mintUrl,
-      keysets,
-    })
-  );
-
-  store.dispatch(
-    setKeys({
-      mintUrl,
-      keys,
-    })
-  );
-
-  return key;
+  return ok(mint);
 }
 
 // Melt quote and payment functions
@@ -270,9 +239,7 @@ export async function getMeltQuote({
   mintUrl: string;
   mppAmount?: number;
 }): Promise<Result<MeltQuoteResponse, Error>> {
-  const walletRes = await toResult(
-    getWallet({ unit, mintUrl, profile: null })
-  );
+  const walletRes = await getWallet({ unit, mintUrl, profile: null });
   if (walletRes.isErr()) return err(walletRes.error);
   const wallet = walletRes.value;
   const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
@@ -328,14 +295,12 @@ export async function sendLightning({
     forceRefresh = false
   ): Promise<Result<LightningSendTransaction, Error>> => {
     const currentProofs = memoizedGetProofs(unit)(state);
-    const walletRes = await toResult(
-      getWallet({
-        unit,
-        mintUrl,
-        profile: null,
-        ...(forceRefresh && { forceRefresh: true }),
-      })
-    );
+    const walletRes = await getWallet({
+      unit,
+      mintUrl,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
     if (walletRes.isErr()) return err(walletRes.error);
     const wallet = walletRes.value;
 
@@ -483,13 +448,11 @@ export async function receiveLightning({
   const profile = memoizedGetCurrentProfile(store.getState());
 
   Alert.alert('a', JSON.stringify(unit, selectedMint));
-  const walletRes = await toResult(
-    getWallet({
-      unit,
-      mintUrl: selectedMint,
-      profile: null,
-    })
-  );
+  const walletRes = await getWallet({
+    unit,
+    mintUrl: selectedMint,
+    profile: null,
+  });
   if (walletRes.isErr()) return err(walletRes.error);
   const wallet = walletRes.value;
 
@@ -568,14 +531,12 @@ export async function sendEcash({
       return err(new AppError('insufficient_funds', 'Insufficient funds'));
     }
 
-    const walletRes = await toResult(
-      getWallet({
-        unit,
-        mintUrl: selectedMint,
-        profile: null,
-        ...(forceRefresh && { forceRefresh: true }),
-      })
-    );
+    const walletRes = await getWallet({
+      unit,
+      mintUrl: selectedMint,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
     if (walletRes.isErr()) return err(walletRes.error);
     const wallet = walletRes.value;
 
@@ -725,14 +686,12 @@ export async function receiveEcash({
   const attemptReceive = async (
     forceRefresh = false
   ): Promise<Result<EcashReceiveTransaction, Error>> => {
-    const walletRes = await toResult(
-      getWallet({
-        unit,
-        mintUrl: receiveMintUrl,
-        profile: null,
-        ...(forceRefresh && { forceRefresh: true }),
-      })
-    );
+    const walletRes = await getWallet({
+      unit,
+      mintUrl: receiveMintUrl,
+      profile: null,
+      ...(forceRefresh && { forceRefresh: true }),
+    });
     if (walletRes.isErr()) return err(walletRes.error);
     const wallet = walletRes.value;
 
@@ -868,14 +827,14 @@ export async function getPaymentRequest({
 export async function cancelEcashTransaction(
   transaction: Transaction,
   navigation: any
-): Promise<void> {
+): Promise<Result<void, Error>> {
   const res = await receiveEcash({
     token: transaction.token as string,
     unit: transaction.unit,
     refund: true,
   });
   if (res.isErr()) {
-    throw res.error;
+    return err(res.error);
   }
 
   const profileId = store.getState().nostr?.currentProfile?.id;
@@ -893,6 +852,7 @@ export async function cancelEcashTransaction(
 
   SheetManager.hide('button-handler');
   navigation.navigate('', {}, { closeParents: true });
+  return ok(undefined);
 }
 
 export function getUsedProofs(currentProofs, keepProofs) {
@@ -926,14 +886,12 @@ export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
       setLoading(true);
       setError(null);
 
-      const walletResult = await toResult(
-        getWallet({
-          unit,
-          mintUrl,
-          profile,
-          forceRefresh,
-        })
-      );
+      const walletResult = await getWallet({
+        unit,
+        mintUrl,
+        profile,
+        forceRefresh,
+      });
 
       if (isMounted) {
         if (walletResult.isOk()) {
@@ -963,14 +921,12 @@ export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
       setError(null);
       setLoading(true);
 
-      toResult(
-        getWallet({
-          unit,
-          mintUrl,
-          profile,
-          forceRefresh: true,
-        })
-      ).then((result) => {
+      getWallet({
+        unit,
+        mintUrl,
+        profile,
+        forceRefresh: true,
+      }).then((result) => {
         if (result.isOk()) {
           setWallet(result.value);
         } else {
@@ -996,8 +952,18 @@ export async function checkTokenSpent({ token }) {
   const decodedToken = getDecodedToken(token);
   const { unit, mint, proofs } = decodedToken;
 
-  const wallet = await getWallet({ unit, mintUrl: mint });
-  return (await wallet.checkProofsStates(proofs)).some((p) => p.state === 'SPENT');
+  const walletRes = await getWallet({ unit, mintUrl: mint, profile: null });
+  if (walletRes.isErr()) {
+    console.error('Error fetching wallet for checkTokenSpent:', walletRes.error);
+    return false;
+  }
+  const wallet = walletRes.value;
+  const statesRes = await toResult(wallet.checkProofsStates(proofs));
+  if (statesRes.isErr()) {
+    console.error('Error checking proof states:', statesRes.error);
+    return false;
+  }
+  return statesRes.value.some((p) => p.state === 'SPENT');
 }
 
 // HELPER FUNCTIONS

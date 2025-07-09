@@ -110,7 +110,7 @@ export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRe
     });
 
     let received;
-    if (spent.length !== 0) {
+    if (spent) {
       // throw new AppError("Token already spent.", "Token already spent.");
     } else {
       const res = await receiveEcash({
