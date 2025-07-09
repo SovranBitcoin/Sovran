@@ -9,7 +9,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
-import { showMessage } from '../popup/popups';
+import { ok, err, Result } from 'neverthrow';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
@@ -29,13 +29,15 @@ interface NavigationResult {
   params: Record<string, any>;
 }
 
+type HandlerResult = Result<NavigationResult | null, string>;
+
 interface HandlePaymentRequestProps {
   request: string;
 }
 
 export const handlePaymentRequest = async ({
   request,
-}: HandlePaymentRequestProps): Promise<NavigationResult | null> => {
+}: HandlePaymentRequestProps): Promise<HandlerResult> => {
   const decodedPaymentRequest = decodePaymentRequest(request);
   const receiverMints = decodedPaymentRequest.mints;
   const receiverAmount = decodedPaymentRequest.amount;
@@ -45,25 +47,22 @@ export const handlePaymentRequest = async ({
   const unit = decodedPaymentRequest.unit;
 
   if (!receiverAmount) {
-    showMessage('invalid_payment_request', {}, { emoji: '🚨' });
-    return null;
+    return err('invalid_payment_request');
   }
 
   if (receiverMints?.length === 0) {
-    showMessage('missing_mint', {}, { emoji: '🚨' });
-    return null;
+    return err('missing_mint');
   }
 
   const balances = receiverMints.map((m) => memoizedGetBalance(unit, m));
 
   if (balances.some((b) => b < receiverAmount)) {
-    showMessage('insufficient_balance', { amount: receiverAmount, unit, fee: 0 }, { emoji: '🚨' });
-    return null;
+    return err('insufficient_balance');
   }
 
   let { data } = nip19.decode(receiverTarget);
   const { pubkey } = data as { pubkey: string };
-  return {
+  return ok({
     screen: 'paymentRequestSendConfirmation',
     params: {
       request,
@@ -71,7 +70,7 @@ export const handlePaymentRequest = async ({
       amount: receiverAmount,
       to: pubkey,
     },
-  };
+  });
 };
 
 interface BarcodeHandlerProps {
@@ -94,7 +93,7 @@ const handleUR = async ({
   urDecoder: URDecoder;
   unit: string;
   setProgress: (progress: number) => void;
-}): Promise<NavigationResult | null> => {
+}): Promise<HandlerResult> => {
   const prevPer = urDecoder.getProgress();
   urDecoder.receivePart(scanning.data);
   const nextPer = urDecoder.getProgress();
@@ -115,15 +114,15 @@ const handleUR = async ({
     const decoded = ur.decodeCBOR();
     const tokenString = new TextDecoder().decode(decoded);
     setProgress(0);
-    return {
+    return ok({
       screen: 'ecashReceiveConfirmation',
       params: {
         token: tokenString,
         unit,
       },
-    };
+    });
   }
-  return null;
+  return ok(null);
 };
 
 const handleEcash = async ({
@@ -132,26 +131,24 @@ const handleEcash = async ({
 }: {
   data: string;
   unit: string;
-}): Promise<NavigationResult | null> => {
+}): Promise<HandlerResult> => {
   const giveaway = getGiveaway({ token: data });
   if (giveaway?.id) {
     if (checkIfAlreadyRedeemed(data)) {
-      showMessage('already_redeemed', {}, { emoji: '🚨' });
-      return null;
+      return err('already_redeemed');
     }
     const error = giveaway.error();
     if (!giveaway.condition() && error) {
-      showMessage('general_error', { error: error.message }, { emoji: '🚨' });
-      return null;
+      return err('general_error');
     }
   }
-  return {
+  return ok({
     screen: 'ecashReceiveConfirmation',
     params: {
       token: data,
       unit,
     },
-  };
+  });
 };
 
 const handleLightning = async ({
@@ -167,18 +164,18 @@ const handleLightning = async ({
   unit: string;
   balance: number;
   setLoading: (loading: boolean) => void;
-}): Promise<NavigationResult | null> => {
+}): Promise<HandlerResult> => {
   const lnurl = lnTrim(data);
   const amount = getLightningAmount({ pr: lnurl });
   if (!amount) {
-    return {
+    return ok({
       screen: 'currency',
       params: {
         to: 'lightningSendConfirmation',
         lud16: lnurl,
         unit,
       },
-    };
+    });
   }
 
   if (amount) {
@@ -190,14 +187,9 @@ const handleLightning = async ({
     const totalAmount = amount + meltQuote.fee_reserve;
     const isBalanceSufficient = balance >= totalAmount;
     if (!isBalanceSufficient && validateBalance) {
-      showMessage(
-        'insufficient_balance',
-        { amount, unit, fee: meltQuote.fee_reserve },
-        { emoji: '🚨' }
-      );
-      return null;
+      return err('insufficient_balance');
     }
-    return {
+    return ok({
       screen: 'lightningSendConfirmation',
       params: {
         pr: lnurl,
@@ -205,9 +197,9 @@ const handleLightning = async ({
         meltQuote: JSON.stringify(meltQuote),
         unit,
       },
-    };
+    });
   }
-  return null;
+  return ok(null);
 };
 
 export const handleBarcode = async ({
@@ -219,7 +211,7 @@ export const handleBarcode = async ({
   setLoading,
   setScanned,
   validateBalance = true,
-}: BarcodeHandlerProps): Promise<NavigationResult | null> => {
+}: BarcodeHandlerProps): Promise<HandlerResult> => {
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
 
   if (!scanning.data.startsWith('ur:') && setScanned) {
@@ -253,7 +245,7 @@ export const handleBarcode = async ({
     case 'paymentRequest':
       const decodedPaymentRequest = decodePaymentRequest(scanning.data);
 
-      return {
+      return ok({
         screen: 'currency',
         params: {
           unit: decodedPaymentRequest.unit,
@@ -263,7 +255,7 @@ export const handleBarcode = async ({
           paymentRequest: scanning.data,
           to: 'ecashSendConfirmation',
         },
-      };
+      });
     case 'lightning':
       return handleLightning({
         data: scanning.data,
@@ -274,22 +266,30 @@ export const handleBarcode = async ({
         validateBalance,
       });
     default:
-      return null;
+      return err('invalid_address');
   }
 };
 
 // Wrapper function to maintain current navigation behavior
-export const barcodeHandler = async (props: BarcodeHandlerProps & { navigation: any }) => {
+export const barcodeHandler = async (
+  props: BarcodeHandlerProps & { navigation: any }
+): Promise<Result<void, string>> => {
   const { navigation, ...handlerProps } = props;
 
   if (!navigation.isFocused()) {
-    return;
+    return ok(undefined);
   }
 
   const result = await handleBarcode(handlerProps);
-  if (result) {
-    navigation.navigate(result.screen, result.params, {
-      closeCurrentAndParent: true,
-    });
+  if (result.isOk()) {
+    const value = result.value;
+    if (value) {
+      navigation.navigate(value.screen, value.params, {
+        closeCurrentAndParent: true,
+      });
+    }
+    return ok(undefined);
   }
+
+  return err(result.error);
 };

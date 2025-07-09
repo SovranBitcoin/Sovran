@@ -226,7 +226,7 @@ function ModalScreen() {
 
     const scanning: ScanningData = { data: text };
     setLoading(true);
-    await barcodeHandler({
+    const res = await barcodeHandler({
       scanning,
       navigation,
       urDecoder,
@@ -234,6 +234,9 @@ function ModalScreen() {
       selectedMint,
       setLoading,
     });
+    if (res.isErr()) {
+      showMessage(res.error, {}, { emoji: '🚨' });
+    }
   };
 
   const renderButtons = () => {

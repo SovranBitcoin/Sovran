@@ -74,14 +74,13 @@ export function LightningSendConfirmation({
         setScanned: () => {},
         urDecoder: null,
       });
-
-      if (!result?.params?.meltQuote) {
+      if (result.isOk() && result.value) {
+        dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+        setMeltQuote(result.value.params.meltQuote);
+        setUnit(result.value.params.unit);
+      } else {
         throw new Error('mint_change_failed');
       }
-
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-      setMeltQuote(result.params.meltQuote);
-      setUnit(result.params.unit);
     } else {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
       setUnit(mint.unit.toLowerCase());
