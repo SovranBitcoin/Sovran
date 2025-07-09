@@ -2,7 +2,7 @@
 
 import { bech32 } from 'bech32';
 import { Buffer } from 'buffer/';
-
+import bolt11 from 'light-bolt11-decoder';
 const LNURL_REGEX = /^(?:http.*[&?]lightning=|lightning:)?(lnurl[0-9]{1,}[02-9ac-hj-np-z]+)/;
 
 const LN_ADDRESS_REGEX =
@@ -63,6 +63,15 @@ export const parseLnUrl = (url: string): string | null => {
   const result = LNURL_REGEX.exec(url.toLowerCase());
   return result ? result[1] : null;
 };
+
+export function isLightningInvoice(invoice) {
+  try {
+    bolt11.decode(invoice);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Verify if a string is a lightning adress
@@ -184,7 +193,7 @@ export async function getInvoiceFromLnurl(lnUrlOrAddress: string, amount: number
       }
       return { pr: pr || '', minSendable, maxSendable };
     }
-  } catch (err) {}
+  } catch (err) { }
   return '';
 }
 
@@ -215,4 +224,12 @@ export function lnTrim(str: string) {
 
 export function isStr(v: unknown): v is string {
   return typeof v === 'string';
+}
+function parsePaymentRequest(arg0: { request: any }): {
+  mtokens: any;
+  tokens: any;
+  destination: any;
+  created_at: any;
+} {
+  throw new Error('Function not implemented.');
 }

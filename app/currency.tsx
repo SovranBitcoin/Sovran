@@ -47,6 +47,7 @@ function ModalScreen() {
   const [loading, setLoading] = useState(false);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
+  const [isValidMint, setIsValidMint] = useState(false);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
@@ -210,10 +211,11 @@ function ModalScreen() {
   useEffect(() => {
     if (params?.paymentRequest && params?.amount) {
       setIsValidAmount(true);
-      handleNext();
+      setIsValidMint(!!selectedMint);
+      // handleNext();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedMint]);
 
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
@@ -241,6 +243,7 @@ function ModalScreen() {
       if (params?.paymentRequest) {
         return (
           <View style={styles.buttonContainer}>
+            <Text></Text>
             <ButtonHandler
               buttons={[
                 {
@@ -249,7 +252,11 @@ function ModalScreen() {
                   variant: 'primary',
                   onPress: handleNext,
                   loading: loading,
-                  disabled: !isValidAmount,
+                  disabled: !(
+                    isValidAmount &&
+                    params?.mints?.includes(selectedMint) &&
+                    params?.allowedUnits?.includes(unit.toUpperCase())
+                  ),
                 },
               ]}
             />

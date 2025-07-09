@@ -7,7 +7,7 @@ import { memoizedGetBalance, memoizedGetTransactions } from '../redux/cashu';
 import { nip19 } from 'nostr-tools';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
-import { lnTrim } from 'helper/third-party/lnurl';
+import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
 import { showMessage } from '../popup/popups';
 
@@ -231,7 +231,11 @@ export const handleBarcode = async ({
     type = 'ecash';
   } else if (isValidPaymentRequest(scanning.data)) {
     type = 'paymentRequest';
-  } else {
+  } else if (
+    isLightningAddress(lnTrim(scanning.data)) ||
+    isLnurlp(lnTrim(scanning.data)) ||
+    isLightningInvoice(lnTrim(scanning.data))
+  ) {
     type = 'lightning';
   }
 
