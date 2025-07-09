@@ -6,7 +6,7 @@ import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Text } from 'components/common/Text';
-import { getMint, restoreMint } from 'helper/cashu';
+import { getMint, restoreMint } from 'helper/cashuClient';
 import { createStyles } from './helper';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';

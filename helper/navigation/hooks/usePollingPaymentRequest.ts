@@ -1,12 +1,10 @@
 import { useMemo, useEffect } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { NDKKind } from '@nostr-dev-kit/ndk';
-import { useSelector } from 'react-redux';
-import { nip04 } from 'nostr-tools';
-import { nip19 } from 'nostr-tools';
+import { nip04, nip19 } from 'nostr-tools';
 import { bytesToHex } from '@noble/hashes/utils';
 import { getEncodedToken, PaymentRequest } from '@cashu/cashu-ts';
-import { checkTokenSpent, receiveEcash } from 'helper/cashu';
+import { checkTokenSpent, receiveEcash } from 'helper/cashuClient';
 import { updateTransaction } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
@@ -78,7 +76,7 @@ export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRe
               break;
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       }
     };
 

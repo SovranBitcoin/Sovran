@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { receiveEcash } from 'components/cashu';
+import { receiveEcash, giveaways } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector } from 'react-redux';
 import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
-import { giveaways } from 'helper/cashu/secrets';
 import { useRoute } from '@react-navigation/native';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetMints, TransactionBuilder, useGetMintInfo } from 'helper/redux/cashu';

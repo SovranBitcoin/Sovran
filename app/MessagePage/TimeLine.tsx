@@ -6,7 +6,7 @@ import { useNostr } from 'helper/redux/nostr';
 import EventComponent from './EventsComponent';
 import VpnComponent from './VpnComponent';
 import CashuTokenComponent from './CashuTokenComponent';
-import { isValidEcashToken } from 'components/cashu';
+import { isValidEcashToken } from 'helper/cashuClient';
 
 const TimelineItem = ({ item, theme }) => {
   const { currentProfile } = useNostr();

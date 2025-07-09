@@ -1,15 +1,14 @@
-import { getLightningAmount, getMeltQuote, isValidEcashToken, Transaction } from 'components/cashu';
+import { getLightningAmount, getMeltQuote, isValidEcashToken } from 'helper/cashuClient';
 
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { store } from '../redux/store';
-import { decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
-import { memoizedGetBalance, memoizedGetTransactions } from '../redux/cashu';
-import { nip19 } from 'nostr-tools';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
+import { memoizedGetTransactions, TransactionData } from '../redux/cashu';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { isValidPaymentRequest } from '../cashu/helper';
-import { showMessage } from '../popup/popups';
+import { ok, err, Result } from 'neverthrow';
 
 export const checkIfAlreadyRedeemed = (token: string): boolean => {
   const profileId = store.getState().nostr?.currentProfile?.id;
@@ -19,7 +18,7 @@ export const checkIfAlreadyRedeemed = (token: string): boolean => {
   if (!giveaway) return false;
 
   return transactions.some(
-    (tx: Transaction) =>
+    (tx: TransactionData) =>
       tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
   );
 };
@@ -29,50 +28,7 @@ interface NavigationResult {
   params: Record<string, any>;
 }
 
-interface HandlePaymentRequestProps {
-  request: string;
-}
-
-export const handlePaymentRequest = async ({
-  request,
-}: HandlePaymentRequestProps): Promise<NavigationResult | null> => {
-  const decodedPaymentRequest = decodePaymentRequest(request);
-  const receiverMints = decodedPaymentRequest.mints;
-  const receiverAmount = decodedPaymentRequest.amount;
-  const receiverTarget = decodedPaymentRequest.getTransport(
-    PaymentRequestTransportType.NOSTR
-  ).target;
-  const unit = decodedPaymentRequest.unit;
-
-  if (!receiverAmount) {
-    showMessage('invalid_payment_request', {}, { emoji: '🚨' });
-    return null;
-  }
-
-  if (receiverMints?.length === 0) {
-    showMessage('missing_mint', {}, { emoji: '🚨' });
-    return null;
-  }
-
-  const balances = receiverMints.map((m) => memoizedGetBalance(unit, m));
-
-  if (balances.some((b) => b < receiverAmount)) {
-    showMessage('insufficient_balance', { amount: receiverAmount, unit, fee: 0 }, { emoji: '🚨' });
-    return null;
-  }
-
-  let { data } = nip19.decode(receiverTarget);
-  const { pubkey } = data as { pubkey: string };
-  return {
-    screen: 'paymentRequestSendConfirmation',
-    params: {
-      request,
-      unit,
-      amount: receiverAmount,
-      to: pubkey,
-    },
-  };
-};
+type HandlerResult = Result<NavigationResult | null, string>;
 
 interface BarcodeHandlerProps {
   scanning: { data: string };
@@ -82,6 +38,7 @@ interface BarcodeHandlerProps {
   setProgress?: (progress: number) => void;
   setLoading: (loading: boolean) => void;
   setScanned?: (scanned: boolean) => void;
+  balance?: number;
 }
 
 const handleUR = async ({
@@ -94,7 +51,7 @@ const handleUR = async ({
   urDecoder: URDecoder;
   unit: string;
   setProgress: (progress: number) => void;
-}): Promise<NavigationResult | null> => {
+}): Promise<HandlerResult> => {
   const prevPer = urDecoder.getProgress();
   urDecoder.receivePart(scanning.data);
   const nextPer = urDecoder.getProgress();
@@ -115,15 +72,15 @@ const handleUR = async ({
     const decoded = ur.decodeCBOR();
     const tokenString = new TextDecoder().decode(decoded);
     setProgress(0);
-    return {
+    return ok({
       screen: 'ecashReceiveConfirmation',
       params: {
         token: tokenString,
         unit,
       },
-    };
+    });
   }
-  return null;
+  return ok(null);
 };
 
 const handleEcash = async ({
@@ -132,26 +89,24 @@ const handleEcash = async ({
 }: {
   data: string;
   unit: string;
-}): Promise<NavigationResult | null> => {
+}): Promise<HandlerResult> => {
   const giveaway = getGiveaway({ token: data });
   if (giveaway?.id) {
     if (checkIfAlreadyRedeemed(data)) {
-      showMessage('already_redeemed', {}, { emoji: '🚨' });
-      return null;
+      return err('already_redeemed');
     }
     const error = giveaway.error();
     if (!giveaway.condition() && error) {
-      showMessage('general_error', { error: error.message }, { emoji: '🚨' });
-      return null;
+      return err('general_error');
     }
   }
-  return {
+  return ok({
     screen: 'ecashReceiveConfirmation',
     params: {
       token: data,
       unit,
     },
-  };
+  });
 };
 
 const handleLightning = async ({
@@ -159,26 +114,23 @@ const handleLightning = async ({
   selectedMint,
   unit,
   balance,
-  setLoading,
-  validateBalance = true,
 }: {
   data: string;
   selectedMint: any;
   unit: string;
-  balance: number;
-  setLoading: (loading: boolean) => void;
-}): Promise<NavigationResult | null> => {
+  balance?: number;
+}): Promise<HandlerResult> => {
   const lnurl = lnTrim(data);
   const amount = getLightningAmount({ pr: lnurl });
   if (!amount) {
-    return {
+    return ok({
       screen: 'currency',
       params: {
         to: 'lightningSendConfirmation',
         lud16: lnurl,
         unit,
       },
-    };
+    });
   }
 
   if (amount) {
@@ -188,16 +140,10 @@ const handleLightning = async ({
       mintUrl: selectedMint,
     });
     const totalAmount = amount + meltQuote.fee_reserve;
-    const isBalanceSufficient = balance >= totalAmount;
-    if (!isBalanceSufficient && validateBalance) {
-      showMessage(
-        'insufficient_balance',
-        { amount, unit, fee: meltQuote.fee_reserve },
-        { emoji: '🚨' }
-      );
-      return null;
+    if (balance !== undefined && balance < totalAmount) {
+      return err('insufficient_balance');
     }
-    return {
+    return ok({
       screen: 'lightningSendConfirmation',
       params: {
         pr: lnurl,
@@ -205,9 +151,9 @@ const handleLightning = async ({
         meltQuote: JSON.stringify(meltQuote),
         unit,
       },
-    };
+    });
   }
-  return null;
+  return ok(null);
 };
 
 export const handleBarcode = async ({
@@ -218,78 +164,74 @@ export const handleBarcode = async ({
   setProgress,
   setLoading,
   setScanned,
-  validateBalance = true,
-}: BarcodeHandlerProps): Promise<NavigationResult | null> => {
-  const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
-
+  balance,
+}: BarcodeHandlerProps): Promise<HandlerResult> => {
   if (!scanning.data.startsWith('ur:') && setScanned) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
   }
 
-  let type: 'ur' | 'ecash' | 'paymentRequest' | 'lightning';
   if (scanning.data.startsWith('ur:')) {
-    type = 'ur';
+    if (!setProgress) {
+      throw new Error('setProgress is required for handling UR');
+    }
+    return handleUR({ scanning, urDecoder, unit, setProgress });
   } else if (isValidEcashToken(scanning.data)) {
-    type = 'ecash';
+    return handleEcash({ data: scanning.data, unit });
   } else if (isValidPaymentRequest(scanning.data)) {
-    type = 'paymentRequest';
+    const decodedPaymentRequest = decodePaymentRequest(scanning.data);
+    console.log({ decodedPaymentRequest });
+
+    return ok({
+      screen: 'currency',
+      params: {
+        unit: decodedPaymentRequest.unit,
+        amount:
+          decodedPaymentRequest.unit === 'sat'
+            ? decodedPaymentRequest.amount
+            : decodedPaymentRequest.amount / 100,
+        mints: decodedPaymentRequest.mints,
+        allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
+        paymentRequest: scanning.data,
+        to: 'ecashSendConfirmation',
+      },
+    });
   } else if (
     isLightningAddress(lnTrim(scanning.data)) ||
     isLnurlp(lnTrim(scanning.data)) ||
     isLightningInvoice(lnTrim(scanning.data))
   ) {
-    type = 'lightning';
+    return handleLightning({
+      data: scanning.data,
+      selectedMint,
+      unit,
+      balance,
+      setLoading,
+    });
   }
-
-  switch (type) {
-    case 'ur':
-      if (!setProgress) {
-        throw new Error('setProgress is required for handling UR');
-      }
-      return handleUR({ scanning, urDecoder, unit, setProgress });
-    case 'ecash':
-      return handleEcash({ data: scanning.data, unit });
-    case 'paymentRequest':
-      const decodedPaymentRequest = decodePaymentRequest(scanning.data);
-
-      return {
-        screen: 'currency',
-        params: {
-          unit: decodedPaymentRequest.unit,
-          amount: decodedPaymentRequest.amount,
-          mints: decodedPaymentRequest.mints,
-          allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
-          paymentRequest: scanning.data,
-          to: 'ecashSendConfirmation',
-        },
-      };
-    case 'lightning':
-      return handleLightning({
-        data: scanning.data,
-        selectedMint,
-        unit,
-        balance,
-        setLoading,
-        validateBalance,
-      });
-    default:
-      return null;
-  }
+  return err('invalid_address');
 };
 
 // Wrapper function to maintain current navigation behavior
-export const barcodeHandler = async (props: BarcodeHandlerProps & { navigation: any }) => {
+export const barcodeHandler = async (
+  props: BarcodeHandlerProps & { navigation: any }
+): Promise<Result<void, string>> => {
   const { navigation, ...handlerProps } = props;
 
   if (!navigation.isFocused()) {
-    return;
+    return ok(undefined);
   }
 
   const result = await handleBarcode(handlerProps);
-  if (result) {
-    navigation.navigate(result.screen, result.params, {
-      closeCurrentAndParent: true,
-    });
+  if (result.isOk()) {
+    const value = result.value;
+    if (value) {
+      navigation.navigate(value.screen, value.params, {
+        closeCurrentAndParent: true,
+      });
+    }
+    return ok(undefined);
   }
+
+  return err(result.error);
 };

@@ -7,7 +7,7 @@ import { Text } from 'components/common/Text';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { FlagIcon } from 'assets/icons';
-import { getLightningAmount, getMeltQuote } from 'components/cashu';
+import { getLightningAmount, getMeltQuote } from 'helper/cashuClient';
 import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
 import * as Device from 'expo-device';
 import opacity from 'hex-color-opacity';
