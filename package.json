@@ -19,7 +19,11 @@
   },
   "jest": {
     "preset": "jest-expo",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleDirectories": [
+      "node_modules",
+      "<rootDir>"
+    ]
   },
   "dependencies": {
     "@babel/plugin-transform-class-static-block": "^7.24.7",
@@ -174,23 +178,28 @@
     "webln": "^0.3.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0",
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
     "@react-native-community/cli": "latest",
+    "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.10",
+    "@types/mocha": "^10.0.10",
     "@types/react": "^19.1.2",
+    "babel-jest": "^30.0.4",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~9.2.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-unused-imports": "^4.1.4",
     "expo-atlas": "^0.4.0",
-    "jest": "^29.2.1",
-    "jest-expo": "~52.0.2",
+    "jest": "~29.7.0",
+    "jest-expo": "~53.0.9",
     "patch-package": "^8.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
-    "typescript": "~5.3.3"
+    "typescript": "~5.3.3",
+    "@gandlaf21/bc-ur": "^1.1.12"
   },
   "private": true,
   "react-native": {
