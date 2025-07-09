@@ -26,12 +26,12 @@ import {
   PaymentRequestTransportType,
 } from '@cashu/cashu-ts';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { giveaways } from './secrets';
 import { publishWalletEvent } from '../nostr/cashu';
-import { nip19 } from 'nostr-tools';
+import { getPublicKey, nip19 } from 'nostr-tools';
 import { v4 as uuidv4 } from 'uuid';
 import { SheetManager } from 'react-native-actions-sheet';
 import { getUsedProofs } from './wallet';
+import { bytesToHex } from '@noble/hashes/utils';
 
 interface BaseTransaction {
   amount: number;
@@ -542,9 +542,16 @@ export async function receiveEcash({
     }
   };
 
-  const giveaway = Object.values(giveaways).find(({ public_key }) => {
-    return getPubkeyFromToken(token) === public_key;
-  });
+  const key = (() => {
+    const decoded = nip19.decode(profile.nsec).data as Uint8Array;
+    const pubkey = getPublicKey(decoded);
+    return getPubkeyFromToken(token) === pubKeyTo02(pubkey)
+      ? {
+        privkey: bytesToHex(decoded),
+        pubkey,
+      }
+      : null;
+  })();
 
   // Retry logic for wallet operations
   const attemptReceive = async (forceRefresh = false): Promise<EcashReceiveTransaction> => {
@@ -572,7 +579,7 @@ export async function receiveEcash({
     const response = await wallet.receive(token, {
       counter,
       keysetId,
-      ...(giveaway ? { privkey: giveaway.private_key } : {}),
+      ...(key.privkey ? { privkey: key.privkey } : {}),
     });
 
     if (!response) {
@@ -610,11 +617,11 @@ export async function receiveEcash({
       ...(from ? { nostr: { pubkey: from } } : {}),
       refund,
       fromNIP05,
-      ...(giveaway
+      ...(key.privkey
         ? {
           p2pk: {
-            pubkey: giveaway.public_key,
-            privkey: giveaway.private_key,
+            pubkey: key.pubkey,
+            privkey: key.privkey,
           },
         }
         : {}),

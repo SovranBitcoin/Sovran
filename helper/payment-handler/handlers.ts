@@ -114,13 +114,11 @@ const handleLightning = async ({
   selectedMint,
   unit,
   balance,
-  setLoading,
 }: {
   data: string;
   selectedMint: any;
   unit: string;
   balance?: number;
-  setLoading: (loading: boolean) => void;
 }): Promise<HandlerResult> => {
   const lnurl = lnTrim(data);
   const amount = getLightningAmount({ pr: lnurl });
