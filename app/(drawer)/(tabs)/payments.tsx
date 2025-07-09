@@ -16,7 +16,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { LNVPN_PUBKEY } from '../../vpnCheckout';
 import { Tabs } from 'components/common/Tabs';
-import { maybeConvertNpub } from 'helper/cashu/pay';
+import { maybeConvertNpub } from 'helper/cashuClient';
 import { nip19 } from 'nostr-tools';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 

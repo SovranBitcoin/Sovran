@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { isValidEcashToken } from 'components/cashu';
+import { isValidEcashToken } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from '../layout/PaymentInfo';

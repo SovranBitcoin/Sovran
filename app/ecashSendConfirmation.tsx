@@ -25,7 +25,7 @@ import {
   updateTransaction,
   useGetMintInfo,
 } from 'helper/redux/cashu';
-import { cancelEcashTransaction, getWallet } from 'helper/cashu';
+import { cancelEcashTransaction, getWallet } from 'helper/cashuClient';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';

@@ -11,7 +11,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import Wrapper from '../wrapper';
 import { sovran } from '.';
 import { ScrollView } from 'react-native-actions-sheet';
-import { getMint, getWallet } from 'components/cashu';
+import { getMint, getWallet } from 'helper/cashuClient';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { memoizedGetTheme } from 'helper/redux/settings';
 

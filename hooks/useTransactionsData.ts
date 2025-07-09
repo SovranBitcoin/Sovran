@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { TransactionData } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
-import { getRawExpiry } from 'components/cashu';
+import { getRawExpiry } from 'helper/cashuClient';
 
 interface Account {
   unit: string;

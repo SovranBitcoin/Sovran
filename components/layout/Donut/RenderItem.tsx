@@ -5,7 +5,7 @@ import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { View } from 'components/common/View';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { getMint } from 'helper/cashu/mint';
+import { getMint } from 'helper/cashuClient';
 import Image from 'components/common/Image';
 
 interface RenderItemData {

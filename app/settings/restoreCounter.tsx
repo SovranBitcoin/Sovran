@@ -4,7 +4,7 @@ import { store } from 'helper/redux/store';
 import { Button } from 'components/common/Button';
 import { Text } from 'components/common/Text';
 import Container from 'components/layout/Container';
-import { restoreCounter } from 'helper/cashu/restore';
+import { restoreCounter } from 'helper/cashuClient';
 import { increaseCounterV2 } from 'helper/redux/cashu';
 import { runWithAnimationFrame } from '../onboard/new';
 import { ScrollView } from 'react-native';

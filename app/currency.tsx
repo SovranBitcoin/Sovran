@@ -5,7 +5,14 @@ import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
 
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { getMeltQuote, receiveLightning, sendEcash } from 'components/cashu';
+import {
+  getMeltQuote,
+  receiveLightning,
+  sendEcash,
+  maybeConvertNpub,
+  npubToPublicKey,
+  pubKeyTo02,
+} from 'helper/cashuClient';
 import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -21,7 +28,6 @@ import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
-import { maybeConvertNpub, npubToPublicKey, pubKeyTo02 } from 'helper/cashu/pay';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';

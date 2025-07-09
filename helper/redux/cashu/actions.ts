@@ -1,4 +1,4 @@
-import { getMint } from 'helper/cashu';
+import { getMint } from 'helper/cashuClient';
 import {
   ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,

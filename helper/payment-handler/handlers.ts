@@ -1,4 +1,4 @@
-import { getLightningAmount, getMeltQuote, isValidEcashToken } from 'components/cashu';
+import { getLightningAmount, getMeltQuote, isValidEcashToken } from 'helper/cashuClient';
 
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { store } from '../redux/store';
