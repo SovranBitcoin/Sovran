@@ -25,6 +25,7 @@ describe('barcodeHandler', () => {
       unit: 'sat',
       selectedMint: 'https://mint.example.com',
       setLoading: () => {},
+      balance: 100,
     });
     expect(result.isOk()).toBe(true);
     expect(navigation.navigate).toHaveBeenCalledWith(

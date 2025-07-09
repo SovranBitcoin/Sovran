@@ -73,6 +73,7 @@ export function LightningSendConfirmation({
         setLoading: () => {},
         setScanned: () => {},
         urDecoder: null,
+        balance: balance?.amount,
       });
       if (result.isOk() && result.value) {
         dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));

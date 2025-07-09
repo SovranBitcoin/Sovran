@@ -147,7 +147,6 @@ const Camera: React.FC = () => {
             setProgress,
             setLoading,
             setScanned,
-            validateBalance: false,
           });
           if (res.isErr()) {
             showMessage(res.error, {}, { emoji: '🚨' });

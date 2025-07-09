@@ -81,6 +81,7 @@ interface BarcodeHandlerProps {
   setProgress?: (progress: number) => void;
   setLoading: (loading: boolean) => void;
   setScanned?: (scanned: boolean) => void;
+  balance?: number;
 }
 
 const handleUR = async ({
@@ -157,12 +158,11 @@ const handleLightning = async ({
   unit,
   balance,
   setLoading,
-  validateBalance = true,
 }: {
   data: string;
   selectedMint: any;
   unit: string;
-  balance: number;
+  balance?: number;
   setLoading: (loading: boolean) => void;
 }): Promise<HandlerResult> => {
   const lnurl = lnTrim(data);
@@ -185,8 +185,7 @@ const handleLightning = async ({
       mintUrl: selectedMint,
     });
     const totalAmount = amount + meltQuote.fee_reserve;
-    const isBalanceSufficient = balance >= totalAmount;
-    if (!isBalanceSufficient && validateBalance) {
+    if (balance !== undefined && balance < totalAmount) {
       return err('insufficient_balance');
     }
     return ok({
@@ -210,39 +209,22 @@ export const handleBarcode = async ({
   setProgress,
   setLoading,
   setScanned,
-  validateBalance = true,
+  balance,
 }: BarcodeHandlerProps): Promise<HandlerResult> => {
-  const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
 
   if (!scanning.data.startsWith('ur:') && setScanned) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
   }
 
-  let type: 'ur' | 'ecash' | 'paymentRequest' | 'lightning';
   if (scanning.data.startsWith('ur:')) {
-    type = 'ur';
-  } else if (isValidEcashToken(scanning.data)) {
-    type = 'ecash';
-  } else if (isValidPaymentRequest(scanning.data)) {
-    type = 'paymentRequest';
-  } else if (
-    isLightningAddress(lnTrim(scanning.data)) ||
-    isLnurlp(lnTrim(scanning.data)) ||
-    isLightningInvoice(lnTrim(scanning.data))
-  ) {
-    type = 'lightning';
-  }
-
-  switch (type) {
-    case 'ur':
       if (!setProgress) {
         throw new Error('setProgress is required for handling UR');
       }
       return handleUR({ scanning, urDecoder, unit, setProgress });
-    case 'ecash':
+  } else if (isValidEcashToken(scanning.data)) {
       return handleEcash({ data: scanning.data, unit });
-    case 'paymentRequest':
+  } else if (isValidPaymentRequest(scanning.data)) {
       const decodedPaymentRequest = decodePaymentRequest(scanning.data);
 
       return ok({
@@ -256,18 +238,20 @@ export const handleBarcode = async ({
           to: 'ecashSendConfirmation',
         },
       });
-    case 'lightning':
+  } else if (
+    isLightningAddress(lnTrim(scanning.data)) ||
+    isLnurlp(lnTrim(scanning.data)) ||
+    isLightningInvoice(lnTrim(scanning.data))
+  ) {
       return handleLightning({
         data: scanning.data,
         selectedMint,
         unit,
         balance,
         setLoading,
-        validateBalance,
       });
-    default:
-      return err('invalid_address');
   }
+  return err('invalid_address');
 };
 
 // Wrapper function to maintain current navigation behavior

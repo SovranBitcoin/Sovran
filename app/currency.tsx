@@ -233,6 +233,7 @@ function ModalScreen() {
       unit,
       selectedMint,
       setLoading,
+      balance,
     });
     if (res.isErr()) {
       showMessage(res.error, {}, { emoji: '🚨' });
