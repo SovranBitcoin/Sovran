@@ -113,11 +113,16 @@ export const usePollingPaymentRequest = ({ paymentRequest }: UsePollingPaymentRe
     if (spent.length !== 0) {
       // throw new AppError("Token already spent.", "Token already spent.");
     } else {
-      received = await receiveEcash({
+      const res = await receiveEcash({
         token: encodedEcash,
         unit,
         from,
       });
+      if (res.isOk()) {
+        received = res.value;
+      } else {
+        return;
+      }
     }
 
     const profileId = memoizedGetCurrentProfile(store.getState()).id;

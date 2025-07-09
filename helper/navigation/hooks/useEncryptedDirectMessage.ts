@@ -41,13 +41,14 @@ export const useSendEncryptedDirectMessage = () => {
 
     const pubkey: string = (result.data as ProfilePointer).pubkey;
 
-    const transaction = await sendEcash({
+    const result = await sendEcash({
       unit: decodedRequest.unit as string,
       amount: decodedRequest.amount as number,
       to: pubkey,
       paymentRequest: request,
     });
-
+    if (result.isErr()) return;
+    const transaction = result.value;
     const decodedToken = getDecodedToken(transaction.token);
 
     sendGiftWrappedEncryptedDirectMessage({

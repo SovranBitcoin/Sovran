@@ -85,25 +85,29 @@ function ModalScreen() {
         amount,
       })
     );
-    const response = await receiveLightning({
+    const res = await receiveLightning({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo,
     });
-
-    navigation?.goBack();
-    navigation.replace(params.to, {
-      ...params,
-      unifiedRequest: response.unifiedRequest,
-      paymentRequest: response.paymentRequest,
-      request: response.request,
-      amount: unit === 'sat' ? amount : amount * 100,
-      transaction: JSON.stringify(response),
-    });
+    if (res.isOk()) {
+      const response = res.value;
+      navigation?.goBack();
+      navigation.replace(params.to, {
+        ...params,
+        unifiedRequest: response.unifiedRequest,
+        paymentRequest: response.paymentRequest,
+        request: response.request,
+        amount: unit === 'sat' ? amount : amount * 100,
+        transaction: JSON.stringify(response),
+      });
+    } else {
+      showMessage(res.error.message, {}, { emoji: '🚨' });
+    }
   };
 
   const handleEcashSend = async ({ message }) => {
-    const transaction = await sendEcash({
+    const result = await sendEcash({
       to: npubToPublicKey(params?.profile?.npub),
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
@@ -119,12 +123,17 @@ function ModalScreen() {
         : {}),
     });
 
-    navigation.replace(params.to, {
-      ...params,
-      token: transaction.token,
-      amount: unit === 'sat' ? amount : amount * 100,
-      paymentRequest: params.paymentRequest,
-    });
+    if (result.isOk()) {
+      const transaction = result.value;
+      navigation.replace(params.to, {
+        ...params,
+        token: transaction.token,
+        amount: unit === 'sat' ? amount : amount * 100,
+        paymentRequest: params.paymentRequest,
+      });
+    } else {
+      showMessage(result.error.message, {}, { emoji: '🚨' });
+    }
   };
 
   const handleDefaultSend = async () => {
@@ -133,11 +142,16 @@ function ModalScreen() {
       tokens: utils.toSats(amount),
     });
 
-    const meltQuote = await getMeltQuote({
+    const meltQuoteRes = await getMeltQuote({
       pr: invoice,
       unit: unit,
       mintUrl: selectedMint,
     });
+    if (meltQuoteRes.isErr()) {
+      showMessage(meltQuoteRes.error.message, {}, { emoji: '🚨' });
+      return;
+    }
+    const meltQuote = meltQuoteRes.value;
 
     const totalAmount = Number(amount) + Number(meltQuote.fee_reserve);
 
@@ -166,8 +180,7 @@ function ModalScreen() {
 
     setLoading(true);
 
-    try {
-      switch (params.to) {
+    switch (params.to) {
         case 'lightningReceiveConfirmation':
           SheetManager.show('transaction-message', {
             onClose: async (data) => {
@@ -207,11 +220,6 @@ function ModalScreen() {
           setLoading(false);
           break;
       }
-    } catch (e) {
-      showMessage(e?.message, { ...e?.params }, { emoji: '🚨' });
-      setLoading(false);
-    } finally {
-    }
   };
 
   useEffect(() => {

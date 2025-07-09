@@ -126,14 +126,14 @@ export function EcashSendConfirmation({
   };
 
   const handleCancelSend = async (onClose) => {
+    const profileId = store.getState().nostr?.currentProfile?.id;
+    const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+
+    const transaction = transactions.find(
+      (t) => t.token === token && t.transactionType === 'send'
+    );
+
     try {
-      const profileId = store.getState().nostr?.currentProfile?.id;
-      const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
-
-      const transaction = transactions.find(
-        (t) => t.token === token && t.transactionType === 'send'
-      );
-
       await cancelEcashTransaction(transaction, navigation);
     } catch (error) {
       showMessage(error.message, {}, {}, onClose);
