@@ -79,8 +79,7 @@ export function EcashSendConfirmation({
     })
   );
 
-  const resolvedPaymentRequest =
-    paymentRequest || getCurrentTransaction[0]?.paymentRequest;
+  const resolvedPaymentRequest = paymentRequest || getCurrentTransaction[0]?.paymentRequest;
 
   const handleNFCSend = async () => {
     await write(token);
@@ -105,9 +104,7 @@ export function EcashSendConfirmation({
     try {
       setSendingNostr(true);
       const decoded = decodePaymentRequest(request);
-      const receiverTarget = decoded.getTransport(
-        PaymentRequestTransportType.NOSTR
-      ).target;
+      const receiverTarget = decoded.getTransport(PaymentRequestTransportType.NOSTR).target;
       const { data } = nip19.decode(receiverTarget);
       const { pubkey } = data as { pubkey: string };
 
@@ -409,8 +406,7 @@ export function EcashSendConfirmation({
 }
 
 function ModalScreen() {
-  const { unit, amount, token, paymentRequest } =
-    useTypedRoute<'ecashSendConfirmation'>();
+  const { unit, amount, token, paymentRequest } = useTypedRoute<'ecashSendConfirmation'>();
   return (
     <EcashSendConfirmation
       unit={unit}
