@@ -182,12 +182,16 @@ export const handleBarcode = async ({
     return handleEcash({ data: scanning.data, unit });
   } else if (isValidPaymentRequest(scanning.data)) {
     const decodedPaymentRequest = decodePaymentRequest(scanning.data);
+    console.log({ decodedPaymentRequest });
 
     return ok({
       screen: 'currency',
       params: {
         unit: decodedPaymentRequest.unit,
-        amount: decodedPaymentRequest.amount,
+        amount:
+          decodedPaymentRequest.unit === 'sat'
+            ? decodedPaymentRequest.amount
+            : decodedPaymentRequest.amount / 100,
         mints: decodedPaymentRequest.mints,
         allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
         paymentRequest: scanning.data,
