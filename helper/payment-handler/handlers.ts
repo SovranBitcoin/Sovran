@@ -1,10 +1,9 @@
-import { getLightningAmount, getMeltQuote, isValidEcashToken, Transaction } from 'components/cashu';
+import { getLightningAmount, getMeltQuote, isValidEcashToken } from 'components/cashu';
 
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { store } from '../redux/store';
-import { decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
-import { memoizedGetBalance, memoizedGetTransactions } from '../redux/cashu';
-import { nip19 } from 'nostr-tools';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
+import { memoizedGetTransactions, TransactionData } from '../redux/cashu';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
@@ -19,7 +18,7 @@ export const checkIfAlreadyRedeemed = (token: string): boolean => {
   if (!giveaway) return false;
 
   return transactions.some(
-    (tx: Transaction) =>
+    (tx: TransactionData) =>
       tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
   );
 };
@@ -30,48 +29,6 @@ interface NavigationResult {
 }
 
 type HandlerResult = Result<NavigationResult | null, string>;
-
-interface HandlePaymentRequestProps {
-  request: string;
-}
-
-export const handlePaymentRequest = async ({
-  request,
-}: HandlePaymentRequestProps): Promise<HandlerResult> => {
-  const decodedPaymentRequest = decodePaymentRequest(request);
-  const receiverMints = decodedPaymentRequest.mints;
-  const receiverAmount = decodedPaymentRequest.amount;
-  const receiverTarget = decodedPaymentRequest.getTransport(
-    PaymentRequestTransportType.NOSTR
-  ).target;
-  const unit = decodedPaymentRequest.unit;
-
-  if (!receiverAmount) {
-    return err('invalid_payment_request');
-  }
-
-  if (receiverMints?.length === 0) {
-    return err('missing_mint');
-  }
-
-  const balances = receiverMints.map((m) => memoizedGetBalance(unit, m));
-
-  if (balances.some((b) => b < receiverAmount)) {
-    return err('insufficient_balance');
-  }
-
-  let { data } = nip19.decode(receiverTarget);
-  const { pubkey } = data as { pubkey: string };
-  return ok({
-    screen: 'paymentRequestSendConfirmation',
-    params: {
-      request,
-      unit,
-      amount: receiverAmount,
-      to: pubkey,
-    },
-  });
-};
 
 interface BarcodeHandlerProps {
   scanning: { data: string };
@@ -211,45 +168,44 @@ export const handleBarcode = async ({
   setScanned,
   balance,
 }: BarcodeHandlerProps): Promise<HandlerResult> => {
-
   if (!scanning.data.startsWith('ur:') && setScanned) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
   }
 
   if (scanning.data.startsWith('ur:')) {
-      if (!setProgress) {
-        throw new Error('setProgress is required for handling UR');
-      }
-      return handleUR({ scanning, urDecoder, unit, setProgress });
+    if (!setProgress) {
+      throw new Error('setProgress is required for handling UR');
+    }
+    return handleUR({ scanning, urDecoder, unit, setProgress });
   } else if (isValidEcashToken(scanning.data)) {
-      return handleEcash({ data: scanning.data, unit });
+    return handleEcash({ data: scanning.data, unit });
   } else if (isValidPaymentRequest(scanning.data)) {
-      const decodedPaymentRequest = decodePaymentRequest(scanning.data);
+    const decodedPaymentRequest = decodePaymentRequest(scanning.data);
 
-      return ok({
-        screen: 'currency',
-        params: {
-          unit: decodedPaymentRequest.unit,
-          amount: decodedPaymentRequest.amount,
-          mints: decodedPaymentRequest.mints,
-          allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
-          paymentRequest: scanning.data,
-          to: 'ecashSendConfirmation',
-        },
-      });
+    return ok({
+      screen: 'currency',
+      params: {
+        unit: decodedPaymentRequest.unit,
+        amount: decodedPaymentRequest.amount,
+        mints: decodedPaymentRequest.mints,
+        allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
+        paymentRequest: scanning.data,
+        to: 'ecashSendConfirmation',
+      },
+    });
   } else if (
     isLightningAddress(lnTrim(scanning.data)) ||
     isLnurlp(lnTrim(scanning.data)) ||
     isLightningInvoice(lnTrim(scanning.data))
   ) {
-      return handleLightning({
-        data: scanning.data,
-        selectedMint,
-        unit,
-        balance,
-        setLoading,
-      });
+    return handleLightning({
+      data: scanning.data,
+      selectedMint,
+      unit,
+      balance,
+      setLoading,
+    });
   }
   return err('invalid_address');
 };
