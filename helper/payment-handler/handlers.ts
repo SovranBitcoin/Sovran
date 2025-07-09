@@ -160,6 +160,7 @@ const handleLightning = async ({
   unit,
   balance,
   setLoading,
+  validateBalance = true,
 }: {
   data: string;
   selectedMint: any;
@@ -188,7 +189,7 @@ const handleLightning = async ({
     });
     const totalAmount = amount + meltQuote.fee_reserve;
     const isBalanceSufficient = balance >= totalAmount;
-    if (!isBalanceSufficient) {
+    if (!isBalanceSufficient && validateBalance) {
       showMessage(
         'insufficient_balance',
         { amount, unit, fee: meltQuote.fee_reserve },
@@ -217,8 +218,10 @@ export const handleBarcode = async ({
   setProgress,
   setLoading,
   setScanned,
+  validateBalance = true,
 }: BarcodeHandlerProps): Promise<NavigationResult | null> => {
   const balance = memoizedGetBalance(unit, selectedMint)(store.getState());
+
   if (!scanning.data.startsWith('ur:') && setScanned) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setScanned(true);
@@ -268,6 +271,7 @@ export const handleBarcode = async ({
         unit,
         balance,
         setLoading,
+        validateBalance,
       });
     default:
       return null;

@@ -144,6 +144,7 @@ const Camera: React.FC = () => {
             setProgress,
             setLoading,
             setScanned,
+            validateBalance: false,
           });
         }
       } catch (error) {

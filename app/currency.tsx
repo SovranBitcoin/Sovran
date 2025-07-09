@@ -356,6 +356,7 @@ function ModalScreen() {
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }
+        requireValidMint={!!params?.allowedUnits}
       />
       {params.to === 'ecashSendConfirmation' && params?.profile && (
         <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>

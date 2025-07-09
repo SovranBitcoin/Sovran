@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -32,6 +32,7 @@ interface Props {
   allowedMints?: string[];
   allowedUnits?: string[];
   style?: StyleProp<ViewStyle>;
+  requireValidMint?: boolean;
 }
 
 const MintBalanceDisplay: React.FC<Props> = ({
@@ -41,6 +42,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
   updateSelectedMint = true,
   allowedMints,
   allowedUnits,
+  requireValidMint = false,
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -49,6 +51,13 @@ const MintBalanceDisplay: React.FC<Props> = ({
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const mintInfo = useGetMintInfo({ mintUrl: selectedMint });
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+
+  const isMintAllowed = useMemo(
+    () => (allowedMints ? allowedMints.includes(selectedMint) : true),
+    [allowedMints, selectedMint]
+  );
+
+  const showMintInfo = !(requireValidMint && !isMintAllowed);
 
   const handlePress = () => {
     SheetManager.show('mint-balance', {
@@ -83,14 +92,23 @@ const MintBalanceDisplay: React.FC<Props> = ({
           },
           style,
         ]}>
-        <View style={{ flexDirection: 'row' }}>
-          <MintIcon mintInfo={mintInfo} />
-          <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginRight: 10 }}>
-            <Text style={styles.name}>
-              {mintInfo?.name || selectedMint?.replace('https://', '').split('/')[0]}
-            </Text>
-            <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {showMintInfo ? (
+            <>
+              <MintIcon mintInfo={mintInfo} />
+              <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginRight: 10 }}>
+                <Text style={styles.name}>
+                  {mintInfo?.name || selectedMint?.replace('https://', '').split('/')[0]}
+                </Text>
+                <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Icon name="fluent:add-24-filled" size={20} color={greys(theme)[0]} />
+              <Text style={[styles.name, { marginLeft: 8 }]}>Selected mint</Text>
+            </>
+          )}
         </View>
         <View style={styles.chevronContainer}>
           <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
