@@ -1,18 +1,10 @@
-import { barcodeHandler } from '../helper/payment-handler/handlers';
+import { barcodeHandler } from 'helper/payment-handler/handlers';
 import { URDecoder } from '@gandlaf21/bc-ur';
 
-jest.mock('../components/cashu', () => ({
+jest.mock('components/cashu', () => ({
   getLightningAmount: jest.fn(() => 11),
   getMeltQuote: jest.fn(async () => ({ fee_reserve: 1 })),
   isValidEcashToken: jest.fn(() => false),
-}));
-
-jest.mock('../helper/redux/cashu', () => ({
-  memoizedGetBalance: jest.fn(() => () => 100),
-}));
-
-jest.mock('../helper/redux/store', () => ({
-  store: { getState: jest.fn(() => ({ nostr: { currentProfile: { id: '1' } } })) },
 }));
 
 describe('barcodeHandler', () => {
