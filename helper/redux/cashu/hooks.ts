@@ -1,7 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedMint } from './actions';
-import { useQuery } from '@tanstack/react-query';
-import { getMint } from 'helper/cashu';
 import { memoizedGetMintInfo, memoizedGetAudit, memoizedGetTransactions } from './selectors';
 
 export const useCashu = () => {

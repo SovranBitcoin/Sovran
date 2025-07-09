@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatCurrency } from 'helper/currency';
-import { getDescription, getTimestamp, sendLightning } from 'components/cashu';
+import { getDescription, getTimestamp, sendLightning } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { Spacer, View } from 'components/common/View';
@@ -73,15 +73,15 @@ export function LightningSendConfirmation({
         setLoading: () => {},
         setScanned: () => {},
         urDecoder: null,
+        balance: balance?.amount,
       });
-
-      if (!result?.params?.meltQuote) {
+      if (result.isOk() && result.value) {
+        dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+        setMeltQuote(result.value.params.meltQuote);
+        setUnit(result.value.params.unit);
+      } else {
         throw new Error('mint_change_failed');
       }
-
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-      setMeltQuote(result.params.meltQuote);
-      setUnit(result.params.unit);
     } else {
       dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
       setUnit(mint.unit.toLowerCase());

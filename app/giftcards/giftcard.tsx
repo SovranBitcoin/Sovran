@@ -17,6 +17,7 @@ import { Card } from 'components/common/Card';
 import lookup from 'country-code-lookup';
 import RenderHtml from 'react-native-render-html';
 import { SheetManager } from 'react-native-actions-sheet';
+import { Spacer } from 'components/common/View';
 
 const width = Dimensions.get('window').width;
 
@@ -261,11 +262,13 @@ export default function ModalScreen() {
               <Card message={selectedProduct?.specialNote?.en} variant="warning" theme={theme} />
             )}
 
+            <Spacer size={12} />
             <Card
-              message="Gift cards are provided through a third party."
+              message="Gift cards are provided through Bitrefill"
               variant="info"
               theme={theme}
             />
+            <Spacer size={12} />
 
             <Button
               onPress={() =>

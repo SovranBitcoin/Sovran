@@ -5,7 +5,7 @@ import { greens, greys } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
 import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
-import { useWallet } from 'helper/cashu/wallet';
+import { useWallet } from 'helper/cashuClient';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Card } from 'components/common/Card';
 import { useSelector } from 'react-redux';

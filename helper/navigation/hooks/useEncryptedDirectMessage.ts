@@ -1,4 +1,4 @@
-import { sendEcash } from 'helper/cashu/pay';
+import { sendEcash } from 'helper/cashuClient';
 import { decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';
 import { NDKEvent, NDKKind, ProfilePointer } from '@nostr-dev-kit/ndk';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';

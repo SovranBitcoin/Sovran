@@ -19,7 +19,7 @@ import {
   useGetMintInfo,
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
-import { getWallet } from 'helper/cashu';
+import { getWallet, getRawExpiry } from 'helper/cashuClient';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -35,7 +35,6 @@ import { publishWalletEvent } from 'helper/nostr/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
-import { getRawExpiry } from 'components/cashu';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import Icon from 'assets/icons';

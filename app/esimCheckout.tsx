@@ -11,7 +11,7 @@ import Modal from 'components/layout/Modal';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
-import { getLightningAmount, getMeltQuote } from 'components/cashu';
+import { getLightningAmount, getMeltQuote } from 'helper/cashuClient';
 import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
 import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';

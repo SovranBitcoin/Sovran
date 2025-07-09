@@ -17,7 +17,7 @@ import {
 } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
 import { publishWalletEvent } from 'helper/nostr/cashu';
-import { getWallet } from 'components/cashu';
+import { getWallet } from 'helper/cashuClient';
 import _ from 'lodash';
 import { Alert } from 'react-native';
 

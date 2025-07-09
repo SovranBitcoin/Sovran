@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { getMeltQuote } from 'components/cashu';
+import { getMeltQuote } from 'helper/cashuClient';
 import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useBitrefill } from 'helper/redux/bitrefill';

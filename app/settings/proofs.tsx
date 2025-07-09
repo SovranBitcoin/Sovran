@@ -7,7 +7,7 @@ import { Text } from 'components/common/Text';
 import Container from 'components/layout/Container';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
-import { getWallet } from 'helper/cashu';
+import { getWallet } from 'helper/cashuClient';
 import { removeProofs } from 'helper/redux/cashu'; // Import the removeProofs action
 import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';

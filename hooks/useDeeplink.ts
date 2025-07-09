@@ -6,6 +6,7 @@ import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { showMessage } from 'helper/popup/popups';
 
 export const useDeeplink = () => {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
@@ -24,7 +25,7 @@ export const useDeeplink = () => {
           parsed.hostname
         ) {
           try {
-            await barcodeHandler({
+            const res = await barcodeHandler({
               scanning: { data: parsed.hostname },
               navigation,
               urDecoder,
@@ -32,7 +33,12 @@ export const useDeeplink = () => {
               selectedMint,
               setLoading: () => { },
             });
-          } catch (err) { }
+            if (res.isErr()) {
+              showMessage(res.error, {}, { emoji: '🚨' });
+            }
+          } catch (err) {
+            // ignore
+          }
         }
       }
     })();

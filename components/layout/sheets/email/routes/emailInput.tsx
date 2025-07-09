@@ -5,7 +5,7 @@ import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Card } from 'components/common/Card';
 
@@ -40,10 +40,12 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
         backgroundColor: greys(theme)[800],
         padding: 16,
       }}>
+      <Spacer size={12} />
       <Text style={styles.title}>Input Email</Text>
       <Card
         message="Purchased giftcards will be sent to your email. It's very IMPORTANT you enter a valid email address you control otherwise your giftcards will be LOST."
         variant="warning"></Card>
+      <Spacer size={12} />
 
       <TextInput
         style={styles.textInput}

@@ -6,7 +6,7 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades } from 'helper/colors';
 import { Button } from 'components/common/Button';
 import { AmountFormatter } from 'components/common/AmountFormatter';
-import { receiveEcash } from 'components/cashu';
+import { receiveEcash } from 'helper/cashuClient';
 import { showMessage } from 'helper/popup/popups';
 import { useCashu } from 'helper/redux/cashu';
 import { useTypedNavigation } from 'helper/navigation';
