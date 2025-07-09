@@ -1,11 +1,14 @@
-import { barcodeHandler } from 'helper/payment-handler/handlers';
 import { URDecoder } from '@gandlaf21/bc-ur';
+
+jest.mock('@monicon/native', () => ({ Monicon: () => null }));
 
 jest.mock('components/cashu', () => ({
   getLightningAmount: jest.fn(() => 11),
   getMeltQuote: jest.fn(async () => ({ fee_reserve: 1 })),
   isValidEcashToken: jest.fn(() => false),
 }));
+
+import { barcodeHandler } from 'helper/payment-handler/handlers';
 
 describe('barcodeHandler', () => {
   it('handles lightning invoice', async () => {
