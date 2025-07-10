@@ -1,37 +1,9 @@
 import { createSelector } from 'reselect';
 import _ from 'lodash';
 import { RootState } from 'helper/redux/store/reducer';
-import { getDecodedToken, MintQuoteResponse } from '@cashu/cashu-ts';
+import { getDecodedToken } from '@cashu/cashu-ts';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
-
-export interface TransactionData {
-  id?: string;
-  txid?: string;
-  request?: string;
-  token?: string;
-  unit: string;
-  amount: number;
-  date: string | Date;
-  transactionType: 'send' | 'receive' | string;
-  type?: string;
-  isBuy?: string;
-  isSell?: boolean;
-  paid?: boolean;
-  isCancel?: boolean;
-  unifiedRequest?: string;
-  paymentRequest?: string;
-  from?: string;
-  to?: string;
-  fromNIP05?: string;
-  status?: { block_time: number;[key: string]: any };
-  nostr?: { pubkey: string;[key: string]: any };
-  mintUrl?: string;
-
-  isSend?: boolean;
-  isReceive?: boolean;
-
-  mintQuote?: MintQuoteResponse;
-}
+import { TransactionData } from './types';
 
 export class TransactionBuilder {
   [key: string]: any;

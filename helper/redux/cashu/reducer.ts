@@ -20,8 +20,12 @@ import {
   SET_AUDIT,
 } from './actionTypes';
 import { ensureProfileExists } from './helpers';
+import { CashuState } from './types';
+import { CashuAction } from './actions';
+import { Reducer } from 'redux';
+import { typedUpdate } from 'helper/typedUpdate';
 
-const initialState = {
+const initialState: CashuState = {
   profiles: [
     {
       selectedMint: null,
@@ -32,9 +36,15 @@ const initialState = {
       transactions: [],
     },
   ],
+  keysets: {},
+  keys: {},
+  info: {},
+  audits: {},
 };
-
-export const cashuReducer = (state = initialState, action) => {
+export const cashuReducer: Reducer<CashuState, CashuAction> = (
+  state = initialState,
+  action
+): CashuState => {
   if (action?.payload?.profileId !== undefined) {
     state = ensureProfileExists(state, action.payload.profileId);
   }
@@ -58,133 +68,164 @@ export const cashuReducer = (state = initialState, action) => {
       return ensureProfileExists(state, action.payload.profileId);
 
     case SET_KEYSETS:
-      return _.set(['keysets', action.payload.mintUrl], action.payload.keysets, state);
+      return typedUpdate('keysets', (ks) => ({
+        ...ks,
+        [action.payload.mintUrl]: action.payload.keysets,
+      }), state);
 
     case SET_KEYS:
-      return _.set(['keys', action.payload.mintUrl], action.payload.keys, state);
+      return typedUpdate('keys', (ks) => ({
+        ...ks,
+        [action.payload.mintUrl]: action.payload.keys,
+      }), state);
 
     case SET_INFO:
-      return _.set(['info', action.payload.mintUrl], action.payload.mintInfo, state);
+      return typedUpdate('info', (info) => ({
+        ...info,
+        [action.payload.mintUrl]: action.payload.mintInfo,
+      }), state);
 
     case SET_AUDIT:
-      return _.set(['audits', action.payload.mintUrl], action.payload.audit, state);
+      return typedUpdate('audits', (audits) => ({
+        ...audits,
+        [action.payload.mintUrl]: action.payload.audit,
+      }), state);
 
     case SET_PROOFS:
-      return _.set(
-        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
-        action.payload.proofs,
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const updated = {
+          ...prof,
+          proofs: {
+            ...prof.proofs,
+            [action.payload.mintUrl]: action.payload.proofs,
+          },
+        };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case SET_TRANSACTIONS:
-      return _.set(
-        ['profiles', action.payload.profileId, 'transactions'],
-        action.payload.transactions,
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const updated = { ...prof, transactions: action.payload.transactions };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case UPDATE_TRANSACTION: {
       const { profileId, updateFn, matcher = () => false } = action.payload;
-
-      return _.update(
-        ['profiles', profileId, 'transactions'],
-        _.map((tx) => (matcher(tx) ? updateFn(tx) : tx)),
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[profileId];
+        const updated = {
+          ...prof,
+          transactions: prof.transactions.map((tx) =>
+            matcher(tx) ? updateFn(tx) : tx
+          ),
+        };
+        return profiles.map((p, idx) => (idx === profileId ? updated : p));
+      }, state);
     }
 
     case APPEND_TRANSACTION: {
       const { profileId, transaction } = action.payload;
-
-      return _.update(
-        ['profiles', profileId, 'transactions'],
-        (transactions = []) => {
-          return _.concat(transactions, transaction);
-        },
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[profileId];
+        const updated = {
+          ...prof,
+          transactions: [...prof.transactions, transaction],
+        };
+        return profiles.map((p, idx) => (idx === profileId ? updated : p));
+      }, state);
     }
 
     case APPEND_TRANSACTIONS_V2:
-      // check if tx already exists inside transactions and return early
-      return _.update(
-        ['profiles', action.payload.profileId, 'transactions'],
-        (transactions = []) => _.concat(transactions, action.payload.transactions),
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const updated = {
+          ...prof,
+          transactions: [...prof.transactions, ...action.payload.transactions],
+        };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case SET_SELECTED_MINT:
-      return _.set(
-        ['profiles', action.payload.profileId, 'selectedMint'],
-        action.payload.mintUrl,
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const updated = { ...prof, selectedMint: action.payload.mintUrl };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case APPEND_PROOFS_V2:
-      const newState = _.update(
-        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
-        (proofs = []) => {
-          // Combine existing and new proofs
-          const combined = proofs.concat(action.payload.proofs);
-
-          // Deduplicate using native JS
-          const deduped = combined.filter(
-            (item, index, self) =>
-              index === self.findIndex((t) => JSON.stringify(t) === JSON.stringify(item))
-          );
-
-          return deduped;
-        },
-        state
-      );
-
-      return newState;
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const existing = prof.proofs[action.payload.mintUrl] || [];
+        const combined = [...existing, ...action.payload.proofs];
+        const deduped = combined.filter(
+          (item, index, self) => index === self.findIndex((t) => JSON.stringify(t) === JSON.stringify(item))
+        );
+        const updated = {
+          ...prof,
+          proofs: { ...prof.proofs, [action.payload.mintUrl]: deduped },
+        };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case REMOVE_PROOFS:
-      return _.update(
-        ['profiles', action.payload.profileId, 'proofs', action.payload.mintUrl],
-        (proofs = []) => {
-          return proofs.filter((proof) => {
-            const shouldRemove = action.payload.proofs.some((usedProof) => {
-              const proofPicked = {
-                C: proof.C,
-                secret: proof.secret,
-                amount: proof.amount,
-              };
-              const usedProofPicked = {
-                C: usedProof.C,
-                secret: usedProof.secret,
-                amount: usedProof.amount,
-              };
-              const isMatch = _.isEqual(proofPicked, usedProofPicked);
-
-              return isMatch;
-            });
-
-            return !shouldRemove; // Keep proofs that shouldn't be removed
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const filtered = (prof.proofs[action.payload.mintUrl] || []).filter((proof) => {
+          const shouldRemove = action.payload.proofs.some((usedProof) => {
+            const proofPicked = {
+              C: proof.C,
+              secret: proof.secret,
+              amount: proof.amount,
+            };
+            const usedProofPicked = {
+              C: usedProof.C,
+              secret: usedProof.secret,
+              amount: usedProof.amount,
+            };
+            return _.isEqual(proofPicked, usedProofPicked);
           });
-        },
-        state
-      );
+          return !shouldRemove;
+        });
+        const updated = {
+          ...prof,
+          proofs: { ...prof.proofs, [action.payload.mintUrl]: filtered },
+        };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case INCREMENT_COUNTER:
-      return _.update(
-        ['profiles', action.payload.profileId, 'counters', action.payload.mintUrl],
-        (count = 1) => count + action.payload.amount,
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const current = prof.counters[action.payload.mintUrl] || 1;
+        const updated = {
+          ...prof,
+          counters: { ...prof.counters, [action.payload.mintUrl]: current + action.payload.amount },
+        };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case RESET_COUNTER:
-      const { profileId } = action.payload;
-      return _.set(['profiles', profileId, 'counters'], {}, state);
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[action.payload.profileId];
+        const updated = { ...prof, counters: {} };
+        return profiles.map((p, idx) => (idx === action.payload.profileId ? updated : p));
+      }, state);
 
     case INCREASE_COUNTER_V2: {
       const { profileId, mintUrl, keysetId, amount } = action.payload;
-      return _.update(
-        ['profiles', profileId, 'counters', mintUrl, keysetId],
-        (count = 1) => count + amount,
-        state
-      );
+      return typedUpdate('profiles', (profiles) => {
+        const prof = profiles[profileId];
+        const mintCounters = (prof.counters[mintUrl] as Record<string, number>) || {};
+        const current = mintCounters[keysetId] || 1;
+        const updatedCounters = {
+          ...prof.counters,
+          [mintUrl]: { ...mintCounters, [keysetId]: current + amount },
+        };
+        const updated = { ...prof, counters: updatedCounters };
+        return profiles.map((p, idx) => (idx === profileId ? updated : p));
+      }, state);
     }
 
     default:

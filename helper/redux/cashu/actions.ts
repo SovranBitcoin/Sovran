@@ -21,17 +21,19 @@ import {
 } from './actionTypes';
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
 import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
-import { TransactionData } from './selectors';
+import { TransactionData } from './types';
 
-export const addMints = ({ profileId, mints }: { profileId: number; mints: string[] }) => ({
-  type: ADD_MINTS,
-  payload: { profileId, mints },
-});
+export const addMints = ({ profileId, mints }: { profileId: number; mints: string[] }) =>
+  ({
+    type: ADD_MINTS,
+    payload: { profileId, mints },
+  }) as const;
 
-export const removeMints = ({ profileId, mints }: { profileId: number; mints: string[] }) => ({
-  type: REMOVE_MINTS,
-  payload: { profileId, mints },
-});
+export const removeMints = ({ profileId, mints }: { profileId: number; mints: string[] }) =>
+  ({
+    type: REMOVE_MINTS,
+    payload: { profileId, mints },
+  }) as const;
 
 export const setSelectedMint = ({
   profileId,
@@ -39,30 +41,35 @@ export const setSelectedMint = ({
 }: {
   profileId: number;
   mintUrl: string;
-}) => ({
-  type: SET_SELECTED_MINT,
-  payload: { profileId, mintUrl },
-});
+}) =>
+  ({
+    type: SET_SELECTED_MINT,
+    payload: { profileId, mintUrl },
+  }) as const;
 
-export const setKeysets = ({ mintUrl, keysets }: { mintUrl: string; keysets: MintKeyset[] }) => ({
-  type: SET_KEYSETS,
-  payload: { mintUrl, keysets },
-});
+export const setKeysets = ({ mintUrl, keysets }: { mintUrl: string; keysets: MintKeyset[] }) =>
+  ({
+    type: SET_KEYSETS,
+    payload: { mintUrl, keysets },
+  }) as const;
 
-export const setKeys = ({ mintUrl, keys }: { mintUrl: string; keys: MintKeys[] }) => ({
-  type: SET_KEYS,
-  payload: { mintUrl, keys },
-});
+export const setKeys = ({ mintUrl, keys }: { mintUrl: string; keys: MintKeys[] }) =>
+  ({
+    type: SET_KEYS,
+    payload: { mintUrl, keys },
+  }) as const;
 
-export const setInfo = ({ mintUrl, mintInfo }: { mintUrl: string; mintInfo: MintInfo }) => ({
-  type: SET_INFO,
-  payload: { mintUrl, mintInfo },
-});
+export const setInfo = ({ mintUrl, mintInfo }: { mintUrl: string; mintInfo: MintInfo }) =>
+  ({
+    type: SET_INFO,
+    payload: { mintUrl, mintInfo },
+  }) as const;
 
-export const setAudit = ({ mintUrl, audit }) => ({
-  type: SET_AUDIT,
-  payload: { mintUrl, audit },
-});
+export const setAudit = ({ mintUrl, audit }: { mintUrl: string; audit: any }) =>
+  ({
+    type: SET_AUDIT,
+    payload: { mintUrl, audit },
+  }) as const;
 
 export const setTransactions = ({
   profileId,
@@ -70,19 +77,21 @@ export const setTransactions = ({
 }: {
   profileId: number;
   transactions: TransactionData[];
-}) => ({
-  type: SET_TRANSACTIONS,
-  payload: { profileId, transactions },
-});
+}) =>
+  ({
+    type: SET_TRANSACTIONS,
+    payload: { profileId, transactions },
+  }) as const;
 
-export const updateTransaction = ({ profileId, matcher, updateFn }) => ({
-  type: UPDATE_TRANSACTION,
-  payload: {
-    profileId,
-    matcher,
-    updateFn,
-  },
-});
+export const updateTransaction = ({ profileId, matcher, updateFn }: { profileId: number; matcher: (tx: TransactionData) => boolean; updateFn: (tx: TransactionData) => TransactionData }) =>
+  ({
+    type: UPDATE_TRANSACTION,
+    payload: {
+      profileId,
+      matcher,
+      updateFn,
+    },
+  }) as const;
 
 // Append Transaction Action Creator
 export const appendTransaction = ({
@@ -91,13 +100,14 @@ export const appendTransaction = ({
 }: {
   profileId: number;
   transaction: TransactionData;
-}) => ({
-  type: APPEND_TRANSACTION,
-  payload: {
-    profileId,
-    transaction,
-  },
-});
+}) =>
+  ({
+    type: APPEND_TRANSACTION,
+    payload: {
+      profileId,
+      transaction,
+    },
+  }) as const;
 
 export const appendTransactionsV2 = ({
   profileId,
@@ -105,10 +115,11 @@ export const appendTransactionsV2 = ({
 }: {
   profileId: number;
   transactions: TransactionData[];
-}) => ({
-  type: APPEND_TRANSACTIONS_V2,
-  payload: { profileId, transactions },
-});
+}) =>
+  ({
+    type: APPEND_TRANSACTIONS_V2,
+    payload: { profileId, transactions },
+  }) as const;
 
 export const appendProofsV2 = ({
   profileId,
@@ -118,10 +129,11 @@ export const appendProofsV2 = ({
   profileId: number;
   mintUrl: string;
   proofs: Proof[];
-}) => ({
-  type: APPEND_PROOFS_V2,
-  payload: { profileId, mintUrl, proofs },
-});
+}) =>
+  ({
+    type: APPEND_PROOFS_V2,
+    payload: { profileId, mintUrl, proofs },
+  }) as const;
 
 export const removeProofs = ({
   profileId,
@@ -131,10 +143,11 @@ export const removeProofs = ({
   profileId: number;
   mintUrl: string;
   proofs: Proof[];
-}) => ({
-  type: REMOVE_PROOFS,
-  payload: { profileId, mintUrl, proofs },
-});
+}) =>
+  ({
+    type: REMOVE_PROOFS,
+    payload: { profileId, mintUrl, proofs },
+  }) as const;
 
 export const incrementCounter = ({
   profileId,
@@ -144,10 +157,11 @@ export const incrementCounter = ({
   profileId: number;
   mintUrl: string;
   amount: number;
-}) => ({
-  type: INCREMENT_COUNTER,
-  payload: { profileId, mintUrl, amount },
-});
+}) =>
+  ({
+    type: INCREMENT_COUNTER,
+    payload: { profileId, mintUrl, amount },
+  }) as const;
 
 export const increaseCounterV2 = ({
   profileId,
@@ -159,20 +173,42 @@ export const increaseCounterV2 = ({
   mintUrl: string;
   keysetId: string;
   amount: number;
-}) => ({
-  type: INCREASE_COUNTER_V2,
-  payload: { profileId, mintUrl, keysetId, amount },
-});
+}) =>
+  ({
+    type: INCREASE_COUNTER_V2,
+    payload: { profileId, mintUrl, keysetId, amount },
+  }) as const;
 
-export const resetCounter = ({ profileId }: { profileId: number }) => ({
-  type: RESET_COUNTER,
-  payload: { profileId },
-});
+export const resetCounter = ({ profileId }: { profileId: number }) =>
+  ({
+    type: RESET_COUNTER,
+    payload: { profileId },
+  }) as const;
 
-export const ensureProfileExistsAction = (profileId: number) => ({
-  type: ENSURE_PROFILE_EXISTS,
-  payload: { profileId },
-});
+export const ensureProfileExistsAction = (profileId: number) =>
+  ({
+    type: ENSURE_PROFILE_EXISTS,
+    payload: { profileId },
+  }) as const;
+
+export type CashuAction =
+  | ReturnType<typeof addMints>
+  | ReturnType<typeof removeMints>
+  | ReturnType<typeof setSelectedMint>
+  | ReturnType<typeof setKeysets>
+  | ReturnType<typeof setKeys>
+  | ReturnType<typeof setInfo>
+  | ReturnType<typeof setAudit>
+  | ReturnType<typeof setTransactions>
+  | ReturnType<typeof updateTransaction>
+  | ReturnType<typeof appendTransaction>
+  | ReturnType<typeof appendTransactionsV2>
+  | ReturnType<typeof appendProofsV2>
+  | ReturnType<typeof removeProofs>
+  | ReturnType<typeof incrementCounter>
+  | ReturnType<typeof increaseCounterV2>
+  | ReturnType<typeof resetCounter>
+  | ReturnType<typeof ensureProfileExistsAction>;
 
 export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
   return async (dispatch) => {
