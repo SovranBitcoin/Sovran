@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
@@ -189,6 +189,7 @@ function ModalScreen() {
           // },
         ]}
       />
+      <Spacer size={12} />
       <Section
         camera={false}
         items={[
@@ -198,6 +199,8 @@ function ModalScreen() {
           },
         ]}
       />
+      <Spacer size={12} />
+
       <Text
         weight="bold"
         size={16}

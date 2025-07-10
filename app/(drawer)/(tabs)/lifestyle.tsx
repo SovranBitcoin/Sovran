@@ -101,9 +101,9 @@ const ServicesSection = () => {
 
   const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
-      navigation.navigate(item.navigateTo, item.params);
+      navigation.navigate(item.navigateTo, item.params, {});
     } else {
-      navigation.navigate(item.navigateTo);
+      navigation.navigate(item.navigateTo, {}, {});
     }
   };
 
@@ -126,7 +126,7 @@ const ServicesSection = () => {
       </Text>
       <View style={styles.gridContainer}>
         {SERVICE_MENU_ITEMS.filter((item) =>
-          ['giftcards', 'vpn', 'esims', 'donate'].includes(item.id) ? settings?.experimental : true
+          ['giftcards', 'donate'].includes(item.id) ? settings?.experimental : true
         ).map((item) => (
           <MenuItem
             key={item.id}

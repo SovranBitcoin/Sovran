@@ -39,31 +39,33 @@ const createStyles = (theme: any) =>
 
 **Design:** Check `design.tsx` as it has some useful components.
 
-**Primary:** Use Tailwind CSS for styling whenever possible.
-
-**Colors:** When you need theme-aware colors, use inline styles:
-
-- Simple: `style={{backgroundColor: greys(theme)[950]}}`
-- Complex: Create a `createStyles` function as shown in the example above
-
 **Note:** Check `helper/colors` for the complete list of available theme colors.
 
-**Types:** For StyleSheet props use `style?: StyleProp<ViewStyle>`
+# Tailwind
+
+We are migrating away from `createStyles` but it has some differences from a full Tailwind conversion.
+
+- Our colors for `greys` goes from `50,100,200,300,400,500,600,700,800,900,950` and shades `goes` from `100-500`
+- Do not use Tailwind styles on `<Text />` components directly. Just use inline styles.
+- Use inline styles for everything except for color related styles so change `<View style={{color: greys(theme)[900], marginBottom: 8 }}>` -> `<View className="mb-1" style={{color: greys(theme)[900] }}>`
+
+# Error handling
+
+- Instead of using async/await we now use `neverthrow`
+- Example of typical pattern for neverthrow function calls:
 
 ```
-style={[
-  {
-    color: 'red',
-    ...style
-  },
-]}
-
-->
-
-style={[
-  {
-    color: 'red'
-  },
-  style,
-]}
+  const walletRes = await getWallet({ unit, mintUrl, profile: null });
+  if (walletRes.isErr()) return err(walletRes.error);
+  const wallet = walletRes.value;
 ```
+
+- You can also convert functions from other libraries using:
+
+```
+  const spentRes = await toResult(wallet.checkProofsStates(proofs));
+```
+
+# Text
+
+- use `size` and other props provided by Text to change size,font,weight rather than inline styles.

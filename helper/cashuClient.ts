@@ -14,6 +14,7 @@ import {
   removeProofs,
   memoizedGetBalance,
   memoizedGetProofs,
+  TransactionData,
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { Alert, Platform } from 'react-native';
@@ -28,7 +29,6 @@ import { useState, useEffect } from 'react';
 import {
   MeltQuoteResponse,
   CashuWallet,
-  MintKeyset,
   CashuMint,
   decodePaymentRequest,
   getDecodedToken,
@@ -48,6 +48,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { bytesToHex } from '@noble/hashes/utils';
 import { toResult, toResultSync } from 'helper/toResult';
 import { ok, err, Result } from 'neverthrow';
+import { getGiveaway } from 'app/ecashReceiveConfirmation';
 
 // TYPES
 
@@ -129,13 +130,17 @@ interface GetMintParams {
   forceRefresh?: boolean;
 }
 
-
 // wallet caches for all the mints
 let walletCache: { [key: string]: CashuWallet } = {};
 
 // MAIN UTILITIES
 
-export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams): Promise<Result<CashuWallet, Error>> {
+export async function getWallet({
+  unit,
+  mintUrl,
+  profile,
+  forceRefresh = false,
+}: GetWalletParams): Promise<Result<CashuWallet, Error>> {
   if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {
     return ok(walletCache[mintUrl][unit]);
   }
@@ -201,7 +206,10 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   return ok(wallet);
 }
 
-export async function getMint({ mintUrl, forceRefresh = false }: GetMintParams): Promise<Result<CashuMint, Error>> {
+export async function getMint({
+  mintUrl,
+  forceRefresh = false,
+}: GetMintParams): Promise<Result<CashuMint, Error>> {
   const mint = new CashuMint(mintUrl);
 
   if (forceRefresh) {
@@ -242,6 +250,7 @@ export async function getMeltQuote({
   const walletRes = await getWallet({ unit, mintUrl, profile: null });
   if (walletRes.isErr()) return err(walletRes.error);
   const wallet = walletRes.value;
+
   const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
   const keysetId = activeKeyset.id;
   wallet.keysetId = keysetId;
@@ -285,6 +294,7 @@ export async function sendLightning({
   if (expiryResult.isErr()) {
     return err(new AppError('invalid_invoice', 'Invalid payment request'));
   }
+
   const expiry = expiryResult.value;
   if (expiry && new Date(Date.now() + 60_000) > expiry) {
     return err(new AppError('invoice_expired', 'Invoice expired'));
@@ -315,6 +325,7 @@ export async function sendLightning({
     const balance = currentProofs
       .map((p: { amount: number }) => p.amount)
       .reduce((a: number, b: number) => a + b, 0);
+
     if (meltQuote.amount + meltQuote.fee_reserve > balance) {
       return err(new AppError('insufficient_funds', 'Insufficient funds'));
     }
@@ -463,9 +474,6 @@ export async function receiveLightning({
   const mintQuoteResult = await toResult(wallet.createMintQuote(amount, memo));
   if (mintQuoteResult.isErr()) return err(mintQuoteResult.error);
   const mintQuote = mintQuoteResult.value;
-  if ((mintQuote as any).error) {
-    return err(new AppError('quote_error', 'Error getting mint quote'));
-  }
 
   const paymentRequest = await getPaymentRequest({
     amount: amount,
@@ -539,10 +547,6 @@ export async function sendEcash({
     });
     if (walletRes.isErr()) return err(walletRes.error);
     const wallet = walletRes.value;
-
-    if (!wallet) {
-      return err(new AppError('wallet_not_found', 'Wallet not found'));
-    }
 
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
@@ -694,10 +698,6 @@ export async function receiveEcash({
     });
     if (walletRes.isErr()) return err(walletRes.error);
     const wallet = walletRes.value;
-
-    if (!wallet) {
-      return err(new AppError('wallet_not_found', 'Wallet not found'));
-    }
 
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
@@ -1098,155 +1098,155 @@ export async function* restoreMint({
   allowedUnits?: string[];
 }) {
   let response = {};
-    const mint = await getMint({ mintUrl });
+  const mint = await getMint({ mintUrl });
 
-    const keysets = (await mint.getKeySets()).keysets;
+  const keysets = (await mint.getKeySets()).keysets;
 
-    const uniqueUnits = keysets
-      .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
-      .filter((keyset) => allowedUnits.includes(keyset.unit));
+  const uniqueUnits = keysets
+    .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
+    .filter((keyset) => allowedUnits.includes(keyset.unit));
+
+  yield {
+    label: 'INIT',
+    progress: 0,
+    totalUnits: uniqueUnits.length,
+    currentUnit: 0,
+    message: 'Starting restoration process',
+    mintUrl,
+    response,
+  };
+
+  for (let i = 0; i < uniqueUnits.length; i++) {
+    const keyset = uniqueUnits[i];
 
     yield {
-      label: 'INIT',
-      progress: 0,
+      label: 'RESTORING KEYSET',
+      unit: keyset.unit,
+      progress: i / uniqueUnits.length,
+      currentUnit: i + 1,
       totalUnits: uniqueUnits.length,
-      currentUnit: 0,
-      message: 'Starting restoration process',
+      message: `Restoring keyset for ${keyset.unit}`,
       mintUrl,
       response,
     };
 
-    for (let i = 0; i < uniqueUnits.length; i++) {
-      const keyset = uniqueUnits[i];
+    const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile });
+    let start: number = 0;
+    let emptyBatchCount: number = 0;
+    let restoredProofs: Proof[] = [];
+    let totalProofsProcessed = 0;
+    let firstEmptyStart = 0; // Track the first position where proofs begin to be empty
 
+    while (emptyBatchCount < MAX_GAP) {
       yield {
-        label: 'RESTORING KEYSET',
+        label: 'RESTORING BATCH',
         unit: keyset.unit,
-        progress: i / uniqueUnits.length,
+        batchStart: start,
+        batchEnd: start + BATCH_SIZE,
         currentUnit: i + 1,
         totalUnits: uniqueUnits.length,
-        message: `Restoring keyset for ${keyset.unit}`,
+        message: `Fetching proofs ${start} to ${start + BATCH_SIZE}`,
         mintUrl,
         response,
       };
 
-      const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile });
-      let start: number = 0;
-      let emptyBatchCount: number = 0;
-      let restoredProofs: Proof[] = [];
-      let totalProofsProcessed = 0;
-      let firstEmptyStart = 0; // Track the first position where proofs begin to be empty
+      // Fetch a batch of proofs
+      const uncheckedProofs: Proof[] = (
+        await wallet.restore(start, BATCH_SIZE, { keysetId: keyset.id })
+      ).proofs;
 
-      while (emptyBatchCount < MAX_GAP) {
-        yield {
-          label: 'RESTORING BATCH',
-          unit: keyset.unit,
-          batchStart: start,
-          batchEnd: start + BATCH_SIZE,
-          currentUnit: i + 1,
-          totalUnits: uniqueUnits.length,
-          message: `Fetching proofs ${start} to ${start + BATCH_SIZE}`,
-          mintUrl,
-          response,
-        };
-
-        // Fetch a batch of proofs
-        const uncheckedProofs: Proof[] = (
-          await wallet.restore(start, BATCH_SIZE, { keysetId: keyset.id })
-        ).proofs;
-
-        if (uncheckedProofs.length === 0) {
-          if (emptyBatchCount === 0) {
-            firstEmptyStart = start;
-          }
-          emptyBatchCount++;
-        } else {
-          emptyBatchCount = 0;
-          firstEmptyStart = 0; // Reset if we find proofs again
-          totalProofsProcessed += uncheckedProofs.length;
-
-          // Process this batch immediately instead of waiting
-          if (uncheckedProofs.length > 0) {
-            yield {
-              label: 'CHECKING BATCH',
-              unit: keyset.unit,
-              batchStart: start,
-              batchSize: uncheckedProofs.length,
-              currentUnit: i + 1,
-              totalUnits: uniqueUnits.length,
-              message: `Checking states for ${uncheckedProofs.length} proofs`,
-              mintUrl,
-              response,
-            };
-
-            // Check states of this batch
-            const proofStates: ProofState[] = await wallet.checkProofsStates(uncheckedProofs);
-
-            // Filter and keep only the unspent proofs
-            const unspentProofs = uncheckedProofs.filter(
-              (p, index) => proofStates[index].state === 'UNSPENT'
-            );
-
-            // Add unspent proofs to our collection
-            restoredProofs = restoredProofs.concat(unspentProofs);
-
-            yield {
-              label: 'BATCH_PROCESSED',
-              unit: keyset.unit,
-              batchStart: start,
-              unspentCount: unspentProofs.length,
-              totalUnspent: restoredProofs.length,
-              totalProcessed: totalProofsProcessed,
-              currentUnit: i + 1,
-              totalUnits: uniqueUnits.length,
-              message: `Found ${unspentProofs.length} unspent proofs in batch`,
-              mintUrl,
-              response,
-            };
-          }
+      if (uncheckedProofs.length === 0) {
+        if (emptyBatchCount === 0) {
+          firstEmptyStart = start;
         }
+        emptyBatchCount++;
+      } else {
+        emptyBatchCount = 0;
+        firstEmptyStart = 0; // Reset if we find proofs again
+        totalProofsProcessed += uncheckedProofs.length;
 
-        start += BATCH_SIZE;
+        // Process this batch immediately instead of waiting
+        if (uncheckedProofs.length > 0) {
+          yield {
+            label: 'CHECKING BATCH',
+            unit: keyset.unit,
+            batchStart: start,
+            batchSize: uncheckedProofs.length,
+            currentUnit: i + 1,
+            totalUnits: uniqueUnits.length,
+            message: `Checking states for ${uncheckedProofs.length} proofs`,
+            mintUrl,
+            response,
+          };
+
+          // Check states of this batch
+          const proofStates: ProofState[] = await wallet.checkProofsStates(uncheckedProofs);
+
+          // Filter and keep only the unspent proofs
+          const unspentProofs = uncheckedProofs.filter(
+            (p, index) => proofStates[index].state === 'UNSPENT'
+          );
+
+          // Add unspent proofs to our collection
+          restoredProofs = restoredProofs.concat(unspentProofs);
+
+          yield {
+            label: 'BATCH_PROCESSED',
+            unit: keyset.unit,
+            batchStart: start,
+            unspentCount: unspentProofs.length,
+            totalUnspent: restoredProofs.length,
+            totalProcessed: totalProofsProcessed,
+            currentUnit: i + 1,
+            totalUnits: uniqueUnits.length,
+            message: `Found ${unspentProofs.length} unspent proofs in batch`,
+            mintUrl,
+            response,
+          };
+        }
       }
 
-      // Calculate the final index after searching
-      const keysetIndex = firstEmptyStart !== 0 ? firstEmptyStart : start - MAX_GAP * BATCH_SIZE;
-
-      // Build the full response
-      response = {
-        ...response,
-        [keyset.unit]: {
-          proofs: restoredProofs,
-          keysets: {
-            ...response?.[keyset?.unit]?.keysets,
-            [keyset.id]: keysetIndex,
-          },
-        },
-      };
-
-      yield {
-        label: 'KEYSET_COMPLETE',
-        unit: keyset.unit,
-        progress: (i + 1) / uniqueUnits.length,
-        currentUnit: i + 1,
-        totalUnits: uniqueUnits.length,
-        proofCount: restoredProofs.length,
-        index: keysetIndex, // Add index to the yield data
-        message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs, index: ${keysetIndex}`,
-        mintUrl,
-        response,
-      };
+      start += BATCH_SIZE;
     }
 
+    // Calculate the final index after searching
+    const keysetIndex = firstEmptyStart !== 0 ? firstEmptyStart : start - MAX_GAP * BATCH_SIZE;
+
+    // Build the full response
+    response = {
+      ...response,
+      [keyset.unit]: {
+        proofs: restoredProofs,
+        keysets: {
+          ...response?.[keyset?.unit]?.keysets,
+          [keyset.id]: keysetIndex,
+        },
+      },
+    };
+
     yield {
-      label: 'COMPLETE',
-      progress: 1,
-      message: 'Restoration complete',
+      label: 'KEYSET_COMPLETE',
+      unit: keyset.unit,
+      progress: (i + 1) / uniqueUnits.length,
+      currentUnit: i + 1,
+      totalUnits: uniqueUnits.length,
+      proofCount: restoredProofs.length,
+      index: keysetIndex, // Add index to the yield data
+      message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs, index: ${keysetIndex}`,
       mintUrl,
       response,
     };
+  }
 
-    return response;
+  yield {
+    label: 'COMPLETE',
+    progress: 1,
+    message: 'Restoration complete',
+    mintUrl,
+    response,
+  };
+
+  return response;
 }
 
 export async function restoreCounter({
@@ -1291,14 +1291,27 @@ export async function restoreCounter({
   return firstEmptyStart;
 }
 
-// ERROR
+export const checkIfAlreadyRedeemed = (token: string): boolean => {
+  const profileId = store.getState().nostr?.currentProfile?.id;
+  const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+
+  const giveaway = getGiveaway({ token });
+  if (!giveaway) return false;
+
+  return transactions.some(
+    (tx: TransactionData) =>
+      tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
+  );
+};
 
 export class AppError extends Error {
-  static messageMap = {};
+  type: string;
+  code?: string;
 
-  constructor(name, message) {
-    const mappedError = AppError.messageMap[message];
-    super(mappedError?.message || message);
-    this.name = mappedError?.name || name;
+  constructor(message: string, type: string, code?: string) {
+    super(message);
+    this.name = 'AppError';
+    this.type = type;
+    this.code = code;
   }
 }

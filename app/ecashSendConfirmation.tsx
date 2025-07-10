@@ -45,6 +45,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { err, ok, Result } from 'neverthrow';
 
 export function EcashSendConfirmation({
   unit,
@@ -130,9 +131,7 @@ export function EcashSendConfirmation({
     const profileId = store.getState().nostr?.currentProfile?.id;
     const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
-    const transaction = transactions.find(
-      (t) => t.token === token && t.transactionType === 'send'
-    );
+    const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
 
     const res = await cancelEcashTransaction(transaction, navigation);
     if (res.isErr()) {
@@ -204,7 +203,12 @@ export function EcashSendConfirmation({
         showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
     } else {
-      showMessage('error_checking_status', { error: result.error.message }, { emoji: '⚠️' }, onClose);
+      showMessage(
+        'error_checking_status',
+        { error: result.error.message },
+        { emoji: '⚠️' },
+        onClose
+      );
     }
     setIsCheckingStatus(false);
   };

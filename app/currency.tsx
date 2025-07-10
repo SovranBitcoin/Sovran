@@ -126,6 +126,14 @@ function ModalScreen() {
         paymentRequest: params.paymentRequest,
       });
     } else {
+      console.log(1298372, {
+        result,
+        error: result.error,
+        message: result.error.message,
+        cause: result.error.cause,
+        name: result.error.name,
+        stack: result.error.stack,
+      });
       showMessage(result.error.message, {}, { emoji: '🚨' });
     }
   };
@@ -175,45 +183,45 @@ function ModalScreen() {
     setLoading(true);
 
     switch (params.to) {
-        case 'lightningReceiveConfirmation':
-          SheetManager.show('transaction-message', {
-            onClose: async (data) => {
-              if (data?.action === 'confirm') {
-                await handleLightningReceive({ memo: data.message });
-              } else if (data?.action === 'skip') {
-                await handleLightningReceive({ memo: undefined });
-              }
-              setLoading(false);
-            },
-          });
-          break;
-        case 'ecashSendConfirmation':
-          // check balance
-          if (unit === 'sat' ? balance < amount : balance < amount * 100) {
-            showMessage(
-              'insufficient_balance',
-              { amount: unit === 'sat' ? amount : amount * 100, unit, fee: 0 },
-              { emoji: '🚨' }
-            );
+      case 'lightningReceiveConfirmation':
+        SheetManager.show('transaction-message', {
+          onClose: async (data) => {
+            if (data?.action === 'confirm') {
+              await handleLightningReceive({ memo: data.message });
+            } else if (data?.action === 'skip') {
+              await handleLightningReceive({ memo: undefined });
+            }
             setLoading(false);
-            return;
-          }
-          SheetManager.show('transaction-message', {
-            onClose: async (data) => {
-              if (data?.action === 'confirm') {
-                await handleEcashSend({ message: data.message });
-              } else if (data?.action === 'skip') {
-                await handleEcashSend({ message: undefined });
-              }
-              setLoading(false);
-            },
-          });
-          break;
-        default:
-          await handleDefaultSend();
+          },
+        });
+        break;
+      case 'ecashSendConfirmation':
+        // check balance
+        if (unit === 'sat' ? balance < amount : balance < amount * 100) {
+          showMessage(
+            'insufficient_balance',
+            { amount: unit === 'sat' ? amount : amount * 100, unit, fee: 0 },
+            { emoji: '🚨' }
+          );
           setLoading(false);
-          break;
-      }
+          return;
+        }
+        SheetManager.show('transaction-message', {
+          onClose: async (data) => {
+            if (data?.action === 'confirm') {
+              await handleEcashSend({ message: data.message });
+            } else if (data?.action === 'skip') {
+              await handleEcashSend({ message: undefined });
+            }
+            setLoading(false);
+          },
+        });
+        break;
+      default:
+        await handleDefaultSend();
+        setLoading(false);
+        break;
+    }
   };
 
   useEffect(() => {

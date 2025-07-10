@@ -26,32 +26,24 @@ export const TAB_SCREENS = (settings: any): TabConfig[] => [
     title: 'Payments',
     icon: ({ color }) => <Icon name="fluent:arrow-swap-16-filled" color={color} size={32} />,
   },
-  ...(settings?.experimental
-    ? [
-        {
-          name: 'myEsims',
-          component: MyEsims,
-          title: '',
-          icon: ({ color }) => <Icon name="fluent:sim-24-filled" color={color} size={32} />,
-        },
-      ]
-    : []),
+  {
+    name: 'myEsims',
+    component: MyEsims,
+    title: '',
+    icon: ({ color }) => <Icon name="fluent:sim-24-filled" color={color} size={32} />,
+  },
   {
     name: 'index',
     component: HomeView,
     title: 'Wallet',
     icon: LightningIcon,
   },
-  ...(settings?.experimental
-    ? [
-        {
-          name: 'myVpns',
-          component: MyVpns,
-          title: '',
-          icon: ({ color }) => <Icon name="ic:baseline-vpn-lock" color={color} size={32} />,
-        },
-      ]
-    : []),
+  {
+    name: 'myVpns',
+    component: MyVpns,
+    title: '',
+    icon: ({ color }) => <Icon name="ic:baseline-vpn-lock" color={color} size={32} />,
+  },
   {
     name: 'lifestyle',
     component: LifestyleView,

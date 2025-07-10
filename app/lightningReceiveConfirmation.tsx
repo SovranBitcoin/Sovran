@@ -41,6 +41,7 @@ import { TransactionMintRefresh } from 'components/common/Transaction/Transactio
 import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
+import { err } from 'neverthrow';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -432,72 +433,76 @@ export function LightningReceiveConfirmation({
     }
     const status = statusRes.value;
 
-      if (status.state === 'PAID') {
-        const profileId = store.getState().nostr?.currentProfile?.id;
+    if (status.state === 'PAID') {
+      const profileId = store.getState().nostr?.currentProfile?.id;
 
-        const counter = memoizedGetCounterV2({
+      const counter = memoizedGetCounterV2({
+        profileId: store.getState().nostr.currentProfile.id,
+        mintUrl: currentTx.mintUrl,
+        keysetId: wallet.keysetId,
+      })(store.getState());
+
+      // Mint proofs
+      const proofsResult = await toResult(
+        wallet.mintProofs(amount, currentTx.mintQuote.quote, {
+          counter,
+          keysetId: wallet.keysetId,
+        })
+      );
+      if (proofsResult.isErr()) return err(proofsResult.error);
+      const proofs = proofsResult.value;
+
+      // Increase counter
+      store.dispatch(
+        increaseCounterV2({
           profileId: store.getState().nostr.currentProfile.id,
           mintUrl: currentTx.mintUrl,
           keysetId: wallet.keysetId,
-        })(store.getState());
+          amount: proofs.length,
+        })
+      );
 
-        // Mint proofs
-        const proofs = await wallet.mintProofs(amount, currentTx.mintQuote.quote, {
-          counter,
-          keysetId: wallet.keysetId,
-        });
+      // Add proofs to redux
+      await store.dispatch(
+        appendProofsV2({
+          profileId: store.getState().nostr.currentProfile.id,
+          mintUrl: currentTx.mintUrl,
+          proofs: proofs,
+        })
+      );
 
-        // Increase counter
-        store.dispatch(
-          increaseCounterV2({
-            profileId: store.getState().nostr.currentProfile.id,
-            mintUrl: currentTx.mintUrl,
-            keysetId: wallet.keysetId,
-            amount: proofs.length,
-          })
-        );
+      // Publish wallet event, this basically just makes sure we can restore our account via nostr
+      const currentProfileId = store.getState().nostr.currentProfile.id;
+      const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
+      publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
 
-        // Add proofs to redux
-        await store.dispatch(
-          appendProofsV2({
-            profileId: store.getState().nostr.currentProfile.id,
-            mintUrl: currentTx.mintUrl,
-            proofs: proofs,
-          })
-        );
+      // Update transaction status to paid
+      showMessage('funds_sent', {
+        amount: currentTx.amount,
+        unit: currentTx.unit,
+      });
 
-        // Publish wallet event, this basically just makes sure we can restore our account via nostr
-        const currentProfileId = store.getState().nostr.currentProfile.id;
-        const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
-        publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
+      await store.dispatch(
+        updateTransaction({
+          profileId,
+          matcher: (tx) => tx.request === currentTx.request,
+          updateFn: (tx) => ({
+            ...tx,
+            paid: true,
+          }),
+        })
+      );
 
-        // Update transaction status to paid
-        showMessage('funds_sent', {
-          amount: currentTx.amount,
-          unit: currentTx.unit,
-        });
-
-        await store.dispatch(
-          updateTransaction({
-            profileId,
-            matcher: (tx) => tx.request === currentTx.request,
-            updateFn: (tx) => ({
-              ...tx,
-              paid: true,
-            }),
-          })
-        );
-
-        showMessage(
-          'funds_received',
-          { amount: currentTx.amount, unit: currentTx.unit },
-          { emoji: '🎉' },
-          onClose
-        );
-      } else if (status.state === 'ISSUED') {
-      } else {
-        showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
-      }
+      showMessage(
+        'funds_received',
+        { amount: currentTx.amount, unit: currentTx.unit },
+        { emoji: '🎉' },
+        onClose
+      );
+    } else if (status.state === 'ISSUED') {
+    } else {
+      showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
+    }
   };
 
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });

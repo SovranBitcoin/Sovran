@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Dimensions, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Dimensions, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from 'expo-router';
 import { greys } from 'helper/colors';
@@ -11,10 +11,9 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
-import opacity from 'hex-color-opacity';
-import { BlurView } from 'expo-blur';
 import Icon from 'assets/icons';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
+import { View } from 'components/common/View';
 
 // Screen dimensions
 const { width: screenWidth } = Dimensions.get('window');
@@ -49,14 +48,11 @@ const BlurredCircleButton: React.FC<BlurredCircleButtonProps> = ({
   const theme = useSelector(memoizedGetTheme);
 
   return (
-    <BlurView intensity={intensity} tint={tint} style={[styles.blurContainer, style]}>
-      <TouchableOpacity
-        className="m-auto items-center rounded-lg "
-        style={{ backgroundColor: opacity(greys(theme)[800], 0.1) }}
-        onPress={onPress}>
+    <View blur blurIntensity={intensity} blurTint={tint} style={[styles.blurContainer, style]}>
+      <TouchableOpacity className="m-auto items-center rounded-lg " onPress={onPress}>
         {children}
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 };
 
