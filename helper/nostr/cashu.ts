@@ -1,9 +1,7 @@
-import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
-import { store } from 'helper/redux/store';
+import { SimplePool } from 'nostr-tools';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 
 const cache = new Cache({
   namespace: 'last-wallet-event',
@@ -37,45 +35,3 @@ export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | nu
   return null;
 }
 
-async function publishWalletEvent(mints: string[], units: string[] = ['sat']): Promise<string>[] {
-  try {
-    const currentProfile = memoizedGetCurrentProfile(store.getState());
-
-    if (!currentProfile?.pubkey || !currentProfile?.nsec) {
-      throw new Error('No valid profile available');
-    }
-
-    const pubKey = currentProfile.pubkey;
-    const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
-
-    if (!(privKeyBytes instanceof Uint8Array)) {
-      throw new Error('Invalid private key format');
-    }
-
-    const event: NostrEvent = {
-      kind: 37375,
-      tags: [
-        ['d', 'my-cashu-wallet'],
-        ...mints
-          .filter((item, index, self) => index === self.findIndex((t) => t === item))
-          .map((mint) => ['mint', mint]),
-        ['name', 'Sovran Wallet'],
-        ['unit', 'sat'],
-        ['description', 'iOS Sovran wallet'],
-        ...relays
-          .filter((item, index, self) => index === self.findIndex((t) => t === item))
-          .map((relay) => ['relay', relay]),
-      ],
-      pubkey: pubKey,
-      content: '', // You might want to add encrypted content here using nip44
-      created_at: Math.floor(Date.now() / 1000),
-    };
-
-    const pool = new SimplePool();
-    return await pool.publish(relays, finalizeEvent(event, privKeyBytes));
-  } catch (err) {
-    throw err;
-  }
-}
-
-export { publishWalletEvent };

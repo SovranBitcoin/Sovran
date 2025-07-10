@@ -16,7 +16,7 @@ import {
   updateTransaction,
 } from 'helper/redux/cashu';
 import { showMessage } from 'helper/popup/popups';
-import { publishWalletEvent } from 'helper/nostr/cashu';
+import { publishWalletEvent } from 'helper/nostrClient';
 import { getWallet } from 'helper/cashuClient';
 import _ from 'lodash';
 import { Alert } from 'react-native';
@@ -373,9 +373,12 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         const existingTxs = memoizedGetTransactions({ id: currentProfileId })(
                           store.getState()
                         );
-                        publishWalletEvent([
+                        const publishRes = await publishWalletEvent([
                           ...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl]),
                         ]);
+                        if (publishRes.isErr()) {
+                          console.error('Failed to publish wallet event:', publishRes.error);
+                        }
 
                         // Update transaction status to paid
                         showMessage('funds_sent', {

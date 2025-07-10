@@ -32,7 +32,7 @@ import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { greens, greys } from 'helper/colors';
-import { publishWalletEvent } from 'helper/nostr/cashu';
+import { publishWalletEvent } from 'helper/nostrClient';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
@@ -469,7 +469,12 @@ export function LightningReceiveConfirmation({
         // Publish wallet event, this basically just makes sure we can restore our account via nostr
         const currentProfileId = store.getState().nostr.currentProfile.id;
         const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
-        publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
+        const publishRes = await publishWalletEvent([
+          ...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl]),
+        ]);
+        if (publishRes.isErr()) {
+          console.error('Failed to publish wallet event:', publishRes.error);
+        }
 
         // Update transaction status to paid
         showMessage('funds_sent', {

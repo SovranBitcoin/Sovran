@@ -24,20 +24,16 @@ export const useDeeplink = () => {
           parsed.hostname !== 'expo-development-client' &&
           parsed.hostname
         ) {
-          try {
-            const res = await barcodeHandler({
-              scanning: { data: parsed.hostname },
-              navigation,
-              urDecoder,
-              unit: 'sat',
-              selectedMint,
-              setLoading: () => { },
-            });
-            if (res.isErr()) {
-              showMessage(res.error, {}, { emoji: '🚨' });
-            }
-          } catch (err) {
-            // ignore
+          const res = await barcodeHandler({
+            scanning: { data: parsed.hostname },
+            navigation,
+            urDecoder,
+            unit: 'sat',
+            selectedMint,
+            setLoading: () => {},
+          });
+          if (res.isErr()) {
+            showMessage(res.error, {}, { emoji: '🚨' });
           }
         }
       }

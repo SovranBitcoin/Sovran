@@ -51,7 +51,7 @@ export const useSendEncryptedDirectMessage = () => {
     const transaction = sendResult.value;
     const decodedToken = getDecodedToken(transaction.token);
 
-    sendGiftWrappedEncryptedDirectMessage({
+    const publishResult = await sendGiftWrappedEncryptedDirectMessage({
       message: JSON.stringify({
         mint: decodedToken.mint,
         unit: decodedToken.unit,
@@ -61,6 +61,9 @@ export const useSendEncryptedDirectMessage = () => {
       recipient: pubkey,
       nsec: currentProfile.nsec,
     });
+    if (publishResult.isErr()) {
+      console.error('Failed to send encrypted direct message:', publishResult.error);
+    }
   };
 
   return { sendEncryptedDirectMessage, sendPaymentRequest };

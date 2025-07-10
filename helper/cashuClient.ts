@@ -17,7 +17,7 @@ import {
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { Alert, Platform } from 'react-native';
-import { publishWalletEvent } from 'helper/nostr/cashu';
+import { publishWalletEvent } from 'helper/nostrClient';
 import { convertTime } from 'helper/time';
 import dayjs from 'dayjs';
 import { auditMint } from 'helper/apiClient';
@@ -771,12 +771,15 @@ export async function receiveEcash({
       })
     );
 
-    await publishWalletEvent([
+    const publishRes = await publishWalletEvent([
       ...new Set([
         ...memoizedGetTransactions({ id: profile.id })(store.getState()).map((t) => t.mintUrl),
         receiveMintUrl,
       ]),
     ]);
+    if (publishRes.isErr()) {
+      console.error('Failed to publish wallet event:', publishRes.error);
+    }
 
     return ok(transaction);
   };

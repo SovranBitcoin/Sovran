@@ -111,7 +111,7 @@ export function EcashSendConfirmation({
 
       const decodedToken = getDecodedToken(token);
 
-      await sendGiftWrappedEncryptedDirectMessage({
+      const publishResult = await sendGiftWrappedEncryptedDirectMessage({
         message: JSON.stringify({
           mint: decodedToken.mint,
           unit: decodedToken.unit,
@@ -121,6 +121,9 @@ export function EcashSendConfirmation({
         recipient: pubkey,
         nsec: currentProfile.nsec,
       });
+      if (publishResult.isErr()) {
+        console.error('Failed to send encrypted direct message:', publishResult.error);
+      }
     } finally {
       setSendingNostr(false);
     }
