@@ -6,7 +6,7 @@ export const ensureProfileExists = (state: CashuState, profileId: number): Cashu
     const profile: CashuProfile = {
       selectedMint: 'https://mint.minibits.cash/Bitcoin',
       mints: ['https://mint.minibits.cash/Bitcoin'],
-      proofs: [],
+      proofs: {},
       keysets: {},
       transactions: [],
       counters: {},
