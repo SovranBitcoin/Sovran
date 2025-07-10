@@ -140,7 +140,7 @@ const handleLightning = async ({
       mintUrl: selectedMint,
     });
     if (meltQuoteRes.isErr()) {
-      return err('general_error');
+      return err(meltQuoteRes.error);
     }
     const meltQuote = meltQuoteRes.value;
     const totalAmount = amount + meltQuote.fee_reserve;
