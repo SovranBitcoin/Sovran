@@ -12,7 +12,11 @@ const MessageComponent = ({ message, theme, isReceived }) => {
     <View style={styles.wrapper}>
       <View style={styles.arrow}></View>
       <LinearGradient
-        colors={isReceived ? [greys(theme)[500], greys(theme)[500]] : [shades[200], shades[300]]}
+        colors={
+          isReceived
+            ? [greys(theme)[500], greys(theme)[500]]
+            : [theme.shades[200], theme.shades[300]]
+        }
         style={styles.container}>
         <Text style={styles.text}>{message.content}</Text>
         <View style={styles.footer}>
@@ -43,7 +47,7 @@ const createStyles = (theme, isReceived) =>
       [isReceived ? 'left' : 'right']: 16,
       width: 8,
       height: 8,
-      backgroundColor: isReceived ? greys(theme)[500] : shades[300],
+      backgroundColor: isReceived ? greys(theme)[500] : theme.shades[300],
       transform: [{ rotate: '45deg' }],
     },
     text: {
