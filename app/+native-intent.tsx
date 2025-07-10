@@ -1,3 +1,3 @@
-export function redirectSystemPath({ path, initial }) {
+export function redirectSystemPath() {
   return '';
 }

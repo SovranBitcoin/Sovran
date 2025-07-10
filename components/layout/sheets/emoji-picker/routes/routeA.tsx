@@ -19,6 +19,7 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   const payload = useSheetPayload('emoji-picker');
 
   const emojis = [
+    { id: 'laugh', emoji: '😂' },
     { id: 'nut', emoji: '🥜' }, // peanut (inside joke in some bitcoin circles)
     { id: 'lightning', emoji: '⚡' }, // lightning (for Lightning Network)
     { id: 'heart', emoji: '🧡' }, // orange heart (bitcoin community love)

@@ -1,12 +1,21 @@
 import { BlurTint } from 'expo-blur';
 import { ImageSource } from 'expo-image';
-import { computeGreys, computeShades, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from './colors';
+import {
+  computeShades,
+  GreyKey,
+  greys,
+  Greys,
+  hexToRgb,
+  hslToRgb,
+  rgbToHex,
+  rgbToHsl,
+} from './colors';
 import { darken, getLuminance, parseToHsl } from 'polished';
 
 export interface BackgroundImageAttributes {
   id: string;
   shades: Record<100 | 200 | 300 | 400 | 500, string>;
-  greys: Record<number | '2300', string>;
+  greys: Greys;
   text: string;
   tint: BlurTint;
   dominantColors?: string[];
@@ -57,7 +66,7 @@ const pickByStrategy = (colors: string[], strategy: GreyStrategy) => {
   }
 };
 
-function learnedBlurTransform(hex) {
+function learnedBlurTransform(hex: string) {
   const { r, g, b } = hexToRgb(hex);
 
   const red = 0.4533 * r + 0.1569 * g + 0.1992 * b + 10.8973;
@@ -93,30 +102,39 @@ const makeBackgroundAttributes = ({
 }: BackgroundConfig): BackgroundImageAttributes => {
   const isArray = Array.isArray(base);
   const baseColor = isArray ? brightest(base) : base;
-  const greysBase = computeGreys('dark', baseColor);
+  const greysBase = greys('dark');
 
-  const greys =
-    isArray && darkenAmount != null
-      ? {
-        ...greysBase,
-        ...Object.fromEntries(
-          [50, 100, 200, 300, 400, 500, 600, 700, 800].map((key) => [
-            key,
-            adjustLuminanceOfHex(
-              learnedBlurTransform(darken(darkenAmount, pickByStrategy(base, strategy))),
-              getLuminanceFromHex(greysBase[key])
-            ),
-          ])
-        ),
-        900: learnedBlurTransform(darken(darkenAmount, pickByStrategy(base, strategy))),
-        950: darken(darkenAmount, pickByStrategy(base, strategy)),
-      }
-      : greysBase;
+  const buildDarkenedGreys = (base_: string[]): Greys => {
+    const chosen = pickByStrategy(base_, strategy);
+    const darkened = darken(darkenAmount!, chosen);
+    const blurred = learnedBlurTransform(darkened);
+
+    // Only the keys 50–800, statically typed to exclude 900 & 950
+    const darkenedKeys: Exclude<GreyKey, 900 | 950>[] = [
+      50, 100, 200, 300, 400, 500, 600, 700, 800,
+    ];
+
+    const adjustedEntries = darkenedKeys.map((key) => {
+      const originalL = getLuminanceFromHex(greysBase[key]);
+      const hex = adjustLuminanceOfHex(blurred, originalL);
+      return [key, hex];
+    });
+
+    return {
+      ...greysBase,
+      ...Object.fromEntries(adjustedEntries),
+      900: blurred,
+      950: darkened,
+    };
+  };
+
+  // Now choose which greys to use
+  const g = isArray && darkenAmount != null ? buildDarkenedGreys(base as string[]) : greysBase;
 
   return {
     id,
     shades: computeShades(baseColor),
-    greys,
+    greys: g,
     text: '#FFFFFF',
     tint,
     ...(isArray ? { dominantColors: base } : {}),

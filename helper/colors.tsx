@@ -1,6 +1,10 @@
 import { BACKGROUND_IMAGE_ATTRIBUTES } from './backgroundImages';
+import { Theme } from './redux/settings';
 
-export const shades = {
+export type ShadeKey = 100 | 200 | 300 | 400 | 500;
+export type Shades = Record<ShadeKey, string>;
+
+export const shades: Shades = {
   100: '#FF5841',
   200: '#FF353C',
   300: '#ED0C46',
@@ -8,135 +12,15 @@ export const shades = {
   500: '#BF004E',
 };
 
-type ShadeKey = 100 | 200 | 300 | 400 | 500;
-
-/**
- * Convert a hex string to an RGB object.
- */
-export const hexToRgb = (hex: string) => {
-  const clean = hex.replace('#', '');
-  const bigint = parseInt(
-    clean.length === 3
-      ? clean
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : clean,
-    16
-  );
-  return {
-    r: (bigint >> 16) & 255,
-    g: (bigint >> 8) & 255,
-    b: bigint & 255,
-  };
-};
-
-/**
- * Convert an RGB tuple to HSL.
- */
-export const rgbToHsl = (r: number, g: number, b: number) => {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r:
-        h = (g - b) / d + (g < b ? 6 : 0);
-        break;
-      case g:
-        h = (b - r) / d + 2;
-        break;
-      default:
-        h = (r - g) / d + 4;
-    }
-    h /= 6;
-  }
-
-  return { h: h * 360, s: s * 100, l: l * 100 };
-};
-
-/**
- * Convert an HSL tuple to RGB.
- */
-export const hslToRgb = (h: number, s: number, l: number) => {
-  h /= 360;
-  s /= 100;
-  l /= 100;
-
-  if (s === 0) {
-    const val = Math.round(l * 255);
-    return { r: val, g: val, b: val };
-  }
-
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-
-  const r = hue2rgb(p, q, h + 1 / 3);
-  const g = hue2rgb(p, q, h);
-  const b = hue2rgb(p, q, h - 1 / 3);
-
-  return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
-};
-
-export const rgbToHex = (r: number, g: number, b: number) =>
-  `#${[r, g, b]
-    .map((x) => {
-      const hex = x.toString(16);
-      return hex.length === 1 ? `0${hex}` : hex;
-    })
-    .join('')}`;
-
-interface ShadeDelta {
-  h: number;
-  s: number;
-  l: number;
-}
-
-const BASE_SHADE_DELTAS: Record<Exclude<ShadeKey, 300>, ShadeDelta> = {
-  100: { h: -337.2701754385965, s: 9.638554216867476, l: 13.921568627450974 },
-  200: { h: 13.387458745874653, s: 9.638554216867476, l: 11.568627450980387 },
-  400: { h: -6.960517799352772, s: 8.677015755329023, l: -8.039215686274517 },
-  500: { h: -9.035951134380412, s: 9.638554216867476, l: -11.372549019607845 },
-};
-
-export const computeShades = (base300: string) => {
-  const baseHsl = rgbToHsl(...Object.values(hexToRgb(base300)));
-  const result: Record<ShadeKey, string> = { 300: base300 } as Record<ShadeKey, string>;
-
-  (Object.keys(BASE_SHADE_DELTAS) as Exclude<ShadeKey, 300>[]).forEach((key) => {
-    const delta = BASE_SHADE_DELTAS[key];
-    const h = (baseHsl.h + delta.h + 360) % 360;
-    const s = Math.max(0, Math.min(100, baseHsl.s + delta.s));
-    const l = Math.max(0, Math.min(100, baseHsl.l + delta.l));
-    const { r, g, b } = hslToRgb(h, s, l);
-    result[key] = rgbToHex(r, g, b);
-  });
-
-  return result;
-};
-
-export const reds = {
+export const reds: Shades = {
+  100: '#F8E0E6',
+  200: '#E4A3B4',
   300: shades[300],
+  400: '#BF0A39',
+  500: '#9A082E',
 };
 
-export const greens = {
+export const greens: Shades = {
   100: '#E0F8E0',
   200: '#A3E4A3',
   300: '#0CED3E',
@@ -144,7 +28,7 @@ export const greens = {
   500: '#089A2C',
 };
 
-export const purples = {
+export const purples: Shades = {
   100: '#E0E0F8',
   200: '#A3A3E4',
   300: '#8A2BE2',
@@ -152,7 +36,7 @@ export const purples = {
   500: '#4B0082',
 };
 
-export const indigos = {
+export const indigos: Shades = {
   100: '#E0E0F8',
   200: '#A3A3E4',
   300: '#8A2BE2',
@@ -160,12 +44,19 @@ export const indigos = {
   500: '#4B0082',
 };
 
-export const blues = {
+export const blues: Shades = {
+  100: '#E0F8E5',
+  200: '#A3E4B1',
   300: '#0CED3E',
+  400: '#0ABF32',
+  500: '#089A28',
 };
 
-export const greys = (t = 'dark') => {
-  const name = t?.id || t;
+export type GreyKey = 0 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
+export type Greys = Record<GreyKey, string>;
+
+export const greys = (t: string | Theme): Greys => {
+  const name = typeof t === 'string' ? t : t.id;
   if (BACKGROUND_IMAGE_ATTRIBUTES?.[name]) {
     return BACKGROUND_IMAGE_ATTRIBUTES[name].greys;
   }
@@ -685,45 +576,123 @@ export const white = '#FFFFFF';
 
 export const black = '#181412'; // off black
 
-export function computeGreys(
-  theme: string,
-  primaryColor = '#FF0000',
-  maxSaturation = 25,
-  minLightness = 12
-) {
+export function computeGreys(theme: string) {
   return greys(theme);
-  const baseLightnessMap: Record<string, number> = {};
-  for (const [key, hex] of Object.entries(baseGreys)) {
-    baseLightnessMap[key] = rgbToHsl(...Object.values(hexToRgb(hex))).l;
-  }
-
-  const originalL2300 = baseLightnessMap[950];
-  const {
-    h: primaryHue,
-    s: baseS,
-    l: primaryLightness,
-  } = rgbToHsl(...Object.values(hexToRgb(primaryColor)));
-
-  const lightnessValues = Object.values(baseLightnessMap);
-  const minL = Math.min(...lightnessValues);
-  const maxL = Math.max(...lightnessValues);
-
-  const scaleLightness = (l: number) =>
-    originalL2300 + ((l - minL) / (maxL - minL)) * (100 - originalL2300);
-
-  const scaleSaturation = (l: number) =>
-    Math.min(
-      maxSaturation,
-      maxSaturation * ((l - minL) / (maxL - minL)) ** 1.2 // curved scale to boost higher L
-    );
-
-  const tinted: Record<string, string> = {};
-  for (const [key, origL] of Object.entries(baseLightnessMap)) {
-    const newL = Math.max(scaleLightness(origL), minLightness);
-    const newS = scaleSaturation(origL);
-    const { r, g, b } = hslToRgb(primaryHue, newS, newL);
-    tinted[key] = rgbToHex(r, g, b);
-  }
-
-  return tinted;
 }
+
+export const hexToRgb = (hex: string) => {
+  const clean = hex.replace('#', '');
+  const bigint = parseInt(
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean,
+    16
+  );
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255,
+  };
+};
+
+export const rgbToHsl = (r: number, g: number, b: number) => {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+
+  return { h: h * 360, s: s * 100, l: l * 100 };
+};
+
+export const hslToRgb = (h: number, s: number, l: number) => {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+
+  if (s === 0) {
+    const val = Math.round(l * 255);
+    return { r: val, g: val, b: val };
+  }
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const r = hue2rgb(p, q, h + 1 / 3);
+  const g = hue2rgb(p, q, h);
+  const b = hue2rgb(p, q, h - 1 / 3);
+
+  return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+};
+
+export const rgbToHex = (r: number, g: number, b: number) =>
+  `#${[r, g, b]
+    .map((x) => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? `0${hex}` : hex;
+    })
+    .join('')}`;
+
+interface ShadeDelta {
+  h: number;
+  s: number;
+  l: number;
+}
+
+const BASE_SHADE_DELTAS: Record<Exclude<ShadeKey, 300>, ShadeDelta> = {
+  100: { h: -337.2701754385965, s: 9.638554216867476, l: 13.921568627450974 },
+  200: { h: 13.387458745874653, s: 9.638554216867476, l: 11.568627450980387 },
+  400: { h: -6.960517799352772, s: 8.677015755329023, l: -8.039215686274517 },
+  500: { h: -9.035951134380412, s: 9.638554216867476, l: -11.372549019607845 },
+};
+
+const SHADE_KEYS = [100, 200, 400, 500] as const; // typed as readonly [100,200,400,500]
+
+export const computeShades = (base300: string) => {
+  const { r, g, b } = hexToRgb(base300);
+  const baseHsl = rgbToHsl(r, g, b);
+
+  const result: Record<ShadeKey, string> = { 300: base300 } as Record<ShadeKey, string>;
+
+  SHADE_KEYS.forEach((key) => {
+    const delta = BASE_SHADE_DELTAS[key];
+    const h = (baseHsl.h + delta.h + 360) % 360;
+    const s = Math.max(0, Math.min(100, baseHsl.s + delta.s));
+    const l = Math.max(0, Math.min(100, baseHsl.l + delta.l));
+    const { r, g, b } = hslToRgb(h, s, l);
+    result[key] = rgbToHex(r, g, b);
+  });
+
+  return result;
+};

@@ -1,6 +1,3 @@
-/**
- * Truncates a string in the middle, preserving characters at the beginning and end.
- */
 export const truncateMiddle = (str: string, n: number): string => {
   // Check for invalid inputs
   if (!str || typeof str !== 'string' || n < 0) {

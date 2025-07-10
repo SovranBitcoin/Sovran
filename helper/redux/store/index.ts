@@ -167,10 +167,10 @@ const migrations = {
                   },
                   ...(oldTx.privkey
                     ? {
-                        p2pk: {
-                          privkey: oldTx.privkey,
-                        },
-                      }
+                      p2pk: {
+                        privkey: oldTx.privkey,
+                      },
+                    }
                     : null),
                 };
                 return ecashReceiveTx;
@@ -359,7 +359,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 export const store = createStore(persistedReducer, applyMiddleware(thunkMiddleware));
 
 // log state
-store.subscribe(() => {
+store.subscribe((o) => {
   const getStructure = (obj: any): any => {
     if (typeof obj !== 'object' || obj === null) {
       return typeof obj;
@@ -392,6 +392,8 @@ store.subscribe(() => {
     }
     return structure;
   };
+
+  console.log(JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

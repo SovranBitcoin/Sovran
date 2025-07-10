@@ -37,12 +37,37 @@ export const memoizedGetSettings = createSelector(
   }
 );
 
+export interface Theme {
+  id: string;
+  greys: {
+    0: string;
+    50: string;
+    100: string;
+    200: string;
+    300: string;
+    400: string;
+    500: string;
+    600: string;
+    700: string;
+    800: string;
+    900: string;
+    950: string;
+  };
+  shades: {
+    100: string;
+    200: string;
+    300: string;
+    400: string;
+    500: string;
+  };
+}
+
 export const memoizedGetTheme = createSelector(
   [
     (state: RootState) => state.settings.settings.theme,
     (state: RootState) => state.settings.settings.backgroundImage,
   ],
-  (themeName: string, image) => {
+  (themeName: string, image: string): Theme => {
     if (image) {
       return BACKGROUND_IMAGE_ATTRIBUTES[image];
     }

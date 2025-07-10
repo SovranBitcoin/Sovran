@@ -1,6 +1,10 @@
 import { SET_PRICELIST } from './actionTypes';
 
-const initialState = {};
+const initialState = {
+  usd: {
+    btc: 113377,
+  },
+};
 
 export const pricelistReducer = (state = initialState, action) => {
   switch (action.type) {
