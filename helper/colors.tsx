@@ -1,5 +1,29 @@
 import { BACKGROUND_IMAGE_ATTRIBUTES } from './backgroundImages';
-import { Theme } from './redux/settings';
+
+export interface Theme {
+  id: string;
+  greys: {
+    0: string;
+    50: string;
+    100: string;
+    200: string;
+    300: string;
+    400: string;
+    500: string;
+    600: string;
+    700: string;
+    800: string;
+    900: string;
+    950: string;
+  };
+  shades: {
+    100: string;
+    200: string;
+    300: string;
+    400: string;
+    500: string;
+  };
+}
 
 export type ShadeKey = 100 | 200 | 300 | 400 | 500;
 export type Shades = Record<ShadeKey, string>;

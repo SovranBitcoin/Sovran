@@ -10,3 +10,4 @@ export const toResultSync = <T>(fn: () => T): Result<T, Error> => {
     return err(e instanceof Error ? e : new Error(String(e)));
   }
 };
+

@@ -69,3 +69,42 @@ We are migrating away from `createStyles` but it has some differences from a ful
 # Text
 
 - use `size` and other props provided by Text to change size,font,weight rather than inline styles.
+
+# Reducers
+
+## Selectors
+
+```
+export const setLanguage = (lang: string) => ({
+  type: SET_LANGUAGE,
+  payload: lang,
+} as const); <- important to add `as const` for type safety
+```
+
+## Actions
+
+Ensure you add the type of new selectors to the action type so that action prop types can be inferred.
+
+```
+export type SettingsAction =
+  | ReturnType<typeof setLanguage>
+  | ReturnType<typeof setTheme>
+  | ReturnType<typeof setDisplayBitcoin>
+  | ReturnType<typeof setExperimental>
+  | ReturnType<typeof setPasscode>
+  | ReturnType<typeof setBackgroundImage>
+  | ReturnType<typeof termsAccepted>;
+```
+
+## Reducers
+
+Using `typedUpdate` is recommended because it gives us type safety on the return so it would be invalid here for example to put `termsAccepted: 'a'`, it would catch that.
+
+```
+case TERMS_ACCEPTED: {
+  return typedUpdate('settings.termsAccepted', () => ({
+    termsAccepted: true,
+    date: action.payload.date,
+  }), state);
+}
+```

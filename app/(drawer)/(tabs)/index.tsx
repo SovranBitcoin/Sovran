@@ -20,6 +20,7 @@ import {
   memoizedGetBackgroundImage,
   memoizedGetSettings,
   memoizedGetTheme,
+  termsAccepted,
 } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
@@ -168,12 +169,7 @@ function TabOneScreen() {
     return (
       <TermsConditionsScreen
         onClose={() => {
-          store.dispatch({
-            type: 'TERMS_ACCEPTED',
-            payload: {
-              date: new Date().toISOString(),
-            },
-          });
+          store.dispatch(termsAccepted(new Date().toISOString()));
         }}
       />
     );
