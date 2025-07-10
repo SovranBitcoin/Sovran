@@ -8,6 +8,7 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 
 ## Features
 
+- [x] Deeplinks, can receive ecash via airdrop, can send via airdrop.
 - [x] (optional) pin code to unlock app
 - [ ] Payment requests (needs more testing)
 
