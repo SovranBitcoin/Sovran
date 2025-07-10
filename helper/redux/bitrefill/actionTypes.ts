@@ -1,2 +1,2 @@
-export const SET_EVENTS = 'SET_EVENTS';
-export const APPEND_EVENTS = 'APPEND_EVENTS';
+export const SET_EVENTS = 'SET_EVENTS' as const;
+export const APPEND_EVENTS = 'APPEND_EVENTS' as const;
