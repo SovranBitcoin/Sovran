@@ -34,8 +34,8 @@ import AnimatedSpriteBackground from 'components/common/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/layout/AccountPagerView';
-import { Card } from 'components/common/Card';
 import { useDeeplink } from 'hooks/useDeeplink';
+import { Card } from 'components/common/Card';
 interface NPUBQuote {
   amount: number;
   createdAt: number;

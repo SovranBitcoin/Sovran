@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMeltQuote } from 'helper/cashuClient';
+import { showMessage } from 'helper/popup/popups';
 import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useBitrefill } from 'helper/redux/bitrefill';
@@ -79,19 +80,23 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
       const { paymentAddress } = data;
       const mintUrl = memoizedGetSelectedMint(store.getState());
 
-      const meltQuote = await getMeltQuote({
+      const meltQuoteRes = await getMeltQuote({
         pr: paymentAddress,
         unit: 'sat',
         mintUrl,
       });
-
-      navigation.navigate('lightningSendConfirmation', {
-        pr: paymentAddress,
-        unit: 'sat',
-        meltQuote: JSON.stringify(meltQuote),
-        pubkey: BITREFILL_NOSTR_PUBKEY,
-        email: email,
-      });
+      if (meltQuoteRes.isOk()) {
+        const meltQuote = meltQuoteRes.value;
+        navigation.navigate('lightningSendConfirmation', {
+          pr: paymentAddress,
+          unit: 'sat',
+          meltQuote: JSON.stringify(meltQuote),
+          pubkey: BITREFILL_NOSTR_PUBKEY,
+          email: email,
+        });
+      } else {
+        showMessage(meltQuoteRes.error.message, {}, { emoji: '🚨' });
+      }
     }
   };
 

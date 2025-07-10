@@ -14,6 +14,7 @@ import {
   removeProofs,
   memoizedGetBalance,
   memoizedGetProofs,
+  TransactionData,
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { Alert, Platform } from 'react-native';
@@ -28,7 +29,6 @@ import { useState, useEffect } from 'react';
 import {
   MeltQuoteResponse,
   CashuWallet,
-  MintKeyset,
   CashuMint,
   decodePaymentRequest,
   getDecodedToken,
@@ -46,6 +46,9 @@ import { getPublicKey, nip19 } from 'nostr-tools';
 import { v4 as uuidv4 } from 'uuid';
 import { SheetManager } from 'react-native-actions-sheet';
 import { bytesToHex } from '@noble/hashes/utils';
+import { toResult, toResultSync } from 'helper/toResult';
+import { ok, err, Result } from 'neverthrow';
+import { getGiveaway } from 'app/ecashReceiveConfirmation';
 
 // TYPES
 
@@ -127,20 +130,19 @@ interface GetMintParams {
   forceRefresh?: boolean;
 }
 
-interface GetKeysParams {
-  unit: string;
-  mintUrl: string;
-  forceRefresh?: boolean;
-}
-
 // wallet caches for all the mints
 let walletCache: { [key: string]: CashuWallet } = {};
 
 // MAIN UTILITIES
 
-export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }: GetWalletParams) {
+export async function getWallet({
+  unit,
+  mintUrl,
+  profile,
+  forceRefresh = false,
+}: GetWalletParams): Promise<Result<CashuWallet, Error>> {
   if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {
-    return walletCache[mintUrl][unit];
+    return ok(walletCache[mintUrl][unit]);
   }
 
   const currentProfile = profile?.pubkey ? profile : memoizedGetCurrentProfile(store.getState());
@@ -152,10 +154,12 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
   const lastFetched = audits?.lastFetched ?? 0;
   const shouldRefresh = forceRefresh || !mintInfo || !keys || !keysets;
 
-  const mint = await getMint({
+  const mintRes = await getMint({
     mintUrl,
     forceRefresh: shouldRefresh,
   });
+  if (mintRes.isErr()) return err(mintRes.error);
+  const mint = mintRes.value;
 
   mintInfo = store.getState().cashu?.info?.[mintUrl];
   keys = store.getState().cashu?.keys?.[mintUrl];
@@ -199,61 +203,36 @@ export async function getWallet({ unit, mintUrl, profile, forceRefresh = false }
     ...walletCache,
   };
 
-  return wallet;
+  return ok(wallet);
 }
 
-export async function getMint({ mintUrl, forceRefresh = false }: GetMintParams) {
+export async function getMint({
+  mintUrl,
+  forceRefresh = false,
+}: GetMintParams): Promise<Result<CashuMint, Error>> {
   const mint = new CashuMint(mintUrl);
 
   if (forceRefresh) {
-    const mintInfo = await mint.getInfo();
+    const infoRes = await toResult(mint.getInfo());
+    if (infoRes.isErr()) return err(infoRes.error);
+
+    const keysetsRes = await toResult(mint.getKeySets());
+    if (keysetsRes.isErr()) return err(keysetsRes.error);
+
+    const keysRes = await toResult(mint.getKeys());
+    if (keysRes.isErr()) return err(keysRes.error);
 
     store.dispatch(
       setInfo({
         mintUrl,
-        mintInfo,
+        mintInfo: infoRes.value,
       })
     );
-    store.dispatch(setKeysets({ mintUrl, keysets: (await mint.getKeySets()).keysets }));
-    store.dispatch(setKeys({ mintUrl, keys: (await mint.getKeys()).keysets }));
+    store.dispatch(setKeysets({ mintUrl, keysets: keysetsRes.value.keysets }));
+    store.dispatch(setKeys({ mintUrl, keys: keysRes.value.keysets }));
   }
 
-  return mint;
-}
-
-export async function getKeys({
-  unit,
-  mintUrl,
-  forceRefresh = false,
-}: GetKeysParams): Promise<MintKeyset | undefined> {
-  const mint = getMint({ mintUrl });
-
-  // check if keysets and keys are already cached
-  if (store.getState().cashu.keysets[mintUrl] && !forceRefresh) {
-    return store.getState().cashu.keysets[mintUrl].find((k) => k.unit === unit);
-  }
-
-  const keysets = (await (await mint).getKeySets()).keysets;
-  const keys = (await (await mint).getKeys()).keysets;
-
-  const key = keysets.find((k) => k.unit === unit);
-
-  // Store the keyset in cache
-  store.dispatch(
-    setKeysets({
-      mintUrl,
-      keysets,
-    })
-  );
-
-  store.dispatch(
-    setKeys({
-      mintUrl,
-      keys,
-    })
-  );
-
-  return key;
+  return ok(mint);
 }
 
 // Melt quote and payment functions
@@ -267,21 +246,28 @@ export async function getMeltQuote({
   unit: string;
   mintUrl: string;
   mppAmount?: number;
-}): Promise<MeltQuoteResponse> {
-  const wallet = await getWallet({ unit, mintUrl, profile: null });
+}): Promise<Result<MeltQuoteResponse, Error>> {
+  const walletRes = await getWallet({ unit, mintUrl, profile: null });
+  if (walletRes.isErr()) return err(walletRes.error);
+  const wallet = walletRes.value;
+
   const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
   const keysetId = activeKeyset.id;
   wallet.keysetId = keysetId;
 
   const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
 
-  const meltQuote = await wallet.mint.createMeltQuote({
-    request: pr,
-    unit,
-    ...options,
-  });
+  const meltQuoteRes = await toResult(
+    wallet.mint.createMeltQuote({
+      request: pr,
+      unit,
+      ...options,
+    })
+  );
 
-  return meltQuote;
+  if (meltQuoteRes.isErr()) return err(meltQuoteRes.error);
+
+  return ok(meltQuoteRes.value);
 }
 
 export async function sendLightning({
@@ -300,44 +286,48 @@ export async function sendLightning({
   meltQuote: MeltQuoteResponse;
   email?: string;
   lud16?: string;
-}): Promise<LightningSendTransaction> {
+}): Promise<Result<LightningSendTransaction, Error>> {
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
 
-  let expiry: Date | null = null;
-  try {
-    expiry = getRawExpiry({ pr });
-  } catch {
-    throw new AppError('invalid_invoice', 'Invalid payment request');
+  const expiryResult = toResultSync(() => getRawExpiry({ pr }));
+  if (expiryResult.isErr()) {
+    return err(new AppError('invalid_invoice', 'Invalid payment request'));
   }
+
+  const expiry = expiryResult.value;
   if (expiry && new Date(Date.now() + 60_000) > expiry) {
-    throw new AppError('invoice_expired', 'Invoice expired');
+    return err(new AppError('invoice_expired', 'Invoice expired'));
   }
 
   // Retry logic for wallet operations
-  const attemptSend = async (forceRefresh = false): Promise<LightningSendTransaction> => {
+  const attemptSend = async (
+    forceRefresh = false
+  ): Promise<Result<LightningSendTransaction, Error>> => {
     const currentProofs = memoizedGetProofs(unit)(state);
-
-    const wallet = await getWallet({
+    const walletRes = await getWallet({
       unit,
       mintUrl,
       profile: null,
       ...(forceRefresh && { forceRefresh: true }),
     });
+    if (walletRes.isErr()) return err(walletRes.error);
+    const wallet = walletRes.value;
 
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
     wallet.keysetId = keysetId;
 
     if (!meltQuote.amount) {
-      throw new AppError('invalid_invoice', 'No amount specified in payment request');
+      return err(new AppError('invalid_invoice', 'No amount specified in payment request'));
     }
 
     const balance = currentProofs
       .map((p: { amount: number }) => p.amount)
       .reduce((a: number, b: number) => a + b, 0);
+
     if (meltQuote.amount + meltQuote.fee_reserve > balance) {
-      throw new AppError('insufficient_funds', 'Insufficient funds');
+      return err(new AppError('insufficient_funds', 'Insufficient funds'));
     }
 
     const profileId = store.getState().nostr?.currentProfile?.id;
@@ -376,10 +366,14 @@ export async function sendLightning({
       keysetId: wallet.keysetId,
     })(store.getState());
 
-    const { change } = await wallet.meltProofs(meltQuote, proofsToSend, {
-      counter: counter2, // it's going up forever, laura
-      keysetId,
-    });
+    const meltRes = await toResult(
+      wallet.meltProofs(meltQuote, proofsToSend, {
+        counter: counter2,
+        keysetId,
+      })
+    );
+    if (meltRes.isErr()) return err(meltRes.error);
+    const { change } = meltRes.value;
 
     store.dispatch(
       increaseCounterV2({
@@ -440,26 +434,16 @@ export async function sendLightning({
       })
     );
 
-    return transaction;
+    return ok(transaction);
   };
 
   // First attempt
-  try {
-    return await attemptSend(false);
-  } catch (error) {
-    // Check if it's the specific keyset inactive error
-    if (error.message === 'keyset id inactive.') {
-      Alert.alert('Updating keyset...');
-      try {
-        return await attemptSend(true);
-      } catch (retryError) {
-        throw retryError;
-      }
-    }
-
-    // Re-throw other errors
-    throw error;
+  const first = await attemptSend(false);
+  if (first.isErr() && first.error.message === 'keyset id inactive.') {
+    Alert.alert('Updating keyset...');
+    return attemptSend(true);
   }
+  return first;
 }
 
 export async function receiveLightning({
@@ -470,26 +454,26 @@ export async function receiveLightning({
   amount: number;
   unit: string;
   memo?: string;
-}): Promise<LightningReceiveTransaction> {
+}): Promise<Result<LightningReceiveTransaction, Error>> {
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
 
   Alert.alert('a', JSON.stringify(unit, selectedMint));
-  const wallet = await getWallet({
+  const walletRes = await getWallet({
     unit,
     mintUrl: selectedMint,
     profile: null,
   });
+  if (walletRes.isErr()) return err(walletRes.error);
+  const wallet = walletRes.value;
 
   const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
   const keysetId = activeKeyset.id;
   wallet.keysetId = keysetId;
 
-  const mintQuote = await wallet.createMintQuote(amount, memo);
-
-  if (mintQuote.error) {
-    throw new AppError('quote_error', 'Error getting mint quote');
-  }
+  const mintQuoteResult = await toResult(wallet.createMintQuote(amount, memo));
+  if (mintQuoteResult.isErr()) return err(mintQuoteResult.error);
+  const mintQuote = mintQuoteResult.value;
 
   const paymentRequest = await getPaymentRequest({
     amount: amount,
@@ -522,7 +506,7 @@ export async function receiveLightning({
     })
   );
 
-  return transaction;
+  return ok(transaction);
 }
 
 export async function sendEcash({
@@ -539,30 +523,30 @@ export async function sendEcash({
   to?: string;
   p2pk?: { pubkey?: string; privkey?: string };
   paymentRequest?: string;
-}): Promise<EcashSendTransaction> {
+}): Promise<Result<EcashSendTransaction, Error>> {
   const state = store.getState();
   const selectedMint = memoizedGetSelectedMint(state);
   const profile = memoizedGetCurrentProfile(state);
 
   // Retry logic for wallet operations
-  const attemptSend = async (forceRefresh = false): Promise<EcashSendTransaction> => {
+  const attemptSend = async (
+    forceRefresh = false
+  ): Promise<Result<EcashSendTransaction, Error>> => {
     const currentProofs = memoizedGetProofs(unit)(state);
     const balance = memoizedGetBalance(unit)(state);
 
     if (amount > balance) {
-      throw new AppError('insufficient_funds', 'Insufficient funds');
+      return err(new AppError('insufficient_funds', 'Insufficient funds'));
     }
 
-    const wallet = await getWallet({
+    const walletRes = await getWallet({
       unit,
       mintUrl: selectedMint,
       profile: null,
       ...(forceRefresh && { forceRefresh: true }),
     });
-
-    if (!wallet) {
-      throw new AppError('wallet_not_found', 'Wallet not found');
-    }
+    if (walletRes.isErr()) return err(walletRes.error);
+    const wallet = walletRes.value;
 
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
@@ -574,11 +558,15 @@ export async function sendEcash({
       keysetId: wallet.keysetId,
     })(state);
 
-    const { keep, send, used } = await wallet._send(Number(amount), currentProofs, {
-      ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
-      counter,
-      keysetId,
-    });
+    const sendRes = await toResult(
+      wallet._send(Number(amount), currentProofs, {
+        ...(p2pk?.pubkey ? { pubkey: p2pk.pubkey } : {}),
+        counter,
+        keysetId,
+      })
+    );
+    if (sendRes.isErr()) return err(sendRes.error);
+    const { keep, send, used } = sendRes.value;
 
     store.dispatch(
       removeProofs({
@@ -645,27 +633,16 @@ export async function sendEcash({
       })
     );
 
-    return transaction;
+    return ok(transaction);
   };
 
   // First attempt
-  try {
-    return await attemptSend(false);
-  } catch (error) {
-    // Check if it's the specific keyset inactive error
-    if (error.message === 'keyset id inactive.') {
-      Alert.alert('Updating keyset...');
-      try {
-        return await attemptSend(true);
-      } catch (retryError) {
-        console.error('[sendEcash] Retry failed:', retryError);
-        throw retryError;
-      }
-    }
-
-    // Re-throw other errors
-    throw error;
+  const first = await attemptSend(false);
+  if (first.isErr() && first.error.message === 'keyset id inactive.') {
+    Alert.alert('Updating keyset...');
+    return attemptSend(true);
   }
+  return first;
 }
 
 export async function receiveEcash({
@@ -682,7 +659,7 @@ export async function receiveEcash({
   memo?: string;
   fromNIP05?: string;
   refund?: boolean;
-}): Promise<EcashReceiveTransaction> {
+}): Promise<Result<EcashReceiveTransaction, Error>> {
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
   const decodedToken = getDecodedToken(token);
@@ -690,15 +667,12 @@ export async function receiveEcash({
 
   const getPubkeyFromToken = (token: string) => {
     const decodedToken = getDecodedToken(token);
-
-    try {
-      return JSON.parse(decodedToken.proofs[0].secret)[0] === 'P2PK'
-        ? JSON.parse(decodedToken.proofs[0].secret)[1].data
-        : null;
-    } catch (error) {
-      console.error('Error parsing token secret:', error);
+    const res = toResultSync(() => JSON.parse(decodedToken.proofs[0].secret));
+    if (res.isErr()) {
+      console.error('Error parsing token secret:', res.error);
       return null;
     }
+    return res.value[0] === 'P2PK' ? res.value[1].data : null;
   };
 
   const key = (() => {
@@ -713,17 +687,17 @@ export async function receiveEcash({
   })();
 
   // Retry logic for wallet operations
-  const attemptReceive = async (forceRefresh = false): Promise<EcashReceiveTransaction> => {
-    const wallet = await getWallet({
+  const attemptReceive = async (
+    forceRefresh = false
+  ): Promise<Result<EcashReceiveTransaction, Error>> => {
+    const walletRes = await getWallet({
       unit,
       mintUrl: receiveMintUrl,
       profile: null,
       ...(forceRefresh && { forceRefresh: true }),
     });
-
-    if (!wallet) {
-      throw new AppError('wallet_not_found', 'Wallet not found');
-    }
+    if (walletRes.isErr()) return err(walletRes.error);
+    const wallet = walletRes.value;
 
     const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
     const keysetId = activeKeyset.id;
@@ -735,14 +709,18 @@ export async function receiveEcash({
       keysetId: keysetId,
     })(state);
 
-    const response = await wallet.receive(token, {
-      counter,
-      keysetId,
-      ...(key?.privkey ? { privkey: key.privkey } : {}),
-    });
+    const responseRes = await toResult(
+      wallet.receive(token, {
+        counter,
+        keysetId,
+        ...(key?.privkey ? { privkey: key.privkey } : {}),
+      })
+    );
+    if (responseRes.isErr()) return err(responseRes.error);
+    const response = responseRes.value;
 
     if (!response) {
-      throw new AppError('invalid_token', 'Invalid token');
+      return err(new AppError('invalid_token', 'Invalid token'));
     }
 
     const newProofs = [...response];
@@ -800,30 +778,20 @@ export async function receiveEcash({
       ]),
     ]);
 
-    return transaction;
+    return ok(transaction);
   };
 
   // First attempt
-  try {
-    return await attemptReceive(false);
-  } catch (error) {
-    // Check if it's the specific keyset inactive error
-    if (
-      error.message === 'keyset id inactive.' ||
-      error?.message?.startsWith('Could not calculate fees. No keyset found with id:')
-    ) {
-      Alert.alert('Updating keyset...');
-      try {
-        return await attemptReceive(true);
-      } catch (retryError) {
-        console.error('[receiveEcash] Retry failed:', retryError);
-        throw retryError;
-      }
-    }
-
-    // Re-throw other errors
-    throw error;
+  const first = await attemptReceive(false);
+  if (
+    first.isErr() &&
+    (first.error.message === 'keyset id inactive.' ||
+      first.error.message.startsWith('Could not calculate fees. No keyset found with id:'))
+  ) {
+    Alert.alert('Updating keyset...');
+    return attemptReceive(true);
   }
+  return first;
 }
 
 export async function getPaymentRequest({
@@ -859,12 +827,15 @@ export async function getPaymentRequest({
 export async function cancelEcashTransaction(
   transaction: Transaction,
   navigation: any
-): Promise<void> {
-  await receiveEcash({
+): Promise<Result<void, Error>> {
+  const res = await receiveEcash({
     token: transaction.token as string,
     unit: transaction.unit,
     refund: true,
   });
+  if (res.isErr()) {
+    return err(res.error);
+  }
 
   const profileId = store.getState().nostr?.currentProfile?.id;
   store.dispatch(
@@ -881,6 +852,7 @@ export async function cancelEcashTransaction(
 
   SheetManager.hide('button-handler');
   navigation.navigate('', {}, { closeParents: true });
+  return ok(undefined);
 }
 
 export function getUsedProofs(currentProofs, keepProofs) {
@@ -911,29 +883,24 @@ export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
     let isMounted = true;
 
     const fetchWallet = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+      setLoading(true);
+      setError(null);
 
-        const walletInstance = await getWallet({
-          unit,
-          mintUrl,
-          profile,
-          forceRefresh,
-        });
+      const walletResult = await getWallet({
+        unit,
+        mintUrl,
+        profile,
+        forceRefresh,
+      });
 
-        if (isMounted) {
-          setWallet(walletInstance);
+      if (isMounted) {
+        if (walletResult.isOk()) {
+          setWallet(walletResult.value);
+        } else {
+          setError(walletResult.error);
+          console.error('Failed to get wallet:', walletResult.error);
         }
-      } catch (err) {
-        if (isMounted) {
-          setError(err);
-          console.error('Failed to get wallet:', err);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
@@ -959,10 +926,14 @@ export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
         mintUrl,
         profile,
         forceRefresh: true,
-      })
-        .then(setWallet)
-        .catch(setError)
-        .finally(() => setLoading(false));
+      }).then((result) => {
+        if (result.isOk()) {
+          setWallet(result.value);
+        } else {
+          setError(result.error);
+        }
+        setLoading(false);
+      });
     }
   };
 
@@ -981,8 +952,18 @@ export async function checkTokenSpent({ token }) {
   const decodedToken = getDecodedToken(token);
   const { unit, mint, proofs } = decodedToken;
 
-  const wallet = await getWallet({ unit, mintUrl: mint });
-  return (await wallet.checkProofsStates(proofs)).some((p) => p.state === 'SPENT');
+  const walletRes = await getWallet({ unit, mintUrl: mint, profile: null });
+  if (walletRes.isErr()) {
+    console.error('Error fetching wallet for checkTokenSpent:', walletRes.error);
+    return false;
+  }
+  const wallet = walletRes.value;
+  const statesRes = await toResult(wallet.checkProofsStates(proofs));
+  if (statesRes.isErr()) {
+    console.error('Error checking proof states:', statesRes.error);
+    return false;
+  }
+  return statesRes.value.some((p) => p.state === 'SPENT');
 }
 
 // HELPER FUNCTIONS
@@ -1024,33 +1005,22 @@ export const giveaways = {
  * Validates if a string is a valid ecash token
  */
 export function isValidEcashToken(token: string): boolean {
-  try {
-    getDecodedToken(token);
-    return true;
-  } catch {
-    return false;
-  }
+  return toResultSync(() => getDecodedToken(token)).isOk();
 }
 
 /**
  * Validates if a string is a valid payment request
  */
 export function isValidPaymentRequest(paymentRequest: string): boolean {
-  try {
-    return !!decodePaymentRequest(paymentRequest);
-  } catch {
-    return false;
-  }
+  return toResultSync(() => decodePaymentRequest(paymentRequest)).isOk();
 }
 
 // Lightning invoice parsing utilities
 export function getLightningAmount({ pr }) {
-  try {
-    const decodedPR = decode(pr as string);
-    return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
-  } catch {
-    return null;
-  }
+  const res = toResultSync(() => decode(pr as string));
+  if (res.isErr()) return null;
+  const decodedPR = res.value;
+  return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
 }
 
 export function getTimestamp({ pr }) {
@@ -1082,12 +1052,7 @@ export function getDescription({ pr }) {
 }
 
 export function isValidLNURL(url: string): boolean {
-  try {
-    decode(url);
-    return true;
-  } catch {
-    return false;
-  }
+  return toResultSync(() => decode(url)).isOk();
 }
 
 export function npubToPublicKey(key: string) {
@@ -1132,160 +1097,156 @@ export async function* restoreMint({
   MAX_GAP?: number;
   allowedUnits?: string[];
 }) {
-  try {
-    let response = {};
-    const mint = await getMint({ mintUrl });
+  let response = {};
+  const mint = await getMint({ mintUrl });
 
-    const keysets = (await mint.getKeySets()).keysets;
+  const keysets = (await mint.getKeySets()).keysets;
 
-    const uniqueUnits = keysets
-      .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
-      .filter((keyset) => allowedUnits.includes(keyset.unit));
+  const uniqueUnits = keysets
+    .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
+    .filter((keyset) => allowedUnits.includes(keyset.unit));
+
+  yield {
+    label: 'INIT',
+    progress: 0,
+    totalUnits: uniqueUnits.length,
+    currentUnit: 0,
+    message: 'Starting restoration process',
+    mintUrl,
+    response,
+  };
+
+  for (let i = 0; i < uniqueUnits.length; i++) {
+    const keyset = uniqueUnits[i];
 
     yield {
-      label: 'INIT',
-      progress: 0,
+      label: 'RESTORING KEYSET',
+      unit: keyset.unit,
+      progress: i / uniqueUnits.length,
+      currentUnit: i + 1,
       totalUnits: uniqueUnits.length,
-      currentUnit: 0,
-      message: 'Starting restoration process',
+      message: `Restoring keyset for ${keyset.unit}`,
       mintUrl,
       response,
     };
 
-    for (let i = 0; i < uniqueUnits.length; i++) {
-      const keyset = uniqueUnits[i];
+    const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile });
+    let start: number = 0;
+    let emptyBatchCount: number = 0;
+    let restoredProofs: Proof[] = [];
+    let totalProofsProcessed = 0;
+    let firstEmptyStart = 0; // Track the first position where proofs begin to be empty
 
+    while (emptyBatchCount < MAX_GAP) {
       yield {
-        label: 'RESTORING KEYSET',
+        label: 'RESTORING BATCH',
         unit: keyset.unit,
-        progress: i / uniqueUnits.length,
+        batchStart: start,
+        batchEnd: start + BATCH_SIZE,
         currentUnit: i + 1,
         totalUnits: uniqueUnits.length,
-        message: `Restoring keyset for ${keyset.unit}`,
+        message: `Fetching proofs ${start} to ${start + BATCH_SIZE}`,
         mintUrl,
         response,
       };
 
-      const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile });
-      let start: number = 0;
-      let emptyBatchCount: number = 0;
-      let restoredProofs: Proof[] = [];
-      let totalProofsProcessed = 0;
-      let firstEmptyStart = 0; // Track the first position where proofs begin to be empty
+      // Fetch a batch of proofs
+      const uncheckedProofs: Proof[] = (
+        await wallet.restore(start, BATCH_SIZE, { keysetId: keyset.id })
+      ).proofs;
 
-      while (emptyBatchCount < MAX_GAP) {
-        yield {
-          label: 'RESTORING BATCH',
-          unit: keyset.unit,
-          batchStart: start,
-          batchEnd: start + BATCH_SIZE,
-          currentUnit: i + 1,
-          totalUnits: uniqueUnits.length,
-          message: `Fetching proofs ${start} to ${start + BATCH_SIZE}`,
-          mintUrl,
-          response,
-        };
-
-        // Fetch a batch of proofs
-        const uncheckedProofs: Proof[] = (
-          await wallet.restore(start, BATCH_SIZE, { keysetId: keyset.id })
-        ).proofs;
-
-        if (uncheckedProofs.length === 0) {
-          if (emptyBatchCount === 0) {
-            firstEmptyStart = start;
-          }
-          emptyBatchCount++;
-        } else {
-          emptyBatchCount = 0;
-          firstEmptyStart = 0; // Reset if we find proofs again
-          totalProofsProcessed += uncheckedProofs.length;
-
-          // Process this batch immediately instead of waiting
-          if (uncheckedProofs.length > 0) {
-            yield {
-              label: 'CHECKING BATCH',
-              unit: keyset.unit,
-              batchStart: start,
-              batchSize: uncheckedProofs.length,
-              currentUnit: i + 1,
-              totalUnits: uniqueUnits.length,
-              message: `Checking states for ${uncheckedProofs.length} proofs`,
-              mintUrl,
-              response,
-            };
-
-            // Check states of this batch
-            const proofStates: ProofState[] = await wallet.checkProofsStates(uncheckedProofs);
-
-            // Filter and keep only the unspent proofs
-            const unspentProofs = uncheckedProofs.filter(
-              (p, index) => proofStates[index].state === 'UNSPENT'
-            );
-
-            // Add unspent proofs to our collection
-            restoredProofs = restoredProofs.concat(unspentProofs);
-
-            yield {
-              label: 'BATCH_PROCESSED',
-              unit: keyset.unit,
-              batchStart: start,
-              unspentCount: unspentProofs.length,
-              totalUnspent: restoredProofs.length,
-              totalProcessed: totalProofsProcessed,
-              currentUnit: i + 1,
-              totalUnits: uniqueUnits.length,
-              message: `Found ${unspentProofs.length} unspent proofs in batch`,
-              mintUrl,
-              response,
-            };
-          }
+      if (uncheckedProofs.length === 0) {
+        if (emptyBatchCount === 0) {
+          firstEmptyStart = start;
         }
+        emptyBatchCount++;
+      } else {
+        emptyBatchCount = 0;
+        firstEmptyStart = 0; // Reset if we find proofs again
+        totalProofsProcessed += uncheckedProofs.length;
 
-        start += BATCH_SIZE;
+        // Process this batch immediately instead of waiting
+        if (uncheckedProofs.length > 0) {
+          yield {
+            label: 'CHECKING BATCH',
+            unit: keyset.unit,
+            batchStart: start,
+            batchSize: uncheckedProofs.length,
+            currentUnit: i + 1,
+            totalUnits: uniqueUnits.length,
+            message: `Checking states for ${uncheckedProofs.length} proofs`,
+            mintUrl,
+            response,
+          };
+
+          // Check states of this batch
+          const proofStates: ProofState[] = await wallet.checkProofsStates(uncheckedProofs);
+
+          // Filter and keep only the unspent proofs
+          const unspentProofs = uncheckedProofs.filter(
+            (p, index) => proofStates[index].state === 'UNSPENT'
+          );
+
+          // Add unspent proofs to our collection
+          restoredProofs = restoredProofs.concat(unspentProofs);
+
+          yield {
+            label: 'BATCH_PROCESSED',
+            unit: keyset.unit,
+            batchStart: start,
+            unspentCount: unspentProofs.length,
+            totalUnspent: restoredProofs.length,
+            totalProcessed: totalProofsProcessed,
+            currentUnit: i + 1,
+            totalUnits: uniqueUnits.length,
+            message: `Found ${unspentProofs.length} unspent proofs in batch`,
+            mintUrl,
+            response,
+          };
+        }
       }
 
-      // Calculate the final index after searching
-      const keysetIndex = firstEmptyStart !== 0 ? firstEmptyStart : start - MAX_GAP * BATCH_SIZE;
-
-      // Build the full response
-      response = {
-        ...response,
-        [keyset.unit]: {
-          proofs: restoredProofs,
-          keysets: {
-            ...response?.[keyset?.unit]?.keysets,
-            [keyset.id]: keysetIndex,
-          },
-        },
-      };
-
-      yield {
-        label: 'KEYSET_COMPLETE',
-        unit: keyset.unit,
-        progress: (i + 1) / uniqueUnits.length,
-        currentUnit: i + 1,
-        totalUnits: uniqueUnits.length,
-        proofCount: restoredProofs.length,
-        index: keysetIndex, // Add index to the yield data
-        message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs, index: ${keysetIndex}`,
-        mintUrl,
-        response,
-      };
+      start += BATCH_SIZE;
     }
 
+    // Calculate the final index after searching
+    const keysetIndex = firstEmptyStart !== 0 ? firstEmptyStart : start - MAX_GAP * BATCH_SIZE;
+
+    // Build the full response
+    response = {
+      ...response,
+      [keyset.unit]: {
+        proofs: restoredProofs,
+        keysets: {
+          ...response?.[keyset?.unit]?.keysets,
+          [keyset.id]: keysetIndex,
+        },
+      },
+    };
+
     yield {
-      label: 'COMPLETE',
-      progress: 1,
-      message: 'Restoration complete',
+      label: 'KEYSET_COMPLETE',
+      unit: keyset.unit,
+      progress: (i + 1) / uniqueUnits.length,
+      currentUnit: i + 1,
+      totalUnits: uniqueUnits.length,
+      proofCount: restoredProofs.length,
+      index: keysetIndex, // Add index to the yield data
+      message: `Completed keyset for ${keyset.unit} with ${restoredProofs.length} proofs, index: ${keysetIndex}`,
       mintUrl,
       response,
     };
-
-    return response;
-  } catch (err) {
-    return null;
   }
+
+  yield {
+    label: 'COMPLETE',
+    progress: 1,
+    message: 'Restoration complete',
+    mintUrl,
+    response,
+  };
+
+  return response;
 }
 
 export async function restoreCounter({
@@ -1330,14 +1291,27 @@ export async function restoreCounter({
   return firstEmptyStart;
 }
 
-// ERROR
+export const checkIfAlreadyRedeemed = (token: string): boolean => {
+  const profileId = store.getState().nostr?.currentProfile?.id;
+  const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+
+  const giveaway = getGiveaway({ token });
+  if (!giveaway) return false;
+
+  return transactions.some(
+    (tx: TransactionData) =>
+      tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
+  );
+};
 
 export class AppError extends Error {
-  static messageMap = {};
+  type: string;
+  code?: string;
 
-  constructor(name, message) {
-    const mappedError = AppError.messageMap[message];
-    super(mappedError?.message || message);
-    this.name = mappedError?.name || name;
+  constructor(message: string, type: string, code?: string) {
+    super(message);
+    this.name = 'AppError';
+    this.type = type;
+    this.code = code;
   }
 }

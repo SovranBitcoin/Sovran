@@ -37,17 +37,18 @@ export const useSendEncryptedDirectMessage = () => {
   const sendPaymentRequest = async ({ request }: { request: string }) => {
     const decodedRequest = decodePaymentRequest(request);
 
-    const result = nip19.decode(decodedRequest.transport[0].target);
+    const decodedTarget = nip19.decode(decodedRequest.transport[0].target);
 
-    const pubkey: string = (result.data as ProfilePointer).pubkey;
+    const pubkey: string = (decodedTarget.data as ProfilePointer).pubkey;
 
-    const transaction = await sendEcash({
+    const sendResult = await sendEcash({
       unit: decodedRequest.unit as string,
       amount: decodedRequest.amount as number,
       to: pubkey,
       paymentRequest: request,
     });
-
+    if (sendResult.isErr()) return;
+    const transaction = sendResult.value;
     const decodedToken = getDecodedToken(transaction.token);
 
     sendGiftWrappedEncryptedDirectMessage({

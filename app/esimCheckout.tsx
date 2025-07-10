@@ -48,45 +48,42 @@ function ModalScreen() {
   }, []);
 
   const handleMintSelected = async (mint, balance) => {
-    try {
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-      setUnit(mint.unit);
-    } catch (error) {
-      throw error;
-    }
+    dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    setUnit(mint.unit);
   };
 
   const handleBuy = async () => {
     setLoading(true);
-    try {
-      const meltQuote = await getMeltQuote({
-        pr: params.request,
-        unit: 'sat',
-        mintUrl: selectedMint,
-      });
-
-      const amount = getLightningAmount({ pr: params.request });
-      const totalAmount = amount + meltQuote.fee_reserve;
-
-      if (balance < totalAmount) {
-        showMessage(
-          'insufficient_balance',
-          { amount, unit, fee: meltQuote.fee_reserve },
-          { emoji: '🚨' }
-        );
-      } else {
-        navigation.navigate('lightningSendConfirmation', {
-          pr: params.request,
-          unit,
-          meltQuote: JSON.stringify(meltQuote),
-          pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
-        });
-      }
-    } catch (error) {
+    const meltQuoteRes = await getMeltQuote({
+      pr: params.request,
+      unit: 'sat',
+      mintUrl: selectedMint,
+    });
+    if (meltQuoteRes.isErr()) {
       showMessage('general_error', {}, { emoji: '❌' });
-    } finally {
       setLoading(false);
+      return;
     }
+    const meltQuote = meltQuoteRes.value;
+
+    const amount = getLightningAmount({ pr: params.request });
+    const totalAmount = amount + meltQuote.fee_reserve;
+
+    if (balance < totalAmount) {
+      showMessage(
+        'insufficient_balance',
+        { amount, unit, fee: meltQuote.fee_reserve },
+        { emoji: '🚨' }
+      );
+    } else {
+      navigation.navigate('lightningSendConfirmation', {
+        pr: params.request,
+        unit,
+        meltQuote: JSON.stringify(meltQuote),
+        pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+      });
+    }
+    setLoading(false);
   };
 
   const getSectionItems = () => {

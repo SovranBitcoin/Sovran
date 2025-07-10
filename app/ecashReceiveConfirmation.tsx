@@ -129,21 +129,20 @@ export function EcashReceiveConfirmation({
   };
 
   const handleRedeem = async () => {
-    try {
-      setLoading(true);
-      await receiveEcash({
-        token: token as string,
-        unit: unit as string,
-      });
+    setLoading(true);
+    const res = await receiveEcash({
+      token: token as string,
+      unit: unit as string,
+    });
 
+    if (res.isOk()) {
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
         navigation.navigate('index', {}, { closeParents: true });
       });
-
-      setLoading(false);
-    } catch (error) {
-      showMessage(error.message);
+    } else {
+      showMessage(res.error.message);
     }
+    setLoading(false);
   };
 
   const handleRedeemPress = async () => {

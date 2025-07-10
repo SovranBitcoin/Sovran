@@ -273,26 +273,26 @@ function ModalScreen() {
                     },
                   ]
                 : []),
-              ...(remainingTime !== 'Not activated'
-                ? [
-                    vpnStatus?.isConnected
-                      ? {
-                          text: 'Disconnect',
-                          variant: 'primary',
-                          onPress: handleDisconnect,
-                        }
-                      : {
-                          text: 'Connect',
-                          variant: 'primary',
-                          onPress: handleConnect,
-                        },
-                    {
-                      text: 'Status',
-                      variant: 'secondary',
-                      onPress: handleStatus,
-                    },
-                  ]
-                : []),
+              // ...(remainingTime !== 'Not activated'
+              //   ? [
+              //       vpnStatus?.isConnected
+              //         ? {
+              //             text: 'Disconnect',
+              //             variant: 'primary',
+              //             onPress: handleDisconnect,
+              //           }
+              //         : {
+              //             text: 'Connect',
+              //             variant: 'primary',
+              //             onPress: handleConnect,
+              //           },
+              //       {
+              //         text: 'Status',
+              //         variant: 'secondary',
+              //         onPress: handleStatus,
+              //       },
+              //     ]
+              //   : []),
             ]}
           />
         </View>

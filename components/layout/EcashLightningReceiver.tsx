@@ -1,14 +1,13 @@
 import React, { useCallback } from 'react';
 import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { isValidEcashToken } from 'helper/cashuClient';
+import { checkIfAlreadyRedeemed, isValidEcashToken } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from '../layout/PaymentInfo';
 import { useNostr } from 'helper/redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
-import { checkIfAlreadyRedeemed } from 'helper/payment-handler/handlers';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { useTypedNavigation } from 'helper/navigation';

@@ -7,6 +7,8 @@ import { View } from 'components/common/View';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { getMint } from 'helper/cashuClient';
 import Image from 'components/common/Image';
+import { toResult } from 'helper/toResult';
+import { err } from 'neverthrow';
 
 interface RenderItemData {
   color: string;
@@ -30,10 +32,15 @@ const RenderItem = ({ item, index }: Props) => {
   useEffect(() => {
     const fetchMintInfo = async () => {
       try {
-        const mint = await getMint({ mintUrl: item.subtitle });
-        const info = await mint.getInfo();
+        const mintResult = await getMint({ mintUrl: item.subtitle });
+        if (mintResult.isErr()) return err(mintResult.error);
+        const mint = mintResult.value;
 
-        setIconUrl(info?.icon_url); // Set the icon URL from the mint info
+        const mintInfoResult = await toResult(mint.getInfo());
+        if (mintInfoResult.isErr()) return err(mintInfoResult.error);
+        const mintInfo = mintInfoResult.value;
+
+        setIconUrl(mintInfo?.icon_url); // Set the icon URL from the mint info
       } catch {}
     };
 

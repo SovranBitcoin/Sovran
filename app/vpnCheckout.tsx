@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
@@ -35,39 +35,40 @@ function ModalScreen() {
   const balance = useSelector(memoizedGetBalance(unit));
   const selectedMint = useSelector(memoizedGetSelectedMint);
   async function buyEsim() {
-    try {
-      const meltQuote = await getMeltQuote({
-        pr: params.request,
-        unit: 'sat',
-        mintUrl: selectedMint,
-      });
+    setLoading(true);
+    const meltQuoteRes = await getMeltQuote({
+      pr: params.request,
+      unit: 'sat',
+      mintUrl: selectedMint,
+    });
 
-      const amount = getLightningAmount({ pr: params.request });
-      // Alert.alert(String(amount));
-
-      const totalAmount = amount + meltQuote.fee_reserve;
-      //
-      const isBalanceSufficient = balance >= totalAmount;
-
-      if (!isBalanceSufficient) {
-        showMessage(
-          'insufficient_balance',
-          { amount, unit, fee: meltQuote.fee_reserve },
-          { emoji: '🚨' }
-        );
-      } else {
-        navigation.navigate('lightningSendConfirmation', {
-          pr: params.request,
-          unit,
-          meltQuote: JSON.stringify(meltQuote),
-          pubkey: LNVPN_PUBKEY,
-        });
-      }
-    } catch {
+    if (meltQuoteRes.isErr()) {
       showMessage('general_error', {}, { emoji: '❌' });
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const meltQuote = meltQuoteRes.value;
+
+    const amount = getLightningAmount({ pr: params.request });
+    const totalAmount = amount + meltQuote.fee_reserve;
+    const isBalanceSufficient = balance >= totalAmount;
+
+    if (!isBalanceSufficient) {
+      showMessage(
+        'insufficient_balance',
+        { amount, unit, fee: meltQuote.fee_reserve },
+        { emoji: '🚨' }
+      );
+    } else {
+      navigation.navigate('lightningSendConfirmation', {
+        pr: params.request,
+        unit,
+        meltQuote: JSON.stringify(meltQuote),
+        pubkey: LNVPN_PUBKEY,
+      });
+    }
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -89,14 +90,8 @@ function ModalScreen() {
     iconUrl: string | null;
     unit: string;
   }) => {
-    try {
-      // Update selected mint in Redux
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
-      setUnit(mint.unit);
-      // Update account unit
-    } catch (error) {
-      throw error;
-    }
+    dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    setUnit(mint.unit);
   };
 
   return (
@@ -194,6 +189,7 @@ function ModalScreen() {
           // },
         ]}
       />
+      <Spacer size={12} />
       <Section
         camera={false}
         items={[
@@ -203,6 +199,8 @@ function ModalScreen() {
           },
         ]}
       />
+      <Spacer size={12} />
+
       <Text
         weight="bold"
         size={16}

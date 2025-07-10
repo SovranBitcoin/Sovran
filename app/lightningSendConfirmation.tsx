@@ -91,7 +91,7 @@ export function LightningSendConfirmation({
   const handleLightningSend = async () => {
     setLoading(true);
     try {
-      await sendLightning({
+      const result = await sendLightning({
         pr,
         unit,
         pubkey,
@@ -99,14 +99,17 @@ export function LightningSendConfirmation({
         email,
         lud16,
       });
-
-      showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
-        navigation.navigate(
-          redirect || (pubkey ? 'userMessages' : 'index'),
-          { pubkey },
-          { closeCurrentAndParents: true }
-        );
-      });
+      if (result.isOk()) {
+        showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
+          navigation.navigate(
+            redirect || (pubkey ? 'userMessages' : 'index'),
+            { pubkey },
+            { closeCurrentAndParents: true }
+          );
+        });
+      } else {
+        throw result.error;
+      }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
       showMessage(errorMessage, { error: errorMessage }, { emoji: '🚨' });

@@ -8,6 +8,7 @@ import Container from 'components/layout/Container';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
 import { getWallet } from 'helper/cashuClient';
+import { toResult } from 'helper/toResult';
 import { removeProofs } from 'helper/redux/cashu'; // Import the removeProofs action
 import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -60,31 +61,41 @@ export default function ModalScreen() {
       setCheckingSpent(true);
       setError(null);
 
-      try {
-        const wallet = await getWallet({ unit: 'sat', mintUrl, profile: currentProfile });
-
-        // Make sure proofs are in the correct format before checking
-        const validProofs = mintProofs.filter(
-          (proof) => proof && typeof proof === 'object' && proof.id && proof.C
-        );
-
-        if (validProofs.length === 0) {
-          throw new Error(`No valid proofs found for mint: ${mintUrl}`);
-        }
-
-        const states = await wallet.checkProofsStates(validProofs);
-
-        // Update proof states for this mint
-        setProofStates((prevStates) => ({
-          ...prevStates,
-          [mintUrl]: states,
-        }));
-      } catch (err) {
-        console.error(`Error checking spent status for ${mintUrl}:`, err);
-        setError(`Error for ${mintUrl}: ${err.message || JSON.stringify(err)}`);
-      } finally {
+      const walletResult = await getWallet({ unit: 'sat', mintUrl, profile: currentProfile });
+      if (walletResult.isErr()) {
+        console.error(`Error checking spent status for ${mintUrl}:`, walletResult.error);
+        setError(`Error for ${mintUrl}: ${walletResult.error.message}`);
         setCheckingSpent(false);
+        return;
       }
+
+      const wallet = walletResult.value;
+
+      const validProofs = mintProofs.filter(
+        (proof) => proof && typeof proof === 'object' && proof.id && proof.C
+      );
+
+      if (validProofs.length === 0) {
+        setError(`No valid proofs found for mint: ${mintUrl}`);
+        setCheckingSpent(false);
+        return;
+      }
+
+      const statesResult = await toResult(wallet.checkProofsStates(validProofs));
+      if (statesResult.isErr()) {
+        console.error(`Error checking spent status for ${mintUrl}:`, statesResult.error);
+        setError(`Error for ${mintUrl}: ${statesResult.error.message}`);
+        setCheckingSpent(false);
+        return;
+      }
+
+      const states = statesResult.value;
+
+      setProofStates((prevStates) => ({
+        ...prevStates,
+        [mintUrl]: states,
+      }));
+      setCheckingSpent(false);
     },
     [allProofs, currentProfile]
   );
@@ -95,12 +106,7 @@ export default function ModalScreen() {
     setError(null);
 
     for (const mintUrl of allMints) {
-      try {
-        await checkProofSpentStatus(mintUrl);
-      } catch (err) {
-        console.error(`Failed to check mint ${mintUrl}:`, err);
-        // Continue with other mints even if one fails
-      }
+      await checkProofSpentStatus(mintUrl);
     }
 
     setCheckingSpent(false);

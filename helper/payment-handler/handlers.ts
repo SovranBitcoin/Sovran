@@ -1,34 +1,24 @@
-import { getLightningAmount, getMeltQuote, isValidEcashToken } from 'helper/cashuClient';
+import {
+  checkIfAlreadyRedeemed,
+  getLightningAmount,
+  getMeltQuote,
+  isValidEcashToken,
+  isValidPaymentRequest,
+} from 'helper/cashuClient';
 
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
-import { store } from '../redux/store';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
-import { memoizedGetTransactions, TransactionData } from '../redux/cashu';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/common/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
-import { isValidPaymentRequest } from '../cashu/helper';
 import { ok, err, Result } from 'neverthrow';
-
-export const checkIfAlreadyRedeemed = (token: string): boolean => {
-  const profileId = store.getState().nostr?.currentProfile?.id;
-  const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
-
-  const giveaway = getGiveaway({ token });
-  if (!giveaway) return false;
-
-  return transactions.some(
-    (tx: TransactionData) =>
-      tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
-  );
-};
 
 interface NavigationResult {
   screen: string;
   params: Record<string, any>;
 }
 
-type HandlerResult = Result<NavigationResult | null, string>;
+type HandlerResult = Result<NavigationResult | null, Error>;
 
 interface BarcodeHandlerProps {
   scanning: { data: string };
@@ -93,11 +83,11 @@ const handleEcash = async ({
   const giveaway = getGiveaway({ token: data });
   if (giveaway?.id) {
     if (checkIfAlreadyRedeemed(data)) {
-      return err('already_redeemed');
+      return err(new Error('already_redeemed'));
     }
     const error = giveaway.error();
     if (!giveaway.condition() && error) {
-      return err('general_error');
+      return err(new Error('general_error'));
     }
   }
   return ok({
@@ -134,14 +124,18 @@ const handleLightning = async ({
   }
 
   if (amount) {
-    const meltQuote = await getMeltQuote({
+    const meltQuoteRes = await getMeltQuote({
       pr: lnurl,
       unit,
       mintUrl: selectedMint,
     });
+    if (meltQuoteRes.isErr()) {
+      return err(meltQuoteRes.error);
+    }
+    const meltQuote = meltQuoteRes.value;
     const totalAmount = amount + meltQuote.fee_reserve;
     if (balance !== undefined && balance < totalAmount) {
-      return err('insufficient_balance');
+      return err(new Error('insufficient_balance'));
     }
     return ok({
       screen: 'lightningSendConfirmation',
@@ -156,13 +150,31 @@ const handleLightning = async ({
   return ok(null);
 };
 
+function handlePaymentRequest({ data }: { data: string }): HandlerResult {
+  const decodedPaymentRequest = decodePaymentRequest(data);
+
+  return ok({
+    screen: 'currency',
+    params: {
+      unit: decodedPaymentRequest.unit,
+      amount:
+        decodedPaymentRequest.unit === 'sat'
+          ? decodedPaymentRequest.amount
+          : decodedPaymentRequest.amount / 100,
+      mints: decodedPaymentRequest.mints,
+      allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
+      paymentRequest: data,
+      to: 'ecashSendConfirmation',
+    },
+  });
+}
+
 export const handleBarcode = async ({
   scanning,
   urDecoder,
   unit,
   selectedMint,
   setProgress,
-  setLoading,
   setScanned,
   balance,
 }: BarcodeHandlerProps): Promise<HandlerResult> => {
@@ -179,23 +191,7 @@ export const handleBarcode = async ({
   } else if (isValidEcashToken(scanning.data)) {
     return handleEcash({ data: scanning.data, unit });
   } else if (isValidPaymentRequest(scanning.data)) {
-    const decodedPaymentRequest = decodePaymentRequest(scanning.data);
-    console.log({ decodedPaymentRequest });
-
-    return ok({
-      screen: 'currency',
-      params: {
-        unit: decodedPaymentRequest.unit,
-        amount:
-          decodedPaymentRequest.unit === 'sat'
-            ? decodedPaymentRequest.amount
-            : decodedPaymentRequest.amount / 100,
-        mints: decodedPaymentRequest.mints,
-        allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
-        paymentRequest: scanning.data,
-        to: 'ecashSendConfirmation',
-      },
-    });
+    return handlePaymentRequest({ data: scanning.data });
   } else if (
     isLightningAddress(lnTrim(scanning.data)) ||
     isLnurlp(lnTrim(scanning.data)) ||
@@ -206,20 +202,19 @@ export const handleBarcode = async ({
       selectedMint,
       unit,
       balance,
-      setLoading,
     });
   }
-  return err('invalid_address');
+  return err(new Error('invalid_address'));
 };
 
 // Wrapper function to maintain current navigation behavior
 export const barcodeHandler = async (
   props: BarcodeHandlerProps & { navigation: any }
-): Promise<Result<void, string>> => {
+): Promise<HandlerResult> => {
   const { navigation, ...handlerProps } = props;
 
   if (!navigation.isFocused()) {
-    return ok(undefined);
+    return ok(null);
   }
 
   const result = await handleBarcode(handlerProps);
@@ -230,7 +225,7 @@ export const barcodeHandler = async (
         closeCurrentAndParent: true,
       });
     }
-    return ok(undefined);
+    return ok(null);
   }
 
   return err(result.error);

@@ -19,7 +19,8 @@ import { showMessage } from 'helper/popup/popups';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { getWallet } from 'helper/cashuClient';
 import _ from 'lodash';
-import { Alert } from 'react-native';
+import { err } from 'neverthrow';
+import { toResult } from 'helper/toResult';
 
 const TransactionContext = createContext(null);
 
@@ -184,14 +185,21 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
       // loop over mints
       for (const [mintUrl, txs] of Object.entries(groupedTransactions)) {
         // loop over txs
-        const w = await getWallet({
+        const walletResult = await getWallet({
           mintUrl,
           unit: 'sat',
           forceRefresh,
+          profile: null,
         });
-        const activeKeyset = w.getActiveKeyset(w.keysets.filter((key) => key.unit === 'sat'));
+
+        if (walletResult.isErr()) return err(walletResult.error);
+        const wallet = walletResult.value;
+
+        const activeKeyset = wallet.getActiveKeyset(
+          wallet.keysets.filter((key) => key.unit === 'sat')
+        );
         const keysetId = activeKeyset.id;
-        w.keysetId = keysetId;
+        wallet.keysetId = keysetId;
 
         for (const [type, txs_] of Object.entries(txs)) {
           try {
@@ -200,7 +208,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
             if (type === 'ecash') {
               const proofs = _.flatMap(txs_.map((tx: any) => getDecodedToken(tx.token).proofs));
-              unsub = await w.onProofStateUpdates(
+              unsub = await wallet.onProofStateUpdates(
                 // flat map the proofs
                 proofs,
                 (
@@ -270,7 +278,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                 addConnection(id, unsub);
               }
             } else if (type === 'lightning') {
-              unsub = await w.onMintQuoteUpdates(
+              unsub = await wallet.onMintQuoteUpdates(
                 txs_.map((tx) => tx.mintQuote.quote),
                 async (update: MintQuoteResponse) => {
                   try {
@@ -281,7 +289,6 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
                     switch (update.state) {
                       case 'UNPAID':
-                        Alert.alert(update.state);
                         updateTransactionStatus(
                           {
                             request: transaction.request,
@@ -302,8 +309,6 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         );
                         break;
                       case 'ISSUED':
-                        Alert.alert(update.state);
-
                         updateTransactionStatus(
                           {
                             request: transaction.request,
@@ -331,30 +336,28 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         }
                         break;
                       case 'PAID':
-                        Alert.alert(update.state);
-
                         const counter = memoizedGetCounterV2({
                           profileId: store.getState().nostr.currentProfile.id,
                           mintUrl,
-                          keysetId: w.keysetId,
+                          keysetId: wallet.keysetId,
                         })(store.getState());
 
                         // Mint proofs
-                        const proofs = await w.mintProofs(
-                          transaction.amount,
-                          transaction.mintQuote.quote,
-                          {
+                        const proofsResult = await toResult(
+                          wallet.mintProofs(transaction.amount, transaction.mintQuote.quote, {
                             counter,
-                            keysetId: w.keysetId,
-                          }
+                            keysetId: wallet.keysetId,
+                          })
                         );
+                        if (proofsResult.isErr()) return err(proofsResult.error);
+                        const proofs = proofsResult.value;
 
                         // Increase counter
                         store.dispatch(
                           increaseCounterV2({
                             profileId: store.getState().nostr.currentProfile.id,
                             mintUrl,
-                            keysetId: w.keysetId,
+                            keysetId: wallet.keysetId,
                             amount: proofs.length,
                           })
                         );

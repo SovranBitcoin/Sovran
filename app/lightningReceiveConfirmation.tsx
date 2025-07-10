@@ -20,6 +20,7 @@ import {
 } from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
 import { getWallet, getRawExpiry } from 'helper/cashuClient';
+import { toResult } from 'helper/toResult';
 import { store } from 'helper/redux/store';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -40,6 +41,7 @@ import { TransactionMintRefresh } from 'components/common/Transaction/Transactio
 import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
+import { err } from 'neverthrow';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -404,93 +406,102 @@ export function LightningReceiveConfirmation({
   // const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const handleCheckStatus = async (onClose, forceRefresh) => {
-    try {
-      const currentTx = getCurrentTransaction[0];
-      const wallet = await getWallet({
-        unit: currentTx.unit,
+    const currentTx = getCurrentTransaction[0];
+    const walletRes = await getWallet({
+      unit: currentTx.unit,
+      mintUrl: currentTx.mintUrl,
+      profile: null,
+      forceRefresh,
+    });
+    if (walletRes.isErr()) {
+      if (walletRes.error.message === 'keyset id inactive.') {
+        handleCheckStatus(onClose, true);
+      }
+      return;
+    }
+    const wallet = walletRes.value;
+    const activeKeyset = wallet.getActiveKeyset(
+      wallet.keysets.filter((key) => key.unit === currentTx.unit)
+    );
+    const keysetId = activeKeyset.id;
+    wallet.keysetId = keysetId;
+
+    const statusRes = await toResult(wallet.checkMintQuote(currentTx.mintQuote?.quote));
+    if (statusRes.isErr()) {
+      showMessage(statusRes.error.message);
+      return;
+    }
+    const status = statusRes.value;
+
+    if (status.state === 'PAID') {
+      const profileId = store.getState().nostr?.currentProfile?.id;
+
+      const counter = memoizedGetCounterV2({
+        profileId: store.getState().nostr.currentProfile.id,
         mintUrl: currentTx.mintUrl,
-        profile: null,
-        forceRefresh,
-      });
-      const activeKeyset = wallet.getActiveKeyset(
-        wallet.keysets.filter((key) => key.unit === currentTx.unit)
+        keysetId: wallet.keysetId,
+      })(store.getState());
+
+      // Mint proofs
+      const proofsResult = await toResult(
+        wallet.mintProofs(amount, currentTx.mintQuote.quote, {
+          counter,
+          keysetId: wallet.keysetId,
+        })
       );
-      const keysetId = activeKeyset.id;
-      wallet.keysetId = keysetId;
+      if (proofsResult.isErr()) return err(proofsResult.error);
+      const proofs = proofsResult.value;
 
-      const status = await wallet.checkMintQuote(currentTx.mintQuote?.quote);
-
-      if (status.state === 'PAID') {
-        const profileId = store.getState().nostr?.currentProfile?.id;
-
-        const counter = memoizedGetCounterV2({
+      // Increase counter
+      store.dispatch(
+        increaseCounterV2({
           profileId: store.getState().nostr.currentProfile.id,
           mintUrl: currentTx.mintUrl,
           keysetId: wallet.keysetId,
-        })(store.getState());
+          amount: proofs.length,
+        })
+      );
 
-        // Mint proofs
-        const proofs = await wallet.mintProofs(amount, currentTx.mintQuote.quote, {
-          counter,
-          keysetId: wallet.keysetId,
-        });
+      // Add proofs to redux
+      await store.dispatch(
+        appendProofsV2({
+          profileId: store.getState().nostr.currentProfile.id,
+          mintUrl: currentTx.mintUrl,
+          proofs: proofs,
+        })
+      );
 
-        // Increase counter
-        store.dispatch(
-          increaseCounterV2({
-            profileId: store.getState().nostr.currentProfile.id,
-            mintUrl: currentTx.mintUrl,
-            keysetId: wallet.keysetId,
-            amount: proofs.length,
-          })
-        );
+      // Publish wallet event, this basically just makes sure we can restore our account via nostr
+      const currentProfileId = store.getState().nostr.currentProfile.id;
+      const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
+      publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
 
-        // Add proofs to redux
-        await store.dispatch(
-          appendProofsV2({
-            profileId: store.getState().nostr.currentProfile.id,
-            mintUrl: currentTx.mintUrl,
-            proofs: proofs,
-          })
-        );
+      // Update transaction status to paid
+      showMessage('funds_sent', {
+        amount: currentTx.amount,
+        unit: currentTx.unit,
+      });
 
-        // Publish wallet event, this basically just makes sure we can restore our account via nostr
-        const currentProfileId = store.getState().nostr.currentProfile.id;
-        const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
-        publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
+      await store.dispatch(
+        updateTransaction({
+          profileId,
+          matcher: (tx) => tx.request === currentTx.request,
+          updateFn: (tx) => ({
+            ...tx,
+            paid: true,
+          }),
+        })
+      );
 
-        // Update transaction status to paid
-        showMessage('funds_sent', {
-          amount: currentTx.amount,
-          unit: currentTx.unit,
-        });
-
-        await store.dispatch(
-          updateTransaction({
-            profileId,
-            matcher: (tx) => tx.request === currentTx.request,
-            updateFn: (tx) => ({
-              ...tx,
-              paid: true,
-            }),
-          })
-        );
-
-        showMessage(
-          'funds_received',
-          { amount: currentTx.amount, unit: currentTx.unit },
-          { emoji: '🎉' },
-          onClose
-        );
-      } else if (status.state === 'ISSUED') {
-      } else {
-        showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
-      }
-    } catch (error) {
-      if (error.message === 'keyset id inactive.') {
-        handleCheckStatus(onClose, true);
-      } else {
-      }
+      showMessage(
+        'funds_received',
+        { amount: currentTx.amount, unit: currentTx.unit },
+        { emoji: '🎉' },
+        onClose
+      );
+    } else if (status.state === 'ISSUED') {
+    } else {
+      showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
     }
   };
 

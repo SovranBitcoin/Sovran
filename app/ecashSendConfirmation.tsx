@@ -26,6 +26,7 @@ import {
   useGetMintInfo,
 } from 'helper/redux/cashu';
 import { cancelEcashTransaction, getWallet } from 'helper/cashuClient';
+import { toResult } from 'helper/toResult';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
@@ -44,6 +45,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { err, ok, Result } from 'neverthrow';
 
 export function EcashSendConfirmation({
   unit,
@@ -126,17 +128,14 @@ export function EcashSendConfirmation({
   };
 
   const handleCancelSend = async (onClose) => {
-    try {
-      const profileId = store.getState().nostr?.currentProfile?.id;
-      const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+    const profileId = store.getState().nostr?.currentProfile?.id;
+    const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
 
-      const transaction = transactions.find(
-        (t) => t.token === token && t.transactionType === 'send'
-      );
+    const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
 
-      await cancelEcashTransaction(transaction, navigation);
-    } catch (error) {
-      showMessage(error.message, {}, {}, onClose);
+    const res = await cancelEcashTransaction(transaction, navigation);
+    if (res.isErr()) {
+      showMessage(res.error.message, {}, {}, onClose);
     }
   };
 
@@ -145,53 +144,47 @@ export function EcashSendConfirmation({
 
   const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
-  const checkProofsSpent = async (token: string): Promise<boolean> => {
-    try {
-      const decodedToken = getDecodedToken(token);
-      const { unit, mint: mintUrl, proofs } = decodedToken;
+  const checkProofsSpent = async (token: string): Promise<Result<boolean, Error>> => {
+    const decodedToken = getDecodedToken(token);
+    const { unit, mint: mintUrl, proofs } = decodedToken;
 
-      const wallet = await getWallet({
-        unit,
-        mintUrl,
-        profile: null,
-      });
+    const walletRes = await getWallet({
+      unit,
+      mintUrl,
+      profile: null,
+    });
+    if (walletRes.isErr()) return err(walletRes.error);
+    const wallet = walletRes.value;
 
-      if (!wallet) {
-        throw new Error('Failed to initialize wallet');
-      }
+    const spentRes = await toResult(wallet.checkProofsStates(proofs));
+    if (spentRes.isErr()) return err(spentRes.error);
 
-      const spentProofs = await wallet.checkProofsStates(proofs);
-
-      if (spentProofs.some((p) => p.state === 'SPENT')) {
-        // Update transaction state
-        const profileId = store.getState().nostr?.currentProfile?.id;
-        await store.dispatch(
-          updateTransaction({
-            profileId,
-            matcher: (tx) => tx.token === token,
-            updateFn: (tx) => ({
-              ...tx,
-              paid: true,
-            }),
-          })
-        );
-
-        return true; // Proofs are spent
-      }
-
-      return false; // Proofs are not spent
-    } catch (error) {
-      throw error;
+    if (spentRes.value.some((p) => p.state === 'SPENT')) {
+      const profileId = store.getState().nostr?.currentProfile?.id;
+      await store.dispatch(
+        updateTransaction({
+          profileId,
+          matcher: (tx) => tx.token === token,
+          updateFn: (tx) => ({
+            ...tx,
+            paid: true,
+          }),
+        })
+      );
+      return ok(true);
     }
+
+    return ok(false);
   };
 
   const handleCheckStatus = async (onClose) => {
     if (isCheckingStatus) return;
 
-    try {
-      setIsCheckingStatus(true);
-      const proofsSpent = await checkProofsSpent(token);
+    setIsCheckingStatus(true);
+    const result = await checkProofsSpent(token);
 
+    if (result.isOk()) {
+      const proofsSpent = result.value;
       if (proofsSpent) {
         const decodedToken = getDecodedToken(token);
         const amount = _.sumBy(decodedToken.proofs, 'amount');
@@ -209,11 +202,15 @@ export function EcashSendConfirmation({
       } else {
         showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
       }
-    } catch (error) {
-      showMessage('error_checking_status', { error: error.message }, { emoji: '⚠️' }, onClose);
-    } finally {
-      setIsCheckingStatus(false);
+    } else {
+      showMessage(
+        'error_checking_status',
+        { error: result.error.message },
+        { emoji: '⚠️' },
+        onClose
+      );
     }
+    setIsCheckingStatus(false);
   };
 
   const handleCopyEmoji = async (onClose) => {

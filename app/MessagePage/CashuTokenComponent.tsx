@@ -40,11 +40,11 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   };
 
   const handleRedeem = async () => {
-    try {
-      await receiveEcash({ token, unit });
+    const res = await receiveEcash({ token, unit });
+    if (res.isOk()) {
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' });
-    } catch (error) {
-      showMessage(error.message, {}, { emoji: '🚨' });
+    } else {
+      showMessage(res.error.message, {}, { emoji: '🚨' });
     }
   };
 
