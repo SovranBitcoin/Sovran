@@ -69,6 +69,7 @@ interface BaseTransaction {
   paid: boolean;
   memo?: string;
 
+
   counter?: number;
   nostr?: {
     pubkey: string;
@@ -78,6 +79,7 @@ interface BaseTransaction {
 interface BaseLightningTransaction extends BaseTransaction {
   type: 'lightning';
   request: string;
+  lud16?: string;
 }
 
 interface LightningSendTransaction extends BaseLightningTransaction {
@@ -458,7 +460,6 @@ export async function receiveLightning({
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
 
-  Alert.alert('a', JSON.stringify(unit, selectedMint));
   const walletRes = await getWallet({
     unit,
     mintUrl: selectedMint,

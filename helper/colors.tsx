@@ -600,7 +600,7 @@ export const white = '#FFFFFF';
 
 export const black = '#181412'; // off black
 
-export function computeGreys(theme: string) {
+export function computeGreys(theme: Theme) {
   return greys(theme);
 }
 

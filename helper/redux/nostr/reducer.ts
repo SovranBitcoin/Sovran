@@ -1,18 +1,102 @@
+import { Reducer } from 'react';
 import {
   SET_CURRENT_PROFILE,
   SET_SEARCH,
   SET_PROFILES,
   SET_FOLLOWS,
-  UPDATE_MESSAGE_STATUS,
   ADD_MESSAGE,
-  APPEND_QUERY,
   MUTE_USER,
   REPORT_USER,
   ADD_CONTACT,
   REMOVE_CONTACT,
 } from './actionTypes';
+import { NostrAction } from './actions';
 
-const initialState = {
+type NostrProfile = {
+  created_at: number;
+  profileEvent: string;
+  name: string;
+  picture: string;
+  image: string;
+};
+
+type NostrSearchProfile = {
+  created_at: number;
+  profileEvent: string;
+  lud16: string;
+  banner?: string;
+  nip05?: string;
+  website: string;
+  name: string;
+  lud06?: string;
+  picture?: string;
+  image: string;
+  displayName: string;
+  about: string;
+  pubkey?: string;
+  npub: string;
+  nip05Valid?: boolean;
+  hasNip05Conflict?: boolean;
+};
+
+export type NostrContactProfile = {
+  pubkey: string;
+  name: string;
+  about: string;
+  lud16: string;
+  nip05: string;
+  picture: string;
+  displayName: string;
+  display_name: string;
+  website: string;
+  banner: string;
+};
+
+export type Message = {
+  sender: string;
+  receiver: string;
+  pubkey: string;
+  content: string;
+  created_at: number;
+  id: string;
+  sig: string;
+};
+
+export type Profile = {
+  id: number;
+  pubkey: string;
+  profile: NostrProfile;
+  npub: string;
+  nsec: string;
+  mints: any[];
+  mnemonic: string;
+  picture: string;
+  root: {
+    xpub: string;
+    xpriv: string;
+  };
+  nut13: string;
+}
+
+type NostrState = {
+  currentProfile: { id: number };
+  search: Array<{
+    pubkey: string;
+    profile: NostrSearchProfile;
+  }>;
+  profiles: Array<Profile>;
+  messages: {
+    loaded_messages: any[];
+    [key: string]: Message[];
+  };
+  follows: Record<string, any>;
+  contacts: Array<{
+    pubkey: string;
+    profile: NostrContactProfile;
+  }>;
+};
+
+const initialState: NostrState = {
   currentProfile: {
     id: 0,
   },
@@ -89,26 +173,18 @@ const initialState = {
   contacts: [],
 };
 
-export const nostrReducer = (state = initialState, action) => {
+export const nostrReducer: Reducer<NostrState, NostrAction> = (
+  state = initialState,
+  action
+): NostrState => {
   switch (action.type) {
     case SET_CURRENT_PROFILE: {
       return { ...state, currentProfile: action.payload };
     }
 
-    case APPEND_QUERY: {
-      return {
-        ...state,
-        queries: [...(state?.queries || []), action.payload],
-      };
-    }
-
     case SET_SEARCH: {
       const uniqueSearch = [];
       const pubkeyMap = new Map();
-      for (const item of action.payload) {
-        if (!item.pubkey) continue;
-        pubkeyMap.set(item.pubkey, item);
-      }
       for (const item of state.search) {
         if (!pubkeyMap.has(item.pubkey)) {
           pubkeyMap.set(item.pubkey, item);
@@ -125,21 +201,6 @@ export const nostrReducer = (state = initialState, action) => {
     case SET_FOLLOWS: {
       const pubkey = state.profiles?.[state.currentProfile.id]?.pubkey;
       return { ...state, follows: { [pubkey]: action.payload } };
-    }
-
-    case UPDATE_MESSAGE_STATUS: {
-      const { pubkey, status } = action.payload;
-      const updatedMessages = state.messages[pubkey]?.map((message) => ({
-        ...message,
-        status,
-      }));
-      return {
-        ...state,
-        messages: {
-          ...state.messages,
-          [pubkey]: [...updatedMessages],
-        },
-      };
     }
 
     case ADD_MESSAGE: {

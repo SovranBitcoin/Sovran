@@ -1,19 +1,30 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ViewStyle, StyleProp, ColorValue } from 'react-native';
 import { StyledText, Text } from 'components/common/Text';
 import Icon from 'assets/icons';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import BottomButtons from './BottomButtons';
+import BottomButtons, { ButtonProps } from './BottomButtons';
 import { useTypedNavigation } from 'helper/navigation';
 import { Cashews } from 'assets/images';
 import { LinearGradient } from 'expo-linear-gradient';
 
-/**
- * InfoSection - Reusable component for displaying title, highlight text, and description
- */
-export const InfoSection = ({ title, highlight, description, highlightColors, style }) => {
+interface InfoSectionProps {
+  title: string;
+  highlight: string;
+  description: string;
+  highlightColors: readonly [ColorValue, ColorValue, ...ColorValue[]];
+  style?: StyleProp<ViewStyle>;
+}
+
+export const InfoSection = ({
+  title,
+  highlight,
+  description,
+  highlightColors,
+  style,
+}: InfoSectionProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -32,9 +43,6 @@ export const InfoSection = ({ title, highlight, description, highlightColors, st
   );
 };
 
-/**
- * NavigationFooter - Component for navigating between onboarding screens
- */
 export const NavigationFooter = ({
   onBack,
   onNext,
@@ -64,56 +72,15 @@ export const NavigationFooter = ({
   );
 };
 
-/**
- * ActionFooter - Component for displaying action buttons
- */
-export const ActionFooter = ({ actions, theme, style }) => {
-  const styles = createStyles(theme);
+interface OnboardingLayoutProps {
+  title: string;
+  highlight: string;
+  description: string;
+  highlightColors: readonly [ColorValue, ColorValue, ...ColorValue[]];
+  nextScreen: string;
+  actions: ButtonProps[];
+}
 
-  return (
-    <View style={[styles.footerContainer, style]}>
-      {actions.map((action, index) => {
-        const isPrimary = action.variant === 'primary';
-        const buttonStyle = [
-          styles.actionButton,
-          isPrimary && styles.primaryButton,
-          {
-            backgroundColor: isPrimary ? greys(theme)[0] : 'transparent',
-          },
-        ];
-
-        return (
-          <TouchableOpacity key={index} style={buttonStyle} onPress={action.onPress}>
-            <Text
-              size={16}
-              style={{
-                color: isPrimary ? greys(theme)[950] : greys(theme)[0],
-                fontFamily: 'LexendMedium',
-              }}>
-              {action.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
-
-/**
- * HeaderSkipButton - Component for the skip button in the header
- */
-export const HeaderSkipButton = ({ onPress, theme }) => (
-  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={onPress}>
-    <Text size={16} style={{ marginRight: 8 }}>
-      Skip
-    </Text>
-    <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[0]} />
-  </TouchableOpacity>
-);
-
-/**
- * OnboardingLayout - A wrapper component that provides consistent onboarding screens
- */
 export function OnboardingLayout({
   title,
   highlight,
@@ -121,7 +88,7 @@ export function OnboardingLayout({
   highlightColors,
   nextScreen,
   actions,
-}) {
+}: OnboardingLayoutProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
@@ -171,7 +138,7 @@ export function OnboardingLayout({
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     titleText: {
       fontFamily: 'LexendBold',

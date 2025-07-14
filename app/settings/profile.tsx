@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
@@ -130,7 +130,7 @@ const Profile = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     content: {
       paddingHorizontal: 16,

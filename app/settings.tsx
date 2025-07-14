@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import FeatherIcon from '@expo/vector-icons/Feather';
 
-import { greys, reds } from 'helper/colors';
+import { greys, reds, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import {
   ActionSheetProvider,
@@ -39,10 +39,7 @@ export const Section: React.FC<{
   );
 };
 
-const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
-  currentProfile,
-  theme,
-}) => {
+const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: Theme }) => {
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
@@ -70,7 +67,7 @@ const ProfileButton: React.FC<{ currentProfile: any; theme: any }> = ({
 };
 
 export const RowButton: React.FC<{
-  label: string;
+  label: string | React.ReactElement;
   value?: string;
   onPress: () => void;
   isFirst?: boolean;
@@ -86,7 +83,7 @@ export const RowButton: React.FC<{
       style={[
         styles.rowWrapper,
         {
-          borderTopWidth: !isFirst && 1,
+          borderTopWidth: !isFirst ? 1 : 0,
         },
       ]}>
       <TouchableOpacity
@@ -358,7 +355,7 @@ const ModalScreen = () => {
   );
 };
 
-const createStyles = (theme: any, isDanger?: boolean) =>
+const createStyles = (theme: Theme, isDanger?: boolean) =>
   StyleSheet.create({
     header: {
       flexDirection: 'row',

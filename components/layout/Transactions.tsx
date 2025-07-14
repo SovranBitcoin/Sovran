@@ -2,13 +2,13 @@ import React from 'react';
 import { Dimensions, TouchableOpacity } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useSelector } from 'react-redux';
-import { useNavigation } from 'expo-router';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Transaction } from 'components/layout/Transaction';
 import { Text } from 'components/common/Text';
 import Icon from 'assets/icons';
 import { View } from 'components/common/View';
 import { TransactionData } from 'helper/redux/cashu';
+import { useTypedNavigation } from 'helper/navigation';
 
 interface Account {
   unit: string;
@@ -22,7 +22,7 @@ interface Section {
 }
 
 interface Props {
-  header?: React.ReactNode;
+  header?: React.ReactElement | (() => React.ReactElement) | null;
   listKey?: string;
   account: Account;
   showMore: boolean;
@@ -46,7 +46,7 @@ export const Transactions = React.memo(
     morePendingCount,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
-    const navigation = useNavigation();
+    const navigation = useTypedNavigation();
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;

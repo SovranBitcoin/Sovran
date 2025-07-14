@@ -3,9 +3,18 @@ import { Text } from 'components/common/Text';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
+import { Message } from 'helper/redux/nostr';
 
-const MessageComponent = ({ message, theme, isReceived }) => {
+const MessageComponent = ({
+  message,
+  theme,
+  isReceived,
+}: {
+  message: Message;
+  theme: Theme;
+  isReceived: boolean;
+}) => {
   const styles = createStyles(theme, isReceived);
 
   return (
@@ -21,14 +30,13 @@ const MessageComponent = ({ message, theme, isReceived }) => {
         <Text style={styles.text}>{message.content}</Text>
         <View style={styles.footer}>
           <Text style={styles.timestamp}>{convertTime(new Date(message.created_at * 1000))}</Text>
-          {message.status && <Text style={styles.status}> • {message.status}</Text>}
         </View>
       </LinearGradient>
     </View>
   );
 };
 
-const createStyles = (theme, isReceived) =>
+const createStyles = (theme: Theme, isReceived: boolean) =>
   StyleSheet.create({
     wrapper: {
       marginVertical: 8,

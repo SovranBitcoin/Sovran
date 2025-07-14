@@ -2,17 +2,32 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { convertTime } from 'helper/time';
+import { BitrefillEvent } from 'helper/redux/bitrefill';
 
-const EVENT_TYPES = {
+export type BitrefillEventType =
+  | 'invoice_created'
+  | 'invoice_update'
+  | 'payment_intent'
+  | 'invoice_complete';
+
+const EVENT_TYPES: Record<BitrefillEventType, string> = {
   invoice_created: 'Invoice created',
   invoice_update: 'Invoice updated',
   payment_intent: 'Payment intent',
   invoice_complete: 'Invoice complete',
 };
 
-const EventComponent = ({ event, theme, isReceived = true }) => {
+const EventComponent = ({
+  event,
+  theme,
+  isReceived = true,
+}: {
+  event: BitrefillEvent;
+  theme: Theme;
+  isReceived?: boolean;
+}) => {
   const styles = createStyles(theme, isReceived);
   const eventTitle = EVENT_TYPES[event.event] || event.event;
 
@@ -42,7 +57,7 @@ const EventComponent = ({ event, theme, isReceived = true }) => {
   );
 };
 
-const createStyles = (theme, isReceived) =>
+const createStyles = (theme: Theme, isReceived: boolean) =>
   StyleSheet.create({
     eventWrapper: {
       marginVertical: 8,

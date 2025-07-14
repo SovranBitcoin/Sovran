@@ -138,7 +138,7 @@ function TabOneScreen() {
   const onRefresh = useCallback(async () => {}, []);
 
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const styles = createStyles();
 
   const { transactions } = useCashu();
   const txData = useTransactionsData({
@@ -235,7 +235,7 @@ function TabOneScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = () =>
   StyleSheet.create({
     scrollView: {
       marginTop: 0,

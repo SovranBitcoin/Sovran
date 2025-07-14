@@ -16,3 +16,14 @@ export const memoizedGetNostrProfile = ({ nostrPubkey }: { nostrPubkey: string }
       return _.find(profiles, { pubkey: nostrPubkey });
     }
   );
+
+export const memoizedMessagesByProfile = ({ pubkey }: { pubkey?: string } = {}) =>
+  createSelector(
+    [
+      (state: RootState) => state.nostr.messages,
+      (state: RootState) => memoizedGetCurrentProfile(state),
+    ],
+    (messages, profile) => {
+      return messages[pubkey || profile.pubkey];
+    }
+  );

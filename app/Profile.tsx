@@ -3,7 +3,7 @@ import { nip19 } from 'nostr-tools';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import Icon, { QRIcon } from 'assets/icons';
 import { useNostr } from 'helper/redux/nostr';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -288,7 +288,7 @@ const Screen = () => {
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     smallProfilePicture: {
       width: 32,

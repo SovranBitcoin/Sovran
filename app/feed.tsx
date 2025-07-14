@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dimensions, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
@@ -93,7 +93,7 @@ const TabTwoScreen = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[950],

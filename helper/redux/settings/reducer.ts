@@ -10,7 +10,6 @@ import {
 import { BACKGROUND_IMAGE_ATTRIBUTES } from '../../backgroundImages';
 import { SettingsAction } from './actions';
 import _ from 'lodash/fp';
-import { RootState } from '../store/reducer';
 import { Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
 export interface TermsAccepted {
@@ -50,33 +49,41 @@ export const settingsReducer: Reducer<SettingsState, SettingsAction> = (
 ): SettingsState => {
   switch (action.type) {
     case SET_DISPLAY_BITCOIN: {
-      return typedUpdate('settings.display_btc', () => action.payload, state);
+      return typedUpdate('settings.display_btc' as const, () => action.payload, state);
     }
     case SET_LANGUAGE: {
-      return typedUpdate('settings.lang', () => action.payload, state);
+      return typedUpdate('settings.lang' as const, () => action.payload, state);
     }
     case SET_THEME: {
-      return typedUpdate('settings.theme', () => action.payload, state);
+      return typedUpdate('settings.theme' as const, () => action.payload, state);
     }
     case SET_BACKGROUND_IMAGE: {
-      return typedUpdate('settings', (settings) => ({
-        ...settings,
-        backgroundImage: action.payload,
-        backgroundImageAttrs:
-          BACKGROUND_IMAGE_ATTRIBUTES[action.payload] || settings.backgroundImageAttrs,
-      }), state);
+      return typedUpdate(
+        'settings' as const,
+        (settings) => ({
+          ...settings,
+          backgroundImage: action.payload,
+          backgroundImageAttrs:
+            BACKGROUND_IMAGE_ATTRIBUTES[action.payload] || settings.backgroundImageAttrs,
+        }),
+        state
+      );
     }
     case TERMS_ACCEPTED: {
-      return typedUpdate('settings.termsAccepted', () => ({
-        termsAccepted: true,
-        date: action.payload.date,
-      }), state);
+      return typedUpdate(
+        'settings.termsAccepted' as const,
+        () => ({
+          termsAccepted: true,
+          date: action.payload.date,
+        }),
+        state
+      );
     }
     case SET_EXPERIMENTAL: {
-      return typedUpdate('settings.experimental', () => action.payload, state);
+      return typedUpdate('settings.experimental' as const, () => action.payload, state);
     }
     case SET_PASSCODE: {
-      return typedUpdate('settings.passcode', () => action.payload, state);
+      return typedUpdate('settings.passcode' as const, () => action.payload, state);
     }
     default: {
       return state;

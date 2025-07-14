@@ -21,6 +21,7 @@ import { getWallet } from 'helper/cashuClient';
 import _ from 'lodash';
 import { err } from 'neverthrow';
 import { toResult } from 'helper/toResult';
+import { Alert } from 'react-native';
 
 const TransactionContext = createContext(null);
 
@@ -187,16 +188,21 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
         // loop over txs
         const walletResult = await getWallet({
           mintUrl,
-          unit: 'sat',
+          unit: 'sat', // todo, use correct unit.
           forceRefresh,
           profile: null,
         });
 
-        if (walletResult.isErr()) return err(walletResult.error);
+        if (walletResult.isErr()) {
+          if (walletResult.error.message === 'keyset id inactive.') {
+            await listenToTransaction(transactions, true);
+          }
+          return err(walletResult.error);
+        }
         const wallet = walletResult.value;
 
         const activeKeyset = wallet.getActiveKeyset(
-          wallet.keysets.filter((key) => key.unit === 'sat')
+          wallet.keysets.filter((key) => key.unit === 'sat') // todo: use correct unit.
         );
         const keysetId = activeKeyset.id;
         wallet.keysetId = keysetId;
@@ -286,7 +292,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                     const transaction = txs_.find((tx) => tx.mintQuote.quote === update.quote);
 
                     if (!transaction) return;
-
+                    Alert.alert(JSON.stringify(update.state));
                     switch (update.state) {
                       case 'UNPAID':
                         updateTransactionStatus(
@@ -342,6 +348,8 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                           keysetId: wallet.keysetId,
                         })(store.getState());
 
+                        Alert.alert(JSON.stringify({ counter }));
+
                         // Mint proofs
                         const proofsResult = await toResult(
                           wallet.mintProofs(transaction.amount, transaction.mintQuote.quote, {
@@ -349,8 +357,17 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                             keysetId: wallet.keysetId,
                           })
                         );
+                        Alert.alert(
+                          JSON.stringify({
+                            proofsResult,
+                            isErr: proofsResult.isErr(),
+                            error: proofsResult.error.message,
+                          })
+                        );
                         if (proofsResult.isErr()) return err(proofsResult.error);
                         const proofs = proofsResult.value;
+
+                        Alert.alert(JSON.stringify({ proofs }));
 
                         // Increase counter
                         store.dispatch(

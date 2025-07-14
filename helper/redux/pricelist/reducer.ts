@@ -21,7 +21,7 @@ export const pricelistReducer: Reducer<PricelistState, PricelistAction> = (
 ): PricelistState => {
   switch (action.type) {
     case SET_PRICELIST: {
-      return typedUpdate('usd.btc', () => action.payload, state);
+      return typedUpdate('usd.btc' as const, () => action.payload, state);
     }
     default: {
       return state;

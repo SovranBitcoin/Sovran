@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import NumericKeyboard from 'components/passcode/NumericKeyboard';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
@@ -94,7 +94,7 @@ const PasscodeSettings: React.FC = () => {
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

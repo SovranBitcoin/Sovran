@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import lookup from 'country-code-lookup';
 
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -91,7 +91,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: 'transparent',

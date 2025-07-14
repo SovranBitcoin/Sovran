@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { View } from 'components/common/View';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -87,7 +87,7 @@ const RenderItem = ({ item, index }: Props) => {
 
 export default RenderItem;
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       paddingVertical: 20,

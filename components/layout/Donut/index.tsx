@@ -6,7 +6,7 @@ import { useSharedValue, withTiming } from 'react-native-reanimated';
 import RenderItem from './RenderItem';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View } from 'components/common/View';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -107,7 +107,7 @@ export const DonutChartContainer = ({
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

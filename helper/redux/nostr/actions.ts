@@ -1,68 +1,79 @@
+import { UserProfile } from 'helper/apiClient';
 import {
   SET_CURRENT_PROFILE,
   SET_SEARCH,
   SET_PROFILES,
   SET_FOLLOWS,
-  UPDATE_MESSAGE_STATUS,
   ADD_MESSAGE,
-  APPEND_QUERY,
   MUTE_USER,
   REPORT_USER,
   ADD_CONTACT,
   REMOVE_CONTACT,
 } from './actionTypes';
+import { NostrContactProfile, Profile } from './reducer';
+import { NDKUserProfile } from '@nostr-dev-kit/ndk';
 
-export const muteUser = (pubkey: string) => ({
-  type: MUTE_USER,
-  payload: pubkey,
-});
+export type NostrAction =
+  | ReturnType<typeof muteUser>
+  | ReturnType<typeof reportUser>
+  | ReturnType<typeof setCurrentProfile>
+  | ReturnType<typeof setSearch>
+  | ReturnType<typeof addMessage>
+  | ReturnType<typeof addContact>
+  | ReturnType<typeof removeContact>
+  | ReturnType<typeof setProfiles>
+  | ReturnType<typeof setFollows>;
 
-export const reportUser = (pubkey: string) => ({
-  type: REPORT_USER,
-  payload: pubkey,
-});
+export const muteUser = (pubkey: string) =>
+  ({
+    type: MUTE_USER,
+    payload: pubkey,
+  }) as const;
 
-export const setCurrentProfile = (profile) => ({
-  type: SET_CURRENT_PROFILE,
-  payload: profile,
-});
+export const reportUser = (pubkey: string) =>
+  ({
+    type: REPORT_USER,
+    payload: pubkey,
+  }) as const;
 
-export const setSearch = (keysets) => ({
-  type: SET_SEARCH,
-  payload: keysets,
-});
+export const setCurrentProfile = (profile: Profile) =>
+  ({
+    type: SET_CURRENT_PROFILE,
+    payload: profile,
+  }) as const;
 
-export const appendQuery = (query) => ({
-  type: APPEND_QUERY,
-  payload: query,
-});
+export const setSearch = (search: { pubkey: string; profile: UserProfile }) =>
+  ({
+    type: SET_SEARCH,
+    payload: search,
+  }) as const;
 
-export const setProfiles = (profiles) => ({
-  type: SET_PROFILES,
-  payload: profiles,
-});
+export const setProfiles = (profiles: Profile[]) =>
+  ({
+    type: SET_PROFILES,
+    payload: profiles,
+  }) as const;
 
-export const setFollows = (follows) => ({
-  type: SET_FOLLOWS,
-  payload: follows,
-});
+export const setFollows = (follows: { pubkey: string, profile: NDKUserProfile }) =>
+  ({
+    type: SET_FOLLOWS,
+    payload: follows,
+  }) as const;
 
-export const updateMessageStatus = (pubkey, messageId, status) => ({
-  type: UPDATE_MESSAGE_STATUS,
-  payload: { pubkey, messageId, status },
-});
+export const addMessage = (pubkey: string, message: string) =>
+  ({
+    type: ADD_MESSAGE,
+    payload: { pubkey, message },
+  }) as const;
 
-export const addMessage = (pubkey, message) => ({
-  type: ADD_MESSAGE,
-  payload: { pubkey, message },
-});
+export const addContact = (contact: { pubkey: string; profile: NostrContactProfile }) =>
+  ({
+    type: ADD_CONTACT,
+    payload: contact,
+  }) as const;
 
-export const addContact = (contact) => ({
-  type: ADD_CONTACT,
-  payload: contact,
-});
-
-export const removeContact = (pubkey) => ({
-  type: REMOVE_CONTACT,
-  payload: pubkey,
-});
+export const removeContact = (pubkey: string) =>
+  ({
+    type: REMOVE_CONTACT,
+    payload: pubkey,
+  }) as const;

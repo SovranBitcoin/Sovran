@@ -10,7 +10,7 @@ import { sovran } from 'components/layout/sheets/mints';
 
 interface TabsProps {
   tabs: string[];
-  amounts?: number[];
+  amounts?: string[];
   selectedTab: string;
   handleTabPress: (tab: string, index: number) => void;
 }

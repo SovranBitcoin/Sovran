@@ -18,7 +18,11 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
 
   const { blur = false, blurIntensity = 70, blurTint, style, children, ...rest } = props;
 
-  const effectiveTint = blurTint || BACKGROUND_IMAGE_ATTRIBUTES[image]?.tint || 'prominent';
+  const effectiveTint = blurTint
+    ? blurTint
+    : image
+      ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.tint
+      : 'prominent';
 
   const flattenedStyle = StyleSheet.flatten(style);
   const { backgroundColor, ...cleanStyle } = flattenedStyle || {};
@@ -60,7 +64,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export const Spacer = ({ size }) => {
+export const Spacer = ({ size }: { size: number }) => {
   return (
     <View
       style={{
@@ -69,5 +73,3 @@ export const Spacer = ({ size }) => {
     />
   );
 };
-
-export { View };

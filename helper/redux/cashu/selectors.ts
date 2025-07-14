@@ -118,17 +118,15 @@ export const memoizedGetMints = createSelector(
   }
 );
 
-export const memoizedGetSupportedUnits = createSelector(
-  [
-    (state: RootState) =>
-      state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
-  ],
-  (keysets) => {
-    return [...new Set(keysets?.map((keyset) => keyset.unit) || ['sat', 'usd', 'eur', 'gbp'])];
-  }
-);
+type MatcherFunction = (transactions: TransactionData[]) => TransactionData[];
 
-export const memoizedGetTransactionByMatcher = ({ profileId, matcher }) =>
+export const memoizedGetTransactionByMatcher = ({
+  profileId,
+  matcher,
+}: {
+  profileId: number;
+  matcher: MatcherFunction;
+}) =>
   createSelector(
     [(state: RootState) => state.cashu.profiles[profileId]?.transactions],
     (transactions = []) => {
@@ -137,13 +135,6 @@ export const memoizedGetTransactionByMatcher = ({ profileId, matcher }) =>
     }
   );
 
-export const memoizedGetMintNostrContact = (mintUrl: string) =>
-  createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]?.contact], (contactList) => {
-    if (!Array.isArray(contactList)) return null;
-    const entry = contactList.find((c) => c.method && c.method.toLowerCase() === 'nostr');
-    return entry ? entry.info : null;
-  });
-
 export const memoizedGetSelectedMint = createSelector(
   [(state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
   (selectedMint) => {
@@ -151,28 +142,25 @@ export const memoizedGetSelectedMint = createSelector(
   }
 );
 
-export const memoizedGetKeysets = (mintUrl) =>
-  createSelector([(state: RootState) => state.cashu?.keysets?.[mintUrl]], (keysets) => {
-    return keysets;
-  });
-
-export const memoizedGetMintInfo = (mintUrl) =>
+export const memoizedGetMintInfo = (mintUrl: string) =>
   createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]], (info) => {
     return info;
   });
 
-export const memoizedGetAudit = (mintUrl) =>
+export const memoizedGetAudit = (mintUrl: string) =>
   createSelector([(state: RootState) => state.cashu?.audits?.[mintUrl]], (audit) => {
     return audit;
   });
 
-export const memoizedGetCounter = ({ profileId, mintUrl }) =>
-  createSelector(
-    [(state: RootState) => state.cashu.profiles[profileId]?.counters?.[mintUrl]],
-    (counter) => 200 + (counter || 0)
-  );
-
-export const memoizedGetCounterV2 = ({ profileId, mintUrl, keysetId }) =>
+export const memoizedGetCounterV2 = ({
+  profileId,
+  mintUrl,
+  keysetId,
+}: {
+  profileId: number;
+  mintUrl: string;
+  keysetId: string;
+}) =>
   createSelector(
     [
       (state: RootState) =>
@@ -189,25 +177,51 @@ export const memoizedGetTransactions = ({ id }: { id: number }) =>
     }
   );
 
-export const memoizedGetProofs = (unit) =>
-  createSelector(
+export const memoizedGetProofs = (unit: string) => {
+  return createSelector(
     [
-      (state: RootState) =>
-        state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
-        state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
-        ],
-      (state: RootState) =>
-        state.cashu?.keysets?.[state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
+      (state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint,
+      (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id].proofs,
+      (state: RootState) => state.cashu?.keysets,
     ],
-    (proofs, keysets) => {
-      const matchingKeysets = _.filter(keysets, (ks) => ks.unit === unit);
+    (mint, proofs, keysets) => {
+      if (!mint) {
+        return [];
+      }
+      const matchingKeysets = _.filter(keysets[mint], (ks) => ks.unit === unit);
       if (_.isEmpty(matchingKeysets)) {
         return [];
       }
       const keysetIds = _.map(matchingKeysets, 'id');
-      return _.filter(proofs, (proof) => _.includes(keysetIds, proof.id));
+      return _.filter(proofs[mint], (proof) => _.includes(keysetIds, proof.id));
     }
   );
+};
+
+export const memoizedGetBalance = (unit: string, mintUrl?: string) => {
+  return createSelector(
+    [
+      (state: RootState) =>
+        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint,
+      (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs,
+      (state: RootState) => state.cashu?.keysets,
+    ],
+    (mint, proofs, keysets) => {
+      if (!mint) {
+        return 0;
+      }
+
+      const matchingKeysets = _.filter(keysets[mint], (ks) => ks.unit === unit);
+      if (_.isEmpty(matchingKeysets)) {
+        return 0;
+      }
+      const keysetIds = _.map(matchingKeysets, 'id');
+      const filteredProofs = _.filter(proofs[mint], (proof) => _.includes(keysetIds, proof.id));
+      return _.sumBy(filteredProofs, 'amount');
+    }
+  );
+};
+
 export const memoizedGetAllBalances = createSelector(
   [(state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs],
   (proofsByMint) => {
@@ -287,30 +301,7 @@ export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
   }
 );
 
-export const memoizedGetBalance = (unit, mintUrl = null) =>
-  createSelector(
-    [
-      (state: RootState) =>
-        state.cashu.profiles[state.nostr.currentProfile.id]?.proofs?.[
-        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
-        ],
-      (state: RootState) =>
-        state.cashu?.keysets?.[
-        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint
-        ],
-    ],
-    (proofs, keysets) => {
-      const matchingKeysets = _.filter(keysets, (ks) => ks.unit === unit);
-      if (_.isEmpty(matchingKeysets)) {
-        return 0;
-      }
-      const keysetIds = _.map(matchingKeysets, 'id');
-      const filteredProofs = _.filter(proofs, (proof) => _.includes(keysetIds, proof.id));
-      return _.sumBy(filteredProofs, 'amount');
-    }
-  );
-
-export const memoizedGetTotalBalance = (unit) =>
+export const memoizedGetTotalBalance = (unit: string) =>
   createSelector(
     [
       (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs,

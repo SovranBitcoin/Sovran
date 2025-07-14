@@ -239,8 +239,8 @@ function AddMintItem({
   if (mint.error) return null;
 
   const isDisabled = mint.loading;
-  const isHighlyRated = mint.averageRating >= 5 && mint.reviewCount >= 3;
-  const showReviews = isHighlyRated && mint.reviews.length > 0;
+  // const isHighlyRated = mint.averageRating >= 5 && mint.reviewCount >= 3;
+  // const showReviews = isHighlyRated && mint.reviews.length > 0;
 
   return (
     <View className="mb-3 overflow-hidden rounded-lg" blur style={[{ backgroundColor: g[800] }]}>

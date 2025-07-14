@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { StyleSheet, Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
 import CachedImage from '../common/Image';
 import { useNostr } from 'helper/redux/nostr';
@@ -99,7 +99,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

@@ -13,6 +13,9 @@ export type NavigationParams = {
     token: string;
     paymentRequest?: string;
   };
+  userMessages: {
+    pubkey: string;
+  }
   lightningReceiveConfirmation: {
     request: string;
     unit: string;
@@ -36,7 +39,7 @@ export type NavigationParams = {
   vpnShare: {
     vpnCode: string;
     location: string;
-    config: string;
+    config: string[];
     hash: string;
   };
   wallets: {

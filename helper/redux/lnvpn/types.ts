@@ -1,3 +1,19 @@
+export interface WireguardConfig {
+  interface: {
+    privateKey: string;
+    address: string;
+    dns?: string;
+    validUntil?: string; // ISO string or readable date
+    location?: string;
+  };
+  peer: {
+    publicKey: string;
+    presharedKey?: string;
+    endpoint: string;
+    allowedIPs: string;
+  };
+}
+
 export interface VpnOrder {
   WireguardConfig?: string[];
   ordered_at?: string;

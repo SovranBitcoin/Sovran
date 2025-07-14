@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useTypedRoute } from 'helper/navigation';
 import Icon from 'assets/icons';
 import { useNavigation } from 'expo-router';
@@ -21,7 +21,7 @@ import { Spacer } from 'components/common/View';
 
 const width = Dimensions.get('window').width;
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     productImage: {
       width: '100%',

@@ -20,8 +20,8 @@ export interface TransactionData {
   from?: string;
   to?: string;
   fromNIP05?: string;
-  status?: { block_time: number; [key: string]: any };
-  nostr?: { pubkey: string; [key: string]: any };
+  status?: { block_time: number;[key: string]: any };
+  nostr?: { pubkey: string;[key: string]: any };
   mintUrl?: string;
 
   isSend?: boolean;
@@ -36,7 +36,7 @@ export interface CashuProfile {
   proofs: Record<string, Proof[]>;
   keysets: Record<string, MintKeyset[]>;
   transactions: TransactionData[];
-  counters: Record<string, number | Record<string, number>>;
+  counters: Record<string, Record<string, number>>;
 }
 
 export interface CashuState {

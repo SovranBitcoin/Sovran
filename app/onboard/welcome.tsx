@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon, { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import { Cashews } from 'assets/images';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,7 +55,7 @@ export default function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     centeredContainer: {
       flex: 1,

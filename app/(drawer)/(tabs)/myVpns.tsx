@@ -8,7 +8,7 @@ import { Text } from 'components/common/Text';
 import CircularProgress from 'components/common/CircleProgress';
 
 import { useCashu } from 'helper/redux/cashu';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -44,10 +44,10 @@ function TabTwoScreen() {
     (vpn: any) => new Date(vpn?.order?.expiry_date) <= currentDate
   );
 
-  const amounts = [
-    nonActiveVpns.length > 99 ? '99+' : nonActiveVpns.length,
-    nonExpiredVpns.length > 99 ? '99+' : nonExpiredVpns.length,
-    expiredVpns.length > 99 ? '99+' : expiredVpns.length,
+  const amounts: string[] = [
+    nonActiveVpns.length > 99 ? '99+' : String(nonActiveVpns.length),
+    nonExpiredVpns.length > 99 ? '99+' : String(nonExpiredVpns.length),
+    expiredVpns.length > 99 ? '99+' : String(expiredVpns.length),
   ];
 
   const fetchPackages = async () => {
@@ -237,7 +237,7 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
 
 export default TabTwoScreen;
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     modalContent: {
       flex: 1,

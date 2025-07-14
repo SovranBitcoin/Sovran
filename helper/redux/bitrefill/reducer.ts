@@ -14,9 +14,9 @@ export const bitrefillReducer: Reducer<BitrefillState, BitrefillAction> = (
 ): BitrefillState => {
   switch (action.type) {
     case SET_EVENTS:
-      return typedUpdate('events', () => action.payload, state);
+      return typedUpdate('events' as const, () => action.payload, state);
     case APPEND_EVENTS:
-      return typedUpdate('events', (events) => [...events, ...action.payload], state);
+      return typedUpdate('events' as const, (events) => [...events, ...action.payload], state);
     default:
       return state;
   }

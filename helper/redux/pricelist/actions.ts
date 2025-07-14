@@ -1,6 +1,7 @@
 import { SET_PRICELIST } from './actionTypes';
 
-export type PricelistAction = ReturnType<typeof setPricelist>;
+export type PricelistAction =
+  | ReturnType<typeof setPricelist>
 
 export const setPricelist = (price: number) =>
   ({

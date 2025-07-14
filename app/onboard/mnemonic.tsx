@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, greys, reds, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
@@ -406,7 +406,7 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   return rgbToHex(r, g, b);
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,

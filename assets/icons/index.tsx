@@ -15,7 +15,17 @@ import { greys, shades } from 'helper/colors';
 export { FlagIcon } from './flag';
 
 export const icons = [
+  'majesticons:text',
+  'la:user-plus',
+  'la:user-minus',
+  'uil:invoice',
+  'material-symbols:update-rounded',
+  'ic:round-cloud-sync',
+  'hugeicons:new-twitter',
+  'material-symbols:info-rounded',
+  'la:user-slash',
   'material-symbols:report-rounded',
+  'fluent:emoji-24-filled',
   'mdi:lightbulb-on-outline',
   'mdi:lightbulb-on',
   'majesticons:lightbulb-shine',
@@ -52,6 +62,7 @@ export const icons = [
   'fluent:wallet-20-filled',
   'material-symbols:settings-rounded',
   'fluent:chevron-down-12-filled',
+  'simple-line-icons:check',
   'ic:baseline-card-giftcard',
   'lucide:arrow-up-right',
   'mdi:charity',
@@ -74,7 +85,6 @@ export const icons = [
   'stash:qr-code',
   'majesticons:eye-off',
   'majesticons:eye',
-  'material-symbols-light:currency-bitcoin',
   'fa6-solid:chevron-left',
   'fa6-solid:chevron-right',
   'fluent:add-24-filled',
@@ -137,7 +147,7 @@ export default ({
   );
 };
 
-export function SovranTextIcon({ color = 'black', size = 300 }) {
+export function SovranTextIcon({ size = 300 }: { size?: number }) {
   return (
     <Svg width={size} height={(size * 254) / 1204} viewBox="0 0 1204 254" fill="none">
       <Defs>
@@ -155,28 +165,15 @@ export function SovranTextIcon({ color = 'black', size = 300 }) {
       </Defs>
       <Path
         d="M101.3 253.5C86.1333 253.5 72.25 251.633 59.65 247.9C47.2833 244.167 36.2 238.683 26.4 231.45C16.8333 224.217 8.2 215.467 0.5 205.2L33.4 167.75C44.8333 183.617 56.15 194.467 67.35 200.3C78.7833 205.9 91.15 208.7 104.45 208.7C111.683 208.7 118.1 207.767 123.7 205.9C129.533 203.8 134.083 200.883 137.35 197.15C140.617 193.417 142.25 188.983 142.25 183.85C142.25 180.117 141.433 176.733 139.8 173.7C138.167 170.433 135.833 167.633 132.8 165.3C129.767 162.733 126.15 160.517 121.95 158.65C117.75 156.55 113.083 154.8 107.95 153.4C102.817 151.767 97.2167 150.483 91.15 149.55C78.0833 146.517 66.65 142.9 56.85 138.7C47.05 134.267 38.8833 128.9 32.35 122.6C25.8167 116.067 20.9167 108.717 17.65 100.55C14.6167 92.3833 13.1 83.1667 13.1 72.9C13.1 62.4 15.4333 52.7167 20.1 43.85C24.7667 34.75 31.1833 26.9333 39.35 20.4C47.75 13.8667 57.3167 8.84999 68.05 5.34998C79.0167 1.84998 90.5667 0.0999838 102.7 0.0999838C117.633 0.0999838 130.7 1.84998 141.9 5.34998C153.1 8.61665 162.783 13.4 170.95 19.7C179.35 26 186.35 33.7 191.95 42.8L158.7 75C153.8 68.4667 148.433 62.9833 142.6 58.55C137 54.1167 130.817 50.85 124.05 48.75C117.517 46.4167 110.75 45.25 103.75 45.25C96.05 45.25 89.4 46.3 83.8 48.4C78.2 50.2667 73.7667 53.0667 70.5 56.8C67.4667 60.5333 65.95 65.0833 65.95 70.45C65.95 74.65 67 78.3833 69.1 81.65C71.2 84.9167 74.2333 87.8333 78.2 90.4C82.1667 92.7333 86.95 94.8333 92.55 96.7C98.15 98.5667 104.333 100.2 111.1 101.6C123.933 104.167 135.483 107.55 145.75 111.75C156.017 115.95 164.767 121.083 172 127.15C179.467 132.983 185.183 139.983 189.15 148.15C193.117 156.083 195.1 165.067 195.1 175.1C195.1 191.667 191.133 205.783 183.2 217.45C175.267 229.117 164.3 238.1 150.3 244.4C136.3 250.467 119.967 253.5 101.3 253.5ZM321.751 253.5C302.851 253.5 285.934 249.417 271.001 241.25C256.301 232.85 244.634 221.417 236.001 206.95C227.601 192.483 223.401 175.917 223.401 157.25C223.401 138.583 227.601 122.133 236.001 107.9C244.634 93.4333 256.301 82 271.001 73.6C285.934 65.2 302.851 61 321.751 61C340.417 61 357.101 65.2 371.801 73.6C386.734 82 398.401 93.4333 406.801 107.9C415.201 122.133 419.401 138.583 419.401 157.25C419.401 175.917 415.201 192.483 406.801 206.95C398.401 221.417 386.734 232.85 371.801 241.25C357.101 249.417 340.417 253.5 321.751 253.5ZM321.751 210.1C330.851 210.1 339.017 207.883 346.251 203.45C353.484 198.783 359.084 192.483 363.051 184.55C367.251 176.383 369.351 167.283 369.351 157.25C369.351 146.983 367.251 137.883 363.051 129.95C359.084 121.783 353.484 115.483 346.251 111.05C339.017 106.383 330.851 104.05 321.751 104.05C312.417 104.05 304.134 106.383 296.901 111.05C289.667 115.717 283.951 122.017 279.751 129.95C275.551 137.883 273.567 146.983 273.801 157.25C273.567 167.283 275.551 176.383 279.751 184.55C283.951 192.483 289.667 198.783 296.901 203.45C304.134 207.883 312.417 210.1 321.751 210.1ZM509.766 250L432.066 64.85H486.666L536.016 203.1L524.466 205.2L576.266 64.85H629.466L547.916 250H509.766ZM659.821 250V64.85H707.771L709.521 124.35L701.121 112.1C703.921 102.533 708.471 93.9 714.771 86.2C721.071 78.2667 728.421 72.0833 736.821 67.65C745.454 63.2167 754.437 61 763.771 61C767.737 61 771.587 61.35 775.321 62.05C779.054 62.75 782.204 63.5667 784.771 64.5L771.471 119.1C768.671 117.7 765.287 116.533 761.321 115.6C757.354 114.433 753.271 113.85 749.071 113.85C743.471 113.85 738.221 114.9 733.321 117C728.654 118.867 724.571 121.667 721.071 125.4C717.571 128.9 714.771 133.1 712.671 138C710.804 142.9 709.871 148.267 709.871 154.1V250H659.821ZM874.726 253.5C859.326 253.5 845.443 249.3 833.076 240.9C820.71 232.5 810.91 221.067 803.676 206.6C796.443 192.133 792.826 175.567 792.826 156.9C792.826 138.233 796.443 121.783 803.676 107.55C811.143 93.0833 821.176 81.7667 833.776 73.6C846.376 65.2 860.726 61 876.826 61C885.926 61 894.21 62.4 901.676 65.2C909.376 67.7667 916.026 71.3833 921.626 76.05C927.46 80.7167 932.36 86.0833 936.326 92.15C940.293 98.2167 943.093 104.75 944.726 111.75L934.226 110V64.85H983.576V250H933.526V205.55L944.726 204.5C942.86 211.033 939.826 217.217 935.626 223.05C931.426 228.883 926.176 234.133 919.876 238.8C913.81 243.233 906.926 246.85 899.226 249.65C891.526 252.217 883.36 253.5 874.726 253.5ZM888.376 210.45C897.71 210.45 905.876 208.233 912.876 203.8C919.876 199.367 925.243 193.183 928.976 185.25C932.943 177.083 934.926 167.633 934.926 156.9C934.926 146.4 932.943 137.183 928.976 129.25C925.243 121.317 919.876 115.133 912.876 110.7C905.876 106.033 897.71 103.7 888.376 103.7C879.276 103.7 871.226 106.033 864.226 110.7C857.46 115.133 852.093 121.317 848.126 129.25C844.16 137.183 842.176 146.4 842.176 156.9C842.176 167.633 844.16 177.083 848.126 185.25C852.093 193.183 857.46 199.367 864.226 203.8C871.226 208.233 879.276 210.45 888.376 210.45ZM1033.4 250V64.85H1081L1082.4 102.65L1072.6 106.85C1075.17 98.45 1079.72 90.8667 1086.25 84.1C1093.02 77.1 1101.07 71.5 1110.4 67.3C1119.74 63.1 1129.54 61 1139.8 61C1153.8 61 1165.47 63.8 1174.8 69.4C1184.37 75 1191.49 83.5167 1196.15 94.95C1201.05 106.15 1203.5 120.033 1203.5 136.6V250H1153.8V140.45C1153.8 132.05 1152.64 125.05 1150.3 119.45C1147.97 113.85 1144.35 109.767 1139.45 107.2C1134.79 104.4 1128.95 103.233 1121.95 103.7C1116.35 103.7 1111.1 104.633 1106.2 106.5C1101.54 108.133 1097.45 110.583 1093.95 113.85C1090.69 117.117 1088 120.85 1085.9 125.05C1084.04 129.25 1083.1 133.8 1083.1 138.7V250H1058.6C1053.24 250 1048.45 250 1044.25 250C1040.05 250 1036.44 250 1033.4 250Z"
-        // fill={color}
         fill="url(#paint0_linear_84_4)"
       />
     </Svg>
   );
 }
 
-export function HomeIcon({ color = 'black', size = 21 }) {
-  const aspectRatio = 21 / 19;
+export function ZapIcon({ color, size = 24 }: { color: string; size?: number }) {
   return (
-    <Svg width={size} height={size / aspectRatio} viewBox="0 0 21 19" fill="none">
-      <Path
-        d="M20.0317 1.76845L18.1668 2.12214C17.8239 2.18645 17.6524 2.41153 17.6524 2.79737V15.7553C17.6524 16.1197 17.8346 16.3341 18.199 16.3984L20.0317 16.7521V18.4241H11.3824V16.7521L12.6685 16.3984C13.033 16.2912 13.2152 16.0768 13.2152 15.7553V9.49069L6.81658 11.5003V15.7553C6.81658 16.1197 6.98807 16.3341 7.33104 16.3984L8.81011 16.7521V18.4241H0V16.7521L1.83276 16.3984C2.19717 16.3341 2.37937 16.1197 2.37937 15.7553V2.79737C2.37937 2.41153 2.19717 2.18645 1.83276 2.12214L0 1.76845V0H8.81011V1.76845L7.33104 2.12214C6.98807 2.20789 6.81658 2.43296 6.81658 2.79737V8.00626L13.2152 5.99666V2.79737C13.2152 2.4544 13.0437 2.22932 12.7007 2.12214L11.3502 1.76845V0H20.0317V1.76845Z"
-        fill={color}
-      />
-    </Svg>
-  );
-}
-
-export function ZapIcon({ color, width, height }) {
-  return (
-    <Svg width={width} height={height} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         fill={color}
         fill-rule="evenodd"
@@ -187,9 +184,9 @@ export function ZapIcon({ color, width, height }) {
   );
 }
 
-export function CommentIcon({ color, width, height }) {
+export function CommentIcon({ color, size = 24 }: { color: string; size?: number }) {
   return (
-    <Svg width={width} height={height} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
         fill={color}
         fill-rule="evenodd"
@@ -200,9 +197,9 @@ export function CommentIcon({ color, width, height }) {
   );
 }
 
-export function HeartIcon({ color, width = 24, height = 24 }) {
+export function HeartIcon({ color, size = 24 }: { color: string; size?: number }) {
   return (
-    <Svg width={width} height={height} viewBox="0 0 256 256">
+    <Svg width={size} height={size} viewBox="0 0 256 256">
       <Path
         fill={color}
         d="M240 102c0 70-103.79 126.66-108.21 129a8 8 0 0 1-7.58 0C119.79 228.66 16 172 16 102a62.07 62.07 0 0 1 62-62c20.65 0 38.73 8.88 50 23.89C139.27 48.88 157.35 40 178 40a62.07 62.07 0 0 1 62 62"
@@ -211,39 +208,12 @@ export function HeartIcon({ color, width = 24, height = 24 }) {
   );
 }
 
-export function RepostIcon({ color, width, height }) {
+export function RepostIcon({ color, size = 24 }: { color: string; size?: number }) {
   return (
-    <Svg width={width} height={height} viewBox="0 0 16 16">
+    <Svg width={size} height={size} viewBox="0 0 16 16">
       <Path
         fill={color}
         d="M3 2h.02q.034 0 .07.004za1 1 0 0 1 .595.196q.06.044.112.097l-.09-.08l.008.007l.082.073l2 2C6.337 4.923 5.891 6 5 6H4v5a1 1 0 0 0 .883.993L5 12h3a1 1 0 0 1 .117 1.993L8 14H5a3 3 0 0 1-2.995-2.824L2 11V6H1C.148 6-.297 5.014.217 4.377l.076-.084l2-2l.082-.073A1 1 0 0 1 3 2m8 0a3 3 0 0 1 2.995 2.824L14 5v5h1c.852 0 1.297.986.783 1.623l-.076.084l-2 2A1 1 0 0 1 13 14h-.032l-.054-.004L13 14a1 1 0 0 1-.595-.196a1 1 0 0 1-.112-.097l.09.08a1 1 0 0 1-.09-.08l-2-2C9.663 11.077 10.109 10 11 10l1-.001V5a1 1 0 0 0-.883-.993L11 4H8a1 1 0 0 1-.117-1.993L8 2z"
-      />
-    </Svg>
-  );
-}
-
-export function InfoIcon({ color }) {
-  return (
-    <Svg width="32" height="32" viewBox="0 0 16 16">
-      <Path
-        fill={color}
-        d="m8.93 6.588l-2.29.287l-.082.38l.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319c.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246c-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0a1 1 0 0 1 2 0"
-      />
-    </Svg>
-  );
-}
-
-export function ActivityIcon({ color }) {
-  const theme = useSelector(memoizedGetTheme);
-  return (
-    <Svg width="24" height="24" viewBox="0 0 48 48" stroke={color || theme.greys[0]}>
-      <Path
-        fill="none"
-        stroke={color}
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        strokeWidth={3.4}
-        d="M5.5 5.5h15.857v15.857H5.5zm19.07 7.928l10-10l10 10l-10 10zM5.5 26.643h15.857V42.5H5.5zm21.143 0H42.5V42.5H26.643z"
       />
     </Svg>
   );
@@ -255,10 +225,10 @@ export function UserIcon() {
   return (
     <View
       style={{
-        backgroundColor: theme.greys[800], // Set the background color to black
-        borderRadius: 50, // Adjust this value to get the roundness you desire
-        padding: 4, // Adjust padding to control the size of the background relative to the SVG
-        marginLeft: 8, // Adjust margin to control the distance between the icon and the edge of the screen
+        backgroundColor: theme.greys[800],
+        borderRadius: 50,
+        padding: 4,
+        marginLeft: 8,
       }}>
       <Svg fill={theme.greys[100]} height="24" viewBox="0 -960 960 960" width="24">
         <Path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z" />
@@ -267,18 +237,7 @@ export function UserIcon() {
   );
 }
 
-export function LanguageIcon({ color }) {
-  return (
-    <Svg width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        d="m12.87 15.07l-2.54-2.51l.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35C8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5l3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7l1.62-4.33L19.12 17z"
-      />
-    </Svg>
-  );
-}
-
-export function ThemeIcon({ color }) {
+export function ThemeIcon({ color }: { color: string }) {
   return (
     <Svg width="24" height="24" viewBox="0 0 20 20">
       <Path fill={color} d="M10 3.5a6.5 6.5 0 1 1 0 13zM10 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16" />
@@ -286,16 +245,30 @@ export function ThemeIcon({ color }) {
   );
 }
 
-export function SovranIcon({ width = 32, height = 32, transform = [{ scale: 1.5 }] }) {
+export function SovranIcon({
+  size = 32,
+  transform = [{ scale: 1.5 }],
+}: {
+  size?: number;
+  transform?: ViewStyle['transform'];
+}) {
   return (
     <CachedImage
-      style={{ width, height, transform }}
+      style={{ width: size, height: size, transform }}
       source={require('assets/images/sovran_transparent.png')}
     />
   );
 }
 
-export function ArrowIcon({ color, rotate = 0, size = 24 }) {
+export function ArrowIcon({
+  color,
+  rotate = 0,
+  size = 24,
+}: {
+  color: string;
+  rotate: number;
+  size: number;
+}) {
   return (
     <View
       style={{
@@ -306,32 +279,6 @@ export function ArrowIcon({ color, rotate = 0, size = 24 }) {
       }}>
       <Icon name="lucide:arrow-up-right" color={color} size={size} />
     </View>
-  );
-}
-
-export function FixedAmountIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={theme.greys[0]}
-        d="m17.423 20.789l-.707-.689L18.79 18h-6.81v-1h6.81l-2.075-2.1l.707-.688l3.289 3.288zM4.25 12.827v-1.692h1.692v1.692zm5.825 0q-1.14 0-1.944-.805q-.804-.806-.804-1.945v-4q0-1.14.806-1.945t1.946-.805t1.944.805t.804 1.945v4q0 1.14-.806 1.945t-1.946.805m7.885 0q-1.14 0-1.944-.805q-.804-.806-.804-1.945v-4q0-1.14.806-1.945t1.946-.805t1.944.805t.803 1.945v4q0 1.14-.805 1.945q-.806.805-1.946.805m-7.883-1q.729 0 1.24-.51t.51-1.24v-4q0-.73-.51-1.24q-.511-.51-1.24-.51q-.73 0-1.24.51t-.51 1.24v4q0 .729.51 1.24q.51.51 1.24.51m7.884 0q.73 0 1.24-.51q.51-.511.51-1.24v-4q0-.73-.51-1.24t-1.24-.51t-1.239.51t-.51 1.24v4q0 .729.51 1.24t1.24.51"
-      />
-    </Svg>
-  );
-}
-
-export function QRCodeIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={theme.greys[0]}
-        d="M3 7.039V3h4.039v1H4v3.039zM3 21v-4.038h1V20h3.039v1zm13.962 0v-1H20v-3.038h1V21zM20 7.039V4h-3.038V3H21v4.039zm-3.058 9.903h1.212v1.212h-1.212zm0-2.423h1.212v1.212h-1.212zm-1.211 1.212h1.211v1.211h-1.211zm-1.212 1.211h1.212v1.212h-1.212zm-1.211-1.211h1.211v1.211h-1.211zm2.423-2.423h1.211v1.211h-1.211zm-1.212 1.211h1.212v1.212h-1.212zm-1.211-1.211h1.211v1.211h-1.211zm4.846-7.462v4.846h-4.846V5.846zm-7.462 7.462v4.846H5.846v-4.846zm0-7.462v4.846H5.846V5.846zM9.808 17.27v-3.077H6.73v3.077zm0-7.461V6.73H6.73v3.077zm7.461 0V6.73h-3.077v3.077z"
-      />
-    </Svg>
   );
 }
 
@@ -427,7 +374,15 @@ export function PoundMaskIcon() {
   );
 }
 
-export function CloseIcon({ color, width, height }) {
+export function CloseIcon({
+  color,
+  width,
+  height,
+}: {
+  color: string;
+  width: number;
+  height: number;
+}) {
   return (
     <Svg width={width} height={height} viewBox="0 0 24 24">
       <Path
@@ -438,7 +393,15 @@ export function CloseIcon({ color, width, height }) {
   );
 }
 
-export function CloseIcon2({ color, width, height }) {
+export function CloseIcon2({
+  color,
+  width,
+  height,
+}: {
+  color: string;
+  width: number;
+  height: number;
+}) {
   return (
     <Svg width={width} height={height} viewBox="0 0 24 24">
       <Path
@@ -500,9 +463,18 @@ export function ProfileIcon() {
   );
 }
 
-export function CurrencyIcon({ width = 36, currency, colors }) {
+export function CurrencyIcon({
+  width = 36,
+  currency,
+  colors,
+}: {
+  width?: number;
+  currency?: string;
+  colors?: string[];
+}) {
   const theme = useSelector(memoizedGetTheme);
   const gradientColors = colors ?? [shades[200], shades[300], shades[300]];
+
   if (currency === 'eur') {
     return (
       <View
@@ -796,9 +768,11 @@ export function CurrencyIcon({ width = 36, currency, colors }) {
         </Svg>
       );
   }
+
+  return null;
 }
 
-export function VerifiedIcon({ style, fill }) {
+export function VerifiedIcon({ style }: { style?: StyleProp<ViewStyle> }) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -827,8 +801,7 @@ export function VerifiedIcon({ style, fill }) {
   );
 }
 
-export function LightningIcon({ color }) {
-  const theme = useSelector(memoizedGetTheme);
+export function LightningIcon({ color }: { color: string }) {
   return (
     <Svg width="20" height="20" viewBox="0 0 14 17" fill="none">
       <Path
@@ -839,57 +812,22 @@ export function LightningIcon({ color }) {
   );
 }
 
-export function FalseIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="21" height="20" viewBox="0 0 21 20" fill="none">
-      <Path
-        d="M6.9 15L10.5 11.4L14.1 15L15.5 13.6L11.9 10L15.5 6.4L14.1 5L10.5 8.6L6.9 5L5.5 6.4L9.1 10L5.5 13.6L6.9 15ZM10.5 20C9.11667 20 7.81667 19.7375 6.6 19.2125C5.38333 18.6875 4.325 17.975 3.425 17.075C2.525 16.175 1.8125 15.1167 1.2875 13.9C0.7625 12.6833 0.5 11.3833 0.5 10C0.5 8.61667 0.7625 7.31667 1.2875 6.1C1.8125 4.88333 2.525 3.825 3.425 2.925C4.325 2.025 5.38333 1.3125 6.6 0.7875C7.81667 0.2625 9.11667 0 10.5 0C11.8833 0 13.1833 0.2625 14.4 0.7875C15.6167 1.3125 16.675 2.025 17.575 2.925C18.475 3.825 19.1875 4.88333 19.7125 6.1C20.2375 7.31667 20.5 8.61667 20.5 10C20.5 11.3833 20.2375 12.6833 19.7125 13.9C19.1875 15.1167 18.475 16.175 17.575 17.075C16.675 17.975 15.6167 18.6875 14.4 19.2125C13.1833 19.7375 11.8833 20 10.5 20ZM10.5 18C12.7333 18 14.625 17.225 16.175 15.675C17.725 14.125 18.5 12.2333 18.5 10C18.5 7.76667 17.725 5.875 16.175 4.325C14.625 2.775 12.7333 2 10.5 2C8.26667 2 6.375 2.775 4.825 4.325C3.275 5.875 2.5 7.76667 2.5 10C2.5 12.2333 3.275 14.125 4.825 15.675C6.375 17.225 8.26667 18 10.5 18Z"
-        fill={theme.greys[400]}
-      />
-    </Svg>
-  );
-}
-
-export function TrueIcon() {
-  const theme = useSelector(memoizedGetTheme);
-  return (
-    <Svg width="21" height="20" viewBox="0 0 21 20" fill="none">
-      <Path
-        d="M9.1 14.6L16.15 7.55L14.75 6.15L9.1 11.8L6.25 8.95L4.85 10.35L9.1 14.6ZM10.5 20C9.11667 20 7.81667 19.7375 6.6 19.2125C5.38333 18.6875 4.325 17.975 3.425 17.075C2.525 16.175 1.8125 15.1167 1.2875 13.9C0.7625 12.6833 0.5 11.3833 0.5 10C0.5 8.61667 0.7625 7.31667 1.2875 6.1C1.8125 4.88333 2.525 3.825 3.425 2.925C4.325 2.025 5.38333 1.3125 6.6 0.7875C7.81667 0.2625 9.11667 0 10.5 0C11.8833 0 13.1833 0.2625 14.4 0.7875C15.6167 1.3125 16.675 2.025 17.575 2.925C18.475 3.825 19.1875 4.88333 19.7125 6.1C20.2375 7.31667 20.5 8.61667 20.5 10C20.5 11.3833 20.2375 12.6833 19.7125 13.9C19.1875 15.1167 18.475 16.175 17.575 17.075C16.675 17.975 15.6167 18.6875 14.4 19.2125C13.1833 19.7375 11.8833 20 10.5 20ZM10.5 18C12.7333 18 14.625 17.225 16.175 15.675C17.725 14.125 18.5 12.2333 18.5 10C18.5 7.76667 17.725 5.875 16.175 4.325C14.625 2.775 12.7333 2 10.5 2C8.26667 2 6.375 2.775 4.825 4.325C3.275 5.875 2.5 7.76667 2.5 10C2.5 12.2333 3.275 14.125 4.825 15.675C6.375 17.225 8.26667 18 10.5 18Z"
-        fill={theme.shades[300]}
-      />
-    </Svg>
-  );
-}
-
-export function EcashIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="21" height="15" viewBox="0 0 21 15" fill="none">
-      <Path
-        d="M13.2197 0C14.6596 0 16.0672 0.439867 17.2644 1.26398C18.4616 2.08809 19.3948 3.25943 19.9458 4.62987C20.4968 6.00032 20.641 7.50832 20.3601 8.96317C20.0792 10.418 19.3858 11.7544 18.3676 12.8033C17.3495 13.8522 16.0522 14.5665 14.64 14.8559C13.2277 15.1453 11.7639 14.9968 10.4336 14.4291C9.1033 13.8614 7.96627 12.9001 7.1663 11.6668C6.36633 10.4334 5.93934 8.98336 5.93934 7.5C5.93934 5.51087 6.70637 3.60322 8.0717 2.1967C9.43703 0.790176 11.2888 0 13.2197 0ZM2.29918 7.5C2.30047 8.66212 2.65113 9.7953 3.30295 10.7438C3.95478 11.6923 4.87577 12.4095 5.93934 12.7969V14.7562C4.38136 14.3368 3.00234 13.397 2.01812 12.084C1.03389 10.771 0.5 9.15891 0.5 7.5C0.5 5.84109 1.03389 4.22899 2.01812 2.91601C3.00234 1.60302 4.38136 0.66324 5.93934 0.24375V2.20312C4.87577 2.5905 3.95478 3.30772 3.30295 4.25621C2.65113 5.20469 2.30047 6.33788 2.29918 7.5Z"
-        fill={theme.greys[0]}
-      />
-    </Svg>
-  );
-}
-export function BtcIcon({ height = 34, width = 34, color, weight }) {
+export function BtcIcon({
+  size = 34,
+  color,
+  weight,
+}: {
+  size: number;
+  color: string;
+  weight: string;
+}) {
   const theme = useSelector(memoizedGetTheme);
   const iconName =
     weight === 'heavy'
       ? 'material-symbols:currency-bitcoin'
       : 'material-symbols-light:currency-bitcoin';
-  return <Icon name={iconName} color={color || theme.greys[0]} size={width * 1.2} />;
-}
 
-export function BtcUnit({ color, width = '24', height = '24' }) {
-  const theme = useSelector(memoizedGetTheme);
-  return (
-    <Icon name="material-symbols:currency-bitcoin" color={color || theme.greys[0]} size={width} />
-  );
+  return <Icon name={iconName} color={color || theme.greys[0]} size={size * 1.2} />;
 }
 
 export function ShareIcon() {
@@ -903,59 +841,7 @@ export function ShareIcon() {
   );
 }
 
-export function CopyIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg height="21" viewBox="0 -960 960 960" width="21">
-      <Path
-        fill={theme.greys[0]}
-        d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"
-      />
-    </Svg>
-  );
-}
-
-export function CancelSendIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="21" height="21" viewBox="0 0 24 24">
-      <Path
-        fill={theme.greys[0]}
-        d="m16 20l-.707.707l.707.707l.707-.707zM4 15a1 1 0 1 0 2 0zm6.293.707l5 5l1.414-1.414l-5-5zm6.414 5l5-5l-1.414-1.414l-5 5zM17 20V9.5h-2V20zM4 9.5V15h2V9.5zM10.5 3A6.5 6.5 0 0 0 4 9.5h2A4.5 4.5 0 0 1 10.5 5zM17 9.5A6.5 6.5 0 0 0 10.5 3v2A4.5 4.5 0 0 1 15 9.5z"
-      />
-    </Svg>
-  );
-}
-
-export function RetryIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={theme.greys[0]}
-        d="M12 20q-3.35 0-5.675-2.325T4 12t2.325-5.675T12 4q1.725 0 3.3.712T18 6.75V4h2v7h-7V9h4.2q-.8-1.4-2.187-2.2T12 6Q9.5 6 7.75 7.75T6 12t1.75 4.25T12 18q1.925 0 3.475-1.1T17.65 14h2.1q-.7 2.65-2.85 4.325T12 20"
-      />
-    </Svg>
-  );
-}
-
-export function CarrotIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-      <Path
-        d="M4 5.15833L0.5 1.65833L1.31667 0.841667L4 3.525L6.68333 0.841667L7.5 1.65833L4 5.15833Z"
-        fill={theme.greys[950]}
-      />
-    </Svg>
-  );
-}
-
-export function QRIcon({ style, color }) {
+export function QRIcon({ style, color }: { style?: StyleProp<ViewStyle>; color?: string }) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -968,31 +854,15 @@ export function QRIcon({ style, color }) {
   );
 }
 
-export function PlusIcon({ style }) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg style={style} viewBox="0 0 24 24">
-      <Path fill={theme.greys[0]} d="M19 12.998h-6v6h-2v-6H5v-2h6v-6h2v6h6z" />
-    </Svg>
-  );
-}
-
-export function DotsIcon({ style }) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg style={style} viewBox="0 0 20 20">
-      <G fill={theme.greys[0]}>
-        <Circle cx="10" cy="15" r="2" />
-        <Circle cx="10" cy="10" r="2" />
-        <Circle cx="10" cy="5" r="2" />
-      </G>
-    </Svg>
-  );
-}
-
-export function CheckIcon({ color, style, size = 24 }) {
+export function CheckIcon({
+  color,
+  style,
+  size = 24,
+}: {
+  color: string;
+  style?: StyleProp<ViewStyle>;
+  size?: number;
+}) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -1000,70 +870,6 @@ export function CheckIcon({ color, style, size = 24 }) {
       <Path
         fill={color || theme.greys[0]}
         d="m10.6 13.8l-2.15-2.15q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7L9.9 15.9q.3.3.7.3t.7-.3l5.65-5.65q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
-      />
-    </Svg>
-  );
-}
-
-export function ImportIcon({ style }) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg style={style} width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={theme.greys[0]}
-        d="m12 14l-.707.707l.707.707l.707-.707zm1-9a1 1 0 1 0-2 0zM6.293 9.707l5 5l1.414-1.414l-5-5zm6.414 5l5-5l-1.414-1.414l-5 5zM13 14V5h-2v9z"
-      />
-      <Path stroke={theme.greys[0]} strokeWidth={2} d="M5 16v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
-    </Svg>
-  );
-}
-
-export function LightOff({ style, color }: { style?: any; color?: string }) {
-  return (
-    <Svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={color || 'currentColor'}
-        fillRule="evenodd"
-        d="M11.5 2C7.358 2 4 5.436 4 9.674c0 2.273.966 4.315 2.499 5.72c.51.467.889.814 1.157 1.066a15 15 0 0 1 .4.39l.033.036c.237.3.288.376.318.446s.053.16.112.54c.024.15.026.406.026 1.105v.03c0 .409 0 .762.026 1.051c.027.306.087.61.248.895c.18.319.438.583.75.767c.278.165.575.226.874.254c.283.026.628.026 1.028.026h.058c.4 0 .745 0 1.028-.026c.3-.028.595-.09.875-.254a2.07 2.07 0 0 0 .749-.767c.16-.285.22-.588.248-.895c.026-.29.026-.642.025-1.051v-.03c0-.699.003-.955.026-1.105c.06-.38.082-.47.113-.54c.03-.07.081-.147.318-.446l.008-.01l.025-.026l.088-.09q.112-.113.312-.3c.268-.252.647-.599 1.157-1.067A7.74 7.74 0 0 0 19 9.674C19 5.436 15.642 2 11.5 2m1.585 17.674h-3.17q.004.145.014.258c.019.21.05.286.071.324a.7.7 0 0 0 .25.255c.037.022.111.054.316.073c.214.02.497.02.934.02s.72 0 .934-.02c.205-.019.279-.05.316-.073a.7.7 0 0 0 .25-.255c.021-.038.052-.114.07-.324q.011-.113.015-.258M12.61 8.176c.307.224.378.66.159.974l-1.178 1.687h1.402a.68.68 0 0 1 .607.379a.71.71 0 0 1-.052.724L11.6 14.731a.67.67 0 0 1-.951.162a.71.71 0 0 1-.158-.973l1.178-1.687h-1.403a.68.68 0 0 1-.606-.379a.71.71 0 0 1 .051-.725l1.948-2.79a.67.67 0 0 1 .951-.163"
-        clipRule="evenodd"
-      />
-    </Svg>
-  );
-}
-
-export function LightOn({ style, color }: { style?: any; color?: string }) {
-  return (
-    <Svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-      <G fill="none" stroke={color || 'currentColor'} strokeLinecap="round" strokeWidth={1.5}>
-        <Path d="M14.5 19.5h-5m5 0c0-.713 0-1.07.038-1.307c.123-.763.144-.812.631-1.412c.151-.186.711-.688 1.832-1.692A7.48 7.48 0 0 0 19.5 9.5a7.5 7.5 0 0 0-.427-2.5M14.5 19.5c0 .935 0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549C13.402 22 12.935 22 12 22s-1.402 0-1.75-.201a1.5 1.5 0 0 1-.549-.549c-.201-.348-.201-.815-.201-1.75m0 0c0-.713 0-1.07-.038-1.307c-.123-.763-.144-.812-.631-1.412c-.151-.186-.712-.688-1.832-1.692A7.5 7.5 0 0 1 15.744 3" />
-        <Path strokeLinejoin="round" d="m12.786 8.5l-2.143 3h3l-2.143 3" />
-      </G>
-    </Svg>
-  );
-}
-
-export function NotificationIcon({ color }) {
-  return (
-    <Svg width="24" height="24" viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        d="M14.235 19c.865 0 1.322 1.024.745 1.668A4 4 0 0 1 12 22a4 4 0 0 1-2.98-1.332c-.552-.616-.158-1.579.634-1.661l.11-.006zM12 2c1.358 0 2.506.903 2.875 2.141l.046.171l.008.043a8.01 8.01 0 0 1 4.024 6.069l.028.287L19 11v2.931l.021.136a3 3 0 0 0 1.143 1.847l.167.117l.162.099c.86.487.56 1.766-.377 1.864L20 18H4c-1.028 0-1.387-1.364-.493-1.87a3 3 0 0 0 1.472-2.063L5 13.924l.001-2.97A8 8 0 0 1 8.822 4.5l.248-.146l.01-.043a3 3 0 0 1 2.562-2.29l.182-.017z"
-      />
-    </Svg>
-  );
-}
-
-export function FeedIcon({ color }) {
-  return (
-    <Svg width="38" height="38" viewBox="0 0 24 24">
-      <Path
-        fill="none"
-        stroke={color}
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="3.5"
-        d="M5 8h14M5 12h14M5 16h6"
       />
     </Svg>
   );

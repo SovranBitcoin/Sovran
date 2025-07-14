@@ -1,4 +1,3 @@
-import React from 'react';
 import MessageComponent from './MessageComponent';
 import EsimComponent from './EsimComponent';
 import TransactionComponent from './TransactionComponent';
@@ -7,8 +6,15 @@ import EventComponent from './EventsComponent';
 import VpnComponent from './VpnComponent';
 import CashuTokenComponent from './CashuTokenComponent';
 import { isValidEcashToken } from 'helper/cashuClient';
+import { Theme } from 'helper/colors';
+import { TimelineItemType } from '.';
 
-const TimelineItem = ({ item, theme }) => {
+interface TimelineItemProps {
+  theme: Theme;
+  item: TimelineItemType;
+}
+
+const TimelineItem = ({ item, theme }: TimelineItemProps) => {
   const { currentProfile } = useNostr();
 
   // Determine item type
@@ -39,7 +45,7 @@ const TimelineItem = ({ item, theme }) => {
   }
 
   if (isVPN) {
-    return <VpnComponent esim={item} theme={theme} isReceived={isVPN} />;
+    return <VpnComponent vpn={item} theme={theme} isReceived={isVPN} />;
   }
 
   if (isEsim) {

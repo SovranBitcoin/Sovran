@@ -1,5 +1,7 @@
+import { BitrefillEventType } from "app/MessagePage/EventsComponent";
+
 export interface BitrefillEvent {
-  event?: string;
+  event: BitrefillEventType;
   [key: string]: any;
 }
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
@@ -18,7 +18,7 @@ const ShowSeedPhrase: React.FC = () => {
     <Container>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mnemonic</Text>
-        <Card message="Keep this private and secure!" theme={theme} variant="warning" />
+        <Card message="Keep this private and secure!" variant="warning" />
         <TextInput
           style={[styles.textArea, !isVisible && styles.blurredText]}
           value={currentProfile?.mnemonic}
@@ -39,7 +39,7 @@ const ShowSeedPhrase: React.FC = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     section: {
       paddingVertical: 14,

@@ -1,7 +1,37 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  TextStyle,
+  StyleProp,
+  ViewStyle,
+  GestureResponderEvent,
+} from 'react-native';
 import { Text } from 'components/common/Text';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
+
+type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
+
+export interface ButtonProps {
+  text: string;
+  onPress: (event: GestureResponderEvent) => void;
+  variant: ButtonVariant;
+  disabled?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  buttonStyle?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+}
+
+interface BottomButtonsProps {
+  buttons: ButtonProps[];
+  vertical?: boolean;
+  theme: Theme;
+  textStyle?: StyleProp<TextStyle>;
+  buttonStyle?: StyleProp<ViewStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
+}
 
 const BottomButtons = ({
   buttons,
@@ -10,7 +40,7 @@ const BottomButtons = ({
   containerStyle,
   buttonStyle,
   textStyle,
-}) => {
+}: BottomButtonsProps) => {
   const styles = createStyles(theme);
   const layout = vertical ? styles.verticalButtons : styles.horizontalButtons;
 
@@ -55,7 +85,7 @@ const BottomButtons = ({
 };
 
 // Helper function to get spacing style based on layout
-const getSpacingStyle = (vertical, index, isLastButton) => {
+const getSpacingStyle = (vertical: boolean, index: number, isLastButton: boolean) => {
   if (vertical) {
     return isLastButton ? null : { marginBottom: 12 };
   }
@@ -67,8 +97,8 @@ const getSpacingStyle = (vertical, index, isLastButton) => {
 };
 
 // Helper function to get button style based on variant
-const getButtonStyle = (variant, theme) => {
-  const variantStyles = {
+const getButtonStyle = (variant: ButtonVariant, theme: Theme) => {
+  const variantStyles: Record<ButtonVariant, ViewStyle> = {
     primary: { backgroundColor: shades[300] },
     secondary: { backgroundColor: greys(theme)[500] },
     tertiary: { backgroundColor: greys(theme)[800] },
@@ -76,10 +106,10 @@ const getButtonStyle = (variant, theme) => {
     default: { backgroundColor: greys(theme)[800] },
   };
 
-  return variantStyles[variant] || variantStyles.default;
+  return variantStyles[variant as ButtonVariant] ?? variantStyles.default;
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     bottomButtons: {
       width: '100%',

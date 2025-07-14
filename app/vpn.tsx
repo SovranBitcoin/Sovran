@@ -201,11 +201,6 @@ function ModalScreen() {
     setVpnStatus(status);
   };
 
-  const handleStatus = async () => {
-    const status = await getVpnStatus();
-    setVpnStatus(status);
-  };
-
   return (
     <Modal
       showClose

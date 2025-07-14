@@ -3,13 +3,12 @@ import { StyleSheet, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMeltQuote } from 'helper/cashuClient';
 import { showMessage } from 'helper/popup/popups';
-import { useNavigation } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useBitrefill } from 'helper/redux/bitrefill';
 import { store } from 'helper/redux/store';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
@@ -56,7 +55,7 @@ function findKeyWithLargestSum(obj) {
 function BitrefillWidget({ url = BITREFILL_URL }) {
   const { events, setEvents } = useBitrefill();
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const { product, amount, email } = useTypedRoute();
   const config = {
     ...(amount && { value: amount }),

@@ -1,7 +1,7 @@
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { greens, greys } from 'helper/colors';
+import { greens, greys, Theme } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
 import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
@@ -297,7 +297,7 @@ const MintDetailPage = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flex: 1,

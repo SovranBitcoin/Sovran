@@ -14,10 +14,10 @@ export const esimReducer: Reducer<EsimState, EsimAction> = (
 ): EsimState => {
   switch (action.type) {
     case SET_ESIM:
-      return typedUpdate('esims', (esims) => [...esims, action.payload], state);
+      return typedUpdate('esims' as const, (esims) => [...esims, action.payload], state);
     case UPDATE_ESIM:
       return typedUpdate(
-        'esims',
+        'esims' as const,
         (esims) =>
           esims.map((esim) =>
             esim.request === action.payload.request

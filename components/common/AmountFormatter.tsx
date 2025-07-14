@@ -59,7 +59,7 @@ export function AmountFormatter({
         <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} height={size} width={size} color={currentColor} />
+            <BtcIcon weight={weight} size={size} color={currentColor} />
           </View>
           <Text
             size={size}
@@ -112,7 +112,7 @@ export function AmountFormatter({
         <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
           <View
             style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} height={size} width={size} color={currentColor} />
+            <BtcIcon weight={weight} size={size} color={currentColor} />
           </View>
           <Text
             size={size}

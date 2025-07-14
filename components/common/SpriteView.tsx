@@ -8,7 +8,7 @@ import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 import { BACKGROUND_IMAGES } from 'helper/backgroundImages';
 import { View } from './View';
 
-const AnimatedSpriteBackground = ({ backgroundColor }) => {
+const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   useEffect(() => {
@@ -50,17 +50,11 @@ const AnimatedSpriteBackground = ({ backgroundColor }) => {
       ]}>
       {isDynamic ? (
         <SpriteView
-          source={
-            BACKGROUND_IMAGES[backgroundImage]?.source ||
-            BACKGROUND_IMAGES['bg.png'].source
-          }
+          source={BACKGROUND_IMAGES[backgroundImage]?.source || BACKGROUND_IMAGES['bg.png'].source}
         />
       ) : (
         <Image
-          source={
-            BACKGROUND_IMAGES[backgroundImage]?.source ||
-            BACKGROUND_IMAGES['bg5.png'].source
-          }
+          source={BACKGROUND_IMAGES[backgroundImage]?.source || BACKGROUND_IMAGES['bg5.png'].source}
           style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
         />
       )}

@@ -17,10 +17,7 @@ declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
       routes: {
-        'message-input': RouteDefinition<
-          { onConfirm?: (message: string) => void },
-          { confirmed: boolean; message?: string }
-        >;
+        'message-input': RouteDefinition;
       };
     }>;
   }

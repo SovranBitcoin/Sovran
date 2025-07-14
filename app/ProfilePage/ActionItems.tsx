@@ -122,7 +122,7 @@ const ActionItem = ({ Icon, count, theme, size }) => (
       alignItems: 'center',
       backgroundColor: 'transparent',
     }}>
-    <Icon width={size} height={size} color={greys(theme)[400]} />
+    <Icon size={size} color={greys(theme)[400]} />
     <Text
       size={size}
       weight="bold"

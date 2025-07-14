@@ -90,7 +90,7 @@ export const StyledText = ({
 
 export type TextProps = DefaultText['props'] & { id?: string };
 
-type CustomTextProps = {
+export interface CustomTextProps extends TextProps {
   // Weight props
   thin?: boolean;
   extralight?: boolean;
@@ -121,7 +121,7 @@ type CustomTextProps = {
   testID?: string;
   loading?: boolean;
   color?: string;
-};
+}
 
 function getWeightFromProps(props: CustomTextProps): string {
   if (props.weight) return props.weight;

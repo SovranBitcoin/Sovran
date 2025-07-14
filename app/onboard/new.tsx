@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation } from 'helper/navigation';
@@ -327,7 +327,7 @@ const RecoveryScreen = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,

@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import emoji from 'emoji-dictionary'; // Import the emoji dictionary package
 import { EventKind } from './Profile';
@@ -397,7 +397,7 @@ const TabTwoScreen = () => {
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[950],

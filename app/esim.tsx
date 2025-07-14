@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 
-import { greys, reds } from 'helper/colors';
+import { greys, reds, Theme } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -289,7 +289,7 @@ function ModalScreen() {
 
 export default withSheetProvider(ModalScreen);
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     chartContainer: {
       marginBottom: 20,

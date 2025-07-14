@@ -279,7 +279,7 @@ function RepostText({ pubkey, repostCounter }) {
         alignItems: 'center',
         marginBottom: 12,
       }}>
-      <RepostIcon width={16} height={16} color={greys(theme)[400]} />
+      <RepostIcon size={16} color={greys(theme)[400]} />
 
       <UserNameProfiles
         pubkey={pubkey}

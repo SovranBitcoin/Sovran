@@ -1,4 +1,4 @@
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
@@ -73,7 +73,7 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       marginHorizontal: 16,

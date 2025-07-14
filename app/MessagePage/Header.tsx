@@ -2,7 +2,7 @@ import React from 'react';
 import { Animated, Dimensions } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import opacity from 'hex-color-opacity';
@@ -13,8 +13,16 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { muteUser, reportUser, addContact, removeContact } from 'helper/redux/nostr';
 import { useDispatch, useSelector } from 'react-redux';
 import { showMessage } from 'helper/popup/popups';
+import { RootState } from 'helper/redux/store';
 
-const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
+interface HeaderProps {
+  theme: Theme;
+  combinedSearchAndProfiles: any[];
+  params: any;
+  profiles: any[];
+}
+
+const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderProps) => {
   const navigation = useTypedNavigation();
   const maxWidth = Math.min(Dimensions.get('window').width, 600);
   const bannerHeight = (maxWidth * 214) / 600 + 32;
@@ -30,7 +38,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
     'Unknown User';
 
   const dispatch = useDispatch();
-  const contacts = useSelector((state) => state.nostr.contacts || []);
+  const contacts = useSelector((state: RootState) => state.nostr.contacts || []);
   const isContact = contacts.some((c) => c.pubkey === params.pubkey);
 
   const handleGoBack = () => {
@@ -75,7 +83,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
             <Animated.View style={styles.profileImageContainer}>
               {isVerified && (
                 <View style={[styles.verifiedBadge, { backgroundColor: greys(theme)[950] }]}>
-                  <VerifiedIcon fill={greys(theme)[50]} />
+                  <VerifiedIcon />
                 </View>
               )}
               <CachedImage
@@ -96,6 +104,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
               payload: {
                 buttons: [
                   {
+                    variant: 'secondary',
                     icon: 'majesticons:text',
                     text: 'Feed',
                     onPress: async () => {
@@ -105,6 +114,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
                     },
                   },
                   {
+                    variant: 'secondary',
                     icon: isContact ? 'la:user-minus' : 'la:user-plus',
                     text: isContact ? 'Remove Contact' : 'Add Contact',
                     onPress: async () => {
@@ -118,6 +128,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
                     },
                   },
                   {
+                    variant: 'secondary',
                     icon: 'la:user-slash',
                     text: 'Mute User',
                     onPress: async () => {
@@ -126,6 +137,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }) => {
                     },
                   },
                   {
+                    variant: 'secondary',
                     icon: 'material-symbols:report-rounded',
                     text: 'Report User',
                     onPress: async () => {

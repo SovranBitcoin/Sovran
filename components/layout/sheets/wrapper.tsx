@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -15,13 +15,7 @@ interface WrapperProps {
   scrollContainerStyle?: StyleProp<ViewStyle>;
 }
 
-interface ButtonProps {
-  onPress: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-}
-
-export const SheetButton: React.FC<ButtonProps> = ({ onPress, children, disabled }) => {
+export const SheetButton = ({ onPress, children, disabled }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -62,7 +56,7 @@ const Wrapper: React.FC<WrapperProps> = ({
   );
 };
 
-const createStyles = (theme: string, buttonHeight: number, containerHeight: number) =>
+const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: number = 0) =>
   StyleSheet.create({
     actionSheetContainer: {
       height: '100%',

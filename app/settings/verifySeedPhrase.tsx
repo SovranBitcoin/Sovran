@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -96,7 +96,7 @@ const VerifySeedPhrase = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

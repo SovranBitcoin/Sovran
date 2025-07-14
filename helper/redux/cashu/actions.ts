@@ -8,7 +8,6 @@ import {
   APPEND_TRANSACTIONS_V2,
   SET_SELECTED_MINT,
   APPEND_PROOFS_V2,
-  INCREMENT_COUNTER,
   ADD_MINTS,
   REMOVE_MINTS,
   INCREASE_COUNTER_V2,
@@ -22,6 +21,24 @@ import {
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
 import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
 import { TransactionData } from './types';
+
+export type CashuAction =
+  | ReturnType<typeof addMints>
+  | ReturnType<typeof removeMints>
+  | ReturnType<typeof setSelectedMint>
+  | ReturnType<typeof setKeysets>
+  | ReturnType<typeof setKeys>
+  | ReturnType<typeof setInfo>
+  | ReturnType<typeof setAudit>
+  | ReturnType<typeof setTransactions>
+  | ReturnType<typeof updateTransaction>
+  | ReturnType<typeof appendTransaction>
+  | ReturnType<typeof appendTransactionsV2>
+  | ReturnType<typeof appendProofsV2>
+  | ReturnType<typeof removeProofs>
+  | ReturnType<typeof increaseCounterV2>
+  | ReturnType<typeof resetCounter>
+  | ReturnType<typeof ensureProfileExistsAction>;
 
 export const addMints = ({ profileId, mints }: { profileId: number; mints: string[] }) =>
   ({
@@ -149,20 +166,6 @@ export const removeProofs = ({
     payload: { profileId, mintUrl, proofs },
   }) as const;
 
-export const incrementCounter = ({
-  profileId,
-  mintUrl,
-  amount,
-}: {
-  profileId: number;
-  mintUrl: string;
-  amount: number;
-}) =>
-  ({
-    type: INCREMENT_COUNTER,
-    payload: { profileId, mintUrl, amount },
-  }) as const;
-
 export const increaseCounterV2 = ({
   profileId,
   mintUrl,
@@ -190,25 +193,6 @@ export const ensureProfileExistsAction = (profileId: number) =>
     type: ENSURE_PROFILE_EXISTS,
     payload: { profileId },
   }) as const;
-
-export type CashuAction =
-  | ReturnType<typeof addMints>
-  | ReturnType<typeof removeMints>
-  | ReturnType<typeof setSelectedMint>
-  | ReturnType<typeof setKeysets>
-  | ReturnType<typeof setKeys>
-  | ReturnType<typeof setInfo>
-  | ReturnType<typeof setAudit>
-  | ReturnType<typeof setTransactions>
-  | ReturnType<typeof updateTransaction>
-  | ReturnType<typeof appendTransaction>
-  | ReturnType<typeof appendTransactionsV2>
-  | ReturnType<typeof appendProofsV2>
-  | ReturnType<typeof removeProofs>
-  | ReturnType<typeof incrementCounter>
-  | ReturnType<typeof increaseCounterV2>
-  | ReturnType<typeof resetCounter>
-  | ReturnType<typeof ensureProfileExistsAction>;
 
 export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
   return async (dispatch) => {

@@ -4,8 +4,16 @@ import { View } from 'components/common/View';
 import Icon from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { Button } from 'components/common/Button';
+import { Theme } from 'helper/colors';
 
-const Footer = ({ theme, message, setMessage, handleSendDM, setIsFocused }) => {
+interface FooterProps {
+  theme: Theme;
+  message: string;
+  setMessage: (text: string) => void;
+  handleSendDM: () => void;
+}
+
+const Footer = ({ theme, message, setMessage, handleSendDM }: FooterProps) => {
   const styles = createStyles(theme);
 
   return (
@@ -14,8 +22,6 @@ const Footer = ({ theme, message, setMessage, handleSendDM, setIsFocused }) => {
         placeholder="Type your message..."
         value={message}
         onChangeText={setMessage}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
         style={{
           padding: 12,
           marginLeft: 12,
@@ -46,7 +52,7 @@ const Footer = ({ theme, message, setMessage, handleSendDM, setIsFocused }) => {
   );
 };
 
-const createStyles = () =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     inputContainer: {
       position: 'relative',

@@ -14,10 +14,10 @@ export const vpnReducer: Reducer<VpnState, VpnAction> = (
 ): VpnState => {
   switch (action.type) {
     case SET_VPN:
-      return typedUpdate('vpns', (vpns) => [...vpns, action.payload], state);
+      return typedUpdate('vpns' as const, (vpns) => [...vpns, action.payload], state);
     case UPDATE_VPN:
       return typedUpdate(
-        'vpns',
+        'vpns' as const,
         (vpns) =>
           vpns.map((vpn) =>
             vpn.payment_request === action.payload.request

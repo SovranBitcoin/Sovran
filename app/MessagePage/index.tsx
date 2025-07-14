@@ -1,177 +1,53 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  StyleSheet,
-  Alert,
-  Animated,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Alert, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { finalizeEvent, nip04, nip19, SimplePool } from 'nostr-tools';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import moment from 'moment';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
 // Custom hooks
-import { useNostr } from 'helper/redux/nostr';
-import { useCashu } from 'helper/redux/cashu';
-import { useEsims } from 'helper/redux/esim';
-import { useVpn } from 'helper/redux/lnvpn';
-import { useBitrefill } from 'helper/redux/bitrefill';
+import { memoizedMessagesByProfile, Message, useNostr } from 'helper/redux/nostr';
+import { TransactionBuilder, useCashu } from 'helper/redux/cashu';
+import { Esim, useEsims } from 'helper/redux/esim';
+import { useVpn, Vpn } from 'helper/redux/lnvpn';
+import { BitrefillEvent, useBitrefill } from 'helper/redux/bitrefill';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Components
 import Modal from 'components/layout/Modal';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Footer from './Footer';
 import Header from './Header';
 import TimelineItem from './TimeLine';
 import { Button } from 'components/common/Button';
-import ndk, { relays } from 'components/ndk';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
-import { EventKind } from 'app/Profile';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 
-// Function to fetch Nostr profile
-export const fetchNostrProfile = async (npub) => {
-  const profile = await ndk.getUser({ pubkey: npub });
-  return profile.fetchProfile();
-};
-
-// Function to send DM via Nostr
-async function sendDM(priv, pub, toPubkey, message, relays) {
-  const encryptMessage = async (privKey, recipientPubKey, message) => {
-    return nip04.encrypt(priv, recipientPubKey, message);
-  };
-
-  const signEventAsync = async (privKey, event) => {
-    return finalizeEvent(event, hexToBytes(priv));
-  };
-
-  const content = await encryptMessage(priv, toPubkey, message);
-  const event = {
-    kind: 4,
-    tags: [['p', toPubkey]],
-    content,
-    pubkey: pub,
-    created_at: Math.floor(Date.now() / 1000),
-    id: '',
-    sig: '',
-  };
-
-  const signedEvent = await signEventAsync(priv, event);
-  if (!signedEvent) {
-    throw new Error("Couldn't sign the event!");
-  }
-
-  return new Promise((resolve, reject) => {
-    const pool = new SimplePool();
-    const pubs = pool.publish(relays, signedEvent);
-
-    Promise.any(pubs)
-      .then(() => resolve(signedEvent))
-      .catch((error) => reject(`Failed to publish: ${error}`))
-      .finally(() => pool.close(relays));
-  });
-}
-
-export function useNostrProfile(pubkey?: string) {
-  const [profile, setProfile] = useState(null);
-
-  const filters = useMemo(() => {
-    if (!pubkey) return [];
-    return [
-      {
-        authors: [convertNpub(pubkey)],
-        kinds: [EventKind.Metadata],
-        limit: 1,
-      },
-    ];
-  }, [pubkey]);
-
-  const { events } = useSubscribe({ filters });
-
-  useEffect(() => {
-    if (events?.length > 0) {
-      try {
-        const content = JSON.parse(events[0].content);
-        setProfile(content);
-      } catch (err) {
-        console.error('Failed to parse profile', err);
-      }
-    }
-  }, [events]);
-
-  return profile;
-}
+export type TimelineItemType = BitrefillEvent | Vpn | Esim | Message | TransactionBuilder;
 
 export default function ModalScreen() {
-  // Hooks and state
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
-  const { params } = useRoute();
+  const params = useTypedRoute<'userMessages'>();
 
-  const navigation = useNavigation();
-  const { profiles, search, messages, addMessage, currentProfile } = useNostr();
+  const navigation = useTypedNavigation();
+  const { profiles, search, addMessage, currentProfile } = useNostr();
+  const messages = useSelector(memoizedMessagesByProfile());
   const { transactions } = useCashu();
   const { esims } = useEsims();
   const { vpn } = useVpn();
   const { events } = useBitrefill();
   const { showActionSheetWithOptions } = useActionSheet();
-  const scrollViewRef = useRef(null);
 
   const [message, setMessage] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-
-  // Animations
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const paddingAnim = useRef(new Animated.Value(1)).current;
-  const paddingAnim2 = useRef(new Animated.Value(8)).current;
-
-  useNostrProfile(params?.pubkey);
-
-  // Handle animation effects
-  useEffect(() => {
-    Animated.timing(scaleAnim, {
-      toValue: isFocused ? 0.5 : 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.timing(paddingAnim, {
-      toValue: isFocused ? 0.75 : 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-
-    Animated.timing(paddingAnim2, {
-      toValue: isFocused ? -16 : 8,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isFocused, paddingAnim, paddingAnim2, scaleAnim]);
-
-  // Auto-scroll to bottom when messages update
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (scrollViewRef.current) {
-        scrollViewRef.current.scrollToEnd({ animated: false });
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [filteredMessages]);
 
   // Combine profiles and search results
   const combinedSearchAndProfiles = [
-    // { pubkey: params.pubkey, ...params.profile },
-    // ...profiles,
     ...search.map((s) => ({ pubkey: convertNpub(s.pubkey), ...s.profile })),
   ];
 
@@ -179,7 +55,12 @@ export default function ModalScreen() {
   const filteredTransactions = transactions.filter((t) => t?.nostr?.pubkey);
 
   // Group transactions by pubkey
-  const groupedTransactions = filteredTransactions.reduce((acc, transaction) => {
+  const groupedTransactions: Record<
+    string,
+    { pubkey: string; transactions: TransactionBuilder[] }
+  > = filteredTransactions.reduce<
+    Record<string, { pubkey: string; transactions: TransactionBuilder[] }>
+  >((acc, transaction) => {
     const pubkey = convertNpub(transaction.nostr.pubkey);
     if (!acc[pubkey]) {
       acc[pubkey] = { pubkey, transactions: [] };
@@ -216,22 +97,26 @@ export default function ModalScreen() {
   );
 
   // Filter and deduplicate messages
-  const filteredMessages = messages
+  const filteredMessages: Message[] = messages
     .filter((msg) => (msg.pubkey || msg.sender) === convertNpub(params.pubkey))
-    .reduce((unique, msg) => {
+    .reduce<Message[]>((unique, msg) => {
       return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
     }, []);
+
+  const bitrefillEvents =
+    params?.pubkey === 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264'
+      ? events
+      : [];
+
   // Combine all timeline items and sort by date
-  const timelimeItems = [
+  const timelimeItems: TimelineItemType[] = [
     ...esimsWithRequest,
     ...vpnsWithRequest,
     ...(currentTransactions?.transactions || []),
     ...filteredMessages,
-    ...(params?.pubkey === 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264'
-      ? events
-      : []),
-  ].sort((a, b) => {
-    const getDate = (item) => {
+    ...bitrefillEvents,
+  ].sort((a: TimelineItemType, b: TimelineItemType) => {
+    const getDate = (item: TimelineItemType) => {
       const vpnDate = item?.cc ? item.created_at : null;
       return (
         item?.date || item?.order?.packageList?.[0]?.createTime || vpnDate || item.created_at * 1000
@@ -241,21 +126,27 @@ export default function ModalScreen() {
   });
 
   // Group timeline items by date
-  const timelineItemsGroupedByDate = timelimeItems.reduce((groups, item) => {
-    const getDate = (item) => {
-      const vpnDate = item?.cc ? item.created_at : null;
-      return (
-        item?.date || item?.order?.packageList?.[0]?.createTime || vpnDate || item.created_at * 1000
-      );
-    };
+  const timelineItemsGroupedByDate = timelimeItems.reduce<Record<string, TimelineItemType[]>>(
+    (groups, item) => {
+      const getDate = (item: TimelineItemType) => {
+        const vpnDate = 'cc' in item ? item.created_at : null;
+        return (
+          (item as any)?.date ||
+          (item as any)?.order?.packageList?.[0]?.createTime ||
+          vpnDate ||
+          item.created_at * 1000
+        );
+      };
 
-    const date = moment(getDate(item)).format('YYYY-MM-DD');
-    if (!groups[date]) {
-      groups[date] = [];
-    }
-    groups[date].push(item);
-    return groups;
-  }, {});
+      const date = moment(getDate(item)).format('YYYY-MM-DD');
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(item);
+      return groups;
+    },
+    {}
+  );
 
   // Handle long press on timeline items
   const handleLongPress = (item) => {
@@ -299,14 +190,15 @@ export default function ModalScreen() {
   const handleSendDM = async () => {
     try {
       const recipientPubKey = convertNpub(params.pubkey);
-      const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
-      const privKey = bytesToHex(privKeyBytes);
-      const pubKey = convertNpub(currentProfile.pubkey);
 
-      const sentEvent = await sendDM(privKey, pubKey, recipientPubKey, message, relays);
+      const sentEvent = await sendEncryptedDirectMessage({
+        nsec: currentProfile.nsec,
+        recipientPublicKey: recipientPubKey,
+        message,
+      });
 
-      addMessage(pubKey, {
-        sender: pubKey,
+      addMessage(sentEvent.pubkey, {
+        sender: sentEvent.pubkey,
         receiver: recipientPubKey,
         pubkey: recipientPubKey,
         content: message,
@@ -351,9 +243,6 @@ export default function ModalScreen() {
         title={
           <>
             <Header
-              scaleAnim={scaleAnim}
-              paddingAnim={paddingAnim}
-              paddingAnim2={paddingAnim2}
               theme={theme}
               combinedSearchAndProfiles={combinedSearchAndProfiles}
               params={params}
@@ -407,22 +296,6 @@ export default function ModalScreen() {
                     });
                   },
                 },
-                // ...(currentProfile?.nsec
-                //   ? [
-                //       {
-                //         text: "Send DM",
-                //         variant: "secondary",
-                //         disabled: !message,
-                //         onPress: handleSendDM,
-                //       },
-                //     ]
-                //   : [
-                //       {
-                //         text: "Sign in to send and receive messages",
-                //         variant: "primary",
-                //         onPress: () => navigation.navigate("nostrSettings"),
-                //       },
-                //     ]),
               ]}
             />
             {currentProfile?.nsec ? (
@@ -431,8 +304,6 @@ export default function ModalScreen() {
                 message={message}
                 setMessage={setMessage}
                 handleSendDM={handleSendDM}
-                isFocused={isFocused}
-                setIsFocused={setIsFocused}
               />
             ) : (
               <Button
@@ -463,7 +334,7 @@ export default function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     inner: {
       padding: 24,

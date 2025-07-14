@@ -52,7 +52,7 @@ const MnemonicDisplayScreen = () => {
     );
   };
 
-  const renderWordCell = (index) => (
+  const renderWordCell = (index: number) => (
     <View key={index} style={styles.wordCell}>
       <Text style={styles.wordNumber}>{`${index + 1}.`}</Text>
       <Text
