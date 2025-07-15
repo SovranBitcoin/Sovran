@@ -197,7 +197,7 @@ function ModalScreen() {
                       icon: <ShareIcon />,
                       variant: 'secondary',
                       onPress: () => {
-                        navigation.navigate('vpnShare', {
+                        navigation.navigate('VpnShare', {
                           vpnCode: vpn
                             ?.find((v) => v.payment_request === params.payment_request)
                             ?.order?.WireguardConfig.join('\n'),

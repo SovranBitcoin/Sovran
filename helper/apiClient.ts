@@ -3,6 +3,8 @@ import { ok, err, Result } from 'neverthrow';
 
 const BASE_URL = 'https://api.sovran.money/api';
 
+export const PRICELIST_URL = `wss://ws.sovran.money`;
+
 export interface UserStats {
   pubkey: string;
   follows_count: number;
