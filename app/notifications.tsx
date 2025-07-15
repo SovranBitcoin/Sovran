@@ -36,7 +36,7 @@ export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any
       try {
         const metadata = JSON.parse(latestEvent.content);
         return metadata.displayName || metadata.name || 'Unknown User'; // Extract name or fallback
-      } catch (e) {}
+      } catch {}
     }
     return 'Unknown User';
   }, [events]);
@@ -70,7 +70,7 @@ export function UserReactionProfiles({ pubkey, isOverlapping = true }: { pubkey:
       try {
         const metadata = JSON.parse(latestEvent.content);
         return metadata.picture; // Extract profile picture URL
-      } catch (e) {}
+      } catch {}
     }
     return null;
   }, [events]);
@@ -224,7 +224,7 @@ const TabTwoScreen = () => {
       try {
         const parsed = JSON.parse(event.content);
         return parsed;
-      } catch (e) {
+      } catch {
         // Not a valid JSON string, return the original content
         return event;
       }

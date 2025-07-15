@@ -172,8 +172,6 @@ function TabOneScreen() {
     return <Welcome />;
   }
 
-  console.log(23982737, theme.greys);
-
   return (
     <View
       style={{

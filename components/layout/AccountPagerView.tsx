@@ -17,7 +17,7 @@ import {
   memoizedGetBalance,
   memoizedGetSelectedMint,
 } from 'helper/redux/cashu';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -51,7 +51,7 @@ export function AccountPagerView({
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
 
-  const styles = createStyles(theme.id, theme.greys, theme.shades);
+  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -88,8 +88,6 @@ export function AccountPagerView({
     if (page === 'currency' && balance <= 0) {
       SheetManager.show('mint-balance', {
         payload: {
-          accountType: account.type,
-          accountIndex: account.accountIndex,
           navigate: true,
           requireBalance: true,
         },
@@ -115,8 +113,6 @@ export function AccountPagerView({
     navigation.navigate(page, {
       to: 'ecashSendConfirmation',
       unit: accountUnit,
-      type: account.type,
-      accountIndex: account.accountIndex,
     });
   };
 
@@ -140,7 +136,7 @@ export function AccountPagerView({
         <Icon
           name="stash:qr-code"
           size={24}
-          color={theme === 'light' ? greys(theme)[950] : greys(theme)[0]}
+          color={theme.id === 'light' ? greys(theme)[950] : greys(theme)[0]}
         />
       ),
     },
@@ -174,7 +170,7 @@ export function AccountPagerView({
           }}>
           {loopedAccounts.map((acc, index) => (
             <View
-              key={`${acc.key}-${index}`}
+              key={`${acc.unit}-${index}`}
               style={{
                 flex: 1,
                 justifyContent: 'center',
@@ -261,7 +257,7 @@ export function AccountPagerView({
   );
 }
 
-const createStyles = (theme, greys: string, shades) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     touchableOpacity: {
       flex: 1,
@@ -272,13 +268,13 @@ const createStyles = (theme, greys: string, shades) =>
     cameraButton: {
       maxWidth: 64,
       zIndex: 10000,
-      shadowColor: shades[300],
+      shadowColor: theme.shades[300],
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.75,
       shadowRadius: 8,
       elevation: 5,
       borderRadius: 10000,
-      borderColor: shades[100],
+      borderColor: theme.shades[100],
       borderWidth: 0.5,
     },
     receiveButton: {
@@ -311,15 +307,15 @@ const createStyles = (theme, greys: string, shades) =>
       borderRadius: 1000,
     },
     receiveIconView: {
-      backgroundColor: greys[800],
+      backgroundColor: greys(theme)[800],
       borderBottomLeftRadius: 1000,
       borderTopLeftRadius: 1000,
-      borderColor: greys[700],
+      borderColor: greys(theme)[700],
     },
     sendIconView: {
-      backgroundColor: greys[800],
+      backgroundColor: greys(theme)[800],
       borderBottomRightRadius: 1000,
       borderTopRightRadius: 1000,
-      borderColor: greys[700],
+      borderColor: greys(theme)[700],
     },
   });

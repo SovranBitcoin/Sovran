@@ -14,9 +14,7 @@ import { NonGestureView } from './NonGestureView';
 
 // Define proper interfaces for our data types
 interface AccountData {
-  key: string;
   unit: string;
-  type: string;
 }
 
 interface AccountProps {
@@ -68,10 +66,6 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  // Memoize derived data
-  const onchainAccounts = accounts.filter((acc) => acc.type === 'onchain');
-  const ecashAccounts = accounts.filter((acc) => acc.type !== 'onchain');
-
   // Function to render currency icon based on unit
   const renderCurrencyIcon = () => {
     switch (account.unit) {
@@ -92,9 +86,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   const renderDotIndicators = (accountsToRender: AccountData[], startIndex: number) => {
     return accountsToRender.map((_, index) => {
       const actualIndex = startIndex + index;
-      const isActive =
-        actualIndex ===
-        accounts.findIndex((a) => a.unit === account.unit && a.type === account.type);
+      const isActive = actualIndex === accounts.findIndex((a) => a.unit === account.unit);
 
       return (
         <Text
@@ -116,7 +108,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   const image = useSelector(memoizedGetBackgroundImage);
 
   return (
-    <NonGestureView key={account.key} index={0} style={styles.nonGestureView}>
+    <NonGestureView key={account.unit} index={0} style={styles.nonGestureView}>
       <View style={styles.transparentBackground}>
         <View style={styles.transparentBackgroundWithPadding} />
         <View
@@ -131,7 +123,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
 
         <View style={styles.transparentBackgroundRow}>
           {/* Onchain account indicators */}
-          {renderDotIndicators(onchainAccounts, 0)}
+          {renderDotIndicators(accounts, 0)}
 
           {/* Spacer between indicators */}
           <Text
@@ -145,9 +137,6 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
             }}>
             {' '}
           </Text>
-
-          {/* Ecash account indicators */}
-          {renderDotIndicators(ecashAccounts, onchainAccounts.length)}
         </View>
       </View>
 
