@@ -140,7 +140,6 @@ const makeBackgroundAttributes = ({
     ...(isArray ? { dominantColors: base } : {}),
   };
 };
-
 export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttributes> = {
   'bg.png': makeBackgroundAttributes({ id: 'bg.png', base: '#A855F7' }),
   'bg2.png': makeBackgroundAttributes({ id: 'bg2.png', base: '#F97316' }),
