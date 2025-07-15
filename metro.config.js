@@ -1,6 +1,7 @@
 const { getDefaultConfig } = require('@expo/metro-config');
 const { withMonicon } = require('@monicon/metro');
 const { withNativeWind } = require('nativewind/metro');
+const withStorybook = require('@storybook/react-native/metro/withStorybook');
 
 const config = getDefaultConfig(__dirname);
 config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
@@ -89,4 +90,7 @@ const configWithMonicon = withMonicon(config, {
 // Then apply NativeWind
 const finalConfig = withNativeWind(configWithMonicon, { input: './global.css' });
 
-module.exports = finalConfig;
+module.exports = withStorybook(finalConfig, {
+  enabled: process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true',
+  onDisabledRemoveStorybook: true,
+});

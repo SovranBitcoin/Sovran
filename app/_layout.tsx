@@ -113,8 +113,6 @@ function MySplashScreen({ opacity }: { opacity: Animated.Value }) {
       />
     </Animated.View>
   );
-}
-
 /**
  * Stack navigation component
  */
@@ -199,7 +197,7 @@ function MainStack() {
 /**
  * Main application component
  */
-export default function RootLayout() {
+export function RootLayout() {
   const { init: initializeNDK } = useNDK();
   const [appIsReady, setAppIsReady] = useState(false);
   const scaleRef = useRef(new Animated.Value(1));
@@ -280,3 +278,9 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+
+const AppEntry = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === "true" ? require("../storybook").default : RootLayout;
+
+export default AppEntry;
+
