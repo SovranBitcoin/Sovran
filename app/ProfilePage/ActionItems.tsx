@@ -4,12 +4,12 @@ import { Text } from 'components/common/Text';
 import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { EventKind } from '../../app/Profile';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { getLightningAmount } from 'helper/cashuClient';
+import { EventKind } from 'helper/constants';
 
 const reactionCache = new Cache({
   namespace: 'reactions',

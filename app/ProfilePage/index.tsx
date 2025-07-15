@@ -16,12 +16,12 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { BlurView } from 'expo-blur';
-import { EventKind } from '../../app/Profile';
 import { Posts } from './posts';
 import CachedImage from 'components/common/Image';
 import ndk from 'components/ndk';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useRoute } from '@react-navigation/native';
+import { EventKind } from 'helper/constants';
 dayjs.extend(relativeTime);
 
 export async function getFollowedUsers(userPubkey, verbose = true) {

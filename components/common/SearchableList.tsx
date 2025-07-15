@@ -5,28 +5,20 @@ import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 
-type ItemId = string | number;
-
-interface ListItem {
-  id: ItemId;
-  [key: string]: any;
-}
-
-type DataItem = ListItem | string;
-
-interface SearchableListProps {
+interface SearchableListProps<T> {
   searchText: string;
   onSearchChange: (text: string) => void;
-  data: readonly DataItem[];
-  renderIcon: (item: DataItem) => ReactNode;
-  getLabel: (item: DataItem) => string;
-  onItemPress: (item: DataItem) => void;
+  data: readonly T[];
+  renderIcon: (item: T) => ReactNode;
+  getLabel: (item: T) => string;
+  onItemPress: (item: T) => void;
   searchPlaceholder: string;
   theme: Theme;
   itemStyle?: ViewStyle;
+  getItemKey?: (item: T) => string | number;
 }
 
-export function SearchableList({
+export function SearchableList<T>({
   searchText,
   onSearchChange,
   data,
@@ -36,17 +28,22 @@ export function SearchableList({
   searchPlaceholder,
   theme,
   itemStyle,
-}: SearchableListProps) {
+  getItemKey,
+}: SearchableListProps<T>) {
   // Extract item key generation logic
-  const getItemKey = useCallback((item: DataItem): ItemId => {
-    return typeof item === 'string' ? item : item.id;
-  }, []);
+  const getKey = useCallback(
+    (item: T): string | number => {
+      if (getItemKey) return getItemKey(item);
+      return typeof item === 'string' ? item : (item as any).id || item;
+    },
+    [getItemKey]
+  );
 
   // Memoize the item rendering function
   const renderItem = useCallback(
-    (item: DataItem) => (
+    (item: T) => (
       <Pressable
-        key={getItemKey(item)}
+        key={getKey(item)}
         className="mb-2 flex-row items-center rounded-full p-2"
         style={{
           backgroundColor: greys(theme)[800],
@@ -61,7 +58,7 @@ export function SearchableList({
         </Text>
       </Pressable>
     ),
-    [getItemKey, renderIcon, getLabel, onItemPress, theme, itemStyle]
+    [getKey, renderIcon, getLabel, onItemPress, theme, itemStyle]
   );
 
   return (

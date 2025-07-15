@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { eventKind } from 'nostr-fetch';
 import { useNostrEvents as useNE } from 'nostr-react';
-import { EventKind } from '../../app/Profile';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { extractUrls } from './TextContent';
+import { EventKind } from 'helper/constants';
 
 export const useNostrEvents = (authors, ids, kinds, type) => {
   const [since, setSince] = useState(Math.floor(Date.now() / 1000));

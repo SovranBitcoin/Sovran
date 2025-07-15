@@ -6,12 +6,12 @@ import { Text } from 'components/common/Text';
 import * as Clipboard from 'expo-clipboard';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from 'app/Profile';
 import { greys } from 'helper/colors';
 import Image from 'components/common/Image';
 import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { EventKind } from 'helper/constants';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);

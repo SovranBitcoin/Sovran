@@ -12,70 +12,24 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 
 // An array of available themes
 const themes = [
-  // "light",
   'dark',
   'navy',
-  // "ocean",
   'sunset',
-  // "forest",
-  // "rose",
-  // "autumn",
   'beige',
-  // "light-beige",
-  // "middle-beige",
-  // "retro-outrun",
-  // "dark-grey",
-  // "slate-shadow",
-  // "mystic-fog",
-  // "eclipse-steel",
-  // "aurora-twilight",
   'crimson-night',
   'twilight-amber',
   'velvet-emerald',
-  // "volcanic-crimson",
-  // "urban-concrete",
-  // "celestial-aura",
-  // "digital-oasis",
-  // "cosmic-ember",
-  // "neon-dream",
-  // "misty-morning",
-  // "desert-dune",
-  // "tropical-forest",
-  // "ice-queen",
-  // "coral-sunrise"
-  // 'light',
-  // 'light',
 ];
 
-// Mapping of theme names to user-friendly names
-const themeNameMap = {
-  // light: 'Light',
-  light: 'Light',
+// Mapping of theme names to user-friendly names (only for used themes)
+const themeNameMap: Record<string, string> = {
   dark: 'Dark',
   navy: 'Navy',
   beige: 'Beige',
-  rose: 'Rose',
   sunset: 'Sunset',
-  'light-beige': 'Light Beige',
   'crimson-night': 'Crimson Night',
   'twilight-amber': 'Twilight Amber',
   'velvet-emerald': 'Velvet Emerald',
-
-  'volcanic-crimson': 'Volcanic Crimson',
-  'urban-concrete': 'Urban Concrete',
-  'celestial-aura': 'Celestial Aura',
-
-  'digital-oasis': 'Digital Oasis',
-  // "cosmic-ember": "Cosmic Ember",
-  // "neon-dream": "Neon Dream",
-
-  'misty-morning': 'Misty Morning',
-  'desert-dune': 'Desert Dune',
-  'tropical-forest': 'Tropical Forest',
-  'ice-queen': 'Ice Queen',
-  'coral-sunrise': 'Coral Sunrise',
-
-  // Add other themes here as needed
 };
 
 function ThemeSettings() {
@@ -87,7 +41,6 @@ function ThemeSettings() {
   const filteredThemes = themes.filter((theme) =>
     theme.toLowerCase().includes(searchText.toLowerCase())
   );
-  // .sort((a, b) => themeNameMap[a].localeCompare(themeNameMap[b]));
 
   const handleThemePress = (themeName: string) => {
     setTheme(themeName);

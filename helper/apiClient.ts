@@ -1,7 +1,7 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ok, err, Result } from 'neverthrow';
 
-const BASE_URL = 'https://esim.sovran.cash/api';
+const BASE_URL = 'https://api.sovran.money/api';
 
 export interface UserStats {
   pubkey: string;
@@ -100,7 +100,7 @@ const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
 
 export const fetchProducts = () => {
   return safeFetch<{ success: boolean; obj?: { packageList: ProductPackage[] } }>(
-    `${BASE_URL}/products`
+    `${BASE_URL}/esim/products`
   );
 };
 
@@ -118,7 +118,7 @@ export const fetchQuote = ({
     params.append('type', 'TOPUP');
     params.append('iccid', iccid);
   }
-  return safeFetch<QuoteResponse>(`${BASE_URL}/quote?${params}`);
+  return safeFetch<QuoteResponse>(`${BASE_URL}/esim/quote?${params}`);
 };
 
 export const fetchOrderData = ({
@@ -140,7 +140,7 @@ export const fetchOrderData = ({
     params.append('iccid', iccid);
     params.append('type', 'TOPUP');
   }
-  return safeFetch<OrderResponse>(`${BASE_URL}/order?${params}`);
+  return safeFetch<OrderResponse>(`${BASE_URL}/esim/order?${params}`);
 };
 
 export const fetchEsimData = ({ orderNo }: { orderNo: string }) =>
@@ -148,7 +148,7 @@ export const fetchEsimData = ({ orderNo }: { orderNo: string }) =>
 
 export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: number }) => {
   const params = new URLSearchParams({ query, limit: String(limit) });
-  return safeFetch<SearchUsersResponse>(`${BASE_URL}/search?${params}`);
+  return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
 export const fetchVpnInvoice = ({ duration }: { duration: string | number }) =>
@@ -198,4 +198,4 @@ interface AuditMintResponse {
 }
 
 export const auditMint = ({ mintUrl }: { mintUrl: string }) =>
-  safeFetch<AuditMintResponse>(`${BASE_URL}/mint/audit?mintUrl=${mintUrl}`);
+  safeFetch<AuditMintResponse>(`${BASE_URL}/cashu/mint/audit?mintUrl=${mintUrl}`);

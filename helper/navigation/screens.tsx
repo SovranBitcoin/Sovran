@@ -178,12 +178,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'scanner',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'lightningReceiveConfirmation',
     options: {
       presentation: 'modal',

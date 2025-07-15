@@ -5,13 +5,13 @@ import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import emoji from 'emoji-dictionary'; // Import the emoji dictionary package
-import { EventKind } from './Profile';
 import { FlashList } from '@shopify/flash-list';
 import Image from 'components/common/Image';
 import PagerView from 'react-native-pager-view';
 import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { EventKind } from 'helper/constants';
 
 export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
   const filters = useMemo(

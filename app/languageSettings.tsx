@@ -93,7 +93,7 @@ function ModalScreen() {
 
   return (
     <Container>
-      <SearchableList
+      <SearchableList<string>
         searchText={searchText}
         onSearchChange={setSearchText}
         data={filteredLanguages}

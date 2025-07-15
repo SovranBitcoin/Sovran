@@ -8,6 +8,58 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { sovran } from 'components/layout/sheets/mints';
 
+interface TabProps {
+  tab: string;
+  index: number;
+  isSelected: boolean;
+  amount?: string;
+  onPress: (tab: string, index: number) => void;
+  isScrollable: boolean;
+}
+
+function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps) {
+  const theme = useSelector(memoizedGetTheme);
+
+  const handlePress = useCallback(() => {
+    onPress(tab, index);
+  }, [tab, index, onPress]);
+
+  return (
+    <TouchableOpacity className={isScrollable ? '' : 'flex-1'} key={tab} onPress={handlePress}>
+      <View
+        blur={isSelected}
+        className="shrink-0 flex-row items-center justify-center rounded-3xl px-4 py-2.5"
+        style={{
+          ...(isSelected && {
+            backgroundColor: greys(theme)[600],
+            borderWidth: 0,
+            borderRadius: 1000,
+            borderColor: greys(theme)[600],
+          }),
+        }}>
+        <Text
+          className="text-center text-sm"
+          style={{
+            color: isSelected ? greys(theme)[0] : greys(theme)[100],
+            fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
+          }}>
+          {tab}
+        </Text>
+        {amount ? (
+          <Text
+            className="ml-1 text-xs"
+            style={{
+              fontFamily: 'OverpassBold',
+              color: greys(theme)[300],
+            }}>
+            {`(${amount})`}
+          </Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 interface TabsProps {
   tabs: string[];
   amounts?: string[];
@@ -48,62 +100,26 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
       }}>
       <View
         blur
+        className="flex-row rounded-3xl p-1.5"
         style={[
           sovran(theme).listItem,
           {
-            flexDirection: 'row',
             width: isScrollable ? undefined : '100%',
             minWidth: isScrollable ? undefined : '100%',
-            padding: 2,
-            borderRadius: 24,
+            borderRadius: 1000,
+            padding: 4,
           },
         ]}>
         {tabs.map((tab, index) => (
-          <TouchableOpacity
-            style={{
-              flex: isScrollable ? 0 : 1,
-            }}
+          <Tab
             key={tab}
-            onPress={() => onTabPress(tab, index)}>
-            <View
-              blur={selectedTab === tab}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                borderRadius: 24,
-                flexShrink: 0,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-                ...(selectedTab === tab && {
-                  backgroundColor: greys(theme)[600],
-                  borderWidth: 0,
-                  borderRadius: 1000,
-                  borderColor: greys(theme)[600],
-                }),
-              }}>
-              <Text
-                style={{
-                  color: selectedTab === tab ? greys(theme)[0] : greys(theme)[100],
-                  fontFamily: selectedTab === tab ? 'OverpassHeavy' : 'OverpassSemibold',
-                  fontSize: 14,
-                  textAlign: 'center',
-                }}>
-                {tab}
-              </Text>
-              {amounts?.[index] ? (
-                <Text
-                  style={{
-                    marginLeft: 4,
-                    fontSize: 12,
-                    fontFamily: 'OverpassBold',
-                    color: greys(theme)[300],
-                  }}>
-                  {`(${amounts[index]})`}
-                </Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
+            tab={tab}
+            index={index}
+            isSelected={selectedTab === tab}
+            amount={amounts?.[index]}
+            onPress={onTabPress}
+            isScrollable={isScrollable}
+          />
         ))}
       </View>
     </ScrollView>
