@@ -1,10 +1,8 @@
 import { NDKKind, NDKEvent } from '@nostr-dev-kit/ndk';
 import ndk from 'components/ndk';
-import { Event, finalizeEvent, getEventHash, getPublicKey, nip04, nip19, nip59 } from 'nostr-tools';
-import { Alert } from 'react-native';
+import { finalizeEvent, getPublicKey, nip04, nip19, nip59 } from 'nostr-tools';
 
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
-import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 
 interface SendGiftWrappedEncryptedDirectMessage {
   message: string;

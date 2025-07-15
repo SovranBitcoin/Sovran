@@ -21,10 +21,9 @@ import { extractUrls, TextContent } from './TextContent';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { UserNameProfiles } from '../notifications';
-import { useTypedNavigation } from 'helper/navigation';
 dayjs.extend(relativeTime);
 
-export const PostQuote = React.memo(({ id }) => {
+export const PostQuote = React.memo(({ id }: { id: string }) => {
   const theme = useSelector(memoizedGetTheme);
 
   const { events } = useNostrEvents({ filter: { ids: [id] } });
@@ -238,19 +237,19 @@ export function getPost(post) {
   if (typeof post?.content === 'string') {
     try {
       post = JSON.parse(post?.content);
-    } catch (error) {
+    } catch {
       //
     }
   }
   return post;
 }
 
-function UrlProcessor({ urls }) {
-  const isImageUrl = (url) => {
+function UrlProcessor({ urls }: { urls: string[] }) {
+  const isImageUrl = (url: string) => {
     return /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(url);
   };
 
-  const isVideoUrl = (url) => {
+  const isVideoUrl = (url: string) => {
     return /\.(mp4|webm|ogg|mov|bin)$/i.test(url);
   };
 
@@ -370,7 +369,7 @@ export function ProfileIcon({ pubkey }) {
   );
 }
 
-function PostTop({ post, font }) {
+function PostTop({ post }) {
   const theme = useSelector(memoizedGetTheme);
   const profile = useNostrProfile({ id: post?.pubkey });
   let timeAgo = getTime(post.created_at);
@@ -439,8 +438,6 @@ export const Post = React.memo(
     const { reactionCount, repostCount, zapCount } = usePostReactions({
       id: post_.id,
     });
-
-    const navigation = useTypedNavigation<'post'>();
 
     try {
       const { nostrEvents } = extractUrls(post_?.content);

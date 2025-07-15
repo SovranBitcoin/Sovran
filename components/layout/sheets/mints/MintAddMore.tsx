@@ -302,7 +302,12 @@ function AddMintItem({
   );
 }
 
-export function MintAddMore({ onClose, payload }) {
+interface MintAddMoreProps {
+  onClose: (data: { mints: string[] }) => void;
+  payload: { currencies: string[] };
+}
+
+export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
   const theme = useSelector(memoizedGetTheme);
   const g = greys(theme);
   const router = useSheetRouter('mint');
@@ -322,7 +327,11 @@ export function MintAddMore({ onClose, payload }) {
   const handleToggleMint = (id: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };

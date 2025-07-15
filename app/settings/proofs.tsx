@@ -12,23 +12,38 @@ import { toResult } from 'helper/toResult';
 import { removeProofs } from 'helper/redux/cashu'; // Import the removeProofs action
 import { ScrollView } from 'react-native';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { RootState } from 'helper/redux/store/reducer';
+import { Proof, ProofState } from '@cashu/cashu-ts';
 
 export default function ModalScreen() {
   const dispatch = useDispatch(); // Add dispatch hook
-  const [proofStates, setProofStates] = useState({});
+  const [proofStates, setProofStates] = useState<{ [key: string]: ProofState[] }>({});
   const [checkingSpent, setCheckingSpent] = useState(false);
   const [removingSpent, setRemovingSpent] = useState(false);
-  const [error, setError] = useState(null);
-  const [activeMintsData, setActiveMintsData] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [activeMintsData, setActiveMintsData] = useState<
+    {
+      url: string;
+      isSelected: boolean;
+      proofs: Proof[];
+      totalAmount: number;
+    }[]
+  >([]);
 
   const theme = useSelector(memoizedGetTheme);
   const currentProfile = useSelector(memoizedGetCurrentProfile);
-  const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const profileId = useSelector((state: RootState) => state.nostr?.currentProfile?.id);
 
   // Improved selectors to get all data we need
-  const selectedMint = useSelector((state) => state.cashu?.profiles?.[profileId]?.selectedMint);
-  const allMints = useSelector((state) => state.cashu?.profiles?.[profileId]?.mints || []);
-  const allProofs = useSelector((state) => state.cashu?.profiles?.[profileId]?.proofs || {});
+  const selectedMint = useSelector(
+    (state: RootState) => state.cashu?.profiles?.[profileId]?.selectedMint
+  );
+  const allMints = useSelector(
+    (state: RootState) => state.cashu?.profiles?.[profileId]?.mints || []
+  );
+  const allProofs = useSelector(
+    (state: RootState) => state.cashu?.profiles?.[profileId]?.proofs || {}
+  );
 
   console.log(JSON.stringify(allProofs, null, 2));
   // Prepare data structure for display
@@ -50,7 +65,7 @@ export default function ModalScreen() {
 
   // Function to check proof spent status for a specific mint
   const checkProofSpentStatus = useCallback(
-    async (mintUrl) => {
+    async (mintUrl: string) => {
       const mintProofs = allProofs[mintUrl];
 
       if (!mintProofs || mintProofs.length === 0) {
@@ -113,7 +128,7 @@ export default function ModalScreen() {
   }, [allMints, checkProofSpentStatus, setCheckingSpent, setError]);
 
   // Function to remove spent proofs for a specific mint
-  const removeSpentProofsForMint = async (mintUrl) => {
+  const removeSpentProofsForMint = async (mintUrl: string) => {
     setRemovingSpent(true);
     setError(null);
 
@@ -121,7 +136,7 @@ export default function ModalScreen() {
       .find((mintData) => mintData.url === mintUrl)
       ?.proofs?.filter((proof, index) => proofStates[mintUrl][index].state === 'SPENT');
 
-    if (spentProofs?.length > 0) {
+    if (spentProofs && spentProofs.length > 0) {
       dispatch(removeProofs({ profileId, mintUrl, proofs: spentProofs }));
     }
 
@@ -148,7 +163,7 @@ export default function ModalScreen() {
   }, [allMints.length, checkAllMints, proofStates]);
 
   // Helper function to count spent proofs for a mint
-  const getSpentProofCount = (mintUrl) => {
+  const getSpentProofCount = (mintUrl: string) => {
     const states = proofStates[mintUrl] || [];
     return states.filter((state) => state?.state === 'SPENT').length;
   };
@@ -168,7 +183,12 @@ export default function ModalScreen() {
 
         {error && <Text style={{ color: reds[300], marginBottom: 12 }}>{error}</Text>}
 
-        <Button text="Refresh All Proofs" onPress={checkAllMints} disabled={checkingSpent} />
+        <Button
+          variant="primary"
+          text="Refresh All Proofs"
+          onPress={checkAllMints}
+          disabled={checkingSpent}
+        />
 
         {checkingSpent && <Text style={{ marginTop: 10 }}>Checking proof status...</Text>}
         {removingSpent && <Text style={{ marginTop: 10 }}>Removing spent proofs...</Text>}
@@ -199,6 +219,7 @@ export default function ModalScreen() {
               </View>
 
               <Button
+                variant="primary"
                 text={`Check ${mintData.proofs.length} Proofs`}
                 onPress={() => checkProofSpentStatus(mintData.url)}
                 disabled={checkingSpent}
@@ -239,6 +260,7 @@ export default function ModalScreen() {
 
                   {/* Add Remove Spent Proofs button at the bottom of the list */}
                   <Button
+                    variant="primary"
                     text={`Remove ${spentProofCount} Spent Proofs`}
                     onPress={() => removeSpentProofsForMint(mintData.url)}
                     disabled={removingSpent || spentProofCount === 0}

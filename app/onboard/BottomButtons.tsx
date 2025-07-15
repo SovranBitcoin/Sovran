@@ -11,12 +11,12 @@ import {
 import { Text } from 'components/common/Text';
 import { greys, shades, Theme } from 'helper/colors';
 
-type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
 
 export interface ButtonProps {
   text: string;
   onPress: (event: GestureResponderEvent) => void;
-  variant: ButtonVariant;
+  variant: 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
   disabled?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;

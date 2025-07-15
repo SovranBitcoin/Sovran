@@ -69,7 +69,6 @@ interface BaseTransaction {
   paid: boolean;
   memo?: string;
 
-
   counter?: number;
   nostr?: {
     pubkey: string;
@@ -876,7 +875,7 @@ export function getUsedProofs(currentProofs, keepProofs) {
 }
 
 export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
-  const [wallet, setWallet] = useState(null);
+  const [wallet, setWallet] = useState<CashuWallet>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

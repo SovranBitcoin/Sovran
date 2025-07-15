@@ -6,8 +6,7 @@ import { useSelector } from 'react-redux';
 import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
-import { useRoute } from '@react-navigation/native';
-import { useTypedNavigation } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { memoizedGetMints, TransactionBuilder, useGetMintInfo } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -69,15 +68,15 @@ function getTokenAmount({ token }: TokenProps): number {
   return decodedToken.proofs.reduce((a, b) => a + b.amount, 0);
 }
 
-function getTokenMemo({ token }: TokenProps): string {
+function getTokenMemo({ token }: TokenProps): string | undefined {
   return getDecodedToken(token).memo;
 }
 
-function getTokenUnit({ token }: TokenProps): string {
+function getTokenUnit({ token }: TokenProps): string | undefined {
   return getDecodedToken(token).unit;
 }
 
-function getTokenMints({ token }: TokenProps): string {
+function getTokenMints({ token }: TokenProps): string | undefined {
   return getDecodedToken(token).mint;
 }
 
@@ -264,9 +263,7 @@ export function EcashReceiveConfirmation({
 }
 
 function ModalScreen() {
-  const {
-    params: { token },
-  } = useRoute() as { params: { token: string } };
+  const { token } = useTypedRoute<'ecashReceiveConfirmation'>();
 
   return (
     <EcashReceiveConfirmation

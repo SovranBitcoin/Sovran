@@ -7,8 +7,6 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import Haptics from 'components/common/Haptics';
 
 interface Props {
@@ -20,7 +18,6 @@ type KeyVal = string | number;
 interface KeyButtonProps {
   value: KeyVal;
   onPress: (value: KeyVal) => void;
-  theme: string;
 }
 
 const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
@@ -115,7 +112,6 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
 
 const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   const [, setInputValue] = useState('');
-  const theme = useSelector(memoizedGetTheme);
 
   const handlePress = useCallback(
     (value: KeyVal) => {
@@ -137,7 +133,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
 
   const renderButton = useCallback(
     (value: KeyVal) => <KeyButton key={String(value)} value={value} onPress={handlePress} />,
-    [handlePress, theme]
+    [handlePress]
   );
 
   const buttons: KeyVal[][] = [

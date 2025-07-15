@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import Svg, { Circle, Defs, G, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useSelector } from 'react-redux';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Monicon as Icon } from '@monicon/native';
+import { Monicon } from '@monicon/native';
 
 // todo: remove all these icons and use <Icon name={name} size={size} color={color || theme.greys[0]} /> instead.
 
@@ -92,24 +92,20 @@ export const icons = [
   'ic:round-refresh',
 ];
 
-export default ({
-  name,
-  color,
-  size = 24,
-  spin,
-  style = {},
-}: {
+export type IconProps = {
   name: string;
   color?: string;
   size?: number;
   spin?: {
-    duration: number;
-    outputRange: string[];
-    delay: number;
-    easing: any;
+    duration: Animated.TimingAnimationConfig['duration'];
+    outputRange: number[] | string[];
+    delay: Animated.TimingAnimationConfig['delay'];
+    easing?: Animated.TimingAnimationConfig['easing'] | 'linear';
   };
   style?: any;
-}) => {
+};
+
+function Icon({ name, color, size = 24, spin, style = {} }: IconProps) {
   const theme = useSelector(memoizedGetTheme);
   const spinValue = useRef(new Animated.Value(0)).current;
 
@@ -122,7 +118,7 @@ export default ({
           easing: spin?.easing === 'linear' ? Easing.linear : Easing.elastic(1),
           useNativeDriver: true,
         }),
-        Animated.delay(spin?.delay), // 4 second delay
+        Animated.delay(spin?.delay || 0), // 4 second delay
       ]);
 
       Animated.loop(spinAnimation).start();
@@ -142,10 +138,12 @@ export default ({
         transform: [{ rotate: spinAnimation }],
         ...style,
       }}>
-      <Icon name={name} size={size} color={color || theme.greys[0]} />
+      <Monicon name={name} size={size} color={color || theme.greys[0]} />
     </Animated.View>
   );
-};
+}
+
+export default Icon;
 
 export function SovranTextIcon({ size = 300 }: { size?: number }) {
   return (

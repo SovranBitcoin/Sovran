@@ -35,7 +35,7 @@ export default function ModalScreen() {
 
   const params = useTypedRoute<'userMessages'>();
 
-  const navigation = useTypedNavigation();
+  const navigation = useTypedNavigation<'currency'>();
   const { profiles, search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
   const { transactions } = useCashu();
@@ -149,7 +149,7 @@ export default function ModalScreen() {
   );
 
   // Handle long press on timeline items
-  const handleLongPress = (item) => {
+  const handleLongPress = (item: TimelineItemType) => {
     let options = ['Cancel'];
     let cancelButtonIndex = 0;
     let destructiveButtonIndex = -1;

@@ -407,6 +407,7 @@ export default function ModalScreen() {
         {Object.keys(theme.greys).map((grey) => {
           return (
             <View
+              key={grey}
               style={{
                 backgroundColor: greys(theme)[grey],
                 height: 64,

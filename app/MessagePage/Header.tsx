@@ -13,7 +13,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { muteUser, reportUser, addContact, removeContact } from 'helper/redux/nostr';
 import { useDispatch, useSelector } from 'react-redux';
 import { showMessage } from 'helper/popup/popups';
-import { RootState } from 'helper/redux/store';
+import { RootState } from 'helper/redux/store/reducer';
 
 interface HeaderProps {
   theme: Theme;
@@ -26,6 +26,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
   const navigation = useTypedNavigation();
   const maxWidth = Math.min(Dimensions.get('window').width, 600);
   const bannerHeight = (maxWidth * 214) / 600 + 32;
+  const styles = createStyles();
 
   const profile = combinedSearchAndProfiles.find((p) => p.pubkey === params.pubkey);
   const isVerified = profiles.some((p) => p.pubkey === params.pubkey);
@@ -160,7 +161,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
   );
 };
 
-const styles = {
+const createStyles = () => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -248,6 +249,6 @@ const styles = {
     opacity: 0,
     pointerEvents: 'none',
   },
-};
+});
 
 export default Header;

@@ -43,6 +43,15 @@ export const InfoSection = ({
   );
 };
 
+interface NavigationFooterProps {
+  onBack: () => void;
+  onNext: () => void;
+  backText?: string;
+  nextText?: string;
+  theme: Theme;
+  style?: StyleProp<ViewStyle>;
+}
+
 export const NavigationFooter = ({
   onBack,
   onNext,
@@ -50,7 +59,7 @@ export const NavigationFooter = ({
   nextText = 'Next',
   theme,
   style,
-}) => {
+}: NavigationFooterProps) => {
   const styles = createStyles(theme);
   const iconColor = greys(theme)[0];
 
@@ -78,7 +87,7 @@ interface OnboardingLayoutProps {
   description: string;
   highlightColors: readonly [ColorValue, ColorValue, ...ColorValue[]];
   nextScreen: string;
-  actions: ButtonProps[];
+  actions?: ButtonProps[];
 }
 
 export function OnboardingLayout({

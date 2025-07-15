@@ -112,3 +112,7 @@ case TERMS_ACCEPTED: {
   }), state);
 }
 ```
+
+# Comments
+
+When adding comments try to stick to tsdoc standard.

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Linking } from 'react-native';
 import { useSelector } from 'react-redux';
-import { useNavigation, useRoute } from '@react-navigation/native';
 import lookup from 'country-code-lookup';
 
 import { greys, reds, Theme } from 'helper/colors';
@@ -17,6 +16,8 @@ import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { fetchOrderData, fetchEsimData } from 'helper/apiClient';
 import { DonutChartContainer } from 'components/layout/Donut';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { RootState } from 'helper/redux/store/reducer';
 
 // Move utility function outside of component
 export function convertDataUsage(data) {
@@ -61,10 +62,10 @@ function ModalScreen() {
   const { updateEsim } = useEsims();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
-  const { params } = useRoute();
+  const navigation = useTypedNavigation<'esimShare'>();
+  const params = useTypedRoute<'esim'>();
 
-  const esim = useSelector((state) =>
+  const esim = useSelector((state: RootState) =>
     state.esim?.esims?.find((esim) => esim.request === params.request)
   );
 

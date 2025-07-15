@@ -1,7 +1,5 @@
 // from enuts
 
-import { bech32 } from 'bech32';
-import { Buffer } from 'buffer/';
 import bolt11 from 'light-bolt11-decoder';
 const LNURL_REGEX = /^(?:http.*[&?]lightning=|lightning:)?(lnurl[0-9]{1,}[02-9ac-hj-np-z]+)/;
 
@@ -64,7 +62,7 @@ export const parseLnUrl = (url: string): string | null => {
   return result ? result[1] : null;
 };
 
-export function isLightningInvoice(invoice) {
+export function isLightningInvoice(invoice: string) {
   try {
     bolt11.decode(invoice);
     return true;
@@ -131,72 +129,6 @@ export const parseLnurlp = (url: string): string | null => {
   return parsedUrl.replace('lnurlp://', protocol);
 };
 
-export const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
-  const bech32Url = parseLnUrl(lnUrlOrAddress);
-  if (bech32Url) {
-    const decoded = bech32.decode(bech32Url, 20000);
-    return Buffer.from(bech32.fromWords(decoded.words)).toString();
-  }
-  const address = parseLightningAddress(lnUrlOrAddress);
-  if (address) {
-    const { username, domain } = address;
-    const protocol = domain.match(/\.onion$/) ? 'http' : 'https';
-    return `${protocol}://${domain}/.well-known/lnurlp/${username}`;
-  }
-  return parseLnurlp(lnUrlOrAddress);
-};
-
-export function getLnurlData(url?: string): Promise<any> | null {
-  if (!url) {
-    return null;
-  }
-  return fetch(url).then((res) => res.json());
-}
-
-export function getLnurlIdentifierFromMetadata(metadata: string) {
-  try {
-    const parsed = JSON.parse(metadata) as string[][];
-    const identidier = parsed.find(([key]) => key === 'text/identifier')?.[1];
-    return identidier ?? 'Identifier not found';
-  } catch (e) {
-    return 'Error: Identifier not found';
-  }
-}
-
-export async function getInvoiceFromLnurl(lnUrlOrAddress: string, amount: number) {
-  try {
-    lnUrlOrAddress = lnTrim(lnUrlOrAddress);
-    if (!isLnurlOrAddress(lnUrlOrAddress)) {
-      throw new Error('invalid address');
-    }
-    const url = decodeUrlOrAddress(lnUrlOrAddress);
-    if (!url || !isUrl(url)) {
-      throw new Error('Invalid lnUrlOrAddress');
-    }
-    amount *= 1000;
-    //
-    const { tag, minSendable, maxSendable, callback } = await (await fetch(url)).json();
-    //
-
-    if (minSendable > amount || amount > maxSendable) {
-      return { pr: '', minSendable, maxSendable };
-    }
-
-    // const { tag, callback, minSendable, maxSendable } = await fetch(resp2)
-    // const { tag, callback, minSendable, maxSendable } = await (await fetch(`https://${host}/.well-known/lnurlp/${user}`)).json<ILnUrl>()
-    if (tag === 'payRequest' && minSendable <= amount && amount <= maxSendable) {
-      const resp = await fetch(`${callback}?amount=${amount}`);
-      //
-      const { pr } = await resp.json<{ pr: string }>();
-      // const resp = await (await fetch(`${callback}?amount=${amount}`)).json<{ pr: string }>()
-      if (!pr) {
-      }
-      return { pr: pr || '', minSendable, maxSendable };
-    }
-  } catch (err) { }
-  return '';
-}
-
 export function lnTrim(str: string) {
   if (!str || !isStr(str)) {
     return '';
@@ -224,12 +156,4 @@ export function lnTrim(str: string) {
 
 export function isStr(v: unknown): v is string {
   return typeof v === 'string';
-}
-function parsePaymentRequest(arg0: { request: any }): {
-  mtokens: any;
-  tokens: any;
-  destination: any;
-  created_at: any;
-} {
-  throw new Error('Function not implemented.');
 }

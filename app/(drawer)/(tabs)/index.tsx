@@ -16,12 +16,7 @@ import {
 import { useTransactionsData } from 'hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import {
-  memoizedGetBackgroundImage,
-  memoizedGetSettings,
-  memoizedGetTheme,
-  termsAccepted,
-} from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
@@ -160,8 +155,6 @@ function TabOneScreen() {
       ),
     });
   }, [navigation, account, accounts]);
-
-  const image = useSelector(memoizedGetBackgroundImage);
 
   useDeeplink();
 

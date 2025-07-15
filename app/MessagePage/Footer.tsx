@@ -52,7 +52,7 @@ const Footer = ({ theme, message, setMessage, handleSendDM }: FooterProps) => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = () =>
   StyleSheet.create({
     inputContainer: {
       position: 'relative',

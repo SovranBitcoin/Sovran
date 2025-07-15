@@ -11,7 +11,7 @@ import { default as registerMintBalance } from 'components/layout/sheets/mint-ba
 import { default as registerEmail } from 'components/layout/sheets/email';
 import { default as registerVideo } from 'components/layout/sheets/video';
 
-export function registerAllSheets({ context }: { context: 'global' | 'modal' }) {
+export function registerAllSheets({ context }: { context?: 'global' }) {
   registerExample({ context });
   registerPopup({ context });
   registerNpubcashSelector({ context });

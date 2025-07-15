@@ -136,7 +136,7 @@ export const memoizedGetTransactionByMatcher = ({
   );
 
 export const memoizedGetSelectedMint = createSelector(
-  [(state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint],
+  [(state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id].selectedMint],
   (selectedMint) => {
     return selectedMint;
   }

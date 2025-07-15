@@ -18,7 +18,7 @@ const linkPreviewCache = new Cache({
   backend: AsyncStorage,
 });
 
-const useLinkPreview = (url) => {
+const useLinkPreview = (url: string) => {
   const [loading, setLoading] = useState(true);
   const [linkData, setLinkData] = useState(null);
   const [error, setError] = useState(null);
@@ -96,7 +96,7 @@ const LinkDetails = ({ theme, url, linkData }) => (
   </View>
 );
 
-export const ExternalLink = ({ url }) => {
+export const ExternalLink = ({ url }: { url: string }) => {
   const theme = useSelector(memoizedGetTheme);
   const { loading, linkData, error } = useLinkPreview(url);
 

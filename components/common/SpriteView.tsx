@@ -1,4 +1,3 @@
-// components/common/AnimatedSpriteBackground.tsx
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import Image, { SpriteView } from './Image';

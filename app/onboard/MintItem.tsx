@@ -1,7 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Image } from 'react-native';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { calculatePosition, calculateSize, calculateOpacity } from './helper';
+
+interface MintItemProps {
+  mint: any;
+  mintIndex: number;
+  activeMintId: string;
+  mintIndices: string[];
+  renderProgressCircle: (progress: number, size: number, theme: Theme) => React.ReactNode;
+  getMintProgress: (mintUrl: string) => number;
+  theme: Theme;
+}
 
 // Individual mint component that animates based on active state
 export const MintItem = ({
@@ -12,7 +22,7 @@ export const MintItem = ({
   renderProgressCircle,
   getMintProgress,
   theme,
-}) => {
+}: MintItemProps) => {
   const isMintActive = activeMintId === mint.id;
   const positionIndex = mintIndex - mintIndices.findIndex((m) => m === activeMintId);
 
@@ -51,7 +61,7 @@ export const MintItem = ({
         height: 100,
         marginRight: -100,
         zIndex: zIndexValue,
-        backgroundColor: theme ? theme[950] : '#222',
+        backgroundColor: theme ? greys(theme)[950] : '#222',
       }}>
       <View
         style={{

@@ -8,13 +8,15 @@ import { restoreCounter } from 'helper/cashuClient';
 import { increaseCounterV2 } from 'helper/redux/cashu';
 import { runWithAnimationFrame } from '../onboard/new';
 import { ScrollView } from 'react-native';
+import { RootState } from 'helper/redux/store/reducer';
+import { MintKeyset } from '@cashu/cashu-ts';
 
 export default function ModalScreen() {
   const [isLoading, setIsLoading] = useState(false);
-  const keysets = useSelector((state) => state.cashu?.keysets);
-  const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const keysets = useSelector((state: RootState) => state.cashu?.keysets);
+  const profileId = useSelector((state: RootState) => state.nostr?.currentProfile?.id);
 
-  async function restore({ keyset, mintUrl }) {
+  async function restore({ keyset, mintUrl }: { keyset: any; mintUrl: string }) {
     const counter = await restoreCounter({
       keyset,
       mintUrl,
@@ -30,7 +32,7 @@ export default function ModalScreen() {
     );
   }
 
-  const handleRestore = (keyset, mintUrl) => {
+  const handleRestore = (keyset: MintKeyset, mintUrl: string) => {
     return () => runWithAnimationFrame(restore, setIsLoading)({ keyset, mintUrl });
   };
 

@@ -24,5 +24,5 @@ function TransactionMessageSheet(props: any) {
   );
 }
 
-export default ({ context }: { context: 'global' | 'modal' }) =>
+export default ({ context }: { context?: 'global' }) =>
   registerSheet(sheetName, TransactionMessageSheet, context);

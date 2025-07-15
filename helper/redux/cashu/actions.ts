@@ -52,13 +52,7 @@ export const removeMints = ({ profileId, mints }: { profileId: number; mints: st
     payload: { profileId, mints },
   }) as const;
 
-export const setSelectedMint = ({
-  profileId,
-  mintUrl,
-}: {
-  profileId: number;
-  mintUrl: string;
-}) =>
+export const setSelectedMint = ({ profileId, mintUrl }: { profileId: number; mintUrl: string }) =>
   ({
     type: SET_SELECTED_MINT,
     payload: { profileId, mintUrl },
@@ -100,7 +94,15 @@ export const setTransactions = ({
     payload: { profileId, transactions },
   }) as const;
 
-export const updateTransaction = ({ profileId, matcher, updateFn }: { profileId: number; matcher: (tx: TransactionData) => boolean; updateFn: (tx: TransactionData) => TransactionData }) =>
+export const updateTransaction = ({
+  profileId,
+  matcher,
+  updateFn,
+}: {
+  profileId: number;
+  matcher: (tx: TransactionData) => boolean;
+  updateFn: (tx: TransactionData) => TransactionData;
+}) =>
   ({
     type: UPDATE_TRANSACTION,
     payload: {

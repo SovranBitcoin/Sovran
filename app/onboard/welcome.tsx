@@ -6,14 +6,14 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon, { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
-import { useNavigation } from 'expo-router';
+import { useTypedNavigation } from 'helper/navigation';
 import { Cashews } from 'assets/images';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
 
   return (
     <View style={styles.centeredContainer}>

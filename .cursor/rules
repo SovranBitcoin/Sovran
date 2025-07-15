@@ -1,0 +1,124 @@
+# Sovran Development Rules
+
+## Bottom Sheets
+
+- For bottom sheets that trigger on user interaction, refer to `Sovran/components/layout/sheets/example`
+- Check usage documentation at `Sovran/components/layout/sheets/example/usage.md`
+- Follow the established patterns in the example implementation
+
+## Theme Management
+
+- Always use `memoizedGetTheme` from `helper/redux/settings` to access current theme
+- Use `useSelector` hook to get theme state
+- Import `greys` from `helper/colors` for color theming
+- Follow this pattern:
+
+```ts
+import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector } from 'react-redux';
+import { greys } from 'helper/colors';
+import { StyleSheet } from 'react-native';
+
+const theme = useSelector(memoizedGetTheme);
+const styles = createStyles(theme);
+
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      color: greys(theme)[0],
+      backgroundColor: greys(theme)[950],
+    },
+  });
+```
+
+## Styling Approach
+
+- We are migrating away from `createStyles` but follow these rules:
+- Colors: `greys` range from `50,100,200,300,400,500,600,700,800,900,950`
+- Shades range from `100-500`
+- DO NOT use Tailwind styles directly on `<Text />` components - use inline styles
+- Use inline styles for everything except color-related styles
+- Convert styles like: `<View style={{color: greys(theme)[900], marginBottom: 8 }}>` to `<View className="mb-1" style={{color: greys(theme)[900] }}>`
+- Check `design.tsx` for useful components
+- Check `helper/colors` for complete list of available theme colors
+
+## Error Handling
+
+- Use `neverthrow` instead of async/await
+- Follow this pattern for function calls:
+
+```ts
+const walletRes = await getWallet({ unit, mintUrl, profile: null });
+if (walletRes.isErr()) return err(walletRes.error);
+const wallet = walletRes.value;
+```
+
+- Convert functions from other libraries using:
+
+```ts
+const spentRes = await toResult(wallet.checkProofsStates(proofs));
+```
+
+## Text Components
+
+- Use `size` and other props provided by Text component to change size, font, weight
+- Do NOT use inline styles for text formatting
+- Prefer component props over style attributes
+
+## Reducers
+
+### Selectors
+
+- Always add `as const` for type safety:
+
+```ts
+export const setLanguage = (lang: string) =>
+  ({
+    type: SET_LANGUAGE,
+    payload: lang,
+  }) as const;
+```
+
+### Actions
+
+- Add the type of new selectors to the action type for proper inference:
+
+```ts
+export type SettingsAction =
+  | ReturnType<typeof setLanguage>
+  | ReturnType<typeof setTheme>
+  | ReturnType<typeof setDisplayBitcoin>;
+```
+
+### Reducers
+
+- Use `typedUpdate` and `typedSet` for type safety
+- Path syntax for `typedUpdate` and `typedSet`:
+  - Array indices: `[${profileId}]`
+  - Object keys: `.${mintUrl}`
+  - Example: `profiles[${profileId}].counters.${mintUrl}.${keysetId}`
+- For array params, use `as const`: `['profiles', profileId, 'counters', 'mintUrl', 'keysetId'] as const`
+- Example reducer case:
+
+```ts
+case TERMS_ACCEPTED: {
+  return typedUpdate('settings.termsAccepted', () => ({
+    termsAccepted: true,
+    date: action.payload.date,
+  }), state);
+}
+```
+
+## Comments
+
+- Use TSDoc standard for all comments
+- Follow established documentation patterns
+- Be descriptive and helpful for future developers
+
+## General Guidelines
+
+- Follow established patterns in the codebase
+- Maintain type safety throughout
+- Check existing implementations before creating new patterns
+- Use the helper functions and utilities provided in the project

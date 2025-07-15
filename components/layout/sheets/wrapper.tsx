@@ -10,12 +10,18 @@ import { Spacer } from 'components/common/View';
 
 interface WrapperProps {
   children: React.ReactNode;
-  buttons: React.ReactNode;
+  buttons?: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
   scrollContainerStyle?: StyleProp<ViewStyle>;
 }
 
-export const SheetButton = ({ onPress, children, disabled }) => {
+interface SheetButtonProps {
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}
+
+export const SheetButton = ({ onPress, children, disabled }: SheetButtonProps) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 

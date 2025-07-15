@@ -12,6 +12,7 @@ interface TransactionDebugCodeProps {
 
 export function TransactionDebugCode({ transaction }: TransactionDebugCodeProps) {
   return null;
+  // eslint-disable-next-line no-unreachable
   const theme = useSelector(memoizedGetTheme);
   return (
     <ScrollView horizontal>

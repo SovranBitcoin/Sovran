@@ -27,21 +27,27 @@ const Profile = () => {
     cashuMnemonic: false,
   });
 
-  const handleCopy = (text, messageKey) => {
+  const handleCopy = (text: string, messageKey: string) => {
     if (text) {
       Clipboard.setString(text);
       showMessage(messageKey);
     }
   };
 
-  const toggleFieldVisibility = (field) => {
+  const toggleFieldVisibility = (field: keyof typeof visibleFields) => {
     setVisibleFields((prev) => ({
       ...prev,
       [field]: !prev[field],
     }));
   };
 
-  const renderCopyableDetail = (label, value, messageKey, fieldKey = null, description = null) => {
+  const renderCopyableDetail = (
+    label: string,
+    value: string,
+    messageKey: string,
+    fieldKey: keyof typeof visibleFields | null = null,
+    description: string | null = null
+  ) => {
     const showEyeIcon = fieldKey !== null;
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
 

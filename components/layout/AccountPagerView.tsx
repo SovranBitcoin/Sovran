@@ -80,7 +80,7 @@ export function AccountPagerView({
 
   useEffect(() => {
     goToIndex(accounts.findIndex((a) => a.unit === account.unit));
-  }, [account]);
+  }, [accounts, account]);
 
   const handleButtonPress = async (page: string, accountUnit: string) => {
     const balance = memoizedGetBalance(accountUnit)(store.getState());

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { Text, View, Animated, FlatList } from 'react-native';
@@ -27,10 +27,6 @@ export const Posts = React.memo(({ mainPost = [], authors, ids, kinds, type }) =
   };
 
   const theme = useSelector(memoizedGetTheme);
-
-  const [values, setValues] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isContentUpdated, setIsContentUpdated] = useState(false);
 
   // Ref for opacity animation
   const opacity = useRef(new Animated.Value(1)).current;

@@ -151,8 +151,8 @@ const NpubSelector = ({
   const { showActionSheetWithOptions } = useActionSheet();
 
   useEffect(() => {
-    if (currentProfile?.name) {
-      const baseName = currentProfile.name.replace(' ', '');
+    if (currentProfile?.profile?.name) {
+      const baseName = currentProfile.profile.name.replace(' ', '');
       const variants = [
         baseName,
         `${baseName.replace(' ', '_')}`,
@@ -178,7 +178,7 @@ const NpubSelector = ({
         setNameAvailability(results);
       });
     }
-  }, [currentProfile?.name, selectedDomain]);
+  }, [currentProfile?.profile?.name, selectedDomain]);
 
   useEffect(() => {
     const names = ['Satoshi', 'Laura', 'Nakamoto', 'Andreas', 'Hal', 'Finney', 'Nick', 'Calle'];
@@ -248,7 +248,7 @@ const NpubSelector = ({
       },
       (buttonIndex) => {
         if (buttonIndex !== cancelButtonIndex) {
-          setSelectedDomain(options[buttonIndex]);
+          setSelectedDomain(options[buttonIndex || 0]);
         }
       }
     );

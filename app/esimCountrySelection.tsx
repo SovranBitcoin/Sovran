@@ -13,7 +13,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 
-export const getCountry = (iso) => {
+export const getCountry = (iso: string) => {
   try {
     return lookup.byIso(iso)?.country;
   } catch {
