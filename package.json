@@ -185,8 +185,11 @@
     "webln": "^0.3.2"
   },
   "devDependencies": {
-    "vite": "^6.3.5",
-    "storybook": "^9",
+    "@devicecloud.dev/dcd": "^3.7.6",
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "@gandlaf21/bc-ur": "^1.1.12",
+    "@react-native-community/cli": "latest",
     "@storybook/addon-docs": "^9",
     "@storybook/addon-ondevice-actions": "^9",
     "@storybook/addon-ondevice-backgrounds": "^9",
@@ -195,10 +198,6 @@
     "@storybook/react": "^9",
     "@storybook/react-native": "^9",
     "@storybook/react-native-web-vite": "^9",
-    "@babel/core": "^7.28.0",
-    "@babel/preset-env": "^7.28.0",
-    "@gandlaf21/bc-ur": "^1.1.12",
-    "@react-native-community/cli": "latest",
     "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.20",
     "@types/mocha": "^10.0.10",
@@ -215,8 +214,10 @@
     "patch-package": "^8.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.5.11",
+    "storybook": "^9",
     "tailwindcss": "^3.4.0",
-    "typescript": "~5.3.3"
+    "typescript": "~5.3.3",
+    "vite": "^6.3.5"
   },
   "private": true,
   "react-native": {

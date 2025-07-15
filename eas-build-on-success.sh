@@ -15,7 +15,7 @@ then
    APP_EXECUTABLE_PATH=/Users/expo/workingdir/build/ios/build/Build/Products/Release-iphonesimulator/Sovran.app
    
    MAESTRO_API_KEY=$MAESTRO_API_KEY
-   maestro cloud --project-id="proj_01jvhrahrjf5dtcy4zbpewj7p2" --apiKey  $MAESTRO_API_KEY $APP_EXECUTABLE_PATH .maestro  
+   dcd cloud --project-id="proj_01jvhrahrjf5dtcy4zbpewj7p2" --apiKey  $MAESTRO_API_KEY $APP_EXECUTABLE_PATH .maestro  
 else
    APP_EXECUTABLE_PATH=/home/expo/workingdir/build/android/app/build/outputs/apk/release/app-release.apk
 fi

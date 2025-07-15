@@ -1,0 +1,28 @@
+appId: com.sovranbitcoin
+---
+- assertVisible: 'Send Ecash'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-copy-as-emoji-step_1'
+
+- tapOn:
+    id: 'more-button'
+- assertVisible: 'Copy as Emoji'
+- tapOn: 'Copy as Emoji'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-copy-as-emoji-step_2'
+- assertVisible: 'Encode as Emoji'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-copy-as-emoji-step_3'
+- tapOn:
+    id: 'nut'
+- assertVisible: 'Token Copied'
+- runFlow:
+    file: ../../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/send/options/ecash-copy-as-emoji-step_4'
