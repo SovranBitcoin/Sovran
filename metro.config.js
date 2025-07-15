@@ -5,6 +5,8 @@ const { withNativeWind } = require('nativewind/metro');
 const config = getDefaultConfig(__dirname);
 config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
 
+const withStorybook = require('@storybook/react-native/metro/withStorybook');
+
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
@@ -89,4 +91,7 @@ const configWithMonicon = withMonicon(config, {
 // Then apply NativeWind
 const finalConfig = withNativeWind(configWithMonicon, { input: './global.css' });
 
-module.exports = finalConfig;
+module.exports = withStorybook(finalConfig, {
+  enabled: process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true',
+  onDisabledRemoveStorybook: true,
+});
