@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigation } from 'expo-router';
-import { useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 
 import { FlagIcon } from 'assets/icons';
@@ -8,9 +7,10 @@ import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { SearchableList } from 'components/common/SearchableList';
 import Container from 'components/layout/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { useTypedRoute } from 'helper/navigation';
 
 // Maps for language handling
-const isoToLanguageMap = {
+const isoToLanguageMap: Record<string, string> = {
   US: 'English',
   GB: 'English',
   FR: 'French',
@@ -37,7 +37,7 @@ const isoToLanguageMap = {
   RO: 'Romanian',
 };
 
-const countryCodeToLangMap = {
+const countryCodeToLangMap: Record<string, string> = {
   US: 'en',
   GB: 'en',
   FR: 'fr',
@@ -67,11 +67,11 @@ const countryCodeToLangMap = {
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
-  const { params } = useRoute();
+  const params = useTypedRoute<'languageSettings'>();
   const [searchText, setSearchText] = useState('');
   const { setLanguage } = useSettings();
 
-  const getLanguage = (iso) => isoToLanguageMap[iso] || 'Unknown Language';
+  const getLanguage = (iso: string) => isoToLanguageMap[iso] || 'Unknown Language';
 
   const filteredLanguages = (params.countries || [])
     .filter((iso) => getLanguage(iso).toLowerCase().includes(searchText.toLowerCase()))
@@ -79,7 +79,7 @@ function ModalScreen() {
     .sort((a, b) => a.language.localeCompare(b.language))
     .map((c) => c.iso);
 
-  const handleLanguagePress = (lang) => {
+  const handleLanguagePress = (lang: string) => {
     const langCode = countryCodeToLangMap[lang.toUpperCase()];
     if (langCode) {
       setLanguage(langCode);
@@ -87,7 +87,7 @@ function ModalScreen() {
     }
   };
 
-  const renderLanguageIcon = (lang) => (
+  const renderLanguageIcon = (lang: string) => (
     <FlagIcon width={32} height={32} country={lang.toUpperCase()} />
   );
 

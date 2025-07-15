@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
-import type { WireGuardStatus } from 'react-native-wireguard-vpn';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -16,13 +14,6 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { activateVpn } from 'helper/apiClient';
-import {
-  initializeVpn,
-  connectVpn,
-  disconnectVpn,
-  getVpnStatus,
-  parseWireGuardConfig,
-} from 'helper/wireguard';
 
 export function convertDataUsage(data) {
   const totalVolume = data.totalVolume; // in bytes
@@ -66,7 +57,6 @@ function ModalScreen() {
   const { params } = useRoute();
   const navigation = useNavigation();
   const { vpn, updateVpn } = useVpn();
-  const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
 
   const activateVPN = async () => {
     const result = await activateVpn({
@@ -181,30 +171,6 @@ function ModalScreen() {
       setRemainingTime('Not activated');
     }
   }, [vpn, params.payment_request]);
-
-  const handleConnect = async () => {
-    const configLines = vpn?.find((v) => v.payment_request === params.payment_request)?.order
-      ?.WireguardConfig;
-    if (!configLines) {
-      Alert.alert('Configuration missing');
-      return;
-    }
-    await initializeVpn();
-    await connectVpn(parseWireGuardConfig(configLines));
-    const status = await getVpnStatus();
-    setVpnStatus(status);
-  };
-
-  const handleDisconnect = async () => {
-    await disconnectVpn();
-    const status = await getVpnStatus();
-    setVpnStatus(status);
-  };
-
-  const handleStatus = async () => {
-    const status = await getVpnStatus();
-    setVpnStatus(status);
-  };
 
   return (
     <Modal

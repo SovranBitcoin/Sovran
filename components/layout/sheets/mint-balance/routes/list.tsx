@@ -4,7 +4,7 @@ import { ScrollView, useSheetRef, useSheetPayload } from 'react-native-actions-s
 import { useDispatch, useSelector } from 'react-redux';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { Text } from 'components/common/Text';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
@@ -24,7 +24,7 @@ import { View } from 'components/common/View';
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
   balance: { amount: number; unit: string };
-  theme: string;
+  theme: Theme;
   onPress: () => void;
   isLoading: boolean;
   globalLoading: boolean;
@@ -49,7 +49,7 @@ const MintItem: React.FC<MintItemProps> = ({
         {mint.iconUrl ? (
           <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
         ) : (
-          <Image style={styles.mintIcon} />
+          <View style={styles.mintIcon} />
         )}
         <View style={styles.mintDetails}>
           <Text style={styles.mintName}>{mint.name}</Text>
@@ -243,7 +243,7 @@ const ListRoute = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     sectionHeader: {
       color: greys(theme)[0],

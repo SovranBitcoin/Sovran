@@ -6,7 +6,7 @@ import { AnimatedQRCode } from 'components/common/QRCode';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { GradientSkeleton } from '../common/GradientSkeleton';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -199,7 +199,7 @@ interface TabButtonProps {
   isActive: boolean;
   onPress: () => void;
   onLayout: (event: any) => void;
-  theme: any;
+  theme: Theme;
   isFirst: boolean;
   animatedStyle: any;
 }

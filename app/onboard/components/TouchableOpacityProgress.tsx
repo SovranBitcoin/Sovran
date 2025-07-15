@@ -1,12 +1,27 @@
 import React from 'react';
 import { View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { shades } from 'helper/colors';
+import { shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { createStyles } from '../helper';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
+
+interface TouchableOpacityProgressProps {
+  error: boolean;
+  handleProfileAnimation: () => void;
+  isActive: boolean;
+  isComplete: boolean;
+  progress: number;
+  renderProgressCircle: (progress: number, size: number, theme: Theme) => React.ReactNode;
+  setError: (error: boolean) => void;
+  setMessage: (message: string) => void;
+  setSteps: (steps: any[]) => void;
+  step: any;
+  steps: any[];
+  ensureCompleteStep: (steps: any[], newStepsOrUpdater: any[]) => any[];
+}
 
 export function TouchableOpacityProgress({
   error,
@@ -21,7 +36,7 @@ export function TouchableOpacityProgress({
   step,
   steps,
   ensureCompleteStep,
-}) {
+}: TouchableOpacityProgressProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 

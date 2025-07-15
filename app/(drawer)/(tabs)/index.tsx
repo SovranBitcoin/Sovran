@@ -16,12 +16,7 @@ import {
 import { useTransactionsData } from 'hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import {
-  memoizedGetBackgroundImage,
-  memoizedGetSettings,
-  memoizedGetTheme,
-  termsAccepted,
-} from 'helper/redux/settings';
+import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
 import { store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
@@ -138,7 +133,7 @@ function TabOneScreen() {
   const onRefresh = useCallback(async () => {}, []);
 
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const styles = createStyles();
 
   const { transactions } = useCashu();
   const txData = useTransactionsData({
@@ -160,8 +155,6 @@ function TabOneScreen() {
       ),
     });
   }, [navigation, account, accounts]);
-
-  const image = useSelector(memoizedGetBackgroundImage);
 
   useDeeplink();
 
@@ -235,7 +228,7 @@ function TabOneScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = () =>
   StyleSheet.create({
     scrollView: {
       marginTop: 0,

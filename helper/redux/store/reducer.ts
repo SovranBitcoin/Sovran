@@ -7,6 +7,13 @@ import { pricelistReducer } from '../pricelist/reducer';
 import { vpnReducer } from '../lnvpn/reducer';
 import { esimReducer } from '../esim/reducer';
 import { nostrReducer } from '../nostr/reducer';
+import { SettingsAction } from '../settings';
+import { BitrefillAction } from '../bitrefill';
+import { CashuAction } from '../cashu';
+import { VpnAction } from '../lnvpn';
+import { EsimAction } from '../esim';
+import { NostrAction } from '../nostr';
+import { PricelistAction } from '../pricelist';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
@@ -25,16 +32,25 @@ const appReducer = combineReducers({
 // Define RootState from the appReducer
 export type RootState = ReturnType<typeof appReducer>;
 
+type Action =
+  | SettingsAction
+  | CashuAction
+  | BitrefillAction
+  | VpnAction
+  | EsimAction
+  | NostrAction
+  | PricelistAction;
+
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<
   Promise<ReturnType>,
   RootState,
   unknown,
-  AnyAction
+  Action
 >;
 
 // Root reducer with reset functionality and proper typing
-const rootReducer = (state: RootState | undefined, action: AnyAction): RootState => {
+const rootReducer = (state: RootState | undefined, action: Action): RootState => {
   // If the reset action is fired, return undefined state
   // This will cause each reducer to return their initial state
   if (action.type === RESET_APP) {

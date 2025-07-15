@@ -2,7 +2,7 @@ import React from 'react';
 import { SafeAreaView, StyleSheet, ViewStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 
 interface CustomSafeAreaViewProps {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ const CustomSafeAreaView: React.FC<CustomSafeAreaViewProps> = ({ children, style
   return <SafeAreaView style={[styles.container, style]}>{children}</SafeAreaView>;
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

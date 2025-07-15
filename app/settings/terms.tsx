@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import { StyleSheet, Text, View, ScrollView } from 'react-native';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -138,7 +138,7 @@ Using ecash involves significant risks including legal, market, liquidity, count
 
 These Terms represent the entire agreement between you and Sovran.`;
 
-const createStyles = (theme: string) => {
+const createStyles = (theme: Theme) => {
   return StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[900],
@@ -201,19 +201,12 @@ export default function TermsConditionsScreen({ onClose }: TermsConditionsScreen
       <ScrollView>
         <Text style={styles.titleText}>Terms</Text>
 
-        {/* <View style={styles.scrollContainer}> */}
-        {/* <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      > */}
         <Text style={styles.termsText}>{terms}</Text>
-        {/* </ScrollView> */}
-        {/* </View> */}
         <View
           style={{
             marginTop: 64,
           }}>
-          <Button text="Next" onPress={onClose} disabled={!isChecked} />
+          <Button variant="primary" text="Next" onPress={onClose} disabled={!isChecked} />
 
           <TouchableOpacity style={styles.checkboxContainer} onPress={toggleCheckbox}>
             <Checkbox

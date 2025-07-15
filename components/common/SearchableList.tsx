@@ -2,7 +2,7 @@ import React, { useCallback, ReactNode } from 'react';
 import { Pressable, ViewStyle, ScrollView } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
 
 type ItemId = string | number;
@@ -22,7 +22,7 @@ interface SearchableListProps {
   getLabel: (item: DataItem) => string;
   onItemPress: (item: DataItem) => void;
   searchPlaceholder: string;
-  theme: string;
+  theme: Theme;
   itemStyle?: ViewStyle;
 }
 

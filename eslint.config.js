@@ -10,7 +10,7 @@ module.exports = defineConfig([
       'unused-imports': require('eslint-plugin-unused-imports'),
     },
     rules: {
-      'no-empty': false,
+      'no-empty': 0,
       // Remove unused imports
       'unused-imports/no-unused-imports': 'error',
       // Remove unused variables but allow prefix `_` to ignore

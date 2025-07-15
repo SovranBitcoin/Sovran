@@ -8,7 +8,7 @@ import { Text } from 'components/common/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
 
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { memoizedGetBackgroundImage, memoizedGetTheme } from 'helper/redux/settings';
 import { NonGestureView } from './NonGestureView';
 
@@ -73,7 +73,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   const ecashAccounts = accounts.filter((acc) => acc.type !== 'onchain');
 
   // Function to render currency icon based on unit
-  const renderCurrencyIcon = (): JSX.Element | null => {
+  const renderCurrencyIcon = () => {
     switch (account.unit) {
       case 'sat':
         return <BitcoinMaskIcon />;
@@ -89,7 +89,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   };
 
   // Function to render account dot indicators
-  const renderDotIndicators = (accountsToRender: Account[], startIndex: number): JSX.Element[] => {
+  const renderDotIndicators = (accountsToRender: AccountData[], startIndex: number) => {
     return accountsToRender.map((_, index) => {
       const actualIndex = startIndex + index;
       const isActive =
@@ -163,7 +163,7 @@ const PLATFORM_BOTTOM_OFFSET = 24;
 
 // Using function to create styles to respect the existing pattern
 // but with proper typing for theme
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     nonGestureView: {
       // backgroundColor: greys(theme)[950], // Using a default theme value

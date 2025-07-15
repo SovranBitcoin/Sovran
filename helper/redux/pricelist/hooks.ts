@@ -8,7 +8,7 @@ export const usePricelist = () => {
   const pricelist = useSelector(memoizedPricelist);
 
   const setPricelistCallback = useCallback(
-    (pricelistData) => dispatch(setPricelist(pricelistData)),
+    (price: number) => dispatch(setPricelist(price)),
     [dispatch]
   );
 

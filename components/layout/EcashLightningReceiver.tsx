@@ -239,26 +239,6 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
             }}
           />
         )}
-
-        {/* {unit === 'sat' && (
-          <View
-            style={{
-              margin: 16,
-              marginTop: -8,
-            }}>
-            <Card
-              onPress={() => {
-                SheetManager.show('video-sheet', {
-                  payload: {
-                    video: 'https://npubx.cash/video.mp4',
-                  },
-                });
-              }}
-              message="Swipe down on the main homepage to redeem npubx.cash tokens, click here to watch a video demo."
-              variant="info"
-            />
-          </View>
-        )} */}
       </View>
     </Modal>
   );

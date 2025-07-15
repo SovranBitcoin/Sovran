@@ -1,7 +1,7 @@
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { StyleSheet, Dimensions } from 'react-native';
 
-const calculatePosition = (index) => {
+const calculatePosition = (index: number) => {
   const basePosition = 0;
   const maxOffset = 1000;
   const decayFactor = 0.1;
@@ -10,7 +10,7 @@ const calculatePosition = (index) => {
   );
 };
 
-const calculateSize = (index) => {
+const calculateSize = (index: number) => {
   const baseSize = 1;
   const minSize = 0.1;
   const decayFactor = 0.2;
@@ -18,7 +18,7 @@ const calculateSize = (index) => {
   return minSize + (baseSize - minSize) * reductionFactor;
 };
 
-const calculateOpacity = (index) => {
+const calculateOpacity = (index: number) => {
   const baseOpacity = 1;
   const minOpacity = 0.1;
   const decayFactor = 0.5;
@@ -28,7 +28,7 @@ const calculateOpacity = (index) => {
 
 const height = Dimensions.get('window').height;
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     addButtonContainer: {
       width: 80,

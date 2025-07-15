@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { EventKind } from '../../app/Profile';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
@@ -20,7 +20,7 @@ const reactionCache = new Cache({
   backend: AsyncStorage,
 });
 
-export const usePostReactions = ({ id }) => {
+export const usePostReactions = ({ id }: { id: string }) => {
   const [reactionCount, setReactionCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0); // New state for reposts
   const [zapCount, setZapCount] = useState(0); // New state for zaps
@@ -67,7 +67,7 @@ export const usePostReactions = ({ id }) => {
   );
 
   // Fetch reactions, reposts, and zaps for the given post ID if toggle is enabled
-  const { events: reactionEvents, isLoading } = useSubscribe({
+  const { events: reactionEvents } = useSubscribe({
     filters,
   });
 
@@ -88,7 +88,7 @@ export const usePostReactions = ({ id }) => {
           .forEach((event) => {
             const ln = event.tags.find((t) => t[0] === 'bolt11')?.[1];
             if (ln) {
-              newZapCount += getLightningAmount({ pr: ln });
+              newZapCount += getLightningAmount({ pr: ln }) || 0;
             }
           });
 
@@ -111,18 +111,27 @@ export const usePostReactions = ({ id }) => {
     reactionCount: reactionCount || 0,
     repostCount: repostCount || 0, // Return the repost count
     zapCount: zapCount || 0, // Return the zap count
-    loading: isLoading,
   };
 };
 
-const ActionItem = ({ Icon, count, theme, size }) => (
+const ActionItem = ({
+  Icon,
+  count,
+  theme,
+  size,
+}: {
+  Icon: any;
+  count: string;
+  theme: Theme;
+  size: number;
+}) => (
   <View
     style={{
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: 'transparent',
     }}>
-    <Icon width={size} height={size} color={greys(theme)[400]} />
+    <Icon size={size} color={greys(theme)[400]} />
     <Text
       size={size}
       weight="bold"
@@ -135,10 +144,20 @@ const ActionItem = ({ Icon, count, theme, size }) => (
   </View>
 );
 
-export function ActionItems({ reactionCount, repostCount, zapCount, size = 24 }) {
+export function ActionItems({
+  reactionCount,
+  repostCount,
+  zapCount,
+  size = 24,
+}: {
+  reactionCount: number;
+  repostCount: number;
+  zapCount: number;
+  size: number;
+}) {
   const theme = useSelector(memoizedGetTheme);
 
-  function formatNumber(num) {
+  function formatNumber(num: number) {
     if (num >= 1000000000) {
       return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'b';
     } else if (num >= 1000000) {

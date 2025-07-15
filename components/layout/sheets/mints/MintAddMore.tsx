@@ -239,8 +239,8 @@ function AddMintItem({
   if (mint.error) return null;
 
   const isDisabled = mint.loading;
-  const isHighlyRated = mint.averageRating >= 5 && mint.reviewCount >= 3;
-  const showReviews = isHighlyRated && mint.reviews.length > 0;
+  // const isHighlyRated = mint.averageRating >= 5 && mint.reviewCount >= 3;
+  // const showReviews = isHighlyRated && mint.reviews.length > 0;
 
   return (
     <View className="mb-3 overflow-hidden rounded-lg" blur style={[{ backgroundColor: g[800] }]}>
@@ -302,7 +302,12 @@ function AddMintItem({
   );
 }
 
-export function MintAddMore({ onClose, payload }) {
+interface MintAddMoreProps {
+  onClose: (data: { mints: string[] }) => void;
+  payload: { currencies: string[] };
+}
+
+export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
   const theme = useSelector(memoizedGetTheme);
   const g = greys(theme);
   const router = useSheetRouter('mint');
@@ -322,7 +327,11 @@ export function MintAddMore({ onClose, payload }) {
   const handleToggleMint = (id: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };

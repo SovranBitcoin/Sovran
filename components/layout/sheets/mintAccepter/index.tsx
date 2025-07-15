@@ -23,5 +23,7 @@ function SheetWithRouter() {
   );
 }
 
-export default ({ context }: { context: 'global' | 'modal' }) =>
-  registerSheet(sheetName, SheetWithRouter, context);
+export default ({ context }: { context?: 'global' }) =>
+  context
+    ? registerSheet(sheetName, SheetWithRouter, context)
+    : registerSheet(sheetName, SheetWithRouter);

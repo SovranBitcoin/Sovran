@@ -1,13 +1,22 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ColorValue } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
+import { Esim } from 'helper/redux/esim';
 
-const EsimComponent = ({ esim, theme, isReceived }) => {
+const EsimComponent = ({
+  esim,
+  theme,
+  isReceived,
+}: {
+  esim: Esim;
+  theme: Theme;
+  isReceived: boolean;
+}) => {
   const styles = createStyles(theme);
-  const gradientColors = isReceived
+  const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
     ? [greys(theme)[500], greys(theme)[500]]
     : [shades[200], shades[300]];
   const arrowStyle = isReceived ? [styles.arrow, styles.receiveArrow] : styles.arrow;
@@ -23,14 +32,14 @@ const EsimComponent = ({ esim, theme, isReceived }) => {
         </View>
         <Text style={styles.transactionText}>{esim.package?.name.replace('Days', ' days')}</Text>
         <Text style={styles.timestamp}>
-          {convertTime(new Date(esim.order.packageList[0].createTime))}
+          {esim.order && convertTime(new Date(esim.order.packageList[0].createTime))}
         </Text>
       </LinearGradient>
     </View>
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,

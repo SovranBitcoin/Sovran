@@ -45,8 +45,6 @@ const BlurredCircleButton: React.FC<BlurredCircleButtonProps> = ({
   intensity = 75,
   tint = 'dark',
 }) => {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <View blur blurIntensity={intensity} blurTint={tint} style={[styles.blurContainer, style]}>
       <TouchableOpacity className="m-auto items-center rounded-lg " onPress={onPress}>

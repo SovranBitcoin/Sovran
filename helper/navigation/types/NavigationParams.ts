@@ -1,4 +1,26 @@
 export type NavigationParams = {
+  currency: {
+    amount: number;
+    unit: string;
+    to: string;
+    paymentRequest: string;
+    profile: {
+      pubkey: string;
+      npub: string;
+      picture: string;
+      image: string;
+    };
+    lud16: string;
+    allowedUnits: string[];
+    mints?: string;
+  };
+
+  esim: {
+    request: string;
+  };
+  ecashReceiveConfirmation: {
+    token: string;
+  };
   lightningSendConfirmation: {
     pr: string;
     unit: string;
@@ -12,6 +34,9 @@ export type NavigationParams = {
     amount: number;
     token: string;
     paymentRequest?: string;
+  };
+  userMessages: {
+    pubkey: string;
   };
   lightningReceiveConfirmation: {
     request: string;
@@ -36,7 +61,7 @@ export type NavigationParams = {
   vpnShare: {
     vpnCode: string;
     location: string;
-    config: string;
+    config: string[];
     hash: string;
   };
   wallets: {
@@ -58,6 +83,21 @@ export type NavigationParams = {
     esimCode: string;
     esimLink: string;
     location: string;
+  };
+  languageSettings: {
+    countries: string[];
+  };
+  esimCheckout: {
+    request: string;
+    type: string;
+    volume: number;
+    duration: number;
+    speed: string;
+    location: string;
+    iccid: string;
+    topup: boolean;
+    topupAmount: number;
+    price: number;
   };
   esimCountrySelection: {
     countries: string[];

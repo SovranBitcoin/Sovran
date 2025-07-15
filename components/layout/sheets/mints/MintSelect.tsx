@@ -9,7 +9,7 @@ import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
 import Image from 'components/common/Image';
 import Wrapper from '../wrapper';
@@ -413,7 +413,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     sectionHeader: {
       color: greys(theme)[0],

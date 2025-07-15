@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, greys, reds, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
@@ -31,7 +31,7 @@ const RecoveryScreen: React.FC<{}> = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { type = 'recover', mnemonic = null } = useTypedRoute() || {};
+  const { type = 'recover', mnemonic = null } = useTypedRoute();
   const inputRef = useRef<TextInput>(null);
 
   // State for managing word input
@@ -355,6 +355,7 @@ const RecoveryScreen: React.FC<{}> = () => {
             ? []
             : [
                 {
+                  variant: 'secondary',
                   text: "I can't remember my seed phrase",
                   onPress: () => {},
                 },
@@ -374,9 +375,9 @@ const RecoveryScreen: React.FC<{}> = () => {
 };
 
 // Utility function to blend colors
-const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
+const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075) => {
   // Parse hex colors to RGB
-  const parseHex = (hex) => {
+  const parseHex = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
@@ -384,7 +385,7 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   };
 
   // Convert RGB back to hex
-  const rgbToHex = (r, g, b) => {
+  const rgbToHex = (r: number, g: number, b: number) => {
     return (
       '#' +
       Math.round(r).toString(16).padStart(2, '0') +
@@ -406,7 +407,7 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   return rgbToHex(r, g, b);
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,

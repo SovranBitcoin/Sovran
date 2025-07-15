@@ -3,7 +3,7 @@ import { Dimensions, StyleSheet } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/common/View';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -22,15 +22,6 @@ interface WalletHeaderProps {
 
 export function Background() {
   const theme = useSelector(memoizedGetTheme);
-
-  const defaultColors: readonly [string, string, ...string[]] = [
-    greys(theme)[950],
-    opacity(greys(theme)[950], 0.9),
-    opacity(greys(theme)[950], 0.85),
-    opacity(greys(theme)[950], 0.755),
-    opacity(greys(theme)[950], 0.33),
-    opacity(greys(theme)[950], 0),
-  ] as const;
 
   return (
     <LinearGradient
@@ -74,7 +65,7 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       position: 'absolute',

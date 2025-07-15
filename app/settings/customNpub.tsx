@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dimensions, View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { greys, shades, white } from 'helper/colors';
+import { greys, shades, Theme, white } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
@@ -11,7 +11,7 @@ import { Card } from 'components/common/Card';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: 'transparent',
@@ -151,8 +151,8 @@ const NpubSelector = ({
   const { showActionSheetWithOptions } = useActionSheet();
 
   useEffect(() => {
-    if (currentProfile?.name) {
-      const baseName = currentProfile.name.replace(' ', '');
+    if (currentProfile?.profile?.name) {
+      const baseName = currentProfile.profile.name.replace(' ', '');
       const variants = [
         baseName,
         `${baseName.replace(' ', '_')}`,
@@ -178,7 +178,7 @@ const NpubSelector = ({
         setNameAvailability(results);
       });
     }
-  }, [currentProfile?.name, selectedDomain]);
+  }, [currentProfile?.profile?.name, selectedDomain]);
 
   useEffect(() => {
     const names = ['Satoshi', 'Laura', 'Nakamoto', 'Andreas', 'Hal', 'Finney', 'Nick', 'Calle'];
@@ -248,7 +248,7 @@ const NpubSelector = ({
       },
       (buttonIndex) => {
         if (buttonIndex !== cancelButtonIndex) {
-          setSelectedDomain(options[buttonIndex]);
+          setSelectedDomain(options[buttonIndex || 0]);
         }
       }
     );
@@ -293,7 +293,7 @@ const NpubSelector = ({
               <Text style={styles.nameAvailabilityText}>{item.name}</Text>
               {selectedName === item.name && (
                 <View style={styles.checkIconContainer}>
-                  <CheckIcon color={greys(theme)[0]} style={{}} />
+                  <CheckIcon color={greys(theme)[0]} />
                 </View>
               )}
             </TouchableOpacity>

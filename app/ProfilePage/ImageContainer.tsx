@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
-export function ImageContainer({ url }) {
+export function ImageContainer({ url }: { url: string }) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -20,7 +20,7 @@ export function ImageContainer({ url }) {
         borderWidth: 0.5,
       }}
       source={{ uri: url }}
-      resizeMode="contain"
+      // resizeMode="contain"
     />
   );
 }

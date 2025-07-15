@@ -1,7 +1,6 @@
 import { shades } from 'helper/colors';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
-import { SheetManager } from 'react-native-actions-sheet';
 import { Wifi, CreditCard as CardIcon } from 'react-native-feather';
 
 // Enum for card types
@@ -28,14 +27,7 @@ export const CreditCardComponent = ({
 }) => {
   const flipAnimation = useState(new Animated.Value(0))[0];
 
-  const handleFlip = () => {
-    SheetManager.show('credit-card-sheet', {
-      // Handle data returned when sheet is closed
-      onClose() {
-        // Process returned data here
-      },
-    });
-  };
+  const handleFlip = () => {};
 
   // Interpolate flip animation
   const frontAnimatedStyle = {
@@ -159,7 +151,6 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     marginVertical: 20,
-    perspective: 1000,
   },
   card: {
     width: '100%',

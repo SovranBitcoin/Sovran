@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, ReactNode, useMemo } from 'react';
-import { Animated, useWindowDimensions, StyleProp, ViewStyle } from 'react-native';
+import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { greys, black, shades, reds } from 'helper/colors';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
@@ -20,7 +20,6 @@ export interface ButtonBaseProps {
   icon?: ReactNode;
   style?: StyleProp<ViewStyle>;
   noPadding?: boolean;
-  renderBackground?: (colors: string[], width: number) => ReactNode;
 }
 
 export const ButtonBase = ({
@@ -32,7 +31,6 @@ export const ButtonBase = ({
   icon,
   style,
   noPadding = false,
-  renderBackground,
   ...props
 }: ButtonBaseProps): React.ReactNode => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -50,13 +48,6 @@ export const ButtonBase = ({
     }),
     [theme]
   );
-
-  const { width } = useWindowDimensions();
-  const [colors, setColors] = useState<string[]>(colorsMap[variant]);
-
-  useEffect(() => {
-    setColors(colorsMap[variant]);
-  }, [variant, theme, colorsMap]);
 
   useEffect(() => {
     return () => {

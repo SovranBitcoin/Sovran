@@ -1,20 +1,27 @@
 import { SET_PRICELIST } from './actionTypes';
+import { PricelistAction } from './actions';
+import { Reducer } from 'redux';
+import { typedUpdate } from 'helper/typedUpdate';
 
-const initialState = {
+export interface PricelistState {
+  usd: {
+    btc: number;
+  };
+}
+
+const initialState: PricelistState = {
   usd: {
     btc: 113377,
   },
 };
 
-export const pricelistReducer = (state = initialState, action) => {
+export const pricelistReducer: Reducer<PricelistState, PricelistAction> = (
+  state = initialState,
+  action
+): PricelistState => {
   switch (action.type) {
     case SET_PRICELIST: {
-      return {
-        ...state,
-        usd: {
-          btc: action.payload,
-        },
-      };
+      return typedUpdate('usd.btc' as const, () => action.payload, state);
     }
     default: {
       return state;

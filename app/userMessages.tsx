@@ -1,4 +1,3 @@
-import React from 'react';
 import Message from './MessagePage';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 

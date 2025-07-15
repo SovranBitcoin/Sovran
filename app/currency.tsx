@@ -13,7 +13,6 @@ import {
   npubToPublicKey,
   pubKeyTo02,
 } from 'helper/cashuClient';
-import { useRoute } from '@react-navigation/native';
 import CustomKeyboard from 'components/layout/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
@@ -25,7 +24,7 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
-import { useTypedNavigation } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -46,14 +45,14 @@ function ModalScreen() {
   const styles = createStyles();
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
-  const { params } = useRoute();
+  const params = useTypedRoute<'currency'>();
   const navigation = useTypedNavigation();
 
   const [amount, setAmount] = useState(params?.amount || 0);
   const [loading, setLoading] = useState(false);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
-  const [isValidMint, setIsValidMint] = useState(false);
+  // const [isValidMint, setIsValidMint] = useState(false);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const balance = useSelector(memoizedGetBalance(unit, selectedMint));
@@ -65,14 +64,14 @@ function ModalScreen() {
 
   const urDecoder = new URDecoder();
 
-  const handleMintSelected = async (mint, balance) => {
+  const handleMintSelected = async (mint: { id: string; unit: string }) => {
     dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
     const newUnit = mint.unit.toLowerCase();
     setUnit(newUnit);
     navigation.setParams({ ...params, unit: newUnit });
   };
 
-  const handleLightningReceive = async ({ memo }) => {
+  const handleLightningReceive = async ({ memo }: { memo: string }) => {
     Alert.alert(
       JSON.stringify({
         unit,
@@ -227,7 +226,7 @@ function ModalScreen() {
   useEffect(() => {
     if (params?.paymentRequest && params?.amount) {
       setIsValidAmount(true);
-      setIsValidMint(!!selectedMint);
+      // setIsValidMint(!!selectedMint);
       // handleNext();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

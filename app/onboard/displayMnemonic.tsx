@@ -52,7 +52,7 @@ const MnemonicDisplayScreen = () => {
     );
   };
 
-  const renderWordCell = (index) => (
+  const renderWordCell = (index: number) => (
     <View key={index} style={styles.wordCell}>
       <Text style={styles.wordNumber}>{`${index + 1}.`}</Text>
       <Text
@@ -111,13 +111,14 @@ const MnemonicDisplayScreen = () => {
       <BottomButtons
         buttons={[
           {
+            variant: 'secondary',
             text: 'What is a recovery phrase?',
             onPress: showInfoAlert,
           },
           {
+            variant: 'primary',
             text: "I've written it down",
             onPress: handleContinue,
-            variant: 'primary',
           },
         ]}
         theme={theme}
@@ -128,9 +129,9 @@ const MnemonicDisplayScreen = () => {
 };
 
 // Helper function for color blending
-const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
+const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075) => {
   // Parse hex colors to RGB
-  const parseHex = (hex) => {
+  const parseHex = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
@@ -138,7 +139,7 @@ const infuseColors = (baseColor, accentColor, intensity = 0.075) => {
   };
 
   // Convert RGB back to hex
-  const rgbToHex = (r, g, b) => {
+  const rgbToHex = (r: number, g: number, b: number) => {
     return (
       '#' +
       Math.round(r).toString(16).padStart(2, '0') +

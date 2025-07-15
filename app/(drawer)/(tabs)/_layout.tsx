@@ -1,7 +1,9 @@
 import React from 'react';
 import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import {
+  BottomTabNavigationOptions,
+  createBottomTabNavigator,
+} from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -10,7 +12,7 @@ import { useSelector } from 'react-redux';
 import { useClientOnlyValue } from 'hooks/useClientOnlyValue';
 import Icon, { SovranIcon, UserIcon } from 'assets/icons';
 import CachedImage from 'components/common/Image';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
@@ -18,11 +20,12 @@ import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
+import { useTypedNavigation } from 'helper/navigation';
 
 const Tab = createBottomTabNavigator();
 
 // Component for profile avatar
-const ProfileAvatar = ({ picture }) =>
+const ProfileAvatar = ({ picture }: { picture: string }) =>
   picture ? (
     <CachedImage source={{ uri: picture }} style={{ width: 48, height: 48, borderRadius: 1000 }} />
   ) : (
@@ -30,7 +33,17 @@ const ProfileAvatar = ({ picture }) =>
   );
 
 // Tab bar components
-const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
+const TabBarIcon = ({
+  title,
+  IconComponent,
+  focused,
+  theme,
+}: {
+  title: string;
+  IconComponent: React.ComponentType<{ color: string }>;
+  focused: boolean;
+  theme: Theme;
+}) => {
   if (title === 'Wallet') {
     return (
       <>
@@ -43,8 +56,8 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
             bottom: 33,
           }}>
           <BlurView
-            tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-            intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
+            tint={['light', 'beige'].includes(theme.id) ? 'light' : 'dark'}
+            intensity={['light', 'beige'].includes(theme.id) ? 7.5 : 75}
             experimentalBlurMethod="dimezisBlurView"
             style={[
               {
@@ -76,10 +89,10 @@ const TabBarIcon = ({ title, IconComponent, focused, theme }) => {
   return <IconComponent color={focused ? theme.shades[300] : opacity(greys(theme)[50], 0.25)} />;
 };
 
-const TabBarBackground = ({ theme }) => (
+const TabBarBackground = ({ theme }: { theme: Theme }) => (
   <BlurView
-    tint={['light', 'beige'].includes(theme) ? 'light' : 'dark'}
-    intensity={['light', 'beige'].includes(theme) ? 7.5 : 75}
+    tint={['light', 'beige'].includes(theme.id) ? 'light' : 'dark'}
+    intensity={['light', 'beige'].includes(theme.id) ? 7.5 : 75}
     style={[
       StyleSheet.absoluteFill,
       {
@@ -93,7 +106,7 @@ const TabBarBackground = ({ theme }) => (
 );
 
 // Styles creator function
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     tabBarStyle: {
       position: 'absolute',
@@ -131,7 +144,7 @@ const createStyles = (theme: string) =>
 // Main component
 const TabLayout = () => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);
   const styles = createStyles(theme);
@@ -158,7 +171,10 @@ const TabLayout = () => {
   );
 
   // Function to create tab screen options
-  const createTabScreenOptions = (title, IconComponent) => ({
+  const createTabScreenOptions = (
+    title: string,
+    IconComponent: React.ComponentType<{ color: string }>
+  ): BottomTabNavigationOptions => ({
     title,
     tabBarActiveTintColor: shades[300],
     tabBarInactiveTintColor: greys(theme)[300],
@@ -178,12 +194,11 @@ const TabLayout = () => {
                     paddingRight: 16,
                   },
                 ]}>
-                <SearchBar navigation={navigation} theme={theme} style={styles.searchBar} />
+                <SearchBar navigation={navigation} theme={theme} />
               </View>
             )
           : undefined,
     headerStyle: styles.headerStyle,
-    headerLargeTitle: true,
     tabBarIcon: ({ focused }) => (
       <TabBarIcon title={title} IconComponent={IconComponent} focused={focused} theme={theme} />
     ),
@@ -198,7 +213,7 @@ const TabLayout = () => {
         initialRouteName="index"
         screenOptions={{
           headerShadowVisible: false,
-          headerShown: useClientOnlyValue(false, true) && isNavigationVisible,
+          headerShown: Boolean(useClientOnlyValue(false, true) && isNavigationVisible),
           tabBarStyle: {
             ...styles.tabBarStyle,
             display: isNavigationVisible ? 'flex' : 'none',

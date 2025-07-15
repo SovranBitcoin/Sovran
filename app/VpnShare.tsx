@@ -74,21 +74,21 @@ function ModalScreen() {
             {
               title: 'Private Key',
               value: truncateMiddle(
-                config?.find((w) => w?.startsWith('PrivateKey'))?.split('=')?.[1],
+                config?.find((w) => w?.startsWith('PrivateKey'))?.split('=')?.[1] ?? '',
                 5
               ),
             },
             {
               title: 'Public Key',
               value: truncateMiddle(
-                config?.find((w) => w?.startsWith('PublicKey'))?.split('=')?.[1],
+                config?.find((w) => w?.startsWith('PublicKey'))?.split('=')?.[1] ?? '',
                 5
               ),
             },
             {
               title: 'Preshared Key',
               value: truncateMiddle(
-                config?.find((w) => w?.startsWith('PresharedKey'))?.split('=')?.[1],
+                config?.find((w) => w?.startsWith('PresharedKey'))?.split('=')?.[1] ?? '',
                 5
               ),
             },

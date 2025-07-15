@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Platform } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { Platform, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Device from 'expo-device';
 import lookup from 'country-code-lookup';
@@ -21,11 +21,12 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { useTypedRoute } from 'helper/navigation';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
-  const { params } = useRoute();
+  const params = useTypedRoute<'esimCheckout'>();
   const dispatch = useDispatch();
 
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ function ModalScreen() {
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
-      const version = parseFloat(Device.osVersion);
+      const version = parseFloat(Device.osVersion || '0');
       if (version < 17.4) {
         setIosWarning(
           'Update to your iOS version to 17.4 or above for a better onboarding experience.'
@@ -47,7 +48,7 @@ function ModalScreen() {
     }
   }, []);
 
-  const handleMintSelected = async (mint, balance) => {
+  const handleMintSelected = async (mint: { id: string; unit: string }) => {
     dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
     setUnit(mint.unit);
   };
@@ -67,7 +68,7 @@ function ModalScreen() {
     const meltQuote = meltQuoteRes.value;
 
     const amount = getLightningAmount({ pr: params.request });
-    const totalAmount = amount + meltQuote.fee_reserve;
+    const totalAmount = (amount || 0) + meltQuote.fee_reserve;
 
     if (balance < totalAmount) {
       showMessage(
@@ -87,6 +88,7 @@ function ModalScreen() {
   };
 
   const getSectionItems = () => {
+    const styles = createStyles(theme);
     const baseItems = [
       {
         title: 'Coverage',
@@ -126,41 +128,7 @@ function ModalScreen() {
     return baseItems;
   };
 
-  const styles = {
-    flagContainer: {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'transparent',
-    },
-    countryText: {
-      marginLeft: 4,
-      fontSize: 16,
-    },
-    sectionTitle: {
-      marginLeft: 24,
-      fontSize: 16,
-      fontFamily: 'OverpassBold',
-      marginBottom: 8,
-    },
-    cardContainer: {
-      margin: 16,
-    },
-    warningContainer: {
-      backgroundColor: opacity(shades[200], 0.33),
-      borderColor: shades[200],
-      margin: 16,
-      marginBottom: 8,
-      padding: 8,
-      borderRadius: 8,
-      borderWidth: 0.2,
-    },
-    warningText: {
-      color: shades[200],
-      marginTop: 8,
-      fontSize: 14,
-    },
-  };
+  const styles = createStyles(theme);
 
   return (
     <Modal
@@ -205,10 +173,47 @@ function ModalScreen() {
       </Text>
       <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} />
       <View style={styles.cardContainer}>
-        <Card variant="warning" message="Ensure your phone supports eSIMs." theme={theme} />
+        <Card variant="warning" message="Ensure your phone supports eSIMs." />
       </View>
     </Modal>
   );
 }
+
+const createStyles = () =>
+  StyleSheet.create({
+    flagContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+    },
+    countryText: {
+      marginLeft: 4,
+      fontSize: 16,
+    },
+    sectionTitle: {
+      marginLeft: 24,
+      fontSize: 16,
+      fontFamily: 'OverpassBold',
+      marginBottom: 8,
+    },
+    cardContainer: {
+      margin: 16,
+    },
+    warningContainer: {
+      backgroundColor: opacity(shades[200], 0.33),
+      borderColor: shades[200],
+      margin: 16,
+      marginBottom: 8,
+      padding: 8,
+      borderRadius: 8,
+      borderWidth: 0.2,
+    },
+    warningText: {
+      color: shades[200],
+      marginTop: 8,
+      fontSize: 14,
+    },
+  });
 
 export default withSheetProvider(ModalScreen);

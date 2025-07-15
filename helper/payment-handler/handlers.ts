@@ -158,9 +158,11 @@ function handlePaymentRequest({ data }: { data: string }): HandlerResult {
     params: {
       unit: decodedPaymentRequest.unit,
       amount:
-        decodedPaymentRequest.unit === 'sat'
-          ? decodedPaymentRequest.amount
-          : decodedPaymentRequest.amount / 100,
+        decodedPaymentRequest.amount === undefined
+          ? 0
+          : decodedPaymentRequest.unit === 'sat'
+            ? decodedPaymentRequest.amount
+            : decodedPaymentRequest.amount / 100,
       mints: decodedPaymentRequest.mints,
       allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
       paymentRequest: data,

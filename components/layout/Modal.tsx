@@ -24,7 +24,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 
 import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 
-registerAllSheets({ context: undefined });
+registerAllSheets({});
 
 const headerHeight = Constants.statusBarHeight ?? 0;
 
@@ -56,8 +56,7 @@ export default function Modal({
   padding = 40,
   backgroundColor,
   scrollEnabled = true,
-  ...props
-}: ModalProps): JSX.Element {
+}: ModalProps) {
   const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
 
@@ -90,7 +89,7 @@ export default function Modal({
     navigation.goBack();
   };
 
-  const renderHeaderButton = (): JSX.Element | null => {
+  const renderHeaderButton = () => {
     if (showBack) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">

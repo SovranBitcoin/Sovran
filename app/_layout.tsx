@@ -95,7 +95,7 @@ function useNostrDMs(currentProfile, addMessage, messages) {
 /**
  * Splash screen component
  */
-function MySplashScreen({ opacity }) {
+function MySplashScreen({ opacity }: { opacity: Animated.Value }) {
   return (
     <Animated.View
       style={{

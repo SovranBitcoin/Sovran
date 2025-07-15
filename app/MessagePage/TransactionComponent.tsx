@@ -1,14 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { formatCurrency } from 'helper/currency';
+import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
+import { TransactionData } from 'helper/redux/cashu';
 
-const TransactionComponent = ({ transaction, theme, isReceived }) => {
+const TransactionComponent = ({
+  transaction,
+  theme,
+  isReceived,
+}: {
+  transaction: TransactionData;
+  theme: Theme;
+  isReceived: boolean;
+}) => {
   const styles = createStyles(theme);
 
-  const gradientColors = isReceived
+  const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
     ? [greys(theme)[500], greys(theme)[500]]
     : [theme.shades[200], theme.shades[300]];
 
@@ -18,15 +27,16 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
     transaction.unit &&
     formatCurrency(
       {
-        currency: transaction.unit === 'sat' ? 'BTC' : transaction.unit.toUpperCase(),
+        currency:
+          transaction.unit === 'sat' ? 'BTC' : (transaction.unit.toUpperCase() as CurrencyCode),
         value: transaction.amount,
-        denomination: transaction.unit === 'sat' ? 'sats' : transaction.unit,
+        denomination: transaction.unit === 'sat' ? 'sats' : (transaction.unit as Denomination),
       },
       {
         locale: 'en-US',
         precision: transaction.unit === 'sat' ? 0 : 2,
         currencyDisplay: transaction.unit === 'sat' ? 'name' : 'symbol',
-        denomination: transaction.unit === 'sat' ? 'sats' : transaction.unit,
+        denomination: transaction.unit === 'sat' ? 'sats' : (transaction.unit as Denomination),
       }
     );
 
@@ -56,7 +66,7 @@ const TransactionComponent = ({ transaction, theme, isReceived }) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,

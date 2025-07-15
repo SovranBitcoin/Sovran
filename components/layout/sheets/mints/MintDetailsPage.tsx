@@ -1,7 +1,7 @@
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { greens, greys } from 'helper/colors';
+import { greens, greys, Theme } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
 import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
@@ -28,6 +28,8 @@ const MintDetailPage = () => {
   const { wallet, loading, error } = useWallet({
     mintUrl: params?.mintUrl,
     forceRefresh: true,
+    profile: null,
+    unit: null,
   });
 
   const handleCopy = async (text: string) => {
@@ -38,7 +40,7 @@ const MintDetailPage = () => {
     }
   };
 
-  const handleContactPress = (method, info) => {
+  const handleContactPress = (method: string, info: string) => {
     switch (method) {
       case 'email':
         Linking.openURL(`mailto:${info}`);
@@ -202,7 +204,7 @@ const MintDetailPage = () => {
         {/* Description Card */}
         {mintInfo.description && (
           <>
-            <Card theme={theme} variant="info" message={mintInfo.description} />
+            <Card variant="info" message={mintInfo.description} />
             <Spacer size={12} />
           </>
         )}
@@ -210,7 +212,7 @@ const MintDetailPage = () => {
         {/* Long Description */}
         {mintInfo.description_long && (
           <>
-            <Card theme={theme} variant="warning" message={mintInfo.description_long} />
+            <Card variant="warning" message={mintInfo.description_long} />
             <Spacer size={12} />
           </>
         )}
@@ -218,7 +220,7 @@ const MintDetailPage = () => {
         {/* Message of the Day */}
         {mintInfo.motd && (
           <>
-            <Card theme={theme} variant="warning" message={`Message: ${mintInfo.motd}`} />
+            <Card variant="warning" message={`Message: ${mintInfo.motd}`} />
             <Spacer size={12} />
           </>
         )}
@@ -226,7 +228,7 @@ const MintDetailPage = () => {
         {/* Contact Section */}
         {mintInfo.contact && mintInfo.contact.length > 0 && (
           <Section title="Contact">
-            {mintInfo.contact.map((contact, index) => (
+            {mintInfo.contact.map((contact: any, index: number) => (
               <RowButton
                 isFirst={index === 0}
                 key={index}
@@ -297,7 +299,7 @@ const MintDetailPage = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flex: 1,
@@ -311,7 +313,7 @@ const createStyles = (theme: string) =>
     loadingText: {
       marginTop: 16,
       fontSize: 16,
-      color: greys(theme)[2],
+      color: greys(theme)[200],
     },
     errorContainer: {
       flex: 1,
@@ -329,7 +331,7 @@ const createStyles = (theme: string) =>
     },
     errorSubtext: {
       fontSize: 14,
-      color: greys(theme)[2],
+      color: greys(theme)[200],
       textAlign: 'center',
     },
     headerContainer: {
@@ -374,14 +376,14 @@ const createStyles = (theme: string) =>
       marginHorizontal: 16,
       marginBottom: 16,
       padding: 16,
-      backgroundColor: greys(theme)[8],
+      backgroundColor: greys(theme)[800],
       borderRadius: 12,
       borderLeftWidth: 4,
       borderLeftColor: '#FFA726',
     },
     descriptionText: {
       fontSize: 14,
-      color: greys(theme)[1],
+      color: greys(theme)[100],
       lineHeight: 20,
     },
     actionButton: {

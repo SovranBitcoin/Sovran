@@ -78,6 +78,7 @@ interface BaseTransaction {
 interface BaseLightningTransaction extends BaseTransaction {
   type: 'lightning';
   request: string;
+  lud16?: string;
 }
 
 interface LightningSendTransaction extends BaseLightningTransaction {
@@ -458,7 +459,6 @@ export async function receiveLightning({
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
 
-  Alert.alert('a', JSON.stringify(unit, selectedMint));
   const walletRes = await getWallet({
     unit,
     mintUrl: selectedMint,
@@ -875,7 +875,7 @@ export function getUsedProofs(currentProofs, keepProofs) {
 }
 
 export function useWallet({ unit, mintUrl, profile, forceRefresh = false }) {
-  const [wallet, setWallet] = useState(null);
+  const [wallet, setWallet] = useState<CashuWallet>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

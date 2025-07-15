@@ -3,7 +3,7 @@ import { SharedValue, useDerivedValue } from 'react-native-reanimated';
 import { Canvas, Path, SkFont, Skia, Text } from '@shopify/react-native-skia';
 import { DonutPath } from './DonutPath';
 import { View } from 'components/common/View';
-import { greens, greys } from 'helper/colors';
+import { greens, greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -136,7 +136,7 @@ const DonutChart = ({
 
 export default DonutChart;
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

@@ -8,7 +8,7 @@ import { useCashu } from 'helper/redux/cashu';
 import { formatCurrency } from 'helper/currency';
 import Modal from 'components/layout/Modal';
 import { VerifiedIcon } from 'assets/icons';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import PagerView from 'react-native-pager-view';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import CachedImage from 'components/common/Image';
@@ -384,7 +384,7 @@ const ProfilePicture = ({ imageUri, isVerified, theme }) => {
     <View style={styles.profilePictureContainer}>
       {isVerified && (
         <View style={styles.verifiedIconContainer}>
-          <VerifiedIcon fill={greys(theme)[50]} />
+          <VerifiedIcon />
         </View>
       )}
       {imageUri ? (
@@ -414,7 +414,7 @@ const formatCustomDate = (date) => {
   }).format(date);
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[950],

@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ColorValue } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { Button } from 'components/common/Button';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { receiveEcash } from 'helper/cashuClient';
@@ -14,7 +14,7 @@ import opacity from 'hex-color-opacity';
 
 interface Props {
   token: string;
-  theme: string;
+  theme: Theme;
   isReceived: boolean;
 }
 
@@ -40,6 +40,11 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   };
 
   const handleRedeem = async () => {
+    if (!unit) {
+      showMessage('No unit set', {}, { emoji: '🚨' });
+      return;
+    }
+
     const res = await receiveEcash({ token, unit });
     if (res.isOk()) {
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' });
@@ -48,7 +53,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
     }
   };
 
-  const gradientColors = isReceived
+  const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
     ? [greys(theme)[500], greys(theme)[500]]
     : [shades[200], shades[300]];
 
@@ -70,13 +75,15 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
 
           <View style={styles.footer}>
             <View>
-              <AmountFormatter
-                amount={amount}
-                unit={unit}
-                size={24}
-                weight="heavy"
-                color={greys(theme)[0]}
-              />
+              {unit && (
+                <AmountFormatter
+                  amount={amount}
+                  unit={unit}
+                  size={24}
+                  weight="heavy"
+                  color={greys(theme)[0]}
+                />
+              )}
               {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
             </View>
           </View>
@@ -91,7 +98,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     wrapper: {
       marginVertical: 8,

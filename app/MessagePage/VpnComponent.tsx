@@ -3,12 +3,21 @@ import { View, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import lookup from 'country-code-lookup';
+import { Vpn } from 'helper/redux/lnvpn';
 
-const VpnComponent = ({ esim, theme, isReceived }) => {
+const VpnComponent = ({
+  vpn,
+  theme,
+  isReceived,
+}: {
+  vpn: Vpn;
+  theme: Theme;
+  isReceived: boolean;
+}) => {
   const styles = createStyles(theme, isReceived);
-
+  const country = lookup.byIso(vpn.location)?.country;
   return (
     <View style={styles.transactionWrapper}>
       <View style={styles.arrow}></View>
@@ -19,15 +28,15 @@ const VpnComponent = ({ esim, theme, isReceived }) => {
           <Text style={styles.labelText}>You received a VPN</Text>
         </View>
         <Text style={styles.transactionText}>
-          {lookup.byIso(esim.location).country + ', ' + esim.duration + ' plan'}
+          {country && country + ', ' + vpn.duration + ' plan'}
         </Text>
-        <Text style={styles.timestamp}>{convertTime(new Date(esim?.created_at))}</Text>
+        <Text style={styles.timestamp}>{convertTime(new Date(vpn?.created_at))}</Text>
       </LinearGradient>
     </View>
   );
 };
 
-const createStyles = (theme, isReceived) =>
+const createStyles = (theme: Theme, isReceived: boolean) =>
   StyleSheet.create({
     transactionWrapper: {
       marginVertical: 8,

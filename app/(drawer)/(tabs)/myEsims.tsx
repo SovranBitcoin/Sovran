@@ -5,22 +5,23 @@ import { useSelector } from 'react-redux';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import CircularProgress from 'components/common/CircleProgress';
-import { useEsims } from 'helper/redux/esim';
+import { Esim, useEsims } from 'helper/redux/esim';
 import { useCashu } from 'helper/redux/cashu';
 import { convertDataUsage } from '../../../app/esim';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Tabs } from 'components/common/Tabs';
-import { fetchProducts } from 'helper/apiClient';
+import { fetchProducts, ProductPackage } from 'helper/apiClient';
 import { useTypedNavigation } from 'helper/navigation';
 
 // Separate component for eSIM item
-const EsimItem = ({ esim, navigation }) => {
+const EsimItem = ({ esim }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
+  const navigation = useTypedNavigation();
 
   const handlePress = () => {
     const { package: p, order: o } = esim;
@@ -89,7 +90,7 @@ const EsimItem = ({ esim, navigation }) => {
 };
 
 // Section component for better organization
-const EsimSection = ({ title, esims, navigation }) => {
+const EsimSection = ({ title, esims }: { title: string; esims: Esim[] }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -97,7 +98,7 @@ const EsimSection = ({ title, esims, navigation }) => {
     <>
       {/* <Text style={styles.sectionTitle}>{title}</Text> */}
       {esims.length > 0 ? (
-        esims.map((esim) => <EsimItem esim={esim} navigation={navigation} key={esim.request} />)
+        esims.map((esim) => <EsimItem esim={esim} key={esim.request} />)
       ) : (
         <Text style={styles.noItemsText}>No {title.toLowerCase()}</Text>
       )}
@@ -113,7 +114,7 @@ function EsimsScreen() {
   const { transactions: cashuTransactions } = useCashu();
   const { esims } = useEsims();
   const [fetchingPackages, setFetchingPackages] = useState(false);
-  const [packageList, setPackageList] = useState(null);
+  const [packageList, setPackageList] = useState<ProductPackage[]>();
   const [selectedTab, setSelectedTab] = useState('New'); // State for selected tab
 
   // Filter eSIMs by payment status
@@ -166,7 +167,7 @@ function EsimsScreen() {
   };
 
   // Navigation helper
-  const navigateToPackageSelection = (packageList) => {
+  const navigateToPackageSelection = (packageList: ProductPackage[]) => {
     const countries = [...new Set(packageList.map((r) => r.slug.split('_')[0]))];
 
     navigation.navigate('esimsDataPlan', {
@@ -177,22 +178,22 @@ function EsimsScreen() {
     });
   };
 
-  const amounts = [
+  const amounts: string[] = [
     categorizedEsims.new.length
       ? categorizedEsims.new.length > 99
         ? '99+'
-        : categorizedEsims.new.length
-      : 0,
+        : String(categorizedEsims.new.length)
+      : '0',
     categorizedEsims.active.length
       ? categorizedEsims.active.length > 99
         ? '99+'
-        : categorizedEsims.active.length
-      : 0,
+        : String(categorizedEsims.active.length)
+      : '0',
     categorizedEsims.expired.length
       ? categorizedEsims.expired.length > 99
         ? '99+'
-        : categorizedEsims.expired.length
-      : 0,
+        : String(categorizedEsims.expired.length)
+      : '0',
   ];
 
   return (
@@ -223,22 +224,12 @@ function EsimsScreen() {
         />
       </View>
       <ScrollView style={styles.scrollView}>
-        {selectedTab === 'New' && (
-          <EsimSection title="New eSIMs" esims={categorizedEsims.new} navigation={navigation} />
-        )}
+        {selectedTab === 'New' && <EsimSection title="New eSIMs" esims={categorizedEsims.new} />}
         {selectedTab === 'Active' && (
-          <EsimSection
-            title="Installed eSIMs"
-            esims={categorizedEsims.active}
-            navigation={navigation}
-          />
+          <EsimSection title="Installed eSIMs" esims={categorizedEsims.active} />
         )}
         {selectedTab === 'Expired' && (
-          <EsimSection
-            title="Expired eSIMs"
-            esims={categorizedEsims.expired}
-            navigation={navigation}
-          />
+          <EsimSection title="Expired eSIMs" esims={categorizedEsims.expired} />
         )}
       </ScrollView>
       <ButtonHandler
@@ -257,7 +248,7 @@ function EsimsScreen() {
 }
 
 // Helper function to categorize eSIMs
-function categorizeEsims(paidEsims, currentDate) {
+function categorizeEsims(paidEsims: Esim[], currentDate: Date) {
   return {
     new: paidEsims.filter((esim) => !esim.order || !esim.order.activateTime),
     active: paidEsims.filter(
@@ -275,7 +266,7 @@ function categorizeEsims(paidEsims, currentDate) {
 }
 
 // Styles
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     modalContent: {
       flex: 1,

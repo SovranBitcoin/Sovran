@@ -8,10 +8,21 @@ import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
 import { greys } from 'helper/colors';
 
+type ChangelogItem = {
+  title: string;
+  description: string;
+};
+
+interface ChangelogSectionProps {
+  title: string;
+  items: ChangelogItem[];
+  emoji: string;
+}
+
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
 
-  const ChangelogSection = ({ title, items, emoji }) => (
+  const ChangelogSection = ({ title, items, emoji }: ChangelogSectionProps) => (
     <View style={{ marginBottom: 16 }}>
       <Text
         style={{
@@ -84,7 +95,6 @@ export default function ModalScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Card
           message="Sovran is currently in Beta, please use with caution and don't put on more sats than you are willing to lose. If you discover any bugs please report them so we can improve it!"
-          theme={theme}
           variant="info"
         />
 

@@ -215,7 +215,7 @@ const ChainLoadingAnimation = () => {
                 current: index + 1,
                 max: mintsToProcess.length,
               };
-            } catch (error) {
+            } catch {
               // Silently handle mint processing errors
             }
           }
@@ -310,7 +310,7 @@ const ChainLoadingAnimation = () => {
           );
           return { type: 'complete' };
       }
-    } catch (err) {
+    } catch {
       setSteps(
         ensureCompleteStep(
           steps,
@@ -669,7 +669,7 @@ const ChainLoadingAnimation = () => {
   }, [steps[activeStep]]);
 
   // Get progress for a specific mint (global progress)
-  const getMintProgress = (mintUrl, unit) => {
+  const getMintProgress = (mintUrl: string) => {
     // We no longer need the unit parameter for global progress
     return progressObject[mintUrl]?.progress || 0;
   };

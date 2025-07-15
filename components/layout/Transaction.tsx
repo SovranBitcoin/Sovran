@@ -15,11 +15,6 @@ import { TransactionData } from 'helper/redux/cashu';
 import { View } from 'components/common/View';
 import React from 'react';
 
-interface ConnectionData {
-  id: string;
-  [key: string]: any;
-}
-
 export function npubToPubkey(npub: string): string {
   if (!npub) return '';
 
@@ -94,7 +89,7 @@ const useTransaction = (tx: TransactionData) => {
   };
 };
 
-export const Transaction = React.memo(({ tx }) => {
+export const Transaction = React.memo(({ tx }: { tx: TransactionData }) => {
   const theme = useSelector(memoizedGetTheme);
 
   const { isSend, isReceive, showLoading, fiatAmount, handlePress } = useTransaction(tx);

@@ -4,12 +4,12 @@ import { View, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { Text } from 'components/common/Text';
 
 const Calculator = () => {
-  const [display, setDisplay] = useState('0');
+  const [display, setDisplay] = useState<string>('0');
   const [calculation, setCalculation] = useState('');
   const [operatorPressed, setOperatorPressed] = useState(false);
   const [equalsPressed, setEqualsPressed] = useState(false);
 
-  const handleNumberPress = (num) => {
+  const handleNumberPress = (num: string) => {
     if (display === '0' || operatorPressed || equalsPressed) {
       setDisplay(num);
       setOperatorPressed(false);
@@ -19,7 +19,7 @@ const Calculator = () => {
     }
   };
 
-  const handleOperatorPress = (operator) => {
+  const handleOperatorPress = (operator: string) => {
     setCalculation(`${display}${operator}`);
     setOperatorPressed(true);
     setEqualsPressed(false);

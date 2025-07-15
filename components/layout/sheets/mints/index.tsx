@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import Icon from 'assets/icons';
@@ -163,7 +163,7 @@ const opacity = (color: string, alpha: number) => {
 };
 
 // Base styles that can be composed together
-const baseStyles = (theme: string) => ({
+const baseStyles = (theme: Theme) => ({
   // Base container styles
   container: {
     padding: 8,
@@ -318,7 +318,7 @@ const baseStyles = (theme: string) => ({
 });
 
 // Pre-composed style combinations
-const sovran = (theme: string) => ({
+const sovran = (theme: Theme) => ({
   // Base styles
   ...baseStyles(theme),
 
@@ -477,7 +477,7 @@ const MintSheet = ({
   );
 };
 
-export const createStyles = (theme: string) =>
+export const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flexDirection: 'row',

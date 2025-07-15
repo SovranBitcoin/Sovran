@@ -1,12 +1,11 @@
-import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
-import { useNavigation } from 'expo-router';
+import { greys, Theme } from 'helper/colors';
 import CachedImage from 'components/common/Image';
+import { useTypedNavigation } from 'helper/navigation';
 
 // Organization interface
 interface Organization {
@@ -67,7 +66,7 @@ const FEATURED_ORGANIZATIONS: Organization[] = [
 export default function OrganizationScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
 
   const handleNavigation = (pubkey: string) => {
     navigation.navigate('userMessages', { pubkey });
@@ -124,7 +123,7 @@ function OrganizationTile({ organization, onPress }: OrganizationTileProps) {
   );
 }
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     organizationGrid: {
       flexDirection: 'row',

@@ -42,8 +42,6 @@ import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
 import { err } from 'neverthrow';
-import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
-import { Spinner } from 'components/common/Spinner';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -405,7 +403,7 @@ export function LightningReceiveConfirmation({
 
   const isBitcoin = unit === 'sat';
 
-  const { isListening } = useAutoListenBatch(getCurrentTransaction);
+  // const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const handleCheckStatus = async (onClose, forceRefresh) => {
     const currentTx = getCurrentTransaction[0];
@@ -634,7 +632,7 @@ export function LightningReceiveConfirmation({
                   }}>
                   {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                 </Text>
-                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
+                {/* {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />} */}
               </View>
             ),
           },

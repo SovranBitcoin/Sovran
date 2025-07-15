@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation } from 'helper/navigation';
@@ -97,13 +97,19 @@ const profilePictures = [
 // Relay URLs used for Nostr connections
 const RELAY_URLS = relays;
 
-// Separate ProfilePictureSelector component
+interface ProfilePictureSelectorProps {
+  selectedProfilePicture: any;
+  setSelectedProfilePicture: (profile: any) => void;
+  isSubmitting: boolean;
+  styles: any;
+}
+
 const ProfilePictureSelector = ({
   selectedProfilePicture,
   setSelectedProfilePicture,
   isSubmitting,
   styles,
-}) => (
+}: ProfilePictureSelectorProps) => (
   <View style={styles.profileImageContainer}>
     <View style={styles.selectedProfileContainer}>
       {selectedProfilePicture && (
@@ -135,14 +141,24 @@ const ProfilePictureSelector = ({
   </View>
 );
 
-// Helper function for profile picture selection
-const handleProfilePictureSelect = (profile, setSelectedProfilePicture, isSubmitting) => {
+const handleProfilePictureSelect = (
+  profile: any,
+  setSelectedProfilePicture: (profile: any) => void,
+  isSubmitting: boolean
+) => {
   if (isSubmitting) return;
   setSelectedProfilePicture(profile);
 };
 
-// Separate NameInput component
-const NameInput = ({ name, setName, isSubmitting, styles, theme }) => (
+interface NameInputProps {
+  name: string;
+  setName: (name: string) => void;
+  isSubmitting: boolean;
+  styles: any;
+  theme: Theme;
+}
+
+const NameInput = ({ name, setName, isSubmitting, styles, theme }: NameInputProps) => (
   <View style={styles.inputContainer}>
     <Text weight="medium" size={14} style={styles.inputLabel}>
       Enter your name
@@ -162,8 +178,21 @@ const NameInput = ({ name, setName, isSubmitting, styles, theme }) => (
   </View>
 );
 
-// Separate ButtonBar component
-const ButtonBar = ({ handleCreateProfile, handleExistingAccount, isSubmitting, styles, theme }) => (
+interface ButtonBarProps {
+  handleCreateProfile: () => void;
+  handleExistingAccount: () => void;
+  isSubmitting: boolean;
+  styles: any;
+  theme: Theme;
+}
+
+const ButtonBar = ({
+  handleCreateProfile,
+  handleExistingAccount,
+  isSubmitting,
+  styles,
+  theme,
+}: ButtonBarProps) => (
   <View style={styles.bottomButtons}>
     <TouchableOpacity
       style={[styles.createButton, isSubmitting && styles.disabledControl]}
@@ -327,7 +356,7 @@ const RecoveryScreen = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,

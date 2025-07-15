@@ -4,7 +4,7 @@ import { TextInput, StyleSheet } from 'react-native';
 import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Card } from 'components/common/Card';
@@ -78,7 +78,7 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       padding: 16,

@@ -1,4 +1,3 @@
-import React from 'react';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';

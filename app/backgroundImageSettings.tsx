@@ -7,19 +7,15 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
 import { memoizedGetTheme, useSettings, memoizedGetBackgroundImage } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import Image from 'components/common/Image';
 import { BACKGROUND_IMAGES, BackgroundImageMeta } from 'helper/backgroundImages';
 
-const categories = Array.from(
-  new Set(Object.values(BACKGROUND_IMAGES).map((b) => b.category))
-);
+const categories = Array.from(new Set(Object.values(BACKGROUND_IMAGES).map((b) => b.category)));
 
 const imagesByCategory: Record<string, BackgroundImageMeta[]> = categories.reduce(
   (acc, category) => {
-    acc[category] = Object.values(BACKGROUND_IMAGES).filter(
-      (b) => b.category === category
-    );
+    acc[category] = Object.values(BACKGROUND_IMAGES).filter((b) => b.category === category);
     return acc;
   },
   {} as Record<string, BackgroundImageMeta[]>
@@ -35,7 +31,6 @@ export default function BackgroundImageSettings() {
 
   const width = (Dimensions.get('window').width - 48) / 2;
   const height = width / 2;
-
 
   return (
     <Container>
@@ -68,7 +63,7 @@ export default function BackgroundImageSettings() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     gridContainer: {
       flexDirection: 'row',

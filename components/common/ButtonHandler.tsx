@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -18,7 +18,7 @@ export interface ButtonHandlerButton {
   variant: 'primary' | 'secondary' | 'dangerous';
   icon?: string;
   text: string;
-  onPress: any;
+  onPress: (event: GestureResponderEvent) => void;
 }
 
 interface ButtonHandlerProps {

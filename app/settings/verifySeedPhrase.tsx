@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -20,8 +20,8 @@ const VerifySeedPhrase = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { currentProfile } = useNostr();
-  const [shuffledWords, setShuffledWords] = useState([]);
-  const [selectedWords, setSelectedWords] = useState([]);
+  const [shuffledWords, setShuffledWords] = useState<string[]>([]);
+  const [selectedWords, setSelectedWords] = useState<string[]>([]);
 
   useEffect(() => {
     if (currentProfile?.mnemonic) {
@@ -30,7 +30,7 @@ const VerifySeedPhrase = () => {
     }
   }, [currentProfile]);
 
-  const handleWordPress = (word) => {
+  const handleWordPress = (word: string) => {
     setSelectedWords((prev) => [...prev, word]);
   };
 
@@ -48,7 +48,7 @@ const VerifySeedPhrase = () => {
     }
   };
 
-  const renderWord = ({ item }) => (
+  const renderWord = ({ item }: { item: string }) => (
     <TouchableOpacity onPress={() => handleWordPress(item)} style={styles.wordButton}>
       <Text style={styles.wordText}>{item}</Text>
     </TouchableOpacity>
@@ -60,7 +60,6 @@ const VerifySeedPhrase = () => {
         <Text style={styles.sectionTitle}>Verify Seed Phrase</Text>
         <Card
           message="Select the words in the correct order to verify your seed phrase."
-          theme={theme}
           variant="info"
         />
         <View style={styles.selectedWordsContainer}>
@@ -96,7 +95,7 @@ const VerifySeedPhrase = () => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,

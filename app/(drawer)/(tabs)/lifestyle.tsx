@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -152,7 +152,7 @@ const TabTwoScreen = () => {
 };
 
 // Styles
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[950],

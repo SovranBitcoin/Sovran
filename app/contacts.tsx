@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Image, ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, greys, reds, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -85,7 +85,7 @@ function ModalScreen() {
     }, 1000);
   };
 
-  const handleSearchQueryChange = (input) => {
+  const handleSearchQueryChange = (input: string) => {
     setSearchQuery(input);
 
     if (debounceTimeoutRef.current) {
@@ -119,7 +119,7 @@ function ModalScreen() {
     setHasSearched(false); // Reset hasSearched when search is cleared
   };
 
-  const navigateToUserMessages = ({ pubkey, profile }) => {
+  const navigateToUserMessages = ({ pubkey, profile }: { pubkey: string }) => {
     navigation.goBack();
     navigation.goBack();
     navigation.navigate('userMessages', {
@@ -260,7 +260,7 @@ function ModalScreen() {
   );
 }
 
-function NoResultsFound({ theme }) {
+function NoResultsFound({ theme }: { theme: Theme }) {
   return (
     <View
       style={{
@@ -343,7 +343,7 @@ function NoResultsFound({ theme }) {
 }
 
 // New Component for Empty State
-function EmptyStateView({ theme }) {
+function EmptyStateView({ theme }: { theme: Theme }) {
   return (
     <View
       style={{
@@ -425,7 +425,15 @@ function EmptyStateView({ theme }) {
   );
 }
 
-function SearchResult({ result, onPress, loading }) {
+function SearchResult({
+  result,
+  onPress,
+  loading,
+}: {
+  result: any;
+  onPress: () => void;
+  loading: boolean;
+}) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
@@ -462,7 +470,7 @@ function SearchResult({ result, onPress, loading }) {
   );
 }
 
-function ProfileImage({ profile, loading }) {
+function ProfileImage({ profile, loading }: { profile: any; loading: boolean }) {
   const theme = useSelector(memoizedGetTheme);
   const [imageError, setImageError] = useState(false);
 

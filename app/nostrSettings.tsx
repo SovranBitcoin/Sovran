@@ -4,7 +4,7 @@ import { Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'r
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { Button } from 'components/common/Button';
 import { useSelector } from 'react-redux';
@@ -162,7 +162,7 @@ function ModalScreen() {
   );
 }
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     minus: {
       fontFamily: 'OverpassBold',

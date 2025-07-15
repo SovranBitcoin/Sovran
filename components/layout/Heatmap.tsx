@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc'; // Add UTC plugin
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, greys, reds } from 'helper/colors';
+import { greens, greys, reds, Theme } from 'helper/colors';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
 import opacity from 'hex-color-opacity';
@@ -367,7 +367,7 @@ const StatsGrid = ({ theme, successRate, avgResponse }) => {
   );
 };
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container3: {
       flexDirection: 'row',

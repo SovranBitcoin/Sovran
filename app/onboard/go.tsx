@@ -15,6 +15,7 @@ export default function ModalScreen() {
       nextScreen="onboard/displayMnemonic"
       actions={[
         {
+          variant: 'primary',
           text: 'Recover Wallet',
           onPress: () =>
             navigation.navigate('onboard/mnemonic', {

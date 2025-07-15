@@ -3,7 +3,7 @@ import { ViewStyle } from 'react-native';
 import { StyledText, Text } from 'components/common/Text';
 import { View } from 'components/common/View';
 import { useSelector } from 'react-redux';
-import { greys, shades } from 'helper/colors';
+import { greys, shades, Theme } from 'helper/colors';
 import opacity from 'hex-color-opacity';
 import { BlurView } from 'expo-blur';
 
@@ -91,7 +91,12 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   );
 
   // Helper function to render the appropriate value content based on the item type
-  function renderValueContent(item: SectionItem, titleText: string, theme: any, special?: boolean) {
+  function renderValueContent(
+    item: SectionItem,
+    titleText: string,
+    theme: Theme,
+    special?: boolean
+  ) {
     if (React.isValidElement(item.value)) {
       return (
         <View
@@ -219,7 +224,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   }
 
   // Helper function to render prefixed values (npub, creqA, etc.)
-  function renderPrefixedValue(prefix: string, value: string, titleText: string, theme: any) {
+  function renderPrefixedValue(prefix: string, value: string, titleText: string, theme: Theme) {
     return (
       <View
         className="flex flex-1 flex-col items-center justify-center bg-transparent"

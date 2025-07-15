@@ -4,13 +4,13 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
 
-const createStyles = (theme: string) =>
+const createStyles = (theme: Theme) =>
   StyleSheet.create({
     productGrid: {
       flexDirection: 'row',

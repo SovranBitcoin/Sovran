@@ -120,12 +120,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'mints',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'receive',
     options: {
       presentation: 'modal',

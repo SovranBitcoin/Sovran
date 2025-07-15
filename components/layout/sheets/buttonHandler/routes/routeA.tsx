@@ -78,11 +78,13 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
                   borderRadius: 1000,
                   padding: 4,
                 }}>
-                <Icon
-                  color={isDangerous ? reds[300] : greys(theme)[0]}
-                  name={button.icon}
-                  size={32}
-                />
+                {button.icon && (
+                  <Icon
+                    color={isDangerous ? reds[300] : greys(theme)[0]}
+                    name={button.icon}
+                    size={32}
+                  />
+                )}
               </View>
               <Text
                 style={{

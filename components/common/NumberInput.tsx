@@ -101,7 +101,7 @@ export function NumberInput({
           <StyledText
             style={{
               fontFamily: 'OverpassRegular',
-              color: value ? shades[200] : greys()[200],
+              color: value ? shades[200] : greys(theme)[200],
               fontSize: 28,
               marginRight: 4,
               marginTop: 12,
