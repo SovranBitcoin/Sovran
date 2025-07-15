@@ -9,7 +9,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { runWithAnimationFrame } from 'app/onboard/new';
+import { runWithAnimationFrame } from 'helper';
 
 export interface ButtonHandlerButton {
   testID?: string | undefined;

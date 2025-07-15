@@ -43,7 +43,6 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   );
 
   const currentStyle = useMemo(() => variantStyles[variant], [variantStyles, variant]);
-
   return (
     <TouchableOpacity onPress={onPress}>
       <View

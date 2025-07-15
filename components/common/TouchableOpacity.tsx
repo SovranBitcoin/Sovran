@@ -1,4 +1,4 @@
-import { runWithAnimationFrame } from 'app/onboard/new';
+import { runWithAnimationFrame } from 'helper';
 import React, { useRef, FC } from 'react';
 import {
   TouchableOpacity as RNTouchableOpacity,

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { View } from './View';
+import { Text } from './Text';
 import { persistStore } from 'redux-persist';
 import { Provider } from 'react-redux';
 import { store } from 'helper/redux/store';
@@ -7,9 +7,12 @@ import { store } from 'helper/redux/store';
 export const persistor = persistStore(store);
 
 const meta = {
-  title: 'View',
-  component: View,
-  args: {},
+  title: 'Text',
+  component: Text,
+  args: {
+    color: 'black',
+    children: 'Hello world',
+  },
   decorators: [
     (Story) => (
       <Provider store={store}>
@@ -17,7 +20,7 @@ const meta = {
       </Provider>
     ),
   ],
-} satisfies Meta<typeof View>;
+} satisfies Meta<typeof Text>;
 
 export default meta;
 

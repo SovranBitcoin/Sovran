@@ -27,34 +27,10 @@ import * as Crypto from 'expo-crypto';
 import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
+import { runWithAnimationFrame } from 'helper';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
-
-/**
- * Executes an async function within a requestAnimationFrame to improve UI responsiveness
- */
-export const runWithAnimationFrame = <T extends any[]>(
-  callback: Function,
-  setIsSubmitting?: React.Dispatch<React.SetStateAction<boolean>>
-) => {
-  return async (...args: T) => {
-    if (setIsSubmitting) {
-      setIsSubmitting(true);
-    }
-
-    requestAnimationFrame(async () => {
-      try {
-        await callback(...args);
-      } catch {
-      } finally {
-        if (setIsSubmitting) {
-          setIsSubmitting(false);
-        }
-      }
-    });
-  };
-};
 
 export function generateMnemonic(): string {
   const mnemonic = store.getState()?.nostr?.profiles?.[0]?.mnemonic;
