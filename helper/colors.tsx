@@ -79,10 +79,26 @@ export const blues: Shades = {
 export type GreyKey = 0 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 export type Greys = Record<GreyKey, string>;
 
+export const DARK_GREYS: Greys = {
+  0: '#FFFFFF',
+  50: '#E8EAED',
+  100: '#C7C7C7',
+  200: '#A8A8A8',
+  300: '#787878',
+  400: '#525252',
+  500: '#2C2C2C',
+  600: '#202020',
+  700: '#1C1C1C',
+  800: '#181818',
+  900: '#121212',
+  950: '#080808',
+};
+
 export const greys = (t: string | Theme): Greys => {
   const name = typeof t === 'string' ? t : t.id;
-  if (BACKGROUND_IMAGE_ATTRIBUTES?.[name]) {
-    return BACKGROUND_IMAGE_ATTRIBUTES[name].greys;
+
+  if (name === 'dark') {
+    return DARK_GREYS;
   }
 
   switch (name) {
@@ -574,24 +590,13 @@ export const greys = (t: string | Theme): Greys => {
       };
     }
 
-    case 'dark':
-    default: {
-      return {
-        0: '#FFFFFF',
-        50: '#E8EAED', // 50
-        100: '#C7C7C7', // 100
-        200: '#A8A8A8', // 200
-        300: '#787878', // 300
-        400: '#525252', // 400
-        500: '#2C2C2C', // 500
-        600: '#202020', // 600
-        700: '#1C1C1C', // 700
-        800: '#181818', // 800
-        900: '#121212', // 900
-        950: '#080808', // 950
-      };
-    }
   }
+
+  if (BACKGROUND_IMAGE_ATTRIBUTES?.[name]) {
+    return BACKGROUND_IMAGE_ATTRIBUTES[name].greys;
+  }
+
+  return DARK_GREYS;
 };
 
 export const background = '#FFFFFF';
