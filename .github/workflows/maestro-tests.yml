@@ -28,5 +28,5 @@ jobs:
         run: yarn install
 
       - name: 🚀 Send build request
-        run: eas build --platform all --non-interactive --no-wait --profile development-sim
+        run: eas build --platform ios --non-interactive --no-wait --profile development-sim
         shell: bash
