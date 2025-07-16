@@ -33,10 +33,10 @@ runs:
           echo "ARTIFACT_URL=$ARTIFACT_URL" >> $GITHUB_ENV
         else
           echo "No existing build found, creating new build..."
-          BUILD_OUTPUT=$(eas build --platform ios --profile e2e-simulator --non-interactive --wait)
+          BUILD_OUTPUT=$(eas build --platform ios --profile e2e-iOS --non-interactive --wait)
           echo "$BUILD_OUTPUT"
 
-          ARTIFACT_URL=$(eas build:list --platform ios --profile e2e-simulator --status finished --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
+          ARTIFACT_URL=$(eas build:list --platform ios --profile e2e-iOS --status finished --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
           echo "artifact-url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
           echo "ARTIFACT_URL=$ARTIFACT_URL" >> $GITHUB_ENV
           echo "✅ Created new build with artifact URL: $ARTIFACT_URL"
