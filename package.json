@@ -21,8 +21,7 @@
     "storybook-generate": "sb-rn-get-stories",
     "storybook": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start",
     "storybook:ios": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start --ios",
-    "storybook:android": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start --android",
-    "eas-build-on-success": "bash ./eas-build-on-success.sh"
+    "storybook:android": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start --android"
   },
   "jest": {
     "preset": "jest-expo",
