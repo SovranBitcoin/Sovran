@@ -42,8 +42,8 @@ interface MintStats {
 }
 
 export function Comment({ pubkey, message, theme }: CommentProps) {
-  const filters = useMemo(() => ({ kinds: [0], authors: [pubkey], limit: 1 }), [pubkey]);
-  const { events = [], loading } = useSubscribe({ filters });
+  const filters = useMemo(() => [{ kinds: [0], authors: [pubkey], limit: 1 }], [pubkey]);
+  const { events = [] } = useSubscribe({ filters });
   const profile = events[0] ? safeJson(events[0].content) : undefined;
 
   const displayName = profile?.name?.trim() || pubkey;
@@ -67,19 +67,15 @@ export function Comment({ pubkey, message, theme }: CommentProps) {
           {displayName}
         </Text>
 
-        {loading ? (
-          <ActivityIndicator size="small" />
-        ) : (
-          <Text
-            style={{
-              color: g[0],
-              fontSize: 13,
-              lineHeight: 18,
-              width: Dimensions.get('window').width - 120,
-            }}>
-            {message}
-          </Text>
-        )}
+        <Text
+          style={{
+            color: g[0],
+            fontSize: 13,
+            lineHeight: 18,
+            width: Dimensions.get('window').width - 120,
+          }}>
+          {message}
+        </Text>
       </View>
     </View>
   );
@@ -124,7 +120,7 @@ function useRecommendedMints(): { mints: ProcessedMint[] } {
   const balanceMintUrls = useMemo(() => new Set(balances.map((b) => b.mintUrl)), [balances]);
 
   /* 1️⃣ Subscribe for reviews */
-  const filters = useMemo(() => ({ kinds: [38000], limit: 20000 }), []);
+  const filters = useMemo(() => [{ kinds: [38000], limit: 20000 }], []);
   const { events } = useSubscribe({ filters });
 
   /* 2️⃣ Stats per URL (skip already‑owned) */
@@ -229,6 +225,7 @@ function useRecommendedMints(): { mints: ProcessedMint[] } {
         averageRating: 0,
         reviewCount: 0,
         reviews: [],
+        loading: false,
       },
       ...mints,
     ],
