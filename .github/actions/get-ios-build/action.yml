@@ -1,0 +1,50 @@
+name: 'Get iOS Build'
+description: 'Get or create iOS development build'
+outputs:
+  artifact-url:
+    description: 'The URL of the iOS build artifact'
+    value: ${{ steps.get-build.outputs.artifact-url }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Publish EAS update to e2e-ios channel
+      shell: bash
+      run: |
+        echo "Publishing EAS update to e2e-ios channel..."
+        eas update --channel e2e-ios --message "update from CI action" --non-interactive
+        echo "✅ EAS update published to e2e-ios channel"
+
+    - name: Get or create development build
+      id: get-build
+      shell: bash
+      run: |
+        echo "Using manual fetch/build approach..."
+
+        echo "Checking for existing builds..."
+        EXISTING_BUILD=$(eas build:list --platform ios --profile e2e-simulator --status finished --non-interactive --json | jq -r '.[0] // empty')
+
+        if [ -n "$EXISTING_BUILD" ] && [ "$EXISTING_BUILD" != "null" ]; then
+          echo "Found existing build, using it"
+          ARTIFACT_URL=$(echo "$EXISTING_BUILD" | jq -r '.artifacts.buildUrl')
+          BUILD_ID=$(echo "$EXISTING_BUILD" | jq -r '.id')
+          BUILD_DATE=$(echo "$EXISTING_BUILD" | jq -r '.createdAt')
+          echo "✅ Using existing build: $BUILD_ID (created: $BUILD_DATE)"
+          echo "artifact-url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+          echo "ARTIFACT_URL=$ARTIFACT_URL" >> $GITHUB_ENV
+        else
+          echo "No existing build found, creating new build..."
+          BUILD_OUTPUT=$(eas build --platform ios --profile e2e-simulator --non-interactive --wait)
+          echo "$BUILD_OUTPUT"
+
+          ARTIFACT_URL=$(eas build:list --platform ios --profile e2e-simulator --status finished --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
+          echo "artifact-url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+          echo "ARTIFACT_URL=$ARTIFACT_URL" >> $GITHUB_ENV
+          echo "✅ Created new build with artifact URL: $ARTIFACT_URL"
+        fi
+
+        if [ -z "$ARTIFACT_URL" ]; then
+          echo "❌ Failed to get artifact URL"
+          exit 1
+        fi
+
+        echo "Final artifact URL: $ARTIFACT_URL"

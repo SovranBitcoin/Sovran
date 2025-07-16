@@ -3,11 +3,13 @@
     "version": ">= 7.8.5"
   },
   "build": {
-    "development-sim": {
+    "e2e-iOS": {
       "distribution": "internal",
+      "environment": "development",
       "ios": {
         "simulator": true
-      }
+      },
+      "channel": "e2e-simulator"
     },
     "development": {
       "developmentClient": true,
