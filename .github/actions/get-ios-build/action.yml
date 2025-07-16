@@ -21,7 +21,7 @@ runs:
         echo "Using manual fetch/build approach..."
 
         echo "Checking for existing builds..."
-        EXISTING_BUILD=$(eas build:list --platform ios --profile e2e-simulator --status finished --non-interactive --json | jq -r '.[0] // empty')
+        EXISTING_BUILD=$(eas build:list --platform ios --profile e2e-iOS --status finished --non-interactive --json | jq -r '.[0] // empty')
 
         if [ -n "$EXISTING_BUILD" ] && [ "$EXISTING_BUILD" != "null" ]; then
           echo "Found existing build, using it"
