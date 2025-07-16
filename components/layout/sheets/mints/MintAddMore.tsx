@@ -219,7 +219,20 @@ function useRecommendedMints(): { mints: ProcessedMint[] } {
     });
   }, [mintStats, infos]);
 
-  return { mints };
+  return {
+    mints: [
+      {
+        id: 'https://nofees.testnut.cashu.space',
+        name: 'Testnut feeless mint',
+        logo: 'https://picsum.photos/200',
+        supportedUnits: ['SAT'],
+        averageRating: 0,
+        reviewCount: 0,
+        reviews: [],
+      },
+      ...mints,
+    ],
+  };
 }
 
 function AddMintItem({

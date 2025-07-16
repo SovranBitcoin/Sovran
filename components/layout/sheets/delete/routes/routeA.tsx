@@ -1,6 +1,6 @@
 import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -33,6 +33,7 @@ const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) =>
         variant="warning"
         message="There is no guarantee that your mnemonic phrase will allow you to recover your funds. If you were a TestFlight user its possible your recovery phrase won't restore all your funds."
       />
+      <Spacer size={12} />
       <Button text="Delete everything" onPress={handleDeleteProfile} variant={'primary'} />
     </View>
   );

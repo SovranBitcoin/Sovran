@@ -17,13 +17,6 @@ name: Receive Lightning With Note
 - runFlow:
     file: ../helper/screenshot.yml
     env:
-      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_2'
-- tapOn:
-    id: 'more-button'
-
-- runFlow:
-    file: ../helper/screenshot.yml
-    env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_3'
 - tapOn: 'Fixed Amount'
 
