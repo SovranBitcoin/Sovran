@@ -23,6 +23,7 @@ import { getProfile } from './components/fetchAccountData';
 import { Currency } from './components/CurrencyIcon';
 import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { toResult } from 'helper/toResult';
 
 const { height } = Dimensions.get('window');
 
@@ -188,7 +189,19 @@ const ChainLoadingAnimation = () => {
           for (let index = 0; index < mintsToProcess.length; index++) {
             const mint = mintsToProcess[index];
             try {
-              const mintInfo = await (await getMint({ mintUrl: mint })).getInfo();
+              const mintResult = await getMint({ mintUrl: mint });
+              if (mintResult.isErr()) {
+                continue;
+              }
+              const mint_ = mintResult.value;
+
+              const mintInfoResult = await toResult(mint_.getInfo());
+              if (mintInfoResult.isErr()) {
+                continue;
+              }
+
+              const mintInfo = mintInfoResult.value;
+
               const units = mintInfo.nuts[4].methods
                 .map((method) => ({
                   name: method.unit,
