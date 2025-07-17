@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
 import { NumberInput } from '../components/common/NumberInput';
@@ -72,12 +72,6 @@ function ModalScreen() {
   };
 
   const handleLightningReceive = async ({ memo }: { memo: string }) => {
-    Alert.alert(
-      JSON.stringify({
-        unit,
-        amount,
-      })
-    );
     const res = await receiveLightning({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,

@@ -171,7 +171,6 @@ export function AccountPagerView({
                 flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                // backgroundColor: greys(theme)[950],
               }}>
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </View>
@@ -186,7 +185,6 @@ export function AccountPagerView({
           justifyContent: 'space-around',
           padding: 0,
           margin: 0,
-          zIndex: 3,
           marginTop: 350,
           height: 0,
           backgroundColor: 'transparent',
@@ -257,7 +255,6 @@ const createStyles = (theme: Theme) =>
     touchableOpacity: {
       flex: 1,
       maxWidth: 'auto',
-      zIndex: -1,
       backgroundColor: 'transparent',
     },
     cameraButton: {
