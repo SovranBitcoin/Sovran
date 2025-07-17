@@ -42,6 +42,8 @@ import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
 import { err } from 'neverthrow';
+import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
+import { Spinner } from 'components/common/Spinner';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -51,6 +53,7 @@ interface MintQuoteTimelineProps {
     [key: string]: any;
   }[];
   type: 'mint' | 'melt';
+  transaction?: any;
 }
 
 export function MintQuoteTimeline({
@@ -137,7 +140,7 @@ export function MintQuoteTimeline({
   const dotSize = barWidth;
   const dotSpacing = 8;
 
-  const getBarColor = (item) => {
+  const getBarColor = (item: any) => {
     if (item.state === 'CANCELLED' || item.state === 'EXPIRED') {
       return '#ef4444';
     }
@@ -149,7 +152,7 @@ export function MintQuoteTimeline({
     return null;
   }
 
-  const getStateLabel = (s) => {
+  const getStateLabel = (s: string) => {
     switch (s) {
       case 'UNPAID':
         return 'PENDING';
@@ -403,7 +406,7 @@ export function LightningReceiveConfirmation({
 
   const isBitcoin = unit === 'sat';
 
-  // const { isListening } = useAutoListenBatch(getCurrentTransaction);
+  const { isListening } = useAutoListenBatch(getCurrentTransaction);
 
   const handleCheckStatus = async (onClose, forceRefresh) => {
     const currentTx = getCurrentTransaction[0];
@@ -632,7 +635,7 @@ export function LightningReceiveConfirmation({
                   }}>
                   {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                 </Text>
-                {/* {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />} */}
+                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
               </View>
             ),
           },

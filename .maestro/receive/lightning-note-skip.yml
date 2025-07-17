@@ -51,7 +51,7 @@ name: Receive Lightning Without Note
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-skip-step_7'
-- assertVisible: 'Transfer Complete'
+- assertVisible: 'Funds Received'
 - runFlow:
     file: ../helper/screenshot.yml
     env:

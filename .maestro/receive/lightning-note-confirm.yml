@@ -65,7 +65,7 @@ name: Receive Lightning With Note
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_9'
-- assertVisible: 'Transfer Complete'
+- assertVisible: 'Funds Received'
 - runFlow:
     file: ../helper/screenshot.yml
     env:

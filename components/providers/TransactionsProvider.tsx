@@ -19,29 +19,47 @@ import { showMessage } from 'helper/popup/popups';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { getWallet } from 'helper/cashuClient';
 import _ from 'lodash';
-import { err } from 'neverthrow';
 import { toResult } from 'helper/toResult';
-import { Alert } from 'react-native';
 
-const TransactionContext = createContext(null);
+interface ActiveConnection {
+  id: string;
+  since: number;
+}
 
-export const useAutoListenBatch = (transactions = [], options = { enabled: true }) => {
-  const { listenToTransaction, activeConnections } = useTransactions();
+interface TransactionContextType {
+  transactions: any[];
+  listenToTransaction: (transactions: any[], forceRefresh?: boolean) => Promise<void>;
+  stopListening: (id: string) => void;
+  getActiveConnections: () => ActiveConnection[];
+  activeConnections: ActiveConnection[];
+}
+
+const TransactionContext = createContext<TransactionContextType | null>(null);
+
+export const useAutoListenBatch = (transactions: any[] = [], options = { enabled: true }) => {
   const hasStarted = useRef(false);
 
-  // Determine whether we are already listening
+  const context = useTransactions();
+
+  // Always call hooks at the top level
   const isListening = useMemo(() => {
+    if (!context) return false;
+
     return (
       transactions.length > 0 &&
-      transactions.every((tx) =>
-        activeConnections.some((conn) => conn.id.includes(tx.request || tx.token))
+      transactions.every((tx: any) =>
+        context.activeConnections.some((conn) => conn.id.includes(tx.request || tx.token))
       )
     );
-  }, [transactions, activeConnections]);
+  }, [transactions, context?.activeConnections]);
+
+  if (!context) return { isListening: false };
+
+  const { listenToTransaction, activeConnections } = context;
 
   // Precompute preconditions
-  const allUnpaid = transactions.every((tx) => tx.paid !== true);
-  const allInactive = transactions.every((tx) => {
+  const allUnpaid = transactions.every((tx: any) => tx.paid !== true);
+  const allInactive = transactions.every((tx: any) => {
     const id = tx.request || tx.token;
     return !activeConnections.some((conn) => conn.id.includes(id));
   });
@@ -78,12 +96,12 @@ interface TransactionProviderProps {
 export const TransactionProvider = ({ children }: TransactionProviderProps) => {
   const allTransactions = useSelector(memoizedGetTransactions({ id: 0 }));
   // Use a ref to hold the Map object to prevent unnecessary re-renders
-  const activeConnectionsRef = useRef(new Map());
-  const [activeConnections, setActiveConnections] = useState([]);
+  const activeConnectionsRef = useRef(new Map<string, { unsub: any; timestamp: number }>());
+  const [activeConnections, setActiveConnections] = useState<ActiveConnection[]>([]);
 
   const addConnection = (id: string, connection: any) => {
     activeConnectionsRef.current.set(id, {
-      unsub: connection.unsub,
+      unsub: connection.unsub || connection,
       timestamp: Date.now(),
     });
     setActiveConnections(
@@ -96,37 +114,55 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
   const removeConnection = (id: string) => {
     activeConnectionsRef.current.delete(id);
-    setActiveConnections([
-      ...Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
+    setActiveConnections(
+      Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
         id,
         since: connection.timestamp,
-      })),
-    ]);
+      }))
+    );
   };
 
   // Helper function to update transaction status in Redux
   const updateTransactionStatus = (
-    { token, type, transactionType, request, quote },
-    status,
-    additionalData = {}
+    transaction: {
+      token?: string;
+      type: string;
+      transactionType: string;
+      request?: string;
+      mintQuote?: { quote: string };
+    },
+    status: string,
+    additionalData: {
+      paid?: boolean;
+      completedAt?: number;
+      mintQuotes?: any[];
+      proofStates?: any[];
+      [key: string]: any;
+    } = {}
   ) => {
     return store.dispatch(
       updateTransaction({
         profileId: 0,
         matcher: (tx) => {
-          return type === 'ecash'
-            ? tx.token === token && tx.type === type && tx.transactionType === transactionType
-            : tx.request === request &&
-                tx.type === type &&
-                tx.transactionType === transactionType &&
-                tx.mintQuote?.quote === quote;
+          return transaction.type === 'ecash'
+            ? tx.token === transaction.token &&
+                tx.type === transaction.type &&
+                tx.transactionType === transaction.transactionType
+            : tx.request === transaction.request &&
+                tx.type === transaction.type &&
+                tx.transactionType === transaction.transactionType &&
+                (tx as any).mintQuote?.quote === transaction.mintQuote?.quote;
         },
         updateFn: (tx) => ({
           ...tx,
-          status,
           ...additionalData,
-          mintQuotes: [...(tx.mintQuotes || []), ...(additionalData.mintQuotes || [])],
-          proofStates: [...(tx.proofStates || []), ...(additionalData.proofStates || [])],
+          // Add these fields to the transaction if they exist
+          ...(additionalData.mintQuotes && {
+            mintQuotes: [...((tx as any).mintQuotes || []), ...additionalData.mintQuotes],
+          }),
+          ...(additionalData.proofStates && {
+            proofStates: [...((tx as any).proofStates || []), ...additionalData.proofStates],
+          }),
         }),
       })
     );
@@ -149,12 +185,8 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
   }, []);
 
   // Start listening to a transaction
-  const listenToTransaction = async (transactions, forceRefresh = false) => {
+  const listenToTransaction = async (transactions: any[], forceRefresh = false): Promise<void> => {
     try {
-      // if (transaction?.paid) {
-      //   return;
-      // }
-
       // join requests together with _ seperator
       const id =
         transactions?.[0]?.type === 'lightning'
@@ -185,6 +217,8 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
 
       // loop over mints
       for (const [mintUrl, txs] of Object.entries(groupedTransactions)) {
+        const txsTyped = txs as { lightning: any[]; ecash: any[] };
+
         // loop over txs
         const walletResult = await getWallet({
           mintUrl,
@@ -197,7 +231,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
           if (walletResult.error.message === 'keyset id inactive.') {
             await listenToTransaction(transactions, true);
           }
-          return err(walletResult.error);
+          return;
         }
         const wallet = walletResult.value;
 
@@ -207,13 +241,15 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
         const keysetId = activeKeyset.id;
         wallet.keysetId = keysetId;
 
-        for (const [type, txs_] of Object.entries(txs)) {
+        for (const [type, txs_] of Object.entries(txsTyped)) {
           try {
             injectWebSocketImpl(WebSocket);
-            let unsub;
+            let unsub: any;
 
             if (type === 'ecash') {
-              const proofs = _.flatMap(txs_.map((tx: any) => getDecodedToken(tx.token).proofs));
+              const proofs = _.flatMap(
+                (txs_ as any[]).map((tx: any) => getDecodedToken(tx.token).proofs)
+              );
               unsub = await wallet.onProofStateUpdates(
                 // flat map the proofs
                 proofs,
@@ -223,7 +259,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                   }
                 ) => {
                   try {
-                    const transaction = txs_.find((tx: any) =>
+                    const transaction = (txs_ as any[]).find((tx: any) =>
                       getDecodedToken(tx.token).proofs.find((p: any) => _.isEqual(p, payload.proof))
                     );
 
@@ -241,6 +277,16 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         });
                         break;
                       case 'SPENT':
+                        // Show success message for sent funds
+                        showMessage(
+                          'funds_sent',
+                          {
+                            amount: transaction.amount,
+                            unit: transaction.unit,
+                          },
+                          { emoji: '🎉' }
+                        );
+
                         updateTransactionStatus(transaction, 'paid', {
                           paid: true,
                           completedAt: Date.now(),
@@ -251,7 +297,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                             },
                           ],
                         });
-                        unsub();
+                        if (unsub) unsub();
                         removeConnection(id);
                         break;
                       case 'UNSPENT':
@@ -267,16 +313,16 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                       default:
                         break;
                     }
-                  } catch (err) {
-                    unsub();
+                  } catch (error: any) {
+                    if (unsub) unsub();
                     removeConnection(id);
-                    if (err.message === 'keyset id inactive.') {
+                    if (error.message === 'keyset id inactive.') {
                       listenToTransaction(transactions, true);
                     }
                   }
                 },
                 () => {
-                  unsub();
+                  if (unsub) unsub();
                   removeConnection(id);
                 }
               );
@@ -285,70 +331,35 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
               }
             } else if (type === 'lightning') {
               unsub = await wallet.onMintQuoteUpdates(
-                txs_.map((tx) => tx.mintQuote.quote),
+                (txs_ as any[]).map((tx: any) => tx.mintQuote.quote),
                 async (update: MintQuoteResponse) => {
                   try {
                     // This finds the current transaction thats being updated.
-                    const transaction = txs_.find((tx) => tx.mintQuote.quote === update.quote);
+                    const transaction = (txs_ as any[]).find(
+                      (tx: any) => tx.mintQuote.quote === update.quote
+                    );
 
                     if (!transaction) return;
-                    Alert.alert(JSON.stringify(update.state));
+
                     switch (update.state) {
                       case 'UNPAID':
-                        updateTransactionStatus(
-                          {
-                            request: transaction.request,
-                            type: transaction.type,
-                            transactionType: transaction.transactionType,
-                            quote: transaction.mintQuote.quote,
-                          },
-                          'unpaid',
-                          {
-                            mintQuotes: [
-                              {
-                                ...update,
-                                expiry: update.expiry ?? transaction.mintQuote.expiry,
-                                addedAt: Date.now(),
-                              },
-                            ],
-                          }
-                        );
-                        break;
-                      case 'ISSUED':
-                        updateTransactionStatus(
-                          {
-                            request: transaction.request,
-                            type: transaction.type,
-                            transactionType: transaction.transactionType,
-                            quote: transaction.mintQuote.quote,
-                          },
-                          'issued',
-                          {
-                            mintQuotes: [
-                              {
-                                ...update,
-                                expiry: update.expiry ?? transaction.mintQuote.expiry,
-                                addedAt: Date.now(),
-                              },
-                            ],
-                          }
-                        );
-                        const allQuotesPaid = allTransactions.filter((t) =>
-                          transactions.some((t2) => t.request === t2.request)
-                        );
-                        if (allQuotesPaid) {
-                          unsub();
-                          removeConnection(id);
-                        }
+                        updateTransactionStatus(transaction, 'unpaid', {
+                          mintQuotes: [
+                            {
+                              ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
                         break;
                       case 'PAID':
+                        // This is the key fix: mint proofs immediately when PAID, just like handleCheckStatus
                         const counter = memoizedGetCounterV2({
                           profileId: store.getState().nostr.currentProfile.id,
                           mintUrl,
                           keysetId: wallet.keysetId,
                         })(store.getState());
-
-                        Alert.alert(JSON.stringify({ counter }));
 
                         // Mint proofs
                         const proofsResult = await toResult(
@@ -357,17 +368,12 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                             keysetId: wallet.keysetId,
                           })
                         );
-                        Alert.alert(
-                          JSON.stringify({
-                            proofsResult,
-                            isErr: proofsResult.isErr(),
-                            error: proofsResult.error.message,
-                          })
-                        );
-                        if (proofsResult.isErr()) return err(proofsResult.error);
-                        const proofs = proofsResult.value;
 
-                        Alert.alert(JSON.stringify({ proofs }));
+                        if (proofsResult.isErr()) {
+                          console.error('Error minting proofs:', proofsResult.error);
+                          return;
+                        }
+                        const proofs = proofsResult.value;
 
                         // Increase counter
                         store.dispatch(
@@ -398,45 +404,53 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         ]);
 
                         // Update transaction status to paid
-                        showMessage('funds_sent', {
+                        showMessage('funds_received', {
                           amount: transaction.amount,
                           unit: transaction.unit,
                         });
 
                         // We update the transaction status
-                        updateTransactionStatus(
-                          {
-                            request: transaction.request,
-                            type: transaction.type,
-                            transactionType: transaction.transactionType,
-                            quote: transaction.mintQuote.quote,
-                          },
-                          'paid',
-                          {
-                            paid: true,
-                            completedAt: Date.now(),
-                            mintQuotes: [
-                              {
-                                ...update,
-                                expiry: update.expiry ?? transaction.mintQuote.expiry,
-                                addedAt: Date.now(),
-                              },
-                            ],
-                          }
-                        );
+                        updateTransactionStatus(transaction, 'paid', {
+                          paid: true,
+                          completedAt: Date.now(),
+                          mintQuotes: [
+                            {
+                              ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
+
+                        // Unsubscribe after successful payment
+                        if (unsub) unsub();
+                        removeConnection(id);
+                        break;
+                      case 'ISSUED':
+                        // ISSUED means proofs were already minted, just update the status
+                        updateTransactionStatus(transaction, 'issued', {
+                          mintQuotes: [
+                            {
+                              ...update,
+                              expiry: update.expiry ?? transaction.mintQuote.expiry,
+                              addedAt: Date.now(),
+                            },
+                          ],
+                        });
+                        // Don't unsubscribe here in case we missed the PAID event
                         break;
                     }
-                  } catch (err) {
-                    unsub();
+                  } catch (error: any) {
+                    if (unsub) unsub();
                     removeConnection(id);
-                    if (err.message === 'keyset id inactive.') {
+                    if (error.message === 'keyset id inactive.') {
                       listenToTransaction(transactions, true);
                     }
                   }
                 },
-                async (error) => {
+                async (error: any) => {
                   showMessage(error.message);
-                  unsub();
+                  if (unsub) unsub();
                   removeConnection(id);
                 }
               );
@@ -444,35 +458,39 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                 addConnection(id, { unsub });
               }
             }
-          } catch (error) {
+          } catch (error: any) {
             showMessage(error.message);
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log('error', { error });
     }
   };
 
   // Stop listening to a transaction
-  const stopListening = (id) => {
+  const stopListening = (id: string) => {
     const connection = activeConnectionsRef.current.get(id);
     if (connection && connection.unsub) {
       connection.unsub();
-      // Set that transaction is not listening
-      updateTransactionStatus(id, 'inactive');
       // Remove transaction from active connections
       activeConnectionsRef.current.delete(id);
+      setActiveConnections(
+        Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
+          id,
+          since: connection.timestamp,
+        }))
+      );
     }
   };
 
-  const getActiveConnections = () =>
+  const getActiveConnections = (): ActiveConnection[] =>
     Array.from(activeConnectionsRef.current.entries()).map(([id, connection]) => ({
       id,
       since: connection.timestamp,
     }));
 
-  const value = {
+  const value: TransactionContextType = {
     transactions: allTransactions,
     listenToTransaction,
     stopListening,
