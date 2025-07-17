@@ -27,7 +27,6 @@ import { useTypedNavigation } from 'helper/navigation';
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
   text: {
-    id: string;
     children: string;
   };
   icon: React.ReactNode;
@@ -121,7 +120,6 @@ export function AccountPagerView({
     {
       page: 'receive',
       text: {
-        id: 'onchain_receive_button',
         children: 'Receive',
       },
       icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
@@ -129,7 +127,6 @@ export function AccountPagerView({
     {
       page: 'camera',
       text: {
-        id: 'scan_button',
         children: 'Scan',
       },
       icon: (
@@ -143,7 +140,6 @@ export function AccountPagerView({
     {
       page: 'currency',
       text: {
-        id: 'onchain_send_button',
         children: 'Send',
       },
       icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
@@ -214,7 +210,6 @@ export function AccountPagerView({
 
             return (
               <TouchableOpacity
-                testID={text.children.toLowerCase()}
                 key={page}
                 style={[
                   styles.touchableOpacity,

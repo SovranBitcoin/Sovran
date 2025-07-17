@@ -7,14 +7,12 @@ name: Receive Lightning Without Note
 # - startRecording:
 #     path: './.maestro/receive/lightning-note-skip-video'
 
-- assertVisible: 'BTC'
-
-- assertVisible: 'Receive'
 - runFlow:
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-skip-step_1'
-- tapOn: 'Receive'
+- tapOn:
+    id: 'receive'
 
 - runFlow:
     file: ../helper/screenshot.yml

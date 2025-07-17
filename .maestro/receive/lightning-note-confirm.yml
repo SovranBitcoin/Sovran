@@ -4,15 +4,22 @@ name: Receive Lightning With Note
 ---
 - launchApp
 
-# - startRecording:
-#     path: './.maestro/receive/lightning-note-confirm-video'
+- startRecording:
+    path: './.maestro/receive/lightning-note-confirm-video'
 
-- assertVisible: 'Receive'
+- runFlow:
+    file: ../helper/screenshot.yml
+    env:
+      SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_0'
+
+- assertVisible: 'No'
+
 - runFlow:
     file: ../helper/screenshot.yml
     env:
       SCREENSHOT_PATH: './.maestro/receive/lightning-note-confirm-step_1'
-- tapOn: 'Receive'
+- tapOn:
+    id: 'receive'
 
 - runFlow:
     file: ../helper/screenshot.yml
