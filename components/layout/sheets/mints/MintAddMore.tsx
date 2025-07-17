@@ -470,7 +470,7 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
               fontWeight: '600',
             },
           ]}>
-          Discovered mints
+          Discovered mints2
         </Text>
         <Spacer size={4} />
 
