@@ -1,6 +1,6 @@
 {
   "expo": {
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "name": "Sovran",
     "slug": "sovran",
     "version": "0.0.24",
