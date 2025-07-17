@@ -1,7 +1,6 @@
 executionOrder:
   continueOnFailure: false
   flowsOrder:
-    # - Recover Account
     - Create Account
     - Receive Lightning With Note
     - Receive Lightning Without Note
@@ -11,4 +10,3 @@ flows:
   - onboarding/*
   - receive/*
   - send/*
-  # - helper/*
