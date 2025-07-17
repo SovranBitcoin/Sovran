@@ -107,7 +107,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
             width: isScrollable ? undefined : '100%',
             minWidth: isScrollable ? undefined : '100%',
             borderRadius: 1000,
-            padding: 4,
+            padding: 1.5,
           },
         ]}>
         {tabs.map((tab, index) => (
