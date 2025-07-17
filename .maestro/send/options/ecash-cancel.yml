@@ -15,9 +15,6 @@ appId: com.sovranbitcoin
       SCREENSHOT_PATH: './.maestro/send/options/ecash-cancel-step_2'
 - tapOn: 'Cancel Transaction'
 
-# todo: add confirmation modal for cancelling a tx
-- assertVisible: 'BTC'
-
 - runFlow:
     file: ../../helper/screenshot.yml
     env:

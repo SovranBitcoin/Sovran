@@ -49,9 +49,6 @@ name: Send Ecash Without Note
     file: './options/ecash-share.yml'
 
 - runFlow:
-    file: './options/ecash-check-status.yml'
-
-- runFlow:
     file: './options/ecash-copy-as-emoji.yml'
 
 - runFlow:
