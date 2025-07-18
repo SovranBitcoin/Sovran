@@ -1,9 +1,8 @@
 import React from 'react';
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/common/View';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
-import { greys, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -38,10 +37,8 @@ export function Background() {
 }
 
 export default function WalletHeader({ unit, accounts, setAccount }: WalletHeaderProps) {
-  const theme = useSelector(memoizedGetTheme);
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const dispatch = useDispatch();
-  const styles = createStyles(theme);
 
   const handleMintSelected = async (mint: { id: string; unit: string }) => {
     dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
@@ -52,11 +49,11 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   };
 
   return (
-    <View style={styles.container}>
+    <View className="h-13 pointer-events-box-none absolute left-0 right-0 mt-8 pt-5">
       <SelectedMintDisplay
         style={{
-          width: Dimensions.get('window').width - 32 - 16 - 16 - 16 - 16 - 16 - 16,
-          marginLeft: 50 - 16 - 16 - 16,
+          width: Dimensions.get('window').width - 128,
+          marginLeft: 2,
         }}
         onMintSelected={handleMintSelected}
         unit={unit}
@@ -64,29 +61,3 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
     </View>
   );
 }
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: {
-      position: 'absolute',
-      transform: [{ translateX: '-50%' }],
-      width: 0,
-      height: 52,
-      marginTop: 42,
-      pointerEvents: 'box-none',
-      backgroundColor: 'red',
-    },
-    unitContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 99999,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      marginRight: 8,
-      height: 40,
-      marginBottom: 4,
-    },
-    unitText: {
-      color: greys(theme)[100],
-    },
-  });
