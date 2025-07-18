@@ -222,7 +222,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
         // loop over txs
         const walletResult = await getWallet({
           mintUrl,
-          unit: 'sat', // todo, use correct unit.
+          unit: txsTyped.lightning[0]?.unit || txsTyped.ecash[0]?.unit || 'sat', // get unit from first transaction
           forceRefresh,
           profile: null,
         });
@@ -234,12 +234,6 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
           return;
         }
         const wallet = walletResult.value;
-
-        const activeKeyset = wallet.getActiveKeyset(
-          wallet.keysets.filter((key) => key.unit === 'sat') // todo: use correct unit.
-        );
-        const keysetId = activeKeyset.id;
-        wallet.keysetId = keysetId;
 
         for (const [type, txs_] of Object.entries(txsTyped)) {
           try {
@@ -354,18 +348,24 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                         });
                         break;
                       case 'PAID':
+                        // Get the active keyset for this transaction's unit
+                        const activeKeyset = wallet.getActiveKeyset(
+                          wallet.keysets.filter((key) => key.unit === transaction.unit)
+                        );
+                        const keysetId = activeKeyset.id;
+
                         // This is the key fix: mint proofs immediately when PAID, just like handleCheckStatus
                         const counter = memoizedGetCounterV2({
                           profileId: store.getState().nostr.currentProfile.id,
                           mintUrl,
-                          keysetId: wallet.keysetId,
+                          keysetId,
                         })(store.getState());
 
                         // Mint proofs
                         const proofsResult = await toResult(
                           wallet.mintProofs(transaction.amount, transaction.mintQuote.quote, {
                             counter,
-                            keysetId: wallet.keysetId,
+                            keysetId,
                           })
                         );
 
@@ -380,7 +380,7 @@ export const TransactionProvider = ({ children }: TransactionProviderProps) => {
                           increaseCounterV2({
                             profileId: store.getState().nostr.currentProfile.id,
                             mintUrl,
-                            keysetId: wallet.keysetId,
+                            keysetId,
                             amount: proofs.length,
                           })
                         );
