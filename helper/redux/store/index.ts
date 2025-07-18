@@ -52,41 +52,40 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = createStore(persistedReducer, applyMiddleware(thunkMiddleware));
 
-// log state
-store.subscribe(() => {
-  const getStructure = (obj: any): any => {
-    if (typeof obj !== 'object' || obj === null) {
-      return typeof obj;
-    }
-    if (Array.isArray(obj)) {
-      const allKeys = obj.reduce((keys, item) => {
-        if (typeof item === 'object' && item !== null) {
-          Object.keys(item).forEach((key) => keys.add(key));
-        }
-        return keys;
-      }, new Set<string>());
-
-      const exampleItem = obj.find((item) => typeof item === 'object' && item !== null);
-
-      const structure: any = {};
-      allKeys.forEach((key) => {
-        structure[key] =
-          exampleItem && key in exampleItem ? getStructure(exampleItem[key]) : 'undefined';
-      });
-
-      return [structure];
-    }
-    const structure: any = {};
-    for (const key in obj) {
-      if (key.includes('https://')) {
-        structure['https://mint.example.com'] = getStructure(obj[key]);
-      } else {
-        structure[key] = getStructure(obj[key]);
+export const getStructure = (obj: any): any => {
+  if (typeof obj !== 'object' || obj === null) {
+    return typeof obj;
+  }
+  if (Array.isArray(obj)) {
+    const allKeys = obj.reduce((keys, item) => {
+      if (typeof item === 'object' && item !== null) {
+        Object.keys(item).forEach((key) => keys.add(key));
       }
-    }
-    return structure;
-  };
+      return keys;
+    }, new Set<string>());
 
+    const exampleItem = obj.find((item) => typeof item === 'object' && item !== null);
+
+    const structure: any = {};
+    allKeys.forEach((key: any) => {
+      structure[key] =
+        exampleItem && key in exampleItem ? getStructure(exampleItem[key]) : 'undefined';
+    });
+
+    return [structure];
+  }
+  const structure: any = {};
+  for (const key in obj) {
+    if (key.includes('https://')) {
+      structure['https://mint.example.com'] = getStructure(obj[key]);
+    } else {
+      structure[key] = getStructure(obj[key]);
+    }
+  }
+  return structure;
+};
+
+store.subscribe(() => {
   console.log(JSON.stringify(getStructure(store.getState()), null, 2));
 });
 
