@@ -55,5 +55,5 @@ android/
 # !ios/Sovran/Info.plist
 # !ios/Sovran/Sovran.entitlements
 
-*.png
-*.mp4
+# *.png
+# *.mp4

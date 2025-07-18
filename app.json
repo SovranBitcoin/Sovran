@@ -59,11 +59,6 @@
       "expo-video"
     ],
     "extra": {
-      "assets": {
-        "assetPatternsToBeBundled": [
-          "assets/**/*.png"
-        ]
-      },
       "router": {
         "origin": false
       },
