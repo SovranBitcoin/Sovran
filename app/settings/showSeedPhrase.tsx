@@ -7,6 +7,7 @@ import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import { Card } from 'components/common/Card';
 import { ButtonHandler } from 'components/common/ButtonHandler';
+import { Spacer } from 'components/common/View';
 
 const ShowSeedPhrase: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -19,6 +20,7 @@ const ShowSeedPhrase: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mnemonic</Text>
         <Card message="Keep this private and secure!" variant="warning" />
+        <Spacer size={12} />
         <TextInput
           style={[styles.textArea, !isVisible && styles.blurredText]}
           value={currentProfile?.mnemonic}

@@ -37,6 +37,7 @@ export const ButtonBase = ({
 }: ButtonBaseProps): React.ReactNode => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showLoading, setShowLoading] = useState<boolean>(false);
+  const [contentWidth, setContentWidth] = useState<number>(!text ? 48 : 200);
   const theme = useSelector(memoizedGetTheme);
   const scaleRef = useRef(new Animated.Value(1));
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -128,8 +129,12 @@ export const ButtonBase = ({
             },
             style,
           ]}
-          blur={variant !== 'primary'}>
-          {renderBackground && renderBackground(colorsMap[variant], !text ? 48 : 200)}
+          blur={variant !== 'primary'}
+          onLayout={(event) => {
+            const { width } = event.nativeEvent.layout;
+            setContentWidth(width);
+          }}>
+          {renderBackground && renderBackground(colorsMap[variant], contentWidth)}
           <View className="flex flex-row items-center justify-center">
             {shouldShowLoading ? (
               <Icon

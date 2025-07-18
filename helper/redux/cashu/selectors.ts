@@ -46,6 +46,7 @@ export class TransactionBuilder {
     try {
       const decodedToken = this.decodedToken;
       const secret = decodedToken?.proofs[0].secret;
+      if (!secret) return null;
       return JSON.parse(secret);
     } catch (error) {
       return null;

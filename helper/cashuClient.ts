@@ -48,7 +48,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { bytesToHex } from '@noble/hashes/utils';
 import { toResult, toResultSync } from 'helper/toResult';
 import { ok, err, Result } from 'neverthrow';
-import { getGiveaway } from 'app/ecashReceiveConfirmation';
+import { sha256 } from '@noble/hashes/sha256';
 
 // TYPES
 
@@ -1098,9 +1098,13 @@ export async function* restoreMint({
   allowedUnits?: string[];
 }) {
   let response = {};
-  const mint = await getMint({ mintUrl });
+  const mintResult = await getMint({ mintUrl });
 
-  const keysets = (await mint.getKeySets()).keysets;
+  if (mintResult.isErr()) {
+    return err(mintResult.error);
+  }
+
+  const keysets = (await mintResult.value.getKeySets()).keysets;
 
   const uniqueUnits = keysets
     .filter((keyset, index, self) => index === self.findIndex((k) => k.unit === keyset.unit))
@@ -1130,7 +1134,12 @@ export async function* restoreMint({
       response,
     };
 
-    const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile });
+    const walletResult = await getWallet({ unit: keyset.unit, mintUrl, profile });
+    if (walletResult.isErr()) {
+      return err(walletResult.error);
+    }
+    const wallet = walletResult.value;
+
     let start: number = 0;
     let emptyBatchCount: number = 0;
     let restoredProofs: Proof[] = [];
@@ -1314,4 +1323,24 @@ export class AppError extends Error {
     this.type = type;
     this.code = code;
   }
+}
+
+export function deriveMintBackupKeys(mnemonic: string): {
+  privateKeyHex: string;
+  publicKeyHex: string;
+  privateKeyBytes: Uint8Array;
+} {
+  // Derive seed from mnemonic
+  const seed: Uint8Array = mnemonicToSeedSync(mnemonic);
+  const domainSeparator = new TextEncoder().encode('cashu-mint-backup');
+  const combinedData = new Uint8Array(seed.length + domainSeparator.length);
+  combinedData.set(seed);
+  combinedData.set(domainSeparator, seed.length);
+
+  // Use SHA256 of combined data as private key
+  const privateKeyBytes = sha256(combinedData);
+  const privateKeyHex = bytesToHex(privateKeyBytes);
+  const publicKeyHex = getPublicKey(privateKeyBytes);
+
+  return { privateKeyHex, privateKeyBytes, publicKeyHex };
 }

@@ -1,9 +1,15 @@
-import { finalizeEvent, nip19, SimplePool } from 'nostr-tools';
+import { finalizeEvent, nip44, SimplePool } from 'nostr-tools';
 import { store } from 'helper/redux/store';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { deriveMintBackupKeys } from 'helper/cashuClient';
+import _ from 'lodash';
+import { Alert } from 'react-native';
+import { HDKey } from '@scure/bip32';
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 const cache = new Cache({
   namespace: 'last-wallet-event',
@@ -22,57 +28,87 @@ interface NostrEvent {
   created_at: number;
 }
 
-export async function fetchEventFromRelays(pubKey: string): Promise<Event[] | null> {
+export async function fetchEventFromRelays(
+  pubKey: string,
+  mnemonic: string
+): Promise<string[] | null> {
   const pool = new SimplePool();
+
+  const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+
+  const DERIVATION_PATH = `m/44'/129372'`;
+  const path = `${DERIVATION_PATH}/0'/0'/0/0`;
+  const seed = root.derive(path);
+  const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey, wordlist);
+
+  const { privateKeyBytes, publicKeyHex } = deriveMintBackupKeys(derivedCashuMnemonic);
+
   try {
     const events = await pool.get(relays, {
-      kinds: [37375],
-      authors: [pubKey],
+      kinds: [30078],
+      authors: [publicKeyHex],
+      '#d': ['mint-list'], // Filter for the specific replaceable event
     });
-    return events;
+
+    if (!events) {
+      return null;
+    }
+
+    // Decrypt the content
+    const conversationKey = nip44.v2.utils.getConversationKey(privateKeyBytes, publicKeyHex);
+    const decryptedContent = nip44.v2.decrypt(events.content, conversationKey);
+
+    // Parse the decrypted backup data
+    const backupData = JSON.parse(decryptedContent);
+
+    // Return the mints array
+    return backupData.mints || [];
   } catch (error) {
+    console.error('Error fetching or decrypting event:', error);
+    return null;
   } finally {
     pool.close(relays);
   }
-  return null;
 }
 
-async function publishWalletEvent(mints: string[], units: string[] = ['sat']): Promise<string>[] {
+async function publishWalletEvent(mints: string[]): Promise<boolean> {
   try {
+    Alert.alert('publishWalletEvent', JSON.stringify(mints));
     const currentProfile = memoizedGetCurrentProfile(store.getState());
+    Alert.alert('currentProfile', JSON.stringify(currentProfile));
 
-    if (!currentProfile?.pubkey || !currentProfile?.nsec) {
-      throw new Error('No valid profile available');
+    if (!currentProfile?.nut13) {
+      throw new Error('No valid nut13 set in profile');
     }
 
-    const pubKey = currentProfile.pubkey;
-    const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
+    const backupData = {
+      mints: _.uniq(mints),
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+    Alert.alert('backupData', JSON.stringify(backupData));
 
-    if (!(privKeyBytes instanceof Uint8Array)) {
-      throw new Error('Invalid private key format');
-    }
+    const { privateKeyBytes, publicKeyHex } = deriveMintBackupKeys(currentProfile.nut13);
+    Alert.alert('privateKeyBytes', JSON.stringify(privateKeyBytes));
+    Alert.alert('publicKeyHex', JSON.stringify(publicKeyHex));
+    const conversationKey = nip44.v2.utils.getConversationKey(privateKeyBytes, publicKeyHex);
+    Alert.alert('conversationKey', JSON.stringify(conversationKey));
+    const encryptedContent = nip44.v2.encrypt(JSON.stringify(backupData), conversationKey);
+    Alert.alert('encryptedContent', JSON.stringify(encryptedContent));
 
     const event: NostrEvent = {
-      kind: 37375,
+      kind: 30078,
       tags: [
-        ['d', 'my-cashu-wallet'],
-        ...mints
-          .filter((item, index, self) => index === self.findIndex((t) => t === item))
-          .map((mint) => ['mint', mint]),
-        ['name', 'Sovran Wallet'],
-        ['unit', 'sat'],
-        ['description', 'iOS Sovran wallet'],
-        ...relays
-          .filter((item, index, self) => index === self.findIndex((t) => t === item))
-          .map((relay) => ['relay', relay]),
+        ['d', 'mint-list'], // replaceable event identifier
+        ['client', 'sovran.money'],
       ],
-      pubkey: pubKey,
-      content: '', // You might want to add encrypted content here using nip44
+      pubkey: publicKeyHex,
+      content: encryptedContent,
       created_at: Math.floor(Date.now() / 1000),
     };
 
     const pool = new SimplePool();
-    return await pool.publish(relays, finalizeEvent(event, privKeyBytes));
+    pool.publish(relays, finalizeEvent(event, privateKeyBytes));
+    return true;
   } catch (err) {
     throw err;
   }

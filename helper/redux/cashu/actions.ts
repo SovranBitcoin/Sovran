@@ -240,10 +240,16 @@ export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
   };
 };
 
-export const addMintsAction = ({ profileId, mintUrls }) => {
-  return async (dispatch) => {
+export const addMintsAction = ({
+  profileId,
+  mintUrls,
+}: {
+  profileId: number;
+  mintUrls: string[];
+}) => {
+  return async (dispatch: any) => {
     // First update all mints (fetch and store keysets and info)
-    const updatePromises = mintUrls.map((mintUrl) => dispatch(updateMint({ mintUrl })));
+    const updatePromises = mintUrls.map((mintUrl: string) => dispatch(updateMint({ mintUrl })));
 
     const results = await Promise.all(updatePromises);
 

@@ -13,7 +13,6 @@ import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
 import { addMints, appendProofsV2, increaseCounterV2, setSelectedMint } from 'helper/redux/cashu';
 import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
 import { MintItem } from './MintItem';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -22,6 +21,7 @@ import _ from 'lodash';
 import { getProfile } from './components/fetchAccountData';
 import { Currency } from './components/CurrencyIcon';
 import { TouchableOpacityProgress } from './components/TouchableOpacityProgress';
+import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { toResult } from 'helper/toResult';
 
@@ -271,6 +271,7 @@ const ChainLoadingAnimation = () => {
           const mints = [];
           for (const mint of message.payload.mints) {
             const { mintUrl } = mint;
+
             const generator = await restoreMint({
               mintUrl,
               profile,
@@ -278,7 +279,7 @@ const ChainLoadingAnimation = () => {
                 mnemonic.trim() ===
                 'suit edge uphold icon modify more oak can zero legal sudden rival'
                   ? ['sat']
-                  : ['sat'],
+                  : ['sat', 'usd', 'eur', 'gbp'],
             });
             let result = await generator.next();
 
@@ -323,7 +324,7 @@ const ChainLoadingAnimation = () => {
           );
           return { type: 'complete' };
       }
-    } catch {
+    } catch (e) {
       setSteps(
         ensureCompleteStep(
           steps,
@@ -723,7 +724,7 @@ const ChainLoadingAnimation = () => {
     const currencies = currentMintInfo.mint.currencies;
     console.log(123213123, currencies, currencyIndex);
     if (currencyIndex < currencies.length) {
-      return currencies[currencyIndex].name;
+      return currencies[currencyIndex]?.name;
     }
     return '';
   };

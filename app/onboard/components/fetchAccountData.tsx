@@ -32,11 +32,16 @@ export async function getProfile({ mnemonic, accountIndex }) {
   const profileData = await fetchAccountData({ nsec });
 
   if (profileData?.profile?.created_at) {
-    const mintsInfo = await fetchEventFromRelays(pk);
+    // Pass both pubKey and mnemonic to decrypt the mint data
+    const mints = await fetchEventFromRelays(pk, mnemonic);
 
-    const mints = mintsInfo?.tags.filter((tag) => tag[0] === 'mint').map((tag) => tag[1]) || [];
-
-    return { ...profileData, mints, mnemonic, id: accountIndex, nsec };
+    return {
+      ...profileData,
+      mints: mints || [], // Ensure mints is always an array
+      mnemonic,
+      id: accountIndex,
+      nsec,
+    };
   } else {
     return null;
   }
