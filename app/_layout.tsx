@@ -41,6 +41,11 @@ import { registerAllSheets } from 'components/layout/sheets/registerSheets';
 import PasscodeGate from 'components/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
 
+/**
+ * Splash screen component
+ */
+import splash from 'assets/images/splash.png';
+
 registerAllSheets({ context: 'global' });
 
 // Configure constants
@@ -91,10 +96,6 @@ function useNostrDMs(currentProfile, addMessage, messages) {
     fetchDMs();
   }, [currentProfile.pubkey, currentProfile.nsec, addMessage, messages]);
 }
-
-/**
- * Splash screen component
- */
 function MySplashScreen({ opacity }: { opacity: Animated.Value }) {
   return (
     <Animated.View
@@ -109,7 +110,7 @@ function MySplashScreen({ opacity }: { opacity: Animated.Value }) {
           width: Dimensions.get('window').width,
           height: Dimensions.get('window').height,
         }}
-        source={require('assets/images/splash.png')}
+        source={splash}
       />
     </Animated.View>
   );

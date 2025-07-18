@@ -31,10 +31,18 @@ type MessageConfig = {
   text: MessageText;
   type: string;
   buttons?: MessageButton[]; // Make button optional
+  variant?: string; // Add variant as optional property
 };
 
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   // Authentication & Permissions
+  latest_version: {
+    title: 'New Version Available',
+    text: ({ version }: { version: string }) =>
+      `A new version of the app is available. Please update to the latest version.`,
+    type: MESSAGE_TYPES.INFO,
+    variant: 'persistent',
+  },
   ecash_token_copied: {
     title: 'Token Copied',
     text: 'Ecash token has been copied to your clipboard.',
@@ -358,7 +366,7 @@ export const showMessage = (
 
   const text = typeof config.text === 'function' ? config.text(params) : config.text;
 
-  const variant = options.variant || 'alert'; // Default to alert if not specified
+  const variant = options.variant || config.variant || 'alert'; // Use config variant if available
 
   const payload = {
     message: config.title,

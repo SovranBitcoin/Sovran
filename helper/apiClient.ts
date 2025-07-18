@@ -100,6 +100,15 @@ const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
   }
 };
 
+const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Error>> => {
+  try {
+    const res = await fetch(url, { method: 'POST', body });
+    return ok(res.json() as T);
+  } catch (e) {
+    return err(e instanceof Error ? e : new Error('Unknown error'));
+  }
+};
+
 export const fetchProducts = () => {
   return safeFetch<{ success: boolean; obj?: { packageList: ProductPackage[] } }>(
     `${BASE_URL}/esim/products`
@@ -201,3 +210,19 @@ interface AuditMintResponse {
 
 export const auditMint = ({ mintUrl }: { mintUrl: string }) =>
   safeFetch<AuditMintResponse>(`${BASE_URL}/cashu/mint/audit?mintUrl=${mintUrl}`);
+
+// The point of this object is to extract the structure of the state object
+// This is so we don't send the state object with all its private data
+// The reason I'm doing this is so I can help ensure the users state is not corrupted or invalid
+// It's not a fullproof solution, but it will allow me to purge parts of the state if unused
+// or restructure the state object if needed without being concerned about bugs.
+// If any private data is leaked from this that would be considered a bug.
+// Also we can at the same time check if the user is on the latest version.
+export const getLatestVersion = ({
+  storage,
+}: {
+  storage: {
+    version: string;
+    store: object;
+  };
+}) => safePost<{ version: string }>(`${BASE_URL}/app/latest-version`, storage);

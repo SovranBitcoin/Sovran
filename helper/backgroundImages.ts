@@ -222,30 +222,6 @@ export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttribut
 };
 
 export const BACKGROUND_IMAGES: Record<string, BackgroundImageMeta> = {
-  // 'bg.png': {
-  //   id: 'bg.png',
-  //   name: 'Eternal Pines',
-  //   category: 'Dynamic',
-  //   source: require('assets/images/backgrounds/bg.png'),
-  // },
-  // 'bg2.png': {
-  //   id: 'bg2.png',
-  //   name: 'Eternal Jungle',
-  //   category: 'Dynamic',
-  //   source: require('assets/images/backgrounds/bg2.png'),
-  // },
-  // 'bg3.png': {
-  //   id: 'bg3.png',
-  //   name: 'Cabin in the Light',
-  //   category: 'Dynamic',
-  //   source: require('assets/images/backgrounds/bg3.png'),
-  // },
-  // 'bg4.png': {
-  //   id: 'bg4.png',
-  //   name: 'Ebb and Glow',
-  //   category: 'Dynamic',
-  //   source: require('assets/images/backgrounds/bg4.png'),
-  // },
   'bg6.png': {
     id: 'bg6.png',
     name: 'Static 2',

@@ -15,10 +15,11 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
 
   const payload = useSheetPayload('popup-sheet');
   const isModal = payload?.variant === 'modal';
+  const isPersistent = payload?.variant === 'persistent';
   const navigation = useTypedNavigation();
 
   useEffect(() => {
-    if (!isModal) {
+    if (!isModal && !isPersistent) {
       const timer = setTimeout(() => {
         router?.goBack();
       }, 3000);
@@ -31,7 +32,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
 
       return () => clearTimeout(timer);
     }
-  }, [router, progress, isModal]);
+  }, [router, progress, isModal, isPersistent]);
 
   return (
     <View
@@ -42,7 +43,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
         overflow: 'hidden',
         backgroundColor: greys(theme)[800],
         padding: 16,
-        justifyContent: isModal ? 'center' : 'flex-end',
+        justifyContent: isModal || isPersistent ? 'center' : 'flex-end',
       }}>
       <View style={styles.iconContainer}>
         <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>
@@ -69,7 +70,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
             variant={'primary'}></Button>
         );
       })}
-      {!isModal && (
+      {!isModal && !isPersistent && (
         <View style={styles.progressBarContainer}>
           <Animated.View
             style={[

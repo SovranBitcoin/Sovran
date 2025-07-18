@@ -1,6 +1,5 @@
 {
   "expo": {
-    "newArchEnabled": true,
     "name": "Sovran",
     "slug": "sovran",
     "version": "0.0.24",
@@ -60,6 +59,11 @@
       "expo-video"
     ],
     "extra": {
+      "assets": {
+        "assetPatternsToBeBundled": [
+          "assets/**/*.png"
+        ]
+      },
       "router": {
         "origin": false
       },

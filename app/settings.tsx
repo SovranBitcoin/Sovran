@@ -20,9 +20,9 @@ import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
 
-const name = Application.applicationName;
-const version = Application.nativeApplicationVersion;
-const buildNumber = Application.nativeBuildVersion;
+export const name = Application.applicationName;
+export const version = Application.nativeApplicationVersion;
+export const buildNumber = Application.nativeBuildVersion;
 
 export const Section: React.FC<{
   title: string;

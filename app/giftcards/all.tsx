@@ -10,6 +10,16 @@ import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
 
+import amazon from 'assets/images/giftcards/amazon.png';
+import deliveroo from 'assets/images/giftcards/deliveroo.png';
+import justeat from 'assets/images/giftcards/justeat.png';
+import uber from 'assets/images/giftcards/uber.png';
+import adidas from 'assets/images/giftcards/adidas.png';
+import nike from 'assets/images/giftcards/nike.png';
+import airbnb from 'assets/images/giftcards/airbnb.png';
+import asos from 'assets/images/giftcards/asos.png';
+import costa from 'assets/images/giftcards/costa.png';
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     productGrid: {
@@ -76,62 +86,56 @@ export default function ModalScreen() {
 
   const productsList = [
     {
-      productImage: require('assets/images/giftcards/amazon.png'),
+      productImage: amazon,
       title: 'Amazon',
       image: 'https://www.bitrefill.com/af/en/gift-cards/amazon-united-arab-emirates/',
       slug: 'amazon',
     },
     {
-      productImage: require('assets/images/giftcards/deliveroo.png'),
+      productImage: deliveroo,
       title: 'Deliveroo',
       image: 'https://www.bitrefill.com/af/en/gift-cards/amazon-united-arab-emirates/',
       slug: 'deliveroo',
     },
     {
-      productImage: require('assets/images/giftcards/justeat.png'),
+      productImage: justeat,
       slug: 'just-eat',
       title: 'Just Eat',
       image: 'https://www.bitrefill.com/af/en/gift-cards/just-eat-united-arab-emirates/',
     },
     {
-      productImage: require('assets/images/giftcards/uber.png'),
+      productImage: uber,
       title: 'Uber',
       image: 'https://www.bitrefill.com/af/en/gift-cards/uber-united-arab-emirates/',
     },
     {
-      productImage: require('assets/images/giftcards/adidas.png'),
+      productImage: adidas,
       title: 'Adidas',
       slug: 'adidas',
       image: 'https://www.bitrefill.com/af/en/gift-cards/adidas-united-arab-emirates/',
     },
     {
-      productImage: require('assets/images/giftcards/nike.png'),
+      productImage: nike,
       title: 'Nike',
       image: 'https://www.bitrefill.com/af/en/gift-cards/nike-united-arab-emirates/',
       slug: 'nike',
     },
     {
-      productImage: require('assets/images/giftcards/airbnb.png'),
+      productImage: airbnb,
       slug: 'airbnb',
       title: 'Airbnb',
       image: 'https://www.bitrefill.com/af/en/gift-cards/airbnb-united-arab-emirates/',
     },
     {
-      productImage: require('assets/images/giftcards/asos.png'),
+      productImage: asos,
       slug: 'asos',
       title: 'ASOS',
       image: 'https://www.bitrefill.com/af/en/gift-cards/asos-united-arab-emirates/',
     },
     {
-      productImage: require('assets/images/giftcards/costa.png'),
+      productImage: costa,
       slug: 'costa',
       title: 'Costa',
-      image: 'https://www.bitrefill.com/af/en/gift-cards/costa-united-arab-emirates/',
-    },
-    {
-      productImage: require('assets/images/giftcards/costa.png'),
-      slug: 'apple',
-      title: 'Apple',
       image: 'https://www.bitrefill.com/af/en/gift-cards/costa-united-arab-emirates/',
     },
   ];

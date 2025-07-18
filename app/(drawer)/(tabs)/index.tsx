@@ -1,5 +1,5 @@
 import 'app/global';
-import React, { memo, useCallback, useState, useLayoutEffect } from 'react';
+import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -17,7 +17,7 @@ import { useTransactionsData } from 'hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
-import { store } from 'helper/redux/store';
+import { getStructure, store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import Welcome from 'app/onboard/welcome';
 import TermsConditionsScreen from 'app/settings/terms';
@@ -32,6 +32,10 @@ import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/layout/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { Card } from 'components/common/Card';
+import { getLatestVersion } from 'helper/apiClient';
+import semver from 'semver';
+import { version } from 'app/settings';
+
 interface NPUBQuote {
   amount: number;
   createdAt: number;
@@ -157,6 +161,27 @@ function TabOneScreen() {
   }, [navigation, account, accounts]);
 
   useDeeplink();
+
+  useEffect(() => {
+    (async () => {
+      if (!version) return;
+
+      const latestVersionResult = await getLatestVersion({
+        storage: {
+          version: version,
+          store: getStructure(store.getState()),
+        },
+      });
+
+      if (latestVersionResult.isOk()) {
+        if (semver.gt(latestVersionResult.value.version, version)) {
+          showMessage('latest_version', {
+            version: latestVersionResult.value.version,
+          });
+        }
+      }
+    })();
+  }, []);
 
   if (!(currentProfile?.pubkey && selectedMint)) {
     return <Welcome />;
