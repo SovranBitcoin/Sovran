@@ -20,6 +20,7 @@ export interface ButtonBaseProps {
   icon?: ReactNode;
   style?: StyleProp<ViewStyle>;
   noPadding?: boolean;
+  renderBackground?: (colors: string[], width: number) => ReactNode;
 }
 
 export const ButtonBase = ({
@@ -31,6 +32,7 @@ export const ButtonBase = ({
   icon,
   style,
   noPadding = false,
+  renderBackground,
   ...props
 }: ButtonBaseProps): React.ReactNode => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -122,11 +124,12 @@ export const ButtonBase = ({
               borderColor: variant === 'primary' ? greys(theme)[50] : greys(theme)[500],
               width: !text ? 48 : undefined,
               height: !text ? 48 : undefined,
-              backgroundColor: colorsMap[variant][1],
+              backgroundColor: renderBackground ? 'transparent' : colorsMap[variant][1],
             },
             style,
           ]}
           blur={variant !== 'primary'}>
+          {renderBackground && renderBackground(colorsMap[variant], !text ? 48 : 200)}
           <View className="flex flex-row items-center justify-center">
             {shouldShowLoading ? (
               <Icon
