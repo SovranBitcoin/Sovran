@@ -273,13 +273,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 
   'outputs have already been signed before.': {
     title: 'Outputs have been signed before',
-    text: 'Fix this in the debug settings',
-    buttons: [
-      {
-        text: 'Open Debug',
-        page: 'settings/restoreCounter',
-      },
-    ],
+    text: 'Trying again should fix this. If not contact support.',
     type: MESSAGE_TYPES.INFO,
   },
 

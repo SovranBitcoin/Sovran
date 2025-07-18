@@ -303,7 +303,8 @@ export async function sendLightning({
 
   // Retry logic for wallet operations
   const attemptSend = async (
-    forceRefresh = false
+    forceRefresh = false,
+    updateCounter = false
   ): Promise<Result<LightningSendTransaction, Error>> => {
     const currentProofs = memoizedGetProofs(unit)(state);
     const walletRes = await getWallet({
@@ -332,6 +333,17 @@ export async function sendLightning({
     }
 
     const profileId = store.getState().nostr?.currentProfile?.id;
+
+    if (updateCounter) {
+      store.dispatch(
+        increaseCounterV2({
+          profileId,
+          mintUrl: wallet.mint.mintUrl,
+          keysetId: wallet.keysetId,
+          amount: 25,
+        })
+      );
+    }
 
     const counter = memoizedGetCounterV2({
       profileId,
@@ -443,6 +455,13 @@ export async function sendLightning({
   if (first.isErr() && first.error.message === 'keyset id inactive.') {
     Alert.alert('Updating keyset...');
     return attemptSend(true);
+  } else if (
+    first.isErr() &&
+    first.error.message.startsWith('outputs have already been signed before.')
+  ) {
+    Alert.alert('Updating counter...');
+    // todo: perhaps we can get the real counter. That would be better but this works as a hack for now.
+    return attemptSend(false, true);
   }
   return first;
 }
@@ -530,7 +549,8 @@ export async function sendEcash({
 
   // Retry logic for wallet operations
   const attemptSend = async (
-    forceRefresh = false
+    forceRefresh = false,
+    updateCounter = false
   ): Promise<Result<EcashSendTransaction, Error>> => {
     const currentProofs = memoizedGetProofs(unit)(state);
     const balance = memoizedGetBalance(unit)(state);
@@ -552,6 +572,17 @@ export async function sendEcash({
     const keysetId = activeKeyset.id;
     wallet.keysetId = keysetId;
 
+    if (updateCounter) {
+      store.dispatch(
+        increaseCounterV2({
+          profileId: profile.id,
+          mintUrl: wallet.mint.mintUrl,
+          keysetId: wallet.keysetId,
+          amount: 25,
+        })
+      );
+    }
+
     const counter = memoizedGetCounterV2({
       profileId: profile.id,
       mintUrl: wallet.mint.mintUrl,
@@ -565,6 +596,7 @@ export async function sendEcash({
         keysetId,
       })
     );
+
     if (sendRes.isErr()) return err(sendRes.error);
     const { keep, send, used } = sendRes.value;
 
@@ -641,6 +673,12 @@ export async function sendEcash({
   if (first.isErr() && first.error.message === 'keyset id inactive.') {
     Alert.alert('Updating keyset...');
     return attemptSend(true);
+  } else if (
+    first.isErr() &&
+    first.error.message.startsWith('outputs have already been signed before.')
+  ) {
+    Alert.alert('Updating counter...');
+    return attemptSend(false, true);
   }
   return first;
 }
