@@ -46,7 +46,7 @@ export default function ModalScreen() {
         {Object.entries(keysets).map(([mintUrl, keysetArray]) => (
           <React.Fragment key={mintUrl}>
             <Text>{mintUrl}</Text>
-            {keysetArray.map((keyset) => (
+            {keysetArray?.map((keyset) => (
               <React.Fragment key={keyset.id}>
                 <Text>{keyset.id}</Text>
                 <Button

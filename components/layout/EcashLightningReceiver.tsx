@@ -188,10 +188,12 @@ const EcashLightningReceiver = ({ unit }: EcashLightningReceiverProps) => {
               marginHorizontal: 16,
               marginTop: 0,
             }}>
-            <Card
-              message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
-              variant="warning"
-            />
+            {new Date() > new Date('2025-07-30') && (
+              <Card
+                message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
+                variant="warning"
+              />
+            )}
             <Spacer size={12} />
           </View>
         )}
