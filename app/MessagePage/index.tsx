@@ -97,11 +97,12 @@ export default function ModalScreen() {
   );
 
   // Filter and deduplicate messages
-  const filteredMessages: Message[] = messages
-    .filter((msg) => (msg.pubkey || msg.sender) === convertNpub(params.pubkey))
-    .reduce<Message[]>((unique, msg) => {
-      return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
-    }, []);
+  const filteredMessages: Message[] =
+    messages
+      ?.filter((msg) => (msg.pubkey || msg.sender) === convertNpub(params.pubkey))
+      ?.reduce<Message[]>((unique, msg) => {
+        return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
+      }, []) || [];
 
   const bitrefillEvents =
     params?.pubkey === 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264'

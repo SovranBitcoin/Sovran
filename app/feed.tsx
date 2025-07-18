@@ -12,7 +12,7 @@ import { Tabs } from 'components/common/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
-import { EventKind } from './Profile';
+import { EventKind } from 'helper/constants';
 
 const Feed = ({ theme, filters }) => {
   const { events, isLoading } = useSubscribe({ filters });

@@ -6,7 +6,6 @@ import { relays } from 'components/ndk';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { deriveMintBackupKeys } from 'helper/cashuClient';
 import _ from 'lodash';
-import { Alert } from 'react-native';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -73,9 +72,7 @@ export async function fetchEventFromRelays(
 
 async function publishWalletEvent(mints: string[]): Promise<boolean> {
   try {
-    Alert.alert('publishWalletEvent', JSON.stringify(mints));
     const currentProfile = memoizedGetCurrentProfile(store.getState());
-    Alert.alert('currentProfile', JSON.stringify(currentProfile));
 
     if (!currentProfile?.nut13) {
       throw new Error('No valid nut13 set in profile');
@@ -85,15 +82,10 @@ async function publishWalletEvent(mints: string[]): Promise<boolean> {
       mints: _.uniq(mints),
       timestamp: Math.floor(Date.now() / 1000),
     };
-    Alert.alert('backupData', JSON.stringify(backupData));
 
     const { privateKeyBytes, publicKeyHex } = deriveMintBackupKeys(currentProfile.nut13);
-    Alert.alert('privateKeyBytes', JSON.stringify(privateKeyBytes));
-    Alert.alert('publicKeyHex', JSON.stringify(publicKeyHex));
     const conversationKey = nip44.v2.utils.getConversationKey(privateKeyBytes, publicKeyHex);
-    Alert.alert('conversationKey', JSON.stringify(conversationKey));
     const encryptedContent = nip44.v2.encrypt(JSON.stringify(backupData), conversationKey);
-    Alert.alert('encryptedContent', JSON.stringify(encryptedContent));
 
     const event: NostrEvent = {
       kind: 30078,
