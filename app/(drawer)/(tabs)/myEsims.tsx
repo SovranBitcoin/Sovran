@@ -18,7 +18,7 @@ import { fetchProducts, ProductPackage } from 'helper/apiClient';
 import { useTypedNavigation } from 'helper/navigation';
 
 // Separate component for eSIM item
-const EsimItem = ({ esim }) => {
+const EsimItem = ({ esim }: { esim: Esim }) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
