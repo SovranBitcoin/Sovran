@@ -451,6 +451,18 @@ export const getStructure = (obj: any): any => {
     return typeof obj;
   }
   if (Array.isArray(obj)) {
+    if (obj.length === 0) {
+      return [];
+    }
+
+    const firstItem = obj[0];
+
+    // If array contains primitives (strings, numbers, etc.)
+    if (typeof firstItem !== 'object' || firstItem === null) {
+      return [typeof firstItem];
+    }
+
+    // If array contains objects, use your existing logic
     const allKeys = obj.reduce((keys, item) => {
       if (typeof item === 'object' && item !== null) {
         Object.keys(item).forEach((key) => keys.add(key));
