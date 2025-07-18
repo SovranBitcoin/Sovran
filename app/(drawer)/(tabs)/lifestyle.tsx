@@ -21,7 +21,7 @@ interface MenuItemData {
   empty?: boolean;
 }
 
-export const activationDate = new Date('2025-08-01');
+export const activationDate = new Date('2025-07-17');
 
 const SERVICE_MENU_ITEMS: MenuItemData[] = [
   ...(new Date() > activationDate
