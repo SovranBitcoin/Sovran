@@ -21,6 +21,8 @@ interface DonutChartContainerProps {
   titleText?: string;
   totalValueSuffix?: string;
   colors?: string[];
+  disableItems?: boolean;
+  isSpecialCase?: boolean;
 }
 
 const RADIUS = 160;

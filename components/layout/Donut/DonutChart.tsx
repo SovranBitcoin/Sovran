@@ -6,6 +6,7 @@ import { View } from 'components/common/View';
 import { greens, greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { DonutData } from '.';
 
 type Props = {
   n: number;
@@ -20,6 +21,8 @@ type Props = {
   smallFont: SkFont;
   titleText?: string;
   totalValueSuffix?: string;
+  isSpecialCase?: boolean;
+  chartData: DonutData[];
 };
 
 const DonutChart = ({
