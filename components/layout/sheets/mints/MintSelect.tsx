@@ -67,7 +67,7 @@ interface MintItemProps {
   isLoading: boolean;
   globalLoading: boolean;
   selectedCurrency: string;
-  theme: string;
+  theme: Theme;
   onPress: () => void;
 }
 
@@ -442,15 +442,6 @@ const createStyles = (theme: Theme) =>
       color: greys(theme)[0],
       fontSize: 14,
       fontFamily: 'OverpassBold',
-    },
-    mintScroll: {},
-    mintItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      borderRadius: 8,
-      backgroundColor: greys(theme)[800],
-      marginBottom: 8,
     },
     selectedMintItem: {
       backgroundColor: greys(theme)[700],
