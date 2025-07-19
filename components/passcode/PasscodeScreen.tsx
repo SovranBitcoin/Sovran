@@ -66,12 +66,6 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     }
   };
 
-  const name =
-    currentProfile?.profile?.displayName ||
-    currentProfile?.profile?.name ||
-    currentProfile?.profile?.display_name ||
-    currentProfile?.profile?.username;
-
   return (
     <BlurView style={styles.container}>
       <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
@@ -81,7 +75,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
         )}
 
-        {name ? (
+        {currentProfile?.profile?.name ? (
           <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
         ) : (
           <Text style={styles.title}>Enter Passcode</Text>
