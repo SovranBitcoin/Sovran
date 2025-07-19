@@ -220,7 +220,7 @@ function TabOneScreen() {
             )}
           </View>
           <View
-            className="p-4"
+            className="p-4 pt-0"
             style={{
               backgroundColor: opacity(theme.greys[950], 0.99),
             }}>
@@ -262,7 +262,6 @@ const createStyles = () =>
     },
     accountPagerView: {
       display: 'flex',
-      // height: 550,
       width: '100%',
     },
   });
