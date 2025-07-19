@@ -238,17 +238,6 @@ const createStyles = () => ({
     fontFamily: 'OverpassBold',
     width: '100%',
   },
-  hiddenButton: {
-    backgroundColor: 'transparent',
-    borderRadius: 1000,
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    opacity: 0,
-    pointerEvents: 'none',
-  },
 });
 
 export default Header;
