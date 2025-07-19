@@ -20,7 +20,6 @@ import { Text } from 'components/common/Text';
 import Footer from './Footer';
 import Header from './Header';
 import TimelineItem from './TimeLine';
-import { Button } from 'components/common/Button';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
@@ -299,18 +298,12 @@ export default function ModalScreen() {
                 },
               ]}
             />
-            {currentProfile?.nsec ? (
+            {currentProfile?.nsec && (
               <Footer
                 theme={theme}
                 message={message}
                 setMessage={setMessage}
                 handleSendDM={handleSendDM}
-              />
-            ) : (
-              <Button
-                text={'Sign in to send and receive messages'}
-                variant="primary"
-                onPress={() => navigation.navigate('nostrSettings')}
               />
             )}
           </>
