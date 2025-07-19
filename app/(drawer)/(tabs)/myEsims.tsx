@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 import { View } from 'components/common/View';
@@ -8,7 +8,7 @@ import CircularProgress from 'components/common/CircleProgress';
 import { Esim, useEsims } from 'helper/redux/esim';
 import { useCashu } from 'helper/redux/cashu';
 import { convertDataUsage } from '../../../app/esim';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { convertTimeData } from 'helper/time';
 import { showMessage } from 'helper/popup/popups';
@@ -20,7 +20,6 @@ import { useTypedNavigation } from 'helper/navigation';
 // Separate component for eSIM item
 const EsimItem = ({ esim }: { esim: Esim }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
   const handlePress = () => {
@@ -76,16 +75,35 @@ const EsimItem = ({ esim }: { esim: Esim }) => {
 
   return (
     <Pressable onPress={handlePress}>
-      <View blur style={styles.esimItem}>
-        <View style={styles.progressContainer}>
+      <View
+        blur
+        className="mb-4 flex-row items-center rounded-2xl p-3"
+        style={{
+          backgroundColor: greys(theme)[800],
+          borderColor: greys(theme)[600],
+          borderWidth: 0.2,
+        }}>
+        <View className="flex-row items-center justify-between bg-transparent">
           <CircularProgress country={esim.package.location} progress={getDataUsagePercentage()} />
         </View>
-        <View style={styles.esimInfo}>
-          <Text style={styles.countryText}>{countryName}</Text>
-          <Text style={styles.remainingDataText}>
+        <View className="ml-3 flex-1 bg-transparent">
+          <Text
+            size={14}
+            style={{
+              color: greys(theme)[200],
+            }}>
+            {countryName}
+          </Text>
+          <Text overpass bold size={18}>
             {remainingData ? `${remainingData} remaining` : 'Not activated'}
           </Text>
-          <Text style={styles.expirationText}>
+          <Text
+            size={14}
+            overpass
+            regular
+            style={{
+              marginTop: 12,
+            }}>
             {remainingData ? `Expires ${expiresOn}` : 'eSIM'}
           </Text>
         </View>
@@ -97,14 +115,22 @@ const EsimItem = ({ esim }: { esim: Esim }) => {
 // Section component for better organization
 const EsimSection = ({ title, esims }: { title: string; esims: Esim[] }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   return (
     <>
       {esims.length > 0 ? (
         esims.map((esim) => <EsimItem esim={esim} key={esim.request} />)
       ) : (
-        <Text style={styles.noItemsText}>No {title.toLowerCase()}</Text>
+        <Text
+          size={14}
+          overpass
+          regular
+          style={{
+            color: greys(theme)[200],
+            marginBottom: 16,
+          }}>
+          No {title.toLowerCase()}
+        </Text>
       )}
     </>
   );
@@ -113,7 +139,6 @@ const EsimSection = ({ title, esims }: { title: string; esims: Esim[] }) => {
 // Main component
 function EsimsScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const { transactions: cashuTransactions } = useCashu();
   const { esims } = useEsims();
@@ -202,15 +227,16 @@ function EsimsScreen() {
 
   return (
     <View
+      className="flex-1"
       style={{
         paddingTop: 96,
-        flex: 1,
         backgroundColor: greys(theme)[950],
       }}>
       <Text
         size={32}
+        overpass
+        heavy
         style={{
-          fontFamily: 'OverpassHeavy',
           marginLeft: 16,
           marginBottom: 4,
         }}>
@@ -227,7 +253,7 @@ function EsimsScreen() {
           handleTabPress={setSelectedTab}
         />
       </View>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView className="flex-1 px-4 pt-1">
         {selectedTab === 'New' && <EsimSection title="New eSIMs" esims={categorizedEsims.new} />}
         {selectedTab === 'Active' && (
           <EsimSection title="Installed eSIMs" esims={categorizedEsims.active} />
@@ -278,54 +304,5 @@ function categorizeEsims(paidEsims: Esim[], currentDate: Date) {
     ),
   };
 }
-
-// Styles
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    scrollView: {
-      padding: 16,
-      paddingTop: 4,
-      flex: 1,
-    },
-    esimItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-      padding: 12,
-      borderRadius: 16,
-      backgroundColor: greys(theme)[800],
-      borderColor: greys(theme)[600],
-      borderWidth: 0.2,
-    },
-    progressContainer: {
-      alignItems: 'center',
-      backgroundColor: 'transparent',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    esimInfo: {
-      backgroundColor: 'transparent',
-      marginLeft: 12,
-      flex: 1,
-    },
-    countryText: {
-      fontSize: 14,
-      color: greys(theme)[200],
-    },
-    remainingDataText: {
-      fontSize: 18,
-      fontFamily: 'OverpassBold',
-    },
-    expirationText: {
-      marginTop: 12,
-      fontSize: 14,
-      fontFamily: 'OverpassRegular',
-    },
-    noItemsText: {
-      fontSize: 14,
-      color: greys(theme)[200],
-      marginBottom: 16,
-    },
-  });
 
 export default EsimsScreen;
