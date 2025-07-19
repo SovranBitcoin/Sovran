@@ -221,12 +221,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'nostrSettings',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'vpns',
     options: {
       presentation: 'modal',
