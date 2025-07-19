@@ -95,6 +95,7 @@ function useNostrDMs(currentProfile, addMessage, messages) {
     fetchDMs();
   }, [currentProfile.pubkey, currentProfile.nsec, addMessage, messages]);
 }
+
 function MySplashScreen() {
   return (
     <Animated.Image
@@ -159,7 +160,7 @@ function MainStack() {
     <>
       <StatusBar
         backgroundColor={greys(theme)[950]}
-        barStyle={theme === 'light' ? 'dark-content' : 'light-content'}
+        barStyle={theme.id.includes('light') ? 'dark-content' : 'light-content'}
       />
       <Stack
         screenOptions={{
@@ -196,18 +197,14 @@ export default function RootLayout() {
   const [appIsReady, setAppIsReady] = useState(false);
   const scaleRef = useRef(new Animated.Value(1));
 
-  // Load fonts
   const [fontsLoaded, fontsError] = useFonts();
 
-  // Handle font loading errors
   useEffect(() => {
     if (fontsError) throw fontsError;
   }, [fontsError]);
 
-  // Initialize NDK and prepare app
   useEffect(() => {
     if (fontsLoaded) {
-      // Start splash screen fade out animation
       setTimeout(() => {
         Animated.timing(scaleRef.current, {
           toValue: 0,
@@ -218,30 +215,24 @@ export default function RootLayout() {
       }, 0);
     }
 
-    // Initialize Nostr Development Kit
     initializeNDK({
       explicitRelayUrls: RELAY_URLS,
     });
   }, [fontsLoaded, initializeNDK]);
 
-  // Hide splash screen when app is ready
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) await SplashScreen.hideAsync();
   }, [appIsReady]);
 
-  // Show splash screen while loading
   if (!appIsReady) {
     return <MySplashScreen />;
   }
 
-  // Get container styles based on platform
   const containerStyle = {
     width:
       Platform.OS === 'web'
         ? Math.min(Dimensions.get('window').width, 600)
         : Dimensions.get('window').width,
-    margin: 'auto',
-    maxWidth: '100%',
   };
 
   return (
