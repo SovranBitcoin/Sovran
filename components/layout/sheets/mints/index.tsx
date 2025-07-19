@@ -479,15 +479,6 @@ const MintSheet = ({
 
 export const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 6,
-      paddingHorizontal: 6,
-      borderRadius: 100000,
-      backgroundColor: greys(theme)[800],
-      marginBottom: 8,
-    },
     icon: {
       width: 32,
       height: 32,
@@ -505,137 +496,10 @@ export const createStyles = (theme: Theme) =>
       fontFamily: 'OverpassBold',
       marginLeft: -2,
     },
-    dot: {
-      color: greys(theme)[400],
-      fontSize: 16,
-      marginHorizontal: 8,
-    },
-    balance: {
-      color: greys(theme)[100],
-      fontSize: 12,
-      fontFamily: 'OverpassBold',
-    },
     chevronContainer: {
       alignSelf: 'center',
       justifyContent: 'flex-end',
-
       padding: 4,
-    },
-    chevron: {
-      marginRight: 0,
-    },
-    actionSheetContainer: {
-      height: '100%',
-      backgroundColor: greys(theme)[950],
-    },
-    scrollContainer: {
-      padding: 16,
-      height: '100%',
-    },
-    buttonContainer: {
-      padding: 16,
-      backgroundColor: greys(theme)[950],
-    },
-    sectionHeader: {
-      color: greys(theme)[0],
-      fontSize: 18,
-      fontWeight: '600',
-      marginBottom: 12,
-    },
-    currencyScroll: {
-      flexGrow: 1,
-    },
-    currencyButton: {
-      marginRight: 12,
-      padding: 12,
-      borderRadius: 8,
-      backgroundColor: greys(theme)[800],
-      minWidth: 100,
-    },
-    currencyContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      gap: 8,
-    },
-    selectedCurrencyButton: {
-      backgroundColor: greys(theme)[700],
-    },
-    currencyText: {
-      color: greys(theme)[0],
-      fontSize: 14,
-      fontFamily: 'OverpassBold',
-    },
-    mintScroll: {
-      maxHeight: 300,
-    },
-    mintItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      borderRadius: 8,
-      backgroundColor: greys(theme)[800],
-      marginBottom: 8,
-    },
-    selectedMintItem: {
-      backgroundColor: greys(theme)[700],
-    },
-    mintIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: greys(theme)[200],
-    },
-    mintDetails: {
-      flex: 1,
-      marginLeft: 12,
-      marginRight: 12,
-    },
-    mintName: {
-      color: greys(theme)[0],
-      fontSize: 16,
-    },
-    mintBalance: {
-      color: greys(theme)[200],
-      fontSize: 14,
-    },
-    button: {
-      padding: 16,
-      backgroundColor: greys(theme)[800],
-      borderRadius: 8,
-      marginTop: 16,
-      alignItems: 'center',
-    },
-    buttonText: {
-      color: greys(theme)[0],
-      fontSize: 16,
-    },
-    checkIconContainer: {
-      backgroundColor: 'transparent',
-      marginLeft: 8,
-    },
-    loadingMintItem: {
-      opacity: 0.7,
-    },
-    loadingContainer: {
-      backgroundColor: 'transparent',
-      marginLeft: 8,
-      width: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    disabledButtonText: {
-      opacity: 0.5,
-    },
-    disabledMintItem: {
-      opacity: 0.5,
-    },
-    disabledImage: {
-      opacity: 0.5,
-    },
-    disabledText: {
-      opacity: 0.5,
     },
   });
 
