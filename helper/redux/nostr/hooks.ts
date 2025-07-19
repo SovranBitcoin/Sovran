@@ -1,11 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  setCurrentProfile,
-  setProfiles,
-  addMessage,
-  setSearch,
-  setFollows,
-} from './actions';
+import { setCurrentProfile, setProfiles, addMessage, setSearch, setFollows } from './actions';
 
 import { memoizedGetCurrentProfile } from './selectors';
 import { RootState } from '../store/reducer';
