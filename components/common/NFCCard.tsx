@@ -178,24 +178,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  chip: {
-    width: 45,
-    height: 35,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  chipLines: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-  },
-  chipLine: {
-    height: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    marginVertical: 2,
-  },
   rightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -213,16 +195,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontStyle: 'italic',
   },
-  cardNumberContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  cardNumber: {
-    fontSize: 22,
-    fontWeight: '500',
-    letterSpacing: 2,
-  },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -230,10 +202,6 @@ const styles = StyleSheet.create({
   },
   cardholderContainer: {
     flex: 2,
-  },
-  expiryContainer: {
-    flex: 1,
-    alignItems: 'flex-end',
   },
   label: {
     fontSize: 10,
@@ -244,10 +212,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     textTransform: 'uppercase',
-  },
-  expiryDate: {
-    fontSize: 16,
-    fontWeight: '500',
   },
   magneticStrip: {
     width: '100%',
