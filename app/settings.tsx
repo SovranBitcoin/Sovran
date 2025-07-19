@@ -110,6 +110,7 @@ export const RowButton: React.FC<{
       style={{
         backgroundColor: greys(theme)[800],
         borderColor: greys(theme)[700],
+        borderTopWidth: !isFirst ? 1 : 0,
       }}>
       <TouchableOpacity
         onPress={onPress}
