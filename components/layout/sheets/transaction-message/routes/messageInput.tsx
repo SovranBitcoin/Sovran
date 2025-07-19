@@ -75,10 +75,6 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: {
-      padding: 16,
-      flex: 1,
-    },
     title: {
       fontSize: 20,
       fontWeight: 'bold',
@@ -88,11 +84,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       color: greys(theme)[100],
       marginBottom: 24,
-    },
-    inputContainer: {
-      flex: 1,
-      marginBottom: 24,
-      height: 300,
     },
     textInput: {
       borderWidth: 0.5,
@@ -104,9 +95,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       minHeight: 120,
       textAlignVertical: 'top',
-    },
-    buttonContainer: {
-      marginTop: 16,
     },
   });
 
