@@ -27,7 +27,7 @@ const RenderItem = ({ item, index }: Props) => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
-  const [iconUrl, setIconUrl] = useState<string | null>(null); // State to store the icon URL
+  const [iconUrl, setIconUrl] = useState<string>(); // State to store the icon URL
 
   useEffect(() => {
     const fetchMintInfo = async () => {
