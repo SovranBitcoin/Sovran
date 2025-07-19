@@ -11,10 +11,9 @@ function CameraScreen() {
 
   return (
     <View
+      className="relative flex-1"
       style={{
-        flex: 1,
         backgroundColor: greys(theme)[950],
-        position: 'relative',
       }}>
       <Camera />
     </View>
