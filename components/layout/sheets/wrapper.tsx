@@ -80,12 +80,6 @@ const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: n
       top: containerHeight - buttonHeight,
       width: '100%',
     },
-    sectionHeader: {
-      color: greys(theme)[0],
-      fontSize: 18,
-      fontWeight: '600',
-      marginBottom: 12,
-    },
     button: {
       padding: 16,
       marginTop: 12,
