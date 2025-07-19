@@ -76,7 +76,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
         )}
 
         {currentProfile?.profile?.name ? (
-          <Text style={styles.welcome}>{`Welcome back, ${name}`}</Text>
+          <Text style={styles.welcome}>{`Welcome back, ${currentProfile?.profile?.name}`}</Text>
         ) : (
           <Text style={styles.title}>Enter Passcode</Text>
         )}
