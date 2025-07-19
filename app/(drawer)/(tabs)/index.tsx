@@ -137,7 +137,6 @@ function TabOneScreen() {
   const onRefresh = useCallback(async () => {}, []);
 
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles();
 
   const { transactions } = useCashu();
   const txData = useTransactionsData({
@@ -205,9 +204,9 @@ function TabOneScreen() {
       }}>
       <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
 
-      <View style={styles.safeAreaView}>
+      <View className="flex-1">
         <ScrollView
-          style={styles.scrollView}
+          className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
           <View className="mx-4">
@@ -251,19 +250,5 @@ function TabOneScreen() {
     </View>
   );
 }
-
-const createStyles = () =>
-  StyleSheet.create({
-    scrollView: {
-      marginTop: 0,
-    },
-    safeAreaView: {
-      flex: 1,
-    },
-    accountPagerView: {
-      display: 'flex',
-      width: '100%',
-    },
-  });
 
 export default memo(TabOneScreen);
