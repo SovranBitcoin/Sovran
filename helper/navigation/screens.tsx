@@ -308,10 +308,6 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Settings',
   },
   {
-    name: 'settings/showSeedPhrase',
-    title: 'Seed Phrase',
-  },
-  {
     name: 'settings/about',
     title: 'About',
   },

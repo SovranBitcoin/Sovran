@@ -240,17 +240,11 @@ const ModalScreen = () => {
         </Section>
         <Section title="Security">
           <RowButton
-            label="Show Seed Phrase"
-            onPress={() => {
-              navigation.navigate('settings/showSeedPhrase');
-            }}
-            isFirst
-          />
-          <RowButton
             label="Passcode"
             onPress={() => {
               navigation.navigate('settings/passcode');
             }}
+            isFirst
           />
         </Section>
         <Section title="Danger Zone" isDanger>
