@@ -7,7 +7,7 @@ import { greys, shades } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
-export const extractUrls = (text) => {
+export const extractUrls = (text: string) => {
   try {
     const urlRegex = /(https:\/\/[^\s]+)/g;
     const nostrRegex = /(nostr:(note1[^\s]+|nevent1[^\s]+))/g;
@@ -23,10 +23,18 @@ export const extractUrls = (text) => {
   }
 };
 
-export function TextContent({ content, length = 200, fontSize = 14 }) {
+export function TextContent({
+  content,
+  length = 200,
+  fontSize = 14,
+}: {
+  content: string;
+  length?: number;
+  fontSize?: number;
+}) {
   const theme = useSelector(memoizedGetTheme);
 
-  const extractHashtags = (text) => {
+  const extractHashtags = (text: string) => {
     try {
       const hashtagRegex = /#\w+/g;
       const hashtags = text.match(hashtagRegex) || [];
@@ -36,7 +44,7 @@ export function TextContent({ content, length = 200, fontSize = 14 }) {
     }
   };
 
-  const extractMentions = (text) => {
+  const extractMentions = (text: string) => {
     try {
       const mentionsRegex = /nostr:npub1\w+/g;
       const mentions = text.match(mentionsRegex) || [];
