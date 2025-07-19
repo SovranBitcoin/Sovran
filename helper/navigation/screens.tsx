@@ -32,7 +32,9 @@ export const TAB_SCREENS = (): TabConfig[] => [
           name: 'myEsims',
           component: MyEsims,
           title: '',
-          icon: ({ color }) => <Icon name="fluent:sim-24-filled" color={color} size={32} />,
+          icon: ({ color }: { color: string }) => (
+            <Icon name="fluent:sim-24-filled" color={color} size={32} />
+          ),
         },
       ]
     : []),
@@ -49,7 +51,9 @@ export const TAB_SCREENS = (): TabConfig[] => [
           name: 'myVpns',
           component: MyVpns,
           title: '',
-          icon: ({ color }) => <Icon name="ic:baseline-vpn-lock" color={color} size={32} />,
+          icon: ({ color }: { color: string }) => (
+            <Icon name="ic:baseline-vpn-lock" color={color} size={32} />
+          ),
         },
       ]
     : []),
