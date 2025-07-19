@@ -247,12 +247,6 @@ const ModalScreen = () => {
             isFirst
           />
           <RowButton
-            label="Verify Seed Phrase"
-            onPress={() => {
-              navigation.navigate('settings/verifySeedPhrase');
-            }}
-          />
-          <RowButton
             label="Passcode"
             onPress={() => {
               navigation.navigate('settings/passcode');

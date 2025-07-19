@@ -340,10 +340,6 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Custom Lightning URL',
   },
   {
-    name: 'settings/verifySeedPhrase',
-    title: 'Verify Seed Phrase',
-  },
-  {
     name: 'settings/passcode',
     title: 'Passcode',
   },
