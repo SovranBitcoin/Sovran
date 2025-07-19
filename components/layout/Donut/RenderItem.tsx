@@ -95,9 +95,6 @@ const createStyles = (theme: Theme) =>
     },
     contentContainer: {
       backgroundColor: 'transparent',
-      // flex: 1,
-      // flexDirection: "row",
-      // justifyContent: "space-between",
     },
     rightContainer: {
       flexDirection: 'row',
