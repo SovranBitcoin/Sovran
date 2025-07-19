@@ -206,6 +206,7 @@
     "@types/lodash": "^4.17.20",
     "@types/mocha": "^10.0.10",
     "@types/react": "^19.1.2",
+    "@types/semver": "^7.7.0",
     "babel-jest": "^30.0.4",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~9.2.0",
