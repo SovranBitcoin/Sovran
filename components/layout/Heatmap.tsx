@@ -7,7 +7,6 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import Image from 'components/common/Image';
-import opacity from 'hex-color-opacity';
 import { View } from 'components/common/View';
 
 const DonutChart = ({
@@ -206,7 +205,7 @@ const Heatmap = ({ mintInfo, wallet }: HeatmapProps) => {
 
   // heatmap
 
-  const getColor = (successRate) => {
+  const getColor = (successRate: number) => {
     // base colors on green/yellow/red
     if (successRate >= 0.9) return '#0CED3E';
     if (successRate >= 0.7) return '#ED9E0C';
@@ -303,7 +302,15 @@ const Heatmap = ({ mintInfo, wallet }: HeatmapProps) => {
   );
 };
 
-const StatsGrid = ({ theme, successRate, avgResponse }) => {
+const StatsGrid = ({
+  theme,
+  successRate,
+  avgResponse,
+}: {
+  theme: Theme;
+  successRate: number;
+  avgResponse: number;
+}) => {
   const stats = [
     {
       label: 'Success Rate',
@@ -404,15 +411,6 @@ const createStyles = (theme: Theme) =>
       elevation: 3,
     },
 
-    gradientOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      backgroundColor: opacity(greys(theme)[900], 0.1),
-    },
-
     label: {
       fontFamily: 'OverpassSemibold',
       fontSize: 13,
@@ -443,14 +441,6 @@ const createStyles = (theme: Theme) =>
       letterSpacing: 0.1,
     },
 
-    accentLine: {
-      position: 'absolute',
-      top: 0,
-      left: 16,
-      right: 16,
-      height: 2,
-      borderRadius: 1,
-    },
     container: {
       width: '100%',
       marginTop: 16,
@@ -458,44 +448,6 @@ const createStyles = (theme: Theme) =>
       flex: 1,
       justifyContent: 'flex-end',
       alignItems: 'flex-end',
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    title: {
-      color: greys(theme)[300],
-      fontFamily: 'OverpassRegular',
-      fontSize: 16,
-    },
-    value: {
-      color: greys(theme)[0],
-      fontFamily: 'OverpassBold',
-      fontSize: 16,
-    },
-    grid: {
-      flexDirection: 'row',
-      alignSelf: 'center',
-    },
-    column: {
-      flexDirection: 'column',
-      marginHorizontal: 1,
-    },
-    cell: {
-      width: 14,
-      height: 14,
-      marginVertical: 1,
-      borderRadius: 2,
-    },
-    loading: {
-      padding: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    scrollContainer: {
-      flex: 1,
     },
     loadingContainer: {
       flex: 1,
@@ -507,30 +459,6 @@ const createStyles = (theme: Theme) =>
       marginTop: 16,
       fontSize: 16,
       color: greys(theme)[100],
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 40,
-      paddingHorizontal: 20,
-    },
-    errorText: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: '#D32F2F',
-      textAlign: 'center',
-      marginBottom: 8,
-    },
-    errorSubtext: {
-      fontSize: 14,
-      color: greys(theme)[100],
-      textAlign: 'center',
-    },
-    headerContainer: {
-      alignItems: 'center',
-      paddingVertical: 24,
-      paddingBottom: 32,
     },
     logoContainer: {
       marginBottom: 16,
@@ -565,57 +493,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       color: greys(theme)[100],
       textAlign: 'center',
-    },
-    descriptionContainer: {
-      marginHorizontal: 16,
-      marginBottom: 16,
-      padding: 16,
-      backgroundColor: greys(theme)[400],
-      borderRadius: 12,
-      borderLeftWidth: 4,
-      borderLeftColor: '#FFA726',
-    },
-    descriptionText: {
-      fontSize: 14,
-      color: greys(theme)[50],
-      lineHeight: 20,
-    },
-    actionButton: {
-      backgroundColor: greens[300],
-      borderRadius: 8,
-      marginVertical: 2,
-    },
-    destructiveButton: {
-      backgroundColor: '#D32F2F',
-      borderRadius: 8,
-      marginVertical: 2,
-    },
-    actionText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: greys(theme)[0],
-      textAlign: 'center',
-    },
-    destructiveText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#ffffff',
-      textAlign: 'center',
-    },
-    copiedText: {
-      fontSize: 12,
-      color: greens[200],
-      fontWeight: '600',
-    },
-    container2: {
-      position: 'relative',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    centerContent2: {
-      position: 'absolute',
-      justifyContent: 'center',
-      alignItems: 'center',
     },
   });
 
