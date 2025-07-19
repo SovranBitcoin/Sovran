@@ -155,10 +155,6 @@ const createStyles = (theme: Theme) =>
     buttonContainer: {
       padding: 8,
     },
-    button: {
-      margin: 8,
-      marginTop: 0,
-    },
   });
 
 export default VerifySeedPhrase;
