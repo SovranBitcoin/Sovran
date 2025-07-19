@@ -51,7 +51,7 @@ export const useAutoListenBatch = (transactions: any[] = [], options = { enabled
         context.activeConnections.some((conn) => conn.id.includes(tx.request || tx.token))
       )
     );
-  }, [transactions, context?.activeConnections]);
+  }, [transactions, context]);
 
   if (!context) return { isListening: false };
 
