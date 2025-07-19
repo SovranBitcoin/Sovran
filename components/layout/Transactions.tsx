@@ -46,7 +46,7 @@ export const Transactions = React.memo(
     morePendingCount,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
-    const navigation = useTypedNavigation();
+    const navigation = useTypedNavigation<'transactions'>();
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;

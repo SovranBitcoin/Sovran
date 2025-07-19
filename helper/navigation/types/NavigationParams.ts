@@ -58,6 +58,10 @@ export type NavigationParams = {
     unit: string;
     type: string;
   };
+  transactions: {
+    account: { unit: string };
+    tab: 'All' | 'Incoming' | 'Outgoing';
+  };
   vpnShare: {
     vpnCode: string;
     location: string;

@@ -16,9 +16,7 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const { account, tab: tab_ } = useTypedRoute<'transactions'>() || {
-    account: { unit: '' },
-  };
+  const { account, tab: tab_ } = useTypedRoute<'transactions'>();
   const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<string>('all');
@@ -33,12 +31,12 @@ function ModalScreen() {
     setFilter((prevFilter) => (prevFilter === newFilter ? 'all' : newFilter));
   };
 
-  const toggleType = (newType) => {
+  const toggleType = (newType: 'lightning' | 'ecash') => {
     setType((prevType) => (prevType === newType ? 'all' : newType));
     setAt('all');
   };
 
-  const toggleAt = (newAt) => {
+  const toggleAt = (newAt: 'at' | 'all') => {
     setAt((prevAt) => (prevAt === newAt ? 'all' : newAt));
     setType('all');
   };
@@ -75,8 +73,12 @@ function ModalScreen() {
             <Tabs
               tabs={['All', 'Confirmed', 'Pending']}
               selectedTab={tab}
-              handleTabPress={setTab}
-              amounts={[totalCounts.all, totalCounts.confirmed, totalCounts.pending]}
+              handleTabPress={(tab) => setTab(tab)}
+              amounts={[
+                String(totalCounts.all),
+                String(totalCounts.confirmed),
+                String(totalCounts.pending),
+              ]}
             />
 
             <View
