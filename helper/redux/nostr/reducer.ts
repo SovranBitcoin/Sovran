@@ -76,24 +76,24 @@ export type Profile = {
     xpriv: string;
   };
   nut13: string;
-}
+};
 
 type NostrState = {
   currentProfile: { id: number };
-  search: Array<{
+  search: {
     pubkey: string;
     profile: NostrSearchProfile;
-  }>;
-  profiles: Array<Profile>;
+  }[];
+  profiles: Profile[];
   messages: {
     loaded_messages: any[];
     [key: string]: Message[];
   };
   follows: Record<string, any>;
-  contacts: Array<{
+  contacts: {
     pubkey: string;
     profile: NostrContactProfile;
-  }>;
+  }[];
 };
 
 const initialState: NostrState = {
