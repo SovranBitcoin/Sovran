@@ -409,20 +409,18 @@ export default function ModalScreen() {
             <View
               key={grey}
               style={{
-                backgroundColor: greys(theme)[grey],
+                backgroundColor: theme.greys[grey],
                 height: 64,
               }}>
-              <Text>{greys(theme)[grey]}</Text>
-              <Text>
-                {JSON.stringify(rgbToHsl(...Object.values(hexToRgb(greys(theme)[grey]))))}
-              </Text>
+              <Text>{theme.greys[grey]}</Text>
+              <Text>{JSON.stringify(rgbToHsl(...Object.values(hexToRgb(theme.greys[grey]))))}</Text>
             </View>
           );
         })}
 
         <View
           style={{
-            backgroundColor: greys(theme)[950],
+            backgroundColor: theme.greys[950],
             width: 32,
             height: 32,
           }}></View>
@@ -500,7 +498,7 @@ export default function ModalScreen() {
         </View>
 
         <Tabs
-          amounts={[0, 1, 200]}
+          amounts={['0', '1', '200']}
           tabs={['Confirmed', 'Pending', 'Failed']}
           selectedTab={'Confirmed'}
           handleTabPress={() => {}}
