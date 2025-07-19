@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, GestureResponderEvent } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -12,9 +12,12 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
   const payload = useSheetPayload('button-handler');
 
-  const [processingButtonIndex, setProcessingButtonIndex] = useState(null);
+  const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
 
-  const handleButtonPress = (onPress, index) => {
+  const handleButtonPress = (
+    onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>,
+    index: number
+  ) => {
     setProcessingButtonIndex(index);
 
     // Call the original onPress function
@@ -25,11 +28,11 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
     // If it's a promise, reset the processing state when it resolves or rejects
     if (result && typeof result.then === 'function') {
       result.finally(() => {
-        setProcessingButtonIndex(null);
+        setProcessingButtonIndex(undefined);
         // router?.close();
       });
     } else {
-      setProcessingButtonIndex(null);
+      setProcessingButtonIndex(undefined);
       router?.close();
     }
   };

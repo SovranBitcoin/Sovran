@@ -18,7 +18,7 @@ export interface ButtonHandlerButton {
   variant: 'primary' | 'secondary' | 'dangerous';
   icon?: string;
   text: string;
-  onPress: (event: GestureResponderEvent) => void;
+  onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>;
 }
 
 interface ButtonHandlerProps {
