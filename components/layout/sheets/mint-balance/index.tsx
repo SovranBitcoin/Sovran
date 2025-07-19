@@ -26,4 +26,6 @@ function MintBalanceSheet(props: any) {
 }
 
 export default ({ context }: { context?: 'global' }) =>
-  registerSheet(sheetName, MintBalanceSheet, context);
+  context
+    ? registerSheet(sheetName, MintBalanceSheet, context)
+    : registerSheet(sheetName, MintBalanceSheet);

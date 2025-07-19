@@ -25,4 +25,4 @@ function EmailSheet(props: any) {
 }
 
 export default ({ context }: { context?: 'global' }) =>
-  registerSheet(sheetName, EmailSheet, context);
+  context ? registerSheet(sheetName, EmailSheet, context) : registerSheet(sheetName, EmailSheet);

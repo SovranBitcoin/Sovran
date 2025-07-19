@@ -19,6 +19,7 @@ function EmojiPickerSheet(props: any) {
   );
 }
 
-// Register the sheet with its unique name
 export default ({ context }: { context?: 'global' }) =>
-  registerSheet(sheetName, EmojiPickerSheet, context);
+  context
+    ? registerSheet(sheetName, EmojiPickerSheet, context)
+    : registerSheet(sheetName, EmojiPickerSheet);

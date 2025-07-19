@@ -25,4 +25,6 @@ function TransactionMessageSheet(props: any) {
 }
 
 export default ({ context }: { context?: 'global' }) =>
-  registerSheet(sheetName, TransactionMessageSheet, context);
+  context
+    ? registerSheet(sheetName, TransactionMessageSheet, context)
+    : registerSheet(sheetName, TransactionMessageSheet);
