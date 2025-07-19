@@ -1,7 +1,13 @@
 import React, { useState, createContext, useContext, useRef } from 'react';
 import { CashuMint, CashuWallet } from '@cashu/cashu-ts';
 
-const WalletsContext = createContext(null);
+type WalletsContextType = {
+  connect: ({ mintUrl }: { mintUrl: string }) => Promise<CashuWallet>;
+  getWallet: ({ mintUrl }: { mintUrl: string }) => CashuWallet;
+  wallets: CashuWallet[];
+} | null;
+
+const WalletsContext = createContext<WalletsContextType>(null);
 
 export const useWallets = () => {
   const context = useContext(WalletsContext);
@@ -27,18 +33,6 @@ export const WalletsProvider = ({ children }: { children: React.ReactNode }) => 
   const getWallet = ({ mintUrl }: { mintUrl: string }): CashuWallet => {
     return walletsRef.current.get(mintUrl);
   };
-
-  // useEffect(() => {
-  //   const profile = store.getState().nostr.currentProfile;
-  //   const mints =
-  //     store.getState().cashu?.profiles?.[profile?.id]?.mints || [];
-
-  //   mints.forEach((mintUrl: string) => {
-  //     loadWallet({ unit: 'sat', mintUrl, profile, forceRefresh: true }).catch(
-  //       (e) => console.log('wallet preload error', e)
-  //     );
-  //   });
-  // }, []);
 
   const value = { connect, getWallet, wallets };
 
