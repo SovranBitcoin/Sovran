@@ -105,102 +105,6 @@ const MintDetailPage = () => {
           <Heatmap mintInfo={mintInfo} mintUrl={params?.mintUrl} wallet={wallet} />
         </View>
 
-        {/* pill tags */}
-        {/* <View style={{}}>
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingVertical: 8,
-              paddingHorizontal: 8,
-              backgroundColor: greys(theme)[800],
-              borderRadius: 12,
-              borderWidth: 0.5,
-              borderColor: greys(theme)[700],
-              alignItems: 'center',
-              marginRight: 8,
-              marginBottom: 8,
-            }}>
-            <Icon name="material-symbols:update-rounded" size={24} color={greys(theme)[400]} />
-            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
-              Realtime Updates
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingVertical: 8,
-              paddingHorizontal: 8,
-              backgroundColor: greys(theme)[800],
-              borderRadius: 12,
-              borderWidth: 0.5,
-              borderColor: greys(theme)[700],
-              alignItems: 'center',
-              marginRight: 8,
-              marginBottom: 8,
-            }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[400]} />
-            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
-              Restore Money
-            </Text>
-          </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingVertical: 8,
-              paddingHorizontal: 8,
-              backgroundColor: greys(theme)[800],
-              borderRadius: 12,
-              borderWidth: 0.5,
-              borderColor: greys(theme)[700],
-              alignItems: 'center',
-              marginRight: 8,
-              marginBottom: 8,
-            }}>
-            <Icon name="uil:invoice" size={24} color={greys(theme)[400]} />
-            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
-              Payment Requests
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingVertical: 8,
-              paddingHorizontal: 8,
-              backgroundColor: greys(theme)[800],
-              borderRadius: 12,
-              borderWidth: 0.5,
-              borderColor: greys(theme)[700],
-              alignItems: 'center',
-              marginRight: 8,
-              marginBottom: 8,
-            }}>
-            <Icon name="ic:round-cloud-sync" size={24} color={greys(theme)[400]} />
-            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
-              Restore Money
-            </Text>
-          </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingVertical: 8,
-              paddingHorizontal: 8,
-              backgroundColor: greys(theme)[800],
-              borderRadius: 12,
-              borderWidth: 0.5,
-              borderColor: greys(theme)[700],
-              alignItems: 'center',
-              marginRight: 8,
-              marginBottom: 8,
-            }}>
-            <Icon name="solar:key-bold" size={24} color={greys(theme)[400]} />
-            <Text style={{ color: greys(theme)[400], marginLeft: 8 }} bold size={16}>
-              P2PK
-            </Text>
-          </View>
-        </View> */}
-
         {/* Description Card */}
         {mintInfo.description && (
           <>
@@ -262,38 +166,11 @@ const MintDetailPage = () => {
                     </View>
                   )
                 }
-                // label={<Icon name="prime:twitter" size={24} color={greys(theme)[400]} />}
-                // label={contact.method.toUpperCase()}
-                // sublabel={contact.method.toUpperCase()}
                 onPress={() => handleContactPress(contact.method, contact.info)}
               />
             ))}
           </Section>
         )}
-
-        {/* Mint Details Section */}
-        {/* <Section title="Mint Details">
-          <RowButton label="Version" value={mintInfo.version || 'Unknown'} />
-        </Section> */}
-
-        {/* Actions Section */}
-        {/* <Section title="Actions">
-          {allowSetAsNPC && (
-            <RowButton
-              label="Set as NPC"
-              textStyle={styles.actionText}
-              style={styles.actionButton}
-              onPress={async () => {
-                // Handle edit mint navigation
-                const sk = nip19.decode(currentProfile?.nsec).data;
-                const signer = new NsecSigner(sk);
-                const sdk = new NCSDK('https://npubx.cash', signer);
-
-                await sdk.setMint(params?.mintUrl);
-              }}
-            />
-          )}
-        </Section> */}
       </ScrollView>
     </Wrapper>
   );
