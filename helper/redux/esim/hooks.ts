@@ -13,10 +13,7 @@ export const useEsims = () => {
     [dispatch]
   );
 
-  const setEsimsCallback = useCallback(
-    (esim: Esim) => dispatch(setEsims(esim)),
-    [dispatch]
-  );
+  const setEsimsCallback = useCallback((esim: Esim) => dispatch(setEsims(esim)), [dispatch]);
 
   return {
     esims,
