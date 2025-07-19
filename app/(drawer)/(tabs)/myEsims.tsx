@@ -50,7 +50,12 @@ const EsimItem = ({ esim }: { esim: Esim }) => {
 
   const getExpirationText = () => {
     if (esim?.order?.activateTime) {
-      return `on ${convertTimeData(esim.order)?.expiredTime}`;
+      return `on ${
+        convertTimeData({
+          activateTime: esim.order.activateTime || '',
+          expiredTime: esim.order.expiredTime || '',
+        })?.expiredTime
+      }`;
     }
     return `${esim?.order?.totalDuration} days after installation`;
   };
@@ -255,12 +260,22 @@ function categorizeEsims(paidEsims: Esim[], currentDate: Date) {
       (esim) =>
         esim?.order?.esimStatus === 'IN_USE' ||
         (esim?.order?.activateTime &&
-          new Date(convertTimeData(esim.order).expiredTime) > currentDate)
+          new Date(
+            convertTimeData({
+              activateTime: esim.order.activateTime,
+              expiredTime: esim.order.expiredTime || '',
+            }).expiredTime
+          ) > currentDate)
     ),
     expired: paidEsims.filter(
       (esim) =>
         esim?.order?.activateTime &&
-        new Date(convertTimeData(esim.order).expiredTime) <= currentDate
+        new Date(
+          convertTimeData({
+            activateTime: esim.order.activateTime,
+            expiredTime: esim.order.expiredTime || '',
+          }).expiredTime
+        ) <= currentDate
     ),
   };
 }
