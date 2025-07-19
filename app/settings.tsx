@@ -33,8 +33,10 @@ export const Section: React.FC<{
   return (
     <View className="py-3">
       <Text
-        className={`my-2 ml-3 font-medium uppercase tracking-wide ${isDanger ? '' : ''}`}
+        className={`my-2 ml-3 uppercase tracking-wide ${isDanger ? '' : ''}`}
         size={13}
+        medium
+        overpass
         style={{
           color: isDanger ? reds[300] : greys(theme)[300],
         }}>
@@ -77,7 +79,7 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
             {currentProfile?.profile?.name}
           </Text>
           <Text
-            className="mt-0.5 font-normal"
+            className="mt-0.5"
             size={16}
             style={{
               color: greys(theme)[400],
@@ -123,7 +125,7 @@ export const RowButton: React.FC<{
         <View className="flex-1" />
         {value && (
           <Text
-            className="mr-1 font-bold tracking-tight"
+            className="mr-1 tracking-tight"
             overpass
             bold
             size={16}
