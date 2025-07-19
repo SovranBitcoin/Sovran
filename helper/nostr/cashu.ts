@@ -38,7 +38,7 @@ export async function fetchEventFromRelays(
   const DERIVATION_PATH = `m/44'/129372'`;
   const path = `${DERIVATION_PATH}/0'/0'/0/0`;
   const seed = root.derive(path);
-  const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey, wordlist);
+  const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
 
   const { privateKeyBytes, publicKeyHex } = deriveMintBackupKeys(derivedCashuMnemonic);
 
