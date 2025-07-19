@@ -155,7 +155,6 @@ const PLATFORM_BOTTOM_OFFSET = 24;
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     nonGestureView: {
-      // backgroundColor: greys(theme)[950], // Using a default theme value
       overflow: 'hidden',
       zIndex: 1,
       height: 335,
@@ -179,9 +178,6 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       backgroundColor: 'transparent',
     },
-    accountUnitText: {
-      color: greys(theme)[100], // Using a default theme value
-    },
     maxWidthContainer: {
       width: '100%', // Fixed invalid CSS value
       flexDirection: 'column',
@@ -189,17 +185,6 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'space-around',
       backgroundColor: 'transparent',
       alignSelf: 'center',
-    },
-    absoluteBottomBorder: {
-      position: 'absolute',
-      bottom: PLATFORM_BOTTOM_OFFSET,
-      borderBottomColor: greys(theme)[600], // Using a default theme value
-      borderBottomWidth: 0.2,
-      zIndex: -1,
-      height: 1,
-      backgroundColor: 'transparent',
-      overflow: 'hidden',
-      width: '100%',
     },
     absoluteRightBottomBorder: {
       position: 'absolute',
