@@ -23,7 +23,7 @@ function TabTwoScreen() {
   const { transactions: cashuTransactions } = useCashu();
   const { vpn } = useVpn();
   const [fetchingPackages, setFetchingPackages] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('New'); // State for selected tab
+  const [selectedTab, setSelectedTab] = useState('New');
 
   const paidVpns = vpn.filter((vpn: any) =>
     cashuTransactions.some((tx: any) => {
