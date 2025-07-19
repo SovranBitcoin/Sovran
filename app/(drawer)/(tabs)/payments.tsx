@@ -200,22 +200,22 @@ const Section = () => {
 
   const pagerRef = useRef(null);
 
-  const onPageSelected = useCallback((event) => {
+  const onPageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
     const tabNames = ['Recent activity', 'Contacts', 'Mints'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
-  const handleTabPress = (tab, index) => {
+  const handleTabPress = (tab: string, index: number) => {
     setSelectedTab(tab);
     pagerRef.current?.setPage(index);
   };
 
   const tabs = ['Recent activity', 'Contacts', 'Mints'].filter(Boolean);
 
-  const getItem = (data, index) => data[index];
+  const getItem = (data: any, index: number) => data[index];
 
-  const getItemCount = (data) => data.length;
+  const getItemCount = (data: any) => data.length;
 
   return (
     <Modal
@@ -232,7 +232,11 @@ const Section = () => {
           tabs={tabs}
           selectedTab={selectedTab}
           handleTabPress={handleTabPress}
-          amounts={[enrichedContacts.length, contacts.length, mintsData.length]}
+          amounts={[
+            String(enrichedContacts.length),
+            String(contacts.length),
+            String(mintsData.length),
+          ]}
         />
       </View>
       <View
@@ -299,7 +303,7 @@ const Section = () => {
   );
 };
 
-export const SearchBar = ({ theme, navigation }) => {
+export const SearchBar = ({ theme, navigation }: { theme: Theme; navigation: any }) => {
   const styles = createStyles(theme);
   return (
     <View style={styles.searchContainer}>
@@ -314,7 +318,17 @@ export const SearchBar = ({ theme, navigation }) => {
   );
 };
 
-const ContactItem = ({ contact, isVerified, theme, navigation }) => {
+const ContactItem = ({
+  contact,
+  isVerified,
+  theme,
+  navigation,
+}: {
+  contact: any;
+  isVerified: boolean;
+  theme: Theme;
+  navigation: any;
+}) => {
   const styles = createStyles(theme);
 
   const mostRecentTransaction = contact?.transactions?.[0];
@@ -378,7 +392,15 @@ const ContactItem = ({ contact, isVerified, theme, navigation }) => {
   );
 };
 
-const ProfilePicture = ({ imageUri, isVerified, theme }) => {
+const ProfilePicture = ({
+  imageUri,
+  isVerified,
+  theme,
+}: {
+  imageUri: string;
+  isVerified: boolean;
+  theme: Theme;
+}) => {
   const styles = createStyles(theme);
   return (
     <View style={styles.profilePictureContainer}>
@@ -407,7 +429,7 @@ const TabOneScreen = () => {
   );
 };
 
-const formatCustomDate = (date) => {
+const formatCustomDate = (date: Date) => {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
@@ -453,47 +475,6 @@ const createStyles = (theme: Theme) =>
       fontFamily: 'OverpassRegular',
       color: greys(theme)[500],
     },
-    tabContainer: {
-      flexDirection: 'row',
-      backgroundColor: 'transparent',
-    },
-    tabButton: {
-      padding: 10,
-      fontFamily: 'OverpassHeavy',
-      // paddingLeft: 16,
-      // paddingRight: 16,
-      // backgroundColor: greys(theme)[950],
-      borderRadius: 24,
-      // marginRight: 8,
-      // borderWidth: 0.5,
-      // borderColor: greys(theme)[600],
-    },
-    selectedTabButton: {
-      backgroundColor: greys(theme)[600],
-      borderWidth: 0,
-      borderRadius: 1000,
-      borderColor: greys(theme)[600],
-    },
-    tabText: {
-      color: greys(theme)[100],
-      fontFamily: 'OverpassSemibold',
-      fontSize: 14,
-      textAlign: 'center',
-    },
-    selectedTabText: {
-      color: greys(theme)[0],
-      fontFamily: 'OverpassHeavy',
-    },
-    contactsContainer: {
-      backgroundColor: greys(theme)[800],
-      borderColor: greys(theme)[600],
-      borderWidth: 0.2,
-      margin: 16,
-      padding: 16,
-      marginTop: 8,
-      marginBottom: 8,
-      borderRadius: 16,
-    },
     contactItem: {
       flexDirection: 'row',
       backgroundColor: 'transparent',
@@ -516,9 +497,6 @@ const createStyles = (theme: Theme) =>
       color: greys(theme)[0],
       fontFamily: 'OverpassBold',
       fontSize: 16,
-    },
-    transactionInfo: {
-      color: greys(theme)[100],
     },
     date: {
       marginLeft: 8,
