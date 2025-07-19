@@ -246,7 +246,6 @@ export function EcashReceiveConfirmation({
 
         <Section
           items={[
-            // { title: 'Date', value: 'Now' },
             { title: 'Type', value: 'Ecash • Receive' },
             { title: 'Token', value: truncateMiddle(token, 6) },
           ]}
