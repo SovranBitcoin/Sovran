@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 import lookup from 'country-code-lookup';
 import { useSelector } from 'react-redux';
 
@@ -8,7 +8,7 @@ import { Text } from 'components/common/Text';
 import CircularProgress from 'components/common/CircleProgress';
 
 import { useCashu } from 'helper/redux/cashu';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useVpn } from 'helper/redux/lnvpn';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -19,7 +19,6 @@ import { useTypedNavigation } from 'helper/navigation';
 
 function TabTwoScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
   const { transactions: cashuTransactions } = useCashu();
   const { vpn } = useVpn();
@@ -74,24 +73,15 @@ function TabTwoScreen() {
 
   return (
     <View
+      className="flex-1"
       style={{
         paddingTop: 96,
-        flex: 1,
         backgroundColor: greys(theme)[950],
       }}>
-      <Text
-        size={32}
-        style={{
-          fontFamily: 'OverpassHeavy',
-          marginLeft: 16,
-          marginBottom: 4,
-        }}>
+      <Text size={32} className="mb-1 ml-4" overpass heavy>
         VPNs
       </Text>
-      <View
-        style={{
-          paddingHorizontal: 16,
-        }}>
+      <View className="px-4">
         <Tabs
           tabs={['New', 'Active', 'Expired']}
           amounts={amounts}
@@ -99,14 +89,21 @@ function TabTwoScreen() {
           handleTabPress={setSelectedTab}
         />
       </View>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView className="mt-1 flex-1 px-4">
         {selectedTab === 'New' &&
           (nonActiveVpns.length > 0 ? (
             nonActiveVpns.map((vpn: any) => {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
             })
           ) : (
-            <Text style={styles.noItemsText}>No inactive VPNs</Text>
+            <Text
+              className="mb-4"
+              size={14}
+              style={{
+                color: greys(theme)[200],
+              }}>
+              No inactive VPNs
+            </Text>
           ))}
 
         {selectedTab === 'Active' &&
@@ -115,7 +112,14 @@ function TabTwoScreen() {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
             })
           ) : (
-            <Text style={styles.noItemsText}>No active VPNs</Text>
+            <Text
+              className="mb-4"
+              size={14}
+              style={{
+                color: greys(theme)[200],
+              }}>
+              No active VPNs
+            </Text>
           ))}
 
         {selectedTab === 'Expired' &&
@@ -124,7 +128,14 @@ function TabTwoScreen() {
               return <VpnItem vpn={vpn} navigation={navigation} key={vpn.id} />;
             })
           ) : (
-            <Text style={styles.noItemsText}>No expired VPNs</Text>
+            <Text
+              className="mb-4"
+              size={14}
+              style={{
+                color: greys(theme)[200],
+              }}>
+              No expired VPNs
+            </Text>
           ))}
       </ScrollView>
       <ButtonHandler
@@ -168,7 +179,6 @@ const calculateProgress = (startDate: any, expiryDate: any) => {
 
 const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const countryName = lookup.byIso(vpn.location)?.country;
 
   const handlePress = () => {
@@ -218,69 +228,32 @@ const VpnItem = ({ vpn, navigation }: { vpn: any; navigation: any }) => {
   }, [vpn]);
 
   return (
-    <Pressable style={styles.vpnItem} onPress={handlePress}>
-      <View style={styles.progressContainer}>
+    <Pressable
+      className="mb-4 flex-row items-center rounded-2xl p-3"
+      style={{
+        backgroundColor: greys(theme)[800],
+        borderColor: greys(theme)[600],
+        borderWidth: 0.2,
+      }}
+      onPress={handlePress}>
+      <View className="flex-row items-center justify-between bg-transparent">
         <CircularProgress country={vpn.location} progress={progress} />
       </View>
-      <View style={styles.vpnInfo}>
-        <Text style={styles.countryText}>{countryName}</Text>
-        <Text style={styles.remainingDataText}>
+      <View className="ml-3 flex-1 bg-transparent">
+        <Text size={14} overpass regular style={{ color: greys(theme)[200] }}>
+          {countryName}
+        </Text>
+        <Text overpass bold size={18}>
           {vpn?.order?.expiry_date
             ? new Date(vpn?.order?.expiry_date).toLocaleString()
             : 'Not activated'}
         </Text>
-        <Text style={styles.expirationText}>{remainingTime}</Text>
+        <Text className="mt-3" size={14} overpass regular>
+          {remainingTime}
+        </Text>
       </View>
     </Pressable>
   );
 };
 
 export default TabTwoScreen;
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    scrollView: {
-      paddingHorizontal: 16,
-      marginTop: 4,
-      flex: 1,
-    },
-    vpnItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-      padding: 12,
-      borderRadius: 16,
-      backgroundColor: greys(theme)[800],
-      borderColor: greys(theme)[600],
-      borderWidth: 0.2,
-    },
-    progressContainer: {
-      alignItems: 'center',
-      backgroundColor: 'transparent',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    vpnInfo: {
-      backgroundColor: 'transparent',
-      marginLeft: 12,
-      flex: 1,
-    },
-    countryText: {
-      fontSize: 14,
-      color: greys(theme)[200],
-    },
-    remainingDataText: {
-      fontSize: 18,
-      fontFamily: 'OverpassBold',
-    },
-    expirationText: {
-      marginTop: 12,
-      fontSize: 14,
-      fontFamily: 'OverpassRegular',
-    },
-    noItemsText: {
-      fontSize: 14,
-      color: greys(theme)[200],
-      marginBottom: 16,
-    },
-  });
