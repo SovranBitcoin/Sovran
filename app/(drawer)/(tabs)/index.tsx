@@ -183,10 +183,6 @@ function TabOneScreen() {
     })();
   }, []);
 
-  if (!(currentProfile?.pubkey && selectedMint)) {
-    return <Welcome />;
-  }
-
   if (!settings?.termsAccepted) {
     return (
       <TermsConditionsScreen
@@ -195,6 +191,9 @@ function TabOneScreen() {
         }}
       />
     );
+  }
+  if (!(currentProfile?.pubkey && selectedMint)) {
+    return <Welcome />;
   }
 
   return (

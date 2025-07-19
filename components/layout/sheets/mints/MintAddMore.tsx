@@ -216,19 +216,7 @@ function useRecommendedMints(): { mints: ProcessedMint[] } {
   }, [mintStats, infos]);
 
   return {
-    mints: [
-      {
-        id: 'https://nofees.testnut.cashu.space',
-        name: 'Testnut feeless mint',
-        logo: 'https://picsum.photos/200',
-        supportedUnits: ['SAT'],
-        averageRating: 0,
-        reviewCount: 0,
-        reviews: [],
-        loading: false,
-      },
-      ...mints,
-    ],
+    mints,
   };
 }
 
@@ -470,7 +458,7 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
               fontWeight: '600',
             },
           ]}>
-          Discovered mints2
+          Discovered mints
         </Text>
         <Spacer size={4} />
 
