@@ -1,25 +1,17 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  SafeAreaView,
-  Text,
-  TouchableOpacity,
-  Clipboard,
-  ScrollView,
-  Image,
-} from 'react-native';
+import { SafeAreaView, TouchableOpacity, Clipboard, ScrollView, Image } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { showMessage } from 'helper/popup/popups';
 import { View } from 'components/common/View';
+import { Text } from 'components/common/Text';
 
 const Profile = () => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const { currentProfile } = useNostr();
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
@@ -52,18 +44,40 @@ const Profile = () => {
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
 
     return (
-      <View blur style={styles.detailContainer}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <View style={styles.sensitiveField}>
+      <View
+        blur
+        className="mb-2 mt-2 rounded-lg p-2"
+        style={{
+          backgroundColor: greys(theme)[800],
+        }}>
+        <Text
+          bold
+          overpass
+          size={14}
+          style={{
+            color: greys(theme)[400],
+          }}>
+          {label}
+        </Text>
+        <View className="flex-row items-center justify-between">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <Text style={styles.detailText}>
+            <Text
+              size={16}
+              style={{
+                color: greys(theme)[0],
+              }}>
               {showEyeIcon && !isVisible ? '••••••••' : value || 'N/A'}
             </Text>
           </ScrollView>
-          <View style={styles.iconContainer}>
+          <View className="flex-row items-center" style={{ marginLeft: 8 }}>
             {showEyeIcon && (
               <TouchableOpacity onPress={() => toggleFieldVisibility(fieldKey)}>
-                <View blur style={styles.iconButton}>
+                <View
+                  blur
+                  className="ml-1 rounded p-2"
+                  style={{
+                    backgroundColor: greys(theme)[700],
+                  }}>
                   <Icon
                     name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
                     size={16}
@@ -73,13 +87,29 @@ const Profile = () => {
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={() => handleCopy(value, messageKey)}>
-              <View blur style={styles.iconButton}>
+              <View
+                blur
+                className="ml-1 rounded p-2"
+                style={{
+                  backgroundColor: greys(theme)[700],
+                }}>
                 <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
               </View>
             </TouchableOpacity>
           </View>
         </View>
-        {description && <Text style={styles.descriptionText}>{description}</Text>}
+        {description && (
+          <Text
+            italic
+            overpass
+            size={12}
+            className="mt-1"
+            style={{
+              color: greys(theme)[200],
+            }}>
+            {description}
+          </Text>
+        )}
       </View>
     );
   };
@@ -87,15 +117,25 @@ const Profile = () => {
   return (
     <Container>
       <ScrollView>
-        <SafeAreaView style={styles.content}>
-          <Text style={styles.sectionTitle}>Profile Details</Text>
+        <SafeAreaView className="px-4">
+          <Text
+            bold
+            overpass
+            size={13}
+            className="mb-2 ml-2 uppercase tracking-wide"
+            style={{
+              color: greys(theme)[300],
+            }}>
+            Profile Details
+          </Text>
 
-          <View style={styles.profilePictureContainer}>
+          <View className="mb-4 mt-4 items-center">
             <Image
               source={{
                 uri: currentProfile?.picture || 'https://via.placeholder.com/150',
               }}
-              style={styles.profilePicture}
+              className="h-[100px] w-[100px] rounded-full"
+              resizeMode="cover"
             />
           </View>
 
@@ -135,75 +175,5 @@ const Profile = () => {
     </Container>
   );
 };
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    content: {
-      paddingHorizontal: 16,
-    },
-    sectionTitle: {
-      marginVertical: 6,
-      marginLeft: 8,
-      fontSize: 13,
-      letterSpacing: 0.33,
-      fontWeight: '500',
-      color: greys(theme)[300],
-      textTransform: 'uppercase',
-    },
-    profilePictureContainer: {
-      alignItems: 'center',
-      marginVertical: 12,
-    },
-    profilePicture: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-    },
-    detailContainer: {
-      marginVertical: 8,
-      padding: 8,
-      backgroundColor: greys(theme)[800],
-      borderRadius: 8,
-    },
-    detailLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: greys(theme)[400],
-    },
-    detailText: {
-      fontSize: 16,
-      color: greys(theme)[0],
-    },
-    descriptionText: {
-      fontSize: 12,
-      fontStyle: 'italic',
-      color: greys(theme)[200],
-      marginTop: 4,
-    },
-    editModeText: {
-      fontSize: 12,
-      color: greys(theme)[200],
-      marginBottom: 4,
-    },
-    sensitiveField: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    iconContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    iconButton: {
-      padding: 8,
-      backgroundColor: greys(theme)[700],
-      borderRadius: 4,
-      marginLeft: 4,
-    },
-    headerButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-  });
 
 export default Profile;
