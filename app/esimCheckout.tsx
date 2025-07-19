@@ -16,7 +16,6 @@ import { memoizedGetBalance, memoizedGetSelectedMint, setSelectedMint } from 'he
 import { showMessage } from 'helper/popup/popups';
 import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { Card } from 'components/common/Card';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -24,7 +23,6 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { useTypedRoute } from 'helper/navigation';
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
   const navigation = useNavigation();
   const params = useTypedRoute<'esimCheckout'>();
   const dispatch = useDispatch();
@@ -88,7 +86,7 @@ function ModalScreen() {
   };
 
   const getSectionItems = () => {
-    const styles = createStyles(theme);
+    const styles = createStyles();
     const baseItems = [
       {
         title: 'Coverage',
@@ -128,7 +126,7 @@ function ModalScreen() {
     return baseItems;
   };
 
-  const styles = createStyles(theme);
+  const styles = createStyles();
 
   return (
     <Modal
