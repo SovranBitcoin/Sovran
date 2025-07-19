@@ -54,7 +54,7 @@ export const setProfiles = (profiles: Profile[]) =>
     payload: profiles,
   }) as const;
 
-export const setFollows = (follows: { pubkey: string, profile: NDKUserProfile }) =>
+export const setFollows = (follows: { pubkey: string; profile: NDKUserProfile }) =>
   ({
     type: SET_FOLLOWS,
     payload: follows,
