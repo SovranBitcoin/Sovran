@@ -1,5 +1,5 @@
 // In reducer.ts
-import { AnyAction, ThunkAction, combineReducers } from 'redux';
+import { ThunkAction, combineReducers } from 'redux';
 import { settingsReducer } from '../settings/reducer';
 import { cashuReducer } from '../cashu/reducer';
 import { bitrefillReducer } from '../bitrefill/reducer';
@@ -39,7 +39,8 @@ type Action =
   | VpnAction
   | EsimAction
   | NostrAction
-  | PricelistAction;
+  | PricelistAction
+  | typeof RESET_APP;
 
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<

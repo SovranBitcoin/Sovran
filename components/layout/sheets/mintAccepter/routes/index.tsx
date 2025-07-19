@@ -16,6 +16,9 @@ declare module 'react-native-actions-sheet' {
       routes: {
         'route-a': RouteDefinition;
       };
+      payload: {
+        mint: string;
+      };
     }>;
   }
 }

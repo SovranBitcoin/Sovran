@@ -5,7 +5,7 @@ import { StyledText, Text } from 'components/common/Text';
 import { View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { addMintsAction } from 'helper/redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
@@ -16,6 +16,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
   const theme = useSelector(memoizedGetTheme);
   const ref = useSheetRef('mint-accepter');
   const payload = useSheetPayload('mint-accepter');
+  const dispatch = useDispatch();
 
   return (
     <View
@@ -63,7 +64,6 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
           {
             text: "Don't trust",
             variant: 'secondary',
-            icon: null,
             onPress: () => {
               ref.current.hide({
                 action: 'reject',
@@ -75,9 +75,8 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
           {
             text: 'Trust',
             variant: 'primary',
-            icon: null,
             onPress: () => {
-              store.dispatch(
+              dispatch(
                 addMintsAction({
                   profileId: store.getState().nostr?.currentProfile?.id,
                   mintUrls: [payload.mint],

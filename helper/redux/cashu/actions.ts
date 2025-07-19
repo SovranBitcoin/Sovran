@@ -21,6 +21,7 @@ import {
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
 import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
 import { TransactionData } from './types';
+import { AppThunk } from '../store/reducer';
 
 export type CashuAction =
   | ReturnType<typeof addMints>
@@ -196,7 +197,7 @@ export const ensureProfileExistsAction = (profileId: number) =>
     payload: { profileId },
   }) as const;
 
-export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
+export const updateMint = ({ mintUrl }: { mintUrl: string }): AppThunk<{ success: boolean }> => {
   return async (dispatch: any) => {
     const mintRes = await getMint({ mintUrl, forceRefresh: true });
     if (mintRes.isErr()) {
@@ -246,7 +247,7 @@ export const addMintsAction = ({
 }: {
   profileId: number;
   mintUrls: string[];
-}) => {
+}): AppThunk<{ success: boolean; error?: string }> => {
   return async (dispatch: any) => {
     // First update all mints (fetch and store keysets and info)
     const updatePromises = mintUrls.map((mintUrl: string) => dispatch(updateMint({ mintUrl })));
