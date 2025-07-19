@@ -44,7 +44,6 @@ import { useFonts } from 'hooks/useFonts';
 /**
  * Splash screen component
  */
-import splash from 'assets/images/splash.png';
 
 registerAllSheets({ context: 'global' });
 
@@ -96,23 +95,15 @@ function useNostrDMs(currentProfile, addMessage, messages) {
     fetchDMs();
   }, [currentProfile.pubkey, currentProfile.nsec, addMessage, messages]);
 }
-function MySplashScreen({ opacity }: { opacity: Animated.Value }) {
+function MySplashScreen() {
   return (
-    <Animated.View
+    <Animated.Image
       style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        opacity,
-      }}>
-      <Animated.Image
-        style={{
-          width: Dimensions.get('window').width,
-          height: Dimensions.get('window').height,
-        }}
-        source={splash}
-      />
-    </Animated.View>
+        width: Dimensions.get('window').width,
+        height: Dimensions.get('window').height,
+      }}
+      source={require('assets/images/splash.png')}
+    />
   );
 }
 
@@ -240,7 +231,7 @@ export default function RootLayout() {
 
   // Show splash screen while loading
   if (!appIsReady) {
-    return <MySplashScreen opacity={scaleRef.current} />;
+    return <MySplashScreen />;
   }
 
   // Get container styles based on platform
