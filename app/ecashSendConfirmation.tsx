@@ -221,7 +221,9 @@ export function EcashSendConfirmation({
       onClose,
     });
   };
+
   const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+
   return (
     <Modal
       showClose
