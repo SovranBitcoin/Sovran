@@ -10,7 +10,7 @@ import Image from 'components/common/Image';
 import { toResult } from 'helper/toResult';
 import { err } from 'neverthrow';
 
-interface RenderItemData {
+export interface RenderItemData {
   color: string;
   percentage: number;
   label: string;
