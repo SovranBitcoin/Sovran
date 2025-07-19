@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Platform } from 'react-native';
+import { View, ScrollView, Platform, LayoutChangeEvent } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys, shades } from 'helper/colors';
 import { Text } from 'components/common/Text';
@@ -24,7 +24,7 @@ import { useRoute } from '@react-navigation/native';
 import { EventKind } from 'helper/constants';
 dayjs.extend(relativeTime);
 
-export async function getFollowedUsers(userPubkey, verbose = true) {
+export async function getFollowedUsers(userPubkey: string, verbose = true) {
   // Instantiate the user
   const user = ndk.getUser({ pubkey: userPubkey });
 
@@ -49,7 +49,7 @@ export async function getFollowedUsers(userPubkey, verbose = true) {
 const followed = 0;
 const followers = 0;
 
-export default function AboutPage(props: string) {
+export default function AboutPage(props) {
   const theme = useSelector(memoizedGetTheme);
   const { search, profiles } = useNostr();
   const { params } = useRoute();
@@ -81,13 +81,13 @@ export default function AboutPage(props: string) {
     };
   });
 
-  const handleTabPress = (index) => {
+  const handleTabPress = (index: number) => {
     setActiveTab(index);
     underscoreWidth.value = tabWidths[index];
     underscorePosition.value = tabOffsets[index];
   };
 
-  const measureTab = (event, index) => {
+  const measureTab = (event: LayoutChangeEvent, index: number) => {
     const { width, x } = event.nativeEvent.layout;
     tabWidths[index] = width;
     tabOffsets[index] = x;
