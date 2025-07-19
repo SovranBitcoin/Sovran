@@ -1,3 +1,4 @@
+import React from 'react';
 import { Linking, ActivityIndicator, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -16,7 +17,6 @@ import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/layout/Transaction';
-import React from 'react';
 
 const MintDetailPage = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -339,60 +339,8 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 24,
       paddingBottom: 32,
     },
-    logoContainer: {
-      marginBottom: 16,
-    },
-    logo: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: '#3f836d',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    logoImage: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-    },
-    logoText: {
-      fontSize: 40,
-      fontWeight: 'bold',
-      color: '#ffffff',
-    },
-    mintTitle: {
-      fontSize: 28,
-      fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
-      textAlign: 'center',
-      marginBottom: 4,
-    },
-    mintVersion: {
-      fontSize: 14,
-      color: greys(theme)[100],
-      textAlign: 'center',
-    },
-    descriptionContainer: {
-      marginHorizontal: 16,
-      marginBottom: 16,
-      padding: 16,
-      backgroundColor: greys(theme)[800],
-      borderRadius: 12,
-      borderLeftWidth: 4,
-      borderLeftColor: '#FFA726',
-    },
-    descriptionText: {
-      fontSize: 14,
-      color: greys(theme)[100],
-      lineHeight: 20,
-    },
     actionButton: {
       backgroundColor: greens[300],
-      borderRadius: 8,
-      marginVertical: 2,
-    },
-    destructiveButton: {
-      backgroundColor: '#D32F2F',
       borderRadius: 8,
       marginVertical: 2,
     },
@@ -401,27 +349,6 @@ const createStyles = (theme: Theme) =>
       fontWeight: '600',
       color: greys(theme)[0],
       textAlign: 'center',
-    },
-    destructiveText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#ffffff',
-      textAlign: 'center',
-    },
-    copiedText: {
-      fontSize: 12,
-      color: greens[200],
-      fontWeight: '600',
-    },
-    container2: {
-      position: 'relative',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    centerContent2: {
-      position: 'absolute',
-      justifyContent: 'center',
-      alignItems: 'center',
     },
   });
 
