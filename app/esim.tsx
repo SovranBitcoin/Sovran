@@ -8,7 +8,7 @@ import Modal from 'components/layout/Modal';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon, ShareIcon } from 'assets/icons';
-import { useEsims } from 'helper/redux/esim';
+import { Esim, useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
@@ -20,7 +20,7 @@ import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { RootState } from 'helper/redux/store/reducer';
 
 // Move utility function outside of component
-export function convertDataUsage(data) {
+export function convertDataUsage(data: any) {
   const totalVolume = data.volume; // in bytes
   const orderUsage = data.orderUsage || 0; // in bytes
   const dataLeft = totalVolume - orderUsage;
@@ -70,19 +70,19 @@ function ModalScreen() {
   );
 
   const fetchAndUpdateEsims = useCallback(
-    async (esim) => {
+    async (esim: Esim) => {
       setLoadingEsim(true);
 
       const orderResult = await fetchOrderData({
         request: esim.request,
         packageCode: esim.package.packageCode,
         slug: esim.package.slug,
-        iccid: esim.iccid,
+        iccid: esim.order?.iccid,
         type: esim.type === 'TOPUP' ? 'TOPUP' : undefined,
       });
 
       if (orderResult.isOk()) {
-        const orderNo = orderResult.value?.obj?.orderNo || esim.order.orderNo;
+        const orderNo = orderResult.value?.obj?.orderNo || esim?.order?.orderNo;
 
         if (orderNo) {
           const esimResult = await fetchEsimData({ orderNo });
@@ -123,9 +123,9 @@ function ModalScreen() {
 
   const handleShareEsim = () => {
     navigation.navigate('EsimShare', {
-      esimCode: esim.order.qrCodeUrl,
-      location: esim.package.location,
-      esimLink: esim.order.shortUrl,
+      esimCode: esim?.order?.qrCodeUrl,
+      location: esim?.package?.location,
+      esimLink: esim?.order?.shortUrl,
     });
   };
 
@@ -139,7 +139,8 @@ function ModalScreen() {
   });
 
   const canShareOrInstall =
-    !['IN_USE'].includes(esim?.order?.esimStatus) && !['ENABLED'].includes(esim?.order?.smdpStatus);
+    !['IN_USE'].includes(esim?.order?.esimStatus || '') &&
+    !['ENABLED'].includes(esim?.order?.smdpStatus || '');
 
   const hasActivationCode = esim?.order?.ac;
 
@@ -220,7 +221,7 @@ function ModalScreen() {
               <View style={styles.locationContainer}>
                 <FlagIcon width={24} height={24} country={esim.package.location} />
                 <Text style={styles.locationText}>
-                  {lookup.byIso(esim.package.location).country}
+                  {lookup.byIso(esim.package.location)?.country || 'Unknown'}
                 </Text>
               </View>
             ),
