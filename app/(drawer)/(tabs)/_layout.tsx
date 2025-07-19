@@ -222,7 +222,7 @@ const TabLayout = () => {
           tabBarBackground: () => <TabBarBackground theme={theme} />,
           lazy: true,
         }}>
-        {TAB_SCREENS(settings).map(({ name, component, title, icon }) => (
+        {TAB_SCREENS().map(({ name, component, title, icon }) => (
           <Tab.Screen
             key={name}
             name={name}
