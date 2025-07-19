@@ -175,12 +175,6 @@ const ModalScreen = () => {
       <ScrollView>
         <Section title="Account">
           <ProfileButton currentProfile={currentProfile} theme={theme} />
-          {/* <RowButton
-          label="Manage Profiles"
-          onPress={() => {
-            SheetManager.show('sheet-with-router');
-          }}
-        /> */}
         </Section>
         <Section title="Preferences">
           <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
@@ -197,14 +191,6 @@ const ModalScreen = () => {
               navigation.navigate('backgroundImageSettings');
             }}
           />
-          {/* <RowButton
-          label="Language"
-          onPress={() => {
-            navigation.navigate('languageSettings', {
-              countries: ['GB', 'FR', 'ES', 'DE', 'PT'],
-            });
-          }}
-        /> */}
         </Section>
         <Section title="App Information">
           <RowButton
@@ -248,38 +234,6 @@ const ModalScreen = () => {
             }}
           />
         </Section>
-        {/* <Section title="npubx.cash Settings">
-        <View style={styles.rowWrapper}>
-          <View style={[styles.row, styles.rowFirst, styles.rowLast]}>
-            <Text style={styles.rowLabel}>Listen for Transactions</Text>
-            <View style={styles.rowSpacer} />
-            <Switch
-              value={form.listenForTransactions}
-              onValueChange={handleTransactionSwitch}
-            />
-          </View>
-        </View>
-        <RowButton
-          label="Custom Lightning URL"
-          onPress={() => {
-            navigation.navigate("settings/customNpub");
-          }}
-        />
-      </Section> */}
-        {/* <Section title="Mint Settings">
-        <RowButton
-          label="Manage Mints"
-          onPress={() => {
-            SheetManager.show("mint");
-          }}
-        /> */}
-        {/* <RowButton
-          label="Mint allocation"
-          onPress={() => {
-            navigation.navigate("mints");
-          }}
-        /> */}
-        {/* </Section> */}
         <Section title="Danger Zone" isDanger>
           <RowButton
             label="Delete Account"
@@ -293,12 +247,6 @@ const ModalScreen = () => {
         {settings?.experimental && (
           <>
             <Section title="Advanced Debugging">
-              {/* <RowButton
-          label="Show Local Storage"
-          onPress={() => {
-            navigation.navigate('settings/store');
-          }}
-        /> */}
               <RowButton
                 label="Nostr Data"
                 onPress={() => {
@@ -357,31 +305,6 @@ const ModalScreen = () => {
 
 const createStyles = (theme: Theme, isDanger?: boolean) =>
   StyleSheet.create({
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      paddingHorizontal: 16,
-    },
-    headerAction: {
-      width: 40,
-      height: 40,
-      alignItems: 'flex-start',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      fontSize: 19,
-      fontWeight: '600',
-      color: greys(theme)[0],
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: 0,
-      textAlign: 'center',
-    },
-    content: {
-      paddingHorizontal: 16,
-    },
     contentFooter: {
       marginTop: 24,
       fontSize: 13,
@@ -478,35 +401,6 @@ const createStyles = (theme: Theme, isDanger?: boolean) =>
     rowLast: {
       borderBottomLeftRadius: 12,
       borderBottomRightRadius: 12,
-    },
-    rowLabelLogout: {
-      width: '100%',
-      textAlign: 'center',
-      fontWeight: '600',
-      color: reds[300],
-    },
-    debugContainer: {
-      padding: 12,
-      backgroundColor: greys(theme)[800],
-      borderRadius: 8,
-      marginVertical: 8,
-    },
-    debugText: {
-      color: greys(theme)[0],
-      fontSize: 14,
-    },
-    changeProfileButton: {
-      marginTop: 8,
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      backgroundColor: greys(theme)[700],
-      borderRadius: 4,
-    },
-    changeProfileText: {
-      color: greys(theme)[0],
-      fontSize: 14,
-      fontWeight: '500',
-      textAlign: 'center',
     },
   });
 
