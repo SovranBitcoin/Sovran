@@ -378,7 +378,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
         <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
           Send from
         </Text>
-        <View style={styles.mintScroll}>
+        <View>
           {filteredMints.map((mint) => {
             return (
               <MintItem
