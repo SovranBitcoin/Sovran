@@ -239,10 +239,6 @@ export default TabTwoScreen;
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    modalContent: {
-      flex: 1,
-      backgroundColor: 'red',
-    },
     scrollView: {
       paddingHorizontal: 16,
       marginTop: 4,
@@ -281,17 +277,6 @@ const createStyles = (theme: Theme) =>
       marginTop: 12,
       fontSize: 14,
       fontFamily: 'OverpassRegular',
-    },
-    buttonContainer: {
-      margin: 16,
-      marginBottom: 42,
-      backgroundColor: 'transparent',
-    },
-    sectionTitle: {
-      fontSize: 16,
-      fontFamily: 'OverpassHeavy',
-      marginBottom: 8,
-      color: greys(theme)[100],
     },
     noItemsText: {
       fontSize: 14,
