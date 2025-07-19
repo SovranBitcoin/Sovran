@@ -118,18 +118,6 @@ const createStyles = (theme: Theme) =>
       height: 8,
       transform: [{ rotate: '45deg' }],
     },
-    headerContainer: {
-      backgroundColor: 'rgba(0,0,0,0.25)',
-      padding: 4,
-      marginBottom: 4,
-      borderRadius: 16,
-    },
-    headerText: {
-      fontFamily: 'OverpassBold',
-      fontSize: 14,
-      textAlign: 'center',
-      color: greys(theme)[0],
-    },
     footer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
