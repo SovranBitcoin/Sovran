@@ -103,7 +103,7 @@ export function EcashReceiveConfirmation({
   transaction,
   extraButtons = [],
 }: {
-  token?: string;
+  token: string;
   transaction: any;
   showConfirmation?: (
     title: string,
