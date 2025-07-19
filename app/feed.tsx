@@ -100,12 +100,6 @@ const createStyles = (theme: Theme) =>
       flex: 1,
       padding: 16,
     },
-    loadingText: {
-      color: greys(theme)[0],
-      fontSize: 16,
-      textAlign: 'center',
-      marginTop: 20,
-    },
     pagerView: {
       height: Dimensions.get('window').height,
       backgroundColor: 'transparent',
