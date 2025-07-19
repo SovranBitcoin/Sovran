@@ -53,8 +53,8 @@ import { sha256 } from '@noble/hashes/sha256';
 // TYPES
 
 interface GetWalletParams {
-  unit: string;
-  mintUrl: string;
+  unit?: string;
+  mintUrl?: string;
   profile: any;
   forceRefresh?: boolean;
 }
@@ -127,7 +127,7 @@ type Transaction =
   | LightningSendTransaction;
 
 interface GetMintParams {
-  mintUrl: string;
+  mintUrl?: string;
   forceRefresh?: boolean;
 }
 
@@ -142,6 +142,9 @@ export async function getWallet({
   profile,
   forceRefresh = false,
 }: GetWalletParams): Promise<Result<CashuWallet, Error>> {
+  if (!unit) return err(new AppError('invalid_unit', 'Invalid unit'));
+  if (!mintUrl) return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
+
   if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {
     return ok(walletCache[mintUrl][unit]);
   }
@@ -211,6 +214,8 @@ export async function getMint({
   mintUrl,
   forceRefresh = false,
 }: GetMintParams): Promise<Result<CashuMint, Error>> {
+  if (!mintUrl) return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
+
   const mint = new CashuMint(mintUrl);
 
   if (forceRefresh) {
@@ -1307,7 +1312,10 @@ export async function restoreCounter({
   BATCH_SIZE?: number;
   MAX_GAP?: number;
 }): Promise<number> {
-  const wallet = await getWallet({ unit: keyset.unit, mintUrl, profile: null });
+  const walletResult = await getWallet({ unit: keyset.unit, mintUrl, profile: null });
+
+  if (walletResult.isErr()) throw walletResult.error;
+  const wallet = walletResult.value;
 
   let start = 0;
   let emptyBatchCount = 0;

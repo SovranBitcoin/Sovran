@@ -143,10 +143,9 @@ export const memoizedGetSelectedMint = createSelector(
   }
 );
 
-export const memoizedGetMintInfo = (mintUrl: string) =>
-  createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]], (info) => {
-    return info;
-  });
+export const memoizedGetMintInfo = (mintUrl: string) => {
+  return createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]], (info) => info);
+};
 
 export const memoizedGetAudit = (mintUrl: string) =>
   createSelector([(state: RootState) => state.cashu?.audits?.[mintUrl]], (audit) => {

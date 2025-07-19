@@ -31,7 +31,7 @@ export interface TransactionData {
 }
 
 export interface CashuProfile {
-  selectedMint: string | null;
+  selectedMint?: string;
   mints: string[];
   proofs: Record<string, Proof[]>;
   keysets: Record<string, MintKeyset[]>;

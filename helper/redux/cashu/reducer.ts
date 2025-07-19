@@ -26,7 +26,7 @@ import { typedSet, typedUpdate } from 'helper/typedUpdate';
 const initialState: CashuState = {
   profiles: [
     {
-      selectedMint: null,
+      selectedMint: undefined,
       mints: [],
       proofs: {},
       counters: {},
