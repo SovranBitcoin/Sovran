@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -30,17 +30,22 @@ export const Section: React.FC<{
   isDanger?: boolean;
 }> = ({ title, children, isDanger }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme, isDanger);
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
+    <View className="py-3">
+      <Text
+        className={`my-2 ml-3 font-medium uppercase tracking-wide ${isDanger ? '' : ''}`}
+        size={13}
+        style={{
+          color: isDanger ? reds[300] : greys(theme)[300],
+        }}>
+        {title}
+      </Text>
+      <View className="overflow-hidden rounded-xl">{children}</View>
     </View>
   );
 };
 
 const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: Theme }) => {
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
   return (
@@ -48,17 +53,37 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
       onPress={() => {
         navigation.navigate('settings/profile');
       }}>
-      <View blur style={styles.profile}>
+      <View
+        blur
+        className="flex-row items-center justify-start bg-transparent p-3"
+        style={{
+          backgroundColor: greys(theme)[800],
+        }}>
         <Image
           alt=""
           source={{
             uri: currentProfile?.picture,
           }}
-          style={styles.profileAvatar}
+          className="mr-3 h-[60px] w-[60px] rounded-full"
         />
-        <View style={styles.profileBody}>
-          <Text style={styles.profileName}>{currentProfile?.profile?.name}</Text>
-          <Text style={styles.profileHandle}>{truncateMiddle(currentProfile?.npub, 8)}</Text>
+        <View className="mr-auto">
+          <Text
+            size={18}
+            bold
+            overpass
+            style={{
+              color: greys(theme)[0],
+            }}>
+            {currentProfile?.profile?.name}
+          </Text>
+          <Text
+            className="mt-0.5 font-normal"
+            size={16}
+            style={{
+              color: greys(theme)[400],
+            }}>
+            {truncateMiddle(currentProfile?.npub, 8)}
+          </Text>
         </View>
         <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
       </View>
@@ -76,51 +101,49 @@ export const RowButton: React.FC<{
   rightIcon?: React.ReactNode;
 }> = ({ label, value, onPress, isFirst, isLast, isDanger, rightIcon }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme, isDanger);
   return (
     <View
       blur
-      style={[
-        styles.rowWrapper,
-        {
-          borderTopWidth: !isFirst ? 1 : 0,
-        },
-      ]}>
+      className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
+      style={{
+        backgroundColor: greys(theme)[800],
+        borderColor: greys(theme)[700],
+      }}>
       <TouchableOpacity
         onPress={onPress}
-        style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
-        <Text style={[styles.rowLabel, isDanger && styles.rowLabelDanger]}>{label}</Text>
-
-        <View style={styles.rowSpacer} />
+        className="w-full flex-row items-center justify-start pr-1">
+        <Text
+          className="tracking-tight"
+          size={16}
+          style={{
+            color: isDanger ? reds[300] : greys(theme)[0],
+          }}>
+          {label}
+        </Text>
+        <View className="flex-1" />
         {value && (
           <Text
-            style={[
-              styles.rowValue,
-              {
-                marginRight: 3,
-                fontFamily: 'OverpassBold',
-              },
-              isDanger ? { color: reds[300] } : { color: greys(theme)[400] },
-            ]}>
+            className="mr-1 font-bold tracking-tight"
+            overpass
+            bold
+            size={16}
+            style={{
+              color: isDanger ? reds[300] : greys(theme)[400],
+            }}>
             {value}
           </Text>
         )}
         {onPress ? (
           (rightIcon ?? (
             <FeatherIcon
-              style={{
-                marginRight: !!onPress ? 0 : 8,
-              }}
+              className={`${!!onPress ? 'mr-0.25' : ''}`}
               color={isDanger ? reds[300] : greys(theme)[400]}
               name="chevron-right"
               size={19}
             />
           ))
         ) : (
-          <View
-            style={{
-              marginRight: 2,
-            }}></View>
+          <View className="mr-1" />
         )}
       </TouchableOpacity>
     </View>
@@ -130,7 +153,6 @@ export const RowButton: React.FC<{
 const ModalScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
-  const styles = createStyles(theme);
 
   const navigation = useTypedNavigation();
 
@@ -280,21 +302,23 @@ const ModalScreen = () => {
             navigation.navigate('settings/design');
           }}>
           <Text
-            style={[
-              styles.contentFooter,
-              {
-                fontFamily: 'OverpassBold',
-              },
-            ]}>
+            className="mt-6 text-center"
+            overpass
+            bold
+            size={13}
+            style={{
+              color: greys(theme)[300],
+            }}>
             {name}
           </Text>
           <Text
-            style={[
-              styles.contentFooter,
-              {
-                marginTop: 4,
-              },
-            ]}>
+            className="mt-1 text-center"
+            size={13}
+            overpass
+            medium
+            style={{
+              color: greys(theme)[300],
+            }}>
             App Version {version} ({buildNumber})
           </Text>
         </TouchableOpacity>
@@ -302,107 +326,6 @@ const ModalScreen = () => {
     </Container>
   );
 };
-
-const createStyles = (theme: Theme, isDanger?: boolean) =>
-  StyleSheet.create({
-    contentFooter: {
-      marginTop: 24,
-      fontSize: 13,
-      fontWeight: '500',
-      textAlign: 'center',
-      color: greys(theme)[300],
-    },
-    section: {
-      paddingVertical: 12,
-    },
-    sectionTitle: {
-      margin: 8,
-      marginLeft: 12,
-      fontSize: 13,
-      letterSpacing: 0.33,
-      fontWeight: '500',
-      color: isDanger ? reds[300] : greys(theme)[300],
-      textTransform: 'uppercase',
-    },
-    sectionBody: {
-      borderRadius: 12,
-      shadowColor: greys(theme)[500],
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.2,
-      shadowRadius: 1.41,
-      elevation: 2,
-      overflow: 'hidden',
-    },
-    profile: {
-      padding: 12,
-      backgroundColor: greys(theme)[800],
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-    },
-    profileAvatar: {
-      width: 60,
-      height: 60,
-      borderRadius: 9999,
-      marginRight: 12,
-    },
-    profileBody: {
-      marginRight: 'auto',
-    },
-    profileName: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: greys(theme)[0],
-    },
-    profileHandle: {
-      marginTop: 2,
-      fontSize: 16,
-      fontWeight: '400',
-      color: greys(theme)[400],
-    },
-    row: {
-      height: 44,
-      width: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      paddingRight: 12,
-    },
-    rowWrapper: {
-      paddingLeft: 16,
-      backgroundColor: greys(theme)[800],
-      borderColor: greys(theme)[700],
-    },
-    rowFirst: {
-      borderTopLeftRadius: 12,
-      borderTopRightRadius: 12,
-    },
-    rowLabel: {
-      fontSize: 16,
-      letterSpacing: 0.24,
-      color: greys(theme)[0],
-    },
-    rowValue: {
-      fontSize: 16,
-      letterSpacing: 0.24,
-      color: greys(theme)[0],
-    },
-    rowLabelDanger: {
-      color: reds[300],
-    },
-    rowSpacer: {
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: 0,
-    },
-    rowLast: {
-      borderBottomLeftRadius: 12,
-      borderBottomRightRadius: 12,
-    },
-  });
 
 const ConnectedModalScreen = connectActionSheet(ModalScreen);
 
