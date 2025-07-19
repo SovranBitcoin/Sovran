@@ -4,9 +4,9 @@ import { fetchEventFromRelays } from 'helper/nostr/cashu';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { relays } from 'components/ndk';
 
-export const fetchAccountData = async ({ nsec }) => {
+export const fetchAccountData = async ({ nsec }: { nsec: string }) => {
   let { data: sk } = nip19.decode(nsec);
-  const pk = getPublicKey(sk);
+  const pk = getPublicKey(sk as Uint8Array);
   const npub = nip19.npubEncode(pk);
 
   const signer = new NDKPrivateKeySigner(nsec);
@@ -21,7 +21,13 @@ export const fetchAccountData = async ({ nsec }) => {
   return { profile: await profile.fetchProfile(), pubkey: pk, npub, nsec };
 };
 
-export async function getProfile({ mnemonic, accountIndex }) {
+export async function getProfile({
+  mnemonic,
+  accountIndex,
+}: {
+  mnemonic: string;
+  accountIndex: number;
+}) {
   const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
     mnemonic,
     undefined,
