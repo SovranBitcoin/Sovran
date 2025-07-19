@@ -100,7 +100,7 @@ export type IconProps = {
     duration: Animated.TimingAnimationConfig['duration'];
     outputRange: number[] | string[];
     delay: Animated.TimingAnimationConfig['delay'];
-    easing?: Animated.TimingAnimationConfig['easing'] | 'linear';
+    easing?: 'easeOut' | 'linear';
   };
   style?: any;
 };
