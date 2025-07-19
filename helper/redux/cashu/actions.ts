@@ -197,7 +197,7 @@ export const ensureProfileExistsAction = (profileId: number) =>
   }) as const;
 
 export const updateMint = ({ mintUrl }: { mintUrl: string }) => {
-  return async (dispatch) => {
+  return async (dispatch: any) => {
     const mintRes = await getMint({ mintUrl, forceRefresh: true });
     if (mintRes.isErr()) {
       return { success: false };

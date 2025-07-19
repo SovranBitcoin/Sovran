@@ -160,12 +160,8 @@ export const Transactions = React.memo(
         data={flattenedData}
         estimatedItemSize={ITEM_HEIGHT}
         scrollEnabled
-        // recycleItems
         maintainVisibleContentPosition
         ListHeaderComponent={header}
-        // keyExtractor={(item, index) =>
-        //   item.type === 'header' ? `h-${item.title}-${index}` : item.tx.request || item.tx.token
-        // }
         renderItem={({ item, index }) => {
           if (item.type === 'header') {
             return (
