@@ -1,15 +1,13 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 
-// Constants
 const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
 
 interface MenuItemData {
@@ -44,12 +42,6 @@ const SERVICE_MENU_ITEMS: MenuItemData[] = [
         },
       ]
     : []),
-  // {
-  //   id: 'address',
-  //   icon: 'mdi:at',
-  //   label: 'Address',
-  //   navigateTo: 'settings/customNpub',
-  // },
   {
     id: 'giftcards',
     icon: 'ic:baseline-card-giftcard',
@@ -81,33 +73,46 @@ interface MenuItemProps {
 
 const MenuItem = ({ item, onPress }: MenuItemProps) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={[
-        styles.gridItem,
-        {
-          opacity: item.empty ? 0 : 1,
-          pointerEvents: item.empty ? 'none' : 'auto',
-        },
-      ]}>
+      className="mb-4 items-center justify-center rounded-lg"
+      style={{
+        flexBasis: '22%',
+        opacity: item.empty ? 0 : 1,
+        pointerEvents: item.empty ? 'none' : 'auto',
+      }}>
       {item.icon && (
-        <View style={styles.iconContainer}>
+        <View
+          className="items-center justify-center rounded-lg"
+          style={{
+            padding: 16,
+            backgroundColor: greys(theme)[800],
+          }}>
           <Icon name={item.icon} size={32} color={greys(theme)[0]} />
         </View>
       )}
-      <Text style={styles.gridText}>{item.label}</Text>
+      <Text
+        className="text-center"
+        overpass
+        heavy
+        style={{
+          marginTop: 8,
+          color: greys(theme)[100],
+          fontSize: 11,
+        }}>
+        {item.label}
+      </Text>
     </TouchableOpacity>
   );
 };
 
-// Main section component
-const ServicesSection = () => {
-  const navigation = useTypedNavigation();
+// Root component (ServicesSection logic merged here)
+const TabTwoScreen = () => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const navigation = useTypedNavigation();
+  const settings = useSelector(memoizedGetSettings);
 
   const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
@@ -117,135 +122,38 @@ const ServicesSection = () => {
     }
   };
 
-  const settings = useSelector(memoizedGetSettings);
-
   return (
     <View
+      className="m-0 flex-1 flex-col"
       style={{
-        paddingTop: 64 + 32,
+        backgroundColor: greys(theme)[950],
       }}>
-      <Text
-        size={32}
-        style={{
-          fontFamily: 'OverpassHeavy',
-          marginLeft: 16,
-          marginBottom: 4,
-          marginTop: 4,
-        }}>
-        Lifestyle
-      </Text>
-      <View style={styles.gridContainer}>
-        {SERVICE_MENU_ITEMS.filter((item) =>
-          ['giftcards', 'donate'].includes(item.id) ? settings?.experimental : true
-        ).map((item) => (
-          <MenuItem
-            key={item.id}
-            item={item}
-            onPress={() => !item.empty && handleNavigation(item)}
-          />
-        ))}
+      <View style={{ paddingTop: 64 + 32 }}>
+        <Text
+          size={32}
+          heavy
+          overpass
+          style={{
+            marginLeft: 16,
+            marginBottom: 4,
+            marginTop: 4,
+          }}>
+          Lifestyle
+        </Text>
+        <View className="flex-row flex-wrap justify-between px-4 pt-1">
+          {SERVICE_MENU_ITEMS.filter((item) =>
+            ['giftcards', 'donate'].includes(item.id) ? settings?.experimental : true
+          ).map((item) => (
+            <MenuItem
+              key={item.id}
+              item={item}
+              onPress={() => !item.empty && handleNavigation(item)}
+            />
+          ))}
+        </View>
       </View>
     </View>
   );
 };
-
-// Root component
-const TabTwoScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
-
-  return (
-    <View style={styles.container}>
-      <ServicesSection />
-    </View>
-  );
-};
-
-// Styles
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: greys(theme)[950],
-      flexDirection: 'column',
-      flex: 1,
-      margin: 0,
-    },
-    gridContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      padding: 16,
-      paddingTop: 4,
-    },
-    iconContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 16,
-      borderRadius: 8,
-      backgroundColor: greys(theme)[800],
-    },
-    gridItem: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 8,
-      flexBasis: '22%', // Ensure max 4 icons per row
-      marginBottom: 16,
-    },
-    gridText: {
-      marginTop: 8,
-      color: greys(theme)[100],
-      textAlign: 'center',
-      fontSize: 11,
-      fontFamily: 'OverpassHeavy',
-    },
-    image: {
-      width: 48,
-      height: 48,
-      borderRadius: 1000,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[700],
-    },
-    bitrefillIcon: {
-      width: '100%',
-      height: 80,
-      borderRadius: 12,
-    },
-    pressableContainer: {
-      padding: 16,
-      paddingTop: 0,
-      paddingBottom: 16,
-    },
-    innerContainer: {
-      borderRadius: 12,
-      borderWidth: 0.5,
-      borderColor: greys(theme)[700],
-      backgroundColor: greys(theme)[800],
-      padding: 8,
-    },
-    textContainer: {
-      backgroundColor: 'transparent',
-    },
-    titleText: {
-      marginTop: 8,
-      color: greys(theme)[0],
-      flexWrap: 'wrap',
-    },
-    subtitleText: {
-      marginTop: 1,
-      color: greys(theme)[100],
-      flexWrap: 'wrap',
-    },
-    button: {
-      backgroundColor: greys(theme)[950],
-      borderRadius: 8,
-      padding: 8,
-      marginTop: 8,
-    },
-    buttonText: {
-      textAlign: 'center',
-      color: greys(theme)[0],
-      flexWrap: 'wrap',
-    },
-  });
 
 export default TabTwoScreen;
