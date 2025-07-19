@@ -31,7 +31,6 @@ import { persistor, store } from 'helper/redux/store';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
-import { getFollowedUsers } from './ProfilePage';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
 import { TransactionProvider } from 'components/providers/TransactionsProvider';
@@ -113,18 +112,8 @@ function MySplashScreen() {
  */
 function MainStack() {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
-  const { addMessage, messages, setFollows } = useNostr();
+  const { addMessage, messages } = useNostr();
   const theme = useSelector(memoizedGetTheme);
-
-  // Load followed users
-  useEffect(() => {
-    const loadFollowedUsers = async () => {
-      const followedUsers = await getFollowedUsers(currentProfile.pubkey);
-      if (followedUsers.length) setFollows(followedUsers);
-    };
-
-    loadFollowedUsers();
-  }, [currentProfile.pubkey, setFollows]);
 
   // Set up DM subscriptions
   useNostrDMs(currentProfile, addMessage, messages);

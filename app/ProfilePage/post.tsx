@@ -423,85 +423,75 @@ function PostTop({ post }) {
   );
 }
 
-export const Post = React.memo(
-  ({
-    active = false,
-    mainPost = [],
-    showNested = false,
-    post,
-    index,
-    parentPosts = [],
-    isResponse = false,
-  }) => {
-    let post_ = getPost(post);
-    const theme = useSelector(memoizedGetTheme);
-    const { reactionCount, repostCount, zapCount } = usePostReactions({
-      id: post_.id,
-    });
+export const Post = React.memo(({ active = false, showNested = false, post, index }) => {
+  let post_ = getPost(post);
+  const theme = useSelector(memoizedGetTheme);
+  const { reactionCount, repostCount, zapCount } = usePostReactions({
+    id: post_.id,
+  });
 
-    try {
-      const { nostrEvents } = extractUrls(post_?.content);
-      const quote =
-        post_?.tags?.find((t) => t?.[0] === 'alt')?.[1] === 'Repost event' ||
-        post_?.tags?.find((t) => t?.[0] === 'q')?.[1] ||
-        (nostrEvents?.[0]?.replace('nostr:', '')
-          ? nip19.decode(nostrEvents?.[0]?.replace('nostr:', ''))?.data
-          : null);
+  try {
+    const { nostrEvents } = extractUrls(post_?.content);
+    const quote =
+      post_?.tags?.find((t) => t?.[0] === 'alt')?.[1] === 'Repost event' ||
+      post_?.tags?.find((t) => t?.[0] === 'q')?.[1] ||
+      (nostrEvents?.[0]?.replace('nostr:', '')
+        ? nip19.decode(nostrEvents?.[0]?.replace('nostr:', ''))?.data
+        : null);
 
-      return (
-        <TouchableOpacity
-          onPress={() => {
-            // navigation.navigate("post", {
-            //   event: post_,
-            //   parentPosts: isResponse ? [...parentPosts] : parentPosts,
-            // });
-          }}
-          key={index}
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          // navigation.navigate("post", {
+          //   event: post_,
+          //   parentPosts: isResponse ? [...parentPosts] : parentPosts,
+          // });
+        }}
+        key={index}
+        style={{
+          backgroundColor: greys(theme)[950],
+          padding: 12,
+          borderBottomWidth: 1,
+          borderColor: greys(theme)[600],
+        }}>
+        {post.kind === 6 && <RepostText pubkey={post.pubkey} repostCounter={repostCount} />}
+        <View
           style={{
-            backgroundColor: greys(theme)[950],
-            padding: 12,
-            borderBottomWidth: 1,
-            borderColor: greys(theme)[600],
+            flexDirection: 'row',
           }}>
-          {post.kind === 6 && <RepostText pubkey={post.pubkey} repostCounter={repostCount} />}
-          <View
-            style={{
-              flexDirection: 'row',
-            }}>
-            {!active && <ProfileIcon pubkey={post_?.pubkey} />}
-            <View style={{ flex: 1 }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  alignSelf: 'flex-start',
-                  marginBottom: active ? 16 : 0,
-                }}>
-                {active && <ProfileIcon pubkey={post_?.pubkey} />}
-                <PostTop post={post_} />
-              </View>
-              <TextContent content={post_.content} fontSize={active ? 18 : 14} />
-              <UrlProcessor urls={extractUrls(post_?.content)?.urls} />
+          {!active && <ProfileIcon pubkey={post_?.pubkey} />}
+          <View style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'flex-start',
+                marginBottom: active ? 16 : 0,
+              }}>
+              {active && <ProfileIcon pubkey={post_?.pubkey} />}
+              <PostTop post={post_} />
             </View>
+            <TextContent content={post_.content} fontSize={active ? 18 : 14} />
+            <UrlProcessor urls={extractUrls(post_?.content)?.urls} />
           </View>
-          {showNested && quote && <PostQuote id={quote} />}
-          <ActionItems
-            id={post_.id}
-            reactionCount={reactionCount}
-            repostCount={repostCount}
-            zapCount={zapCount}
-            size={!active ? 16 : 24}
-          />
-        </TouchableOpacity>
-      );
-    } catch (err) {
-      return (
-        <View>
-          <Text>{JSON.stringify(err)}</Text>
         </View>
-      );
-    }
+        {showNested && quote && <PostQuote id={quote} />}
+        <ActionItems
+          id={post_.id}
+          reactionCount={reactionCount}
+          repostCount={repostCount}
+          zapCount={zapCount}
+          size={!active ? 16 : 24}
+        />
+      </TouchableOpacity>
+    );
+  } catch (err) {
+    return (
+      <View>
+        <Text>{JSON.stringify(err)}</Text>
+      </View>
+    );
   }
-);
+});
 
 Post.displayName = 'Post';
