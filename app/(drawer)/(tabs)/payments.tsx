@@ -198,7 +198,7 @@ const Section = () => {
     });
   }, [allBalances, mintInfo, combinedSearchAndProfiles]);
 
-  const pagerRef = useRef(null);
+  const pagerRef = useRef<PagerView>(null);
 
   const onPageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
