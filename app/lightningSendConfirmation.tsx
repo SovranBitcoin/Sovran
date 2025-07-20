@@ -21,6 +21,7 @@ import { TransactionHeader } from 'components/common/Transaction/TransactionHead
 import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { RootState } from 'helper/redux/store/reducer';
 
 export function LightningSendConfirmation({
   transaction,
@@ -55,7 +56,7 @@ export function LightningSendConfirmation({
   const feeReserve = parsedQuote?.fee_reserve;
   const quoteId = parsedQuote?.quote;
 
-  const profileId = useSelector((state) => state.nostr?.currentProfile?.id);
+  const profileId = useSelector((state: RootState) => state.nostr?.currentProfile?.id);
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
