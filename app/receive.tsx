@@ -72,13 +72,6 @@ const EcashLightningReceiver = () => {
    * Handles pasting ecash tokens from clipboard
    */
   const handleEcashPaste = async (): Promise<void> => {
-    // const hasReadPermission = await Clipboard.hasStringAsync();
-
-    // if (!hasReadPermission) {
-    //   showMessage('clipboard_permission_denied', {}, { emoji: '🚨' });
-    //   return;
-    // }
-
     const text = await Clipboard.getStringAsync();
 
     let decodedText;
@@ -142,9 +135,6 @@ const EcashLightningReceiver = () => {
       buttons={
         <View className="flex-row items-center justify-center bg-transparent pb-2">
           <ButtonHandler
-            // helpButton={{
-            //   text: 'Copy Npub',
-            // }}
             buttons={[
               {
                 text: 'Paste',
@@ -164,14 +154,6 @@ const EcashLightningReceiver = () => {
                 variant: 'secondary',
                 onPress: handleScanQR,
               },
-              // {
-              //   text: "Customize Lightning Address",
-              //   icon: "mdi:at",
-              //   variant: "secondary",
-              //   onPress: () => {
-              //     navigation.navigate("settings/customNpub");
-              //   },
-              // },
             ]}
           />
         </View>
