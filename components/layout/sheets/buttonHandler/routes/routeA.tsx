@@ -58,8 +58,8 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
           borderRadius: 16,
         }}>
         {reorderedButtons.map((button, i) => {
-          const isProcessing = processingButtonIndex !== null;
-          const isDisabled = isProcessing && processingButtonIndex !== i;
+          const isProcessing = processingButtonIndex !== undefined;
+          const isDisabled = button.disabled || (isProcessing && processingButtonIndex !== i);
           const isDangerous = button.variant === 'dangerous';
 
           return (
