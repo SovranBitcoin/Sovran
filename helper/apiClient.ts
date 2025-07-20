@@ -169,7 +169,6 @@ const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
       return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
     }
     const data = await res.json();
-    console.log('123123data', url, JSON.stringify(data, null, 2));
     return ok(data as T);
   } catch (e) {
     return err(e instanceof Error ? e : new Error('Unknown error'));
@@ -178,8 +177,18 @@ const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
 
 const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Error>> => {
   try {
-    const res = await fetch(url, { method: 'POST', body });
-    return ok(res.json() as T);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      return err(new Error(`Post error: ${res.status} ${res.statusText}`));
+    }
+    const data = await res.json();
+    return ok(data as T);
   } catch (e) {
     return err(e instanceof Error ? e : new Error('Unknown error'));
   }
