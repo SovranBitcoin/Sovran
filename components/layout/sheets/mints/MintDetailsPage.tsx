@@ -384,7 +384,7 @@ const MintDetailPage = () => {
             {
               text: 'Close',
               variant: 'secondary',
-              onPress: () => router?.goBack(),
+              onPress: async () => router?.goBack(),
             },
           ]}
         />
