@@ -173,10 +173,16 @@ function TabOneScreen() {
       });
 
       if (latestVersionResult.isOk()) {
-        if (semver.gt(latestVersionResult.value.version, version)) {
-          showMessage('latest_version', {
-            version: latestVersionResult.value.version,
-          });
+        if (
+          latestVersionResult.value &&
+          typeof latestVersionResult.value === 'object' &&
+          'version' in latestVersionResult.value
+        ) {
+          if (semver.gt(latestVersionResult.value.version, version)) {
+            showMessage('latest_version', {
+              version: latestVersionResult.value.version,
+            });
+          }
         }
       }
     })();
