@@ -17,7 +17,7 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
   const styles = createStyles(theme);
 
   // Handler for confirming with message
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     sheetRef.current?.hide({
       action: 'confirm',
       message: message.trim(),
@@ -25,7 +25,7 @@ const MessageInput = ({}: RouteScreenProps<'email-sheet', 'email'>) => {
   };
 
   // Handler for skipping the message
-  const handleSkip = () => {
+  const handleSkip = async () => {
     sheetRef.current?.hide({
       action: 'cancel',
       message: '',
