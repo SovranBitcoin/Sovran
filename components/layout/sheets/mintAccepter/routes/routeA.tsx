@@ -64,7 +64,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
           {
             text: "Don't trust",
             variant: 'secondary',
-            onPress: () => {
+            onPress: async () => {
               ref.current.hide({
                 action: 'reject',
                 mint: [payload.mint],
@@ -75,7 +75,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
           {
             text: 'Trust',
             variant: 'primary',
-            onPress: () => {
+            onPress: async () => {
               dispatch(
                 addMintsAction({
                   profileId: store.getState().nostr?.currentProfile?.id,
