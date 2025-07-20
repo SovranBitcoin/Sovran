@@ -10,3 +10,13 @@ export const useTypedRoute = <T extends keyof NavigationParams>() => {
 
   return route.params;
 };
+
+export const useTypedRoute2 = <T = any>() => {
+  const route = useRoute<RouteProp<NavigationParams, any>>();
+
+  if (!route.params) {
+    throw new Error(`Route parameters for ${route.name} are undefined`);
+  }
+
+  return route.params as T;
+};

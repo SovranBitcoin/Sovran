@@ -24,11 +24,11 @@ export interface UserProfile {
   profileEvent: string;
   name: string;
   displayName: string;
-  about: string;
-  banner: string;
+  about?: string;
+  banner?: string;
   picture: string;
   image: string;
-  website: string;
+  website?: string;
   lud16: string;
   lud06?: string;
   nip05?: string;
@@ -49,35 +49,110 @@ export interface SearchUsersResponse {
   fromCache: boolean;
 }
 
+// --- Adjusted types for fetchEsimData (OrderResponse) and fetchProducts (ProductPackage) ---
+
+export interface Operator {
+  operatorName: string;
+  networkType: string;
+}
+
+export interface LocationNetwork {
+  locationName: string;
+  locationLogo: string;
+  locationCode: string;
+  operatorList: Operator[];
+}
+
 export interface ProductPackage {
-  packageCode: number | string;
+  packageCode: string;
   slug: string;
   name: string;
   price: number;
   currencyCode: string;
   volume: number;
-  smsStatus: string;
-  dataType: string;
+  smsStatus: number;
+  dataType: number;
   unusedValidTime: number;
   duration: number;
   durationUnit: string;
   location: string;
   description: string;
-  activeType: string;
-  favourite: boolean;
+  activeType: number;
+  favorite: boolean;
   retailPrice: number;
   speed: string;
+  ipExport: string;
+  supportTopUpType: number;
+  fupPolicy: string;
+  locationNetworkList: LocationNetwork[];
 }
 
-export interface QuoteResponse {
-  sats: number;
-  request: string;
+export interface EsimPackage {
+  packageName: string;
+  packageCode: string;
+  slug: string;
+  duration: number;
+  volume: number;
+  locationCode: string;
+  createTime: string;
 }
 
-export interface OrderResponse {
+export interface EsimListItem {
+  esimTranNo: string;
+  orderNo: string;
+  imsi: string;
+  iccid: string;
+  smsStatus: number;
+  msisdn: string;
+  ac: string;
+  qrCodeUrl: string;
+  shortUrl: string;
+  smdpStatus: string;
+  eid: string;
+  activeType: number;
+  dataType: number;
+  activateTime: string | null;
+  expiredTime: string;
+  installationTime: string | null;
+  totalVolume: number;
+  totalDuration: number;
+  durationUnit: string;
+  orderUsage: number;
+  esimStatus: string;
+  pin: string;
+  puk: string;
+  apn: string;
+  ipExport: string;
+  supportTopUpType: number;
+  fupPolicy: string;
+  packageList: EsimPackage[];
+}
+
+export interface EsimPager {
+  pageSize: number;
+  pageNum: number;
+  total: number;
+}
+
+// Adjusted OrderResponse type to match the actual response for /esim/order
+export interface EsimOrderResponse {
+  success: boolean;
+  errorCode: string | null;
+  errorMsg: string | null;
   obj?: {
     orderNo: string;
-    esimList?: any[];
+  };
+  [key: string]: any;
+}
+
+// The original OrderResponse for /order/query (esimList, pager) is still needed:
+export interface OrderResponse {
+  success: boolean;
+  errorCode: string;
+  errorMsg: string | null;
+  obj?: {
+    esimList: EsimListItem[];
+    pager: EsimPager;
   };
   [key: string]: any;
 }
@@ -94,6 +169,7 @@ const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
       return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
     }
     const data = await res.json();
+    console.log('123123data', url, JSON.stringify(data, null, 2));
     return ok(data as T);
   } catch (e) {
     return err(e instanceof Error ? e : new Error('Unknown error'));
@@ -109,11 +185,29 @@ const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Erro
   }
 };
 
+export interface FetchProductsResponse {
+  errorCode: string | null;
+  errorMsg: string | null;
+  success: boolean;
+  obj?: {
+    packageList: ProductPackage[];
+  };
+}
+
 export const fetchProducts = () => {
-  return safeFetch<{ success: boolean; obj?: { packageList: ProductPackage[] } }>(
-    `${BASE_URL}/esim/products`
-  );
+  return safeFetch<FetchProductsResponse>(`${BASE_URL}/esim/products`);
 };
+
+interface QuoteResponse {
+  request: string;
+  p: ProductPackage & {
+    ipExport: string;
+    supportTopUpType: number;
+    fupPolicy: string;
+    locationNetworkList: LocationNetwork[];
+  };
+  sats: number;
+}
 
 export const fetchQuote = ({
   packageCode,
@@ -132,6 +226,7 @@ export const fetchQuote = ({
   return safeFetch<QuoteResponse>(`${BASE_URL}/esim/quote?${params}`);
 };
 
+// Adjusted to use EsimOrderResponse for /esim/order
 export const fetchOrderData = ({
   request,
   packageCode,
@@ -151,9 +246,10 @@ export const fetchOrderData = ({
     params.append('iccid', iccid);
     params.append('type', 'TOPUP');
   }
-  return safeFetch<OrderResponse>(`${BASE_URL}/esim/order?${params}`);
+  return safeFetch<EsimOrderResponse>(`${BASE_URL}/esim/order?${params}`);
 };
 
+// /order/query still returns the original OrderResponse
 export const fetchEsimData = ({ orderNo }: { orderNo: string }) =>
   safeFetch<OrderResponse>(`${BASE_URL}/order/query?orderNo=${orderNo}`);
 
