@@ -19,6 +19,10 @@ declare module 'react-native-actions-sheet' {
       routes: {
         'message-input': RouteDefinition;
       };
+      returnValue: {
+        action: 'confirm' | 'skip';
+        message: string;
+      };
     }>;
   }
 }
