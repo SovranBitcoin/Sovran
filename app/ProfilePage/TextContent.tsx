@@ -15,7 +15,9 @@ export const extractUrls = (text: string) => {
     const urls = text.match(urlRegex) || [];
     const nostrEvents = text.match(nostrRegex) || [];
 
-    const contentWithoutUrls = text.replace(urlRegex, '').replace(nostrEvents, '');
+    // Remove all URLs and nostr events from the text
+    let contentWithoutUrls = text.replace(urlRegex, '');
+    contentWithoutUrls = contentWithoutUrls.replace(nostrRegex, '');
 
     return { urls, nostrEvents, contentWithoutUrls };
   } catch {
@@ -81,6 +83,7 @@ export function TextContent({
           fontFamily: 'OverpassHeavy',
           color: shades[300],
         }}
+        // @ts-ignore: HighlightText does not type 'searchWords', but it works
         searchWords={[...hashtags, ...mentions]}
         textToHighlight={
           showFullText
