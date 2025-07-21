@@ -1,3 +1,5 @@
+import { ProductPackage, QuoteResponse } from 'helper/apiClient';
+
 export type NavigationParams = {
   currency: {
     amount: number;
@@ -116,21 +118,28 @@ export type NavigationParams = {
     countries: string[];
   };
   esimCheckout: {
-    request: string;
-    type: string;
-    volume: number;
-    duration: number;
-    speed: string;
-    location: string;
-    iccid: string;
-    topup: boolean;
-    topupAmount: number;
-    price: number;
+    quote: QuoteResponse;
+    package: ProductPackage;
+    esimParams: {
+      iccid: string;
+      type: 'BASE' | 'TOPUP';
+      topup: boolean;
+      topupAmount: number;
+    };
   };
   esimCountrySelection: {
     countries: string[];
-    packageList: any; // TODO: Add more specific type when available
+    packageList?: ProductPackage[];
     type: 'vpn' | 'esim';
+    esimType?: 'BASE' | 'TOPUP'; // Preserve the original esim type
+    iccid?: string; // Also preserve iccid for when we navigate back
+  };
+  esimsDataPlan: {
+    country?: string;
+    packageList?: ProductPackage[];
+    countries?: string[];
+    iccid?: string;
+    type: 'BASE' | 'TOPUP';
   };
 
   // Add other endpoints here

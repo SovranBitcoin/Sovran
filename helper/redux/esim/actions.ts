@@ -1,9 +1,7 @@
 import { SET_ESIM, UPDATE_ESIM } from './actionTypes';
 import { Esim, EsimOrder } from './types';
 
-export type EsimAction =
-  | ReturnType<typeof setEsims>
-  | ReturnType<typeof updateEsim>;
+export type EsimAction = ReturnType<typeof setEsims> | ReturnType<typeof updateEsim>;
 
 export const setEsims = (esim: Esim) =>
   ({

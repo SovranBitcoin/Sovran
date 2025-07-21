@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Platform, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Device from 'expo-device';
 import lookup from 'country-code-lookup';
@@ -20,10 +19,10 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { useTypedRoute } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
 function ModalScreen() {
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation<'lightningSendConfirmation'>();
   const params = useTypedRoute<'esimCheckout'>();
   const dispatch = useDispatch();
 
@@ -54,7 +53,7 @@ function ModalScreen() {
   const handleBuy = async () => {
     setLoading(true);
     const meltQuoteRes = await getMeltQuote({
-      pr: params.request,
+      pr: params.quote.request,
       unit: 'sat',
       mintUrl: selectedMint,
     });
@@ -65,7 +64,7 @@ function ModalScreen() {
     }
     const meltQuote = meltQuoteRes.value;
 
-    const amount = getLightningAmount({ pr: params.request });
+    const amount = getLightningAmount({ pr: params.quote.request });
     const totalAmount = (amount || 0) + meltQuote.fee_reserve;
 
     if (balance < totalAmount) {
@@ -76,7 +75,7 @@ function ModalScreen() {
       );
     } else {
       navigation.navigate('lightningSendConfirmation', {
-        pr: params.request,
+        pr: params.quote.request,
         unit,
         meltQuote: JSON.stringify(meltQuote),
         pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
@@ -92,34 +91,34 @@ function ModalScreen() {
         title: 'Coverage',
         value: (
           <View style={styles.flagContainer}>
-            <FlagIcon width={24} height={24} country={params.location} />
-            <Text style={styles.countryText}>{lookup.byIso(params.location).country}</Text>
+            <FlagIcon width={24} height={24} country={params.package.location} />
+            <Text style={styles.countryText}>{lookup.byIso(params.package.location)?.country}</Text>
           </View>
         ),
       },
       {
         title: 'Type',
-        value: String(params.type),
+        value: String(params.esimParams.type),
       },
       {
         title: 'Data',
-        value: `${params.volume / 1073741824} GB`,
+        value: `${params.package.volume / 1073741824} GB`,
       },
       {
         title: 'Validity',
-        value: `${params.duration} days`,
+        value: `${params.package.duration} days`,
       },
       {
         title: 'Speed',
-        value: params.speed,
+        value: params.package.speed,
       },
     ];
 
     // Conditionally add topup information
-    if (params?.type === 'TOPUP') {
+    if (params.esimParams.type === 'TOPUP') {
       baseItems.splice(2, 0, {
         title: 'Topup for',
-        value: params?.iccid,
+        value: params.esimParams.iccid,
       });
     }
 
@@ -161,7 +160,7 @@ function ModalScreen() {
         items={[
           {
             title: 'Total due',
-            value: `$${params.price / 10000}`,
+            value: `$${params.package.price / 10000}`,
           },
         ]}
       />

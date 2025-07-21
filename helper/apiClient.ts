@@ -207,7 +207,7 @@ export const fetchProducts = () => {
   return safeFetch<FetchProductsResponse>(`${BASE_URL}/esim/products`);
 };
 
-interface QuoteResponse {
+export interface QuoteResponse {
   request: string;
   p: ProductPackage & {
     ipExport: string;

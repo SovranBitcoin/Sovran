@@ -3,6 +3,10 @@ import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import _ from 'lodash/fp';
+import { Alert } from 'react-native';
+import bip39 from 'bip39';
+import { HDKey } from '@scure/bip32';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
@@ -230,7 +234,7 @@ const migrations = {
             const path = `${DERIVATION_PATH}/0'/${index}'/0/0`;
             const seed = root.derive(path);
             const derivedCashuMnemonic = bip39.entropyToMnemonic(
-              seed.privateKey as Uint8Array,
+              seed.privateKey as Buffer,
               wordlist
             );
             return {
@@ -270,7 +274,7 @@ const migrations = {
             const derivedKey = root.derive(path);
             // Convert the derived private key back to a mnemonic
             const derivedCashuMnemonic = bip39.entropyToMnemonic(
-              derivedKey.privateKey as Uint8Array,
+              derivedKey.privateKey as Buffer,
               wordlist
             );
             return {

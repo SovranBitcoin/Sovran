@@ -122,3 +122,7 @@ case TERMS_ACCEPTED: {
 - Maintain type safety throughout
 - Check existing implementations before creating new patterns
 - Use the helper functions and utilities provided in the project
+
+# Types
+
+Instead of doing `packageList: any;`, at a minimum check the string `packageList` in the codebase to double check to see if there are types we can reuse. This is an example but it works in general.

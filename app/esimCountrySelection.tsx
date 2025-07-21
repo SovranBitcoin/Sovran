@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { useSelector } from 'react-redux';
 import lookup from 'country-code-lookup';
 
-import { greys, Theme } from 'helper/colors';
 import Modal from 'components/layout/Modal';
-import { View } from 'components/common/View';
+import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { greys } from 'helper/colors';
 
 export const getCountry = (iso: string) => {
   try {
@@ -23,14 +23,13 @@ export const getCountry = (iso: string) => {
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { countries, packageList, type } = useTypedRoute<'esimCountrySelection'>();
+  const { countries, packageList, type, esimType, iccid } = useTypedRoute<'esimCountrySelection'>();
   const [searchText, setSearchText] = useState('');
 
   const filteredCountries = countries
-    ?.map((c) => (type === 'vpn' ? c.isoCode : c))
-    .filter((c) => {
+    ?.map((c: any) => (type === 'vpn' ? c.isoCode : c))
+    .filter((c: string) => {
       try {
         const countryName = lookup.byIso(c)?.country || '';
         return countryName.toLowerCase().includes(searchText.toLowerCase());
@@ -38,12 +37,12 @@ function ModalScreen() {
         return false;
       }
     })
-    .filter((c) => getCountry(c))
-    .map((c) => ({ iso: c, name: getCountry(c) }))
+    .filter((c: string) => getCountry(c) !== undefined)
+    .map((c: string) => ({ iso: c, name: getCountry(c)! }))
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((c) => c.iso);
 
-  const handleCountrySelection = (country) => {
+  const handleCountrySelection = (country: string) => {
     const navigationOptions = { closeCurrentAndParent: true };
 
     if (type === 'vpn') {
@@ -59,7 +58,8 @@ function ModalScreen() {
           country,
           countries,
           packageList,
-          type,
+          type: esimType,
+          iccid,
         },
         navigationOptions
       );
@@ -68,20 +68,27 @@ function ModalScreen() {
 
   return (
     <Modal title="Countries/regions" showBack buttons={<></>}>
-      <View style={styles.container}>
+      <View className="bg-transparent p-4">
         <TextInput
           placeholder="Search for country or region"
           value={searchText}
           onChangeText={setSearchText}
-          style={styles.searchInput}
+          className="mb-4"
         />
+        <Spacer size={12} />
         {filteredCountries.map((countryCode) => (
           <Pressable
             key={countryCode}
-            style={styles.pressable}
+            className="mb-2 flex-row items-center rounded-2xl border border-opacity-20 p-2"
+            style={{
+              borderWidth: 0.2,
+              backgroundColor: greys(theme)[800],
+              borderRadius: 16,
+              borderColor: greys(theme)[600],
+            }}
             onPress={() => handleCountrySelection(countryCode)}>
             <FlagIcon width={32} height={32} country={countryCode} />
-            <Text weight="heavy" size={16} style={styles.countryName}>
+            <Text weight="heavy" size={16} className="ml-2">
               {getCountry(countryCode)}
             </Text>
           </Pressable>
@@ -90,29 +97,5 @@ function ModalScreen() {
     </Modal>
   );
 }
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: 'transparent',
-      padding: 16,
-    },
-    searchInput: {
-      marginBottom: 16,
-    },
-    pressable: {
-      padding: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-      backgroundColor: greys(theme)[800],
-      borderRadius: 16,
-      borderColor: greys(theme)[600],
-      borderWidth: 0.2,
-    },
-    countryName: {
-      marginLeft: 8,
-    },
-  });
 
 export default withSheetProvider(ModalScreen);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Pressable } from 'react-native';
 import { greys, shades } from 'helper/colors';
 import Modal from 'components/layout/Modal';
@@ -6,35 +6,190 @@ import { Button } from 'components/common/Button';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { FlagIcon } from 'assets/icons';
-import { useNavigation } from 'expo-router';
 import lookup from 'country-code-lookup';
 import { useEsims } from 'helper/redux/esim';
-import * as Localization from 'expo-localization';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { fetchQuote } from 'helper/apiClient';
+import type { ProductPackage, QuoteResponse } from 'helper/apiClient';
+import * as Localization from 'expo-localization';
 
-function ModalScreen() {
+// Helper function to get filtered packages
+const getFilteredPackages = (packages: ProductPackage[], country: string): ProductPackage[] => {
+  return packages
+    .filter((pkg) => pkg.location === country)
+    .filter((pkg) => pkg.duration >= 7)
+    .sort((a, b) => {
+      if (a.volume !== b.volume) {
+        return a.volume - b.volume;
+      }
+      return a.price - b.price;
+    });
+};
+
+// Components
+interface CountryHeaderProps {
+  country: string;
+  type: 'BASE' | 'TOPUP' | undefined;
+  loading: boolean;
+  onChangeCountry: () => void;
+}
+
+const CountryHeader: React.FC<CountryHeaderProps> = ({
+  country,
+  type,
+  loading,
+  onChangeCountry,
+}) => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useNavigation();
+  const countryData = lookup.byIso(country);
+
+  return (
+    <View
+      className="m-2 mb-0 flex-row items-center rounded-xl border-opacity-20 p-2"
+      style={{
+        backgroundColor: greys(theme)[800],
+        borderColor: greys(theme)[600],
+        borderWidth: 0.2,
+      }}>
+      <FlagIcon width={32} height={32} country={country} />
+      <Text
+        size={20}
+        weight="heavy"
+        className="ml-2 mr-2 flex-1"
+        overpass
+        heavy
+        numberOfLines={1}
+        ellipsizeMode="tail">
+        {countryData?.country || country}
+      </Text>
+      {type === 'BASE' && (
+        <View className="flex-1">
+          <Button
+            text="Change"
+            variant="primary"
+            noPadding
+            onPress={onChangeCountry}
+            disabled={loading}
+            style={{
+              width: '100%',
+              marginBottom: 0,
+            }}
+          />
+        </View>
+      )}
+    </View>
+  );
+};
+
+interface PackageItemProps {
+  pkg: ProductPackage;
+  isSelected: boolean;
+  onSelect: (packageCode: string) => void;
+}
+
+const PackageItem: React.FC<PackageItemProps> = ({ pkg, isSelected, onSelect }) => {
+  const theme = useSelector(memoizedGetTheme);
+  const volumeInGB = pkg.volume / 1073741824;
+  const priceInDollars = pkg.price / 10000;
+
+  return (
+    <Pressable
+      onPress={() => onSelect(pkg.packageCode)}
+      className="rounded-2xl p-2"
+      style={{
+        backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[800],
+      }}>
+      <View
+        className="flex-row items-center justify-between rounded-2xl"
+        style={{ backgroundColor: 'transparent' }}>
+        <View className="rounded-2xl" style={{ backgroundColor: 'transparent' }}>
+          <View
+            className="flex-row items-center rounded-2xl"
+            style={{ backgroundColor: 'transparent' }}>
+            <View
+              className="border-0.5 h-4 w-4 rounded-2xl"
+              style={{
+                backgroundColor: isSelected ? shades[200] : greys(theme)[600],
+                borderColor: isSelected ? shades[200] : greys(theme)[500],
+              }}
+            />
+            <View style={{ backgroundColor: 'transparent' }}>
+              <Text
+                weight="bold"
+                size={16}
+                className="ml-2"
+                style={{
+                  fontSize: 16,
+                  fontFamily: 'OverpassBold',
+                }}>
+                {`${volumeInGB} GB`}
+              </Text>
+              <Text className="ml-2">{`${pkg.duration} days`}</Text>
+            </View>
+          </View>
+        </View>
+        <Text className="ml-2">{`$${priceInDollars}`}</Text>
+      </View>
+    </Pressable>
+  );
+};
+
+interface PackageListProps {
+  packages: ProductPackage[];
+  selectedPackage: string | null;
+  onSelectPackage: (packageCode: string) => void;
+}
+
+const PackageList: React.FC<PackageListProps> = ({
+  packages,
+  selectedPackage,
+  onSelectPackage,
+}) => {
+  const theme = useSelector(memoizedGetTheme);
+
+  return (
+    <View
+      className="m-2 overflow-hidden rounded-2xl border-opacity-20 p-2"
+      style={{
+        backgroundColor: greys(theme)[800],
+        borderColor: greys(theme)[600],
+        borderWidth: 0.2,
+      }}>
+      {packages.map((pkg) => (
+        <PackageItem
+          key={pkg.packageCode}
+          pkg={pkg}
+          isSelected={selectedPackage === pkg.packageCode}
+          onSelect={onSelectPackage}
+        />
+      ))}
+    </View>
+  );
+};
+
+// Main Component
+function EsimsDataPlanRefactor(): React.ReactElement {
+  const navigation = useTypedNavigation();
   const { setEsims } = useEsims();
 
-  const {
-    country: countryParam,
-    packageList,
-    countries: countriesParams,
-    iccid,
-    type,
-  } = useTypedRoute();
+  // Get route parameters
+  const routeParams = useTypedRoute<'esimsDataPlan'>();
+  const { country: countryParam, packageList = [], countries = [], iccid = '', type } = routeParams;
 
-  const [country, setCountry] = useState(countryParam || 'US');
-  const [packages, setPackages] = useState([]);
-  const [countries, setCountries] = useState([]);
-  const [selectedPackage, setSelectedPackage] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // State
+  const [country, setCountry] = useState<string>(countryParam || 'US');
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // Memoized filtered packages
+  const filteredPackages = useMemo(
+    () => getFilteredPackages(packageList, country),
+    [packageList, country]
+  );
 
   // Set country based on locale if not provided
   useEffect(() => {
@@ -43,161 +198,90 @@ function ModalScreen() {
     }
   }, [countryParam]);
 
-  // Update state from route params
+  // Update country when route param changes
   useEffect(() => {
-    if (packageList) setPackages(packageList);
-    if (countriesParams) setCountries(countriesParams);
-    if (countryParam) setCountry(countryParam);
-  }, [packageList, countriesParams, countryParam]);
+    if (countryParam) {
+      setCountry(countryParam);
+    }
+  }, [countryParam]);
 
-  // Select default package when country or packages change
+  // Select default package when filtered packages change
   useEffect(() => {
-    if (packages.length > 0) {
-      const filteredPackages = packages
-        .filter((r) => r.location === country)
-        .filter((p) => p.duration >= 7)
-        .sort((a, b) => {
-          // Sort by volume first, then by price
-          if (a.volume !== b.volume) {
-            return a.volume - b.volume;
-          }
-          return a.price - b.price;
-        });
-
-      if (filteredPackages.length > 0) {
-        setSelectedPackage(filteredPackages[0].packageCode);
+    if (filteredPackages.length > 0) {
+      const defaultPackage = filteredPackages[0];
+      if (
+        !selectedPackage ||
+        !filteredPackages.find((pkg) => pkg.packageCode === selectedPackage)
+      ) {
+        setSelectedPackage(defaultPackage.packageCode);
       }
     }
-  }, [country, packages]);
+  }, [filteredPackages, selectedPackage]);
 
-  const handleContinue = async () => {
+  const handleContinue = async (): Promise<void> => {
     setLoading(true);
-    const currentPackage = packages.find((p) => p.packageCode === selectedPackage);
-    if (!currentPackage) {
+
+    const currentPackage = packageList.find((p) => p.packageCode === selectedPackage);
+    if (!currentPackage || !type || !iccid) {
       setLoading(false);
-      // optionally show an error toast or alert
+      console.error('Missing required data');
       return;
     }
 
-    console.log(123123123, currentPackage.packageCode, iccid, type);
-    const result = await fetchQuote({ packageCode: currentPackage.packageCode, iccid, type });
-
-    if (result.isOk()) {
-      const data = result.value;
-
-      const esim = {
-        package: {
-          packageCode: currentPackage.packageCode,
-          slug: currentPackage.slug,
-          name: currentPackage.name,
-          price: currentPackage.price,
-          currencyCode: currentPackage.currencyCode,
-          volume: currentPackage.volume,
-          smsStatus: currentPackage.smsStatus,
-          dataType: currentPackage.dataType,
-          unusedValidTime: currentPackage.unusedValidTime,
-          duration: currentPackage.duration,
-          durationUnit: currentPackage.durationUnit,
-          location: currentPackage.location,
-          description: currentPackage.description,
-          activeType: currentPackage.activeType,
-          favorite: currentPackage.favourite,
-          retailPrice: currentPackage.retailPrice,
-          speed: currentPackage.speed,
-        },
-        sats: data.sats,
-        request: data.request,
-        type,
+    try {
+      console.log('Fetching quote for:', currentPackage.packageCode, iccid, type);
+      const result = await fetchQuote({
+        packageCode: currentPackage.packageCode,
         iccid,
-      };
-
-      setEsims(esim);
-
-      navigation.navigate('esimCheckout', {
-        sats: esim.sats,
-        request: esim.request,
-        type: esim.type,
-        iccid: esim.iccid,
-        ...esim.package,
+        type,
       });
-    } else if (result.isErr()) {
-      const error = result.error;
-      // Show an alert/toast or log
-      console.error('Quote fetch failed:', error.message);
-      // optionally alert user
+
+      if (result.isOk()) {
+        const data = result.value as QuoteResponse;
+
+        const esimData = {
+          package: currentPackage,
+          sats: data.sats,
+          request: data.request,
+          type,
+          iccid,
+        };
+
+        setEsims(esimData);
+
+        // Navigate to checkout with structured data
+        navigation.navigate('esimCheckout', {
+          quote: data,
+          package: currentPackage,
+          esimParams: {
+            iccid,
+            type,
+            topup: false,
+            topupAmount: 0,
+          },
+        });
+      } else if (result.isErr()) {
+        const error = result.error;
+        console.error('Quote fetch failed:', error.message);
+        // TODO: Show user-friendly error message
+      }
+    } catch (error) {
+      console.error('Error in handleContinue:', error);
+      // TODO: Show user-friendly error message
     }
 
     setLoading(false);
   };
 
-  // Render a single package item
-  const renderPackageItem = (pkg) => (
-    <Pressable
-      key={pkg.packageCode}
-      onPress={() => setSelectedPackage(pkg.packageCode)}
-      style={{
-        backgroundColor:
-          selectedPackage === pkg.packageCode ? greys(theme)[700] : greys(theme)[800],
-        borderRadius: 16,
-        padding: 8,
-      }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: 'transparent',
-          borderRadius: 16,
-        }}>
-        <View style={{ backgroundColor: 'transparent', borderRadius: 16 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: 'transparent',
-              borderRadius: 16,
-            }}>
-            <View
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: 16,
-                backgroundColor:
-                  selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[600],
-                borderColor: selectedPackage === pkg.packageCode ? shades[200] : greys(theme)[500],
-                borderWidth: 0.5,
-              }}
-            />
-            <View style={{ backgroundColor: 'transparent' }}>
-              <Text
-                weight="bold"
-                size={16}
-                style={{
-                  marginLeft: 8,
-                  fontSize: 16,
-                  fontFamily: 'OverpassBold',
-                }}>
-                {`${pkg.volume / 1073741824} GB`}
-              </Text>
-              <Text style={{ marginLeft: 8 }}>{`${pkg.duration} days`}</Text>
-            </View>
-          </View>
-        </View>
-        <Text style={{ marginLeft: 8 }}>{`$${pkg.price / 10000}`}</Text>
-      </View>
-    </Pressable>
-  );
-
-  // Filter and sort packages
-  const filteredPackages = packages
-    .filter((r) => r.location === country)
-    .filter((p) => p.duration >= 7)
-    .sort((a, b) => {
-      if (a.volume !== b.volume) {
-        return a.volume - b.volume;
-      }
-      return a.price - b.price;
+  const handleChangeCountry = (): void => {
+    navigation.navigate('esimCountrySelection', {
+      countries,
+      packageList,
+      type: 'esim',
+      esimType: type, // Preserve the original esim type
+      iccid, // Preserve the iccid
     });
+  };
 
   return (
     <Modal
@@ -205,89 +289,32 @@ function ModalScreen() {
       title="Get data plan"
       buttons={
         <ButtonHandler
-          context="modal"
+          context="sheet"
           buttons={[
             {
               text: 'Continue',
               variant: 'primary',
-              onPress: handleContinue,
+              onPress: async () => await handleContinue(),
               loading: loading,
               disabled: loading,
             },
           ]}
         />
       }>
-      <View
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          margin: 8,
-          padding: 8,
-          marginBottom: 0,
-          backgroundColor: greys(theme)[800],
-          borderRadius: 12,
-          borderColor: greys(theme)[600],
-          borderWidth: 0.2,
-        }}>
-        <FlagIcon width={32} height={32} country={country} />
-        <Text
-          size={20}
-          weight="heavy"
-          style={{
-            marginLeft: 8,
-            fontSize: 20,
-            fontFamily: 'OverpassHeavy',
-            flex: 1,
-            marginRight: 8,
-          }}
-          numberOfLines={1}
-          ellipsizeMode="tail">
-          {lookup.byIso(country).country}
-        </Text>
-        {type === 'BASE' && (
-          <View
-            style={{
-              alignItems: 'flex-end',
-              backgroundColor: 'transparent',
-              flex: 1,
-            }}>
-            <Button
-              text="Change"
-              variant="primary"
-              position="center"
-              noPadding
-              onPress={() => {
-                navigation.navigate('esimCountrySelection', {
-                  countries,
-                  type,
-                  packageList: packages,
-                });
-              }}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: 16,
-              }}
-            />
-          </View>
-        )}
-      </View>
+      <CountryHeader
+        country={country}
+        type={type}
+        loading={loading}
+        onChangeCountry={handleChangeCountry}
+      />
 
-      <View
-        style={{
-          padding: 8,
-          margin: 8,
-          backgroundColor: greys(theme)[800],
-          borderRadius: 16,
-          borderColor: greys(theme)[600],
-          borderWidth: 0.2,
-          overflow: 'hidden',
-        }}>
-        {filteredPackages.map(renderPackageItem)}
-      </View>
+      <PackageList
+        packages={filteredPackages}
+        selectedPackage={selectedPackage}
+        onSelectPackage={setSelectedPackage}
+      />
     </Modal>
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default withSheetProvider(EsimsDataPlanRefactor);
