@@ -7,7 +7,7 @@ import { greys, reds, Theme } from 'helper/colors';
 import Modal from 'components/layout/Modal';
 import { Spacer, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { FlagIcon, ShareIcon } from 'assets/icons';
+import { FlagIcon } from 'assets/icons';
 import { Esim, useEsims } from 'helper/redux/esim';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
@@ -160,33 +160,28 @@ function ModalScreen() {
             }}>
             <ButtonHandler
               buttons={[
-                ...(canShareOrInstall && hasActivationCode
-                  ? [
-                      {
-                        text: 'Share',
-                        icon: <ShareIcon />,
-                        variant: 'secondary',
-                        onPress: handleShareEsim,
-                        disabled: !hasActivationCode,
-                      },
-                      {
-                        text: 'Install',
-                        variant: 'primary',
-                        onPress: handleInstallEsim,
-                        disabled: !hasActivationCode,
-                      },
-                    ]
-                  : []),
-                ...(canShareOrInstall && !hasActivationCode
-                  ? [
-                      {
-                        text: 'Activate eSIM',
-                        variant: 'primary',
-                        onPress: () => fetchAndUpdateEsims(esim),
-                        disabled: loadingEsim,
-                      },
-                    ]
-                  : []),
+                {
+                  text: 'Share',
+                  icon: 'lucide:share',
+                  variant: 'secondary',
+                  onPress: async () => handleShareEsim(),
+                  disabled: !hasActivationCode,
+                  condition: !!(canShareOrInstall && hasActivationCode),
+                },
+                {
+                  text: 'Install',
+                  variant: 'primary',
+                  onPress: async () => handleInstallEsim(),
+                  disabled: !hasActivationCode,
+                  condition: !!(canShareOrInstall && hasActivationCode),
+                },
+                {
+                  text: 'Activate eSIM',
+                  variant: 'primary',
+                  onPress: async () => fetchAndUpdateEsims(esim),
+                  disabled: loadingEsim,
+                  condition: !!(canShareOrInstall && !hasActivationCode),
+                },
               ]}
             />
           </View>

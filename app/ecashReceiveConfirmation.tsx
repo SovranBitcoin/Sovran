@@ -171,45 +171,36 @@ export function EcashReceiveConfirmation({
       buttons={
         <ButtonHandler
           buttons={[
-            ...(transaction.isCancel && transaction.transactionType === 'receive'
-              ? [
+            {
+              text: 'View Send Transaction',
+              variant: 'secondary',
+              onPress: async () => {
+                navigation.navigate(
+                  'transaction',
                   {
-                    text: 'View Send Transaction',
-                    icon: null,
-                    variant: 'secondary',
-                    onPress: () => {
-                      navigation.navigate(
-                        'transaction',
-                        {
-                          id: transaction.request || transaction.token,
-                          transactionType: 'send',
-                        },
-                        {
-                          closeCurrentAndParents: true,
-                        }
-                      );
-                    },
-                  },
-                ]
-              : []),
-
-            ...(!transaction?.paid
-              ? [
-                  {
-                    text: 'Cancel',
-                    icon: null,
-                    variant: 'secondary',
-                    onPress: handleCancel,
+                    id: transaction.request || transaction.token,
+                    transactionType: 'send',
                   },
                   {
-                    text: 'Redeem Ecash',
-                    icon: null,
-                    variant: 'primary',
-                    onPress: handleRedeemPress,
-                    loading: loading,
-                  },
-                ]
-              : []),
+                    closeCurrentAndParents: true,
+                  }
+                );
+              },
+              condition: !!(transaction.isCancel && transaction.transactionType === 'receive'),
+            },
+            {
+              text: 'Cancel',
+              variant: 'secondary',
+              onPress: async () => handleCancel(),
+              condition: !transaction?.paid,
+            },
+            {
+              text: 'Redeem Ecash',
+              variant: 'primary',
+              onPress: handleRedeemPress,
+              loading: loading,
+              condition: !transaction?.paid,
+            },
             ...extraButtons,
           ]}
         />

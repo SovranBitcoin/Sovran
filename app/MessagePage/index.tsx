@@ -261,7 +261,7 @@ export default function ModalScreen() {
                 {
                   text: 'Send Money',
                   variant: 'primary',
-                  onPress: () => {
+                  onPress: async () => {
                     SheetManager.show('button-handler', {
                       payload: {
                         buttons: [
@@ -269,7 +269,7 @@ export default function ModalScreen() {
                             text: 'Lightning',
                             icon: 'mingcute:lightning-fill',
                             variant: 'primary',
-                            onPress: () => {
+                            onPress: async () => {
                               navigation.navigate('currency', {
                                 to: 'lightningSendConfirmation',
                                 unit: 'sat',
@@ -283,7 +283,7 @@ export default function ModalScreen() {
                             text: 'Lock Ecash',
                             icon: 'solar:key-bold',
                             variant: 'primary',
-                            onPress: () => {
+                            onPress: async () => {
                               navigation.navigate('currency', {
                                 to: 'ecashSendConfirmation',
                                 unit: 'sat',

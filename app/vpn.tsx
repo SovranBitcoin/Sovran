@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from 'components/layout/Modal';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { FlagIcon, ShareIcon } from 'assets/icons';
+import { FlagIcon } from 'assets/icons';
 import lookup from 'country-code-lookup';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useVpn } from 'helper/redux/lnvpn';
@@ -187,78 +187,51 @@ function ModalScreen() {
           }}>
           <ButtonHandler
             buttons={[
-              ...(new Date() <
-              new Date(
-                vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
-              )
-                ? [
-                    {
-                      text: 'Share',
-                      icon: <ShareIcon />,
-                      variant: 'secondary',
-                      onPress: () => {
-                        navigation.navigate('VpnShare', {
-                          vpnCode: vpn
-                            ?.find((v) => v.payment_request === params.payment_request)
-                            ?.order?.WireguardConfig.join('\n'),
-                          location: vpn?.find((v) => v.payment_request === params.payment_request)
-                            .location,
-                          config: vpn?.find((v) => v.payment_request === params.payment_request)
-                            ?.order?.WireguardConfig,
-                          hash: vpn?.find((v) => v.payment_request === params.payment_request)
-                            ?.payment_hash,
-                        });
-                      },
-                    },
-                    {
-                      text: 'Download',
-                      variant: 'primary',
-                      onPress: downloadAndShareVPN,
-                    },
-                  ]
-                : []),
-              // ...(new Date() <
-              // new Date(
-              //   vpn?.find((v) => v.payment_request === params.payment_request)?.order?.expiry_date
-              // )
-              //   ? [
-              //       {
-              //         text: 'Activate',
-              //         variant: 'primary',
-              //         disabled: remainingTime === 'Calculating...',
-              //         onPress: activateVPN,
-              //       },
-              //     ]
-              //   : []),
-              ...(remainingTime === 'Not activated'
-                ? [
-                    {
-                      text: 'Activate',
-                      variant: 'primary',
-                      onPress: activateVPN,
-                    },
-                  ]
-                : []),
-              // ...(remainingTime !== 'Not activated'
-              //   ? [
-              //       vpnStatus?.isConnected
-              //         ? {
-              //             text: 'Disconnect',
-              //             variant: 'primary',
-              //             onPress: handleDisconnect,
-              //           }
-              //         : {
-              //             text: 'Connect',
-              //             variant: 'primary',
-              //             onPress: handleConnect,
-              //           },
-              //       {
-              //         text: 'Status',
-              //         variant: 'secondary',
-              //         onPress: handleStatus,
-              //       },
-              //     ]
-              //   : []),
+              {
+                text: 'Share',
+                icon: 'lucide:share',
+                variant: 'secondary',
+                onPress: async () => {
+                  navigation.navigate('VpnShare', {
+                    vpnCode: vpn
+                      ?.find((v) => v.payment_request === params.payment_request)
+                      ?.order?.WireguardConfig.join('\n'),
+                    location: vpn?.find((v) => v.payment_request === params.payment_request)
+                      .location,
+                    config: vpn?.find((v) => v.payment_request === params.payment_request)?.order
+                      ?.WireguardConfig,
+                    hash: vpn?.find((v) => v.payment_request === params.payment_request)
+                      ?.payment_hash,
+                  });
+                },
+                condition: !!(
+                  new Date() <
+                  new Date(
+                    vpn?.find(
+                      (v) => v.payment_request === params.payment_request
+                    )?.order?.expiry_date
+                  )
+                ),
+              },
+              {
+                text: 'Download',
+                variant: 'primary',
+                onPress: downloadAndShareVPN,
+                condition: !!(
+                  new Date() <
+                  new Date(
+                    vpn?.find(
+                      (v) => v.payment_request === params.payment_request
+                    )?.order?.expiry_date
+                  )
+                ),
+              },
+              {
+                text: 'Activate',
+                variant: 'primary',
+                onPress: activateVPN,
+                condition: remainingTime === 'Not activated',
+              },
             ]}
           />
         </View>

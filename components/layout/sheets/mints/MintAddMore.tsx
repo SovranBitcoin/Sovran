@@ -385,7 +385,7 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
             {
               text: 'Cancel',
               variant: 'secondary',
-              onPress: () => {
+              onPress: async () => {
                 setSelectedMints(new Set());
                 router?.goBack();
               },

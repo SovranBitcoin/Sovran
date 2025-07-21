@@ -486,13 +486,13 @@ export default function ModalScreen() {
                 text: 'Button Text',
                 icon: 'lets-icons:copy', // icon name from a library
                 variant: 'primary',
-                onPress: () => {},
+                onPress: async () => {},
               },
               {
                 text: 'Button Text 2',
                 icon: 'lets-icons:copy', // icon name from a library
                 variant: 'secondary',
-                onPress: () => {},
+                onPress: async () => {},
               },
             ]}></ButtonHandler>
         </View>

@@ -154,48 +154,46 @@ export function LightningSendConfirmation({
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={
-              transaction?.paid
-                ? [
-                    {
-                      text: 'Close',
-                      icon: 'ri:close-circle-line',
-                      variant: 'secondary',
-                      onPress: handleCancel,
-                    },
-                    ...(transaction.nostr.pubkey
-                      ? [
-                          {
-                            text: 'View Message',
-                            icon: 'ri:message-2-line',
-                            variant: 'primary',
-                            onPress: () => {
-                              navigation.navigate('userMessages', {
-                                pubkey: transaction.nostr.pubkey,
-                              });
-                              navigation.goBack();
-                            },
-                          },
-                        ]
-                      : []),
-                  ]
-                : [
-                    {
-                      text: 'Cancel',
-                      icon: 'ri:close-circle-line',
-                      variant: 'secondary',
-                      onPress: handleCancel,
-                    },
-                    {
-                      text: 'Send',
-                      icon: 'ri:send-plane-2-fill',
-                      variant: 'primary',
-                      onPress: handleLightningSend,
-                      loading: loading,
-                    },
-                    ...extraButtons,
-                  ]
-            }
+            buttons={[
+              {
+                text: 'Close',
+                icon: 'ri:close-circle-line',
+                variant: 'secondary',
+                onPress: async () => handleCancel(),
+                condition: !!transaction?.paid,
+              },
+              {
+                text: 'View Message',
+                icon: 'ri:message-2-line',
+                variant: 'primary',
+                onPress: async () => {
+                  navigation.navigate('userMessages', {
+                    pubkey: transaction.nostr.pubkey,
+                  });
+                  navigation.goBack();
+                },
+                condition: !!(transaction?.paid && transaction.nostr.pubkey),
+              },
+              {
+                text: 'Cancel',
+                icon: 'ri:close-circle-line',
+                variant: 'secondary',
+                onPress: async () => handleCancel(),
+                condition: !transaction?.paid,
+              },
+              {
+                text: 'Send',
+                icon: 'ri:send-plane-2-fill',
+                variant: 'primary',
+                onPress: handleLightningSend,
+                loading: loading,
+                condition: !transaction?.paid,
+              },
+              ...extraButtons.map((button) => ({
+                ...button,
+                condition: !transaction?.paid,
+              })),
+            ]}
           />
         </View>
       }>

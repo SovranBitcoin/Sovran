@@ -142,7 +142,6 @@ export async function getWallet({
   profile,
   forceRefresh = false,
 }: GetWalletParams): Promise<Result<CashuWallet, Error>> {
-  if (!unit) return err(new AppError('invalid_unit', 'Invalid unit'));
   if (!mintUrl) return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
 
   if (walletCache?.[mintUrl]?.[unit] && !forceRefresh) {

@@ -237,7 +237,7 @@ const NpubSelector = ({
     setSelectedDomain(`@${newDomain}`);
   };
 
-  const handleDomainPress = () => {
+  const handleDomainPress = async () => {
     const options = ['@sovran.money', '@sovran.cash', '@sovran.id', '@npubx.cash', 'Cancel'];
     const cancelButtonIndex = 4;
 
@@ -310,7 +310,7 @@ export default function ModalScreen() {
   const [username, setUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('https://npubx.cash');
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     // Implement the buy functionality here
   };
 

@@ -251,86 +251,48 @@ function ModalScreen() {
 
   const renderButtons = () => {
     const isP2PK = params?.profile && params.to === 'ecashSendConfirmation';
-    if (params.to === 'ecashSendConfirmation') {
-      // When triggered by a payment request only show the Next button
-      if (params?.paymentRequest) {
-        return (
-          <View style={styles.buttonContainer}>
-            <Text></Text>
-            <ButtonHandler
-              buttons={[
-                {
-                  text: 'Next',
-                  icon: 'lucide:arrow-right',
-                  variant: 'primary',
-                  onPress: handleNext,
-                  loading: loading,
-                  disabled: !(
-                    isValidAmount &&
-                    params?.mints?.includes(selectedMint) &&
-                    params?.allowedUnits?.includes(unit.toUpperCase())
-                  ),
-                },
-              ]}
-            />
-          </View>
-        );
-      }
-
-      return (
-        <View style={styles.buttonContainer}>
-          <ButtonHandler
-            buttons={[
-              ...(isP2PK
-                ? []
-                : [
-                    {
-                      text: 'Paste',
-                      icon: 'lets-icons:copy',
-                      variant: 'secondary',
-                      onPress: handlePastePress,
-                    },
-                  ]),
-              {
-                text: 'Next',
-                icon: 'lucide:arrow-right',
-                variant: 'primary',
-                onPress: handleNext,
-                loading: loading,
-                disabled: !isValidAmount,
-              },
-              ...(isP2PK
-                ? []
-                : [
-                    {
-                      text: 'Scan QR',
-                      icon: 'stash:qr-code',
-                      variant: 'secondary',
-                      onPress: () => navigation.navigate('camera', { unit }),
-                    },
-                    {
-                      text: 'Contacts',
-                      icon: 'mdi:contact',
-                      variant: 'secondary',
-                      onPress: () => navigation.navigate('contacts'),
-                    },
-                  ]),
-            ]}
-          />
-        </View>
-      );
-    }
+    const isEcashSend = params.to === 'ecashSendConfirmation';
+    const hasPaymentRequest = params?.paymentRequest;
 
     return (
       <View style={styles.buttonContainer}>
+        {!params?.amount && isEcashSend && !hasPaymentRequest && <Text></Text>}
         <ButtonHandler
           buttons={[
             {
+              text: 'Paste',
+              icon: 'lets-icons:copy',
+              variant: 'secondary',
+              onPress: handlePastePress,
+              condition: isEcashSend && !isP2PK && !hasPaymentRequest,
+            },
+            {
               text: 'Next',
+              ...(isEcashSend && { icon: 'lucide:arrow-right' }),
               variant: 'primary',
-              loading: loading,
               onPress: handleNext,
-              disabled: !isValidAmount, // Disable the button when amount is invalid
+              loading: loading,
+              disabled: hasPaymentRequest
+                ? !(
+                    isValidAmount &&
+                    params?.mints?.includes(selectedMint) &&
+                    params?.allowedUnits?.includes(unit.toUpperCase())
+                  )
+                : !isValidAmount,
+            },
+            {
+              text: 'Scan QR',
+              icon: 'stash:qr-code',
+              variant: 'secondary',
+              onPress: () => navigation.navigate('camera', { unit }),
+              condition: isEcashSend && !isP2PK && !hasPaymentRequest,
+            },
+            {
+              text: 'Contacts',
+              icon: 'mdi:contact',
+              variant: 'secondary',
+              onPress: () => navigation.navigate('contacts'),
+              condition: isEcashSend && !isP2PK && !hasPaymentRequest,
             },
           ]}
         />

@@ -79,6 +79,7 @@ function ModalScreen() {
       return;
     }
 
+    console.log(123123123, currentPackage.packageCode, iccid, type);
     const result = await fetchQuote({ packageCode: currentPackage.packageCode, iccid, type });
 
     if (result.isOk()) {

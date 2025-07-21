@@ -237,82 +237,76 @@ export function EcashSendConfirmation({
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={
-              getCurrentTransaction[0].paid
-                ? [
-                    {
-                      text: 'Close',
-                      icon: 'ri:close-circle-line',
-                      variant: 'secondary',
-                      onPress: () => navigation.goBack(),
-                    },
-                    ...(getCurrentTransaction[0].nostr?.pubkey
-                      ? [
-                          {
-                            text: 'View Messages',
-                            icon: 'mdi:message-reply',
-                            variant: 'primary',
-                            onPress: () => {
-                              navigation.navigate('userMessages', {
-                                pubkey: getCurrentTransaction[0].nostr.pubkey,
-                              });
-                              navigation.goBack();
-                            },
-                          },
-                        ]
-                      : []),
-                  ]
-                : [
-                    {
-                      text: 'Copy',
-                      icon: 'lets-icons:copy',
-                      variant: 'primary',
-                      onPress: handleCopy,
-                    },
-                    {
-                      text: 'Share',
-                      icon: 'ri:share-fill',
-                      variant: 'secondary',
-                      onPress: handleShare,
-                    },
-                    {
-                      text: 'NFC',
-                      icon: 'ph:contactless-payment-fill',
-                      variant: 'secondary',
-                      onPress: handleNFCSend,
-                    },
-                    ...(resolvedPaymentRequest
-                      ? [
-                          {
-                            text: 'Send via Nostr',
-                            icon: 'mdi:send',
-                            variant: 'primary',
-                            loading: sendingNostr,
-                            onPress: handleSendNostr,
-                          },
-                        ]
-                      : []),
-                    // {
-                    //   text: 'Check Status',
-                    //   icon: 'humbleicons:refresh',
-                    //   variant: 'secondary',
-                    //   onPress: handleCheckStatus,
-                    // },
-                    {
-                      text: 'Copy as Emoji',
-                      icon: 'fluent:emoji-24-filled',
-                      variant: 'primary',
-                      onPress: handleCopyEmoji,
-                    },
-                    {
-                      text: 'Cancel Transaction',
-                      icon: 'mdi:cancel',
-                      variant: 'dangerous',
-                      onPress: handleCancelSend,
-                    },
-                    ...extraButtons,
-                  ]
-            }
+            buttons={[
+              {
+                text: 'Close',
+                icon: 'ri:close-circle-line',
+                variant: 'secondary',
+                onPress: async () => navigation.goBack(),
+                condition: getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'View Messages',
+                icon: 'mdi:message-reply',
+                variant: 'primary',
+                onPress: async () => {
+                  navigation.navigate('userMessages', {
+                    pubkey: getCurrentTransaction[0].nostr.pubkey,
+                  });
+                  navigation.goBack();
+                },
+                condition: !!(
+                  getCurrentTransaction[0].paid && getCurrentTransaction[0].nostr?.pubkey
+                ),
+              },
+              {
+                text: 'Copy',
+                icon: 'lets-icons:copy',
+                variant: 'primary',
+                onPress: handleCopy,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Share',
+                icon: 'ri:share-fill',
+                variant: 'secondary',
+                onPress: handleShare,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'NFC',
+                icon: 'ph:contactless-payment-fill',
+                variant: 'secondary',
+                onPress: handleNFCSend,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Send via Nostr',
+                icon: 'mdi:send',
+                variant: 'primary',
+                loading: sendingNostr,
+                onPress: handleSendNostr,
+                condition: !!(resolvedPaymentRequest && !getCurrentTransaction[0].paid),
+              },
+              {
+                text: 'Copy as Emoji',
+                icon: 'fluent:emoji-24-filled',
+                variant: 'primary',
+                onPress: handleCopyEmoji,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Cancel Transaction',
+                icon: 'mdi:cancel',
+                variant: 'dangerous',
+                onPress: handleCancelSend,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              ...extraButtons.map((button) => ({
+                ...button,
+                condition: !getCurrentTransaction[0].paid,
+              })),
+            ]}
           />
         </View>
       }>

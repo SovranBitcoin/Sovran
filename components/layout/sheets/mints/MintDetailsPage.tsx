@@ -322,6 +322,8 @@ const MintDetailPage = () => {
   // Get mint info - try to access it safely
   const mintInfo = wallet?.mintInfo?._mintInfo;
 
+  console.log(1231222223123, mintInfo);
+
   console.log('mintInfo', mintInfo);
 
   // Render the mint icon/logo even if loading
@@ -355,7 +357,7 @@ const MintDetailPage = () => {
                 {renderMintIcon()}
               </DonutChart>
             </View>
-            <Text style={styles.mintTitle}>{mintInfo?.name || 'Unknown Mint'}</Text>
+            <Text style={styles.mintTitle}>{mintInfo?.name || 'Loading...'}</Text>
             {mintInfo?.version && <Text style={styles.mintVersion}>{mintInfo.version}</Text>}
           </View>
         </ScrollView>

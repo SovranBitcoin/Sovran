@@ -232,6 +232,7 @@ export const fetchQuote = ({
     params.append('type', 'TOPUP');
     params.append('iccid', iccid);
   }
+  console.log(`${BASE_URL}/esim/quote?${params}`);
   return safeFetch<QuoteResponse>(`${BASE_URL}/esim/quote?${params}`);
 };
 

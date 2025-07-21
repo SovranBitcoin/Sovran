@@ -19,6 +19,7 @@ export interface ButtonHandlerButton {
   icon?: string;
   text: string;
   onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>;
+  condition?: boolean; // New optional prop for conditional rendering
 }
 
 interface ButtonHandlerProps {
@@ -39,6 +40,9 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
     greys(theme)[950],
   ] as const;
 
+  // Filter buttons based on condition (default to true if condition is undefined)
+  const visibleButtons = buttons.filter((button) => button.condition !== false);
+
   return (
     <LinearGradient
       colors={colors || defaultColors}
@@ -51,7 +55,7 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
         },
         style,
       ]}>
-      {buttons.slice(0, 2).map((button, index) => (
+      {visibleButtons.slice(0, 2).map((button, index) => (
         <View key={index} className="flex-1 bg-transparent">
           <Button
             testID={button.testID}
@@ -68,14 +72,14 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
         </View>
       ))}
 
-      {buttons.length > 2 && (
+      {visibleButtons.length > 2 && (
         <View className="w-16 bg-transparent">
           <Button
             testID="more-button"
             icon={<Icon name={'tabler:dots'} />}
             onPress={() => {
               SheetManager.show('button-handler', {
-                payload: { buttons },
+                payload: { buttons: visibleButtons },
               });
             }}
             variant="secondary"

@@ -65,7 +65,7 @@ const PasscodeSettings: React.FC = () => {
               text: 'Reset',
               icon: 'reset',
               variant: 'secondary',
-              onPress: () => {
+              onPress: async () => {
                 setPasscode('');
                 setStep('create');
                 setCode('');
@@ -78,7 +78,7 @@ const PasscodeSettings: React.FC = () => {
               icon: 'check',
               variant: 'primary',
               disabled: confirm.length !== PASSCODE_LENGTH,
-              onPress: () => {
+              onPress: async () => {
                 if (code === confirm && code.length === PASSCODE_LENGTH) {
                   setPasscode(code);
                   navigation.goBack();

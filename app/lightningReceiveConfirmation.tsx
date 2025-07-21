@@ -524,31 +524,33 @@ export function LightningReceiveConfirmation({
             paddingBottom: 8,
           }}>
           <ButtonHandler
-            buttons={
-              getCurrentTransaction[0].paid
-                ? []
-                : [
-                    {
-                      text: 'Copy',
-                      icon: 'lets-icons:copy',
-                      variant: 'primary',
-                      onPress: handleCopy,
-                    },
-                    {
-                      text: 'Share',
-                      icon: 'ri:share-fill',
-                      variant: 'secondary',
-                      onPress: handleShare,
-                    },
-                    {
-                      text: 'Check Status',
-                      icon: 'humbleicons:refresh',
-                      variant: 'secondary',
-                      onPress: handleCheckStatus,
-                    },
-                    ...extraButtons,
-                  ]
-            }
+            buttons={[
+              {
+                text: 'Copy',
+                icon: 'lets-icons:copy',
+                variant: 'primary',
+                onPress: handleCopy,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Share',
+                icon: 'ri:share-fill',
+                variant: 'secondary',
+                onPress: handleShare,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Check Status',
+                icon: 'humbleicons:refresh',
+                variant: 'secondary',
+                onPress: handleCheckStatus,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              ...extraButtons.map((button) => ({
+                ...button,
+                condition: !getCurrentTransaction[0].paid,
+              })),
+            ]}
           />
         </View>
       }>
