@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatCurrency } from 'helper/currency';
+import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp, sendLightning } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
@@ -73,7 +73,6 @@ export function LightningSendConfirmation({
         setProgress: () => {},
         setLoading: () => {},
         setScanned: () => {},
-        urDecoder: null,
         balance: balance?.amount,
       });
       if (result.isOk() && result.value) {
@@ -125,18 +124,18 @@ export function LightningSendConfirmation({
 
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
 
-  const formatAmount = (value, displayDenomination = unit === 'sat' ? 'btc' : unit) => {
+  const formatAmount = (value: number, displayDenomination = unit === 'sat' ? 'btc' : unit) => {
     return formatCurrency(
       {
-        currency: getCurrencyDisplay(),
+        currency: getCurrencyDisplay() as CurrencyCode,
         value: value,
-        denomination: unit === 'sat' ? 'sats' : unit,
+        denomination: unit === 'sat' ? 'sats' : (unit as Denomination),
       },
       {
         locale: 'en-US',
         precision: displayDenomination === 'btc' ? 8 : 2,
         currencyDisplay: 'symbol',
-        denomination: displayDenomination,
+        denomination: displayDenomination as Denomination,
       }
     );
   };
