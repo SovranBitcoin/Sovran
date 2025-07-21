@@ -101,7 +101,7 @@ const Camera: React.FC = () => {
       setScanned,
     });
     if (res.isErr()) {
-      showMessage(res.error, {}, { emoji: '🚨' });
+      showMessage(res.error.message, {}, { emoji: '🚨' });
     }
   }, [navigation, urDecoder, unit, selectedMint]);
 
@@ -125,29 +125,25 @@ const Camera: React.FC = () => {
 
   const handleBarcodeScanned = useCallback(
     async (scanning: ScanningData): Promise<void> => {
-      try {
-        if (!navigation.isFocused()) {
-          return;
-        }
+      if (!navigation.isFocused()) {
+        return;
+      }
 
-        if (!scanned || scanning.data.startsWith('ur:')) {
-          setLoading(true);
-          const res = await barcodeHandler({
-            scanning,
-            navigation,
-            urDecoder,
-            unit,
-            selectedMint,
-            setProgress,
-            setLoading,
-            setScanned,
-          });
-          if (res.isErr()) {
-            showMessage(res.error, {}, { emoji: '🚨' });
-          }
+      if (!scanned || scanning.data.startsWith('ur:')) {
+        setLoading(true);
+        const res = await barcodeHandler({
+          scanning,
+          navigation,
+          urDecoder,
+          unit,
+          selectedMint,
+          setProgress,
+          setLoading,
+          setScanned,
+        });
+        if (res.isErr()) {
+          showMessage(res.error.message, {}, { emoji: '🚨' });
         }
-      } catch (error) {
-        showMessage(error.message);
       }
     },
     [navigation, scanned, urDecoder, unit, selectedMint]
