@@ -41,9 +41,9 @@ export const DonutChartContainer = ({
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const colors = useMemo(() => colorsProp ?? Object.values(shades), [colorsProp]);
-  const [chartData, setChartData] = useState<(DonutData & { percentage: number; color: string })[]>(
-    []
-  );
+  const [chartData, setChartData] = useState<
+    (DonutData & { percentage: number; color: string; value: string })[]
+  >([]);
   const totalValue = useSharedValue(0);
   const decimals = useSharedValue<number[]>([]);
 
@@ -62,6 +62,7 @@ export const DonutChartContainer = ({
         ...item,
         percentage: percentages[index],
         color: colors[index % colors.length],
+        value: item.amount.toString(), // Add the missing value property
       }));
 
       setChartData(arrayOfObjects);

@@ -222,7 +222,8 @@ function EsimsDataPlanRefactor(): React.ReactElement {
     setLoading(true);
 
     const currentPackage = packageList.find((p) => p.packageCode === selectedPackage);
-    if (!currentPackage || !type || !iccid) {
+    // Only require iccid for TOPUP type, not for BASE (new eSIM) type
+    if (!currentPackage || !type || (type === 'TOPUP' && !iccid)) {
       setLoading(false);
       console.error('Missing required data');
       return;
