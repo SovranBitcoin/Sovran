@@ -165,7 +165,7 @@ const EcashLightningReceiver = () => {
               marginHorizontal: 16,
               marginTop: 0,
             }}>
-            {new Date() > new Date('2025-07-30') && (
+            {new Date() > new Date('2025-07-22') && (
               <Card
                 message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
                 variant="warning"
