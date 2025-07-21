@@ -71,7 +71,7 @@ function ModalScreen() {
     navigation.setParams({ ...params, unit: newUnit });
   };
 
-  const handleLightningReceive = async ({ memo }: { memo: string }) => {
+  const handleLightningReceive = async ({ memo }: { memo?: string }) => {
     const res = await receiveLightning({
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
@@ -93,7 +93,7 @@ function ModalScreen() {
     }
   };
 
-  const handleEcashSend = async ({ message }) => {
+  const handleEcashSend = async ({ message }: { message?: string }) => {
     const result = await sendEcash({
       to: npubToPublicKey(params?.profile?.npub),
       amount: unit === 'sat' ? amount : amount * 100,
@@ -245,7 +245,7 @@ function ModalScreen() {
       balance,
     });
     if (res.isErr()) {
-      showMessage(res.error, {}, { emoji: '🚨' });
+      showMessage(res.error.message || 'An error occurred', {}, { emoji: '🚨' });
     }
   };
 
