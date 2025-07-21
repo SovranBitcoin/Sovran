@@ -16,6 +16,12 @@ declare module 'react-native-actions-sheet' {
       routes: {
         list: RouteDefinition;
       };
+      returnValue: {
+        id: string;
+        name: string;
+        iconUrl: string | null;
+        unit: string;
+      };
       payload: {
         accountType?: string;
         accountIndex?: number;
@@ -24,12 +30,18 @@ declare module 'react-native-actions-sheet' {
         updateSelectedMint?: boolean;
         allowedMints?: string[];
         allowedUnits?: string[];
-        onMintPress?: (mint: {
-          id: string;
-          unit: string;
-          name: string;
-          iconUrl: string | null;
-        }) => void | Promise<void>;
+        onMintPress?: (
+          mint: {
+            id: string;
+            unit: string;
+            name: string;
+            iconUrl: string | null;
+          },
+          balance: {
+            amount: number;
+            unit: string;
+          }
+        ) => void | Promise<void>;
       };
     }>;
   }

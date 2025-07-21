@@ -124,12 +124,18 @@ const ListRoute = () => {
     setLoadingId(mint.mintUrl);
     try {
       if (payload?.onMintPress) {
-        await payload.onMintPress({
-          id: mint.mintUrl,
-          name: mint.mintUrl.replace('https://', '').split('/')[0],
-          iconUrl: mint.iconUrl,
-          unit: mint.unit,
-        });
+        payload.onMintPress(
+          {
+            id: mint.mintUrl,
+            name: mint.mintUrl.replace('https://', '').split('/')[0],
+            iconUrl: mint.iconUrl,
+            unit: mint.unit,
+          },
+          {
+            amount: mint.amount,
+            unit: mint.unit,
+          }
+        );
       } else if (payload?.updateSelectedMint !== false) {
         dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
       }
@@ -172,7 +178,7 @@ const ListRoute = () => {
             {
               text: 'Close',
               variant: 'secondary',
-              onPress: () => sheetRef.current?.hide(),
+              onPress: async () => sheetRef.current?.hide(),
             },
           ]}
         />

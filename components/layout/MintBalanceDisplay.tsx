@@ -69,7 +69,7 @@ const MintBalanceDisplay: React.FC<Props> = ({
         allowedUnits,
         onMintPress: updateSelectedMint ? undefined : onMintSelected,
       },
-      onClose: (mint?: { id: string; unit: string }) => {
+      onClose: (mint) => {
         if (mint?.id && onMintSelected && updateSelectedMint) {
           const amt = memoizedGetBalance(unit, mint.id)(store.getState());
           onMintSelected(mint, { amount: amt, unit });
