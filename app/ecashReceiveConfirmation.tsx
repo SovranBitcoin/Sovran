@@ -68,15 +68,15 @@ function getTokenAmount({ token }: TokenProps): number {
   return decodedToken.proofs.reduce((a, b) => a + b.amount, 0);
 }
 
-function getTokenMemo({ token }: TokenProps): string | undefined {
+function getTokenMemo({ token }: TokenProps) {
   return getDecodedToken(token).memo;
 }
 
-function getTokenUnit({ token }: TokenProps): string | undefined {
+function getTokenUnit({ token }: TokenProps) {
   return getDecodedToken(token).unit;
 }
 
-function getTokenMints({ token }: TokenProps): string | undefined {
+function getTokenMints({ token }: TokenProps) {
   return getDecodedToken(token).mint;
 }
 

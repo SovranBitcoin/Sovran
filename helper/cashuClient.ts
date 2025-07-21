@@ -250,9 +250,13 @@ export async function getMeltQuote({
 }: {
   pr: string;
   unit: string;
-  mintUrl: string;
+  mintUrl?: string;
   mppAmount?: number;
 }): Promise<Result<MeltQuoteResponse, Error>> {
+  if (!mintUrl) {
+    return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
+  }
+
   const walletRes = await getWallet({ unit, mintUrl, profile: null });
   if (walletRes.isErr()) return err(walletRes.error);
   const wallet = walletRes.value;
@@ -295,6 +299,10 @@ export async function sendLightning({
 }): Promise<Result<LightningSendTransaction, Error>> {
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
+
+  if (!mintUrl) {
+    return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
+  }
 
   const expiryResult = toResultSync(() => getRawExpiry({ pr }));
   if (expiryResult.isErr()) {
