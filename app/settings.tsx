@@ -19,6 +19,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
+import { device } from 'helper/version';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -210,12 +211,14 @@ const ModalScreen = () => {
               navigation.navigate('themeSettings');
             }}
           />
-          <RowButton
-            label="Background Image"
-            onPress={() => {
-              navigation.navigate('backgroundImageSettings');
-            }}
-          />
+          {device.platform('ios').gte(10) && (
+            <RowButton
+              label="Background Image"
+              onPress={() => {
+                navigation.navigate('backgroundImageSettings');
+              }}
+            />
+          )}
         </Section>
         <Section title="App Information">
           <RowButton
