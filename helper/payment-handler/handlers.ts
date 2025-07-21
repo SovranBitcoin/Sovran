@@ -22,7 +22,7 @@ type HandlerResult = Result<NavigationResult | null, Error>;
 
 interface BarcodeHandlerProps {
   scanning: { data: string };
-  urDecoder: URDecoder;
+  urDecoder?: URDecoder;
   unit: string;
   selectedMint: any;
   setProgress?: (progress: number) => void;
