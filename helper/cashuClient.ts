@@ -285,7 +285,7 @@ export async function sendLightning({
   email,
   lud16,
 }: {
-  mintUrl: string;
+  mintUrl?: string;
   pr: string;
   unit: string;
   pubkey?: string;
