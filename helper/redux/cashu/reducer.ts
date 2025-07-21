@@ -26,8 +26,8 @@ import { typedSet, typedUpdate } from 'helper/typedUpdate';
 const initialState: CashuState = {
   profiles: [
     {
-      selectedMint: 'https://mint.sovran.money',
-      mints: ['https://mint.sovran.money'],
+      selectedMint: undefined,
+      mints: [],
       proofs: {},
       counters: {},
       keysets: {},
@@ -64,8 +64,7 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
     case REMOVE_MINTS:
       return typedUpdate(
         `profiles[${action.payload.profileId}].mints` as const,
-        (mints = ['https://mint.sovran.money']) =>
-          mints.filter((mint) => !action.payload.mints.includes(mint)),
+        (mints = []) => mints.filter((mint) => !action.payload.mints.includes(mint)),
         state
       );
 

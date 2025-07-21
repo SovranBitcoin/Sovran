@@ -63,7 +63,7 @@ function ProfileHeader() {
                 size={20}
                 className="mb-2 mt-4 text-center"
                 style={{ color: greys(theme)[0] }}>
-                {currentProfile.profile.name}
+                {currentProfile?.profile?.name}
               </Text>
               <QRIcon
                 color={greys(theme)[0]}
