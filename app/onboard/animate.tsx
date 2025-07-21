@@ -337,7 +337,7 @@ const ChainLoadingAnimation = () => {
     }
   }
 
-  const { mnemonic, type } = useTypedRoute();
+  const { mnemonic, type } = useTypedRoute<'animate'>();
 
   // Initialize with processing step
   const [steps, setSteps] = useState([

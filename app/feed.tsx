@@ -37,7 +37,7 @@ const Feed = ({ theme, filters }) => {
 };
 
 const TabTwoScreen = () => {
-  const params = useTypedRoute();
+  const { pubkey } = useTypedRoute<'feed'>();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const pagerRef = useRef(null);
@@ -49,11 +49,11 @@ const TabTwoScreen = () => {
       Feed: [
         {
           kinds: [EventKind.TextNote, EventKind.Repost, 30023],
-          authors: [params.pubkey],
+          authors: [pubkey],
         },
       ],
     }),
-    [params.pubkey]
+    [pubkey]
   );
 
   const onPageSelected = useCallback(

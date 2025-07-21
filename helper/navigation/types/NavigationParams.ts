@@ -14,9 +14,33 @@ export type NavigationParams = {
     allowedUnits: string[];
     mints?: string;
   };
-
+  bitrefill: {
+    product: {
+      _id: string;
+    };
+    amount: number;
+    email: string;
+  };
+  giftcard: {
+    slug: string;
+    image: string;
+  };
   esim: {
     request: string;
+  };
+  displayMnemonic: {
+    mnemonic: string;
+  };
+  animate: {
+    mnemonic: string;
+    type: string;
+  };
+  feed: {
+    pubkey: string;
+  };
+  mnemonic: {
+    type: string;
+    mnemonic: string | null;
   };
   ecashReceiveConfirmation: {
     token: string;

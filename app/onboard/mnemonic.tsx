@@ -31,7 +31,7 @@ const RecoveryScreen: React.FC<{}> = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
-  const { type = 'recover', mnemonic = null } = useTypedRoute();
+  const { type = 'recover', mnemonic = null } = useTypedRoute<'mnemonic'>();
   const inputRef = useRef<TextInput>(null);
 
   // State for managing word input

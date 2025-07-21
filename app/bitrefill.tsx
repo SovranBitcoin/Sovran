@@ -56,7 +56,7 @@ function BitrefillWidget({ url = BITREFILL_URL }) {
   const { events, setEvents } = useBitrefill();
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
-  const { product, amount, email } = useTypedRoute();
+  const { product, amount, email } = useTypedRoute<'bitrefill'>();
   const config = {
     ...(amount && { value: amount }),
     theme,

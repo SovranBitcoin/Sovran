@@ -105,7 +105,7 @@ export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const navigation = useNavigation();
-  const { slug, image } = useTypedRoute();
+  const { slug, image } = useTypedRoute<'giftcard'>();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [selectedAmount, setSelectedAmount] = useState(null);
