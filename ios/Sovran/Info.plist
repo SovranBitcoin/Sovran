@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.0.29</string>
+    <string>0.0.30</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -50,7 +50,7 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
+    <string>Allow access to your camera to scan QR codes</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>This app requires access to network features for VPN functionality</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -60,13 +60,13 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Sovran will show the users location on some transactions to help them keep track of the location they spent the funds at.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>Allow access to your microphone to use voice commands</string>
     <key>NSMotionUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your device motion</string>
+    <string>Allow motion access to use the motion sensor to rotate the screen</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to save photos</string>
+    <string>Allow access to your photos to save them to your library</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>Allow access to your photos to use them in the app</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
