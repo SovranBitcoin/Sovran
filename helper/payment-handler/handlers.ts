@@ -189,6 +189,9 @@ export const handleBarcode = async ({
     if (!setProgress) {
       throw new Error('setProgress is required for handling UR');
     }
+    if (!urDecoder) {
+      throw new Error('urDecoder is required for handling UR');
+    }
     return handleUR({ scanning, urDecoder, unit, setProgress });
   } else if (isValidEcashToken(scanning.data)) {
     return handleEcash({ data: scanning.data, unit });
