@@ -26,8 +26,8 @@ import { typedSet, typedUpdate } from 'helper/typedUpdate';
 const initialState: CashuState = {
   profiles: [
     {
-      selectedMint: undefined,
-      mints: [],
+      selectedMint: 'https://mint.sovran.money',
+      mints: ['https://mint.sovran.money'],
       proofs: {},
       counters: {},
       keysets: {},
@@ -52,7 +52,10 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
     case ADD_MINTS:
       return typedUpdate(
         `profiles[${action.payload.profileId}].mints`,
-        (existingMints = []) => [...existingMints, ...action.payload.mints],
+        (existingMints = ['https://mint.sovran.money']) => [
+          ...existingMints,
+          ...action.payload.mints,
+        ],
         state
       );
     case ENSURE_PROFILE_EXISTS:
@@ -61,7 +64,8 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
     case REMOVE_MINTS:
       return typedUpdate(
         `profiles[${action.payload.profileId}].mints` as const,
-        (mints = []) => mints.filter((mint) => !action.payload.mints.includes(mint)),
+        (mints = ['https://mint.sovran.money']) =>
+          mints.filter((mint) => !action.payload.mints.includes(mint)),
         state
       );
 
