@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { Image, ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greens, greys, reds, Theme } from 'helper/colors';
@@ -7,7 +7,6 @@ import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
-import { NDKUser } from '@nostr-dev-kit/ndk';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
@@ -15,166 +14,179 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { searchUsers as apiSearchUsers } from 'helper/apiClient';
+import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
+
+// Define proper types for our component
+interface SearchResult {
+  pubkey: string;
+  profile: UserProfile;
+}
+
+interface PlaceholderResult {
+  pubkey: string;
+  profile?: undefined; // Explicitly undefined for loading state
+}
+
+type DisplayResult = SearchResult | PlaceholderResult;
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const inputRef = useRef(null);
+  const inputRef = useRef<RNTextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const navigation = useTypedNavigation();
 
-  const debounceTimeoutRef = useRef(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Generate placeholder results for the loading state
-  const placeholderResults = Array(20)
-    .fill(null)
-    .map((_, index) => ({
-      pubkey: index,
-    }));
+  const placeholderResults = useMemo<PlaceholderResult[]>(
+    () =>
+      Array(20)
+        .fill(null)
+        .map((_, index) => ({
+          pubkey: `placeholder-${index}`,
+        })),
+    []
+  );
 
-  // New function to search using the API instead of DVM
-  const searchUsers = async (query: string) => {
+  // Improved search function with better error handling and no Redux dispatch in loop
+  const searchUsers = useCallback(async (query: string) => {
     if (!query.trim()) return;
 
     setLoading(true);
-    setHasSearched(true); // Set this to true when search is initiated
+    setHasSearched(true);
 
-    const result = await apiSearchUsers({ query, limit: 10 });
+    try {
+      const result = await apiSearchUsers({ query, limit: 10 });
 
-    if (result.isOk()) {
-      const data = result.value;
+      if (result.isOk()) {
+        const data = result.value;
 
-      if (data.results && Array.isArray(data.results)) {
-        const formattedResults = data.results.map((res) => {
-          const pubkey = JSON.parse(res.profileEvent).pubkey;
-          const user = new NDKUser({ pubkey });
-          user.profile = res;
+        if (data.results && Array.isArray(data.results)) {
+          const formattedResults: SearchResult[] = data.results.map((res) => {
+            const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
 
-          return {
-            pubkey: user.pubkey,
-            profile: {
-              ...user.profile,
-              pubkey,
-            },
-          };
-        });
+            return {
+              pubkey: res.pubkey,
+              profile: {
+                ...res,
+                pubkey: profileEventPubkey,
+              },
+            };
+          });
 
-        // Create a map to deduplicate and store in Redux
-        for (const result of formattedResults) {
-          const newResults = [{ pubkey: result?.pubkey, profile: result }];
-          const uniqueResults = [
-            ...new Map(newResults.map((item) => [item.pubkey, item.profile])).values(),
-          ];
-          store.dispatch(setSearch(uniqueResults));
+          // Store all results in Redux at once (not in a loop)
+          if (formattedResults.length > 0) {
+            // Convert to the format expected by setSearch (single object, not array)
+            formattedResults.forEach((result) => {
+              store.dispatch(setSearch({ pubkey: result.pubkey, profile: result.profile }));
+            });
+          }
+
+          setSearchResults(formattedResults);
+        } else {
+          setSearchResults([]);
         }
-
-        setSearchResults(formattedResults);
       } else {
+        console.error('Error searching users:', result.error);
         setSearchResults([]);
       }
-    } else {
-      console.error('Error searching users:', result.error);
+    } catch (error) {
+      console.error('Unexpected error during search:', error);
       setSearchResults([]);
     }
 
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-  };
+    setLoading(false); // Remove artificial delay
+  }, []);
 
-  const handleSearchQueryChange = (input: string) => {
-    setSearchQuery(input);
+  // Improved debounced search with cleanup
+  const handleSearchQueryChange = useCallback(
+    (input: string) => {
+      setSearchQuery(input);
 
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
 
-    // If search query is cleared, reset hasSearched state
-    if (!input.trim()) {
-      setHasSearched(false);
-      setSearchResults([]);
-    }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      if (input.trim()) {
-        searchUsers(input);
-      } else {
-        setSearchResults([]);
+      // Reset state if search is cleared
+      if (!input.trim()) {
         setHasSearched(false);
+        setSearchResults([]);
+        return;
       }
-    }, 800); // Reduced timeout to 800ms for better UX
-  };
 
-  const handleScroll = () => {
+      // Debounce the search
+      debounceTimeoutRef.current = setTimeout(() => {
+        searchUsers(input);
+      }, 500); // Reduced to 500ms for better responsiveness
+    },
+    [searchUsers]
+  );
+
+  const handleScroll = useCallback(() => {
     Keyboard.dismiss();
-  };
+  }, []);
 
-  // New function to clear the search input
-  const clearSearchInput = () => {
+  const clearSearchInput = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
-    setHasSearched(false); // Reset hasSearched when search is cleared
-  };
+    setHasSearched(false);
+  }, []);
 
-  const navigateToUserMessages = ({ pubkey, profile }: { pubkey: string }) => {
-    navigation.goBack();
-    navigation.goBack();
-    navigation.navigate('userMessages', {
-      pubkey: pubkey,
-      profile,
-    });
-  };
+  const navigateToUserMessages = useCallback(
+    ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
+      navigation.goBack();
+      navigation.goBack();
+      navigation.navigate('userMessages', {
+        pubkey: pubkey,
+        profile,
+      });
+    },
+    [navigation]
+  );
 
-  // Display the search results or loading placeholders
-  const displayResults = loading ? placeholderResults : searchResults;
+  // Memoized computed values
+  const displayResults: DisplayResult[] = useMemo(
+    () => (loading ? placeholderResults : searchResults),
+    [loading, placeholderResults, searchResults]
+  );
+
   const showResults = loading || searchResults.length > 0;
-
   const showEmptyState = !hasSearched && !loading;
   const showNoResults = hasSearched && !loading && searchResults.length === 0;
 
-  // Set default values for SkeletonContainer props to avoid using defaultProps
-  const skeletonBgColor = greys(theme)[800];
-  const skeletonHighlightColor = greys(theme)[600];
-  const skeletonSpeed = 800;
-  const skeletonAnimation = loading ? 'pulse' : 'none';
+  // Skeleton configuration
+  const skeletonConfig = useMemo(
+    () => ({
+      backgroundColor: greys(theme)[800],
+      highlightColor: greys(theme)[600],
+      speed: 800,
+      animation: loading ? ('pulse' as const) : ('none' as const),
+    }),
+    [theme, loading]
+  );
 
   return (
-    <SafeAreaView
-      style={{
-        backgroundColor: greys(theme)[950],
-        flex: 1,
-      }}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: greys(theme)[950] }}>
       <SkeletonContainer
-        backgroundColor={skeletonBgColor}
-        highlightColor={skeletonHighlightColor}
-        speed={skeletonSpeed}
-        animation={skeletonAnimation}>
+        backgroundColor={skeletonConfig.backgroundColor}
+        highlightColor={skeletonConfig.highlightColor}
+        speed={skeletonConfig.speed}
+        animation={skeletonConfig.animation}>
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
-            style={{
-              backgroundColor: greys(theme)[950],
-            }}
+            className="flex-1"
+            style={{ backgroundColor: greys(theme)[950] }}
             onScrollBeginDrag={handleScroll}
             scrollEventThrottle={16}>
-            <View
-              style={{
-                backgroundColor: greys(theme)[950],
-                paddingHorizontal: 16,
-              }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}>
-                {/* Wrapper View for TextInput with relative positioning */}
-                <View style={{ flex: 1, position: 'relative' }}>
-                  {/* Use React Native's TextInput directly instead of the custom component */}
+            <View className="bg-transparent px-4" style={{ backgroundColor: greys(theme)[950] }}>
+              <View className="flex-row items-center">
+                <View className="relative flex-1">
                   <RNTextInput
                     ref={inputRef}
-                    // autoFocus={true}
                     value={searchQuery}
                     onChangeText={handleSearchQueryChange}
                     placeholder="Search users..."
@@ -182,75 +194,68 @@ function ModalScreen() {
                     style={{
                       flex: 1,
                       paddingRight: 30,
-                      backgroundColor: greys(theme)[800], // Add background color
-                      borderRadius: 16, // Add border radius for styling
-                      padding: 14, // Add padding
+                      backgroundColor: greys(theme)[800],
+                      borderRadius: 16,
+                      padding: 14,
                       fontSize: 16,
                       fontFamily: 'OverpassRegular',
                       color: greys(theme)[0],
                     }}
                   />
-                  {/* Clear button with absolute positioning */}
                   {searchQuery.length > 0 && (
                     <TouchableOpacity
                       onPress={clearSearchInput}
-                      style={{
-                        position: 'absolute',
-                        right: 0,
-                        zIndex: 1,
-                        padding: 14,
-                      }}>
+                      className="absolute right-0 z-10 p-3.5">
                       <Icon name="simple-line-icons:close" size={20} color={greys(theme)[50]} />
                     </TouchableOpacity>
                   )}
                 </View>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                   <Text
-                    style={{
-                      color: greys(theme)[50],
-                      marginLeft: 12,
-                      fontSize: 16,
-                    }}>
+                    className="ml-3"
+                    overpass
+                    bold
+                    size={16}
+                    style={{ color: greys(theme)[50] }}>
                     Cancel
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {showResults && (
-                <View style={{ marginTop: 8 }}>
-                  {/* Results count text - only shown when not loading */}
-                  <View style={{ marginBottom: 12 }}>
+                <View className="mt-2">
+                  <View className="mb-3">
                     <Text
                       loading={loading}
+                      overpass
+                      bold
+                      size={16}
                       style={{
                         color: greys(theme)[400],
-                        fontSize: 14,
-                        fontFamily: 'OverpassBold',
                       }}>
                       Found {searchResults.length}{' '}
                       {searchResults.length === 1 ? 'result' : 'results'}
                     </Text>
                   </View>
-
-                  {/* Map over actual results or placeholder results */}
                   {displayResults.map((result, index) => (
                     <SearchResult
-                      key={`result-${index}`}
+                      key={result.pubkey}
                       loading={loading}
                       result={result}
-                      onPress={() =>
-                        !loading &&
-                        navigateToUserMessages({ pubkey: result.pubkey, profile: result.profile })
-                      }
+                      onPress={() => {
+                        if (!loading && result.profile) {
+                          navigateToUserMessages({
+                            pubkey: result.pubkey,
+                            profile: result.profile,
+                          });
+                        }
+                      }}
                     />
                   ))}
                 </View>
               )}
 
-              {/* Show EmptyStateView when no search has been attempted */}
               {showEmptyState && <EmptyStateView theme={theme} />}
-
-              {/* Show NoResultsFound when search completed with no results */}
               {showNoResults && <NoResultsFound theme={theme} />}
             </View>
           </ScrollView>
@@ -262,207 +267,148 @@ function ModalScreen() {
 
 function NoResultsFound({ theme }: { theme: Theme }) {
   return (
-    <View
-      style={{
-        marginTop: 40,
-        alignItems: 'center',
-        paddingHorizontal: 24,
-      }}>
+    <View className="mt-10 items-center px-6">
       <View
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: 40,
-          backgroundColor: greys(theme)[800],
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 24,
-        }}>
+        className="mb-6 h-20 w-20 items-center justify-center rounded-full"
+        style={{ backgroundColor: greys(theme)[800] }}>
         <Icon name="nonicons:error-16" size={40} color={greys(theme)[400]} />
       </View>
 
       <Text
+        className="mb-3 text-center"
+        overpass
+        bold
+        size={20}
         style={{
           color: greys(theme)[50],
-          fontSize: 20,
-          fontFamily: 'OverpassBold',
-          marginBottom: 12,
-          textAlign: 'center',
         }}>
         No Results Found
       </Text>
 
       <Text
+        className="mb-7 text-center"
+        overpass
+        regular
+        size={16}
         style={{
           color: greys(theme)[400],
-          fontSize: 16,
-          textAlign: 'center',
-          marginBottom: 28,
         }}>
         {"We couldn't find any users matching your search"}
       </Text>
 
-      <View
-        style={{
-          backgroundColor: greys(theme)[800],
-          borderRadius: 12,
-          padding: 16,
-          width: '100%',
-          marginBottom: 16,
-        }}>
+      <View className="mb-4 w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
         <Text
+          className="mb-3"
+          overpass
+          bold
+          size={16}
           style={{
             color: greys(theme)[100],
-            fontSize: 16,
-            fontFamily: 'OverpassBold',
-            marginBottom: 12,
           }}>
           Try adjusting your search:
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="lucide:pencil-line" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Check your spelling
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="solar:key-bold" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Try using a complete public key
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-          <Icon name="mdi:at" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Use a different NIP-05 identifier
-          </Text>
-        </View>
+        <SearchTip icon="lucide:pencil-line" text="Check your spelling" theme={theme} />
+        <SearchTip icon="solar:key-bold" text="Try using a complete public key" theme={theme} />
+        <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" theme={theme} />
       </View>
     </View>
   );
 }
 
-// New Component for Empty State
 function EmptyStateView({ theme }: { theme: Theme }) {
   return (
-    <View
-      style={{
-        marginTop: 40,
-        alignItems: 'center',
-        paddingHorizontal: 24,
-      }}>
+    <View className="mt-10 items-center px-6">
       <View
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: 40,
-          backgroundColor: greys(theme)[800],
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 24,
-        }}>
+        className="mb-6 h-20 w-20 items-center justify-center rounded-full"
+        style={{ backgroundColor: greys(theme)[800] }}>
         <Icon name="majesticons:search-line" size={40} color={greys(theme)[400]} />
       </View>
 
       <Text
+        className="mb-3 text-center"
+        overpass
+        bold
+        size={20}
         style={{
           color: greys(theme)[50],
-          fontSize: 20,
-          fontFamily: 'OverpassBold',
-          marginBottom: 12,
-          textAlign: 'center',
         }}>
         Search for Users
       </Text>
 
       <Text
+        className="mb-7 text-center"
+        size={16}
+        overpass
+        regular
         style={{
           color: greys(theme)[400],
-          fontSize: 16,
-          textAlign: 'center',
-          marginBottom: 28,
         }}>
         Type a name, public key, or NIP-05 identifier to find users on the network
       </Text>
 
-      <View
-        style={{
-          backgroundColor: greys(theme)[800],
-          borderRadius: 12,
-          padding: 16,
-          width: '100%',
-          marginBottom: 16,
-        }}>
+      <View className="mb-4 w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
         <Text
+          className="mb-1"
+          overpass
+          bold
+          size={16}
           style={{
             color: greys(theme)[100],
-            fontSize: 16,
-            fontFamily: 'OverpassBold',
-            marginBottom: 4,
           }}>
           Search Tips:
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="ph:user-bold" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Search by username or display name
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="solar:key-bold" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Search by public key
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-          <Icon name="mdi:at" size={20} color={greys(theme)[300]} />
-          <Text style={{ color: greys(theme)[200], fontSize: 14, flex: 1, paddingLeft: 8 }}>
-            Search by NIP-05 identifier
-          </Text>
-        </View>
+        <SearchTip icon="ph:user-bold" text="Search by username or display name" theme={theme} />
+        <SearchTip icon="solar:key-bold" text="Search by public key" theme={theme} />
+        <SearchTip icon="mdi:at" text="Search by NIP-05 identifier" theme={theme} />
       </View>
     </View>
   );
 }
 
-function SearchResult({
-  result,
-  onPress,
-  loading,
-}: {
-  result: any;
+function SearchTip({ icon, text, theme }: { icon: string; text: string; theme: Theme }) {
+  return (
+    <View className="mt-3 flex-row items-center">
+      <Icon name={icon} size={20} color={greys(theme)[300]} />
+      <Text className="flex-1 pl-2" size={14} overpass regular style={{ color: greys(theme)[200] }}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+interface SearchResultProps {
+  result: DisplayResult;
   onPress: () => void;
   loading: boolean;
-}) {
+}
+
+function SearchResult({ result, onPress, loading }: SearchResultProps) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 8,
-        backgroundColor: greys(theme)[800],
-        borderRadius: 8,
-        marginBottom: 8,
-      }}>
-      <View style={{ marginRight: 8 }}>
-        <ProfileImage loading={loading} profile={result?.profile} />
+      className="mb-2 flex-row items-center rounded-lg p-2"
+      style={{ backgroundColor: greys(theme)[800] }}
+      disabled={loading || !result.profile}>
+      <View className="mr-2">
+        <ProfileImage loading={loading} profile={result.profile} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text loading={loading} style={{ fontWeight: 'bold', color: greys(theme)[50] }}>
-          {result?.profile?.displayName || result?.profile?.name}
+      <View className="flex-1">
+        <Text loading={loading} overpass bold size={16} style={{ color: greys(theme)[50] }}>
+          {result.profile?.displayName || result.profile?.name || 'Loading...'}
         </Text>
-        {result?.profile?.nip05 && (
+        {result.profile?.nip05 && (
           <Text
             loading={loading}
+            overpass
+            regular
+            size={12}
             style={{
-              color: result?.profile?.nip05Valid ? greens[300] : reds[300],
-              fontSize: 12,
+              color: result.profile.nip05Valid ? greens[300] : reds[300],
             }}>
-            {result?.profile?.nip05Valid ? '✓ ' : '✗ '}
-            {result?.profile?.nip05}
+            {result.profile.nip05Valid ? '✓ ' : '✗ '}
+            {result.profile.nip05}
           </Text>
         )}
       </View>
@@ -470,9 +416,18 @@ function SearchResult({
   );
 }
 
-function ProfileImage({ profile, loading }: { profile: any; loading: boolean }) {
+interface ProfileImageProps {
+  profile: UserProfile | undefined;
+  loading: boolean;
+}
+
+function ProfileImage({ profile, loading }: ProfileImageProps) {
   const theme = useSelector(memoizedGetTheme);
   const [imageError, setImageError] = useState(false);
+
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+  }, []);
 
   return (
     <Skeleton style={{ width: 48, height: 48, borderRadius: 24 }}>
@@ -480,26 +435,18 @@ function ProfileImage({ profile, loading }: { profile: any; loading: boolean }) 
         <>
           {profile?.picture && !imageError ? (
             <Image
-              source={{ uri: profile?.picture }}
-              onError={() => {
-                setImageError(true);
-              }}
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: 1000,
-              }}
-            />
-          ) : (
-            <View
+              source={{ uri: profile.picture }}
+              onError={handleImageError}
               style={{
                 width: 48,
                 height: 48,
                 borderRadius: 24,
-                backgroundColor: greys(theme)[950],
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              }}
+            />
+          ) : (
+            <View
+              className="h-12 w-12 items-center justify-center rounded-full"
+              style={{ backgroundColor: greys(theme)[950] }}>
               <Icon name="ph:user-bold" size={24} color={greys(theme)[400]} />
             </View>
           )}
