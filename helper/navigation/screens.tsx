@@ -315,10 +315,6 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Profile',
   },
   {
-    name: 'settings/nostrData',
-    title: 'Nostr Data',
-  },
-  {
     name: 'transactions',
     title: 'Transactions',
     options: {
