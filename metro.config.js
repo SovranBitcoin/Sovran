@@ -85,6 +85,9 @@ const configWithMonicon = withMonicon(config, {
     'fluent:add-24-filled',
     'material-symbols:refresh-rounded',
     'ic:round-refresh',
+    'ion:checkmark-done',
+    'feather:wifi',
+    'feather:credit-card',
   ],
 });
 

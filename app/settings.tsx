@@ -3,7 +3,6 @@ import { TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
-import FeatherIcon from '@expo/vector-icons/Feather';
 
 import { greys, reds, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
@@ -20,6 +19,7 @@ import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View } from 'components/common/View';
 import { device } from 'helper/version';
+import Icon from 'assets/icons';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -88,7 +88,7 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
             {truncateMiddle(currentProfile?.npub, 8)}
           </Text>
         </View>
-        <FeatherIcon color={greys(theme)[400]} name="chevron-right" size={22} />
+        <Icon name="fa6-solid:chevron-right" color={greys(theme)[400]} size={22} />
       </View>
     </TouchableOpacity>
   );
@@ -139,10 +139,9 @@ export const RowButton: React.FC<{
         )}
         {onPress ? (
           (rightIcon ?? (
-            <FeatherIcon
-              className={`${!!onPress ? 'mr-0.25' : ''}`}
+            <Icon
+              name="fa6-solid:chevron-right"
               color={isDanger ? reds[300] : greys(theme)[400]}
-              name="chevron-right"
               size={19}
             />
           ))

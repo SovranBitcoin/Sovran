@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -1000,7 +1000,7 @@ const ChainLoadingAnimation = () => {
                                 />
                               </View>
                               {currencyProgress >= 1 && (
-                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Icon name="ion:checkmark-done" size={16} color="#10B981" />
                               )}
                             </View>
                           );

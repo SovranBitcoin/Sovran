@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+
 import { shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -74,7 +74,7 @@ export function TouchableOpacityProgress({
                 style={styles.profileIcon}
               />
             ) : (
-              <Ionicons
+              <Icon
                 name={step.icon}
                 size={24}
                 color={

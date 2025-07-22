@@ -1,7 +1,7 @@
 import { shades } from 'helper/colors';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
-import { Wifi, CreditCard as CardIcon } from 'react-native-feather';
+import Icon from 'assets/icons';
 
 // Enum for card types
 const CardType = {
@@ -55,7 +55,7 @@ export const CreditCardComponent = ({
   // Component for contactless
   const CreditCardContactless = () => (
     <View style={styles.contactless}>
-      <Wifi width={20} height={20} color={colorScheme.text} />
+      <Icon name="feather:wifi" size={20} color={colorScheme.text} />
     </View>
   );
 
@@ -65,7 +65,7 @@ export const CreditCardComponent = ({
       {cardType === CardType.SOVRAN ? (
         <Text style={[styles.logoText, { color: colorScheme.text }]}>SOVRAN</Text>
       ) : (
-        <CardIcon width={24} height={24} color={colorScheme.text} />
+        <Icon name="feather:credit-card" size={24} color={colorScheme.text} />
       )}
     </View>
   );
