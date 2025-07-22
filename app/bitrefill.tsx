@@ -16,7 +16,7 @@ import { greys } from 'helper/colors';
 const BITREFILL_URL = 'https://embed.bitrefill.com';
 const BITREFILL_NOSTR_PUBKEY = 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264';
 
-export const DEFAULT_MINT_URL = () => {
+const DEFAULT_MINT_URL = () => {
   const state = store.getState();
   const currentProfileId = state.nostr?.currentProfile?.id;
   const profileProofs = state.cashu?.profiles?.[currentProfileId]?.proofs;
@@ -35,7 +35,7 @@ export const DEFAULT_MINT_URL = () => {
   return 'https://mint.lnvoltz.com';
 };
 
-function findKeyWithLargestSum(obj) {
+function findKeyWithLargestSum(obj: Record<string, { amount?: number }[]>) {
   let maxKey = null;
   let maxSum = 0;
 

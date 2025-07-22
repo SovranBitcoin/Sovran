@@ -3,11 +3,11 @@ import { Platform } from 'react-native';
 
 const name = Application.applicationName;
 
-export const isTestFlight = name === 'TestFlight';
-export const isExpoGo = name === 'Expo Go';
-export const isProduction = name === 'Sovran';
+const isTestFlight = name === 'TestFlight';
+const isExpoGo = name === 'Expo Go';
+const isProduction = name === 'Sovran';
 
-export const isDev = isTestFlight || isExpoGo;
+const isDev = isTestFlight || isExpoGo;
 
 /**
  * Generic device platform version checking with fluent API
