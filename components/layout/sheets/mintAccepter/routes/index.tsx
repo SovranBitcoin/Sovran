@@ -19,6 +19,9 @@ declare module 'react-native-actions-sheet' {
       payload: {
         mint: string;
       };
+      returnValue: {
+        trusted: boolean;
+      };
     }>;
   }
 }

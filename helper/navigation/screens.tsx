@@ -4,10 +4,8 @@ import Icon, { LightningIcon } from 'assets/icons';
 
 // Screen imports
 import HomeView from 'app/(drawer)/(tabs)/index';
-import LifestyleView, { activationDate } from 'app/(drawer)/(tabs)/lifestyle';
+import LifestyleView from 'app/(drawer)/(tabs)/lifestyle';
 import PaymentsView from 'app/(drawer)/(tabs)/payments';
-import MyEsims from 'app/(drawer)/(tabs)/myEsims';
-import MyVpns from 'app/(drawer)/(tabs)/myVpns';
 
 // Tab configuration
 interface TabConfig {
@@ -26,18 +24,18 @@ export const TAB_SCREENS = (): TabConfig[] => [
     title: 'Payments',
     icon: ({ color }) => <Icon name="fluent:arrow-swap-16-filled" color={color} size={32} />,
   },
-  ...(new Date() > activationDate
-    ? [
-        {
-          name: 'myEsims',
-          component: MyEsims,
-          title: '',
-          icon: ({ color }: { color: string }) => (
-            <Icon name="fluent:sim-24-filled" color={color} size={32} />
-          ),
-        },
-      ]
-    : []),
+  // ...(new Date() > activationDate
+  //   ? [
+  //       {
+  //         name: 'myEsims',
+  //         component: MyEsims,
+  //         title: '',
+  //         icon: ({ color }: { color: string }) => (
+  //           <Icon name="fluent:sim-24-filled" color={color} size={32} />
+  //         ),
+  //       },
+  //     ]
+  //   : []),
 
   {
     name: 'index',
@@ -45,18 +43,18 @@ export const TAB_SCREENS = (): TabConfig[] => [
     title: 'Wallet',
     icon: LightningIcon,
   },
-  ...(new Date() > activationDate
-    ? [
-        {
-          name: 'myVpns',
-          component: MyVpns,
-          title: '',
-          icon: ({ color }: { color: string }) => (
-            <Icon name="ic:baseline-vpn-lock" color={color} size={32} />
-          ),
-        },
-      ]
-    : []),
+  // ...(new Date() > activationDate
+  //   ? [
+  //       {
+  //         name: 'myVpns',
+  //         component: MyVpns,
+  //         title: '',
+  //         icon: ({ color }: { color: string }) => (
+  //           <Icon name="ic:baseline-vpn-lock" color={color} size={32} />
+  //         ),
+  //       },
+  //     ]
+  //   : []),
   {
     name: 'lifestyle',
     component: LifestyleView,

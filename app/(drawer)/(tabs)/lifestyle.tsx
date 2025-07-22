@@ -22,26 +22,26 @@ interface MenuItemData {
 export const activationDate = new Date('2025-07-17');
 
 const SERVICE_MENU_ITEMS: MenuItemData[] = [
-  ...(new Date() > activationDate
-    ? [
-        {
-          id: 'esims',
-          icon: 'fluent:sim-24-filled',
-          label: 'eSIMs',
-          navigateTo: 'myEsims',
-        },
-      ]
-    : []),
-  ...(new Date() > activationDate
-    ? [
-        {
-          id: 'vpn',
-          icon: 'ic:baseline-vpn-lock',
-          label: 'VPN',
-          navigateTo: 'myVpns',
-        },
-      ]
-    : []),
+  // ...(new Date() > activationDate
+  //   ? [
+  //       {
+  //         id: 'esims',
+  //         icon: 'fluent:sim-24-filled',
+  //         label: 'eSIMs',
+  //         navigateTo: 'myEsims',
+  //       },
+  //     ]
+  //   : []),
+  // ...(new Date() > activationDate
+  //   ? [
+  //       {
+  //         id: 'vpn',
+  //         icon: 'ic:baseline-vpn-lock',
+  //         label: 'VPN',
+  //         navigateTo: 'myVpns',
+  //       },
+  //     ]
+  //   : []),
   {
     id: 'giftcards',
     icon: 'ic:baseline-card-giftcard',

@@ -151,8 +151,8 @@ export function EcashReceiveConfirmation({
     } else {
       SheetManager.show('mint-accepter', {
         payload: { mint: mintUrl },
-        onClose: async ({ trusted }) => {
-          if (trusted) {
+        onClose: async (result) => {
+          if (result?.trusted) {
             await handleRedeem();
           }
         },
