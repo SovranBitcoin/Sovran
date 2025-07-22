@@ -303,10 +303,6 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: 'Terms & Conditions',
   },
   {
-    name: 'settings/customNpub',
-    title: 'Custom Lightning URL',
-  },
-  {
     name: 'settings/passcode',
     title: 'Passcode',
   },

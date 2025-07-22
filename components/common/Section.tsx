@@ -129,11 +129,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             }}>
             {truncateMiddle(username, 8)}
           </Text>
-          <TouchableOpacity
-            onPress={() => {
-              // navigation.navigate("settings/customNpub");
-            }}
-            className="flex-row items-center">
+          <TouchableOpacity className="flex-row items-center">
             <StyledText
               primary
               style={{
