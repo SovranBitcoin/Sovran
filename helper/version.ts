@@ -1,6 +1,5 @@
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
-import { gt, gte, lt, lte, eq } from 'lodash/fp';
 
 const name = Application.applicationName;
 
@@ -23,9 +22,10 @@ class DeviceChecker {
 
     if (Platform.OS === platform) {
       if (platform === 'ios' || platform === 'android') {
+        // For iOS and Android, parse the version as integer
         this.platformVersion = parseInt(Platform.Version as string, 10);
       } else {
-        // For other platforms, we might need different version parsing
+        // For other platforms, use float parsing
         this.platformVersion = parseFloat(Platform.Version as string);
       }
     } else {
@@ -35,39 +35,49 @@ class DeviceChecker {
     return this;
   }
 
-  private checkVersion(compareFn: (target: number) => (current: number) => boolean) {
-    return (version: number): boolean => {
-      if (this.platformOS !== Platform.OS || this.platformVersion === null) {
-        return false;
-      }
-      return compareFn(version)(this.platformVersion);
-    };
+  private isValidPlatform(): boolean {
+    return this.platformOS === Platform.OS && this.platformVersion !== null;
   }
 
   /**
    * Greater than
    */
-  gt = this.checkVersion(gt);
+  gt = (version: number): boolean => {
+    if (!this.isValidPlatform()) return false;
+    return this.platformVersion! > version;
+  };
 
   /**
    * Greater than or equal
    */
-  gte = this.checkVersion(gte);
+  gte = (version: number): boolean => {
+    if (!this.isValidPlatform()) return false;
+    return this.platformVersion! >= version;
+  };
 
   /**
    * Less than
    */
-  lt = this.checkVersion(lt);
+  lt = (version: number): boolean => {
+    if (!this.isValidPlatform()) return false;
+    return this.platformVersion! < version;
+  };
 
   /**
    * Less than or equal
    */
-  lte = this.checkVersion(lte);
+  lte = (version: number): boolean => {
+    if (!this.isValidPlatform()) return false;
+    return this.platformVersion! <= version;
+  };
 
   /**
    * Equal to
    */
-  eq = this.checkVersion(eq);
+  eq = (version: number): boolean => {
+    if (!this.isValidPlatform()) return false;
+    return this.platformVersion! === version;
+  };
 }
 
 export const device = new DeviceChecker();

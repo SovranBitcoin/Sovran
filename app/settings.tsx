@@ -97,7 +97,7 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
 export const RowButton: React.FC<{
   label: string | React.ReactElement;
   value?: string;
-  onPress: () => void;
+  onPress?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
@@ -115,6 +115,7 @@ export const RowButton: React.FC<{
       }}>
       <TouchableOpacity
         onPress={onPress}
+        disabled={!onPress}
         className="w-full flex-row items-center justify-start pr-1">
         <Text
           className="tracking-tight"
