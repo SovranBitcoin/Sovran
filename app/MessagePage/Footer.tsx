@@ -4,17 +4,15 @@ import { View } from 'components/common/View';
 import Icon from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { Button } from 'components/common/Button';
-import { Theme } from 'helper/colors';
 
 interface FooterProps {
-  theme: Theme;
   message: string;
   setMessage: (text: string) => void;
   handleSendDM: () => void;
 }
 
-const Footer = ({ theme, message, setMessage, handleSendDM }: FooterProps) => {
-  const styles = createStyles(theme);
+const Footer = ({ message, setMessage, handleSendDM }: FooterProps) => {
+  const styles = createStyles();
 
   return (
     <View style={styles.inputContainer}>
@@ -26,7 +24,6 @@ const Footer = ({ theme, message, setMessage, handleSendDM }: FooterProps) => {
           padding: 12,
           marginLeft: 12,
           marginRight: 8,
-          // marginTop: 0,
           margin: 0,
           fontSize: 16,
           flex: 1,

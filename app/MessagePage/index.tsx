@@ -299,12 +299,7 @@ export default function ModalScreen() {
               ]}
             />
             {currentProfile?.nsec && (
-              <Footer
-                theme={theme}
-                message={message}
-                setMessage={setMessage}
-                handleSendDM={handleSendDM}
-              />
+              <Footer message={message} setMessage={setMessage} handleSendDM={handleSendDM} />
             )}
           </>
         }
