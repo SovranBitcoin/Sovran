@@ -133,19 +133,19 @@ const MintItem: React.FC<MintItemProps> = ({
     : '0';
   const router = useSheetRouter('mint');
 
+  const colors = isSelected
+    ? [
+        opacity(theme.shades[200], 0.88),
+        opacity(theme.shades[200], 0.88),
+        opacity(theme.shades[300], 0.88),
+        opacity(theme.shades[200], 0.88),
+        opacity(theme.shades[300], 0.88),
+      ]
+    : [];
+
   return (
     <LinearGradient
-      colors={
-        isSelected
-          ? [
-              opacity(theme.shades[200], 0.88),
-              opacity(theme.shades[200], 0.88),
-              opacity(theme.shades[300], 0.88),
-              opacity(theme.shades[200], 0.88),
-              opacity(theme.shades[300], 0.88),
-            ]
-          : []
-      }
+      colors={colors as any}
       style={[
         {
           padding: 1,
@@ -173,7 +173,7 @@ const MintItem: React.FC<MintItemProps> = ({
           {mint.iconUrl ? (
             <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
           ) : (
-            <Image style={styles.mintIcon} />
+            <View style={styles.mintIcon} />
           )}
           <View
             style={{
@@ -231,9 +231,9 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
 
   // limit to specified currencies: sat, eur, gbp, usd
-  const currencies: SupportedCurrency[] = _.uniq(
-    multipleBalances.map((b) => b.unit?.toUpperCase())
-  ).filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+  const currencies: any = _.uniq(multipleBalances.map((b) => b.unit?.toUpperCase())).filter((c) =>
+    ['SAT', 'USD', 'EUR', 'GBP'].includes(c)
+  );
 
   // Filter mints based on the selected currency
   const filteredMints = useMemo(() => {
@@ -302,7 +302,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
             {
               text: 'Add mints',
               variant: 'primary',
-              onPress: () => {
+              onPress: async () => {
                 router?.navigate('mintAddMore');
               },
               loading: mintState.loadingId !== null,
@@ -310,7 +310,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
             {
               text: 'Cancel',
               variant: 'secondary',
-              onPress: () => {
+              onPress: async () => {
                 router?.goBack();
               },
               loading: mintState.loadingId !== null,
@@ -323,7 +323,7 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
           Send payment in
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
-          {currencies.map((currency) => (
+          {currencies.map((currency: any) => (
             <LinearGradient
               key={currency}
               colors={

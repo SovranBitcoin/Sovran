@@ -5,7 +5,15 @@ import { greys } from 'helper/colors';
 import { Dimensions } from 'react-native';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
-export function Sheet({ initialRoute, routes, actionSheetRef }) {
+export function Sheet({
+  initialRoute,
+  routes,
+  actionSheetRef,
+}: {
+  initialRoute: string;
+  routes: any;
+  actionSheetRef: any;
+}) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
