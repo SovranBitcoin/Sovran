@@ -168,12 +168,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'vpnShare',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'lightningSendConfirmation',
     options: {
       presentation: 'modal',
@@ -192,12 +186,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'vpn',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'esimCountrySelection',
     options: {
       presentation: 'modal',
@@ -205,18 +193,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   {
     name: 'esimCheckout',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'vpnCheckout',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'vpns',
     options: {
       presentation: 'modal',
     },
