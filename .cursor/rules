@@ -66,6 +66,23 @@ const spentRes = await toResult(wallet.checkProofsStates(proofs));
 - Do NOT use inline styles for text formatting
 - Prefer component props over style attributes
 
+```
+<Text
+  loading={loading}
+  overpass
+  bold
+  size={16}
+  style={{
+    color: greys(theme)[400],
+  }}
+>
+  Found {searchResults.length}{' '}
+  {searchResults.length === 1 ? 'result' : 'results'}
+</Text>
+```
+
+This would be the correct way to use `Text`.
+
 ## Reducers
 
 ### Selectors
