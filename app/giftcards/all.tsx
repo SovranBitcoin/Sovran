@@ -5,11 +5,9 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
-import { useNavigation } from 'expo-router';
 import CachedImage from 'components/common/Image';
 import { products } from './products';
 import { SheetManager } from 'react-native-actions-sheet';
-
 import amazon from 'assets/images/giftcards/amazon.png';
 import deliveroo from 'assets/images/giftcards/deliveroo.png';
 import justeat from 'assets/images/giftcards/justeat.png';
@@ -19,6 +17,7 @@ import nike from 'assets/images/giftcards/nike.png';
 import airbnb from 'assets/images/giftcards/airbnb.png';
 import asos from 'assets/images/giftcards/asos.png';
 import costa from 'assets/images/giftcards/costa.png';
+import { useTypedNavigation } from 'helper/navigation/hooks/useTypedNavigation';
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -82,7 +81,7 @@ const filterAvailableProducts = (productList, allProducts) => {
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useTypedNavigation();
 
   const productsList = [
     {
