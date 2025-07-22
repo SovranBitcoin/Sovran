@@ -264,12 +264,6 @@ const ModalScreen = () => {
           <>
             <Section title="Advanced Debugging">
               <RowButton
-                label="Nostr Data"
-                onPress={() => {
-                  navigation.navigate('settings/nostrData');
-                }}
-              />
-              <RowButton
                 label="Restore Counter"
                 onPress={() => {
                   navigation.navigate('settings/restoreCounter');
