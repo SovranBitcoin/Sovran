@@ -1,13 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
+import { greys, Theme } from 'helper/colors';
 import { Text } from 'components/common/Text';
-import { getLinkPreview } from 'link-preview-js';
+import { getLinkPreview as getPreview } from 'link-preview-js';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
+
+type LinkPreviewData =
+  | {
+      url: string;
+      title: string;
+      siteName: string | undefined;
+      description: string | undefined;
+      mediaType: string;
+      contentType: string | undefined;
+      images: string[];
+      videos: {
+        url: string | undefined;
+        secureUrl: string | null | undefined;
+        type: string | null | undefined;
+        width: string | undefined;
+        height: string | undefined;
+      }[];
+      favicons: string[];
+    }
+  | {
+      charset: string | null;
+      url: string;
+      mediaType: string;
+      contentType: string;
+      favicons: string[];
+    }
+  | {
+      charset: string | null;
+      url: string;
+      title: string;
+      siteName: string | undefined;
+      description: string | undefined;
+      mediaType: string;
+      contentType: string | undefined;
+      images: string[];
+      videos: {
+        url: string | undefined;
+        secureUrl: string | null | undefined;
+        type: string | null | undefined;
+        width: string | undefined;
+        height: string | undefined;
+      }[];
+      favicons: string[];
+    };
+
+function getLinkPreview(url: string): Promise<LinkPreviewData> {
+  return getPreview(url);
+}
 
 const linkPreviewCache = new Cache({
   namespace: 'linkPreviews',
@@ -20,8 +68,8 @@ const linkPreviewCache = new Cache({
 
 const useLinkPreview = (url: string) => {
   const [loading, setLoading] = useState(true);
-  const [linkData, setLinkData] = useState(null);
-  const [error, setError] = useState(null);
+  const [linkData, setLinkData] = useState<LinkPreviewData>();
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
     const fetchLinkPreview = async () => {
@@ -56,8 +104,8 @@ const useLinkPreview = (url: string) => {
   return { loading, linkData, error };
 };
 
-const LinkImage = ({ theme, linkData }) =>
-  linkData?.images?.find((image) => image.endsWith('.png')) && (
+const LinkImage = ({ theme, linkData }: { theme: Theme; linkData: any }) =>
+  linkData?.images?.find((image: string) => image.endsWith('.png')) && (
     <CachedImage
       style={{
         width: 'auto',
@@ -65,11 +113,11 @@ const LinkImage = ({ theme, linkData }) =>
         backgroundColor: greys(theme)[800],
         borderRadius: 8,
       }}
-      source={{ uri: linkData.images.find((image) => image.endsWith('.png')) }}
+      source={{ uri: linkData.images.find((image: string) => image.endsWith('.png')) }}
     />
   );
 
-const LinkDetails = ({ theme, url, linkData }) => (
+const LinkDetails = ({ theme, url, linkData }: { theme: Theme; url: string; linkData: any }) => (
   <View>
     <Text
       size={12}
@@ -101,7 +149,7 @@ export const ExternalLink = ({ url }: { url: string }) => {
   const { loading, linkData, error } = useLinkPreview(url);
 
   if (loading) {
-    return <View>{/* <ActivityIndicator size="large" color="#0000ff" /> */}</View>;
+    return <View />;
   }
 
   if (error) {

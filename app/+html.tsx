@@ -6,6 +6,7 @@ import { ScrollViewStyleReset } from 'expo-router/html';
 // web page during static rendering.
 // The contents of this function only run in Node.js environments and
 // do not have access to the DOM or browser APIs.
+// @ts-ignore
 console.disableYellowBox = true;
 
 export default function Root({ children }: { children: React.ReactNode }) {
