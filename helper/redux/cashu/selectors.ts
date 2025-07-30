@@ -323,3 +323,11 @@ export const memoizedGetTotalBalance = (unit: string) =>
       }, 0);
     }
   );
+
+export const memoizedGetAllKeysetIdsFromAllMints = (excludeMintUrl?: string) =>
+  createSelector([(state: RootState) => state.cashu?.keysets], (keysets) => {
+    return Object.entries(keysets || {})
+      .filter(([mintUrl]) => mintUrl !== excludeMintUrl)
+      .flatMap(([, keysetArr]) => keysetArr)
+      .map((m) => m.id);
+  });

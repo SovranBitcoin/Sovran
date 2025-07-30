@@ -139,6 +139,7 @@ export function EcashReceiveConfirmation({
         navigation.navigate('index', {}, { closeParents: true });
       });
     } else {
+      console.error(res.error);
       showMessage(res.error.message);
     }
     setLoading(false);

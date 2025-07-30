@@ -15,6 +15,7 @@ import {
   memoizedGetBalance,
   memoizedGetProofs,
   TransactionData,
+  memoizedGetAllKeysetIdsFromAllMints,
 } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { Alert, Platform } from 'react-native';
@@ -49,6 +50,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { toResult, toResultSync } from 'helper/toResult';
 import { ok, err, Result } from 'neverthrow';
 import { sha256 } from '@noble/hashes/sha256';
+import { getGiveaway } from 'app/ecashReceiveConfirmation';
 
 // TYPES
 
@@ -213,6 +215,7 @@ export async function getMint({
   mintUrl,
   forceRefresh = false,
 }: GetMintParams): Promise<Result<CashuMint, Error>> {
+  console.log('Get Mint');
   if (!mintUrl) return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
 
   const mint = new CashuMint(mintUrl);
@@ -226,6 +229,14 @@ export async function getMint({
 
     const keysRes = await toResult(mint.getKeys());
     if (keysRes.isErr()) return err(keysRes.error);
+
+    // here we should check if there is a collision and refuse to update the keyset.
+    const existingKeysetIds = memoizedGetAllKeysetIdsFromAllMints(mintUrl)(store.getState());
+    console.log(1292873, mintUrl, existingKeysetIds);
+    const newKeysetIds = keysetsRes.value.keysets.map((keyset) => keyset.id);
+    if (newKeysetIds.some((id) => isCollidingKeysetId(id, existingKeysetIds))) {
+      return err(new AppError('colliding_keyset_id', 'Colliding keyset ID'));
+    }
 
     store.dispatch(
       setInfo({
@@ -1396,4 +1407,31 @@ export function deriveMintBackupKeys(mnemonic: string): {
   const publicKeyHex = getPublicKey(privateKeyBytes);
 
   return { privateKeyHex, privateKeyBytes, publicKeyHex };
+}
+
+function keysetIdToBigInt(id: string): bigint {
+  if (/^[0-9a-fA-F]+$/.test(id)) {
+    return BigInt(`0x${id}`) % BigInt(2 ** 31 - 1);
+  } else {
+    const bin = atob(id);
+    const hex = bytesToHex(new TextEncoder().encode(bin));
+    return BigInt(`0x${hex}`) % BigInt(2 ** 31 - 1);
+  }
+}
+
+function isCollidingKeysetId(newKeysetIdHex: string, storedKeysetIds: string[]) {
+  const newKeysetIdInt = keysetIdToBigInt(newKeysetIdHex);
+  return storedKeysetIds.some((storedId) => {
+    const storedKeysetIdInt = keysetIdToBigInt(storedId);
+    if (storedId === newKeysetIdHex) {
+      // Colliding keyset ID!
+      return true;
+    }
+    if (storedKeysetIdInt === newKeysetIdInt) {
+      // Colliding keyset ID integer!
+      return true;
+    }
+    // No collisions, good to go
+    return false;
+  });
 }

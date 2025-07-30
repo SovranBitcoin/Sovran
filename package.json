@@ -23,7 +23,8 @@
     "storybook:ios": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start --ios",
     "storybook:android": "cross-env EXPO_PUBLIC_STORYBOOK_ENABLED='true' expo start --android",
     "type-check": "tsc --noEmit",
-    "maestro": "maestro test ./.maestro"
+    "maestro": "maestro test ./.maestro",
+    "screenshots": "./process-screenshots.sh"
   },
   "jest": {
     "preset": "jest-expo",

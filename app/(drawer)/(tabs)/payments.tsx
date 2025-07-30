@@ -14,11 +14,12 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
-import { LNVPN_PUBKEY } from '../../vpnCheckout';
 import { Tabs } from 'components/common/Tabs';
 import { maybeConvertNpub } from 'helper/cashuClient';
 import { nip19 } from 'nostr-tools';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
+
+const LNVPN_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
 
 export function convertNpub(pubkey: string) {
   try {

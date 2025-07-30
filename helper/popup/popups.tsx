@@ -337,6 +337,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: "Your mint isn't well connected to the recipient's lightning network.",
     type: MESSAGE_TYPES.ERROR,
   },
+  colliding_keyset_id: {
+    title: 'Colliding Keyset ID',
+    text: 'This mint has conflicting keyset IDs with existing mints',
+    type: MESSAGE_TYPES.ERROR,
+  },
 };
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;

@@ -14,6 +14,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { getMint } from 'helper/cashuClient';
 import { toResult } from 'helper/toResult';
 import { Spacer, View } from 'components/common/View';
+import { showMessage } from 'helper/popup/popups';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 
 interface CommentProps {
@@ -118,7 +119,6 @@ function useRecommendedMints(): { mints: ProcessedMint[] } {
   /* 0️⃣ Existing balances */
   const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
   const balanceMintUrls = useMemo(() => new Set(balances.map((b) => b.mintUrl)), [balances]);
-
   /* 1️⃣ Subscribe for reviews */
   const filters = useMemo(() => [{ kinds: [38000], limit: 20000 }], []);
   const { events } = useSubscribe({ filters });
@@ -342,11 +342,18 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
 
   /* Save */
   const handleSave = async () => {
-    await Promise.all(
-      Array.from(selectedMints).map(async (mintUrl) => {
-        await getMint({ mintUrl, forceRefresh: true });
-      })
+    // Use Promise.all to get all results, but don't call onClose if any are Err
+    const results = await Promise.all(
+      Array.from(selectedMints).map((mintUrl) => getMint({ mintUrl, forceRefresh: true }))
     );
+
+    const hasError = results.some((res) => res.isErr());
+
+    if (hasError) {
+      showMessage(results.find((res) => res.isErr())?.error.message ?? 'Error adding mint');
+      return;
+    }
+
     await onClose({ mints: Array.from(selectedMints) });
     router?.goBack();
   };

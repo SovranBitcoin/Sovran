@@ -21,6 +21,8 @@ declare module 'react-native-actions-sheet' {
       };
       returnValue: {
         trusted: boolean;
+        mint?: string[];
+        error?: string;
       };
     }>;
   }

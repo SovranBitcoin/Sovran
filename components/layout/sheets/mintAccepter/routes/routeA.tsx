@@ -10,6 +10,8 @@ import { store } from 'helper/redux/store';
 import { addMintsAction } from 'helper/redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import opacity from 'hex-color-opacity';
+import { getMint } from 'helper/cashuClient';
+import { showMessage } from 'helper/popup/popups';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
@@ -66,7 +68,6 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
             variant: 'secondary',
             onPress: async () => {
               ref.current.hide({
-                action: 'reject',
                 mint: [payload.mint],
                 trusted: false,
               });
@@ -76,6 +77,22 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
             text: 'Trust',
             variant: 'primary',
             onPress: async () => {
+              // Check for keyset ID collisions before adding the mint
+              const mintRes = await getMint({ mintUrl: payload.mint, forceRefresh: true });
+              if (mintRes.isErr()) {
+                console.log('mintRes.error.message', mintRes.error.message);
+                console.error(mintRes.error.message);
+                showMessage(mintRes.error.message);
+                if (mintRes.error.message === 'colliding_keyset_id') {
+                  ref.current.hide({
+                    mint: [payload.mint],
+                    trusted: false,
+                    error: 'This mint has conflicting keyset IDs with existing mints',
+                  });
+                }
+                return;
+              }
+
               dispatch(
                 addMintsAction({
                   profileId: store.getState().nostr?.currentProfile?.id,
@@ -83,7 +100,6 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
                 })
               );
               ref.current.hide({
-                action: 'trust',
                 mint: [payload.mint],
                 trusted: true,
               });
