@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.0.38</string>
+    <string>0.0.24</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -28,6 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>sovran</string>
+          <string>cashu</string>
           <string>com.sovranbitcoin</string>
         </array>
       </dict>
@@ -49,8 +50,12 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>This app uses Bluetooth to connect with nearby devices for decentralized messaging.</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>This app uses Bluetooth to connect with nearby devices for decentralized messaging.</string>
     <key>NSCameraUsageDescription</key>
-    <string>Allow access to your camera to scan QR codes</string>
+    <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>This app requires access to network features for VPN functionality</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -74,6 +79,10 @@
     <key>UIBackgroundModes</key>
     <array>
       <string>fetch</string>
+      <string>bluetooth-central</string>
+      <string>bluetooth-peripheral</string>
+      <string>bluetooth-central</string>
+      <string>bluetooth-peripheral</string>
     </array>
     <key>UIDeviceFamily</key>
     <array>

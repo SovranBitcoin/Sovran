@@ -76,7 +76,13 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
         <View className="w-16 bg-transparent">
           <Button
             testID="more-button"
-            icon={<Icon name={'tabler:dots'} />}
+            icon={
+              visibleButtons.length === 3 && visibleButtons[2].icon ? (
+                <Icon name={visibleButtons[2].icon} />
+              ) : (
+                <Icon name={'tabler:dots'} />
+              )
+            }
             onPress={() => {
               SheetManager.show('button-handler', {
                 payload: { buttons: visibleButtons },
