@@ -53,29 +53,53 @@ interface SelectedMintDisplayProps {
 
 type SupportedCurrency = 'SAT' | 'USD' | 'EUR' | 'GBP';
 
+// Integer ratio system for precise percentage calculations
+const RATIO_PRECISION = 10000; // Gives 0.01% precision
+
+// Helper functions for ratio conversion
+const ratioToPercentage = (ratio: number): number => {
+  return (ratio / RATIO_PRECISION) * 100;
+};
+
+const percentageToRatio = (percentage: number): number => {
+  return Math.round((percentage / 100) * RATIO_PRECISION);
+};
+
+// Initialize ratios that sum to exactly RATIO_PRECISION
+const initializeRatios = (mintIds: string[]): Record<string, number> => {
+  const equalRatio = Math.floor(RATIO_PRECISION / mintIds.length);
+  const remainder = RATIO_PRECISION - equalRatio * (mintIds.length - 1);
+
+  const ratios: Record<string, number> = {};
+  mintIds.forEach((id, index) => {
+    ratios[id] = index === 0 ? remainder : equalRatio;
+  });
+
+  return ratios;
+};
+
+// Helper function for testing - validates that ratios always sum to RATIO_PRECISION
+const validateRatios = (ratios: Record<string, number>, label: string = '') => {
+  const total = Object.values(ratios).reduce((sum, ratio) => sum + ratio, 0);
+  console.log(`${label} Ratio validation:`, {
+    total,
+    expected: RATIO_PRECISION,
+    isValid: total === RATIO_PRECISION,
+    ratios: Object.entries(ratios).map(([id, ratio]) => ({
+      id: id.split('/').pop(), // Show just the mint name
+      ratio,
+      percentage: ratioToPercentage(ratio).toFixed(2) + '%',
+    })),
+  });
+  return total === RATIO_PRECISION;
+};
+
 // Helper function to format percentage to 2 significant figures - optimized
 const formatPercentage = (value: number): number => {
   if (value === 0) return 0;
   if (value >= 10) return Math.round(value);
   if (value >= 1) return Math.round(value * 10) / 10;
   return Math.round(value * 100) / 100;
-};
-
-// Simple memoization with limited cache to prevent memory leaks
-const formatPercentageCache = new Map<number, number>();
-const memoizedFormatPercentage = (value: number): number => {
-  if (formatPercentageCache.has(value)) {
-    return formatPercentageCache.get(value)!;
-  }
-
-  // Limit cache size to prevent memory leaks
-  if (formatPercentageCache.size > 100) {
-    formatPercentageCache.clear();
-  }
-
-  const result = formatPercentage(value);
-  formatPercentageCache.set(value, result);
-  return result;
 };
 
 interface MintState {
@@ -320,7 +344,7 @@ const MintItem = React.memo<MintItemProps>(
                   alignItems: 'flex-start',
                   padding: 16,
                 },
-                isSelected && styles.selectedMintItem,
+                // Remove selected styling in editing mode
               ]}>
               <View style={styles.mintHeaderRow}>
                 <View
@@ -374,8 +398,11 @@ const MintItem = React.memo<MintItemProps>(
                     {/* Text overlay */}
                     <View style={styles.percentageTextOverlay}>
                       <Animated.Text style={[styles.percentageText, textStyle]}>
-                        {`${memoizedFormatPercentage(percentage)}%`}
+                        {`${formatPercentage(percentage)}%`}
                       </Animated.Text>
+                      {/* <Text style={styles.ratioDebugText}>
+                        R:{Math.round(percentageToRatio(percentage))}
+                      </Text> */}
                     </View>
                   </View>
                 </View>
@@ -503,14 +530,14 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
     (unit?.toUpperCase() || 'SAT') as SupportedCurrency
   );
   const [isEditing, setIsEditing] = useState(false);
-  const [mintPercentages, setMintPercentages] = useState<Record<string, number>>({});
+  const [mintRatios, setMintRatios] = useState<Record<string, number>>({});
 
   // ✅ GOOD - Ref-based gesture state to avoid unnecessary re-renders
   const gestureStateRef = useRef({
     isActive: false,
     activeMintId: null as string | null,
-    initialPercentages: {} as Record<string, number>,
-    displayPercentages: {} as Record<string, number>,
+    initialRatios: {} as Record<string, number>, // Renamed for clarity
+    displayRatios: {} as Record<string, number>, // Renamed for clarity
   });
 
   // Separate state for UI that actually needs re-renders
@@ -526,8 +553,8 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
     }
   }, []);
 
-  // Ref to track latest percentages to avoid stale closures
-  const latestPercentagesRef = useRef<Record<string, number>>({});
+  // Ref to track latest ratios to avoid stale closures
+  const latestRatiosRef = useRef<Record<string, number>>({});
 
   // Ref to track current gesture state for stable throttled function
   const gestureStateRefForThrottled = useRef(gestureStateRef.current);
@@ -555,99 +582,113 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
   const filteredMints = useMemo(() => {
     const mints = multipleBalances.filter((mint) => mint.unit?.toUpperCase() === selectedCurrency);
 
-    // Initialize percentages equally when mints change - optimized
-    if (mints.length > 0 && Object.keys(mintPercentages).length === 0) {
-      const equalPercentage = Math.floor(100 / mints.length);
-      const remainder = 100 - equalPercentage * (mints.length - 1);
-
-      const newPercentages: Record<string, number> = {};
-      for (let i = 0; i < mints.length; i++) {
-        const mint = mints[i];
-        newPercentages[mint.mintUrl] = i === 0 ? remainder : equalPercentage;
-      }
+    // Initialize ratios equally when mints change - optimized
+    if (mints.length > 0 && Object.keys(mintRatios).length === 0) {
+      const mintIds = mints.map((mint) => mint.mintUrl);
+      const newRatios = initializeRatios(mintIds);
 
       // ✅ GOOD - Update ref directly in setter
-      latestPercentagesRef.current = newPercentages;
-      setMintPercentages(newPercentages);
+      latestRatiosRef.current = newRatios;
+      setMintRatios(newRatios);
+
+      // Validate ratios sum correctly (temporarily disabled)
+      // validateRatios(newRatios, 'Initial Setup');
     }
 
     return mints;
-  }, [multipleBalances, selectedCurrency, mintPercentages]);
+  }, [multipleBalances, selectedCurrency, mintRatios]);
 
-  // Optimized rebalancing function - efficient delta-based approach
+  // Optimized rebalancing function - integer ratio-based approach
   const rebalanceProportionally = useCallback(
     (
-      percentages: Record<string, number>,
+      ratios: Record<string, number>,
       targetMintId: string,
       newPercentage: number
     ): Record<string, number> => {
-      const oldPercentage = percentages[targetMintId] || 0;
+      const newRatio = percentageToRatio(Math.max(0, Math.min(100, newPercentage)));
+      const oldRatio = ratios[targetMintId] || 0;
 
-      // Early return if no change
-      if (Math.abs(newPercentage - oldPercentage) < 0.01) {
-        return percentages;
+      // Early return if no meaningful change
+      if (Math.abs(newRatio - oldRatio) < 1) {
+        return ratios;
       }
 
-      // ✅ GOOD - Calculate only the delta
-      const delta = newPercentage - oldPercentage;
-      percentages[targetMintId] = newPercentage;
+      // Create new state
+      const newRatios = { ...ratios };
+      newRatios[targetMintId] = newRatio;
 
-      // Get other mint IDs efficiently
-      const otherMintIds = Object.keys(percentages).filter((id) => id !== targetMintId);
+      // Get other mint IDs
+      const otherMintIds = Object.keys(ratios).filter((id) => id !== targetMintId);
 
       if (otherMintIds.length === 0) {
-        return percentages;
+        return newRatios;
       }
 
-      // ✅ GOOD - Distribute delta efficiently without complex proportional math
-      if (Math.abs(delta) > 0.01) {
-        // Calculate total of other mints for proportional distribution
-        let otherTotal = 0;
-        for (const id of otherMintIds) {
-          otherTotal += percentages[id] || 0;
+      // Calculate remaining ratio to distribute
+      const remainingRatio = RATIO_PRECISION - newRatio;
+
+      // Calculate current total of other mints
+      let otherTotal = 0;
+      otherMintIds.forEach((id) => {
+        otherTotal += ratios[id] || 0;
+      });
+
+      if (otherTotal === 0) {
+        // If other mints are 0, distribute equally
+        const equalShare = Math.floor(remainingRatio / otherMintIds.length);
+        const remainder = remainingRatio - equalShare * (otherMintIds.length - 1);
+
+        otherMintIds.forEach((id, index) => {
+          newRatios[id] = index === 0 ? remainder : equalShare;
+        });
+      } else {
+        // Distribute proportionally using integer math
+        let distributed = 0;
+
+        // Handle all but the last mint
+        for (let i = 0; i < otherMintIds.length - 1; i++) {
+          const id = otherMintIds[i];
+          const currentRatio = ratios[id] || 0;
+
+          // Integer-based proportional calculation
+          const newMintRatio = Math.round((remainingRatio * currentRatio) / otherTotal);
+          newRatios[id] = newMintRatio;
+          distributed += newMintRatio;
         }
 
-        if (otherTotal > 0) {
-          // Distribute delta proportionally among other mints
-          const remainingPercentage = 100 - newPercentage;
-          const scaleFactor = remainingPercentage / otherTotal;
-
-          for (const id of otherMintIds) {
-            percentages[id] = memoizedFormatPercentage((percentages[id] || 0) * scaleFactor);
-          }
-        } else {
-          // If other mints are 0, distribute remaining evenly
-          const remainingPercentage = 100 - newPercentage;
-          const equalShare = memoizedFormatPercentage(remainingPercentage / otherMintIds.length);
-          for (const id of otherMintIds) {
-            percentages[id] = equalShare;
-          }
-        }
+        // Give remainder to last mint to ensure exact total
+        const lastMintId = otherMintIds[otherMintIds.length - 1];
+        newRatios[lastMintId] = remainingRatio - distributed;
       }
 
-      return percentages;
+      // Validate that ratios sum to exactly RATIO_PRECISION
+      const total = Object.values(newRatios).reduce((sum, ratio) => sum + ratio, 0);
+      if (total !== RATIO_PRECISION) {
+        console.error('Ratio sum error:', { total, expected: RATIO_PRECISION, newRatios });
+      }
+
+      return newRatios;
     },
     []
   );
 
   const handlePercentageChange = useCallback(
     (mintId: string, change: number) => {
-      setMintPercentages((prev) => {
+      setMintRatios((prev) => {
         // Use the latest state from ref to avoid stale closures
-        const currentState = { ...latestPercentagesRef.current };
-        const currentPercentage = currentState[mintId] || 0;
-        const newPercentage = Math.max(0, Math.min(100, currentPercentage + change));
+        const currentState = { ...latestRatiosRef.current };
+        const currentPercentage = ratioToPercentage(currentState[mintId] || 0);
+        const newPercentage = currentPercentage + change;
 
-        // Don't update if no change
-        if (Math.abs(newPercentage - currentPercentage) < 0.01) {
-          return prev;
-        }
-
-        const newPercentages = rebalanceProportionally(currentState, mintId, newPercentage);
+        const newRatios = rebalanceProportionally(currentState, mintId, newPercentage);
 
         // ✅ GOOD - Update ref directly in setter
-        latestPercentagesRef.current = newPercentages;
-        return newPercentages;
+        latestRatiosRef.current = newRatios;
+
+        // Validate ratios after percentage change
+        validateRatios(newRatios, `After ${change > 0 ? '+' : ''}${change}% change`);
+
+        return newRatios;
       });
     },
     [rebalanceProportionally]
@@ -680,11 +721,11 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
         // Capture initial state only once at gesture start
         isActive: true,
         activeMintId: mintId,
-        initialPercentages: { ...mintPercentages }, // Only copy once at start
-        displayPercentages: { ...mintPercentages }, // Only copy once at start
+        initialRatios: { ...mintRatios }, // Only copy once at start
+        displayRatios: { ...mintRatios }, // Only copy once at start
       });
     },
-    [mintPercentages, updateGestureState]
+    [mintRatios, updateGestureState]
   );
 
   // Throttled version for smoother performance - optimized throttling
@@ -692,15 +733,15 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
     () =>
       _.throttle((mintId: string, newPercentage: number) => {
         // ✅ GOOD - Create copy only once per throttled call, not on every frame
-        const percentagesCopy = { ...gestureStateRefForThrottled.current.initialPercentages };
-        const calculatedPercentages = rebalanceProportionally(
-          percentagesCopy, // Work on copy to preserve initial state
+        const ratiosCopy = { ...gestureStateRefForThrottled.current.initialRatios };
+        const calculatedRatios = rebalanceProportionally(
+          ratiosCopy, // Work on copy to preserve initial state
           mintId,
-          newPercentage
+          newPercentage // Function handles percentage-to-ratio conversion internally
         );
 
         // ✅ GOOD - Direct assignment without re-render
-        gestureStateRef.current.displayPercentages = calculatedPercentages;
+        gestureStateRef.current.displayRatios = calculatedRatios;
       }, 8), // Stable throttling at 8ms
     [] // No dependencies - stable function
   );
@@ -713,7 +754,8 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
       });
 
       // Commit the final change
-      const initialPercentage = gestureStateRef.current.initialPercentages[mintId] || 0;
+      const initialRatio = gestureStateRef.current.initialRatios[mintId] || 0;
+      const initialPercentage = ratioToPercentage(initialRatio); // Convert ratio to percentage
       const change = finalPercentage - initialPercentage;
 
       if (Math.abs(change) >= 0.1) {
@@ -906,10 +948,10 @@ export function MintSelect({ onMintSelected, unit }: SelectedMintDisplayProps) {
         </View>
         <View>
           {filteredMints.map((mint) => {
-            // Get the correct percentage to display from memoized values
+            // Get the correct percentage to display from ratios
             const displayPercentage = gestureStateRef.current.isActive
-              ? gestureStateRef.current.displayPercentages[mint.mintUrl] || 0
-              : mintPercentages[mint.mintUrl] || 0;
+              ? ratioToPercentage(gestureStateRef.current.displayRatios[mint.mintUrl] || 0)
+              : ratioToPercentage(mintRatios[mint.mintUrl] || 0);
 
             // Create stable button handlers for this mint
             const buttonHandlers = buttonHandlersMap.get(mint.mintUrl);
@@ -1006,8 +1048,8 @@ const createStyles = (theme: Theme) =>
       backgroundColor: greys(theme)[700],
     },
     mintIcon: {
-      width: 36,
-      height: 36,
+      width: 32,
+      height: 32,
       borderRadius: 12,
       backgroundColor: greys(theme)[200],
     },
@@ -1118,5 +1160,11 @@ const createStyles = (theme: Theme) =>
       height: '100%',
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    ratioDebugText: {
+      color: greys(theme)[200],
+      fontSize: 12,
+      fontWeight: '400',
+      marginTop: 4,
     },
   });

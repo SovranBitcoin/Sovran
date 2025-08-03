@@ -320,9 +320,9 @@ const MintDetailPage = () => {
   };
 
   // Get mint info - try to access it safely
-  const mintInfo = wallet?.mintInfo?._mintInfo;
+  const mintInfo = wallet?.mintInfo;
 
-  console.log(1231222223123, mintInfo);
+  console.log(1231222223123, JSON.stringify(mintInfo, null, 2));
 
   console.log('mintInfo', mintInfo);
 
