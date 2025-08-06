@@ -84,12 +84,17 @@ export function ButtonHandler({ context, buttons, style, colors }: ButtonHandler
               )
             }
             onPress={() => {
-              SheetManager.show('button-handler', {
-                payload: { buttons: visibleButtons },
-              });
+              if (visibleButtons.length === 3) {
+                runWithAnimationFrame(visibleButtons[2].onPress, setLoading)();
+              } else {
+                SheetManager.show('button-handler', {
+                  payload: { buttons: visibleButtons },
+                });
+              }
             }}
             variant="secondary"
             loading={loading}
+            disabled={visibleButtons.length === 3 && visibleButtons[2].disabled}
           />
         </View>
       )}

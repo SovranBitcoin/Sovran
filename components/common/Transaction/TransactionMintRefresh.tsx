@@ -5,12 +5,25 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { TransactionData } from 'helper/redux/cashu';
+import { TransactionBuilder } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintIcon } from 'components/layout/sheets/mints';
+import { Essential } from 'helper/Essential';
 interface TransactionMintRefreshProps {
   mintInfo: any;
-  transaction: TransactionData;
+  transaction: Essential<
+    TransactionBuilder,
+    | 'mintQuote'
+    | 'request'
+    | 'token'
+    | 'date'
+    | 'isCancel'
+    | 'amount'
+    | 'unit'
+    | 'paid'
+    | 'type'
+    | 'state'
+  >;
   handleCheckStatus?: (onClose: () => void) => Promise<void>;
 }
 

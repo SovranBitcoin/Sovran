@@ -319,13 +319,169 @@ const migrations = {
     );
     return newState;
   },
+  150: (state: RootState) => {
+    console.log('=== MIGRATION 123 DEBUG START ===');
+
+    // Generate allocation config based on highest balance mints
+    // Use EXACT same logic as memoizedGetAllBalancesMultipleCurrencies
+    console.log(123123, state.nostr);
+    const currentProfileId = state.nostr?.currentProfile?.id;
+    console.log('Current Profile ID:', currentProfileId);
+
+    // Get data using same selectors logic
+    const mints = state.cashu.profiles[currentProfileId]?.mints || [];
+    const proofsByMint = state.cashu.profiles[currentProfileId]?.proofs || {};
+    const keysets = state.cashu?.keysets || {};
+    const info = state.cashu?.info || {};
+
+    console.log('Raw data extracted:');
+    console.log('- Mints array:', mints);
+    console.log('- ProofsByMint keys:', Object.keys(proofsByMint));
+    console.log('- Keysets keys:', Object.keys(keysets));
+    console.log('- Info keys:', Object.keys(info));
+
+    // Exact same logic as memoizedGetAllBalancesMultipleCurrencies
+    const allMints = mints || [];
+
+    // Create a set of all mints (both from mints list and proofs)
+    const mintSet = new Set([...allMints, ...Object.keys(proofsByMint)]);
+    console.log('Mint set created:', Array.from(mintSet));
+
+    // Convert Set back to array
+    const uniqueMints = Array.from(mintSet);
+    console.log('Unique mints to process:', uniqueMints);
+
+    // Process each mint exactly like the selector
+    const allBalances = uniqueMints
+      .map((mint) => {
+        console.log(`\n--- Processing mint: ${mint} ---`);
+
+        // Get all unique units from keysets for this mint
+        const mintKeysets = keysets[mint] || [];
+        const mintInfo = info[mint] || {};
+        console.log(`Mint keysets count: ${mintKeysets.length}`);
+        console.log(`Mint info:`, mintInfo);
+
+        const uniqueUnits = [...new Set(mintKeysets.map((ks: any) => ks.unit))];
+        console.log(`Unique units from keysets:`, uniqueUnits);
+
+        // If no units found, default to common currencies (like selector)
+        const units = uniqueUnits.length > 0 ? uniqueUnits : ['sat', 'usd', 'eur', 'gbp'];
+        console.log(`Final units to process:`, units);
+
+        // Get proofs for this mint (or empty array if none)
+        const proofs = proofsByMint[mint] || [];
+        console.log(`Proofs count for mint: ${proofs.length}`);
+
+        // Calculate balance for each unit exactly like selector
+        return units.map((unit) => {
+          console.log(`  Processing unit: ${unit}`);
+
+          const matchingKeysets = mintKeysets.filter((ks: any) => ks.unit === unit);
+          console.log(`  Matching keysets for ${unit}:`, matchingKeysets.length);
+
+          // If there are no matching keysets for this unit, balance is 0
+          if (matchingKeysets.length === 0) {
+            console.log(`  ❌ No matching keysets for ${unit}, balance = 0`);
+            return {
+              mintUrl: mint,
+              amount: 0,
+              unit: unit,
+              iconUrl: mintInfo?.icon_url || null,
+            };
+          }
+
+          // Get all keyset IDs for this unit
+          const keysetIds = matchingKeysets.map((ks: any) => ks.id);
+          console.log(`  Keyset IDs for ${unit}:`, keysetIds);
+
+          // Filter proofs that match these keysets
+          const filteredProofs = proofs.filter((proof: any) => keysetIds.includes(proof.id));
+          console.log(`  Filtered proofs count: ${filteredProofs.length}`);
+          console.log(
+            `  Filtered proofs:`,
+            filteredProofs.map((p) => ({ id: p.id, amount: p.amount }))
+          );
+
+          // Sum amounts (or 0 if no proofs) - exact same logic
+          const amount =
+            filteredProofs.reduce((sum: number, proof: any) => sum + (proof.amount || 0), 0) || 0;
+          console.log(`  ✅ Final amount for ${unit}: ${amount}`);
+
+          return {
+            mintUrl: mint,
+            amount,
+            unit: unit,
+            iconUrl: mintInfo?.icon_url || null,
+          };
+        });
+      })
+      .flat(); // Flatten array of arrays into single array
+
+    console.log('\n=== ALL BALANCES CALCULATED ===');
+    console.log('All balances:', allBalances);
+
+    // Group balances by currency
+    const balancesByCurrency: Record<string, { mintUrl: string; amount: number }[]> = {};
+    allBalances.forEach((balance) => {
+      const unit = balance.unit.toLowerCase();
+      if (!balancesByCurrency[unit]) {
+        balancesByCurrency[unit] = [];
+      }
+      balancesByCurrency[unit].push({
+        mintUrl: balance.mintUrl,
+        amount: balance.amount,
+      });
+    });
+
+    console.log('\n=== BALANCES GROUPED BY CURRENCY ===');
+    Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
+      console.log(`${currency}:`, balances);
+    });
+
+    // Create allocation config
+    const allocation: Record<string, Record<string, number>> = {};
+
+    Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
+      console.log(`\n--- Creating allocation for ${currency} ---`);
+
+      // Sort by balance descending (highest first, even if 0)
+      balances.sort((a, b) => b.amount - a.amount);
+      console.log(`Sorted balances:`, balances);
+
+      const currencyAllocation: Record<string, number> = {};
+
+      // Always assign 100% to first mint (highest balance, even if 0)
+      if (balances.length > 0) {
+        const topMint = balances[0].mintUrl;
+        currencyAllocation[topMint] = 10000;
+        console.log(`✅ Assigned 100% (10000) to top mint: ${topMint}`);
+
+        // Set all others to 0
+        balances.slice(1).forEach(({ mintUrl }) => {
+          currencyAllocation[mintUrl] = 0;
+          console.log(`  Set ${mintUrl} to 0%`);
+        });
+      }
+
+      allocation[currency] = currencyAllocation;
+      console.log(`Final allocation for ${currency}:`, currencyAllocation);
+    });
+
+    console.log('\n=== FINAL ALLOCATION CONFIG ===');
+    console.log('Complete allocation:', JSON.stringify(allocation, null, 2));
+
+    console.log('\n=== MIGRATION 123 DEBUG END ===');
+
+    return _.update('cashu.allocation', () => allocation, state);
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 120,
+  version: 150,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
@@ -362,12 +518,16 @@ const organizedKeys = {
     'experimental',
     'backgroundImage',
     'backgroundImageAttrs',
+    'allocation',
   ],
 
   // Settings sub-objects
   termsAccepted: ['termsAccepted', 'date'],
 
   backgroundImageAttrs: ['id', 'shades', 'greys', 'text', 'tint', 'dominantColors'],
+
+  // Allocation structure (currency -> mint URL -> ratio)
+  allocation: ['sat', 'usd', 'eur', 'gbp'],
 
   // Color shade values (powers of 100)
   colorShades: ['100', '200', '300', '400', '500'],
@@ -775,7 +935,7 @@ export const getStructure = (obj: any): any => {
 };
 
 store.subscribe(() => {
-  console.log(JSON.stringify(getStructure(store.getState()), null, 2));
+  console.log(JSON.stringify(store.getState(), null, 2));
 });
 
 export const persistor = persistStore(store);

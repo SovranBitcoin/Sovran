@@ -16,6 +16,9 @@ import {
   APPEND_TRANSACTION,
   SET_KEYS,
   SET_AUDIT,
+  SET_ALLOCATION,
+  UPDATE_CURRENCY_ALLOCATION,
+  RESET_ALLOCATION,
 } from './actionTypes';
 import { ensureProfileExists } from './helpers';
 import { CashuState } from './types';
@@ -38,13 +41,20 @@ const initialState: CashuState = {
   info: {},
   keys: {},
   keysets: {},
+  allocation: {},
 };
 
 export const cashuReducer: Reducer<CashuState, CashuAction> = (
   state = initialState,
   action
 ): CashuState => {
-  if (action?.payload?.profileId !== undefined) {
+  if (
+    'payload' in action &&
+    action.payload &&
+    typeof action.payload === 'object' &&
+    'profileId' in action.payload &&
+    typeof action.payload.profileId === 'number'
+  ) {
     state = ensureProfileExists(state, action.payload.profileId);
   }
 
@@ -177,6 +187,25 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
         (count = 1) => count + amount,
         state
       );
+    }
+
+    case SET_ALLOCATION: {
+      return typedUpdate('allocation' as const, () => action.payload, state);
+    }
+
+    case UPDATE_CURRENCY_ALLOCATION: {
+      return typedUpdate(
+        'allocation' as const,
+        (allocation) => ({
+          ...allocation,
+          [action.payload.currency]: action.payload.allocation,
+        }),
+        state
+      );
+    }
+
+    case RESET_ALLOCATION: {
+      return typedUpdate('allocation' as const, () => ({}), state);
     }
 
     default:

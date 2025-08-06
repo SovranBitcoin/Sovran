@@ -58,6 +58,8 @@ const configWithMonicon = withMonicon(config, {
     'material-symbols:settings-rounded',
     'fluent:chevron-down-12-filled',
     'simple-line-icons:check',
+    'material-symbols:check-rounded',
+    'material-symbols:close-rounded',
     'ic:baseline-card-giftcard',
     'lucide:arrow-up-right',
     'mdi:charity',
@@ -88,6 +90,8 @@ const configWithMonicon = withMonicon(config, {
     'ion:checkmark-done',
     'feather:wifi',
     'feather:credit-card',
+    'material-symbols:pie-chart',
+    'radix-icons:half-2',
   ],
 });
 

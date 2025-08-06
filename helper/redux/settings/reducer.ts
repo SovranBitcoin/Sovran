@@ -9,7 +9,6 @@ import {
 } from './actionTypes';
 import { BACKGROUND_IMAGE_ATTRIBUTES } from '../../backgroundImages';
 import { SettingsAction } from './actions';
-import _ from 'lodash/fp';
 import { Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
 export interface TermsAccepted {

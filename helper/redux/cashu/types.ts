@@ -45,4 +45,5 @@ export interface CashuState {
   keys: Record<string, MintKeys[]>;
   info: Record<string, MintInfo>;
   audits: Record<string, any>;
+  allocation: Record<string, Record<string, number>>;
 }

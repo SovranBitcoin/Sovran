@@ -1,7 +1,17 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useCallback } from 'react';
-import { setSelectedMint } from './actions';
-import { memoizedGetMintInfo, memoizedGetAudit, memoizedGetTransactions } from './selectors';
+import {
+  setSelectedMint,
+  setAllocation,
+  updateCurrencyAllocation,
+  resetAllocation,
+} from './actions';
+import {
+  memoizedGetMintInfo,
+  memoizedGetAudit,
+  memoizedGetTransactions,
+  memoizedGetAllocation,
+} from './selectors';
 import { RootState } from '../store/reducer';
 
 export const useCashu = () => {
@@ -34,4 +44,19 @@ export const useGetMintInfo = ({ mintUrl }: { mintUrl: string }) => {
 
 export const useGetAudit = ({ mintUrl }: { mintUrl: string }) => {
   return useSelector(memoizedGetAudit(mintUrl));
+};
+
+export const useAllocation = () => {
+  const dispatch = useDispatch();
+  const allocation = useSelector(memoizedGetAllocation);
+
+  return {
+    allocation,
+    getCurrencyAllocation: (currency: string) => allocation[currency] || {},
+    setAllocation: (allocation: Record<string, Record<string, number>>) =>
+      dispatch(setAllocation(allocation)),
+    updateCurrencyAllocation: (currency: string, allocation: Record<string, number>) =>
+      dispatch(updateCurrencyAllocation(currency, allocation)),
+    resetAllocation: () => dispatch(resetAllocation()),
+  };
 };

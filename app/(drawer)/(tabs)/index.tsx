@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
-import { Spacer, View } from 'components/common/View';
+import { View } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
 import {
   useCashu,
@@ -31,7 +31,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/layout/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
-import { Card } from 'components/common/Card';
 import { getLatestVersion } from 'helper/apiClient';
 import semver from 'semver';
 import { version } from 'app/settings';
@@ -215,7 +214,7 @@ function TabOneScreen() {
           className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          <View className="mx-4">
+          {/* <View className="mx-4">
             <Spacer size={12} />
             {new Date() > new Date('2025-07-22') && (
               <Card
@@ -223,7 +222,7 @@ function TabOneScreen() {
                 variant="warning"
               />
             )}
-          </View>
+          </View> */}
           <View
             className="p-4 pt-0"
             style={{

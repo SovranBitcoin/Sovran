@@ -17,6 +17,9 @@ import {
   APPEND_TRANSACTION,
   SET_KEYS,
   SET_AUDIT,
+  SET_ALLOCATION,
+  UPDATE_CURRENCY_ALLOCATION,
+  RESET_ALLOCATION,
 } from './actionTypes';
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
 import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
@@ -39,7 +42,10 @@ export type CashuAction =
   | ReturnType<typeof removeProofs>
   | ReturnType<typeof increaseCounterV2>
   | ReturnType<typeof resetCounter>
-  | ReturnType<typeof ensureProfileExistsAction>;
+  | ReturnType<typeof ensureProfileExistsAction>
+  | ReturnType<typeof setAllocation>
+  | ReturnType<typeof updateCurrencyAllocation>
+  | ReturnType<typeof resetAllocation>;
 
 export const addMints = ({ profileId, mints }: { profileId: number; mints: string[] }) =>
   ({
@@ -270,3 +276,23 @@ export const addMintsAction = ({
     }
   };
 };
+
+export const setAllocation = (allocation: Record<string, Record<string, number>>) =>
+  ({
+    type: SET_ALLOCATION,
+    payload: allocation,
+  }) as const;
+
+export const updateCurrencyAllocation = (currency: string, allocation: Record<string, number>) =>
+  ({
+    type: UPDATE_CURRENCY_ALLOCATION,
+    payload: {
+      currency,
+      allocation,
+    },
+  }) as const;
+
+export const resetAllocation = () =>
+  ({
+    type: RESET_ALLOCATION,
+  }) as const;

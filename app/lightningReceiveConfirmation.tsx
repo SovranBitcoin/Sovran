@@ -15,6 +15,7 @@ import {
   memoizedGetCounterV2,
   memoizedGetTransactionByMatcher,
   memoizedGetTransactions,
+  TransactionBuilder,
   updateTransaction,
   useGetMintInfo,
 } from 'helper/redux/cashu';
@@ -44,6 +45,7 @@ import opacity from 'hex-color-opacity';
 import { err } from 'neverthrow';
 import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
 import { Spinner } from 'components/common/Spinner';
+import { Essential } from 'helper/Essential';
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {
@@ -53,7 +55,19 @@ interface MintQuoteTimelineProps {
     [key: string]: any;
   }[];
   type: 'mint' | 'melt';
-  transaction?: any;
+  transaction?: Essential<
+    TransactionBuilder,
+    | 'mintQuote'
+    | 'request'
+    | 'token'
+    | 'date'
+    | 'isCancel'
+    | 'amount'
+    | 'unit'
+    | 'paid'
+    | 'type'
+    | 'state'
+  >;
 }
 
 export function MintQuoteTimeline({
@@ -61,10 +75,7 @@ export function MintQuoteTimeline({
   meltQuotes = [],
   type = 'melt',
   transaction,
-  handleCheckStatus,
-}: MintQuoteTimelineProps & {
-  handleCheckStatus?: (done: () => void) => void;
-}) {
+}: MintQuoteTimelineProps) {
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -199,11 +210,11 @@ export function MintQuoteTimeline({
               }}>
               <TouchableOpacity
                 onPress={() => {
-                  if (transaction.isCancel && item.state === 'CANCELLED') {
+                  if (transaction?.isCancel && item.state === 'CANCELLED') {
                     navigation.navigate(
                       'transaction',
                       {
-                        id: transaction.request || transaction.token,
+                        id: transaction?.request || transaction?.token,
                         transactionType: 'receive',
                       },
                       {
@@ -214,7 +225,7 @@ export function MintQuoteTimeline({
                 }}
                 style={{
                   flex: 1,
-                  ...(transaction.isCancel && item.state === 'CANCELLED'
+                  ...(transaction?.isCancel && item.state === 'CANCELLED'
                     ? {
                         backgroundColor: opacity(greys(theme)[900], 0.75),
                         borderColor: greys(theme)[600],
@@ -257,7 +268,7 @@ export function MintQuoteTimeline({
                       }}>
                       {convertTime(new Date(item.addedAt))}
                     </Text>
-                  ) : transaction.date && item.state === 'CREATED' ? (
+                  ) : transaction?.date && item.state === 'CREATED' ? (
                     <Text
                       size={12}
                       bold
@@ -267,7 +278,7 @@ export function MintQuoteTimeline({
                       }}>
                       {convertTime(new Date(transaction.date))}
                     </Text>
-                  ) : transaction.isCancel ? (
+                  ) : transaction?.isCancel ? (
                     <Text
                       size={12}
                       bold
@@ -279,7 +290,7 @@ export function MintQuoteTimeline({
                     </Text>
                   ) : null}
                 </View>
-                {transaction.isCancel && item.state === 'CANCELLED' && (
+                {transaction?.isCancel && item.state === 'CANCELLED' && (
                   <Icon
                     style={{
                       marginRight: 8,

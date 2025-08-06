@@ -331,3 +331,20 @@ export const memoizedGetAllKeysetIdsFromAllMints = (excludeMintUrl?: string) =>
       .flatMap(([, keysetArr]) => keysetArr)
       .map((m) => m.id);
   });
+
+// Allocation selectors
+export const selectAllocation = (state: RootState) => state.cashu.allocation || {};
+
+export const selectCurrencyAllocation = (currency: string) =>
+  createSelector([selectAllocation], (allocation) => allocation[currency] || {});
+
+export const memoizedGetAllocation = createSelector(
+  [(state: RootState) => state.cashu.allocation],
+  (allocation) => allocation || {}
+);
+
+export const memoizedGetCurrencyAllocation = (currency: string) =>
+  createSelector(
+    [(state: RootState) => state.cashu.allocation],
+    (allocation) => allocation?.[currency] || {}
+  );
