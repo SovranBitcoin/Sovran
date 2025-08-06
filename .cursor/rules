@@ -1,5 +1,7 @@
 # Sovran Development Rules
 
+When making changes to functions or components its important to remember they could be used elsewhere in the codebase and to ensure you don't break existing functionality.
+
 ## Bottom Sheets
 
 - For bottom sheets that trigger on user interaction, refer to `Sovran/components/layout/sheets/example`

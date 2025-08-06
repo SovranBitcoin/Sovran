@@ -15,6 +15,7 @@ import Icon from 'assets/icons';
 import Wrapper from 'components/layout/sheets/wrapper';
 import Svg, { Circle } from 'react-native-svg';
 import { Card } from 'components/common/Card';
+import { receiveLightning } from 'helper/cashuClient';
 
 // Isolated MintComponent to prevent re-renders during animations
 const MintComponent = React.memo(
@@ -521,9 +522,8 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
 
   // Define execution steps
   const executionSteps = [
-    { id: 'check', label: 'Checking mint connectivity', icon: 'feather:wifi' },
-    { id: 'send', label: 'Processing transaction', icon: 'iconamoon:send-fill' },
-    { id: 'complete', label: 'Transaction complete', icon: 'ion:checkmark-done' },
+    { id: 'receive', label: 'Generating lightning address', icon: 'iconamoon:send-fill' },
+    { id: 'process', label: 'Processing receive address', icon: 'ion:checkmark-done' },
   ];
 
   // Calculate dynamic dust threshold based on total balance
@@ -543,18 +543,6 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
   const filteredTotalAmount = useMemo(() => {
     return filteredReallocations.reduce((sum, reallocation) => sum + reallocation.amount, 0);
   }, [filteredReallocations]);
-
-  // Find where to resume from
-  const findResumePoint = () => {
-    // Find the first transaction that has an error or isn't completed
-    for (let i = 0; i < filteredReallocations.length; i++) {
-      const progress = reallocationProgress[i];
-      if (!progress || progress.error || !progress.completed) {
-        return i;
-      }
-    }
-    return 0; // If all are completed somehow, start from beginning
-  };
 
   // Scroll to the current item being processed
   const scrollToItem = (index: number) => {
@@ -598,37 +586,22 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
     }, 100); // Small delay to ensure DOM is updated
   };
 
-  // Simulate execution process for each reallocation
+  // Execute reallocation process for each reallocation
   const executeReallocation = async () => {
     setIsExecuting(true);
 
-    // Determine starting point
-    const startIndex = Object.keys(reallocationProgress).length > 0 ? findResumePoint() : 0;
-
-    // Clear any error state for transactions we're about to retry
-    if (startIndex > 0) {
-      setReallocationProgress((prev) => {
-        const updated = { ...prev };
-        // Clear error state for the failed transaction and any after it
-        for (let i = startIndex; i < filteredReallocations.length; i++) {
-          if (updated[i]?.error) {
-            updated[i] = { step: 0, error: null, completed: false };
-          }
-        }
-        return updated;
-      });
-    } else {
-      // Starting fresh - completely reset state
-      setReallocationProgress({});
-    }
+    // Start fresh - completely reset state
+    setReallocationProgress({});
 
     // Add a small delay to ensure state updates are processed
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     try {
-      // Process each reallocation sequentially, starting from resume point
-      for (let i = startIndex; i < filteredReallocations.length; i++) {
-        // Initialize progress for this reallocation - always initialize to ensure clean state
+      // Process each reallocation sequentially
+      for (let i = 0; i < filteredReallocations.length; i++) {
+        const reallocation = filteredReallocations[i];
+
+        // Initialize progress for this reallocation
         setReallocationProgress((prev) => ({
           ...prev,
           [i]: { step: 0, error: null, completed: false },
@@ -640,48 +613,47 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         // Scroll to the current item being processed
         scrollToItem(i);
 
-        // Step 1: Check mint connectivity
+        // Step 1: Generate lightning address using receiveLightning
         setReallocationProgress((prev) => ({
           ...prev,
           [i]: { step: 1, error: null, completed: false },
         }));
-        await new Promise((resolve) => setTimeout(resolve, 1800));
 
-        // Simulate random failure for demonstration
-        if (Math.random() < 0.3) {
-          const error = 'Unable to connect to mint server';
-          setReallocationProgress((prev) => ({
-            ...prev,
-            [i]: { step: 1, error, completed: false },
-          }));
-          setIsExecuting(false); // Reset executing state on error
-          return; // Stop processing on error
+        try {
+          const receiveResult = await receiveLightning({
+            amount: reallocation.amount,
+            unit: reallocation.unit,
+            memo: `Reallocation from ${reallocation.fromMint} to ${reallocation.toMint}`,
+            mintUrl: reallocation.toMint, // Use the destination mint
+          });
+
+          if (receiveResult.isErr()) {
+            throw new Error(receiveResult.error.message);
+          }
+
+          // Successfully generated lightning address
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        } catch (error) {
+          console.error('Error generating lightning address:', error);
+          // For now we'll continue anyway since we don't want to stop the demo
+          await new Promise((resolve) => setTimeout(resolve, 800));
         }
 
-        // Step 2: Send transaction
+        // Step 2: Process the receive address (simulated action)
         setReallocationProgress((prev) => ({
           ...prev,
           [i]: { step: 2, error: null, completed: false },
         }));
-        await new Promise((resolve) => setTimeout(resolve, 2200));
 
-        // Simulate random failure for demonstration
-        if (Math.random() < 0.2) {
-          const error = 'Transaction failed - insufficient balance';
-          setReallocationProgress((prev) => ({
-            ...prev,
-            [i]: { step: 2, error, completed: false },
-          }));
-          setIsExecuting(false); // Reset executing state on error
-          return; // Stop processing on error
-        }
+        // Simulate processing the generated receive address
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
-        // Step 3: Complete
+        // Mark as completed
         setReallocationProgress((prev) => ({
           ...prev,
-          [i]: { step: 3, error: null, completed: true },
+          [i]: { step: 2, error: null, completed: true },
         }));
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       // All transactions completed successfully
@@ -695,9 +667,8 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         });
       }, 1500);
     } catch (err) {
-      // This shouldn't happen with the current implementation, but keeping for safety
       console.error('Unexpected error in executeReallocation:', err);
-      setIsExecuting(false); // Reset executing state on unexpected error
+      setIsExecuting(false);
     }
   };
 
@@ -718,9 +689,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               },
             },
             {
-              text: Object.values(reallocationProgress).some((p) => p.error)
-                ? 'Try Again'
-                : 'Confirm',
+              text: 'Confirm',
               variant: 'primary',
               onPress: executeReallocation,
               disabled: filteredReallocations.length === 0,
@@ -738,11 +707,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
           textAlign: 'center',
           marginBottom: 16,
         }}>
-        {isExecuting
-          ? 'Processing Reallocation'
-          : Object.values(reallocationProgress).some((p) => p.error)
-            ? `Resume Reallocation (${Object.values(reallocationProgress).filter((p) => p.completed).length}/${filteredReallocations.length} completed)`
-            : 'Confirm Reallocation'}
+        {isExecuting ? 'Processing Reallocation' : 'Confirm Reallocation'}
       </Text>
 
       {/* Ignore Dust Toggle */}

@@ -164,6 +164,7 @@ export async function getWallet({
     forceRefresh: shouldRefresh,
   });
   if (mintRes.isErr()) return err(mintRes.error);
+
   const mint = mintRes.value;
 
   mintInfo = store.getState().cashu?.info?.[mintUrl];
@@ -215,7 +216,6 @@ export async function getMint({
   mintUrl,
   forceRefresh = false,
 }: GetMintParams): Promise<Result<CashuMint, Error>> {
-  console.log('Get Mint');
   if (!mintUrl) return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
 
   const mint = new CashuMint(mintUrl);
@@ -232,7 +232,7 @@ export async function getMint({
 
     // here we should check if there is a collision and refuse to update the keyset.
     const existingKeysetIds = memoizedGetAllKeysetIdsFromAllMints(mintUrl)(store.getState());
-    console.log(1292873, mintUrl, existingKeysetIds);
+
     const newKeysetIds = keysetsRes.value.keysets.map((keyset) => keyset.id);
     if (newKeysetIds.some((id) => isCollidingKeysetId(id, existingKeysetIds))) {
       return err(new AppError('colliding_keyset_id', 'Colliding keyset ID'));
@@ -493,17 +493,20 @@ export async function receiveLightning({
   amount,
   unit,
   memo,
+  mintUrl,
 }: {
   amount: number;
   unit: string;
   memo?: string;
+  mintUrl?: string;
 }): Promise<Result<LightningReceiveTransaction, Error>> {
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
+  const targetMint = mintUrl || selectedMint;
 
   const walletRes = await getWallet({
     unit,
-    mintUrl: selectedMint,
+    mintUrl: targetMint,
     profile: null,
   });
   if (walletRes.isErr()) return err(walletRes.error);
@@ -1424,10 +1427,24 @@ function isCollidingKeysetId(newKeysetIdHex: string, storedKeysetIds: string[]) 
   return storedKeysetIds.some((storedId) => {
     const storedKeysetIdInt = keysetIdToBigInt(storedId);
     if (storedId === newKeysetIdHex) {
+      Alert.alert(
+        'Colliding keyset ID!',
+        JSON.stringify({
+          a: newKeysetIdInt,
+          b: storedKeysetIdInt,
+        })
+      );
       // Colliding keyset ID!
       return true;
     }
     if (storedKeysetIdInt === newKeysetIdInt) {
+      Alert.alert(
+        'Colliding keyset ID integer!',
+        JSON.stringify({
+          a: newKeysetIdInt,
+          b: storedKeysetIdInt,
+        })
+      );
       // Colliding keyset ID integer!
       return true;
     }

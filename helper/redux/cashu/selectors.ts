@@ -329,7 +329,8 @@ export const memoizedGetAllKeysetIdsFromAllMints = (excludeMintUrl?: string) =>
     return Object.entries(keysets || {})
       .filter(([mintUrl]) => mintUrl !== excludeMintUrl)
       .flatMap(([, keysetArr]) => keysetArr)
-      .map((m) => m.id);
+      .map((m) => m.id)
+      .filter((id) => id); // just in case theres an undefined id somehow which happened locally once.
   });
 
 // Allocation selectors
