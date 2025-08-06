@@ -6,6 +6,7 @@ import { default as registerReallocateAccepter } from 'components/layout/sheets/
 import { default as registerButtonHandler } from 'components/layout/sheets/buttonHandler';
 import { default as registerDelete } from 'components/layout/sheets/delete';
 import { default as registerMintAdder } from 'components/layout/sheets/mint-adder';
+import { default as registerMintDelete } from 'components/layout/sheets/mint-delete';
 import { default as registerTransactionMessage } from 'components/layout/sheets/transaction-message';
 import { default as registerEmojiPicker } from 'components/layout/sheets/emoji-picker';
 import { default as registerMintBalance } from 'components/layout/sheets/mint-balance';
@@ -21,6 +22,7 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerButtonHandler({ context });
   registerDelete({ context });
   registerMintAdder({ context });
+  registerMintDelete({ context });
   registerTransactionMessage({ context });
   registerEmojiPicker({ context });
   registerMintBalance({ context });

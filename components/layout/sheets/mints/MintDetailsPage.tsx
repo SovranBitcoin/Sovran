@@ -5,7 +5,7 @@ import { Text } from 'components/common/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
-import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
+import { useSheetRouteParams, useSheetRouter, SheetManager } from 'react-native-actions-sheet';
 import { useWallet } from 'helper/cashuClient';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Card } from 'components/common/Card';
@@ -308,6 +308,18 @@ const MintDetailPage = () => {
     }
   };
 
+  const handleDeleteMint = async () => {
+    if (!params?.mintUrl) return;
+
+    try {
+      await SheetManager.show('mint-delete', {
+        payload: { mintUrl: params.mintUrl },
+      });
+    } catch (error) {
+      console.error('Error opening delete mint sheet:', error);
+    }
+  };
+
   const getColor = (successRate: number | undefined) => {
     if (successRate === undefined || successRate === null) return greys(theme)[700];
     if (successRate >= 0.9) return '#0CED3E';
@@ -377,6 +389,8 @@ const MintDetailPage = () => {
   }
 
   const days = 45;
+
+  console.log(mintInfo);
 
   return (
     <Wrapper
@@ -523,6 +537,22 @@ const MintDetailPage = () => {
             ))}
           </Section>
         )}
+
+        {/* Delete Section */}
+        <Section title="Danger Zone">
+          <RowButton
+            isFirst={true}
+            label={
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="mdi:trash-can-outline" size={20} color={reds[300]} />
+                <Text style={{ marginLeft: 8, color: reds[300] }} bold>
+                  Delete Mint
+                </Text>
+              </View>
+            }
+            onPress={handleDeleteMint}
+          />
+        </Section>
       </ScrollView>
     </Wrapper>
   );
