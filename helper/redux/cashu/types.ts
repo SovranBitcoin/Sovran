@@ -1,5 +1,5 @@
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
-import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
+type MintInfo = any;
 
 export interface TransactionData {
   id?: string;
@@ -11,6 +11,8 @@ export interface TransactionData {
   date: string | Date;
   transactionType: 'send' | 'receive' | string;
   type?: string;
+  memo?: string;
+  batchId?: string;
   isBuy?: string;
   isSell?: boolean;
   paid?: boolean;

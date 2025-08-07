@@ -9,9 +9,25 @@ import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
 import { LightningReceiveConfirmation } from './lightningReceiveConfirmation';
 import { LightningSendConfirmation } from './lightningSendConfirmation';
 
+function VirtualBatchTransaction({ batchId }: { batchId: string }) {
+  return (
+    <Modal showClose title="Batch">
+      <View>
+        <Text>Virtual Transaction</Text>
+        <Text>Batch ID: {batchId}</Text>
+      </View>
+    </Modal>
+  );
+}
+
 function ModalScreen() {
   const { id, transactionType } = useTypedRoute<'modal'>();
   const { transactions } = useCashu();
+
+  if (typeof id === 'string' && id.startsWith('batch:')) {
+    const batchId = id.replace('batch:', '');
+    return <VirtualBatchTransaction batchId={batchId} />;
+  }
 
   const transaction = transactions.find(
     (t) =>

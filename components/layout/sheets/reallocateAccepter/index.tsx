@@ -18,7 +18,7 @@ function MintBalanceSheet(props: any) {
         height: Dimensions.get('screen').height - 32,
       }}
       safeAreaInsets={{ ...useSafeAreaInsets(), bottom: 0, top: 0 }}
-      gestureEnabled={true}
+      gestureEnabled={false}
       {...props}
     />
   );

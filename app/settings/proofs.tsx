@@ -20,6 +20,7 @@ export default function ModalScreen() {
   const [proofStates, setProofStates] = useState<{ [key: string]: ProofState[] }>({});
   const [checkingSpent, setCheckingSpent] = useState(false);
   const [removingSpent, setRemovingSpent] = useState(false);
+  const [removingAll, setRemovingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeMintsData, setActiveMintsData] = useState<
     {
@@ -143,6 +144,20 @@ export default function ModalScreen() {
     setRemovingSpent(false);
   };
 
+  // Function to remove ALL proofs for a specific mint
+  const removeAllProofsForMint = async (mintUrl: string) => {
+    setRemovingAll(true);
+    setError(null);
+
+    const proofsForMint = activeMintsData.find((mintData) => mintData.url === mintUrl)?.proofs;
+
+    if (proofsForMint && proofsForMint.length > 0) {
+      dispatch(removeProofs({ profileId, mintUrl, proofs: proofsForMint }));
+    }
+
+    setRemovingAll(false);
+  };
+
   // Check proofs when component mounts - only once
   useEffect(() => {
     let isMounted = true;
@@ -192,6 +207,7 @@ export default function ModalScreen() {
 
         {checkingSpent && <Text style={{ marginTop: 10 }}>Checking proof status...</Text>}
         {removingSpent && <Text style={{ marginTop: 10 }}>Removing spent proofs...</Text>}
+        {removingAll && <Text style={{ marginTop: 10 }}>Removing all proofs...</Text>}
 
         {activeMintsData.map((mintData) => {
           const spentProofCount = getSpentProofCount(mintData.url);
@@ -263,10 +279,20 @@ export default function ModalScreen() {
                     variant="primary"
                     text={`Remove ${spentProofCount} Spent Proofs`}
                     onPress={() => removeSpentProofsForMint(mintData.url)}
-                    disabled={removingSpent || spentProofCount === 0}
+                    disabled={removingSpent || removingAll || spentProofCount === 0}
                     style={{
                       marginTop: 10,
                       backgroundColor: spentProofCount > 0 ? reds[300] : undefined,
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    text={`Delete All (${mintData.proofs.length}) Proofs`}
+                    onPress={() => removeAllProofsForMint(mintData.url)}
+                    disabled={removingAll || removingSpent || mintData.proofs.length === 0}
+                    style={{
+                      marginTop: 10,
+                      backgroundColor: mintData.proofs.length > 0 ? reds[300] : undefined,
                     }}
                   />
                 </View>

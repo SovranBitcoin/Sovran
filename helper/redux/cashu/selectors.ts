@@ -177,10 +177,11 @@ export const memoizedGetTransactions = ({ id }: { id: number }) =>
     }
   );
 
-export const memoizedGetProofs = (unit: string) => {
+export const memoizedGetProofs = (unit: string, mintUrl?: string) => {
   return createSelector(
     [
-      (state: RootState) => state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint,
+      (state: RootState) =>
+        mintUrl || state.cashu.profiles?.[state.nostr.currentProfile.id]?.selectedMint,
       (state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id].proofs,
       (state: RootState) => state.cashu?.keysets,
     ],

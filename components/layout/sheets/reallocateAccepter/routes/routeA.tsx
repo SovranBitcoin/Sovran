@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Switch, Animated, ScrollView, View as RNView } from 'react-native';
+import { Switch, Animated, View as RNView } from 'react-native';
 
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Text } from 'components/common/Text';
@@ -7,15 +7,26 @@ import { View } from 'components/common/View';
 import { Spinner } from 'components/common/Spinner';
 import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { memoizedGetMintInfo } from 'helper/redux/cashu/selectors';
+import { memoizedGetMintInfo, memoizedGetBalance } from 'helper/redux/cashu/selectors';
 import { useSelector } from 'react-redux';
-import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
+import {
+  RouteScreenProps,
+  useSheetPayload,
+  useSheetRef,
+  ScrollView,
+} from 'react-native-actions-sheet';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import Wrapper from 'components/layout/sheets/wrapper';
 import Svg, { Circle } from 'react-native-svg';
 import { Card } from 'components/common/Card';
-import { receiveLightning } from 'helper/cashuClient';
+import {
+  checkLightningReceiveStatus,
+  getMeltQuote,
+  receiveLightning,
+  sendLightning,
+} from 'helper/cashuClient';
+import { store } from 'helper/redux/store';
 
 // Isolated MintComponent to prevent re-renders during animations
 const MintComponent = React.memo(
@@ -80,25 +91,7 @@ const MintComponent = React.memo(
       [theme]
     );
 
-    const textStyle = useMemo(
-      () => ({
-        fontSize: 16,
-        color: greys(theme)[100],
-        fontFamily: 'OverpassBold',
-      }),
-      [theme]
-    );
-
-    const nameStyle = useMemo(
-      () => ({
-        fontSize: 10,
-        color: greys(theme)[200],
-        fontFamily: 'OverpassSemiBold',
-        textAlign: 'center' as const,
-        lineHeight: 12,
-      }),
-      [theme]
-    );
+    // text styles are applied via Text props per rules
 
     // Memoize the image component to prevent re-creation
     const imageComponent = useMemo(() => {
@@ -107,17 +100,25 @@ const MintComponent = React.memo(
       } else {
         return (
           <View style={fallbackStyle}>
-            <Text style={textStyle}>{mintName.charAt(0).toUpperCase()}</Text>
+            <Text size={16} bold color={greys(theme)[100]}>
+              {mintName.charAt(0).toUpperCase()}
+            </Text>
           </View>
         );
       }
-    }, [iconUrl, imageStyle, fallbackStyle, textStyle, mintName]);
+    }, [iconUrl, imageStyle, fallbackStyle, mintName, theme]);
 
     return (
       <View style={containerStyle}>
         <View style={cardStyle}>
           {imageComponent}
-          <Text style={nameStyle}>{mintName}</Text>
+          <Text
+            size={10}
+            semibold
+            color={greys(theme)[200]}
+            style={{ textAlign: 'center', lineHeight: 12 }}>
+            {mintName}
+          </Text>
         </View>
       </View>
     );
@@ -189,7 +190,7 @@ const ReallocationItem = React.memo(
           }),
         ]).start();
       }
-    }, [hasError]);
+    }, [hasError, errorOpacity, expandAnimation]);
 
     const containerStyle = useMemo(
       () => ({
@@ -201,7 +202,7 @@ const ReallocationItem = React.memo(
         borderWidth: 1,
         borderColor: greys(theme)[600],
       }),
-      [theme, hasError]
+      [theme]
     );
 
     const errorContainerHeight = expandAnimation.interpolate({
@@ -240,29 +241,25 @@ const ReallocationItem = React.memo(
             />
 
             {/* Amount Above */}
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: 'OverpassBold',
-                textAlign: 'center',
-                marginTop: 3,
-                color: progress?.completed
-                  ? greens[300]
-                  : progress?.error
-                    ? reds[300]
-                    : greys(theme)[0],
-              }}>
-              {reallocation.amount} {reallocation.unit.toUpperCase()}
-            </Text>
+            {(() => {
+              const amountTextColor = progress?.completed
+                ? greens[300]
+                : progress?.error
+                  ? reds[300]
+                  : greys(theme)[0];
+              return (
+                <Text
+                  size={12}
+                  bold
+                  color={amountTextColor}
+                  style={{ textAlign: 'center', marginTop: 3 }}>
+                  {reallocation.amount} {reallocation.unit.toUpperCase()}
+                </Text>
+              );
+            })()}
 
             {/* Percentage Below */}
-            <Text
-              bold
-              style={{
-                fontSize: 10,
-                color: greys(theme)[300],
-                textAlign: 'center',
-              }}>
+            <Text bold size={10} color={greys(theme)[300]} style={{ textAlign: 'center' }}>
               +{reallocation.percentage.toFixed(1)}%
             </Text>
           </View>
@@ -378,7 +375,7 @@ const ReallocationArrow = React.memo(
         pulseAnimation.setValue(1);
         prevStepRef.current = undefined;
       }
-    }, [progress?.step, progress?.completed, progress?.error]);
+    }, [progress, animatedOpacity, animatedScale, pulseAnimation]);
 
     // Separate effect for pulse animation to avoid conflicts
     useEffect(() => {
@@ -406,7 +403,7 @@ const ReallocationArrow = React.memo(
       } else {
         pulseAnimation.setValue(1);
       }
-    }, [isActive, progress?.completed, progress?.error]);
+    }, [isActive, progress, pulseAnimation]);
 
     // Progress state
     const size = 36;
@@ -517,13 +514,15 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
   }>({});
 
   // Refs for auto-scrolling to current item
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const itemRefs = useRef<{ [key: number]: RNView | null }>({});
 
   // Define execution steps
   const executionSteps = [
-    { id: 'receive', label: 'Generating lightning address', icon: 'iconamoon:send-fill' },
-    { id: 'process', label: 'Processing receive address', icon: 'ion:checkmark-done' },
+    { id: 'receive', label: 'Generating receive invoice', icon: 'iconamoon:send-fill' },
+    { id: 'quote', label: 'Quoting fees', icon: 'mdi:cash-sync' },
+    { id: 'send', label: 'Sending funds', icon: 'ri:send-plane-2-fill' },
+    { id: 'status', label: 'Confirming payment', icon: 'humbleicons:refresh' },
   ];
 
   // Calculate dynamic dust threshold based on total balance
@@ -573,7 +572,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               }
             }
           );
-        } catch (_error) {
+        } catch {
           // Final fallback with estimated position
           if (scrollViewRef.current && scrollViewRef.current.scrollTo) {
             scrollViewRef.current.scrollTo({
@@ -597,6 +596,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     try {
+      const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       // Process each reallocation sequentially
       for (let i = 0; i < filteredReallocations.length; i++) {
         const reallocation = filteredReallocations[i];
@@ -613,47 +613,186 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         // Scroll to the current item being processed
         scrollToItem(i);
 
-        // Step 1: Generate lightning address using receiveLightning
+        // Step 1: Generate receive invoice on destination mint
         setReallocationProgress((prev) => ({
           ...prev,
           [i]: { step: 1, error: null, completed: false },
         }));
 
-        try {
-          const receiveResult = await receiveLightning({
-            amount: reallocation.amount,
-            unit: reallocation.unit,
-            memo: `Reallocation from ${reallocation.fromMint} to ${reallocation.toMint}`,
-            mintUrl: reallocation.toMint, // Use the destination mint
-          });
-
-          if (receiveResult.isErr()) {
-            throw new Error(receiveResult.error.message);
-          }
-
-          // Successfully generated lightning address
-          await new Promise((resolve) => setTimeout(resolve, 800));
-        } catch (error) {
-          console.error('Error generating lightning address:', error);
-          // For now we'll continue anyway since we don't want to stop the demo
-          await new Promise((resolve) => setTimeout(resolve, 800));
+        const receiveResult = await receiveLightning({
+          amount: reallocation.amount,
+          unit: reallocation.unit,
+          memo: `Reallocation from ${reallocation.fromMint} to ${reallocation.toMint}`,
+          mintUrl: reallocation.toMint, // Use the destination mint
+          batchId,
+        });
+        if (receiveResult.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: {
+              step: 1,
+              error: receiveResult.error?.message || 'Failed to generate invoice',
+              completed: false,
+            },
+          }));
+          // Continue to next reallocation
+          continue;
         }
+        let pr = receiveResult.value.request;
+        // Brief pause to show step progress
+        await new Promise((resolve) => setTimeout(resolve, 400));
 
-        // Step 2: Process the receive address (simulated action)
+        // Step 2: Get melt quote from source mint and verify balance against fees
         setReallocationProgress((prev) => ({
           ...prev,
           [i]: { step: 2, error: null, completed: false },
         }));
 
-        // Simulate processing the generated receive address
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const meltQuoteRes = await getMeltQuote({
+          pr,
+          unit: reallocation.unit,
+          mintUrl: reallocation.fromMint,
+        });
+        if (meltQuoteRes.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: {
+              step: 2,
+              error: meltQuoteRes.error?.message || 'Failed to get quote',
+              completed: false,
+            },
+          }));
+          continue;
+        }
+        let meltQuote = meltQuoteRes.value;
+        const sourceBalance = memoizedGetBalance(
+          reallocation.unit,
+          reallocation.fromMint
+        )(store.getState());
+        let totalDebit = Number(meltQuote.amount) + Number(meltQuote.fee_reserve);
+        if (typeof sourceBalance === 'number' && totalDebit > sourceBalance) {
+          // Adjust: try to reduce invoice amount to fit balance accounting for fee reserve
+          const adjustedAmount = Math.floor(Number(sourceBalance) - Number(meltQuote.fee_reserve));
+          if (adjustedAmount <= 0) {
+            setReallocationProgress((prev) => ({
+              ...prev,
+              [i]: {
+                step: 2,
+                error: 'Insufficient balance to cover network fee',
+                completed: false,
+              },
+            }));
+            continue;
+          }
 
-        // Mark as completed
+          const adjustedReceive = await receiveLightning({
+            amount: adjustedAmount,
+            unit: reallocation.unit,
+            memo: `Reallocation from ${reallocation.fromMint} to ${reallocation.toMint}`,
+            mintUrl: reallocation.toMint,
+            batchId,
+          });
+          if (adjustedReceive.isErr()) {
+            setReallocationProgress((prev) => ({
+              ...prev,
+              [i]: {
+                step: 2,
+                error: adjustedReceive.error?.message || 'Failed to adjust invoice',
+                completed: false,
+              },
+            }));
+            continue;
+          }
+          const pr2 = adjustedReceive.value.request;
+          const meltQuoteRes2 = await getMeltQuote({
+            pr: pr2,
+            unit: reallocation.unit,
+            mintUrl: reallocation.fromMint,
+          });
+          if (meltQuoteRes2.isErr()) {
+            setReallocationProgress((prev) => ({
+              ...prev,
+              [i]: {
+                step: 2,
+                error: meltQuoteRes2.error?.message || 'Failed to get adjusted quote',
+                completed: false,
+              },
+            }));
+            continue;
+          }
+          meltQuote = meltQuoteRes2.value;
+          totalDebit = Number(meltQuote.amount) + Number(meltQuote.fee_reserve);
+          if (totalDebit > sourceBalance) {
+            setReallocationProgress((prev) => ({
+              ...prev,
+              [i]: {
+                step: 2,
+                error: 'Insufficient balance after adjustment',
+                completed: false,
+              },
+            }));
+            continue;
+          }
+          // Use adjusted pr for sending
+          pr = pr2;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+
+        // Step 3: Send from source mint using melt quote
         setReallocationProgress((prev) => ({
           ...prev,
-          [i]: { step: 2, error: null, completed: true },
+          [i]: { step: 3, error: null, completed: false },
         }));
-        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const sendRes = await sendLightning({
+          pr,
+          unit: reallocation.unit,
+          meltQuote,
+          mintUrl: reallocation.fromMint,
+          batchId,
+        });
+        if (sendRes.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: { step: 3, error: sendRes.error?.message || 'Failed to send', completed: false },
+          }));
+          continue;
+        }
+
+        // Step 4: Check status on destination mint until paid (single check here)
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 4, error: null, completed: false },
+        }));
+
+        const statusRes = await checkLightningReceiveStatus({
+          unit: reallocation.unit,
+          mintUrl: reallocation.toMint,
+          amount: reallocation.amount,
+          quote: receiveResult.value.mintQuote.quote,
+          request: receiveResult.value.request,
+        });
+        if (statusRes.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: {
+              step: 4,
+              error: statusRes.error?.message || 'Failed to confirm',
+              completed: false,
+            },
+          }));
+          continue;
+        }
+
+        // Completed
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 4, error: null, completed: true },
+        }));
+        await new Promise((resolve) => setTimeout(resolve, 400));
+
+        // Backoff between mints to avoid throttling
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       // All transactions completed successfully
@@ -699,11 +838,10 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         />
       }>
       <Text
-        size={24}
+        size={20}
+        heavy
+        color={greys(theme)[0]}
         style={{
-          fontSize: 20,
-          fontFamily: 'OverpassHeavy',
-          color: greys(theme)[0],
           textAlign: 'center',
           marginBottom: 16,
         }}>
@@ -726,20 +864,15 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         }}>
         <View style={{ flex: 1 }}>
           <Text
+            size={14}
+            semibold
+            color={greys(theme)[0]}
             style={{
-              fontSize: 14,
-              color: greys(theme)[0],
-              fontFamily: 'OverpassSemiBold',
               marginBottom: 2,
             }}>
             Ignore Dust (recommended)
           </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: greys(theme)[300],
-              fontFamily: 'OverpassRegular',
-            }}>
+          <Text size={12} regular color={greys(theme)[300]}>
             Skip transactions under 2% of total ({Math.round(dustThreshold)}{' '}
             {payload.unit.toUpperCase()})
           </Text>
@@ -770,20 +903,20 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             }}>
             <Icon name="mdi:cancel" size={24} color={greys(theme)[400]} />
             <Text
+              size={14}
+              bold
+              color={greys(theme)[300]}
               style={{
-                fontSize: 14,
-                color: greys(theme)[300],
-                fontFamily: 'OverpassSemiBold',
                 textAlign: 'center',
                 marginTop: 8,
               }}>
               All transactions filtered out as dust
             </Text>
             <Text
+              size={12}
+              regular
+              color={greys(theme)[400]}
               style={{
-                fontSize: 12,
-                color: greys(theme)[400],
-                fontFamily: 'OverpassRegular',
                 textAlign: 'center',
                 marginTop: 4,
               }}>
@@ -841,20 +974,10 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             gap: 8,
           }}>
           <Icon name="fluent:arrow-swap-16-filled" size={16} color={greys(theme)[200]} />
-          <Text
-            style={{
-              fontSize: 14,
-              color: greys(theme)[0],
-              fontFamily: 'OverpassSemiBold',
-            }}>
+          <Text size={14} semibold color={greys(theme)[0]}>
             Total:
           </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              fontFamily: 'OverpassSemiBold',
-              color: theme.shades[200],
-            }}>
+          <Text size={14} bold color={theme.shades[200]}>
             {filteredTotalAmount} {payload.unit.toUpperCase()}
           </Text>
         </View>
@@ -862,10 +985,10 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         {/* Show filtered transactions info */}
         {ignoreDust && payload.reallocations.length !== filteredReallocations.length && (
           <Text
+            size={11}
+            regular
+            color={greys(theme)[300]}
             style={{
-              fontSize: 11,
-              color: greys(theme)[300],
-              fontFamily: 'OverpassRegular',
               textAlign: 'center',
               marginTop: 6,
             }}>

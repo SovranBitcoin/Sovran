@@ -70,6 +70,7 @@ interface BaseTransaction {
   mintUrl: string;
   paid: boolean;
   memo?: string;
+  batchId?: string;
 
   counter?: number;
   nostr?: {
@@ -298,6 +299,7 @@ export async function sendLightning({
   meltQuote,
   email,
   lud16,
+  batchId,
 }: {
   mintUrl?: string;
   pr: string;
@@ -306,6 +308,7 @@ export async function sendLightning({
   meltQuote: MeltQuoteResponse;
   email?: string;
   lud16?: string;
+  batchId?: string;
 }): Promise<Result<LightningSendTransaction, Error>> {
   const state = store.getState();
   const profile = memoizedGetCurrentProfile(state);
@@ -329,7 +332,7 @@ export async function sendLightning({
     forceRefresh = false,
     updateCounter = false
   ): Promise<Result<LightningSendTransaction, Error>> => {
-    const currentProofs = memoizedGetProofs(unit)(state);
+    const currentProofs = memoizedGetProofs(unit, mintUrl)(state);
     const walletRes = await getWallet({
       unit,
       mintUrl,
@@ -350,6 +353,14 @@ export async function sendLightning({
     const balance = currentProofs
       .map((p: { amount: number }) => p.amount)
       .reduce((a: number, b: number) => a + b, 0);
+
+    console.log(
+      'Send Lightning',
+      meltQuote.amount + meltQuote.fee_reserve > balance,
+      meltQuote.amount,
+      meltQuote.fee_reserve,
+      balance
+    );
 
     if (meltQuote.amount + meltQuote.fee_reserve > balance) {
       return err(new AppError('insufficient_funds', 'Insufficient funds'));
@@ -446,10 +457,7 @@ export async function sendLightning({
       paid: true,
       meltQuote,
       lud16,
-      fees: {
-        lightning_fee: meltQuote.fee_reserve,
-        keyset_fee: keyset_fee,
-      },
+      // fees stored via meltQuote + local keyset_fee derivable if needed
       mintUrl,
       email,
       nostr: {
@@ -461,6 +469,7 @@ export async function sendLightning({
         keep: proofsToKeep,
         send: proofsToSend,
       },
+      ...(batchId ? { batchId } : {}),
     };
 
     store.dispatch(
@@ -494,11 +503,13 @@ export async function receiveLightning({
   unit,
   memo,
   mintUrl,
+  batchId,
 }: {
   amount: number;
   unit: string;
   memo?: string;
   mintUrl?: string;
+  batchId?: string;
 }): Promise<Result<LightningReceiveTransaction, Error>> {
   const selectedMint = memoizedGetSelectedMint(store.getState());
   const profile = memoizedGetCurrentProfile(store.getState());
@@ -542,6 +553,7 @@ export async function receiveLightning({
     paymentRequest: paymentRequest.toEncodedRequest(),
     unifiedRequest: unifiedRequest.toEncodedRequest(),
     memo,
+    ...(batchId ? { batchId } : {}),
   };
 
   store.dispatch(
@@ -552,6 +564,100 @@ export async function receiveLightning({
   );
 
   return ok(transaction);
+}
+
+export async function checkLightningReceiveStatus({
+  unit,
+  mintUrl,
+  amount,
+  quote,
+  request,
+  forceRefresh = false,
+}: {
+  unit: string;
+  mintUrl: string;
+  amount: number;
+  quote: string;
+  request: string;
+  forceRefresh?: boolean;
+}): Promise<Result<string, Error>> {
+  const walletRes = await getWallet({
+    unit,
+    mintUrl,
+    profile: null,
+    ...(forceRefresh && { forceRefresh: true }),
+  });
+  if (walletRes.isErr()) {
+    if (!forceRefresh && walletRes.error.message === 'keyset id inactive.') {
+      return checkLightningReceiveStatus({
+        unit,
+        mintUrl,
+        amount,
+        quote,
+        request,
+        forceRefresh: true,
+      });
+    }
+    return err(walletRes.error);
+  }
+  const wallet = walletRes.value;
+
+  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
+  const keysetId = activeKeyset.id;
+  wallet.keysetId = keysetId;
+
+  const statusRes = await toResult(wallet.checkMintQuote(quote));
+  if (statusRes.isErr()) return err(statusRes.error);
+  const status = statusRes.value;
+
+  if (status.state === 'PAID') {
+    const profileId = store.getState().nostr?.currentProfile?.id;
+
+    const counter = memoizedGetCounterV2({
+      profileId,
+      mintUrl,
+      keysetId: wallet.keysetId,
+    })(store.getState());
+
+    const proofsResult = await toResult(
+      wallet.mintProofs(amount, quote, {
+        counter,
+        keysetId: wallet.keysetId,
+      })
+    );
+    if (proofsResult.isErr()) return err(proofsResult.error);
+    const proofs = proofsResult.value;
+
+    store.dispatch(
+      increaseCounterV2({
+        profileId,
+        mintUrl,
+        keysetId: wallet.keysetId,
+        amount: proofs.length,
+      })
+    );
+
+    await store.dispatch(appendProofsV2({ profileId, mintUrl, proofs }));
+
+    // Mark transaction as paid
+    await store.dispatch(
+      updateTransaction({
+        profileId,
+        matcher: (t: TransactionData) => t.request === request,
+        updateFn: (t: TransactionData) => ({
+          ...t,
+          paid: true,
+          completedAt: Date.now(),
+        }),
+      })
+    );
+
+    // Publish wallet event for restoration
+    const existingTxs = memoizedGetTransactions({ id: profileId })(store.getState());
+    await publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), mintUrl])]);
+  }
+
+  return ok(status.state);
 }
 
 export async function sendEcash({
@@ -578,8 +684,8 @@ export async function sendEcash({
     forceRefresh = false,
     updateCounter = false
   ): Promise<Result<EcashSendTransaction, Error>> => {
-    const currentProofs = memoizedGetProofs(unit)(state);
-    const balance = memoizedGetBalance(unit)(state);
+    const currentProofs = memoizedGetProofs(unit, selectedMint)(state);
+    const balance = memoizedGetBalance(unit, selectedMint)(state);
 
     if (amount > balance) {
       return err(new AppError('insufficient_funds', 'Insufficient funds'));
@@ -863,6 +969,11 @@ export async function getPaymentRequest({
   unit,
   description,
   singleUse = true,
+}: {
+  amount: number;
+  unit: string;
+  description: string;
+  singleUse?: boolean;
 }): Promise<PaymentRequest> {
   const state = store.getState();
   const mint = memoizedGetSelectedMint(state);

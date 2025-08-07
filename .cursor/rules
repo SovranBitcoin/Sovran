@@ -74,8 +74,9 @@ const spentRes = await toResult(wallet.checkProofsStates(proofs));
   overpass
   bold
   size={16}
+  color={greys(theme)[400]}
   style={{
-    color: greys(theme)[400],
+    // other styles
   }}
 >
   Found {searchResults.length}{' '}

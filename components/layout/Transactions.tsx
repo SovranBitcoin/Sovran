@@ -52,10 +52,39 @@ export const Transactions = React.memo(
     const ITEM_HEIGHT = 69;
 
     const flattenedData = React.useMemo(() => {
-      return allSections.flatMap((section) => [
-        { type: 'header' as const, title: section.title },
-        ...section.data.map((tx) => ({ type: 'item' as const, tx })),
-      ]);
+      const isReallocationTx = (tx: TransactionData) => {
+        console.log('tx', tx);
+        const text =
+          `${(tx as any)?.memo || ''} ${(tx as any)?.message || ''} ${(tx as any)?.note || ''}`.toLowerCase();
+        return text.includes('reallocation') || Boolean(tx.batchId);
+      };
+
+      // Build virtual batch transactions per section
+      const enhanceSection = (section: Section) => {
+        const visibleTx = section.data.filter((tx) => !isReallocationTx(tx));
+        const batchGroups = section.data
+          .filter((tx) => isReallocationTx(tx) && tx.batchId)
+          .reduce((acc: Record<string, TransactionData[]>, tx) => {
+            const key = tx.batchId as string;
+            acc[key] = acc[key] || [];
+            acc[key].push(tx);
+            return acc;
+          }, {});
+
+        const virtualItems = Object.keys(batchGroups).map((batchId) => ({
+          type: 'virtual' as const,
+          txs: batchGroups[batchId],
+          batchId,
+        }));
+
+        return [
+          { type: 'header' as const, title: section.title },
+          ...virtualItems,
+          ...visibleTx.map((tx) => ({ type: 'item' as const, tx })),
+        ];
+      };
+
+      return allSections.flatMap(enhanceSection);
     }, [allSections]);
 
     if (showMore) {
@@ -92,12 +121,53 @@ export const Transactions = React.memo(
                   {section.title}
                 </Text>
                 <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
-                  {section.data.map((tx) => (
-                    <Transaction
-                      key={tx.request || tx.token || tx.txid || tx.id || Math.random().toString()}
-                      tx={tx}
-                    />
-                  ))}
+                  {(() => {
+                    const textOf = (tx: TransactionData) =>
+                      `${(tx as any)?.memo ?? ''} ${(tx as any)?.message ?? ''} ${(tx as any)?.note ?? ''}`.toLowerCase();
+                    const isReallocationTx = (tx: TransactionData) =>
+                      textOf(tx).includes('reallocation') || Boolean(tx.batchId);
+
+                    const visibleTx = section.data.filter((tx) => !isReallocationTx(tx));
+                    const batchIds = Array.from(
+                      new Set(
+                        section.data
+                          .filter((tx) => isReallocationTx(tx) && tx.batchId)
+                          .map((tx) => tx.batchId as string)
+                      )
+                    );
+
+                    return (
+                      <>
+                        {batchIds.map((batchId) => (
+                          <TouchableOpacity
+                            key={`batch-${batchId}`}
+                            onPress={() =>
+                              navigation.navigate('transaction', {
+                                id: `batch:${batchId}`,
+                                transactionType: 'batch',
+                              })
+                            }>
+                            <View
+                              blur
+                              style={{ backgroundColor: theme.greys[800] }}
+                              className="rounded-lg p-4">
+                              <Text size={14} heavy color={theme.greys[100]}>
+                                Virtual Transaction
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                        {visibleTx.map((tx) => (
+                          <Transaction
+                            key={
+                              tx.request || tx.token || tx.txid || tx.id || Math.random().toString()
+                            }
+                            tx={tx}
+                          />
+                        ))}
+                      </>
+                    );
+                  })()}
                   {morePendingCount > 0 && label === 'Pending transactions' && (
                     <TouchableOpacity
                       onPress={() =>
@@ -173,6 +243,23 @@ export const Transactions = React.memo(
                 className="mb-1 mt-2">
                 {item.title}
               </Text>
+            );
+          }
+          if (item.type === 'virtual') {
+            return (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('transaction', {
+                    id: `batch:${item.batchId}`,
+                    transactionType: 'batch',
+                  })
+                }>
+                <View blur style={{ backgroundColor: theme.greys[800] }} className="rounded-lg p-4">
+                  <Text size={14} heavy color={theme.greys[100]}>
+                    Virtual Transaction
+                  </Text>
+                </View>
+              </TouchableOpacity>
             );
           }
 
