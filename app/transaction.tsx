@@ -2,19 +2,108 @@ import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Modal from 'components/layout/Modal';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useTypedRoute } from 'helper/navigation';
+import { useTypedRoute, useTypedNavigation } from 'helper/navigation';
 import { useCashu } from 'helper/redux/cashu';
 import { EcashSendConfirmation } from './ecashSendConfirmation';
 import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
 import { LightningReceiveConfirmation } from './lightningReceiveConfirmation';
 import { LightningSendConfirmation } from './lightningSendConfirmation';
+import { TransferRow } from 'components/layout/TransferRow';
+import { ScrollView } from 'react-native';
+import { Section } from 'components/common/Section';
+// useTypedNavigation is already imported; removing duplicate
 
 function VirtualBatchTransaction({ batchId }: { batchId: string }) {
+  const { transactions } = useCashu();
+  const navigation = useTypedNavigation();
+
+  const batchTxs = (transactions || []).filter(
+    (t) => t.batchId === batchId && t.type === 'lightning'
+  );
+
+  const receivesByRequest = new Map<string, any>();
+  const sendsByRequest = new Map<string, any>();
+
+  for (const tx of batchTxs) {
+    if (tx.transactionType === 'receive' && tx.request) {
+      receivesByRequest.set(tx.request, tx);
+    } else if (tx.transactionType === 'send' && tx.request) {
+      sendsByRequest.set(tx.request, tx);
+    }
+  }
+
+  const pairs = Array.from(receivesByRequest.entries())
+    .map(([request, receiveTx]) => {
+      const sendTx = sendsByRequest.get(request);
+      if (!sendTx) return null;
+      const status: 'success' | 'pending' | 'error' | undefined = receiveTx.paid
+        ? 'success'
+        : receiveTx.isCancel
+          ? 'error'
+          : 'pending';
+
+      return {
+        fromMint: sendTx.mintUrl as string,
+        toMint: receiveTx.mintUrl as string,
+        amount: receiveTx.amount,
+        unit: receiveTx.unit,
+        status,
+        request,
+      };
+    })
+    .filter(Boolean) as {
+    fromMint: string;
+    toMint: string;
+    amount: number;
+    unit: string;
+    status?: 'success' | 'pending' | 'error';
+    request: string;
+  }[];
+
   return (
-    <Modal showClose title="Batch">
-      <View>
-        <Text>Virtual Transaction</Text>
-        <Text>Batch ID: {batchId}</Text>
+    <Modal showClose title="Reallocation">
+      <View style={{ marginBottom: 12 }}>
+        <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
+          {pairs.length === 0 ? (
+            <Text>No paired transactions found for this batch.</Text>
+          ) : (
+            pairs.map((p) => (
+              <View style={{ marginHorizontal: 16 }} key={p.request}>
+                <TransferRow
+                  fromMint={p.fromMint}
+                  toMint={p.toMint}
+                  amount={p.amount}
+                  unit={p.unit}
+                  status={p.status}
+                  leftCta={{
+                    label: 'View Invoice',
+                    onPress: () =>
+                      navigation.navigate('transaction', {
+                        id: p.request,
+                        transactionType: 'send',
+                      }),
+                  }}
+                  rightCta={{
+                    label: 'View Invoice',
+                    onPress: () =>
+                      navigation.navigate('transaction', {
+                        id: p.request,
+                        transactionType: 'receive',
+                      }),
+                  }}
+                />
+              </View>
+            ))
+          )}
+          <Section
+            style={{ marginTop: 12 }}
+            items={[
+              { title: 'Type', value: 'Reallocation' },
+              { title: 'Transfers', value: String(pairs.length) },
+              { title: 'Batch', value: batchId },
+            ]}
+          />
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -33,7 +122,7 @@ function ModalScreen() {
     (t) =>
       t.txid === id ||
       String(t.id) === String(id) ||
-      (t.request && t.request === id) ||
+      (t.request && t.request === id && t.transactionType === transactionType) ||
       (t.token && t.token === id && t.transactionType === transactionType)
   );
 

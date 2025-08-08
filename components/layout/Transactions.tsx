@@ -139,23 +139,10 @@ export const Transactions = React.memo(
                     return (
                       <>
                         {batchIds.map((batchId) => (
-                          <TouchableOpacity
+                          <Transaction
                             key={`batch-${batchId}`}
-                            onPress={() =>
-                              navigation.navigate('transaction', {
-                                id: `batch:${batchId}`,
-                                transactionType: 'batch',
-                              })
-                            }>
-                            <View
-                              blur
-                              style={{ backgroundColor: theme.greys[800] }}
-                              className="rounded-lg p-4">
-                              <Text size={14} heavy color={theme.greys[100]}>
-                                Virtual Transaction
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
+                            txs={section.data.filter((t) => t.batchId === batchId)}
+                          />
                         ))}
                         {visibleTx.map((tx) => (
                           <Transaction
@@ -246,21 +233,7 @@ export const Transactions = React.memo(
             );
           }
           if (item.type === 'virtual') {
-            return (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('transaction', {
-                    id: `batch:${item.batchId}`,
-                    transactionType: 'batch',
-                  })
-                }>
-                <View blur style={{ backgroundColor: theme.greys[800] }} className="rounded-lg p-4">
-                  <Text size={14} heavy color={theme.greys[100]}>
-                    Virtual Transaction
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
+            return <Transaction txs={item.txs} />;
           }
 
           const prev = flattenedData[index - 1];

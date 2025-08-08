@@ -837,165 +837,170 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
           ]}
         />
       }>
-      <Text
-        size={20}
-        heavy
-        color={greys(theme)[0]}
-        style={{
-          textAlign: 'center',
-          marginBottom: 16,
-        }}>
-        {isExecuting ? 'Processing Reallocation' : 'Confirm Reallocation'}
-      </Text>
-
       {/* Ignore Dust Toggle */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          backgroundColor: greys(theme)[700],
-          borderRadius: 14,
-          marginBottom: 16,
-          borderWidth: 1,
-          borderColor: greys(theme)[600],
+          flex: 1,
         }}>
-        <View style={{ flex: 1 }}>
-          <Text
-            size={14}
-            semibold
-            color={greys(theme)[0]}
-            style={{
-              marginBottom: 2,
-            }}>
-            Ignore Dust (recommended)
-          </Text>
-          <Text size={12} regular color={greys(theme)[300]}>
-            Skip transactions under 2% of total ({Math.round(dustThreshold)}{' '}
-            {payload.unit.toUpperCase()})
-          </Text>
-        </View>
-        <Switch
-          value={ignoreDust}
-          onValueChange={setIgnoreDust}
-          trackColor={{
-            false: greys(theme)[600],
-            true: theme.shades[200] + '40',
-          }}
-          thumbColor={ignoreDust ? theme.shades[200] : greys(theme)[400]}
-        />
-      </View>
-
-      {/* Reallocation Details */}
-      <View style={{ marginBottom: 12 }}>
-        {filteredReallocations.length === 0 ? (
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 24,
-              backgroundColor: greys(theme)[700],
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: greys(theme)[600],
-              alignItems: 'center',
-            }}>
-            <Icon name="mdi:cancel" size={24} color={greys(theme)[400]} />
-            <Text
-              size={14}
-              bold
-              color={greys(theme)[300]}
-              style={{
-                textAlign: 'center',
-                marginTop: 8,
-              }}>
-              All transactions filtered out as dust
-            </Text>
-            <Text
-              size={12}
-              regular
-              color={greys(theme)[400]}
-              style={{
-                textAlign: 'center',
-                marginTop: 4,
-              }}>
-              No reallocations needed under current settings
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            ref={scrollViewRef}
-            style={{ maxHeight: 400 }}
-            showsVerticalScrollIndicator={false}>
-            {filteredReallocations.map((reallocation, index) => {
-              const hasError = !!reallocationProgress[index]?.error;
-
-              return (
-                <View
-                  key={index}
-                  ref={(ref) => {
-                    itemRefs.current[index] = ref;
-                  }}
-                  collapsable={false}>
-                  <ReallocationItem
-                    reallocation={reallocation}
-                    index={index}
-                    progress={reallocationProgress[index]}
-                    theme={theme}
-                    hasError={hasError}
-                    reallocationProgress={reallocationProgress}
-                    isExecuting={isExecuting}
-                    executionSteps={executionSteps}
-                  />
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Total Summary */}
-      <View
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          backgroundColor: greys(theme)[600],
-          borderRadius: 14,
-          marginBottom: 16,
-          borderWidth: 1,
-          borderColor: greys(theme)[500],
-          alignItems: 'center',
-        }}>
+        <Text
+          size={20}
+          heavy
+          color={greys(theme)[0]}
+          style={{
+            textAlign: 'center',
+            marginBottom: 16,
+          }}>
+          {isExecuting ? 'Processing Reallocation' : 'Confirm Reallocation'}
+        </Text>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 8,
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: greys(theme)[700],
+            borderRadius: 14,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: greys(theme)[600],
           }}>
-          <Icon name="fluent:arrow-swap-16-filled" size={16} color={greys(theme)[200]} />
-          <Text size={14} semibold color={greys(theme)[0]}>
-            Total:
-          </Text>
-          <Text size={14} bold color={theme.shades[200]}>
-            {filteredTotalAmount} {payload.unit.toUpperCase()}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              size={14}
+              semibold
+              color={greys(theme)[0]}
+              style={{
+                marginBottom: 2,
+              }}>
+              Ignore Dust (recommended)
+            </Text>
+            <Text size={12} regular color={greys(theme)[300]}>
+              Skip transactions under 2% of total ({Math.round(dustThreshold)}{' '}
+              {payload.unit.toUpperCase()})
+            </Text>
+          </View>
+          <Switch
+            value={ignoreDust}
+            onValueChange={setIgnoreDust}
+            trackColor={{
+              false: greys(theme)[600],
+              true: theme.shades[200] + '40',
+            }}
+            thumbColor={ignoreDust ? theme.shades[200] : greys(theme)[400]}
+          />
         </View>
 
-        {/* Show filtered transactions info */}
-        {ignoreDust && payload.reallocations.length !== filteredReallocations.length && (
-          <Text
-            size={11}
-            regular
-            color={greys(theme)[300]}
+        {/* Reallocation Details */}
+        <View style={{ marginBottom: 12 }}>
+          {filteredReallocations.length === 0 ? (
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 24,
+                backgroundColor: greys(theme)[700],
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: greys(theme)[600],
+                alignItems: 'center',
+              }}>
+              <Icon name="mdi:cancel" size={24} color={greys(theme)[400]} />
+              <Text
+                size={14}
+                bold
+                color={greys(theme)[300]}
+                style={{
+                  textAlign: 'center',
+                  marginTop: 8,
+                }}>
+                All transactions filtered out as dust
+              </Text>
+              <Text
+                size={12}
+                regular
+                color={greys(theme)[400]}
+                style={{
+                  textAlign: 'center',
+                  marginTop: 4,
+                }}>
+                No reallocations needed under current settings
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              ref={scrollViewRef}
+              style={{ maxHeight: 400 }}
+              showsVerticalScrollIndicator={false}>
+              {filteredReallocations.map((reallocation, index) => {
+                const hasError = !!reallocationProgress[index]?.error;
+
+                return (
+                  <View
+                    key={index}
+                    ref={(ref) => {
+                      itemRefs.current[index] = ref;
+                    }}
+                    collapsable={false}>
+                    <ReallocationItem
+                      reallocation={reallocation}
+                      index={index}
+                      progress={reallocationProgress[index]}
+                      theme={theme}
+                      hasError={hasError}
+                      reallocationProgress={reallocationProgress}
+                      isExecuting={isExecuting}
+                      executionSteps={executionSteps}
+                    />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Total Summary */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: greys(theme)[600],
+            borderRadius: 14,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: greys(theme)[500],
+            alignItems: 'center',
+          }}>
+          <View
             style={{
-              textAlign: 'center',
-              marginTop: 6,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
             }}>
-            {payload.reallocations.length - filteredReallocations.length} dust transaction
-            {payload.reallocations.length - filteredReallocations.length !== 1 ? 's' : ''} filtered
-          </Text>
-        )}
+            <Icon name="fluent:arrow-swap-16-filled" size={16} color={greys(theme)[200]} />
+            <Text size={14} semibold color={greys(theme)[0]}>
+              Total:
+            </Text>
+            <Text size={14} bold color={theme.shades[200]}>
+              {filteredTotalAmount} {payload.unit.toUpperCase()}
+            </Text>
+          </View>
+
+          {/* Show filtered transactions info */}
+          {ignoreDust && payload.reallocations.length !== filteredReallocations.length && (
+            <Text
+              size={11}
+              regular
+              color={greys(theme)[300]}
+              style={{
+                textAlign: 'center',
+                marginTop: 6,
+              }}>
+              {payload.reallocations.length - filteredReallocations.length} dust transaction
+              {payload.reallocations.length - filteredReallocations.length !== 1 ? 's' : ''}{' '}
+              filtered
+            </Text>
+          )}
+        </View>
       </View>
     </Wrapper>
   );

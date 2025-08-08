@@ -10,6 +10,7 @@ import { default as registerMintDelete } from 'components/layout/sheets/mint-del
 import { default as registerTransactionMessage } from 'components/layout/sheets/transaction-message';
 import { default as registerEmojiPicker } from 'components/layout/sheets/emoji-picker';
 import { default as registerMintBalance } from 'components/layout/sheets/mint-balance';
+import { default as registerMintReallocation } from 'components/layout/sheets/mint-reallocation';
 import { default as registerEmail } from 'components/layout/sheets/email';
 import { default as registerVideo } from 'components/layout/sheets/video';
 
@@ -26,6 +27,7 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerTransactionMessage({ context });
   registerEmojiPicker({ context });
   registerMintBalance({ context });
+  registerMintReallocation({ context });
   registerEmail({ context });
   registerVideo({ context });
 }

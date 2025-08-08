@@ -32,15 +32,17 @@ export default function TransactionIcon({ transaction }: any): React.ReactNode {
         }>
         <Icon
           name={
-            transaction.isP2PK
-              ? 'solar:key-bold'
-              : transaction.fromNIP05
-                ? 'mdi:at'
-                : transaction.isCancel && transaction.isSend
-                  ? 'mdi:cancel'
-                  : transaction.isReceive
-                    ? 'fluent:arrow-download-16-filled'
-                    : 'fluent:arrow-upload-16-filled'
+            transaction?.batchId || transaction?.isVirtual
+              ? 'majesticons:percent'
+              : transaction.isP2PK
+                ? 'solar:key-bold'
+                : transaction.fromNIP05
+                  ? 'mdi:at'
+                  : transaction.isCancel && transaction.isSend
+                    ? 'mdi:cancel'
+                    : transaction.isReceive
+                      ? 'fluent:arrow-download-16-filled'
+                      : 'fluent:arrow-upload-16-filled'
           }
           color={greys(theme)[50]}
           size={iconSize}

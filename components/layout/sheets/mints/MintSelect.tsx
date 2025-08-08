@@ -16,7 +16,7 @@ import {
 import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { SheetManager } from 'react-native-actions-sheet';
+// duplicate import removed
 import { Text } from 'components/common/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
@@ -35,6 +35,7 @@ import Haptics from 'components/common/Haptics';
 import RippleButton from 'components/common/RippleButton';
 import { darken } from 'polished';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { SheetManager } from 'react-native-actions-sheet';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -52,6 +53,9 @@ interface SelectedMintDisplayProps {
   unit?: string;
   onUnitUpdate?: (unit: string) => void;
   loading?: boolean;
+  startInEditing?: boolean;
+  onCancel?: () => void;
+  onSaved?: () => void;
 }
 
 type SupportedCurrency = 'SAT' | 'USD' | 'EUR' | 'GBP';
@@ -554,7 +558,13 @@ MemoizedMintItem.displayName = 'MintItem';
 // Export the memoized component as MintItem for clean usage
 const MintItemComponent = MemoizedMintItem;
 
-function MintSelectComponent({ onMintSelected, unit }: SelectedMintDisplayProps) {
+function MintSelectComponent({
+  onMintSelected,
+  unit,
+  startInEditing,
+  onCancel,
+  onSaved,
+}: SelectedMintDisplayProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { getCurrencyAllocation, updateCurrencyAllocation } = useAllocation();
@@ -566,7 +576,13 @@ function MintSelectComponent({ onMintSelected, unit }: SelectedMintDisplayProps)
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>(
     (unit?.toUpperCase() || 'SAT') as SupportedCurrency
   );
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(!!startInEditing);
+
+  React.useEffect(() => {
+    if (startInEditing) {
+      setIsEditing(true);
+    }
+  }, [startInEditing]);
 
   // Local state for temporary editing (before save)
   const [localMintRatios, setLocalMintRatios] = useState<Record<string, number>>({});
@@ -1124,6 +1140,10 @@ function MintSelectComponent({ onMintSelected, unit }: SelectedMintDisplayProps)
         });
         // Haptic feedback for successful save
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        // If used inside dedicated sheet, close it after successful save
+        if (onSaved) {
+          onSaved();
+        }
       }
       // If not confirmed, do nothing - stay in editing mode
     } catch (error) {
@@ -1153,9 +1173,15 @@ function MintSelectComponent({ onMintSelected, unit }: SelectedMintDisplayProps)
       isActive: false,
       activeMintId: null,
     });
+    // If embedded inside dedicated reallocation sheet, close it
+    if (onCancel) {
+      onCancel();
+    }
   };
 
-  const handleStartEdit = () => {
+  // Left for reference; editing is now launched in a dedicated sheet
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleStartEdit = () => {
     // Clear any gesture state when entering edit mode
     updateGestureState({
       isActive: false,
@@ -1229,7 +1255,11 @@ function MintSelectComponent({ onMintSelected, unit }: SelectedMintDisplayProps)
                     variant: 'primary' as const,
                     icon: 'material-symbols:pie-chart',
                     onPress: async () => {
-                      handleStartEdit();
+                      await SheetManager.show('mint-reallocation', {
+                        payload: {
+                          currency: selectedCurrency,
+                        },
+                      });
                     },
                     loading: mintState.loadingId !== null,
                     disabled: isEditing,
