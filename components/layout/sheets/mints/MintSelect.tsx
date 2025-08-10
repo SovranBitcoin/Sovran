@@ -7,6 +7,9 @@ import Animated, {
   withSpring,
   useAnimatedStyle,
   interpolate,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
 } from 'react-native-reanimated';
 
 import {
@@ -16,7 +19,6 @@ import {
 import Icon, { CheckIcon, CurrencyIcon, FlagIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-// duplicate import removed
 import { Text } from 'components/common/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import { formatCurrency } from 'helper/currency';
@@ -28,7 +30,6 @@ import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import _ from 'lodash';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { store } from 'helper/redux/store';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useAllocation } from 'helper/redux/cashu/hooks';
 import Haptics from 'components/common/Haptics';
@@ -38,7 +39,6 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { SheetManager } from 'react-native-actions-sheet';
 
 interface SelectedMintDisplayProps {
-  onPress?: () => void;
   onMintSelected?: (
     mint: {
       id: string;
@@ -48,11 +48,7 @@ interface SelectedMintDisplayProps {
     },
     balance: { amount: number; unit: string } | undefined
   ) => Promise<void>;
-  onMintQuoteUpdate?: (meltQuote: string) => void;
-  pr?: string;
   unit?: string;
-  onUnitUpdate?: (unit: string) => void;
-  loading?: boolean;
   startInEditing?: boolean;
   onCancel?: () => void;
   onSaved?: () => void;
@@ -61,7 +57,7 @@ interface SelectedMintDisplayProps {
 type SupportedCurrency = 'SAT' | 'USD' | 'EUR' | 'GBP';
 
 // Integer ratio system for precise percentage calculations
-const RATIO_PRECISION = 10000; // Gives 0.01% precision
+export const RATIO_PRECISION = 10000; // Gives 0.01% precision
 
 // Helper functions for ratio conversion
 const ratioToPercentage = (ratio: number): number => {
@@ -85,21 +81,23 @@ const initializeRatios = (mintIds: string[]): Record<string, number> => {
   return ratios;
 };
 
-// Helper function for testing - validates that ratios always sum to RATIO_PRECISION
-const validateRatios = (ratios: Record<string, number>, label: string = '') => {
-  const total = Object.values(ratios).reduce((sum, ratio) => sum + ratio, 0);
-  console.log(`${label} Ratio validation:`, {
-    total,
-    expected: RATIO_PRECISION,
-    isValid: total === RATIO_PRECISION,
-    ratios: Object.entries(ratios).map(([id, ratio]) => ({
-      id: id.split('/').pop(), // Show just the mint name
-      ratio,
-      percentage: ratioToPercentage(ratio).toFixed(2) + '%',
-    })),
-  });
-  return total === RATIO_PRECISION;
-};
+// Dev-only helper: validates that ratios sum to RATIO_PRECISION
+const validateRatios = __DEV__
+  ? (ratios: Record<string, number>, label: string = '') => {
+      const total = Object.values(ratios).reduce((sum, ratio) => sum + ratio, 0);
+      console.log(`${label} Ratio validation:`, {
+        total,
+        expected: RATIO_PRECISION,
+        isValid: total === RATIO_PRECISION,
+        ratios: Object.entries(ratios).map(([id, ratio]) => ({
+          id: id.split('/').pop(),
+          ratio,
+          percentage: ratioToPercentage(ratio).toFixed(2) + '%',
+        })),
+      });
+      return total === RATIO_PRECISION;
+    }
+  : () => true;
 
 // Helper function to format percentage to 2 significant figures - optimized
 const formatPercentage = (value: number): number => {
@@ -110,13 +108,6 @@ const formatPercentage = (value: number): number => {
 };
 
 interface MintState {
-  selected: {
-    id: string;
-    name: string;
-    balance: number;
-    iconUrl: string | null;
-    unit: string;
-  } | null;
   loadingId: string | null;
 }
 
@@ -147,6 +138,7 @@ interface MintItemProps {
   // Button handlers
   onIncrement?: () => void;
   onDecrement?: () => void;
+  onSetPercentage?: (mintId: string, newPercentage: number) => void;
   // Preview props
   showPreview?: boolean;
   previewPercentage?: number;
@@ -170,6 +162,7 @@ const MintItem = React.memo<MintItemProps>(
     onGestureEnd,
     onIncrement,
     onDecrement,
+    onSetPercentage,
     showPreview = false,
     previewPercentage = 0,
   }) => {
@@ -177,8 +170,8 @@ const MintItem = React.memo<MintItemProps>(
 
     // Unified Reanimated approach - all animations use shared values
     const animatedPercentage = useSharedValue(percentage);
-    const animatedDisplayText = useSharedValue(percentage);
     const animatedPreviewPercentage = useSharedValue(previewPercentage);
+    const animatedStartPercentage = useSharedValue(percentage);
     const lastHapticValue = useRef(0);
     const gestureStartValue = useRef(0);
 
@@ -187,7 +180,6 @@ const MintItem = React.memo<MintItemProps>(
       if (isAnyGestureActive) {
         // ✅ SMOOTH - Direct assignment during gestures for immediate response
         animatedPercentage.value = percentage;
-        animatedDisplayText.value = percentage;
       } else {
         // ✅ SMOOTH - Spring animation only for final values
         animatedPercentage.value = withSpring(percentage, {
@@ -195,9 +187,15 @@ const MintItem = React.memo<MintItemProps>(
           stiffness: 500, // Higher stiffness for snappier animation
           damping: 25, // Slightly higher damping to reduce overshoot
         });
-        animatedDisplayText.value = percentage;
+        // Keep the previous bar in sync with the final value when not dragging
+        animatedStartPercentage.value = withSpring(percentage, {
+          mass: 0.15,
+          stiffness: 500,
+          damping: 25,
+        });
       }
-    }, [percentage, isAnyGestureActive, animatedPercentage, animatedDisplayText]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [percentage, isAnyGestureActive]); // Shared values intentionally excluded
 
     // Update preview percentage animated value
     React.useEffect(() => {
@@ -205,7 +203,19 @@ const MintItem = React.memo<MintItemProps>(
         // Direct assignment for immediate response during preview
         animatedPreviewPercentage.value = previewPercentage;
       }
-    }, [previewPercentage, showPreview, animatedPreviewPercentage]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [previewPercentage, showPreview]); // Shared value intentionally excluded
+
+    // Cleanup effect to prevent memory leaks
+    React.useEffect(() => {
+      return () => {
+        // Cancel any ongoing animations
+        animatedPercentage.value = 0;
+        animatedPreviewPercentage.value = 0;
+        animatedStartPercentage.value = 0;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Shared values intentionally excluded - cleanup only
 
     // Animated styles for progress bar - optimized
     const progressBarStyle = useAnimatedStyle(() => {
@@ -222,7 +232,15 @@ const MintItem = React.memo<MintItemProps>(
       };
     }, [showPreview]);
 
-    // Animated text style - unified approach
+    // Animated styles for previous (start-of-gesture) progress bar
+    const previousProgressBarStyle = useAnimatedStyle(() => {
+      const width = interpolate(animatedStartPercentage.value, [0, 100], [2, 100], 'clamp');
+      return {
+        width: `${width}%`,
+      };
+    }, []);
+
+    // Animated text style - opacity only (value formatting handled by CPU to avoid JS churn)
     const textStyle = useAnimatedStyle(
       () => ({
         opacity: withSpring(isAnyGestureActive ? 0.8 : 1, { duration: 150 }),
@@ -259,6 +277,8 @@ const MintItem = React.memo<MintItemProps>(
 
       if (state === State.BEGAN) {
         gestureStartValue.current = percentage;
+        // Capture the starting percentage to show previous final position while dragging
+        animatedStartPercentage.value = percentage;
         lastHapticValue.current = Math.floor(percentage);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onGestureStart?.(mint.id);
@@ -271,6 +291,13 @@ const MintItem = React.memo<MintItemProps>(
           0,
           Math.min(100, gestureStartValue.current + percentageChange)
         );
+
+        // Animate previous bar to the new final percentage after release
+        animatedStartPercentage.value = withSpring(finalPercentage, {
+          mass: 0.15,
+          stiffness: 500,
+          damping: 25,
+        });
 
         onGestureEnd?.(mint.id, finalPercentage);
       }
@@ -405,6 +432,15 @@ const MintItem = React.memo<MintItemProps>(
                 </View>
               </View>
               <View style={styles.percentageControls}>
+                {/* Set to 0% */}
+                <RippleButton
+                  style={styles.toZeroButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onSetPercentage?.(mint.id, 0);
+                  }}>
+                  <Icon name="mdi:chevron-double-left" size={24} color={greys(theme)[0]} />
+                </RippleButton>
                 <RippleButton
                   style={styles.decrementButton}
                   disabled={percentage <= 0}
@@ -421,6 +457,14 @@ const MintItem = React.memo<MintItemProps>(
                 <View style={styles.percentageContainer}>
                   <View style={styles.percentageOverlayContainer}>
                     {/* Current progress bar behind text */}
+                    {/* Previous final position bar (only for the actively edited mint) */}
+                    {showPreview && (
+                      <Animated.View
+                        style={[styles.previousProgressBar, previousProgressBarStyle]}
+                      />
+                    )}
+
+                    {/* Current progress bar behind text */}
                     <Animated.View style={[styles.progressBar, progressBarStyle]} />
 
                     {/* Preview progress bar (only visible during gesture) */}
@@ -433,14 +477,6 @@ const MintItem = React.memo<MintItemProps>(
                       <Animated.Text style={[styles.percentageText, textStyle]}>
                         {`${formatPercentage(percentage)}%`}
                       </Animated.Text>
-                      {/* {showPreview && (
-                        <Text style={styles.previewPercentageText}>
-                          → {formatPercentage(previewPercentage)}%
-                        </Text>
-                      )} */}
-                      {/* <Text style={styles.ratioDebugText}>
-                        R:{Math.round(percentageToRatio(percentage))}
-                      </Text> */}
                     </View>
                   </View>
                 </View>
@@ -456,6 +492,15 @@ const MintItem = React.memo<MintItemProps>(
                     size={32}
                     color={percentage >= 100 ? greens[500] : greens[300]}
                   />
+                </RippleButton>
+                {/* Set to 100% */}
+                <RippleButton
+                  style={styles.toHundredButton}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onSetPercentage?.(mint.id, 100);
+                  }}>
+                  <Icon name="mdi:chevron-double-right" size={24} color={greys(theme)[0]} />
                 </RippleButton>
               </View>
             </View>
@@ -570,7 +615,6 @@ function MintSelectComponent({
   const { getCurrencyAllocation, updateCurrencyAllocation } = useAllocation();
 
   const [mintState, setMintState] = useState<MintState>({
-    selected: null,
     loadingId: null,
   });
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>(
@@ -625,9 +669,27 @@ function MintSelectComponent({
   // Ref to track latest ratios to avoid stale closures
   const latestRatiosRef = useRef<Record<string, number>>({});
 
+  // Persist baseline allocations captured when the page first loaded (per currency)
+  const initialRatiosByCurrencyRef = useRef<Record<string, Record<string, number>>>({});
+
+  // Capture initial ratios for the selected currency once per app session
+  React.useEffect(() => {
+    const currencyKey = selectedCurrency.toLowerCase();
+    if (!initialRatiosByCurrencyRef.current[currencyKey]) {
+      initialRatiosByCurrencyRef.current[currencyKey] = {
+        ...getCurrencyAllocation(currencyKey),
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCurrency]);
+
   // Ref to track current gesture state for stable throttled function
   const gestureStateRefForThrottled = useRef(gestureStateRef.current);
-  gestureStateRefForThrottled.current = gestureStateRef.current;
+
+  // Update the ref without causing re-renders
+  React.useEffect(() => {
+    gestureStateRefForThrottled.current = gestureStateRef.current;
+  });
 
   // ADDITIONAL FIX: Clear gesture state when not editing
   React.useEffect(() => {
@@ -648,11 +710,33 @@ function MintSelectComponent({
     }
   }, [selectedCurrency, isEditing]);
 
+  // Cleanup effect for component unmount
+  React.useEffect(() => {
+    return () => {
+      // Clear all local state to prevent memory leaks
+      setLocalMintRatios({});
+      setEditingMintOrder([]);
+      setPreviewState({ mintId: null, percentage: 0 });
+      // Clear gesture state
+      gestureStateRef.current = {
+        isActive: false,
+        activeMintId: null,
+        initialRatios: {},
+        displayRatios: {},
+        previewPercentage: 0,
+      };
+      latestRatiosRef.current = {};
+    };
+  }, []);
+
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  // limit to specified currencies: sat, eur, gbp, usd
-  const currencies: any = _.uniq(multipleBalances.map((b) => b.unit?.toUpperCase())).filter((c) =>
-    ['SAT', 'USD', 'EUR', 'GBP'].includes(c)
-  );
+  // Memoize currencies to prevent recalculation on every render
+  const currencies = useMemo(() => {
+    // limit to specified currencies: sat, eur, gbp, usd
+    return _.uniq(multipleBalances.map((b) => b.unit?.toUpperCase())).filter((c) =>
+      ['SAT', 'USD', 'EUR', 'GBP'].includes(c)
+    );
+  }, [multipleBalances]);
 
   // Get current mint ratios - from local state when editing, from Redux when not
   const currentMintRatios = useMemo(() => {
@@ -821,16 +905,17 @@ function MintSelectComponent({
   const mintButtonHandlers = useMemo(() => {
     const handlers: Record<string, { increment: () => void; decrement: () => void }> = {};
     filteredMints.forEach((mint) => {
-      handlers[mint.mintUrl] = {
+      const mintUrl = mint.mintUrl; // Capture in closure to avoid stale references
+      handlers[mintUrl] = {
         increment: () => {
           // Reset gesture state before updating percentages
           updateGestureState({ isActive: false, activeMintId: null });
-          handlePercentageChange(mint.mintUrl, 5);
+          handlePercentageChange(mintUrl, 5);
         },
         decrement: () => {
           // Reset gesture state before updating percentages
           updateGestureState({ isActive: false, activeMintId: null });
-          handlePercentageChange(mint.mintUrl, -5);
+          handlePercentageChange(mintUrl, -5);
         },
       };
     });
@@ -876,9 +961,15 @@ function MintSelectComponent({
       gestureStateRef.current.previewPercentage = newPercentage;
 
       // Update preview state for UI - minimal throttling just for React state
-      setPreviewState({
-        mintId: mintId,
-        percentage: newPercentage,
+      setPreviewState((prev) => {
+        // Only update if values actually changed to prevent unnecessary re-renders
+        if (prev.mintId !== mintId || Math.abs(prev.percentage - newPercentage) > 0.1) {
+          return {
+            mintId: mintId,
+            percentage: newPercentage,
+          };
+        }
+        return prev;
       });
     },
     [rebalanceProportionally] // Include the dependency
@@ -903,6 +994,21 @@ function MintSelectComponent({
     [updateGestureState, handlePercentageChange]
   );
 
+  const handleSetPercentage = useCallback(
+    (mintId: string, newPercentage: number) => {
+      // Ensure we exit any active gesture so UI uses current ratios, not preview ones
+      updateGestureState({ isActive: false, activeMintId: null });
+      setLocalMintRatios((_prev) => {
+        const currentState = { ...latestRatiosRef.current };
+        const newRatios = rebalanceProportionally(currentState, mintId, newPercentage);
+        latestRatiosRef.current = newRatios;
+        validateRatios(newRatios, `Set ${newPercentage}%`);
+        return newRatios;
+      });
+    },
+    [rebalanceProportionally, updateGestureState]
+  );
+
   // Memoized button handlers to prevent object recreation on every render
   const buttonHandlersMap = useMemo(() => {
     const handlersMap = new Map<string, { increment: () => void; decrement: () => void }>();
@@ -916,6 +1022,13 @@ function MintSelectComponent({
 
     return handlersMap;
   }, [filteredMints, mintButtonHandlers]);
+
+  // Cleanup effect to clear Maps and prevent memory leaks
+  React.useEffect(() => {
+    return () => {
+      buttonHandlersMap.clear();
+    };
+  }, [buttonHandlersMap]);
 
   const handleMintSelection = async (
     mint: {
@@ -942,13 +1055,6 @@ function MintSelectComponent({
           balance
         );
         setMintState(() => ({
-          selected: {
-            id: mint.id,
-            name: mint.name,
-            balance: balance?.amount || 0,
-            iconUrl: mint.iconUrl,
-            unit: finalUnit,
-          },
           loadingId: null,
         }));
       } catch {
@@ -966,38 +1072,55 @@ function MintSelectComponent({
     }
   };
 
-  const selectedMint = memoizedGetSelectedMint(store.getState());
-
-  const displayCurrency = (currency: string) => {
-    return currency === 'SAT' ? 'BTC' : currency;
-  };
+  // Use useSelector instead of direct store.getState() to ensure proper memoization
+  const selectedMint = useSelector(memoizedGetSelectedMint);
 
   const handleSplitEvenly = () => {
-    // Find mints with ratios > 0
-    const mintsWithRatio = Object.entries(currentMintRatios)
-      .filter(([_, ratio]) => ratio > 0)
-      .map(([mintId]) => mintId);
+    // Ensure any active gesture preview is cleared so UI uses committed ratios
+    updateGestureState({ isActive: false, activeMintId: null });
+    // Split ONLY among mints that currently have a non-zero allocation
+    const eligibleMintIds = filteredMints
+      .map((m) => m.mintUrl)
+      .filter((mintId) => (currentMintRatios[mintId] || 0) > 0);
 
-    if (mintsWithRatio.length === 0) return;
+    if (eligibleMintIds.length === 0) return;
 
-    // Calculate equal distribution
-    const equalRatio = Math.floor(RATIO_PRECISION / mintsWithRatio.length);
-    const remainder = RATIO_PRECISION - equalRatio * (mintsWithRatio.length - 1);
-
+    // Start from current ratios and reset all to 0
     const newRatios: Record<string, number> = { ...currentMintRatios };
-
-    // Reset all mint ratios to 0 first
     Object.keys(newRatios).forEach((mintId) => {
       newRatios[mintId] = 0;
     });
 
-    // Distribute evenly among selected mints
-    mintsWithRatio.forEach((mintId, index) => {
-      newRatios[mintId] = index === 0 ? remainder : equalRatio;
+    // Even integer distribution with minimal bias: spread remainder across first N
+    const base = Math.floor(RATIO_PRECISION / eligibleMintIds.length);
+    let remainder = RATIO_PRECISION - base * eligibleMintIds.length;
+
+    eligibleMintIds.forEach((mintId) => {
+      newRatios[mintId] = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
     });
 
     setLocalMintRatios(newRatios);
+    // Keep refs in sync for subsequent adjustments
+    latestRatiosRef.current = newRatios;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleResetToBaseline = () => {
+    // Reset to the baseline ratios captured when the page initially loaded for this currency
+    updateGestureState({ isActive: false, activeMintId: null });
+    const baseline = initialRatiosByCurrencyRef.current[selectedCurrency.toLowerCase()] || {};
+
+    if (Object.keys(baseline).length === 0) return;
+
+    const newRatios: Record<string, number> = {};
+    Object.keys(currentMintRatios).forEach((mintId) => {
+      newRatios[mintId] = baseline[mintId] || 0;
+    });
+
+    setLocalMintRatios(newRatios);
+    latestRatiosRef.current = newRatios;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSaveEdit = async () => {
@@ -1179,32 +1302,6 @@ function MintSelectComponent({
     }
   };
 
-  // Left for reference; editing is now launched in a dedicated sheet
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleStartEdit = () => {
-    // Clear any gesture state when entering edit mode
-    updateGestureState({
-      isActive: false,
-      activeMintId: null,
-    });
-    // Initialize local ratios from Redux when starting edit
-    const reduxRatios = getCurrencyAllocation(selectedCurrency.toLowerCase());
-    setLocalMintRatios(reduxRatios);
-
-    // Capture the initial order sorted by percentages for stable editing
-    const mintsForCurrentCurrency = multipleBalances.filter(
-      (mint) => mint.unit?.toUpperCase() === selectedCurrency
-    );
-    const sortedByPercentage = [...mintsForCurrentCurrency].sort((a, b) => {
-      const percentageA = ratioToPercentage(reduxRatios[a.mintUrl] || 0);
-      const percentageB = ratioToPercentage(reduxRatios[b.mintUrl] || 0);
-      return percentageB - percentageA;
-    });
-    setEditingMintOrder(sortedByPercentage.map((mint) => mint.mintUrl));
-
-    setIsEditing(true);
-  };
-
   const router = useSheetRouter('mint');
 
   return (
@@ -1269,80 +1366,225 @@ function MintSelectComponent({
         />
       }>
       <View>
-        <Text weight="bold" style={styles.sectionHeader}>
-          Send payment in
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.currencyScroll}
-          scrollEnabled={!isEditing}>
-          {currencies.map((currency: any) => (
-            <LinearGradient
-              key={currency}
-              colors={
-                selectedCurrency === currency
-                  ? ([
-                      opacity(theme.shades[200], 0.88),
-                      opacity(theme.shades[200], 0.88),
-                      opacity(theme.shades[300], 0.88),
-                      opacity(theme.shades[200], 0.88),
-                      opacity(theme.shades[300], 0.88),
-                    ] as const)
-                  : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
-              }
-              style={[
-                styles.currencyButton,
-                sovran(theme).borderSubtle,
-                isEditing && styles.disabledCurrency,
+        {/* Allocation summary header with segmented bar and legend */}
+        {isEditing ? (
+          <View style={{ marginBottom: 16 }}>
+            <Text weight="bold" style={[styles.sectionHeader, { marginBottom: 6 }]}>
+              TOTAL BALANCE
+            </Text>
+            {(() => {
+              // Determine which ratios to display (live preview during gesture)
+              const ratios =
+                isGestureActive && gestureStateRef.current.activeMintId
+                  ? gestureStateRef.current.displayRatios
+                  : currentMintRatios;
+
+              // Log the ratios being used
+              console.log('[MintSelect] Using ratios:', ratios);
+
+              // Build list of mints in current currency order
+              const mints = filteredMints.map((m) => {
+                const ratio = ratios[m.mintUrl] || 0; // exact integer ratio (0..RATIO_PRECISION)
+                const pct = ratioToPercentage(ratio);
+                const name = m.mintUrl.replace('https://', '')?.split('/')?.[0];
+                // Log each mint's info and calculated percentage
+                console.log(
+                  `[MintSelect] Mint: ${name}, mintUrl: ${m.mintUrl}, ratio: ${ratio}, pct: ${pct}, amount: ${m.amount}`
+                );
+                return { key: m.mintUrl, name, pct, ratio };
+              });
+
+              // Log the full mints array for inspection
+              console.log('[MintSelect] Mints array:', mints);
+
+              const totalValue = filteredMints.reduce((sum, m) => sum + (m.amount || 0), 0);
+              // Log the total value
+              console.log('[MintSelect] Total value:', totalValue);
+
+              const formattedTotal = formatCurrency(
                 {
-                  marginRight: 8,
-                  borderRadius: 8,
-                  padding: 1,
-                  backgroundColor:
-                    selectedCurrency === currency ? greys(theme)[900] : greys(theme)[900],
+                  currency: selectedCurrency === 'SAT' ? 'BTC' : (selectedCurrency as any),
+                  value: totalValue,
+                  denomination: (selectedCurrency.toLowerCase() === 'sat'
+                    ? 'sats'
+                    : selectedCurrency.toLowerCase()) as any,
                 },
-              ]}>
-              <TouchableOpacity
-                style={[
-                  styles.currencyButton,
-                  selectedCurrency === currency && styles.selectedCurrencyButton,
-                  {
-                    flex: 1,
-                  },
-                ]}
-                onPress={() => !isEditing && setSelectedCurrency(currency)}
-                disabled={isEditing}>
-                <View style={styles.currencyContent}>
-                  {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
-                    <FlagIcon
-                      country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
-                      height={32}
-                      width={32}
-                    />
-                  ) : (
-                    <CurrencyIcon currency={currency.toLowerCase()} />
-                  )}
-                  <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
+                {
+                  locale: 'en-US',
+                  precision: selectedCurrency === 'SAT' ? 0 : 2,
+                  currencyDisplay: selectedCurrency === 'SAT' ? 'name' : 'symbol',
+                  denomination: (selectedCurrency.toLowerCase() === 'sat'
+                    ? 'sats'
+                    : selectedCurrency.toLowerCase()) as any,
+                }
+              );
+
+              // Log the formatted total
+              console.log('[MintSelect] Formatted total:', formattedTotal);
+
+              return (
+                <View>
+                  <Text style={[styles.totalAmount]}>{formattedTotal}</Text>
+                  <View style={styles.segmentedBarContainer}>
+                    {(() => {
+                      const visible = mints.filter((m) => (m.ratio || 0) > 0);
+                      let cumulative = 0;
+                      return visible.map((m, idx) => {
+                        const isLast = idx === visible.length - 1;
+                        const widthRaw = (m.ratio / RATIO_PRECISION) * 100;
+                        const leftPct = cumulative;
+                        const widthPct = isLast
+                          ? Math.max(0, 100 - cumulative)
+                          : Math.max(0, widthRaw);
+                        cumulative += widthRaw;
+                        const alpha = 1 - idx / visible.length; // e.g., 2 items => [1, 0.5]
+                        const bgColor = opacity(theme.shades[300], alpha);
+                        return (
+                          <Animated.View
+                            key={m.key}
+                            layout={LinearTransition.duration(250)}
+                            entering={FadeIn.duration(150)}
+                            exiting={FadeOut.duration(150)}
+                            style={[
+                              styles.segmentAbsolute,
+                              {
+                                left: `${leftPct}%`,
+                                ...(isLast ? { right: 0 } : { width: `${widthPct}%` }),
+                                backgroundColor: bgColor,
+                              },
+                            ]}
+                          />
+                        );
+                      });
+                    })()}
+                  </View>
+                  <View style={styles.legendContainer}>
+                    {(() => {
+                      const visible = mints.filter((m) => (m.ratio || 0) > 0);
+                      const baseline =
+                        initialRatiosByCurrencyRef.current[selectedCurrency.toLowerCase()] || {};
+                      return visible.map((m, idx) => {
+                        const alpha = 1 - idx / visible.length;
+                        const dotColor = opacity(theme.shades[300], alpha);
+                        const currentPct = formatPercentage(ratioToPercentage(ratios[m.key] || 0));
+                        const basePct = formatPercentage(ratioToPercentage(baseline[m.key] || 0));
+                        const delta = parseFloat((currentPct - basePct).toFixed(2));
+                        const deltaStr =
+                          Math.abs(delta) > 0
+                            ? ` (${delta > 0 ? '+' : '-'}${formatPercentage(Math.abs(delta))}%)`
+                            : '';
+                        return (
+                          <View key={m.key} style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: dotColor }]} />
+                            <Text style={styles.legendText}>
+                              {m.name} {currentPct}%{deltaStr}
+                            </Text>
+                          </View>
+                        );
+                      });
+                    })()}
+                  </View>
                 </View>
-              </TouchableOpacity>
-            </LinearGradient>
-          ))}
-        </ScrollView>
+              );
+            })()}
+          </View>
+        ) : (
+          <> </>
+        )}
+        {!isEditing && (
+          <>
+            <Text weight="bold" style={styles.sectionHeader}>
+              Send payment in
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.currencyScroll}
+              scrollEnabled={!isEditing}>
+              {currencies.map((currency: any) => (
+                <LinearGradient
+                  key={currency}
+                  colors={
+                    selectedCurrency === currency
+                      ? ([
+                          opacity(theme.shades[200], 0.88),
+                          opacity(theme.shades[200], 0.88),
+                          opacity(theme.shades[300], 0.88),
+                          opacity(theme.shades[200], 0.88),
+                          opacity(theme.shades[300], 0.88),
+                        ] as const)
+                      : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
+                  }
+                  style={[
+                    styles.currencyButton,
+                    sovran(theme).borderSubtle,
+                    isEditing && styles.disabledCurrency,
+                    {
+                      marginRight: 8,
+                      borderRadius: 8,
+                      padding: 1,
+                      backgroundColor:
+                        selectedCurrency === currency ? greys(theme)[900] : greys(theme)[900],
+                    },
+                  ]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.currencyButton,
+                      selectedCurrency === currency && styles.selectedCurrencyButton,
+                      {
+                        flex: 1,
+                      },
+                    ]}
+                    onPress={() => !isEditing && setSelectedCurrency(currency)}
+                    disabled={isEditing}>
+                    <View style={styles.currencyContent}>
+                      {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
+                        <FlagIcon
+                          country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
+                          height={32}
+                          width={32}
+                        />
+                      ) : (
+                        <CurrencyIcon currency={currency.toLowerCase()} />
+                      )}
+                      <Text style={styles.currencyText}>
+                        {currency === 'SAT' ? 'BTC' : currency}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </LinearGradient>
+              ))}
+            </ScrollView>
+          </>
+        )}
 
         <View style={styles.sendFromHeader}>
           <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 4 }]}>
             Send from
           </Text>
           {isEditing && (
-            <TouchableOpacity
-              onPress={handleSplitEvenly}
-              style={[styles.editButtonContainer, { marginRight: 8 }]}>
-              <View style={styles.splitButtonContent}>
-                <Icon name="radix-icons:half-2" size={16} color={theme.shades[200]} />
-                <Text style={[styles.editButton, { marginLeft: 4 }]}>Split</Text>
-              </View>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity
+                onPress={handleResetToBaseline}
+                style={[styles.editButtonContainer, { marginRight: 8 }]}>
+                <View style={styles.splitButtonContent}>
+                  <Icon
+                    name="material-symbols:settings-backup-restore-rounded"
+                    size={16}
+                    color={theme.shades[200]}
+                  />
+                  <Text style={[styles.editButton, { marginLeft: 4 }]}>Reset</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSplitEvenly}
+                style={[styles.editButtonContainer, { marginRight: 8 }]}>
+                <View style={styles.splitButtonContent}>
+                  <Icon name="radix-icons:half-2" size={16} color={theme.shades[200]} />
+                  <Text style={[styles.editButton, { marginLeft: 4 }]}>Split</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
         <View>
@@ -1380,6 +1622,7 @@ function MintSelectComponent({
                 onGestureEnd={handleGestureEnd}
                 onIncrement={buttonHandlers?.increment}
                 onDecrement={buttonHandlers?.decrement}
+                onSetPercentage={handleSetPercentage}
                 showPreview={previewState.mintId === mint.mintUrl}
                 previewPercentage={previewState.percentage}
                 onPress={() =>
@@ -1412,6 +1655,49 @@ const createStyles = (theme: Theme) =>
       fontSize: 18,
       fontWeight: '600',
       marginBottom: 4,
+    },
+    totalAmount: {
+      color: greys(theme)[0],
+      fontSize: 28,
+      fontWeight: '800',
+      marginBottom: 8,
+    },
+    segmentedBarContainer: {
+      height: 16,
+      borderRadius: 12,
+      backgroundColor: greys(theme)[800],
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    segment: {
+      height: '100%',
+    },
+    segmentAbsolute: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      height: '100%',
+    },
+    legendContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 8,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: 8,
+    },
+    legendDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 10,
+      marginRight: 6,
+    },
+    legendText: {
+      color: greys(theme)[200],
+      fontSize: 14,
     },
     sendFromHeader: {
       flexDirection: 'row',
@@ -1498,14 +1784,18 @@ const createStyles = (theme: Theme) =>
     percentageControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 6,
       alignSelf: 'flex-end',
       width: '100%',
     },
-    percentageButton: {
-      padding: 12,
+
+    toZeroButton: {
+      backgroundColor: greys(theme)[800],
       borderRadius: 10000,
+      paddingHorizontal: 4,
+      paddingVertical: 4,
     },
+
     decrementButton: {
       // padding: 12,
       backgroundColor: darken(0.2, reds[500]), // Dark red background for minus (red-900)
@@ -1515,6 +1805,12 @@ const createStyles = (theme: Theme) =>
       // padding: 12,
       backgroundColor: darken(0.2, greens[500]), // Dark green background for plus (green-800)
       borderRadius: 10000,
+    },
+    toHundredButton: {
+      backgroundColor: greys(theme)[800],
+      borderRadius: 10000,
+      paddingHorizontal: 4,
+      paddingVertical: 4,
     },
     percentageText: {
       color: greys(theme)[0],
@@ -1531,21 +1827,7 @@ const createStyles = (theme: Theme) =>
       gap: 4,
       minHeight: 48,
     },
-    percentageTextContainer: {
-      flex: 1,
-      alignItems: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      borderRadius: 8,
-      backgroundColor: opacity(greys(theme)[700], 0.3),
-    },
-    progressBarContainer: {
-      width: '100%',
-      height: 8,
-      backgroundColor: greys(theme)[700],
-      borderRadius: 4,
-      overflow: 'hidden',
-    },
+
     progressBar: {
       position: 'absolute',
       left: 0,
@@ -1564,6 +1846,15 @@ const createStyles = (theme: Theme) =>
       borderRadius: 8,
       zIndex: 2, // Above the regular progress bar
     },
+    previousProgressBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      height: '100%',
+      backgroundColor: greys(theme)[700],
+      borderRadius: 8,
+      zIndex: 0, // Below the regular progress bar
+    },
     percentageOverlayContainer: {
       position: 'relative',
       width: '100%',
@@ -1581,18 +1872,5 @@ const createStyles = (theme: Theme) =>
       height: '100%',
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    ratioDebugText: {
-      color: greys(theme)[200],
-      fontSize: 12,
-      fontWeight: '400',
-      marginTop: 4,
-    },
-    previewPercentageText: {
-      color: theme.shades[200],
-      fontSize: 14,
-      fontWeight: '500',
-      marginTop: 2,
-      textAlign: 'center',
     },
   });

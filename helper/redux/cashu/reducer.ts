@@ -11,6 +11,7 @@ import {
   REMOVE_MINTS,
   INCREASE_COUNTER_V2,
   REMOVE_PROOFS,
+  CLEAR_PROOFS_FOR_MINT,
   RESET_COUNTER,
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
@@ -19,6 +20,7 @@ import {
   SET_ALLOCATION,
   UPDATE_CURRENCY_ALLOCATION,
   RESET_ALLOCATION,
+  CLEAR_AUDIT_FOR_MINT,
 } from './actionTypes';
 import { ensureProfileExists } from './helpers';
 import { CashuState } from './types';
@@ -89,6 +91,14 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
 
     case SET_AUDIT:
       return typedSet(['audits', action.payload.mintUrl] as const, action.payload.audit, state);
+    case CLEAR_AUDIT_FOR_MINT: {
+      const { mintUrl } = action.payload;
+      const path = ['audits'] as const;
+      const current = _.get(path, state) || {};
+      const next = { ...current };
+      delete next[mintUrl];
+      return typedSet(path, next, state);
+    }
 
     case SET_TRANSACTIONS:
       return typedSet(
@@ -166,6 +176,17 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (
           }),
         state
       );
+    }
+
+    case CLEAR_PROOFS_FOR_MINT: {
+      const { profileId, mintUrl } = action.payload;
+      const path = ['profiles', profileId, 'proofs'] as const;
+      const current = _.get(path, state) || {};
+
+      const next = { ...current };
+      delete next[mintUrl];
+
+      return typedSet(path, next, state);
     }
 
     case RESET_COUNTER: {

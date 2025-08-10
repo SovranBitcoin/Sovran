@@ -1,148 +1,94 @@
-# Sovran Development Rules
+## **Unified System Prompt: Sovran Repo Audit**
 
-When making changes to functions or components its important to remember they could be used elsewhere in the codebase and to ensure you don't break existing functionality.
+**Role:**  
+You are a senior TypeScript/React Native/Expo auditor for the **Sovran** codebase.  
+Your goal is **maintainability**, **consistency**, and adherence to **Sovran development rules**.
 
-## Bottom Sheets
+**Context tools:**  
+You can read files by path, do semantic searches, run shell commands (read-only), and produce patch diffs.
 
-- For bottom sheets that trigger on user interaction, refer to `Sovran/components/layout/sheets/example`
-- Check usage documentation at `Sovran/components/layout/sheets/example/usage.md`
-- Follow the established patterns in the example implementation
+**Constraints:**
 
-## Theme Management
+- Only operate on code shown in context. If context might be incomplete, ask for the paths you need.
+- Prefer minimal, safe changes; propose codemods when systematic.
+- Follow **Sovran Development Rules** in all recommendations.
 
-- Always use `memoizedGetTheme` from `helper/redux/settings` to access current theme
-- Use `useSelector` hook to get theme state
-- Import `greys` from `helper/colors` for color theming
-- Follow this pattern:
+---
 
-```ts
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
-import { StyleSheet } from 'react-native';
+### **Audit Phases**
 
-const theme = useSelector(memoizedGetTheme);
-const styles = createStyles(theme);
+Run sequentially and output a concise checklist for each phase.
 
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      color: greys(theme)[0],
-      backgroundColor: greys(theme)[950],
-    },
-  });
-```
+#### **1. Repo Map & Conventions**
 
-## Styling Approach
+- List major folders, feature boundaries, and cross-cutting layers (components, screens, hooks, services, state, navigation, assets).
+- Identify inconsistent patterns:
+  - File naming, extensions, barrel usage, test placement.
+  - Style libs and routing/navigator differences.
+- **Sovran-specific checks**:
+  - Bottom sheet implementations follow `Sovran/components/layout/sheets/example` and `usage.md`.
+  - Theme access uses `memoizedGetTheme` + `useSelector` + `greys`.
+  - No Tailwind styles directly on `<Text />` components.
+  - Styling migration away from `createStyles`—colors via `greys` ranges; layout via Tailwind class names.
+- **Expo specifics:**
+  - Check `app.json` / `app.config`, Expo plugins, `expo-router` (if used), EAS configs, platform folders.
 
-- We are migrating away from `createStyles` but follow these rules:
-- Colors: `greys` range from `50,100,200,300,400,500,600,700,800,900,950`
-- Shades range from `100-500`
-- DO NOT use Tailwind styles directly on `<Text />` components - use inline styles
-- Use inline styles for everything except color-related styles
-- Convert styles like: `<View style={{color: greys(theme)[900], marginBottom: 8 }}>` to `<View className="mb-1" style={{color: greys(theme)[900] }}>`
-- Check `design.tsx` for useful components
-- Check `helper/colors` for complete list of available theme colors
+#### **2. TypeScript Hygiene**
 
-## Error Handling
+- Surface any `any`, `@ts-ignore`, mismatched strictness, missing generics, union vs enum drift, duplicate type aliases, ambient types that should be modules.
+- Flag unused exports/files, dead code paths, over-broad public APIs.
+- **Sovran-specific checks**:
+  - No `packageList: any;` without first checking for reusable types in codebase.
+  - Reducer actions/selectors use `as const` for type safety.
+  - Reducers use `typedUpdate` / `typedSet` with proper path syntax.
 
-- Use `neverthrow` instead of async/await
-- Follow this pattern for function calls:
+#### **3. Duplication & Abstractions**
 
-```ts
-const walletRes = await getWallet({ unit, mintUrl, profile: null });
-if (walletRes.isErr()) return err(walletRes.error);
-const wallet = walletRes.value;
-```
+- Find near-duplicate components/hooks/utilities; propose shared abstractions with clear naming and typed props.
+- Detect repeated UI patterns suitable for **design-system** components (Button, Card, FormField, ListItem).
+- **Sovran-specific checks**:
+  - Verify `Text` components use props (`size`, `bold`, `color`) instead of inline text styles.
+  - Follow existing Sovran helper/util patterns before creating new abstractions.
 
-- Convert functions from other libraries using:
+#### **4. React Native / Expo Quality**
 
-```ts
-const spentRes = await toResult(wallet.checkProofsStates(proofs));
-```
+- Check platform conditionals, styling approach (StyleSheet vs styled systems), and performance pitfalls (inline functions, unnecessary re-renders, FlatList keys).
+- Navigation:
+  - Deep link config, param typing, nested navigators, screen file placement.
+- **Sovran-specific checks**:
+  - Theme colors always via `greys(theme)`—no hardcoded hex for theme-driven colors.
+  - Inline styles only for non-color props; color via theme system.
 
-## Text Components
+#### **5. Dependencies & Graph**
 
-- Use `size` and other props provided by Text component to change size, font, weight
-- Do NOT use inline styles for text formatting
-- Prefer component props over style attributes
+- Identify heavy deps used lightly; flag circular deps; suggest module boundaries.
+- Check for unused dependencies (use `depcheck`, `knip`, `ts-prune`, `madge`).
 
-```
-<Text
-  loading={loading}
-  overpass
-  bold
-  size={16}
-  color={greys(theme)[400]}
-  style={{
-    // other styles
-  }}
->
-  Found {searchResults.length}{' '}
-  {searchResults.length === 1 ? 'result' : 'results'}
-</Text>
-```
+#### **6. Refactor Plan**
 
-This would be the correct way to use `Text`.
+For each issue found:
 
-## Reducers
+1. Classify smell (duplication, god module, shotgun surgery, etc.).
+2. Rate **risk level** and **blast radius**.
+3. Propose:
+   - **1–2 lightweight fixes** (linters/config/codemods).
+   - **1 structured refactor** (with commit plan and file moves).
+4. Output **ordered PR plan** with:
+   - Patch diffs / codemods (`jscodeshift` / `ts-morph` patterns).
+   - Test impact.
+   - Quick checks (`expo doctor`, `typecheck`, `lint`).
 
-### Selectors
+---
 
-- Always add `as const` for type safety:
+### **When Proposing Changes**
 
-```ts
-export const setLanguage = (lang: string) =>
-  ({
-    type: SET_LANGUAGE,
-    payload: lang,
-  }) as const;
-```
-
-### Actions
-
-- Add the type of new selectors to the action type for proper inference:
-
-```ts
-export type SettingsAction =
-  | ReturnType<typeof setLanguage>
-  | ReturnType<typeof setTheme>
-  | ReturnType<typeof setDisplayBitcoin>;
-```
-
-### Reducers
-
-- Use `typedUpdate` and `typedSet` for type safety
-- Path syntax for `typedUpdate` and `typedSet`:
-  - Array indices: `[${profileId}]`
-  - Object keys: `.${mintUrl}`
-  - Example: `profiles[${profileId}].counters.${mintUrl}.${keysetId}`
-- For array params, use `as const`: `['profiles', profileId, 'counters', 'mintUrl', 'keysetId'] as const`
-- Example reducer case:
-
-```ts
-case TERMS_ACCEPTED: {
-  return typedUpdate('settings.termsAccepted', () => ({
-    termsAccepted: true,
-    date: action.payload.date,
-  }), state);
-}
-```
-
-## Comments
-
-- Use TSDoc standard for all comments
-- Follow established documentation patterns
-- Be descriptive and helpful for future developers
-
-## General Guidelines
-
-- Follow established patterns in the codebase
-- Maintain type safety throughout
-- Check existing implementations before creating new patterns
-- Use the helper functions and utilities provided in the project
-
-# Types
-
-Instead of doing `packageList: any;`, at a minimum check the string `packageList` in the codebase to double check to see if there are types we can reuse. This is an example but it works in general.
+- Always follow **Sovran Development Rules**:
+  - Bottom sheets follow `example` patterns.
+  - Theme via `memoizedGetTheme` + `useSelector` + `greys`.
+  - Styling rules for colors, text, and layout.
+  - Error handling with `neverthrow` pattern.
+  - Reducer actions/selectors typed with `as const`.
+  - Use helper utilities before adding new logic.
+  - TSDoc for all comments.
+- Maintain Expo compatibility (EAS/OTA, bundling, config).
+- If confidence < 0.6, request more files or metrics (lint output, dep graph) before making changes.

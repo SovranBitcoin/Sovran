@@ -20,11 +20,12 @@ import {
   SET_ALLOCATION,
   UPDATE_CURRENCY_ALLOCATION,
   RESET_ALLOCATION,
+  CLEAR_AUDIT_FOR_MINT,
 } from './actionTypes';
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
-import { MintInfo } from '@cashu/cashu-ts/lib/types/model/MintInfo';
 import { TransactionData } from './types';
 import { AppThunk } from '../store/reducer';
+type MintInfo = any;
 
 export type CashuAction =
   | ReturnType<typeof addMints>
@@ -45,7 +46,9 @@ export type CashuAction =
   | ReturnType<typeof ensureProfileExistsAction>
   | ReturnType<typeof setAllocation>
   | ReturnType<typeof updateCurrencyAllocation>
-  | ReturnType<typeof resetAllocation>;
+  | ReturnType<typeof resetAllocation>
+  | { type: 'CLEAR_PROOFS_FOR_MINT'; payload: { profileId: number; mintUrl: string } }
+  | ReturnType<typeof clearAuditForMint>;
 
 export const addMints = ({ profileId, mints }: { profileId: number; mints: string[] }) =>
   ({
@@ -58,6 +61,151 @@ export const removeMints = ({ profileId, mints }: { profileId: number; mints: st
     type: REMOVE_MINTS,
     payload: { profileId, mints },
   }) as const;
+
+// Thunk to perform full mint removal cleanup logic
+export const removeMintsAction = ({
+  profileId,
+  mints,
+}: {
+  profileId: number;
+  mints: string[];
+}): AppThunk<{ success: boolean }> => {
+  return async (dispatch: any, getState: any) => {
+    // Debug: starting removeMintsAction
+    console.log('[removeMintsAction] start', { profileId, mints });
+
+    const state = getState();
+    console.log('[removeMintsAction] current allocation snapshot', state.cashu?.allocation);
+
+    // 1) Remove from the user's mint list
+    console.log('[removeMintsAction] removing from profile mints array');
+    dispatch(
+      removeMints({
+        profileId,
+        mints,
+      })
+    );
+
+    // 2) Clear keysets and keys for each mint
+    mints.forEach((mintUrl) => {
+      console.log('[removeMintsAction] clearing keysets/keys', mintUrl);
+      dispatch(
+        setKeysets({
+          mintUrl,
+          keysets: [],
+        })
+      );
+
+      dispatch(
+        setKeys({
+          mintUrl,
+          keys: [],
+        })
+      );
+    });
+
+    // 3) Remove proofs key only if empty
+    mints.forEach((mintUrl) => {
+      const proofsForMint = state.cashu?.profiles?.[profileId]?.proofs?.[mintUrl];
+      console.log('[removeMintsAction] proofs check', mintUrl, {
+        hasProofs: Array.isArray(proofsForMint) && proofsForMint.length > 0,
+        length: proofsForMint?.length ?? 0,
+      });
+      if (!proofsForMint || proofsForMint.length === 0) {
+        console.log('[removeMintsAction] clearing empty proofs key', mintUrl);
+        dispatch({
+          type: 'CLEAR_PROOFS_FOR_MINT',
+          payload: { profileId, mintUrl },
+        });
+      }
+    });
+
+    // 4) Allocation redistribution per currency if needed
+    const allocation: Record<string, Record<string, number>> = state.cashu.allocation || {};
+    const updatedAllocation: Record<string, Record<string, number>> = { ...allocation };
+
+    Object.keys(allocation).forEach((currency) => {
+      const currencyAllocation = { ...allocation[currency] };
+      let didChangeCurrency = false;
+      mints.forEach((mintUrl) => {
+        const value = currencyAllocation[mintUrl];
+        if (typeof value !== 'number') {
+          // not present, nothing to do
+          return;
+        }
+
+        if (value <= 0) {
+          // just delete this key
+          console.log('[removeMintsAction] allocation delete (zero)', { currency, mintUrl });
+          const { [mintUrl]: _, ...rest } = currencyAllocation;
+          updatedAllocation[currency] = rest;
+          didChangeCurrency = true;
+          return;
+        }
+
+        // redistribute this value among other mints that have positive allocation
+        const others = Object.entries(currencyAllocation)
+          .filter(([url, v]) => url !== mintUrl && typeof v === 'number' && v > 0)
+          .map(([url, v]) => ({ url, value: v as number }));
+
+        if (others.length === 0) {
+          // last one with value, remove it entirely
+          console.log('[removeMintsAction] allocation last-one removal', { currency, mintUrl });
+          const { [mintUrl]: _, ...rest } = currencyAllocation;
+          updatedAllocation[currency] = rest;
+          didChangeCurrency = true;
+          return;
+        }
+
+        // Evenly distribute "value" across the remaining mints with positive allocation
+        const base = Math.floor(value / others.length);
+        const remainder = value - base * others.length;
+        console.log('[removeMintsAction] allocation redistribute', {
+          currency,
+          mintUrl,
+          value,
+          others: others.map((o) => o.url),
+          base,
+          remainder,
+        });
+
+        const nextCurrencyAllocation = { ...currencyAllocation };
+        // remove deleted mint
+        delete nextCurrencyAllocation[mintUrl];
+
+        others.forEach((other, index) => {
+          const extra = index < remainder ? 1 : 0; // distribute remainder across first N
+          nextCurrencyAllocation[other.url] = other.value + base + extra;
+        });
+
+        updatedAllocation[currency] = nextCurrencyAllocation;
+        didChangeCurrency = true;
+      });
+      if (didChangeCurrency) {
+        console.log(
+          '[removeMintsAction] updated currency allocation',
+          currency,
+          updatedAllocation[currency]
+        );
+      }
+    });
+
+    // Update allocation if it changed
+    if (JSON.stringify(updatedAllocation) !== JSON.stringify(allocation)) {
+      console.log('[removeMintsAction] dispatch setAllocation');
+      dispatch(setAllocation(updatedAllocation));
+    }
+
+    // 5) Clear audits for these mints
+    mints.forEach((mintUrl) => {
+      console.log('[removeMintsAction] clearing audit', mintUrl);
+      dispatch(clearAuditForMint(mintUrl));
+    });
+
+    console.log('[removeMintsAction] done');
+    return { success: true };
+  };
+};
 
 export const setSelectedMint = ({ profileId, mintUrl }: { profileId: number; mintUrl: string }) =>
   ({
@@ -295,4 +443,10 @@ export const updateCurrencyAllocation = (currency: string, allocation: Record<st
 export const resetAllocation = () =>
   ({
     type: RESET_ALLOCATION,
+  }) as const;
+
+export const clearAuditForMint = (mintUrl: string) =>
+  ({
+    type: CLEAR_AUDIT_FOR_MINT,
+    payload: { mintUrl },
   }) as const;

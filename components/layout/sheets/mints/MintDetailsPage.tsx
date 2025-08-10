@@ -5,7 +5,7 @@ import { Text } from 'components/common/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import Wrapper from '../wrapper';
 import { RowButton, Section } from 'app/settings';
-import { useSheetRouteParams, useSheetRouter, SheetManager } from 'react-native-actions-sheet';
+import { useSheetRouteParams, useSheetRouter } from 'react-native-actions-sheet';
 import { useWallet } from 'helper/cashuClient';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Card } from 'components/common/Card';
@@ -312,9 +312,7 @@ const MintDetailPage = () => {
     if (!params?.mintUrl) return;
 
     try {
-      await SheetManager.show('mint-delete', {
-        payload: { mintUrl: params.mintUrl },
-      });
+      router?.navigate('mintDeleteConfirm', { mintUrl: params.mintUrl });
     } catch (error) {
       console.error('Error opening delete mint sheet:', error);
     }
@@ -340,8 +338,9 @@ const MintDetailPage = () => {
 
   // Render the mint icon/logo even if loading
   const renderMintIcon = () => {
-    if (mintInfo?.icon_url) {
-      return <Image source={{ uri: mintInfo.icon_url }} style={styles.logoImage} />;
+    const iconUrl = (mintInfo as any)?.icon_url;
+    if (iconUrl) {
+      return <Image source={{ uri: iconUrl }} style={styles.logoImage} />;
     } else {
       return (
         <View style={styles.logo}>
@@ -377,20 +376,15 @@ const MintDetailPage = () => {
     );
   }
 
-  if (error || !wallet?.mintInfo) {
-    return (
-      <Wrapper>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load mint details</Text>
-          <Text style={styles.errorSubtext}>{(error as any)?.message || 'Unknown error'}</Text>
-        </View>
-      </Wrapper>
-    );
-  }
+  const hasError = error || !wallet?.mintInfo;
 
   const days = 45;
 
   console.log(mintInfo);
+
+  // Fallback mint name from URL if no mint info available
+  const displayName =
+    mintInfo?.name || params?.mintUrl?.split('//')[1]?.split('/')[0] || 'Unknown Mint';
 
   return (
     <Wrapper
@@ -406,69 +400,85 @@ const MintDetailPage = () => {
         />
       }>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Error notification if there's an issue loading data */}
+        {hasError && (
+          <>
+            <Card
+              variant="warning"
+              message={`Failed to load complete mint details: ${(error as any)?.message || 'Some information may be missing'}`}
+            />
+            <Spacer size={12} />
+          </>
+        )}
+
         {/* Mint Header with integrated heatmap */}
         <View style={styles.headerContainer}>
           <View style={styles.logoContainer}>
             <DonutChart
               sections={[
                 {
-                  value: swaps?.filter((s) => s.state === 'OK').length || 0,
-                  color: greens[300],
+                  value: swaps?.filter((s) => s.state === 'OK').length || 1,
+                  color: hasError ? greys(theme)[600] : greens[300],
                 },
                 {
                   value: swaps?.filter((s) => s.state === 'ERROR').length || 0,
-                  color: reds[300],
+                  color: hasError ? greys(theme)[700] : reds[300],
                 },
               ]}>
               {renderMintIcon()}
             </DonutChart>
           </View>
-          <Text style={styles.mintTitle}>{mintInfo?.name || 'Unknown Mint'}</Text>
+          <Text style={styles.mintTitle}>{displayName}</Text>
           {mintInfo?.version && <Text style={styles.mintVersion}>{mintInfo.version}</Text>}
 
-          {/* Heatmap visualization */}
-          <View style={styles.heatmapContainer}>
-            {new Array(days).fill(0).map((_, i) => {
-              const date = dayjs()
-                .utc()
-                .subtract(days - i, 'day')
-                .format('YYYY-MM-DD');
+          {/* Only show heatmap and stats if we have data */}
+          {!hasError && swaps?.length > 0 && (
+            <>
+              {/* Heatmap visualization */}
+              <View style={styles.heatmapContainer}>
+                {new Array(days).fill(0).map((_, i) => {
+                  const date = dayjs()
+                    .utc()
+                    .subtract(days - i, 'day')
+                    .format('YYYY-MM-DD');
 
-              const isLastCell = i === days - 1;
+                  const isLastCell = i === days - 1;
 
-              const CellComponent = isLastCell ? Animated.View : View;
-              const cellStyle = isLastCell
-                ? {
-                    flex: 1,
-                    width: 8,
-                    margin: 1,
-                    borderRadius: 4,
-                    backgroundColor: getColor(data[date]?.successRate),
-                    height: Math.floor(30 - (20 * Math.log(days - i)) / Math.log(days)),
-                    opacity: opacityAnim,
-                  }
-                : {
-                    flex: 1,
-                    width: 8,
-                    margin: 1,
-                    borderRadius: 4,
-                    opacity: 0.66,
-                    height: Math.floor(32 - (25 * Math.log(days - i)) / Math.log(days)),
-                    backgroundColor: getColor(data[date]?.successRate),
-                  };
+                  const CellComponent = isLastCell ? Animated.View : View;
+                  const cellStyle = isLastCell
+                    ? {
+                        flex: 1,
+                        width: 8,
+                        margin: 1,
+                        borderRadius: 4,
+                        backgroundColor: getColor(data[date]?.successRate),
+                        height: Math.floor(30 - (20 * Math.log(days - i)) / Math.log(days)),
+                        opacity: opacityAnim,
+                      }
+                    : {
+                        flex: 1,
+                        width: 8,
+                        margin: 1,
+                        borderRadius: 4,
+                        opacity: 0.66,
+                        height: Math.floor(32 - (25 * Math.log(days - i)) / Math.log(days)),
+                        backgroundColor: getColor(data[date]?.successRate),
+                      };
 
-              return <CellComponent key={date} style={cellStyle} />;
-            })}
-          </View>
+                  return <CellComponent key={date} style={cellStyle} />;
+                })}
+              </View>
 
-          {/* Stats Grid */}
-          <StatsGrid
-            theme={theme}
-            successRate={swaps?.filter((s) => s.state === 'OK').length / (swaps?.length || 1)}
-            avgResponse={
-              swaps?.reduce((acc, swap) => acc + swap.time_taken, 0) / (swaps?.length || 1)
-            }
-          />
+              {/* Stats Grid */}
+              <StatsGrid
+                theme={theme}
+                successRate={swaps?.filter((s) => s.state === 'OK').length / (swaps?.length || 1)}
+                avgResponse={
+                  swaps?.reduce((acc, swap) => acc + swap.time_taken, 0) / (swaps?.length || 1)
+                }
+              />
+            </>
+          )}
         </View>
 
         {/* Description Card */}
@@ -495,7 +505,7 @@ const MintDetailPage = () => {
           </>
         )}
 
-        {/* Contact Section */}
+        {/* Contact Section - only show if we have contact info */}
         {mintInfo?.contact && mintInfo.contact.length > 0 && (
           <Section title="Contact">
             {mintInfo.contact.map((contact: any, index: number) => (
@@ -538,7 +548,7 @@ const MintDetailPage = () => {
           </Section>
         )}
 
-        {/* Delete Section */}
+        {/* Always show the Delete Section - this is the key fix */}
         <Section title="Danger Zone">
           <RowButton
             isFirst={true}

@@ -512,6 +512,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
       completed: boolean;
     };
   }>({});
+  const [hasCompletedSuccessfully, setHasCompletedSuccessfully] = useState(false);
 
   // Refs for auto-scrolling to current item
   const scrollViewRef = useRef<any>(null);
@@ -591,12 +592,14 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
 
     // Start fresh - completely reset state
     setReallocationProgress({});
+    setHasCompletedSuccessfully(false);
 
     // Add a small delay to ensure state updates are processed
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     try {
       const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      let hadAnyError = false;
       // Process each reallocation sequentially
       for (let i = 0; i < filteredReallocations.length; i++) {
         const reallocation = filteredReallocations[i];
@@ -635,6 +638,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               completed: false,
             },
           }));
+          hadAnyError = true;
           // Continue to next reallocation
           continue;
         }
@@ -662,6 +666,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               completed: false,
             },
           }));
+          hadAnyError = true;
           continue;
         }
         let meltQuote = meltQuoteRes.value;
@@ -682,6 +687,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 completed: false,
               },
             }));
+            hadAnyError = true;
             continue;
           }
 
@@ -701,6 +707,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 completed: false,
               },
             }));
+            hadAnyError = true;
             continue;
           }
           const pr2 = adjustedReceive.value.request;
@@ -718,6 +725,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 completed: false,
               },
             }));
+            hadAnyError = true;
             continue;
           }
           meltQuote = meltQuoteRes2.value;
@@ -731,6 +739,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 completed: false,
               },
             }));
+            hadAnyError = true;
             continue;
           }
           // Use adjusted pr for sending
@@ -756,6 +765,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             ...prev,
             [i]: { step: 3, error: sendRes.error?.message || 'Failed to send', completed: false },
           }));
+          hadAnyError = true;
           continue;
         }
 
@@ -781,6 +791,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               completed: false,
             },
           }));
+          hadAnyError = true;
           continue;
         }
 
@@ -795,8 +806,11 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      // All transactions completed successfully
+      // All transactions processed; mark success if no errors occurred
       setIsExecuting(false);
+      if (!hadAnyError) {
+        setHasCompletedSuccessfully(true);
+      }
 
       // Close modal after brief delay
       setTimeout(() => {
@@ -826,12 +840,13 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                   ignoreDust,
                 });
               },
+              disabled: isExecuting || hasCompletedSuccessfully,
             },
             {
               text: 'Confirm',
               variant: 'primary',
               onPress: executeReallocation,
-              disabled: filteredReallocations.length === 0,
+              disabled: hasCompletedSuccessfully || filteredReallocations.length === 0,
               loading: isExecuting,
             },
           ]}

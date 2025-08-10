@@ -17,6 +17,7 @@ import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintAddMore } from './MintAddMore';
 import { View } from 'components/common/View';
+import MintDeleteConfirmRoute from './routes/MintDeleteConfirmRoute';
 
 interface SelectedMintDisplayProps {
   onPress?: () => void;
@@ -35,9 +36,10 @@ interface SelectedMintDisplayProps {
   onUnitUpdate?: (unit: string) => void;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  actionSheetRef?: React.RefObject<ActionSheetRef | null>;
 }
 
-export function MintIcon({ mintInfo, size = 32 }) {
+export function MintIcon({ mintInfo, size = 32 }: { mintInfo: any; size?: number }) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
 
@@ -75,7 +77,14 @@ export function MintIcon({ mintInfo, size = 32 }) {
   );
 }
 
-const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
+type MintSelectorButtonProps = {
+  onPress?: () => void;
+  unit?: string;
+  actionSheetRef: React.RefObject<ActionSheetRef | null>;
+  style?: StyleProp<ViewStyle>;
+};
+
+const MintSelectorButton: React.FC<MintSelectorButtonProps> = ({
   onPress,
   unit,
   actionSheetRef,
@@ -85,16 +94,16 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
   const styles = createStyles(theme);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const mintInfo = useGetMintInfo({ mintUrl: selectedMint });
+  const mintInfo = useGetMintInfo({ mintUrl: selectedMint || '' });
 
   const handlePress = () => {
     if (onPress) {
       onPress();
     }
-    actionSheetRef.current?.show();
+    actionSheetRef?.current?.show();
   };
 
-  const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+  const balance = useSelector(memoizedGetBalance(unit || 'sat', selectedMint || ''));
 
   return (
     <TouchableOpacity onPress={handlePress} onPressIn={() => {}} onPressOut={() => {}}>
@@ -139,7 +148,7 @@ const MintSelectorButton: React.FC<SelectedMintDisplayProps> = ({
             }
           )}
         </Text> */}
-            <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
+            <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit || 'sat'} />
           </View>
         </View>
         <View style={styles.chevronContainer}>
@@ -398,15 +407,12 @@ const sovran = (theme: Theme) => ({
 
 export { sovran };
 
-registerSheet('mint', MintSheet);
-
 const SelectedMintDisplay = ({
   onMintSelected,
-  onMintQuoteUpdate,
-  onUnitUpdate,
-  pr,
+  onMintQuoteUpdate: _onMintQuoteUpdate,
+  onUnitUpdate: _onUnitUpdate,
   unit,
-  loading,
+  loading: _loading,
   style,
 }: SelectedMintDisplayProps) => {
   const actionSheetRef = useRef<ActionSheetRef>(null);
@@ -418,11 +424,10 @@ const SelectedMintDisplay = ({
       <MintSheet
         actionSheetRef={actionSheetRef}
         onMintSelected={onMintSelected}
-        onMintQuoteUpdate={onMintQuoteUpdate}
-        onUnitUpdate={onUnitUpdate}
-        pr={pr}
+        onMintQuoteUpdate={_onMintQuoteUpdate}
+        onUnitUpdate={_onUnitUpdate}
         unit={unit}
-        loading={loading}
+        loading={_loading}
       />
     </>
   );
@@ -431,11 +436,17 @@ const SelectedMintDisplay = ({
 const MintSheet = ({
   actionSheetRef,
   onMintSelected,
-  onMintQuoteUpdate,
-  onUnitUpdate,
-  pr,
+  onMintQuoteUpdate: _onMintQuoteUpdate2,
+  onUnitUpdate: _onUnitUpdate2,
   unit,
-  loading,
+  loading: _loading2,
+}: {
+  actionSheetRef: React.RefObject<ActionSheetRef | null>;
+  onMintSelected?: SelectedMintDisplayProps['onMintSelected'];
+  onMintQuoteUpdate?: SelectedMintDisplayProps['onMintQuoteUpdate'];
+  onUnitUpdate?: SelectedMintDisplayProps['onUnitUpdate'];
+  unit?: string;
+  loading?: boolean;
 }) => {
   return (
     <Sheet
@@ -447,10 +458,10 @@ const MintSheet = ({
             <MintSelect
               onMintSelected={onMintSelected}
               unit={unit}
-              pr={pr}
-              loading={loading}
-              onUnitUpdate={onUnitUpdate}
-              onMintQuoteUpdate={onMintQuoteUpdate}></MintSelect>
+              startInEditing={false}
+              onCancel={() => {}}
+              onSaved={() => {}}
+            />
           ),
         },
         {
@@ -465,6 +476,7 @@ const MintSheet = ({
                   })
                 );
               }}
+              payload={{ currencies: ['SAT', 'USD', 'EUR', 'GBP'] }}
             />
           ),
         },
@@ -472,10 +484,16 @@ const MintSheet = ({
           name: 'mintDetailsPage',
           component: () => <MintDetailPage />,
         },
+        {
+          name: 'mintDeleteConfirm',
+          component: () => <MintDeleteConfirmRoute />,
+        },
       ]}
       initialRoute={'mintSelect'}></Sheet>
   );
 };
+
+registerSheet('mint', MintSheet);
 
 export const createStyles = (theme: Theme) =>
   StyleSheet.create({

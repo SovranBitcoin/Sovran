@@ -10,6 +10,8 @@ const withStorybook = require('@storybook/react-native/metro/withStorybook');
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
+    'mdi:chevron-double-left',
+    'mdi:chevron-double-right',
     'majesticons:percent',
     'majesticons:text',
     'la:user-plus',
