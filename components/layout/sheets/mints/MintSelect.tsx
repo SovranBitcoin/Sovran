@@ -1124,6 +1124,20 @@ function MintSelectComponent({
   };
 
   const handleSaveEdit = async () => {
+    // Sanity check: ensure ratios sum exactly to RATIO_PRECISION before saving
+    const totalRatio = Object.values(localMintRatios).reduce(
+      (sum, ratio) => sum + (typeof ratio === 'number' ? ratio : 0),
+      0
+    );
+    if (totalRatio !== RATIO_PRECISION) {
+      showMessage(
+        `Allocation error: ratios total is ${totalRatio}/${RATIO_PRECISION}. Please adjust so it equals 100%.`,
+        {},
+        { emoji: '🚨' }
+      );
+      // Keep user in editing mode to allow further adjustments
+      return;
+    }
     const reduxRatios = getCurrencyAllocation(selectedCurrency.toLowerCase());
 
     // Calculate reallocations properly

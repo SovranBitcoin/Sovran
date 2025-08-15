@@ -132,18 +132,20 @@ export const Transaction = React.memo(
                 ? 'Reallocation'
                 : safeTx.transactionType[0].toUpperCase() + safeTx.transactionType.slice(1)}
             </UntranslatedText>
-            <View className="flex flex-row items-center bg-transparent">
-              <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
-                {isVirtual ? '' : isSend ? '- ' : isReceive ? '+ ' : ''}
-              </UntranslatedText>
-              <AmountFormatter
-                amount={safeTx.amount}
-                unit={safeTx.unit}
-                size={16}
-                weight="heavy"
-                color={isSend ? reds[300] : greens[300]}
-              />
-            </View>
+            {isVirtual ? null : (
+              <View className="flex flex-row items-center bg-transparent">
+                <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
+                  {isVirtual ? '' : isSend ? '- ' : isReceive ? '+ ' : ''}
+                </UntranslatedText>
+                <AmountFormatter
+                  amount={safeTx.amount}
+                  unit={safeTx.unit}
+                  size={16}
+                  weight="heavy"
+                  color={isSend ? reds[300] : greens[300]}
+                />
+              </View>
+            )}
           </View>
 
           <View className="flex flex-row justify-between bg-transparent">
@@ -170,13 +172,15 @@ export const Transaction = React.memo(
               </View>
             </View>
 
-            <UntranslatedText
-              className="font-overpass-heavy self-end text-right text-xs"
-              bold
-              size={10}
-              color={theme.greys[100]}>
-              {fiatAmount}
-            </UntranslatedText>
+            {isVirtual ? null : (
+              <UntranslatedText
+                className="font-overpass-heavy self-end text-right text-xs"
+                bold
+                size={10}
+                color={theme.greys[100]}>
+                {fiatAmount}
+              </UntranslatedText>
+            )}
           </View>
         </View>
       </TouchableOpacity>
