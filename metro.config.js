@@ -87,6 +87,10 @@ const configWithMonicon = withMonicon(config, {
     'majesticons:eye',
     'fa6-solid:chevron-left',
     'fa6-solid:chevron-right',
+    // restoreChoice additions
+    'fa6-solid:user',
+    'fa6-solid:user-check',
+    'fa6-solid:download',
     'fluent:add-24-filled',
     'material-symbols:refresh-rounded',
     'ic:round-refresh',

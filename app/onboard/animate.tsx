@@ -344,13 +344,13 @@ const ChainLoadingAnimation = () => {
     {
       type: 'processing',
       label: 'Processing',
-      icon: 'settings',
+      icon: 'material-symbols:settings-rounded',
       id: 0,
     },
     {
       type: 'complete',
       label: 'Complete',
-      icon: 'checkmark',
+      icon: 'ion:checkmark-done',
     },
   ]);
 

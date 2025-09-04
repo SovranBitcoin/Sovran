@@ -7,9 +7,9 @@ import {
   ScrollView,
   TextInput,
   Image,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -18,6 +18,7 @@ import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
 import { useTypedNavigation } from 'helper/navigation';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
+// @ts-ignore
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
 import * as bip39 from '@scure/bip39';
@@ -27,6 +28,10 @@ import * as Crypto from 'expo-crypto';
 import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
+import { storeMnemonic } from 'helper/secureStorage';
+import { Button } from 'components/common/Button';
+import { Card } from 'components/common/Card';
+import { Spacer } from 'components/common/View';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
@@ -156,13 +161,20 @@ interface NameInputProps {
   isSubmitting: boolean;
   styles: any;
   theme: Theme;
+  error: boolean;
 }
 
-const NameInput = ({ name, setName, isSubmitting, styles, theme }: NameInputProps) => (
+const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameInputProps) => (
   <View style={styles.inputContainer}>
     <Text weight="medium" size={14} style={styles.inputLabel}>
       Enter your name
     </Text>
+    {error && (
+      <>
+        <Card message="You must enter something for your profile name" variant="warning" />
+        <Spacer size={8} />
+      </>
+    )}
     <TextInput
       placeholder="Your public profile name"
       onChangeText={(newText) => setName(newText)}
@@ -178,54 +190,6 @@ const NameInput = ({ name, setName, isSubmitting, styles, theme }: NameInputProp
   </View>
 );
 
-interface ButtonBarProps {
-  handleCreateProfile: () => void;
-  handleExistingAccount: () => void;
-  isSubmitting: boolean;
-  styles: any;
-  theme: Theme;
-}
-
-const ButtonBar = ({
-  handleCreateProfile,
-  handleExistingAccount,
-  isSubmitting,
-  styles,
-  theme,
-}: ButtonBarProps) => (
-  <View style={styles.bottomButtons}>
-    <TouchableOpacity
-      style={[styles.createButton, isSubmitting && styles.disabledControl]}
-      onPress={handleCreateProfile}
-      disabled={isSubmitting}>
-      {isSubmitting ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={greys(theme)[0]} />
-          <Text weight="bold" size={16} style={[styles.createButtonText, { marginLeft: 8 }]}>
-            Creating...
-          </Text>
-        </View>
-      ) : (
-        <Text weight="bold" size={16} style={styles.createButtonText}>
-          Create Sovran Account
-        </Text>
-      )}
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      style={[styles.existingButton, isSubmitting && styles.disabledControl]}
-      onPress={handleExistingAccount}
-      disabled={isSubmitting}>
-      <Text
-        size={16}
-        weight="bold"
-        style={[styles.existingButtonText, isSubmitting && styles.disabledButtonText]}>
-        I already have a Sovran account
-      </Text>
-    </TouchableOpacity>
-  </View>
-);
-
 // Main RecoveryScreen component
 const RecoveryScreen = () => {
   const theme = useSelector(memoizedGetTheme);
@@ -238,10 +202,16 @@ const RecoveryScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mnemonic] = useState(generateMnemonic());
   const [name, setName] = useState('');
+  const [error, setError] = useState(false);
+
+  const prevScreen = navigation.getState().routes[navigation.getState().routes.length - 2].name;
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
     try {
-      if (!name.trim() || isSubmitting) return;
+      if (!name.trim() || isSubmitting) {
+        setError(true);
+        return;
+      }
 
       const accountIndex = 0; // for now we force it to create account at index 0 only
 
@@ -278,6 +248,18 @@ const RecoveryScreen = () => {
         pool.close(RELAY_URLS)
       );
 
+      // Store mnemonic securely before proceeding
+      const mnemonicStored = await storeMnemonic(mnemonic);
+      if (!mnemonicStored) {
+        console.error('Failed to store mnemonic securely');
+        Alert.alert(
+          'Security Error',
+          'Failed to securely store your recovery phrase. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       // Update local profile storage
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
       const newProfile = {
@@ -297,7 +279,8 @@ const RecoveryScreen = () => {
       // setProfiles([...(profiles || []), newProfile]);
       setProfiles([newProfile]); // for now we force it to create account at index 0 only
       setCurrentProfile(newProfile);
-      navigation.navigate('onboard/displayMnemonic', { mnemonic });
+      // Skip seed phrase display and verification - go directly to animation
+      navigation.navigate('onboard/animate', { mnemonic, type: 'new' });
     } catch (err) {
       console.error(err);
     }
@@ -340,18 +323,30 @@ const RecoveryScreen = () => {
               isSubmitting={isSubmitting}
               styles={styles}
               theme={theme}
+              error={error}
             />
           </View>
         </ScrollView>
       </Container>
 
-      <ButtonBar
-        handleCreateProfile={handleCreateProfile}
-        handleExistingAccount={handleExistingAccount}
-        isSubmitting={isSubmitting}
-        styles={styles}
-        theme={theme}
-      />
+      <View style={styles.bottomButtons}>
+        <Button
+          variant="primary"
+          text={prevScreen === 'onboard/nostr' ? 'Create Sovran Account' : 'Next'}
+          onPress={handleCreateProfile}
+          disabled={isSubmitting}
+          loading={isSubmitting}
+        />
+
+        {prevScreen === 'onboard/nostr' && (
+          <Button
+            variant="secondary"
+            text="I already have a Sovran account"
+            onPress={handleExistingAccount}
+            disabled={isSubmitting}
+          />
+        )}
+      </View>
     </KeyboardAvoidingView>
   );
 };

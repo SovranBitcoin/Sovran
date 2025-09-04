@@ -1,7 +1,7 @@
 import { getPublicKey, nip19 } from 'nostr-tools';
 import NDK, { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 import { fetchEventFromRelays } from 'helper/nostr/cashu';
-import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import * as nip06 from 'nostr-tools/nip06';
 import { relays } from 'components/ndk';
 
 export const fetchAccountData = async ({ nsec }: { nsec: string }) => {

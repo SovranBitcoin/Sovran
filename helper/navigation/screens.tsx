@@ -262,6 +262,10 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     title: '',
   },
   {
+    name: 'onboard/restoreChoice',
+    title: '',
+  },
+  {
     name: 'giftcards/all',
     title: 'Gift cards',
     options: {

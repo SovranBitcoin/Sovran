@@ -7,7 +7,6 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import BottomButtons, { ButtonProps } from './BottomButtons';
 import { useTypedNavigation } from 'helper/navigation';
-import { Cashews } from 'assets/images';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface InfoSectionProps {
@@ -71,11 +70,11 @@ export const NavigationFooter = ({
           {backText}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.footerButton} onPress={onNext}>
-        <Text size={16} style={styles.buttonTextRight}>
+      <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+        <Text size={18} weight="bold" style={styles.nextButtonText}>
           {nextText}
         </Text>
-        <Icon name="fa6-solid:chevron-right" size={20} color={iconColor} />
+        <Icon name="fa6-solid:chevron-right" size={22} color={greys(theme)[950]} />
       </TouchableOpacity>
     </View>
   );
@@ -114,9 +113,6 @@ export function OnboardingLayout({
           position: 'absolute',
           backgroundColor: 'black',
         }}>
-        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
-        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
-        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
         <LinearGradient
           colors={['black', 'transparent', 'black']}
           locations={[0, 0.5, 1]}
@@ -198,6 +194,26 @@ const createStyles = (theme: Theme) =>
     footerButton: {
       flexDirection: 'row',
       alignItems: 'center',
+    },
+    nextButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: greys(theme)[0],
+      paddingHorizontal: 24,
+      paddingVertical: 14,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    nextButtonText: {
+      color: greys(theme)[950],
+      marginRight: 8,
     },
     actionButton: {
       padding: 16,

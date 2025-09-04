@@ -139,7 +139,7 @@ function TabOneScreen() {
 
   const { transactions } = useCashu();
   const txData = useTransactionsData({
-    transactions,
+    transactions: transactions as unknown as TransactionData[],
     account,
     days: 1,
     showMore: true,
@@ -196,6 +196,7 @@ function TabOneScreen() {
       />
     );
   }
+
   if (!(currentProfile?.pubkey && selectedMint)) {
     return <Welcome />;
   }

@@ -7,7 +7,6 @@ import Icon, { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
 import { useTypedNavigation } from 'helper/navigation';
-import { Cashews } from 'assets/images';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ModalScreen() {
@@ -24,9 +23,9 @@ export default function ModalScreen() {
           position: 'absolute',
           backgroundColor: 'black',
         }}>
+        {/* <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
         <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
-        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
-        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} />
+        <Cashews style={{ width: '100%', height: undefined, aspectRatio: 1, opacity: 0.66 }} /> */}
         <LinearGradient
           colors={['black', 'transparent', 'black']}
           locations={[0, 0.5, 1]}
@@ -45,10 +44,10 @@ export default function ModalScreen() {
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('onboard/ecash')}>
-          <Text size={16} style={styles.navButtonText}>
+          <Text size={18} weight="bold" style={styles.navButtonText}>
             Next
           </Text>
-          <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[0]} />
+          <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[950]} />
         </TouchableOpacity>
       </View>
     </View>
@@ -91,8 +90,13 @@ const createStyles = (theme: Theme) =>
     navButton: {
       flexDirection: 'row',
       alignItems: 'center',
+      backgroundColor: greys(theme)[0],
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderRadius: 12,
     },
     navButtonText: {
       marginRight: 8,
+      color: greys(theme)[950],
     },
   });
