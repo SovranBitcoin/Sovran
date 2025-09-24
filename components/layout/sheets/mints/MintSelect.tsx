@@ -37,6 +37,7 @@ import RippleButton from 'components/common/RippleButton';
 import { darken } from 'polished';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { SheetManager } from 'react-native-actions-sheet';
+// import { useGetMintInfo, memoizedGetMintInfo } from 'helper/redux/cashu';
 
 interface SelectedMintDisplayProps {
   onMintSelected?: (
@@ -52,6 +53,16 @@ interface SelectedMintDisplayProps {
   startInEditing?: boolean;
   onCancel?: () => void;
   onSaved?: () => void;
+  mode?: 'reallocation' | 'mpp';
+  mppPayload?: {
+    pr: string;
+    amount: number;
+    unit: string;
+    pubkey?: string;
+    email?: string;
+    lud16?: string;
+    redirect?: string;
+  };
 }
 
 type SupportedCurrency = 'SAT' | 'USD' | 'EUR' | 'GBP';
@@ -603,12 +614,29 @@ MemoizedMintItem.displayName = 'MintItem';
 // Export the memoized component as MintItem for clean usage
 const MintItemComponent = MemoizedMintItem;
 
+// Helper function to check if a mint supports nut 15 for the selected currency
+const checkNut15Support = (mintInfo: any, currency: string): boolean => {
+  if (!mintInfo?.nuts?.['15']) {
+    return false;
+  }
+
+  const nut15 = mintInfo.nuts['15'];
+  if (!nut15.methods || !Array.isArray(nut15.methods)) {
+    return false;
+  }
+
+  // Check if any method supports the selected currency
+  return nut15.methods.some((method: any) => method.unit?.toLowerCase() === currency.toLowerCase());
+};
+
 function MintSelectComponent({
   onMintSelected,
   unit,
   startInEditing,
   onCancel,
   onSaved,
+  mode = 'reallocation',
+  mppPayload,
 }: SelectedMintDisplayProps) {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
@@ -730,6 +758,7 @@ function MintSelectComponent({
   }, []);
 
   const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+
   // Memoize currencies to prevent recalculation on every render
   const currencies = useMemo(() => {
     // limit to specified currencies: sat, eur, gbp, usd
@@ -760,19 +789,31 @@ function MintSelectComponent({
     }
   }, [isEditing, selectedCurrency, localMintRatios, getCurrencyAllocation]);
 
+  // Get mint info from Redux state
+  const mintInfoState = useSelector((state: any) => state.cashu?.info || {});
+
   // Filter and sort mints based on the selected currency and view mode - optimized with useMemo
   const filteredMints = useMemo(() => {
     const mints = multipleBalances.filter((mint) => mint.unit?.toUpperCase() === selectedCurrency);
+
+    // Filter mints that support nut 15 for the selected currency (only for MPP mode)
+    const mintsWithNut15Support =
+      mode === 'mpp'
+        ? mints.filter((mint) => {
+            const mintInfo = mintInfoState[mint.mintUrl];
+            return checkNut15Support(mintInfo, selectedCurrency);
+          })
+        : mints;
 
     // Always update ref with current ratios
     latestRatiosRef.current = currentMintRatios;
 
     // Sort based on view mode
-    let sortedMints: typeof mints;
+    let sortedMints: typeof mintsWithNut15Support;
 
     if (isEditing && editingMintOrder.length > 0) {
       // In editing mode with stored order: maintain the stable order
-      sortedMints = [...mints].sort((a, b) => {
+      sortedMints = [...mintsWithNut15Support].sort((a, b) => {
         const indexA = editingMintOrder.indexOf(a.mintUrl);
         const indexB = editingMintOrder.indexOf(b.mintUrl);
         // If mint not found in stored order, put it at the end
@@ -782,11 +823,19 @@ function MintSelectComponent({
       });
     } else {
       // Default view or first time entering edit: sort by balance (highest first)
-      sortedMints = [...mints].sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      sortedMints = [...mintsWithNut15Support].sort((a, b) => (b.amount || 0) - (a.amount || 0));
     }
 
     return sortedMints;
-  }, [multipleBalances, selectedCurrency, currentMintRatios, isEditing, editingMintOrder]);
+  }, [
+    multipleBalances,
+    selectedCurrency,
+    currentMintRatios,
+    isEditing,
+    editingMintOrder,
+    mode,
+    mintInfoState,
+  ]);
 
   // Initialize ratios when needed (moved from useMemo to prevent re-render loops)
   React.useEffect(() => {
@@ -1251,15 +1300,61 @@ function MintSelectComponent({
       return;
     }
 
-    // Show reallocation confirmation
+    // Show confirmation based on mode
     try {
-      const result = await SheetManager.show('reallocate-accepter', {
-        payload: {
-          reallocations,
-          totalAmount: totalTransferred,
-          unit: selectedCurrency.toLowerCase(),
-        },
-      });
+      let result;
+      if (mode === 'mpp' && mppPayload) {
+        // For MPP mode, pass invoice and mint allocations
+        const mppAllocations = currentMints
+          .filter((mint) => (localMintRatios[mint.mintUrl] || 0) > 0)
+          .map((mint) => {
+            const percentage = ratioToPercentage(localMintRatios[mint.mintUrl] || 0);
+            const amount = Math.floor((mppPayload.amount * percentage) / 100);
+            return {
+              mintUrl: mint.mintUrl,
+              percentage,
+              amount,
+            };
+          });
+
+        // Fix rounding errors by distributing the remainder to the largest allocation
+        const totalAllocated = mppAllocations.reduce(
+          (sum, allocation) => sum + allocation.amount,
+          0
+        );
+        const remainder = mppPayload.amount - totalAllocated;
+
+        if (remainder > 0 && mppAllocations.length > 0) {
+          // Find the allocation with the highest percentage and add the remainder
+          const largestAllocation = mppAllocations.reduce((largest, current) =>
+            current.percentage > largest.percentage ? current : largest
+          );
+          largestAllocation.amount += remainder;
+        }
+
+        result = await SheetManager.show('reallocate-accepter', {
+          payload: {
+            mode: 'mpp',
+            pr: mppPayload.pr,
+            amount: mppPayload.amount,
+            unit: mppPayload.unit,
+            pubkey: mppPayload.pubkey,
+            email: mppPayload.email,
+            lud16: mppPayload.lud16,
+            redirect: mppPayload.redirect,
+            mppAllocations,
+          },
+        });
+      } else {
+        // For reallocation mode, use existing logic
+        result = await SheetManager.show('reallocate-accepter', {
+          payload: {
+            reallocations,
+            totalAmount: totalTransferred,
+            unit: selectedCurrency.toLowerCase(),
+          },
+        });
+      }
 
       if (result?.confirmed) {
         // User confirmed - save the changes
@@ -1334,7 +1429,7 @@ function MintSelectComponent({
                     disabled: !isEditing,
                   },
                   {
-                    text: 'Save',
+                    text: mode === 'mpp' ? 'Send Payment' : 'Save',
                     variant: 'primary' as const,
                     onPress: async () => {
                       await handleSaveEdit();
@@ -1384,7 +1479,7 @@ function MintSelectComponent({
         {isEditing ? (
           <View style={{ marginBottom: 16 }}>
             <Text weight="bold" style={[styles.sectionHeader, { marginBottom: 6 }]}>
-              TOTAL BALANCE
+              {mode === 'mpp' ? 'MPP PAYMENT ALLOCATION' : 'TOTAL BALANCE'}
             </Text>
             {(() => {
               // Determine which ratios to display (live preview during gesture)
@@ -1574,7 +1669,7 @@ function MintSelectComponent({
 
         <View style={styles.sendFromHeader}>
           <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 4 }]}>
-            Send from
+            {mode === 'mpp' ? 'Allocate from mints' : 'Send from'}
           </Text>
           {isEditing && (
             <View style={{ flexDirection: 'row' }}>

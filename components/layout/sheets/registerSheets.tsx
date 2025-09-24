@@ -12,6 +12,7 @@ import { default as registerMintBalance } from 'components/layout/sheets/mint-ba
 import { default as registerMintReallocation } from 'components/layout/sheets/mint-reallocation';
 import { default as registerEmail } from 'components/layout/sheets/email';
 import { default as registerVideo } from 'components/layout/sheets/video';
+import { default as registerLightningMPP } from 'components/layout/sheets/lightning-mpp';
 
 export function registerAllSheets({ context }: { context?: 'global' }) {
   registerExample({ context });
@@ -28,4 +29,5 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerMintReallocation({ context });
   registerEmail({ context });
   registerVideo({ context });
+  registerLightningMPP({ context });
 }

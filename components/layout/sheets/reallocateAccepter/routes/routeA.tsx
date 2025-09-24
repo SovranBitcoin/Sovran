@@ -142,7 +142,7 @@ const ReallocationItem = React.memo(
     index,
     progress,
     theme,
-    hasError,
+    _hasError,
     reallocationProgress,
     isExecuting,
     executionSteps,
@@ -151,7 +151,7 @@ const ReallocationItem = React.memo(
     index: number;
     progress: any;
     theme: any;
-    hasError: boolean;
+    _hasError: boolean;
     reallocationProgress: any;
     isExecuting: boolean;
     executionSteps: any[];
@@ -161,7 +161,7 @@ const ReallocationItem = React.memo(
     const errorOpacity = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-      if (hasError) {
+      if (_hasError) {
         // Expand and show error
         Animated.parallel([
           Animated.timing(expandAnimation, {
@@ -190,7 +190,7 @@ const ReallocationItem = React.memo(
           }),
         ]).start();
       }
-    }, [hasError, errorOpacity, expandAnimation]);
+    }, [_hasError, errorOpacity, expandAnimation]);
 
     const containerStyle = useMemo(
       () => ({
@@ -269,7 +269,7 @@ const ReallocationItem = React.memo(
         </View>
 
         {/* Animated error container */}
-        {hasError && (
+        {_hasError && (
           <Animated.View
             style={{
               height: errorContainerHeight,
@@ -292,7 +292,7 @@ const ReallocationItem = React.memo(
   (prevProps, nextProps) => {
     return (
       prevProps.index === nextProps.index &&
-      prevProps.hasError === nextProps.hasError &&
+      prevProps._hasError === nextProps._hasError &&
       prevProps.progress?.step === nextProps.progress?.step &&
       prevProps.progress?.completed === nextProps.progress?.completed &&
       prevProps.progress?.error === nextProps.progress?.error
@@ -301,6 +301,175 @@ const ReallocationItem = React.memo(
 );
 
 ReallocationItem.displayName = 'ReallocationItem';
+
+// MPP Allocation Item component
+const MPPAllocationItem = React.memo(
+  ({
+    allocation,
+    index,
+    progress,
+    theme,
+    _hasError,
+    reallocationProgress,
+    isExecuting,
+    executionSteps,
+    unit,
+  }: {
+    allocation: any;
+    index: number;
+    progress: any;
+    theme: any;
+    _hasError: boolean;
+    reallocationProgress: any;
+    isExecuting: boolean;
+    executionSteps: any[];
+    unit: string;
+  }) => {
+    // Animation for expanding error state
+    const expandAnimation = useRef(new Animated.Value(0)).current;
+    const errorOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      if (_hasError) {
+        // Expand and show error
+        Animated.parallel([
+          Animated.timing(expandAnimation, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(errorOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      } else {
+        // Collapse and hide error
+        Animated.parallel([
+          Animated.timing(expandAnimation, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+          Animated.timing(errorOpacity, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [_hasError, errorOpacity, expandAnimation]);
+
+    const containerStyle = useMemo(
+      () => ({
+        marginBottom: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 12,
+        backgroundColor: greys(theme)[700],
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: greys(theme)[600],
+      }),
+      [theme]
+    );
+
+    const errorContainerHeight = expandAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 60],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View style={containerStyle}>
+        {/* Main row with mint and allocation info */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+          {/* Mint */}
+          <MintComponent mintUrl={allocation.mintUrl} theme={theme} />
+
+          {/* Allocation Info */}
+          <View
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginHorizontal: 6,
+              paddingVertical: 8,
+            }}>
+            {/* Arrow Circle */}
+            <ReallocationArrow
+              reallocationIndex={index}
+              reallocationProgress={reallocationProgress}
+              isExecuting={isExecuting}
+              theme={theme}
+              executionSteps={executionSteps}
+            />
+
+            {/* Amount Above */}
+            {(() => {
+              const amountTextColor = progress?.completed
+                ? greens[300]
+                : progress?.error
+                  ? reds[300]
+                  : greys(theme)[0];
+              return (
+                <Text
+                  size={12}
+                  bold
+                  color={amountTextColor}
+                  style={{ textAlign: 'center', marginTop: 3 }}>
+                  {allocation.amount} {unit?.toUpperCase() || 'SAT'}
+                </Text>
+              );
+            })()}
+
+            {/* Percentage Below */}
+            <Text bold size={10} color={greys(theme)[300]} style={{ textAlign: 'center' }}>
+              {allocation.percentage.toFixed(1)}%
+            </Text>
+          </View>
+
+          {/* Empty space for symmetry */}
+          <View style={{ width: 90 }} />
+        </View>
+
+        {/* Animated error container */}
+        {_hasError && (
+          <Animated.View
+            style={{
+              height: errorContainerHeight,
+              overflow: 'hidden',
+              marginTop: 12,
+            }}>
+            <Animated.View
+              style={{
+                opacity: errorOpacity,
+                marginHorizontal: 10,
+                marginBottom: 8,
+              }}>
+              <Card message={progress?.error} variant="warning"></Card>
+            </Animated.View>
+          </Animated.View>
+        )}
+      </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.index === nextProps.index &&
+      prevProps._hasError === nextProps._hasError &&
+      prevProps.progress?.step === nextProps.progress?.step &&
+      prevProps.progress?.completed === nextProps.progress?.completed &&
+      prevProps.progress?.error === nextProps.progress?.error
+    );
+  }
+);
+
+MPPAllocationItem.displayName = 'MPPAllocationItem';
 
 // Progress component for individual reallocation arrows
 const ReallocationArrow = React.memo(
@@ -320,7 +489,7 @@ const ReallocationArrow = React.memo(
     const progress = reallocationProgress[reallocationIndex];
     const isActive = isExecuting && progress && !progress.completed && !progress.error;
     const isCompleted = progress?.completed;
-    const hasError = progress?.error;
+    const _hasError = progress?.error;
 
     // Animation values
     const animatedScale = useRef(new Animated.Value(1)).current;
@@ -443,7 +612,7 @@ const ReallocationArrow = React.memo(
             }}>
             <Svg width={size} height={size}>
               <Circle
-                stroke={hasError ? reds[300] : isCompleted ? greens[300] : theme.shades[200]}
+                stroke={_hasError ? reds[300] : isCompleted ? greens[300] : theme.shades[200]}
                 fill="none"
                 cx={size / 2}
                 cy={size / 2}
@@ -472,7 +641,7 @@ const ReallocationArrow = React.memo(
             height: size,
             opacity: isExecuting ? 1 : 0.8,
           }}>
-          {hasError ? errorIcon : isActive ? spinner : isCompleted ? successIcon : arrowIcon}
+          {_hasError ? errorIcon : isActive ? spinner : isCompleted ? successIcon : arrowIcon}
         </Animated.View>
       </Animated.View>
     );
@@ -518,26 +687,46 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
   const scrollViewRef = useRef<any>(null);
   const itemRefs = useRef<{ [key: number]: RNView | null }>({});
 
-  // Define execution steps
-  const executionSteps = [
-    { id: 'receive', label: 'Generating receive invoice', icon: 'iconamoon:send-fill' },
-    { id: 'quote', label: 'Quoting fees', icon: 'mdi:cash-sync' },
-    { id: 'send', label: 'Sending funds', icon: 'ri:send-plane-2-fill' },
-    { id: 'status', label: 'Confirming payment', icon: 'humbleicons:refresh' },
-  ];
+  // Define execution steps based on mode
+  const executionSteps = useMemo(() => {
+    if (payload.mode === 'mpp') {
+      return [
+        { id: 'quote', label: 'Getting quote', icon: 'mdi:cash-sync' },
+        { id: 'send', label: 'Sending payment', icon: 'ri:send-plane-2-fill' },
+      ];
+    } else {
+      return [
+        { id: 'receive', label: 'Generating receive invoice', icon: 'iconamoon:send-fill' },
+        { id: 'quote', label: 'Quoting fees', icon: 'mdi:cash-sync' },
+        { id: 'send', label: 'Sending funds', icon: 'ri:send-plane-2-fill' },
+        { id: 'status', label: 'Confirming payment', icon: 'humbleicons:refresh' },
+      ];
+    }
+  }, [payload.mode]);
 
   // Calculate dynamic dust threshold based on total balance
   const dustThreshold = useMemo(() => {
-    return (payload.totalAmount * DUST_PERCENTAGE) / 100;
-  }, [payload.totalAmount, DUST_PERCENTAGE]);
+    const totalAmount = payload.totalAmount || payload.amount || 0;
+    return (totalAmount * DUST_PERCENTAGE) / 100;
+  }, [payload.totalAmount, payload.amount, DUST_PERCENTAGE]);
 
   // Filter reallocations based on ignore dust setting
   const filteredReallocations = useMemo(() => {
-    if (!ignoreDust) {
-      return payload.reallocations;
+    if (payload.mode === 'mpp') {
+      // For MPP mode, use mppAllocations instead of reallocations
+      return payload.mppAllocations || [];
     }
-    return payload.reallocations.filter((reallocation) => reallocation.amount > dustThreshold);
-  }, [payload.reallocations, ignoreDust, dustThreshold]);
+    if (!ignoreDust) {
+      return payload.reallocations || [];
+    }
+    return (payload.reallocations || []).filter(
+      (reallocation) => reallocation.amount > dustThreshold
+    );
+  }, [payload.reallocations, payload.mppAllocations, payload.mode, ignoreDust, dustThreshold]);
+
+  // Separate arrays for type safety
+  const mppAllocations = payload.mode === 'mpp' ? payload.mppAllocations || [] : [];
+  const reallocations = payload.mode !== 'mpp' ? payload.reallocations || [] : [];
 
   // Calculate filtered total amount
   const filteredTotalAmount = useMemo(() => {
@@ -586,6 +775,110 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
     }, 100); // Small delay to ensure DOM is updated
   };
 
+  // Execute MPP payment process
+  const executeMPPPayment = async () => {
+    setIsExecuting(true);
+
+    // Start fresh - completely reset state
+    setReallocationProgress({});
+    setHasCompletedSuccessfully(false);
+
+    // Add a small delay to ensure state updates are processed
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    try {
+      let hadAnyError = false;
+      // Process each mint allocation sequentially
+      for (let i = 0; i < mppAllocations.length; i++) {
+        const allocation = mppAllocations[i];
+
+        // Initialize progress for this allocation
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 0, error: null, completed: false },
+        }));
+
+        // Add a small delay to ensure state is updated
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Scroll to the current item being processed
+        scrollToItem(i);
+
+        // Step 1: Get melt quote
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 1, error: null, completed: false },
+        }));
+
+        const quoteRes = await getMeltQuote({
+          pr: payload.pr!,
+          unit: payload.unit,
+          mintUrl: allocation.mintUrl,
+          mppAmount: allocation.amount,
+        });
+
+        if (quoteRes.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: {
+              step: 1,
+              error: quoteRes.error?.message || 'Failed to get quote',
+              completed: false,
+            },
+          }));
+          hadAnyError = true;
+          continue;
+        }
+
+        // Step 2: Send payment
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 2, error: null, completed: false },
+        }));
+
+        const sendRes = await sendLightning({
+          mintUrl: allocation.mintUrl,
+          pr: payload.pr!,
+          unit: payload.unit,
+          pubkey: payload.pubkey,
+          meltQuote: quoteRes.value,
+          email: payload.email,
+          lud16: payload.lud16,
+        });
+
+        if (sendRes.isErr()) {
+          setReallocationProgress((prev) => ({
+            ...prev,
+            [i]: {
+              step: 2,
+              error: sendRes.error?.message || 'Failed to send payment',
+              completed: false,
+            },
+          }));
+          hadAnyError = true;
+          continue;
+        }
+
+        // Mark as completed
+        setReallocationProgress((prev) => ({
+          ...prev,
+          [i]: { step: 2, error: null, completed: true },
+        }));
+
+        // Brief pause to show completion
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+
+      if (!hadAnyError) {
+        setHasCompletedSuccessfully(true);
+      }
+    } catch (error) {
+      console.error('MPP execution error:', error);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   // Execute reallocation process for each reallocation
   const executeReallocation = async () => {
     setIsExecuting(true);
@@ -601,8 +894,8 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
       const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       let hadAnyError = false;
       // Process each reallocation sequentially
-      for (let i = 0; i < filteredReallocations.length; i++) {
-        const reallocation = filteredReallocations[i];
+      for (let i = 0; i < reallocations.length; i++) {
+        const reallocation = reallocations[i];
 
         // Initialize progress for this reallocation
         setReallocationProgress((prev) => ({
@@ -843,72 +1136,84 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               disabled: isExecuting || hasCompletedSuccessfully,
             },
             {
-              text: 'Confirm',
+              text: payload.mode === 'mpp' ? 'Send Payment' : 'Confirm',
               variant: 'primary',
-              onPress: executeReallocation,
-              disabled: hasCompletedSuccessfully || filteredReallocations.length === 0,
+              onPress: payload.mode === 'mpp' ? executeMPPPayment : executeReallocation,
+              disabled:
+                hasCompletedSuccessfully ||
+                (payload.mode === 'mpp' ? mppAllocations.length === 0 : reallocations.length === 0),
               loading: isExecuting,
             },
           ]}
         />
       }>
-      {/* Ignore Dust Toggle */}
-      <View
-        style={{
-          flex: 1,
-        }}>
-        <Text
-          size={20}
-          heavy
-          color={greys(theme)[0]}
-          style={{
-            textAlign: 'center',
-            marginBottom: 16,
-          }}>
-          {isExecuting ? 'Processing Reallocation' : 'Confirm Reallocation'}
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: greys(theme)[700],
-            borderRadius: 14,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: greys(theme)[600],
-          }}>
-          <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        {/* Ignore Dust Toggle - only show for reallocation mode */}
+        {payload.mode !== 'mpp' && (
+          <View
+            style={{
+              flex: 1,
+            }}>
             <Text
-              size={14}
-              semibold
+              size={20}
+              heavy
               color={greys(theme)[0]}
               style={{
-                marginBottom: 2,
+                textAlign: 'center',
+                marginBottom: 16,
               }}>
-              Ignore Dust (recommended)
+              {isExecuting
+                ? payload.mode === 'mpp'
+                  ? 'Processing MPP Payment'
+                  : 'Processing Reallocation'
+                : payload.mode === 'mpp'
+                  ? 'Confirm MPP Payment'
+                  : 'Confirm Reallocation'}
             </Text>
-            <Text size={12} regular color={greys(theme)[300]}>
-              Skip transactions under 2% of total ({Math.round(dustThreshold)}{' '}
-              {payload.unit.toUpperCase()})
-            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                backgroundColor: greys(theme)[700],
+                borderRadius: 14,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: greys(theme)[600],
+              }}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  size={14}
+                  semibold
+                  color={greys(theme)[0]}
+                  style={{
+                    marginBottom: 2,
+                  }}>
+                  Ignore Dust (recommended)
+                </Text>
+                <Text size={12} regular color={greys(theme)[300]}>
+                  Skip transactions under 2% of total ({Math.round(dustThreshold)}{' '}
+                  {payload.unit.toUpperCase()})
+                </Text>
+              </View>
+              <Switch
+                value={ignoreDust}
+                onValueChange={setIgnoreDust}
+                trackColor={{
+                  false: greys(theme)[600],
+                  true: theme.shades[200] + '40',
+                }}
+                thumbColor={ignoreDust ? theme.shades[200] : greys(theme)[400]}
+              />
+            </View>
           </View>
-          <Switch
-            value={ignoreDust}
-            onValueChange={setIgnoreDust}
-            trackColor={{
-              false: greys(theme)[600],
-              true: theme.shades[200] + '40',
-            }}
-            thumbColor={ignoreDust ? theme.shades[200] : greys(theme)[400]}
-          />
-        </View>
+        )}
 
         {/* Reallocation Details */}
         <View style={{ marginBottom: 12 }}>
-          {filteredReallocations.length === 0 ? (
+          {(payload.mode === 'mpp' ? mppAllocations.length === 0 : reallocations.length === 0) ? (
             <View
               style={{
                 paddingHorizontal: 16,
@@ -946,8 +1251,8 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
               ref={scrollViewRef}
               style={{ maxHeight: 400 }}
               showsVerticalScrollIndicator={false}>
-              {filteredReallocations.map((reallocation, index) => {
-                const hasError = !!reallocationProgress[index]?.error;
+              {(payload.mode === 'mpp' ? mppAllocations : reallocations).map((item, index) => {
+                const _hasError = !!reallocationProgress[index]?.error;
 
                 return (
                   <View
@@ -956,16 +1261,30 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                       itemRefs.current[index] = ref;
                     }}
                     collapsable={false}>
-                    <ReallocationItem
-                      reallocation={reallocation}
-                      index={index}
-                      progress={reallocationProgress[index]}
-                      theme={theme}
-                      hasError={hasError}
-                      reallocationProgress={reallocationProgress}
-                      isExecuting={isExecuting}
-                      executionSteps={executionSteps}
-                    />
+                    {payload.mode === 'mpp' ? (
+                      <MPPAllocationItem
+                        allocation={item}
+                        index={index}
+                        progress={reallocationProgress[index]}
+                        theme={theme}
+                        _hasError={_hasError}
+                        reallocationProgress={reallocationProgress}
+                        isExecuting={isExecuting}
+                        executionSteps={executionSteps}
+                        unit={payload.unit}
+                      />
+                    ) : (
+                      <ReallocationItem
+                        reallocation={item}
+                        index={index}
+                        progress={reallocationProgress[index]}
+                        theme={theme}
+                        _hasError={_hasError}
+                        reallocationProgress={reallocationProgress}
+                        isExecuting={isExecuting}
+                        executionSteps={executionSteps}
+                      />
+                    )}
                   </View>
                 );
               })}
@@ -1000,21 +1319,23 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             </Text>
           </View>
 
-          {/* Show filtered transactions info */}
-          {ignoreDust && payload.reallocations.length !== filteredReallocations.length && (
-            <Text
-              size={11}
-              regular
-              color={greys(theme)[300]}
-              style={{
-                textAlign: 'center',
-                marginTop: 6,
-              }}>
-              {payload.reallocations.length - filteredReallocations.length} dust transaction
-              {payload.reallocations.length - filteredReallocations.length !== 1 ? 's' : ''}{' '}
-              filtered
-            </Text>
-          )}
+          {/* Show filtered transactions info - only for reallocation mode */}
+          {payload.mode !== 'mpp' &&
+            ignoreDust &&
+            (payload.reallocations?.length || 0) !== reallocations.length && (
+              <Text
+                size={11}
+                regular
+                color={greys(theme)[300]}
+                style={{
+                  textAlign: 'center',
+                  marginTop: 6,
+                }}>
+                {(payload.reallocations?.length || 0) - reallocations.length} dust transaction
+                {(payload.reallocations?.length || 0) - reallocations.length !== 1 ? 's' : ''}{' '}
+                filtered
+              </Text>
+            )}
         </View>
       </View>
     </Wrapper>

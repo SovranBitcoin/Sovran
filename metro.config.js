@@ -10,95 +10,144 @@ const withStorybook = require('@storybook/react-native/metro/withStorybook');
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
+    // Navigation & Arrows
+    'fa6-solid:chevron-left',
+    'fa6-solid:chevron-right',
+    'fluent:chevron-down-12-filled',
+    'lucide:arrow-right',
+    'lucide:arrow-up-right',
     'mdi:chevron-double-left',
     'mdi:chevron-double-right',
-    'majesticons:percent',
-    'majesticons:text',
+
+    // Actions & Controls
+    'gala:add',
+    'gala:remove',
+    'fluent:add-24-filled',
+    'fluent:arrow-upload-16-filled',
+    'fluent:arrow-download-16-filled',
+    'fluent:arrow-swap-16-filled',
+    'iconamoon:send-fill',
+    'ri:share-fill',
+    'lets-icons:copy',
+    'mage:edit-pen-fill',
+    'lucide:pencil-line',
+    'lucide:delete',
+
+    // Success & Confirmation
+    'simple-line-icons:check',
+    'material-symbols:check-rounded',
+    'fluent:checkmark-16-filled',
+    'ion:checkmark-done',
+    'fa6-solid:user-check',
+
+    // Error & Close
+    'material-symbols:close-rounded',
+    'simple-line-icons:close',
+    'nonicons:error-16',
+    'mdi:cancel',
+    'fluent:dismiss-16-filled',
+
+    // User & Contact
+    'ph:user-bold',
+    'fa6-solid:user',
     'la:user-plus',
     'la:user-minus',
-    'uil:invoice',
+    'la:user-slash',
+    'mdi:contact',
+
+    // Loading & Refresh
+    'ant-design:loading-outlined',
+    'line-md:uploading-loop',
+    'humbleicons:refresh',
+    'material-symbols:refresh-rounded',
+    'ic:round-refresh',
     'material-symbols:update-rounded',
     'ic:round-cloud-sync',
-    'hugeicons:new-twitter',
-    'material-symbols:info-rounded',
-    'la:user-slash',
-    'material-symbols:report-rounded',
+
+    // Visibility & Eye
+    'majesticons:eye',
+    'majesticons:eye-off',
+
+    // Finance & Currency
+    'material-symbols:currency-bitcoin',
+    'material-symbols-light:currency-bitcoin',
+    'fluent:wallet-20-filled',
+    'majesticons:coins',
+    'solar:card-bold',
+    'feather:credit-card',
+    'ic:baseline-card-giftcard',
+    'ph:contactless-payment-fill',
+    'mynaui:contactless-circle-solid',
+
+    // Charts & Analytics
+    'material-symbols:pie-chart',
+    'radix-icons:half-2',
+    'majesticons:percent',
+
+    // Text & Content
+    'majesticons:text',
+    'mdi:decimal',
     'fluent:emoji-24-filled',
+
+    // Lighting & Bulbs
     'mdi:lightbulb-on-outline',
     'mdi:lightbulb-on',
     'majesticons:lightbulb-shine',
     'majesticons:lightbulb-shine-line',
-    'material-symbols:close-rounded',
-    'proicons:photo',
     'tabler:bulb-filled',
     'tabler:bulb',
-    'solar:card-bold',
-    'nonicons:error-16',
-    'lucide:pencil-line',
+
+    // Media & Photos
+    'proicons:photo',
+
+    // Search & Discovery
     'majesticons:search-line',
+
+    // Security & Keys
     'solar:key-bold',
-    'simple-line-icons:close',
-    'ph:user-bold',
-    'iconamoon:send-fill',
+    'ic:baseline-vpn-lock',
+
+    // Social & Communication
     'lucide:twitter',
-    'mdi:contact',
+    'hugeicons:new-twitter',
+    'mdi:at',
+
+    // Lightning & Energy
     'mingcute:lightning-fill',
-    'majesticons:coins',
+
+    // Notifications & Alerts
     'famicons:notifications',
-    'lucide:delete',
-    'ant-design:loading-outlined',
-    'line-md:uploading-loop',
-    'mdi:decimal',
-    'humbleicons:refresh',
-    'ri:share-fill',
-    'lets-icons:copy',
-    'tabler:dots',
-    'ph:contactless-payment-fill',
-    'mynaui:contactless-circle-solid',
-    'material-symbols:currency-bitcoin',
-    'material-symbols-light:currency-bitcoin',
-    'fluent:wallet-20-filled',
+    'material-symbols:info-rounded',
+    'material-symbols:report-rounded',
+
+    // Documents & Invoice
+    'uil:invoice',
+
+    // Settings & Configuration
     'material-symbols:settings-rounded',
-    'fluent:chevron-down-12-filled',
-    'simple-line-icons:check',
-    'material-symbols:check-rounded',
-    'material-symbols:close-rounded',
-    'ic:baseline-card-giftcard',
-    'lucide:arrow-up-right',
+
+    // Charity & Help
     'mdi:charity',
     'mdi:help-circle',
+
+    // Technology & Connectivity
     'fluent:sim-24-filled',
-    'bx:dots-vertical-rounded',
-    'mdi:at',
-    'lucide:arrow-right',
-    'lucide:arrow-up-right',
-    'fluent:arrow-upload-16-filled',
-    'fluent:arrow-download-16-filled',
-    'fluent:arrow-swap-16-filled',
-    'gala:add',
-    'gala:remove',
-    'fluent:clock-12-filled',
-    'ic:baseline-vpn-lock',
-    'mdi:cancel',
-    'clarity:internet-of-things-solid',
-    'mage:edit-pen-fill',
-    'stash:qr-code',
-    'majesticons:eye-off',
-    'majesticons:eye',
-    'fa6-solid:chevron-left',
-    'fa6-solid:chevron-right',
-    // restoreChoice additions
-    'fa6-solid:user',
-    'fa6-solid:user-check',
-    'fa6-solid:download',
-    'fluent:add-24-filled',
-    'material-symbols:refresh-rounded',
-    'ic:round-refresh',
-    'ion:checkmark-done',
     'feather:wifi',
-    'feather:credit-card',
-    'material-symbols:pie-chart',
-    'radix-icons:half-2',
+    'clarity:internet-of-things-solid',
+
+    // Menu & More
+    'bx:dots-vertical-rounded',
+    'tabler:dots',
+
+    // Time & Clock
+    'fluent:clock-12-filled',
+    'fluent:clock-16-filled',
+
+    // QR & Codes
+    'stash:qr-code',
+
+    // Download & Upload
+    'fa6-solid:download',
   ],
 });
 

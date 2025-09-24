@@ -18,6 +18,12 @@ interface ReallocationItem {
   percentage: number;
 }
 
+interface MPPAllocationItem {
+  mintUrl: string;
+  percentage: number;
+  amount: number;
+}
+
 declare module 'react-native-actions-sheet' {
   interface Sheets {
     [sheetName]: SheetDefinition<{
@@ -25,10 +31,19 @@ declare module 'react-native-actions-sheet' {
         'route-a': RouteDefinition;
       };
       payload: {
-        reallocations: ReallocationItem[];
-        totalAmount: number;
+        reallocations?: ReallocationItem[];
+        totalAmount?: number;
         unit: string;
         ignoreDust?: boolean;
+        // MPP mode payload
+        mode?: 'mpp';
+        pr?: string;
+        amount?: number;
+        pubkey?: string;
+        email?: string;
+        lud16?: string;
+        redirect?: string;
+        mppAllocations?: MPPAllocationItem[];
       };
       returnValue: {
         confirmed: boolean;

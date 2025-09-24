@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
-import { getDescription, getTimestamp, sendLightning } from 'helper/cashuClient';
+import { getDescription, getTimestamp } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { Spacer, View } from 'components/common/View';
@@ -12,7 +12,6 @@ import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
 import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Card } from 'components/common/Card';
-import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Section } from 'components/common/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -22,6 +21,7 @@ import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
 import { RootState } from 'helper/redux/store/reducer';
+import { SheetManager } from 'react-native-actions-sheet';
 
 export function LightningSendConfirmation({
   transaction,
@@ -49,9 +49,7 @@ export function LightningSendConfirmation({
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
-  const [loading, setLoading] = useState(false);
-
-  const parsedQuote = JSON.parse(meltQuote);
+  const parsedQuote = JSON.parse(meltQuote || '{}');
   const amount = parsedQuote?.amount;
   const feeReserve = parsedQuote?.fee_reserve;
   const quoteId = parsedQuote?.quote;
@@ -59,9 +57,9 @@ export function LightningSendConfirmation({
   const profileId = useSelector((state: RootState) => state.nostr?.currentProfile?.id);
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-  const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl });
+  const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl || '' });
 
-  const handleMintSelected = async (mint, balance) => {
+  const handleMintSelected = async (mint: any, balance: any) => {
     if (pr) {
       // Avoid UI bugs with setTimeout
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -88,34 +86,18 @@ export function LightningSendConfirmation({
     }
   };
 
-  const handleLightningSend = async () => {
-    setLoading(true);
-    try {
-      const result = await sendLightning({
+  const handleOpenSheet = () => {
+    SheetManager.show('lightning-mpp', {
+      payload: {
         pr,
         unit,
+        amount,
         pubkey,
-        meltQuote: parsedQuote,
         email,
         lud16,
-      });
-      if (result.isOk()) {
-        showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
-          navigation.navigate(
-            redirect || (pubkey ? 'userMessages' : 'index'),
-            { pubkey },
-            { closeCurrentAndParents: true }
-          );
-        });
-      } else {
-        throw result.error;
-      }
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      showMessage(errorMessage, { error: errorMessage }, { emoji: '🚨' });
-    } finally {
-      setLoading(false);
-    }
+        redirect,
+      },
+    });
   };
 
   const handleCancel = () => {
@@ -185,8 +167,7 @@ export function LightningSendConfirmation({
                 text: 'Send',
                 icon: 'ri:send-plane-2-fill',
                 variant: 'primary',
-                onPress: handleLightningSend,
-                loading: loading,
+                onPress: async () => handleOpenSheet(),
                 condition: !transaction?.paid,
               },
               ...extraButtons.map((button) => ({
@@ -269,8 +250,7 @@ export function LightningSendConfirmation({
 }
 
 function ModalScreen() {
-  const { pr, unit, pubkey, meltQuote, redirect, email, lud16 } =
-    useTypedRoute<'lightningSendConfirmation'>();
+  const { pr, unit, pubkey, meltQuote, redirect } = useTypedRoute<'lightningSendConfirmation'>();
 
   return (
     <LightningSendConfirmation
@@ -279,8 +259,6 @@ function ModalScreen() {
       pubkey={pubkey}
       meltQuote={meltQuote}
       redirect={redirect}
-      email={email}
-      lud16={lud16}
     />
   );
 }

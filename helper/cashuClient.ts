@@ -276,7 +276,7 @@ export async function getMeltQuote({
   const keysetId = activeKeyset.id;
   wallet.keysetId = keysetId;
 
-  const options = mppAmount ? { options: { mpp: { amount: mppAmount } } } : {};
+  const options = mppAmount ? { options: { mpp: { amount: mppAmount * 1000 } } } : {};
 
   const meltQuoteRes = await toResult(
     wallet.mint.createMeltQuote({

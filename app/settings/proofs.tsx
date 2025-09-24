@@ -144,6 +144,25 @@ export default function ModalScreen() {
     setRemovingSpent(false);
   };
 
+  // Function to remove spent or pending proofs for a specific mint
+  const removeSpentOrPendingProofsForMint = async (mintUrl: string) => {
+    setRemovingSpent(true);
+    setError(null);
+
+    const spentOrPendingProofs = activeMintsData
+      .find((mintData) => mintData.url === mintUrl)
+      ?.proofs?.filter((proof, index) => {
+        const state = proofStates[mintUrl]?.[index]?.state;
+        return state === 'SPENT' || state === 'PENDING';
+      });
+
+    if (spentOrPendingProofs && spentOrPendingProofs.length > 0) {
+      dispatch(removeProofs({ profileId, mintUrl, proofs: spentOrPendingProofs }));
+    }
+
+    setRemovingSpent(false);
+  };
+
   // Function to remove ALL proofs for a specific mint
   const removeAllProofsForMint = async (mintUrl: string) => {
     setRemovingAll(true);
@@ -183,6 +202,12 @@ export default function ModalScreen() {
     return states.filter((state) => state?.state === 'SPENT').length;
   };
 
+  // Helper function to count spent or pending proofs for a mint
+  const getSpentOrPendingProofCount = (mintUrl: string) => {
+    const states = proofStates[mintUrl] || [];
+    return states.filter((state) => state?.state === 'SPENT' || state?.state === 'PENDING').length;
+  };
+
   if (allMints.length === 0) {
     return (
       <Container>
@@ -211,6 +236,7 @@ export default function ModalScreen() {
 
         {activeMintsData.map((mintData) => {
           const spentProofCount = getSpentProofCount(mintData.url);
+          const spentOrPendingProofCount = getSpentOrPendingProofCount(mintData.url);
 
           return (
             <View
@@ -274,15 +300,15 @@ export default function ModalScreen() {
                     );
                   })}
 
-                  {/* Add Remove Spent Proofs button at the bottom of the list */}
+                  {/* Add Remove Spent or Pending Proofs button at the bottom of the list */}
                   <Button
                     variant="primary"
-                    text={`Remove ${spentProofCount} Spent Proofs`}
-                    onPress={() => removeSpentProofsForMint(mintData.url)}
-                    disabled={removingSpent || removingAll || spentProofCount === 0}
+                    text={`Delete ${spentOrPendingProofCount} Spent or Pending Proofs`}
+                    onPress={() => removeSpentOrPendingProofsForMint(mintData.url)}
+                    disabled={removingSpent || removingAll || spentOrPendingProofCount === 0}
                     style={{
                       marginTop: 10,
-                      backgroundColor: spentProofCount > 0 ? reds[300] : undefined,
+                      backgroundColor: spentOrPendingProofCount > 0 ? reds[300] : undefined,
                     }}
                   />
                   <Button
