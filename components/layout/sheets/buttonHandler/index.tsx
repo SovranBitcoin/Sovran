@@ -15,16 +15,12 @@ function SheetWithRouter() {
         mass: 0.5,
         stiffness: 200,
         overshootClamping: false,
-        restDisplacementThreshold: 0.01,
-        restSpeedThreshold: 0.01,
       }}
       openAnimationConfig={{
         damping: 50,
         mass: 0.5,
         stiffness: 200,
         overshootClamping: false,
-        restDisplacementThreshold: 0.01,
-        restSpeedThreshold: 0.01,
       }}
       enableRouterBackNavigation={true}
       routes={routes}

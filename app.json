@@ -56,7 +56,9 @@
       "expo-font",
       "expo-router",
       "expo-localization",
-      "expo-video"
+      "expo-video",
+      "expo-secure-store",
+      "expo-sqlite"
     ],
     "extra": {
       "router": {

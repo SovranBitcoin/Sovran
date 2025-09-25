@@ -254,7 +254,7 @@ const MintItem = React.memo<MintItemProps>(
     // Animated text style - opacity only (value formatting handled by CPU to avoid JS churn)
     const textStyle = useAnimatedStyle(
       () => ({
-        opacity: withSpring(isAnyGestureActive ? 0.8 : 1, { duration: 150 }),
+        opacity: withSpring(isAnyGestureActive ? 0.8 : 1, { duration: 100 }),
       }),
       [isAnyGestureActive]
     );
