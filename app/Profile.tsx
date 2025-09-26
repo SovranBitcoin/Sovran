@@ -1,7 +1,7 @@
 import React from 'react';
 import { nip19 } from 'nostr-tools';
 import { View, Pressable, ScrollView } from 'react-native';
-import Icon, { QRIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { useNostr } from 'helper/redux/nostr';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -46,7 +46,7 @@ function ProfileHeader() {
               navigation.navigate('onboard');
             }
           }}>
-          {currentProfile?.pubkey ? (
+          {currentProfile?.pubkey && (
             <>
               <CachedImage
                 source={{ uri: currentProfile.picture }}
@@ -65,32 +65,7 @@ function ProfileHeader() {
                 style={{ color: greys(theme)[0] }}>
                 {currentProfile?.profile?.name}
               </Text>
-              <QRIcon
-                color={greys(theme)[0]}
-                style={{
-                  width: 32,
-                  height: 32,
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <View
-                className="rounded-full border-[0.2px] p-8"
-                style={{
-                  backgroundColor: greys(theme)[950],
-                  borderColor: greys(theme)[600],
-                }}>
-                <QRIcon
-                  style={{
-                    width: 32,
-                    height: 32,
-                  }}
-                />
-              </View>
-              <Text className="mb-2 mt-4 text-center" style={{ color: greys(theme)[0] }}>
-                Create Account
-              </Text>
+              <Icon size={42} name="stash:qr-code" color={greys(theme)[0]} />
             </>
           )}
         </TouchableOpacity>

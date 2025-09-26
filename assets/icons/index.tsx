@@ -168,54 +168,6 @@ export function SovranTextIcon({ size = 300 }: { size?: number }) {
   );
 }
 
-export function ZapIcon({ color, size = 24 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        fill-rule="evenodd"
-        d="M9.5 1a1 1 0 0 0-.96.72l-3.5 12A1 1 0 0 0 6 15h3.867l-.86 6.876a1 1 0 0 0 1.825.679l8-12A1 1 0 0 0 18 9h-3.557l2.493-6.649A1 1 0 0 0 16 1z"
-        clip-rule="evenodd"
-      />
-    </Svg>
-  );
-}
-
-export function CommentIcon({ color, size = 24 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        fill-rule="evenodd"
-        d="M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7.667a1 1 0 0 0-.6.2L3.6 21.8A1 1 0 0 1 2 21zm5 0a1 1 0 0 0 0 2h10a1 1 0 1 0 0-2zm0 4a1 1 0 1 0 0 2h10a1 1 0 1 0 0-2zm0 4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2z"
-        clip-rule="evenodd"
-      />
-    </Svg>
-  );
-}
-
-export function HeartIcon({ color, size = 24 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 256 256">
-      <Path
-        fill={color}
-        d="M240 102c0 70-103.79 126.66-108.21 129a8 8 0 0 1-7.58 0C119.79 228.66 16 172 16 102a62.07 62.07 0 0 1 62-62c20.65 0 38.73 8.88 50 23.89C139.27 48.88 157.35 40 178 40a62.07 62.07 0 0 1 62 62"
-      />
-    </Svg>
-  );
-}
-
-export function RepostIcon({ color, size = 24 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 16 16">
-      <Path
-        fill={color}
-        d="M3 2h.02q.034 0 .07.004za1 1 0 0 1 .595.196q.06.044.112.097l-.09-.08l.008.007l.082.073l2 2C6.337 4.923 5.891 6 5 6H4v5a1 1 0 0 0 .883.993L5 12h3a1 1 0 0 1 .117 1.993L8 14H5a3 3 0 0 1-2.995-2.824L2 11V6H1C.148 6-.297 5.014.217 4.377l.076-.084l2-2l.082-.073A1 1 0 0 1 3 2m8 0a3 3 0 0 1 2.995 2.824L14 5v5h1c.852 0 1.297.986.783 1.623l-.076.084l-2 2A1 1 0 0 1 13 14h-.032l-.054-.004L13 14a1 1 0 0 1-.595-.196a1 1 0 0 1-.112-.097l.09.08a1 1 0 0 1-.09-.08l-2-2C9.663 11.077 10.109 10 11 10l1-.001V5a1 1 0 0 0-.883-.993L11 4H8a1 1 0 0 1-.117-1.993L8 2z"
-      />
-    </Svg>
-  );
-}
-
 export function UserIcon() {
   const theme = useSelector(memoizedGetTheme);
 
@@ -798,17 +750,6 @@ export function VerifiedIcon({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-export function LightningIcon({ color }: { color: string }) {
-  return (
-    <Svg width="20" height="20" viewBox="0 0 14 17" fill="none">
-      <Path
-        d="M13.3706 7.27338L5.30013 16.0327C4.98877 16.3706 4.44648 16.0028 4.64537 15.5885L7.39742 9.85664C7.52491 9.5911 7.33139 9.28351 7.03683 9.28351H0.921647C0.57172 9.28351 0.390478 8.86591 0.629476 8.61031L8.15503 0.56208C8.45747 0.238626 8.98345 0.573499 8.81836 0.984401L6.75047 6.13119C6.64403 6.3961 6.8414 6.68402 7.12687 6.68028L13.0711 6.60238C13.4221 6.59778 13.6084 7.01523 13.3706 7.27338Z"
-        fill={color}
-      />
-    </Svg>
-  );
-}
-
 export function BtcIcon({
   size = 34,
   color,
@@ -825,30 +766,6 @@ export function BtcIcon({
       : 'material-symbols-light:currency-bitcoin';
 
   return <Icon name={iconName} color={color || theme.greys[0]} size={size * 1.2} />;
-}
-
-export function ShareIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg width="21" height="21" viewBox="0 0 24 24">
-      <Path fill={theme.greys[0]} d="M20 8h-5v2h3v11H6V10h3V8H4v15h16z" />
-      <Path fill={theme.greys[0]} d="M11 16h2V5h3l-4-4l-4 4h3z" />
-    </Svg>
-  );
-}
-
-export function QRIcon({ style, color }: { style?: StyleProp<ViewStyle>; color?: string }) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg style={style} viewBox="0 0 36 36" fill="none">
-      <Path
-        d="M3 10.5V3H10.5V6H6V10.5H3ZM3 33V25.5H6V30H10.5V33H3ZM25.5 33V30H30V25.5H33V33H25.5ZM30 10.5V6H25.5V3H33V10.5H30ZM26.25 26.25H28.5V28.5H26.25V26.25ZM26.25 21.75H28.5V24H26.25V21.75ZM24 24H26.25V26.25H24V24ZM21.75 26.25H24V28.5H21.75V26.25ZM19.5 24H21.75V26.25H19.5V24ZM24 19.5H26.25V21.75H24V19.5ZM21.75 21.75H24V24H21.75V21.75ZM19.5 19.5H21.75V21.75H19.5V19.5ZM28.5 7.5V16.5H19.5V7.5H28.5ZM16.5 19.5V28.5H7.5V19.5H16.5ZM16.5 7.5V16.5H7.5V7.5H16.5ZM14.25 26.25V21.75H9.75V26.25H14.25ZM14.25 14.25V9.75H9.75V14.25H14.25ZM26.25 14.25V9.75H21.75V14.25H26.25Z"
-        fill={color || theme.greys[0]}
-      />
-    </Svg>
-  );
 }
 
 export function CheckIcon({

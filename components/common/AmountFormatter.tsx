@@ -1,15 +1,16 @@
-import React from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleProp, ViewStyle, Animated } from 'react-native';
 import { StyledText, Text } from 'components/common/Text';
 import { View } from 'components/common/View';
 import { formatCurrencyWrapper } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
-import { greys } from 'helper/colors';
+import { greys, greens, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';
+type TransactionType = 'send' | 'receive';
 
 interface AmountFormatterProps {
   amount: number;
@@ -18,6 +19,11 @@ interface AmountFormatterProps {
   weight?: FontWeight;
   color?: string;
   style?: StyleProp<ViewStyle>;
+  // Optional enhancements (defaults preserve existing behavior)
+  animated?: boolean;
+  useTypeColors?: boolean;
+  transactionType?: TransactionType;
+  centered?: boolean;
 }
 
 /**
@@ -30,102 +36,179 @@ export function AmountFormatter({
   weight = 'heavy',
   color,
   style,
+  animated = false,
+  useTypeColors = false,
+  transactionType = 'send',
+  centered = false,
 }: AmountFormatterProps) {
   const theme = useSelector(memoizedGetTheme);
   const { settings } = useSettings();
-  const currentColor = color || greys(theme)[0];
   const displayBtc = settings.display_btc ?? 1;
+
+  // Animation setup (only if animated is true)
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const formattedAmount = formatCurrencyWrapper(amount, unit, displayBtc);
+
+  // Dynamic color logic (only if useTypeColors is true)
+  const getTypeColor = (): string => {
+    if (!amount) return greys(theme)[400];
+    return transactionType === 'receive' ? greens[300] : shades[300];
+  };
+
+  // Final color: prioritize passed color, then type colors, then default
+  const currentColor = color || (useTypeColors ? getTypeColor() : greys(theme)[0]);
+
+  // Animation effect (only if animated is true)
+  useEffect(() => {
+    if (!animated) return;
+
+    const length = formattedAmount.toString().length;
+    const newScale = length > 6 ? 1 - (length - 6) * 0.05 : 1;
+
+    Animated.timing(scaleAnim, {
+      toValue: newScale,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [animated, formattedAmount, scaleAnim]);
+
+  // Wrapper component for animation (only when animated is true)
+  const AnimatedWrapper = ({ children }: { children: React.ReactNode }) => {
+    if (!animated) {
+      return <>{children}</>;
+    }
+    return <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>{children}</Animated.View>;
+  };
+
+  // Container styling based on centered prop
+  const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
   if (unit !== 'sat') {
     return (
-      <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
-        <Text
-          size={size}
-          weight={weight}
-          style={{
-            color: currentColor,
-            margin: 0,
-            zIndex: 2,
-          }}>
-          {formatCurrencyWrapper(amount, unit, displayBtc)}
-        </Text>
+      <View className={containerClass} style={[{ backgroundColor: 'transparent' }, style]}>
+        <AnimatedWrapper>
+          <Text
+            size={size}
+            weight={weight}
+            style={{
+              color: currentColor,
+              margin: 0,
+              zIndex: 2,
+              textAlign: centered ? 'center' : 'left',
+            }}>
+            {formattedAmount}
+          </Text>
+        </AnimatedWrapper>
       </View>
     );
   }
 
   return (
-    <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
+    <View className={containerClass} style={[{ backgroundColor: 'transparent' }, style]}>
       {displayBtc === 0 && (
-        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
+        <AnimatedWrapper>
           <View
-            style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} size={size} color={currentColor} />
+            className="flex-row items-center"
+            style={[{ backgroundColor: 'transparent' }, style]}>
+            <View
+              style={{
+                marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
+                backgroundColor: 'transparent',
+                marginRight: centered ? 4 : 0,
+              }}>
+              <BtcIcon weight={weight} size={size} color={currentColor} />
+            </View>
+            <Text
+              size={size}
+              weight={weight}
+              style={{
+                color: currentColor,
+                marginLeft: centered ? 0 : weight === 'heavy' ? -2 : -4,
+                margin: 0,
+                zIndex: 2,
+                textAlign: centered ? 'center' : 'left',
+              }}>
+              {formattedAmount}
+            </Text>
           </View>
-          <Text
-            size={size}
-            weight={weight}
-            style={{
-              color: currentColor,
-              marginLeft: weight === 'heavy' ? -2 : -4,
-              margin: 0,
-              zIndex: 2,
-            }}>
-            {formatCurrencyWrapper(amount, unit, displayBtc)}
-          </Text>
-        </View>
+        </AnimatedWrapper>
       )}
 
       {displayBtc === 1 && (
-        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
-          <StyledText
-            size={size}
-            weight={weight}
-            style={{
-              color: currentColor,
-              margin: 0,
-              zIndex: 2,
-            }}>
-            {formatCurrencyWrapper(amount, unit, displayBtc)}
-          </StyledText>
-          <View style={{ marginBottom: 4, backgroundColor: 'transparent' }}>
-            <LightningUnit height={size} width={size} color={currentColor} />
+        <AnimatedWrapper>
+          <View
+            className="flex-row items-center"
+            style={[{ backgroundColor: 'transparent' }, style]}>
+            <StyledText
+              size={size}
+              weight={weight}
+              style={{
+                color: currentColor,
+                margin: 0,
+                zIndex: 2,
+                textAlign: centered ? 'center' : 'left',
+              }}>
+              {formattedAmount}
+            </StyledText>
+            <View
+              style={{
+                marginBottom: 4,
+                backgroundColor: 'transparent',
+                marginLeft: centered ? 4 : 0,
+              }}>
+              <LightningUnit height={size} width={size} color={currentColor} />
+            </View>
           </View>
-        </View>
+        </AnimatedWrapper>
       )}
 
       {displayBtc === 2 && (
-        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
-          <Text
-            size={size}
-            weight={weight}
-            style={{
-              color: currentColor,
-              margin: 0,
-              zIndex: 2,
-            }}>
-            {formatCurrencyWrapper(amount, unit, displayBtc)}
-          </Text>
-        </View>
+        <AnimatedWrapper>
+          <View
+            className="flex-row items-center"
+            style={[{ backgroundColor: 'transparent' }, style]}>
+            <Text
+              size={size}
+              weight={weight}
+              style={{
+                color: currentColor,
+                margin: 0,
+                zIndex: 2,
+                textAlign: centered ? 'center' : 'left',
+              }}>
+              {formattedAmount}
+            </Text>
+          </View>
+        </AnimatedWrapper>
       )}
 
       {displayBtc === 3 && (
-        <View className="flex-row items-center" style={[{ backgroundColor: 'transparent' }, style]}>
+        <AnimatedWrapper>
           <View
-            style={{ marginLeft: weight === 'heavy' ? -6 : -4, backgroundColor: 'transparent' }}>
-            <BtcIcon weight={weight} size={size} color={currentColor} />
+            className="flex-row items-center"
+            style={[{ backgroundColor: 'transparent' }, style]}>
+            <View
+              style={{
+                marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
+                backgroundColor: 'transparent',
+                marginRight: centered ? 4 : 0,
+              }}>
+              <BtcIcon weight={weight} size={size} color={currentColor} />
+            </View>
+            <Text
+              size={size}
+              weight={weight}
+              style={{
+                color: currentColor,
+                marginLeft: centered ? 0 : weight === 'heavy' ? -2 : -4,
+                margin: 0,
+                zIndex: 2,
+                textAlign: centered ? 'center' : 'left',
+              }}>
+              {formattedAmount}
+            </Text>
           </View>
-          <Text
-            size={size}
-            weight={weight}
-            style={{
-              color: currentColor,
-              marginLeft: weight === 'heavy' ? -2 : -4,
-              margin: 0,
-              zIndex: 2,
-            }}>
-            {formatCurrencyWrapper(amount, unit, displayBtc)}
-          </Text>
-        </View>
+        </AnimatedWrapper>
       )}
     </View>
   );

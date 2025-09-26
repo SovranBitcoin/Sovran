@@ -314,7 +314,7 @@ function ModalScreen() {
         </>
       }>
       <NumberInput
-        currency={unit}
+        unit={unit}
         value={amount}
         type={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'

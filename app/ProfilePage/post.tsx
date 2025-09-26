@@ -7,7 +7,7 @@ import 'react-native-gesture-handler';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { RepostIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { GradientSkeleton } from 'components/common/GradientSkeleton';
 import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './helper';
@@ -140,7 +140,7 @@ function RepostText({ pubkey, repostCounter }) {
         alignItems: 'center',
         marginBottom: 12,
       }}>
-      <RepostIcon size={16} color={greys(theme)[400]} />
+      <Icon name="garden:arrow-retweet-fill-16" size={16} color={greys(theme)[400]} />
 
       <UserNameProfiles
         pubkey={pubkey}

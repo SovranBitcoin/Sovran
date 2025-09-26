@@ -1,6 +1,6 @@
 import React from 'react';
 
-import Icon, { LightningIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 
 // Screen imports
 import HomeView from 'app/(drawer)/(tabs)/index';
@@ -28,7 +28,17 @@ export const TAB_SCREENS = (): TabConfig[] => [
     name: 'index',
     component: HomeView,
     title: 'Wallet',
-    icon: LightningIcon,
+    icon: ({ color }) => (
+      <Icon
+        style={{
+          width: 20,
+          height: 20,
+        }}
+        name="mingcute:lightning-fill"
+        color={color}
+        size={20}
+      />
+    ),
   },
   // ...(new Date() > activationDate
   //   ? [

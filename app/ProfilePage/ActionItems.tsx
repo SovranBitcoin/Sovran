@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
-import { CommentIcon, HeartIcon, RepostIcon, ZapIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
@@ -115,12 +115,12 @@ export const usePostReactions = ({ id }: { id: string }) => {
 };
 
 const ActionItem = ({
-  Icon,
+  icon,
   count,
   theme,
   size,
 }: {
-  Icon: any;
+  icon: any;
   count: string;
   theme: Theme;
   size: number;
@@ -131,7 +131,7 @@ const ActionItem = ({
       alignItems: 'center',
       backgroundColor: 'transparent',
     }}>
-    <Icon size={size} color={greys(theme)[400]} />
+    {icon}
     <Text
       size={size}
       weight="bold"
@@ -177,10 +177,32 @@ export function ActionItems({
         justifyContent: 'space-between',
         backgroundColor: 'transparent',
       }}>
-      <ActionItem size={size} Icon={CommentIcon} count={formatNumber(0)} theme={theme} />
-      <ActionItem size={size} Icon={RepostIcon} count={formatNumber(repostCount)} theme={theme} />
-      <ActionItem size={size} Icon={HeartIcon} count={formatNumber(reactionCount)} theme={theme} />
-      <ActionItem size={size} Icon={ZapIcon} count={formatNumber(zapCount)} theme={theme} />
+      <ActionItem
+        size={size}
+        icon={
+          <Icon name="garden:speech-bubble-typing-fill-12" size={size} color={greys(theme)[400]} />
+        }
+        count={formatNumber(0)}
+        theme={theme}
+      />
+      <ActionItem
+        size={size}
+        icon={<Icon name="garden:arrow-retweet-fill-16" size={size} color={greys(theme)[400]} />}
+        count={formatNumber(repostCount)}
+        theme={theme}
+      />
+      <ActionItem
+        size={size}
+        icon={<Icon name="garden:heart-fill-16" size={size} color={greys(theme)[400]} />}
+        count={formatNumber(reactionCount)}
+        theme={theme}
+      />
+      <ActionItem
+        size={size}
+        icon={<Icon name="mingcute:lightning-fill" size={size} color={greys(theme)[400]} />}
+        count={formatNumber(zapCount)}
+        theme={theme}
+      />
     </View>
   );
 }
