@@ -165,15 +165,6 @@ export const Button = ({
   const shouldUseBlur = blur !== false;
 
   const getButtonStyles = () => {
-    // If ripple is enabled, use minimal styling like original RippleButton
-    if (ripple) {
-      return {
-        overflow: 'hidden' as const,
-        position: 'relative' as const,
-        opacity: disabled || loading ? 0.5 : 1,
-      };
-    }
-
     // Standard Button styling
     const base = {
       margin: noPadding ? 0 : 4, // m-1, but 0 if noPadding
@@ -186,6 +177,22 @@ export const Button = ({
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
+
+    // If ripple is enabled, use minimal styling like original RippleButton
+    if (ripple) {
+      return {
+        overflow: 'hidden' as const,
+        position: 'relative' as const,
+        opacity: disabled || loading ? 0.5 : 1,
+      };
+    }
+
+    if (shouldUseBlur) {
+      return {
+        ...base,
+        borderWidth: 0,
+      };
+    }
 
     switch (variant) {
       case 'primary':
