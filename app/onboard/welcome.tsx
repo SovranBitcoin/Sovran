@@ -1,10 +1,11 @@
 import 'app/global';
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon, { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/common/Text';
+import { VStack, HStack, Spacer } from 'components/common/View';
 import { greys, Theme } from 'helper/colors';
 import { useTypedNavigation } from 'helper/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,8 +16,8 @@ export default function ModalScreen() {
   const navigation = useTypedNavigation();
 
   return (
-    <View style={styles.centeredContainer}>
-      <View
+    <VStack flex={1} align="center" justify="center" style={styles.centeredContainer}>
+      <VStack
         style={{
           width: '100%',
           height: '100%',
@@ -31,35 +32,35 @@ export default function ModalScreen() {
           locations={[0, 0.5, 1]}
           style={styles.gradient}
         />
-      </View>
-      <View style={styles.centeredContent}>
+      </VStack>
+
+      <VStack align="center" justify="center" flex={1} spacing={4}>
         <Text size={32} weight="heavy">
           Welcome to
         </Text>
-        <View style={styles.spacer} />
         <SovranTextIcon size={200} />
-      </View>
-      <View style={styles.bottomButtons}>
-        <View />
+      </VStack>
+
+      <HStack justify="space-between" style={styles.bottomButtons}>
+        <Spacer size={0} />
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate('onboard/ecash')}>
-          <Text size={18} weight="bold" style={styles.navButtonText}>
-            Next
-          </Text>
-          <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[950]} />
+          <HStack align="center" spacing={8}>
+            <Text size={18} weight="bold" style={styles.navButtonText}>
+              Next
+            </Text>
+            <Icon name="fa6-solid:chevron-right" size={20} color={greys(theme)[950]} />
+          </HStack>
         </TouchableOpacity>
-      </View>
-    </View>
+      </HStack>
+    </VStack>
   );
 }
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     centeredContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
       height: '100%',
       backgroundColor: greys(theme)[950],
     },
@@ -70,33 +71,19 @@ const createStyles = (theme: Theme) =>
       top: 0,
       bottom: 0,
     },
-    centeredContent: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      flex: 1,
-      alignSelf: 'stretch',
-    },
-    spacer: {
-      marginBottom: 4,
-    },
     bottomButtons: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       width: '100%',
       padding: 16,
       position: 'absolute',
       bottom: 16,
     },
     navButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: greys(theme)[0],
       paddingHorizontal: 20,
       paddingVertical: 14,
       borderRadius: 12,
     },
     navButtonText: {
-      marginRight: 8,
       color: greys(theme)[950],
     },
   });

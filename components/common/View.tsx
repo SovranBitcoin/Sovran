@@ -1,11 +1,11 @@
 import { BlurTint, BlurView } from 'expo-blur';
 import React from 'react';
-import { View as RNView, ViewProps as RNViewProps, StyleSheet } from 'react-native';
+import { View as RNView, ViewProps as RNViewProps, StyleSheet, FlexStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 
-type Props = RNViewProps & {
+type ViewProps = RNViewProps & {
   blur?: boolean;
   colorBlur?: string;
   blurIntensity?: number;
@@ -13,7 +13,7 @@ type Props = RNViewProps & {
   children?: React.ReactNode;
 };
 
-export const View = React.forwardRef<RNView, Props>((props, ref) => {
+const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   const image = useSelector(memoizedGetBackgroundImage);
 
   const { blur = false, blurIntensity = 70, blurTint, style, children, ...rest } = props;
@@ -38,7 +38,15 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
 
   // 🧊 Blur-enhanced View
   return (
-    <RNView ref={ref} style={[cleanStyle, styles.overflowHidden]} {...rest}>
+    <RNView
+      ref={ref}
+      style={[
+        cleanStyle,
+        {
+          overflow: 'hidden',
+        },
+      ]}
+      {...rest}>
       {rest.colorBlur && (
         <View
           style={[
@@ -58,13 +66,7 @@ export const View = React.forwardRef<RNView, Props>((props, ref) => {
 
 View.displayName = 'View';
 
-const styles = StyleSheet.create({
-  overflowHidden: {
-    overflow: 'hidden',
-  },
-});
-
-export const Spacer = ({ size }: { size: number }) => {
+const Spacer = ({ size }: { size: number }) => {
   return (
     <View
       style={{
@@ -73,3 +75,110 @@ export const Spacer = ({ size }: { size: number }) => {
     />
   );
 };
+
+type StackProps = ViewProps & {
+  spacing?: number;
+  align?: FlexStyle['alignItems'];
+  justify?: FlexStyle['justifyContent'];
+  flex?: number;
+  wrap?: FlexStyle['flexWrap'];
+};
+
+const VStack = React.forwardRef<any, StackProps>((props, ref) => {
+  const {
+    spacing = 0,
+    align = 'stretch',
+    justify = 'flex-start',
+    flex,
+    wrap = 'nowrap',
+    style,
+    children,
+    ...rest
+  } = props;
+
+  const stackStyle = [
+    {
+      flexDirection: 'column' as const,
+      alignItems: align,
+      justifyContent: justify,
+      flex: flex,
+      flexWrap: wrap,
+    },
+    style,
+  ];
+
+  const processedChildren = React.Children.map(children, (child, index) => {
+    if (!React.isValidElement(child)) return child;
+
+    // Add spacing except for the last child
+    const isLastChild = index === React.Children.count(children) - 1;
+    if (spacing > 0 && !isLastChild) {
+      return (
+        <React.Fragment key={index}>
+          {child}
+          <View style={{ height: spacing }} />
+        </React.Fragment>
+      );
+    }
+
+    return child;
+  });
+
+  return (
+    <View ref={ref} style={stackStyle} {...rest}>
+      {processedChildren}
+    </View>
+  );
+});
+
+const HStack = React.forwardRef<any, StackProps>((props, ref) => {
+  const {
+    spacing = 0,
+    align = 'center',
+    justify = 'flex-start',
+    flex,
+    wrap = 'nowrap',
+    style,
+    children,
+    ...rest
+  } = props;
+
+  const stackStyle = [
+    {
+      flexDirection: 'row' as const,
+      alignItems: align,
+      justifyContent: justify,
+      flex: flex,
+      flexWrap: wrap,
+    },
+    style,
+  ];
+
+  const processedChildren = React.Children.map(children, (child, index) => {
+    if (!React.isValidElement(child)) return child;
+
+    // Add spacing except for the last child
+    const isLastChild = index === React.Children.count(children) - 1;
+    if (spacing > 0 && !isLastChild) {
+      return (
+        <React.Fragment key={index}>
+          {child}
+          <View style={{ width: spacing }} />
+        </React.Fragment>
+      );
+    }
+
+    return child;
+  });
+
+  return (
+    <View ref={ref} style={stackStyle} {...rest}>
+      {processedChildren}
+    </View>
+  );
+});
+
+VStack.displayName = 'VStack';
+HStack.displayName = 'HStack';
+
+export { View, Spacer, VStack, HStack };

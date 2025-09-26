@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
+import { VStack } from 'components/common/View';
 import { greys } from 'helper/colors';
 
 type ChangelogItem = {
@@ -23,30 +24,31 @@ export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
 
   const ChangelogSection = ({ title, items, emoji }: ChangelogSectionProps) => (
-    <View style={{ marginBottom: 16 }}>
+    <VStack spacing={8} style={{ marginBottom: 16 }}>
       <Text
         style={{
           fontSize: 16,
           fontWeight: 'bold',
           color: greys(theme)[0],
-          marginBottom: 8,
         }}>
         {emoji} {title}
       </Text>
-      {items.map((item, index) => (
-        <View key={index} style={{ marginBottom: 6, paddingLeft: 12 }}>
-          <Text
-            style={{
-              fontSize: 14,
-              color: greys(theme)[200],
-              lineHeight: 20,
-            }}>
-            • <Text style={{ fontWeight: '600', color: greys(theme)[0] }}>{item.title}</Text>:{' '}
-            {item.description}
-          </Text>
-        </View>
-      ))}
-    </View>
+      <VStack spacing={6}>
+        {items.map((item, index) => (
+          <VStack key={index} style={{ paddingLeft: 12 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                color: greys(theme)[200],
+                lineHeight: 20,
+              }}>
+              • <Text style={{ fontWeight: '600', color: greys(theme)[0] }}>{item.title}</Text>:{' '}
+              {item.description}
+            </Text>
+          </VStack>
+        ))}
+      </VStack>
+    </VStack>
   );
 
   const changelogData = {

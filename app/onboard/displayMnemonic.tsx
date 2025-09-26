@@ -5,6 +5,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
+import { VStack, HStack } from 'components/common/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import BottomButtons from './BottomButtons';
 
@@ -85,15 +86,15 @@ const MnemonicDisplayScreen = () => {
               </Text>
             </View>
 
-            <View style={styles.gridContainer} testID="mnemonic-grid">
+            <VStack spacing={8} style={styles.gridContainer} testID="mnemonic-grid">
               {Array.from({ length: 4 }).map((_, rowIndex) => (
-                <View key={rowIndex} style={styles.gridRow}>
+                <HStack key={rowIndex} justify="space-between">
                   {Array.from({ length: 3 }).map((_, colIndex) =>
                     renderWordCell(rowIndex * 3 + colIndex)
                   )}
-                </View>
+                </HStack>
               ))}
-            </View>
+            </VStack>
 
             <View style={styles.securityTipsContainer}>
               <Text style={styles.securityTipsTitle}>Security Tips:</Text>
@@ -195,11 +196,6 @@ const styles = StyleSheet.create({
   gridContainer: {
     marginTop: 16,
     marginBottom: 24,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
   },
   wordCell: {
     flex: 1,

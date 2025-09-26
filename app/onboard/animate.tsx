@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
+import { VStack, HStack } from 'components/common/View';
 
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
@@ -985,27 +986,27 @@ const ChainLoadingAnimation = () => {
 
                       <Text style={styles.message}>{message}</Text>
 
-                      <View style={styles.currenciesContainer}>
+                      <VStack spacing={8} style={styles.currenciesContainer}>
                         {mint.currencies.map((currency) => {
                           const currencyProgress = getCurrencyProgress(mint.mintUrl, currency.name);
                           return (
-                            <View key={currency.name} style={styles.currencyRow}>
+                            <HStack key={currency.name} align="center" spacing={8}>
                               <Currency currency={currency.name} size={32} />
-                              <View style={styles.progressBarContainer}>
-                                <View
+                              <VStack style={styles.progressBarContainer}>
+                                <VStack
                                   style={[
                                     styles.progressBar,
                                     { width: `${currencyProgress * 100}%` },
                                   ]}
                                 />
-                              </View>
+                              </VStack>
                               {currencyProgress >= 1 && (
                                 <Icon name="ion:checkmark-done" size={16} color="#10B981" />
                               )}
-                            </View>
+                            </HStack>
                           );
                         })}
-                      </View>
+                      </VStack>
                     </View>
                   </>
                 )}

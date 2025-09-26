@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'components/common/Button';
-import { View } from 'components/common/View';
+import { VStack, HStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
 import Container from 'components/layout/Container';
@@ -226,8 +226,7 @@ export default function ModalScreen() {
                 backgroundColor: greys(theme)[900],
                 borderRadius: 8,
               }}>
-              <View
-                style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <HStack justify="space-between" style={{ marginBottom: 8 }}>
                 <Text
                   style={{ fontWeight: 'bold', flex: 1 }}
                   numberOfLines={1}
@@ -235,7 +234,7 @@ export default function ModalScreen() {
                   {mintData.url}
                 </Text>
                 <Text style={{ fontWeight: 'bold' }}>Total: {mintData.totalAmount} sats</Text>
-              </View>
+              </HStack>
 
               <Button
                 variant="primary"
@@ -255,10 +254,9 @@ export default function ModalScreen() {
                     const statusColor = isSpent ? reds[300] : isPending ? 'orange' : greens[300];
 
                     return (
-                      <View
+                      <HStack
                         key={`${proof.id}-${index}`}
                         style={{
-                          flexDirection: 'row',
                           padding: 8,
                           marginBottom: 4,
                           borderRadius: 4,

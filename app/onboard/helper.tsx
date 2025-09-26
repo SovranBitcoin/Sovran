@@ -192,14 +192,7 @@ const createStyles = (theme: Theme) =>
       color: '#999999',
       fontWeight: '500',
     },
-    currenciesContainer: {
-      gap: 8,
-    },
-    currencyRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
+    currenciesContainer: {},
     currencyName: {
       width: 50,
       fontSize: 14,

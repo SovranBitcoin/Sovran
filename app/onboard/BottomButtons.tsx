@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   StyleSheet,
-  View,
   TouchableOpacity,
   TextStyle,
   StyleProp,
@@ -9,6 +8,7 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { Text } from 'components/common/Text';
+import { VStack, HStack } from 'components/common/View';
 import { greys, shades, Theme } from 'helper/colors';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
@@ -42,59 +42,40 @@ const BottomButtons = ({
   textStyle,
 }: BottomButtonsProps) => {
   const styles = createStyles(theme);
-  const layout = vertical ? styles.verticalButtons : styles.horizontalButtons;
+  const Stack = vertical ? VStack : HStack;
+  const spacing = vertical ? 12 : 8;
 
   return (
-    <View style={[styles.bottomButtons, layout, containerStyle]}>
-      {buttons.map((button, index) => {
-        const isLastButton = index === buttons.length - 1;
-        const spacingStyle = getSpacingStyle(vertical, index, isLastButton);
-
-        return (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.button,
-              getButtonStyle(button.variant, theme),
-              spacingStyle,
-              button.disabled && styles.disabledButton,
-              buttonStyle,
-              button.buttonStyle,
-            ]}
-            onPress={button.onPress}
-            disabled={button.disabled}>
+    <Stack
+      spacing={spacing}
+      justify={vertical ? 'flex-start' : 'space-between'}
+      style={[styles.bottomButtons, containerStyle]}>
+      {buttons.map((button, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.button,
+            getButtonStyle(button.variant, theme),
+            !vertical && { flex: 1 },
+            button.disabled && styles.disabledButton,
+            buttonStyle,
+            button.buttonStyle,
+          ]}
+          onPress={button.onPress}
+          disabled={button.disabled}>
+          <HStack align="center" spacing={8}>
             {button.leftIcon}
-            <Text
-              weight="bold"
-              size={16}
-              style={[
-                styles.buttonText,
-                button.leftIcon && { marginLeft: 8 },
-                button.rightIcon && { marginRight: 8 },
-                textStyle,
-                button.textStyle,
-              ]}>
+            <Text weight="bold" size={16} style={[styles.buttonText, textStyle, button.textStyle]}>
               {button.text}
             </Text>
             {button.rightIcon}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+          </HStack>
+        </TouchableOpacity>
+      ))}
+    </Stack>
   );
 };
 
-// Helper function to get spacing style based on layout
-const getSpacingStyle = (vertical: boolean, index: number, isLastButton: boolean) => {
-  if (vertical) {
-    return isLastButton ? null : { marginBottom: 12 };
-  }
-
-  return {
-    flex: 1,
-    ...(index % 2 === 0 ? { marginRight: 8 } : { marginLeft: 8 }),
-  };
-};
 
 // Helper function to get button style based on variant
 const getButtonStyle = (variant: ButtonVariant, theme: Theme) => {
@@ -116,19 +97,11 @@ const createStyles = (theme: Theme) =>
       padding: 16,
       backgroundColor: greys(theme)[950],
     },
-    horizontalButtons: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    verticalButtons: {
-      flexDirection: 'column',
-    },
     button: {
       padding: 16,
       borderRadius: 16,
       justifyContent: 'center',
       alignItems: 'center',
-      flexDirection: 'row',
     },
     buttonText: {
       textAlign: 'center',
