@@ -76,7 +76,6 @@ const BottomButtons = ({
   );
 };
 
-
 // Helper function to get button style based on variant
 const getButtonStyle = (variant: ButtonVariant, theme: Theme) => {
   const variantStyles: Record<ButtonVariant, ViewStyle> = {

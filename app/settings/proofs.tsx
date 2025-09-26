@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'components/common/Button';
-import { VStack, HStack } from 'components/common/View';
+import { HStack, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
 import Container from 'components/layout/Container';
@@ -271,7 +271,7 @@ export default function ModalScreen() {
                           numberOfLines={1}>
                           {proof?.id ? `${proof.id.substring(0, 8)}...` : 'N/A'}
                         </Text>
-                      </View>
+                      </HStack>
                     );
                   })}
 
