@@ -60,22 +60,6 @@ export const purples: Shades = {
   500: '#4B0082',
 };
 
-export const indigos: Shades = {
-  100: '#E0E0F8',
-  200: '#A3A3E4',
-  300: '#8A2BE2',
-  400: '#6A0DAD',
-  500: '#4B0082',
-};
-
-export const blues: Shades = {
-  100: '#E0F8E5',
-  200: '#A3E4B1',
-  300: '#0CED3E',
-  400: '#0ABF32',
-  500: '#089A28',
-};
-
 export type GreyKey = 0 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 export type Greys = Record<GreyKey, string>;
 
@@ -599,10 +583,6 @@ export const background = '#FFFFFF';
 export const white = '#FFFFFF';
 
 export const black = '#181412'; // off black
-
-export function computeGreys(theme: Theme) {
-  return greys(theme);
-}
 
 export const hexToRgb = (hex: string) => {
   const clean = hex.replace('#', '');

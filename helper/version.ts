@@ -1,13 +1,4 @@
-import * as Application from 'expo-application';
 import { Platform } from 'react-native';
-
-const name = Application.applicationName;
-
-const isTestFlight = name === 'TestFlight';
-const isExpoGo = name === 'Expo Go';
-const isProduction = name === 'Sovran';
-
-const isDev = isTestFlight || isExpoGo;
 
 /**
  * Generic device platform version checking with fluent API

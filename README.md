@@ -13,26 +13,22 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 - [ ] Payment requests (needs more testing)
 
 - [x] Lightning Receiving
-
   - [x] Attach note
   - [x] Websockets
   - [x] Check Status Button
 
 - [x] Lightning Sending
-
   - [ ] Attach note
   - [x] Calculate Lightning fees + Mint fees
   - [x] via Pasting, Scanning, DM
   - [ ] When sending via lightning check if invoice has nostr enabled and enrich the transaction with nostr information
 
 - [x] Ecash Receiving
-
   - [x] via Pasting, Scanning
   - [x] Attach note
   - [x] Unlocks tokens locked to '02' + pk
 
 - [x] Ecash Sending
-
   - [x] via Copy, DM, NFC, Share QR Image, Emoji
   - [x] Lock to NPUB
   - [x] Cancel (which automatically redeems ecash)
@@ -41,12 +37,10 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
   - [x] Check Status Button
 
 - [ ] Offline Receive
-
   - [ ] via locked ecash
   - [ ] Store now and redeem later
 
 - [x] QR Codes
-
   - [x] QR Code Scanner
   - [x] Animated or Static depending on context
 
@@ -54,11 +48,9 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 - [x] NUT13 Mnemonic Seed for Ecash
 
 - [x] Nostr DMs
-
   - [x] Ecash formatted nicely so you can click "Redeem"
 
 - [x] NPCV2 Lightning URL
-
   - [ ] Scroll down to fetch ecash
   - [ ] Change NPC mint
   - [ ] Custom Lightning URL e.g. satoshi@npubx.cash
@@ -68,18 +60,14 @@ Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities
 - [ ] Unified payment addresses: Write a formal NUT for this to get community input & implement it in Sovran
 
 - [x] Basic NFC functionality
-
   - [x] Automatic Keyset Rotation on receive/send.
 
 - [x] Marketplace features include:
-
   - [ ] Bitrefill gift cards (behind dev flag)
   - [ ] VPN using LNVPN (WireGuard)
-  - [ ] eSIMs in 150 countries
   - [ ] Donation centre to donate to those in need
 
 - [x] Nostr features:
-
   - [ ] Multiple profiles via a single mnemonic (removed for now)
   - [x] Send direct messages to contacts
   - [x] Transactions enriched with Nostr information (profile pictures, names, etc.)

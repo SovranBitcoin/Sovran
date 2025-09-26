@@ -497,16 +497,7 @@ export const store = createStore(persistedReducer, applyMiddleware(thunkMiddlewa
 // If any private data is leaked from this that would be considered a bug.
 const organizedKeys = {
   // Root level sections
-  rootSections: [
-    'settings',
-    'cashu',
-    'bitrefill',
-    'pricelist',
-    'vpns',
-    'esim',
-    'nostr',
-    '_persist',
-  ],
+  rootSections: ['settings', 'cashu', 'pricelist', 'nostr', '_persist'],
 
   // Settings section
   settings: [
@@ -718,91 +709,6 @@ const organizedKeys = {
 
   // Price list section
   pricelist: ['usd', 'btc'],
-
-  // VPN section
-  vpns: ['vpns'],
-
-  // VPN fields
-  vpn: [
-    'location',
-    'duration',
-    'duration_code',
-    'cc',
-    'created_at',
-    'payment_hash',
-    'payment_request',
-    'order',
-  ],
-
-  // eSIM section
-  esim: ['esims'],
-
-  // eSIM fields
-  esimFields: ['package', 'sats', 'request', 'type', 'order'],
-
-  // eSIM package fields
-  esimPackage: [
-    'packageCode',
-    'slug',
-    'name',
-    'price',
-    'currencyCode',
-    'volume',
-    'smsStatus',
-    'dataType',
-    'unusedValidTime',
-    'duration',
-    'durationUnit',
-    'location',
-    'description',
-    'activeType',
-    'retailPrice',
-    'speed',
-  ],
-
-  // eSIM order fields
-  esimOrder: [
-    'request',
-    'esimTranNo',
-    'orderNo',
-    'imsi',
-    'iccid',
-    'smsStatus',
-    'msisdn',
-    'ac',
-    'qrCodeUrl',
-    'shortUrl',
-    'smdpStatus',
-    'eid',
-    'activeType',
-    'dataType',
-    'activateTime',
-    'expiredTime',
-    'installationTime',
-    'totalVolume',
-    'totalDuration',
-    'durationUnit',
-    'orderUsage',
-    'esimStatus',
-    'pin',
-    'puk',
-    'apn',
-    'ipExport',
-    'supportTopUpType',
-    'fupPolicy',
-    'packageList',
-  ],
-
-  // eSIM package list fields
-  esimPackageList: [
-    'packageName',
-    'packageCode',
-    'slug',
-    'duration',
-    'volume',
-    'locationCode',
-    'createTime',
-  ],
 
   // Nostr section
   nostr: ['currentProfile', 'search', 'profiles', 'messages', 'follows', 'contacts'],

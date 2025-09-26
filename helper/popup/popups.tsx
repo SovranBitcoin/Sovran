@@ -58,11 +58,6 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'Nostr secret key has been copied to your clipboard.',
     type: MESSAGE_TYPES.SUCCESS,
   },
-  vpn_copied: {
-    title: 'VPN Details Copied',
-    text: 'VPN configuration has been copied to your clipboard.',
-    type: MESSAGE_TYPES.SUCCESS,
-  },
   unified_address_copied: {
     title: 'Unified Address Copied',
     text: 'Unified address has been copied to your clipboard.',
@@ -226,19 +221,6 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'The payment request does not specify a mint.',
     type: MESSAGE_TYPES.ERROR,
   },
-
-  // eSIM Related
-  esim_error: {
-    title: 'eSIM Not Found',
-    text: 'Unable to locate eSIMs. Please try again later.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  esim_link_copied: {
-    title: 'eSIM Link Copied',
-    text: 'The eSIM link has been copied to your clipboard.',
-    type: MESSAGE_TYPES.SUCCESS,
-  },
-
   // System & General
   general_error: {
     title: 'Error Occurred',
@@ -393,27 +375,6 @@ export const showSuccess = (
   options: Record<string, any> = {},
   onClose?: (data: unknown) => void
 ) => showMessage(messageCode, params, { ...options, type: MESSAGE_TYPES.SUCCESS }, onClose);
-
-export const showError = (
-  messageCode: MessageCode,
-  params: Record<string, any>,
-  options: Record<string, any> = {},
-  onClose?: (data: unknown) => void
-) => showMessage(messageCode, params, { ...options, type: MESSAGE_TYPES.ERROR }, onClose);
-
-export const showWarning = (
-  messageCode: MessageCode,
-  params: Record<string, any>,
-  options: Record<string, any> = {},
-  onClose?: (data: unknown) => void
-) => showMessage(messageCode, params, { ...options, type: MESSAGE_TYPES.WARNING }, onClose);
-
-export const showInfo = (
-  messageCode: MessageCode,
-  params: Record<string, any>,
-  options: Record<string, any> = {},
-  onClose?: (data: unknown) => void
-) => showMessage(messageCode, params, { ...options, type: MESSAGE_TYPES.INFO }, onClose);
 
 // Export constants for use in other files
 export { MESSAGE_TYPES, MESSAGE_EMOJIS, MESSAGE_CONFIGS };

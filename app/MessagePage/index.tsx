@@ -7,9 +7,6 @@ import moment from 'moment';
 // Custom hooks
 import { memoizedMessagesByProfile, Message, useNostr } from 'helper/redux/nostr';
 import { TransactionBuilder, useCashu } from 'helper/redux/cashu';
-import { Esim, useEsims } from 'helper/redux/esim';
-import { useVpn, Vpn } from 'helper/redux/lnvpn';
-import { BitrefillEvent, useBitrefill } from 'helper/redux/bitrefill';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Components
@@ -26,7 +23,7 @@ import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 
-export type TimelineItemType = BitrefillEvent | Vpn | Esim | Message | TransactionBuilder;
+export type TimelineItemType = Message | TransactionBuilder;
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -38,9 +35,6 @@ export default function ModalScreen() {
   const { profiles, search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
   const { transactions } = useCashu();
-  const { esims } = useEsims();
-  const { vpn } = useVpn();
-  const { events } = useBitrefill();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');
@@ -81,20 +75,6 @@ export default function ModalScreen() {
     (t) => convertNpub(t.pubkey) === convertNpub(params.pubkey)
   );
 
-  // Filter esims with matching requests
-  const esimsWithRequest = esims.filter((esim) =>
-    currentTransactions?.transactions?.some(
-      (transaction) => transaction.request && transaction.request === esim.request
-    )
-  );
-
-  // Filter vpns with matching requests
-  const vpnsWithRequest = vpn.filter((esim) =>
-    currentTransactions?.transactions?.some((tx) => {
-      return tx.request && esim.payment_request && tx.request === esim.payment_request;
-    })
-  );
-
   // Filter and deduplicate messages
   const filteredMessages: Message[] =
     messages
@@ -103,24 +83,13 @@ export default function ModalScreen() {
         return unique.find((item) => item.id === msg.id) ? unique : [...unique, msg];
       }, []) || [];
 
-  const bitrefillEvents =
-    params?.pubkey === 'df865ef4830496b501eebd88377c90f521469d47c53997300e225aab1b29b264'
-      ? events
-      : [];
-
   // Combine all timeline items and sort by date
   const timelimeItems: TimelineItemType[] = [
-    ...esimsWithRequest,
-    ...vpnsWithRequest,
     ...(currentTransactions?.transactions || []),
     ...filteredMessages,
-    ...bitrefillEvents,
   ].sort((a: TimelineItemType, b: TimelineItemType) => {
     const getDate = (item: TimelineItemType) => {
-      const vpnDate = item?.cc ? item.created_at : null;
-      return (
-        item?.date || item?.order?.packageList?.[0]?.createTime || vpnDate || item.created_at * 1000
-      );
+      return item?.date || item.created_at * 1000;
     };
     return new Date(getDate(a)).getTime() - new Date(getDate(b)).getTime();
   });
@@ -129,13 +98,7 @@ export default function ModalScreen() {
   const timelineItemsGroupedByDate = timelimeItems.reduce<Record<string, TimelineItemType[]>>(
     (groups, item) => {
       const getDate = (item: TimelineItemType) => {
-        const vpnDate = 'cc' in item ? item.created_at : null;
-        return (
-          (item as any)?.date ||
-          (item as any)?.order?.packageList?.[0]?.createTime ||
-          vpnDate ||
-          item.created_at * 1000
-        );
+        return (item as any)?.date || item.created_at * 1000;
       };
 
       const date = moment(getDate(item)).format('YYYY-MM-DD');
@@ -154,7 +117,7 @@ export default function ModalScreen() {
     let cancelButtonIndex = 0;
     let destructiveButtonIndex = -1;
 
-    if (item.order || item?.request) {
+    if (item?.request) {
       options = ['View Details', 'Cancel'];
       destructiveButtonIndex = 0;
       cancelButtonIndex = 1;
@@ -168,19 +131,10 @@ export default function ModalScreen() {
       },
       (buttonIndex) => {
         if (buttonIndex === 0 && options.length > 1) {
-          if (item.order) {
-            const { package: p, order: o } = item;
-            if (item?.cc) {
-              navigation.navigate('vpn', { ...item });
-            } else {
-              navigation.navigate('esim', { ...p, ...item, ...o });
-            }
-          } else {
-            navigation.navigate('transaction', {
-              id: item.request,
-              transactionType: item.transactionType,
-            });
-          }
+          navigation.navigate('transaction', {
+            id: item.request,
+            transactionType: item.transactionType,
+          });
         }
       }
     );

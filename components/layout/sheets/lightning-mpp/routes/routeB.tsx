@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Switch, Animated, View as RNView } from 'react-native';
+import React, { useState, useMemo } from 'react';
 
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Text } from 'components/common/Text';
@@ -7,28 +6,14 @@ import { View } from 'components/common/View';
 import { Spinner } from 'components/common/Spinner';
 import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { memoizedGetMintInfo, memoizedGetBalance } from 'helper/redux/cashu/selectors';
+import { memoizedGetMintInfo } from 'helper/redux/cashu/selectors';
 import { useSelector } from 'react-redux';
-import {
-  RouteScreenProps,
-  useSheetPayload,
-  useSheetRef,
-  ScrollView,
-} from 'react-native-actions-sheet';
+import { useSheetPayload, useSheetRef, ScrollView } from 'react-native-actions-sheet';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
 import Wrapper from 'components/layout/sheets/wrapper';
-import Svg, { Circle } from 'react-native-svg';
 import { Card } from 'components/common/Card';
-import {
-  checkLightningReceiveStatus,
-  getMeltQuote,
-  receiveLightning,
-  sendLightning,
-} from 'helper/cashuClient';
-import { store } from 'helper/redux/store';
-import { msatAllocations, MintBalance } from 'helper/mpp';
-import { showMessage } from 'helper/popup/popups';
+import { getMeltQuote, sendLightning } from 'helper/cashuClient';
 import { useTypedNavigation } from 'helper/navigation';
 
 // Isolated MintComponent to prevent re-renders during animations
@@ -135,100 +120,6 @@ const MintComponent = React.memo(
 );
 
 MintComponent.displayName = 'MintComponent';
-
-// Animated progress circle component
-const ProgressCircle = ({
-  progress,
-  theme,
-  size = 24,
-}: {
-  progress: number;
-  theme: any;
-  size?: number;
-}) => {
-  const radius = (size - 4) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-
-  return (
-    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={greys(theme)[600]}
-        strokeWidth="2"
-        fill="none"
-      />
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={progress === 100 ? greens[300] : greys(theme)[0]}
-        strokeWidth="2"
-        fill="none"
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-};
-
-// Arrow component for showing transfer direction
-const TransferArrow = ({
-  progress,
-  isExecuting,
-  theme,
-  executionSteps,
-  currentStep,
-}: {
-  progress: number;
-  isExecuting: boolean;
-  theme: any;
-  executionSteps: any[];
-  currentStep: number;
-}) => {
-  const rotation = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (isExecuting) {
-      const animation = Animated.loop(
-        Animated.timing(rotation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        })
-      );
-      animation.start();
-      return () => animation.stop();
-    } else {
-      rotation.setValue(0);
-    }
-  }, [isExecuting, rotation]);
-
-  const rotateInterpolate = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  return (
-    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View
-        style={{
-          transform: [{ rotate: rotateInterpolate }],
-          marginVertical: 4,
-        }}>
-        <Icon
-          name="material-symbols:arrow-forward"
-          size={20}
-          color={isExecuting ? greys(theme)[0] : greys(theme)[400]}
-        />
-      </Animated.View>
-      <ProgressCircle progress={progress} theme={theme} size={20} />
-    </View>
-  );
-};
 
 interface Payload {
   pr: string;

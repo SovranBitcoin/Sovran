@@ -64,16 +64,6 @@ export async function retrieveMnemonic(): Promise<string | null> {
   }
 }
 
-export async function clearMnemonic(): Promise<boolean> {
-  try {
-    await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_MNEMONIC);
-    return true;
-  } catch (error) {
-    console.error('Failed to clear mnemonic:', error);
-    return false;
-  }
-}
-
 /**
  * Checks if a mnemonic is stored in secure storage
  * @returns Promise<boolean> True if mnemonic exists, false otherwise
@@ -85,64 +75,5 @@ export async function hasMnemonic(): Promise<boolean> {
   } catch (error) {
     console.error('Failed to check for mnemonic:', error);
     return false;
-  }
-}
-
-/**
- * Removes the mnemonic from secure storage (useful for account deletion/reset)
- * @returns Promise<boolean> True if removed successfully, false otherwise
- */
-export async function removeMnemonic(): Promise<boolean> {
-  try {
-    await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_MNEMONIC);
-    console.log('Mnemonic removed from secure storage');
-    return true;
-  } catch (error) {
-    console.error('Failed to remove mnemonic:', error);
-    return false;
-  }
-}
-
-/**
- * Stores additional profile data securely (optional, for future use)
- * @param profileData JSON-serializable profile data
- * @returns Promise<boolean> True if stored successfully, false otherwise
- */
-export async function storeProfileData(profileData: any): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-
-    await SecureStore.setItemAsync(
-      STORAGE_KEYS.USER_PROFILE_DATA,
-      JSON.stringify(profileData),
-      options
-    );
-
-    console.log('Profile data stored securely');
-    return true;
-  } catch (error) {
-    console.error('Failed to store profile data:', error);
-    return false;
-  }
-}
-
-/**
- * Retrieves profile data from secure storage
- * @returns Promise<any | null> The profile data object or null if not found/error
- */
-export async function retrieveProfileData(): Promise<any | null> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-
-    const data = await SecureStore.getItemAsync(STORAGE_KEYS.USER_PROFILE_DATA, options);
-
-    if (data) {
-      return JSON.parse(data);
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Failed to retrieve profile data:', error);
-    return null;
   }
 }

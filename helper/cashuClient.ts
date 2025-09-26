@@ -1226,10 +1226,6 @@ export function getDescription({ pr }) {
   return decodedPR.sections.find((route) => route.name === 'description')?.value;
 }
 
-export function isValidLNURL(url: string): boolean {
-  return toResultSync(() => decode(url)).isOk();
-}
-
 export function npubToPublicKey(key: string) {
   // Check and convert npub to P2PK
   if (key && key.startsWith('npub1')) {

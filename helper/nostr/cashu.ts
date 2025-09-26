@@ -1,7 +1,5 @@
 import { finalizeEvent, nip44, SimplePool } from 'nostr-tools';
 import { store } from 'helper/redux/store';
-import { Cache } from 'react-native-cache';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { relays } from 'components/ndk';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { deriveMintBackupKeys } from 'helper/cashuClient';
@@ -9,15 +7,6 @@ import _ from 'lodash';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-
-const cache = new Cache({
-  namespace: 'last-wallet-event',
-  policy: {
-    maxEntries: 50,
-    stdTTL: 60 * 5, // 5 minutes
-  },
-  backend: AsyncStorage,
-});
 
 interface NostrEvent {
   kind: number;

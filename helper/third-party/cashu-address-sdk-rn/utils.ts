@@ -1,14 +1,3 @@
-export function createRandomString() {
-  if (typeof window === 'undefined') {
-    require('crypto').randomBytes(16).toString('hex');
-  } else {
-    const array = new Uint8Array(16);
-    return [...window.crypto.getRandomValues(array)]
-      .map((x) => x.toString(16).padStart(2, '0'))
-      .join('');
-  }
-}
-
 export async function authedJsonRequest(url: string, authHeader: string, options?: RequestInit) {
   return fetch(url, {
     ...options,

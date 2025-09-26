@@ -1,9 +1,6 @@
 import MessageComponent from './MessageComponent';
-import EsimComponent from './EsimComponent';
 import TransactionComponent from './TransactionComponent';
 import { useNostr } from 'helper/redux/nostr';
-import EventComponent from './EventsComponent';
-import VpnComponent from './VpnComponent';
 import CashuTokenComponent from './CashuTokenComponent';
 import { isValidEcashToken } from 'helper/cashuClient';
 import { Theme } from 'helper/colors';
@@ -19,9 +16,6 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
 
   // Determine item type
   const isMessage = !!item.content;
-  const isEvent = !!item.event;
-  const isVPN = !!item?.cc;
-  const isEsim = !!item.order?.ac;
   const isTransaction = !!item.unit;
 
   const isTokenMessage = isMessage && isValidEcashToken(item.content);
@@ -42,18 +36,6 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
       );
     }
     return <MessageComponent message={item} theme={theme} isReceived={isMessageReceived} />;
-  }
-
-  if (isVPN) {
-    return <VpnComponent vpn={item} theme={theme} isReceived={isVPN} />;
-  }
-
-  if (isEsim) {
-    return <EsimComponent esim={item} theme={theme} isReceived={isEsim} />;
-  }
-
-  if (isEvent) {
-    return <EventComponent event={item} theme={theme} />;
   }
 
   if (isTransaction) {

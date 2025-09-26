@@ -128,22 +128,6 @@ export default function ModalScreen() {
     setCheckingSpent(false);
   }, [allMints, checkProofSpentStatus, setCheckingSpent, setError]);
 
-  // Function to remove spent proofs for a specific mint
-  const removeSpentProofsForMint = async (mintUrl: string) => {
-    setRemovingSpent(true);
-    setError(null);
-
-    const spentProofs = activeMintsData
-      .find((mintData) => mintData.url === mintUrl)
-      ?.proofs?.filter((proof, index) => proofStates[mintUrl][index].state === 'SPENT');
-
-    if (spentProofs && spentProofs.length > 0) {
-      dispatch(removeProofs({ profileId, mintUrl, proofs: spentProofs }));
-    }
-
-    setRemovingSpent(false);
-  };
-
   // Function to remove spent or pending proofs for a specific mint
   const removeSpentOrPendingProofsForMint = async (mintUrl: string) => {
     setRemovingSpent(true);
@@ -196,12 +180,6 @@ export default function ModalScreen() {
     }
   }, [allMints.length, checkAllMints, proofStates]);
 
-  // Helper function to count spent proofs for a mint
-  const getSpentProofCount = (mintUrl: string) => {
-    const states = proofStates[mintUrl] || [];
-    return states.filter((state) => state?.state === 'SPENT').length;
-  };
-
   // Helper function to count spent or pending proofs for a mint
   const getSpentOrPendingProofCount = (mintUrl: string) => {
     const states = proofStates[mintUrl] || [];
@@ -235,7 +213,6 @@ export default function ModalScreen() {
         {removingAll && <Text style={{ marginTop: 10 }}>Removing all proofs...</Text>}
 
         {activeMintsData.map((mintData) => {
-          const spentProofCount = getSpentProofCount(mintData.url);
           const spentOrPendingProofCount = getSpentOrPendingProofCount(mintData.url);
 
           return (

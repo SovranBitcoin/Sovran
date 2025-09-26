@@ -19,41 +19,7 @@ interface MenuItemData {
   empty?: boolean;
 }
 
-export const activationDate = new Date('2025-07-17');
-
 const SERVICE_MENU_ITEMS: MenuItemData[] = [
-  // ...(new Date() > activationDate
-  //   ? [
-  //       {
-  //         id: 'esims',
-  //         icon: 'fluent:sim-24-filled',
-  //         label: 'eSIMs',
-  //         navigateTo: 'myEsims',
-  //       },
-  //     ]
-  //   : []),
-  // ...(new Date() > activationDate
-  //   ? [
-  //       {
-  //         id: 'vpn',
-  //         icon: 'ic:baseline-vpn-lock',
-  //         label: 'VPN',
-  //         navigateTo: 'myVpns',
-  //       },
-  //     ]
-  //   : []),
-  {
-    id: 'giftcards',
-    icon: 'ic:baseline-card-giftcard',
-    label: 'Giftcards',
-    navigateTo: 'giftcards/all',
-  },
-  {
-    id: 'donate',
-    icon: 'mdi:charity',
-    label: 'Donate',
-    navigateTo: 'donate/donate',
-  },
   {
     id: 'support',
     icon: 'mdi:help-circle',
@@ -61,9 +27,6 @@ const SERVICE_MENU_ITEMS: MenuItemData[] = [
     navigateTo: 'userMessages',
     params: { pubkey: SUPPORT_PUBKEY },
   },
-  // Empty placeholders to maintain grid layout
-  { id: 'empty1', empty: true },
-  { id: 'empty2', empty: true },
 ];
 
 interface MenuItemProps {

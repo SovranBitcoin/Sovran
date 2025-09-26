@@ -19,8 +19,6 @@ import { maybeConvertNpub } from 'helper/cashuClient';
 import { nip19 } from 'nostr-tools';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 
-const LNVPN_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
-
 export function convertNpub(pubkey: string) {
   try {
     const npub = nip19.decode(pubkey);
@@ -39,11 +37,7 @@ const RenderContactItem = ({ item }: { item: any }) => {
   if (muted) return null;
   return (
     <ContactItem
-      isVerified={
-        profiles.some((profile) => profile.pubkey === item.pubkey) ||
-        item.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
-        item.pubkey === LNVPN_PUBKEY
-      }
+      isVerified={profiles.some((profile) => profile.pubkey === item.pubkey)}
       contact={item}
       theme={theme}
       navigation={navigation}
@@ -84,9 +78,7 @@ const Section = () => {
     .filter(
       (profile) =>
         messages.some((m) => m.pubkey === profile.pubkey) ||
-        transactions.some((t) => convertNpub(t.nostr?.pubkey) === profile.pubkey) ||
-        profile.pubkey === '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2' ||
-        profile.pubkey === LNVPN_PUBKEY
+        transactions.some((t) => convertNpub(t.nostr?.pubkey) === profile.pubkey)
     )
     .forEach((profile) => {
       combinedSearchAndProfilesMap.set(profile.pubkey, profile);

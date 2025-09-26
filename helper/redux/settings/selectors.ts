@@ -5,8 +5,6 @@ import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 export const selectSettings = (state: RootState) => state.settings.settings;
 
-export const selectTheme = createSelector([selectSettings], (settings) => settings.theme);
-
 export const selectLanguage = createSelector([selectSettings], (settings) => settings.lang);
 
 export const selectDisplayBitcoin = createSelector(
@@ -57,13 +55,4 @@ export const memoizedGetBackgroundImage = createSelector(
   (image) => {
     return image;
   }
-);
-
-export const memoizedGetBackgroundImageAttrs = createSelector(
-  [
-    (state: RootState) => {
-      return state.settings.settings.backgroundImageAttrs;
-    },
-  ],
-  (attrs) => attrs
 );

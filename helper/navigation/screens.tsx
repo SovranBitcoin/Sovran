@@ -24,19 +24,6 @@ export const TAB_SCREENS = (): TabConfig[] => [
     title: 'Payments',
     icon: ({ color }) => <Icon name="fluent:arrow-swap-16-filled" color={color} size={32} />,
   },
-  // ...(new Date() > activationDate
-  //   ? [
-  //       {
-  //         name: 'myEsims',
-  //         component: MyEsims,
-  //         title: '',
-  //         icon: ({ color }: { color: string }) => (
-  //           <Icon name="fluent:sim-24-filled" color={color} size={32} />
-  //         ),
-  //       },
-  //     ]
-  //   : []),
-
   {
     name: 'index',
     component: HomeView,
@@ -110,18 +97,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'esim',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'esimsDataPlan',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'currency',
     options: {
       presentation: 'modal',
@@ -162,12 +137,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'esimShare',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'lightningSendConfirmation',
     options: {
       presentation: 'modal',
@@ -181,18 +150,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   {
     name: 'lightningReceiveConfirmation',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'esimCountrySelection',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'esimCheckout',
     options: {
       presentation: 'modal',
     },

@@ -6,12 +6,7 @@ import {
   updateCurrencyAllocation,
   resetAllocation,
 } from './actions';
-import {
-  memoizedGetMintInfo,
-  memoizedGetAudit,
-  memoizedGetTransactions,
-  memoizedGetAllocation,
-} from './selectors';
+import { memoizedGetMintInfo, memoizedGetTransactions, memoizedGetAllocation } from './selectors';
 import { RootState } from '../store/reducer';
 
 export const useCashu = () => {
@@ -40,10 +35,6 @@ export const useCashu = () => {
 
 export const useGetMintInfo = ({ mintUrl }: { mintUrl: string }) => {
   return useSelector(memoizedGetMintInfo(mintUrl));
-};
-
-export const useGetAudit = ({ mintUrl }: { mintUrl: string }) => {
-  return useSelector(memoizedGetAudit(mintUrl));
 };
 
 export const useAllocation = () => {

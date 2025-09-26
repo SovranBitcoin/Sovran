@@ -1,5 +1,3 @@
-import { ProductPackage, QuoteResponse } from 'helper/apiClient';
-
 export type NavigationParams = {
   currency: {
     amount: number;
@@ -26,9 +24,6 @@ export type NavigationParams = {
   giftcard: {
     slug: string;
     image: string;
-  };
-  esim: {
-    request: string;
   };
   displayMnemonic: {
     mnemonic: string;
@@ -88,12 +83,6 @@ export type NavigationParams = {
     account: { unit: string };
     tab: 'All' | 'Incoming' | 'Outgoing';
   };
-  vpnShare: {
-    vpnCode: string;
-    location: string;
-    config: string[];
-    hash: string;
-  };
   wallets: {
     accounts: string;
   };
@@ -109,41 +98,7 @@ export type NavigationParams = {
   contacts: {
     unit: string;
   };
-  esimShare: {
-    esimCode: string;
-    esimLink: string;
-    location: string;
-  };
   languageSettings: {
     countries: string[];
   };
-  esimCheckout: {
-    quote: QuoteResponse;
-    package: ProductPackage;
-    esimParams: {
-      iccid: string;
-      type: 'BASE' | 'TOPUP';
-      topup: boolean;
-      topupAmount: number;
-    };
-  };
-  esimCountrySelection: {
-    countries: string[];
-    packageList?: ProductPackage[];
-    type: 'vpn' | 'esim';
-    esimType?: 'BASE' | 'TOPUP'; // Preserve the original esim type
-    iccid?: string; // Also preserve iccid for when we navigate back
-  };
-  esimsDataPlan: {
-    country?: string;
-    packageList?: ProductPackage[];
-    countries?: string[];
-    iccid?: string;
-    type: 'BASE' | 'TOPUP';
-  };
-
-  // Add other endpoints here
-  // exampleEndpoint: { param1: string; param2: number };
 };
-
-export type NavigationEndpoints = keyof NavigationParams;

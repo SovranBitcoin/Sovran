@@ -77,7 +77,6 @@ const configWithMonicon = withMonicon(config, {
     'proicons:photo',
     'majesticons:search-line',
     'solar:key-bold',
-    'ic:baseline-vpn-lock',
     'lucide:twitter',
     'hugeicons:new-twitter',
     'mdi:at',

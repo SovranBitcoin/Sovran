@@ -147,11 +147,6 @@ export const memoizedGetMintInfo = (mintUrl: string) => {
   return createSelector([(state: RootState) => state.cashu?.info?.[mintUrl]], (info) => info);
 };
 
-export const memoizedGetAudit = (mintUrl: string) =>
-  createSelector([(state: RootState) => state.cashu?.audits?.[mintUrl]], (audit) => {
-    return audit;
-  });
-
 export const memoizedGetCounterV2 = ({
   profileId,
   mintUrl,
@@ -222,19 +217,6 @@ export const memoizedGetBalance = (unit: string, mintUrl?: string) => {
     }
   );
 };
-
-export const memoizedGetAllBalances = createSelector(
-  [(state: RootState) => state.cashu.profiles[state.nostr.currentProfile.id]?.proofs],
-  (proofsByMint) => {
-    return Object.keys(proofsByMint).map((mint) => {
-      return {
-        mintUrl: mint,
-        amount: _.sumBy(proofsByMint[mint], 'amount'),
-        unit: 'sat',
-      };
-    });
-  }
-);
 
 export const memoizedGetAllBalancesMultipleCurrencies = createSelector(
   [
@@ -334,19 +316,7 @@ export const memoizedGetAllKeysetIdsFromAllMints = (excludeMintUrl?: string) =>
       .filter((id) => id); // just in case theres an undefined id somehow which happened locally once.
   });
 
-// Allocation selectors
-export const selectAllocation = (state: RootState) => state.cashu.allocation || {};
-
-export const selectCurrencyAllocation = (currency: string) =>
-  createSelector([selectAllocation], (allocation) => allocation[currency] || {});
-
 export const memoizedGetAllocation = createSelector(
   [(state: RootState) => state.cashu.allocation],
   (allocation) => allocation || {}
 );
-
-export const memoizedGetCurrencyAllocation = (currency: string) =>
-  createSelector(
-    [(state: RootState) => state.cashu.allocation],
-    (allocation) => allocation?.[currency] || {}
-  );

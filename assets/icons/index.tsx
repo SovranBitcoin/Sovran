@@ -78,7 +78,6 @@ export const icons = [
   'gala:add',
   'gala:remove',
   'fluent:clock-12-filled',
-  'ic:baseline-vpn-lock',
   'mdi:cancel',
   'clarity:internet-of-things-solid',
   'mage:edit-pen-fill',

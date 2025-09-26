@@ -3,7 +3,6 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash, giveaways } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector } from 'react-redux';
-import { schnorr } from '@noble/curves/secp256k1';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
@@ -79,24 +78,6 @@ function getTokenUnit({ token }: TokenProps) {
 function getTokenMints({ token }: TokenProps) {
   return getDecodedToken(token).mint;
 }
-
-// Crypto utilities
-const hexToBytes = (hex: string): Uint8Array => {
-  if (hex.length % 2 !== 0) {
-    throw new Error('Hex string must have an even number of characters');
-  }
-  return new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
-};
-
-export const generatePublicKey = (hexPrivateKey: string): string => {
-  if (hexPrivateKey.length !== 64) {
-    throw new Error('Private key must be 32 bytes (64 hex characters)');
-  }
-
-  const privateKeyBytes = hexToBytes(hexPrivateKey);
-  const publicKeyBytes = schnorr.getPublicKey(privateKeyBytes);
-  return Buffer.from(publicKeyBytes).toString('hex');
-};
 
 export function EcashReceiveConfirmation({
   token,
