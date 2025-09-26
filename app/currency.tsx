@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/layout/Modal';
-import { NumberInput } from '../components/common/NumberInput';
+import { AmountFormatter } from '../components/common/AmountFormatter';
 
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
 import {
@@ -313,15 +313,19 @@ function ModalScreen() {
           {renderButtons()}
         </>
       }>
-      <NumberInput
+      <AmountFormatter
+        amount={typeof amount === 'string' ? parseFloat(amount) || 0 : amount}
         unit={unit}
-        value={amount}
-        type={
+        size={48}
+        weight="heavy"
+        animated
+        useTypeColors
+        transactionType={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
             ? 'send'
             : 'receive'
         }
-        onChange={params?.amount ? undefined : setAmount}
+        centered
       />
       <MintBalanceDisplay
         onMintSelected={handleMintSelected}
