@@ -4,14 +4,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
-import { useClientOnlyValue } from 'hooks/useClientOnlyValue';
-import Icon, { SovranIcon } from 'assets/icons';
+import { SovranIcon } from 'assets/icons';
 import { greys, shades, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
 import { SearchBar } from './payments';
-import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
@@ -19,7 +17,6 @@ import { Avatar } from 'components/common/Avatar';
 
 const Tab = createBottomTabNavigator();
 
-// Shared constants (used multiple times)
 const PROFILE_AVATAR_SIZE = 48;
 const SPACING_XS = 8;
 const SPACING_SM = 16;
@@ -67,31 +64,12 @@ const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Th
   );
 };
 
-// Styles creator function
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    tabBarStyle: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: 'transparent',
-      borderTopColor: 'transparent',
-      elevation: 0,
-    },
-    headerStyle: {
-      backgroundColor: greys(theme)[950],
-      height: 0,
-    },
-  });
-
 // Main component
 const TabLayout = () => {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);
-  const styles = createStyles(theme);
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
   // Determine if navigation should be visible
@@ -101,14 +79,6 @@ const TabLayout = () => {
     <Pressable onPress={() => navigation.openDrawer()}>
       <View className="ml-2">
         <Avatar picture={currentProfile?.picture} />
-      </View>
-    </Pressable>
-  );
-
-  const HeaderRight = () => (
-    <Pressable className="opacity-0" onPress={() => showMessage('not_implemented')}>
-      <View className="mr-2 rounded-full p-2" style={{ backgroundColor: greys(theme)[800] }}>
-        <Icon name="solar:card-bold" color={greys(theme)[0]} />
       </View>
     </Pressable>
   );
@@ -132,34 +102,35 @@ const TabLayout = () => {
       <Tab.Navigator
         initialRouteName="index"
         screenOptions={{
-          headerShadowVisible: false,
-          headerShown: Boolean(useClientOnlyValue(false, true) && isNavigationVisible),
-          tabBarStyle: {
-            ...styles.tabBarStyle,
-            display: isNavigationVisible ? 'flex' : 'none',
-          },
+          lazy: true,
           headerBackground: () => <Background />,
           tabBarBackground: () => <TabBarBackground theme={theme} />,
-          lazy: true,
+          tabBarStyle: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'transparent',
+            borderTopColor: 'transparent',
+            elevation: 0,
+            display: isNavigationVisible ? 'flex' : 'none',
+          },
         }}>
-        {TAB_SCREENS().map(({ name, component, title, icon: IconComponent }) => (
+        {TAB_SCREENS().map(({ name, component, icon: IconComponent }) => (
           <Tab.Screen
             key={name}
             name={name}
             component={component}
             options={{
-              title,
               tabBarActiveTintColor: shades[300],
               tabBarInactiveTintColor: greys(theme)[300],
-              headerTitleAlign: 'center',
-              headerTintColor: '#fff',
               tabBarLabel: '',
-              headerTitleStyle: { fontWeight: 'bold' },
-              headerTitle: getHeaderTitle(title),
-              headerStyle: styles.headerStyle,
               tabBarIcon: ({ focused }) => <IconComponent focused={focused} theme={theme} />,
               headerLeft: HeaderLeft,
-              headerRight: HeaderRight,
+              headerStyle: {
+                backgroundColor: greys(theme)[950],
+                height: 0,
+              },
             }}
           />
         ))}

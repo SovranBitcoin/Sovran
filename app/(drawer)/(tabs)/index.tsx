@@ -215,15 +215,6 @@ function TabOneScreen() {
           className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          {/* <View className="mx-4">
-            <Spacer size={12} />
-            {new Date() > new Date('2025-07-22') && (
-              <Card
-                message="Do not use with large amounts of ecash. Sovran is still in development and is operated on a best-effort basis and without any guarentees."
-                variant="warning"
-              />
-            )}
-          </View> */}
           <View
             className="p-4 pt-0"
             style={{
