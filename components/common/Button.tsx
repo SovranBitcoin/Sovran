@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 
 interface RippleConfig {
   color?: string;
@@ -112,6 +112,11 @@ interface RippleConfig {
   centered?: boolean;
 }
 
+interface BlurConfig {
+  intensity?: number;
+  tint?: 'light' | 'dark' | 'default' | 'prominent';
+}
+
 export interface ButtonProps {
   testID?: string;
   disabled?: boolean;
@@ -123,6 +128,7 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   noPadding?: boolean;
   ripple?: boolean | RippleConfig;
+  blur?: boolean | BlurConfig;
 }
 
 export const Button = ({
@@ -136,6 +142,7 @@ export const Button = ({
   testID,
   noPadding = false,
   ripple = false,
+  blur = false,
 }: ButtonProps) => {
   const theme = useSelector(memoizedGetTheme);
 
@@ -150,6 +157,12 @@ export const Button = ({
     enabled: !!ripple,
     config: rippleConfig,
   });
+
+  // Blur config
+  const blurConfig = typeof blur === 'object' ? blur : {};
+  const { intensity = 75, tint = 'dark' } = blurConfig;
+
+  const shouldUseBlur = blur !== false;
 
   const getButtonStyles = () => {
     // If ripple is enabled, use minimal styling like original RippleButton
@@ -257,7 +270,9 @@ export const Button = ({
         onPressIn={handlePressIn}>
         <View
           style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
-          blur={variant !== 'primary'}>
+          blur={shouldUseBlur}
+          blurIntensity={intensity}
+          blurTint={tint}>
           {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
           {loading ? (
             <Icon
@@ -288,9 +303,11 @@ export const Button = ({
       onPressIn={handlePressIn}>
       <View
         style={[getButtonStyles(), { position: 'relative' }, style]}
-        blur={variant !== 'primary'}>
+        blur={shouldUseBlur}
+        blurIntensity={intensity}
+        blurTint={tint}>
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        <HStack align="center" justify="center" spacing={text && icon ? 8 : 0}>
           {loading ? (
             <Icon
               name="ant-design:loading-outlined"
@@ -304,7 +321,7 @@ export const Button = ({
             />
           ) : (
             <>
-              {icon && <View style={{ marginRight: text ? 8 : 0 }}>{icon}</View>}
+              {icon}
               {text && (
                 <Text
                   style={{
@@ -319,7 +336,7 @@ export const Button = ({
               )}
             </>
           )}
-        </View>
+        </HStack>
       </View>
     </TouchableOpacity>
   );

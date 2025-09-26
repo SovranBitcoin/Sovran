@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Dimensions, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from 'expo-router';
 import { greys } from 'helper/colors';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Text } from 'components/common/Text';
+import { Button } from 'components/common/Button';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
@@ -19,40 +20,10 @@ import { View } from 'components/common/View';
 const { width: screenWidth } = Dimensions.get('window');
 const scanBoxSize = screenWidth * 0.8;
 
-// Type definitions
-type BlurTint = 'light' | 'dark' | 'default';
-
 interface ScanningData {
   data: string;
   type?: string;
 }
-
-interface BlurredCircleButtonProps {
-  onPress: () => void;
-  children: React.ReactNode;
-  style?: ViewStyle;
-  intensity?: number;
-  tint?: BlurTint;
-}
-
-/**
- * BlurredCircleButton - A reusable button component with blur effect
- */
-const BlurredCircleButton: React.FC<BlurredCircleButtonProps> = ({
-  onPress,
-  children,
-  style,
-  intensity = 75,
-  tint = 'dark',
-}) => {
-  return (
-    <View blur blurIntensity={intensity} blurTint={tint} style={[styles.blurContainer, style]}>
-      <TouchableOpacity className="m-auto items-center rounded-lg " onPress={onPress}>
-        {children}
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 /**
  * Camera component for QR code scanning
@@ -170,9 +141,11 @@ const Camera: React.FC = () => {
 
       {/* Close button in top left */}
       <View className="absolute left-6 top-12 z-10">
-        <BlurredCircleButton onPress={handleClosePress}>
-          <Icon name="material-symbols:close-rounded" color={greys(theme)[0]} />
-        </BlurredCircleButton>
+        <Button
+          onPress={handleClosePress}
+          icon={<Icon name="material-symbols:close-rounded" color={greys(theme)[0]} />}
+          blur={{ intensity: 75, tint: 'dark' }}
+        />
       </View>
 
       {/* Scanning overlay with white corners and progress text */}
@@ -196,19 +169,27 @@ const Camera: React.FC = () => {
 
       {/* Bottom buttons container */}
       <View className="absolute bottom-24 left-0 right-0 flex-row items-center justify-between px-8">
-        <BlurredCircleButton onPress={handleClipboardPress}>
-          <Icon name="lets-icons:copy" color={greys(theme)[0]} />
-        </BlurredCircleButton>
-        <BlurredCircleButton onPress={handleGalleryPress}>
-          <Icon name="proicons:photo" color={greys(theme)[0]} />
-        </BlurredCircleButton>
-        <BlurredCircleButton onPress={toggleFlashlight}>
-          {!flashlightOn ? (
-            <Icon name="mdi:lightbulb-on-outline" color={greys(theme)[0]} />
-          ) : (
-            <Icon name="mdi:lightbulb-on" color={greys(theme)[0]} />
-          )}
-        </BlurredCircleButton>
+        <Button
+          onPress={handleClipboardPress}
+          icon={<Icon name="lets-icons:copy" color={greys(theme)[0]} />}
+          blur={{ intensity: 75, tint: 'dark' }}
+        />
+        <Button
+          onPress={handleGalleryPress}
+          icon={<Icon name="proicons:photo" color={greys(theme)[0]} />}
+          blur={{ intensity: 75, tint: 'dark' }}
+        />
+        <Button
+          onPress={toggleFlashlight}
+          icon={
+            !flashlightOn ? (
+              <Icon name="mdi:lightbulb-on-outline" color={greys(theme)[0]} />
+            ) : (
+              <Icon name="mdi:lightbulb-on" color={greys(theme)[0]} />
+            )
+          }
+          blur={{ intensity: 75, tint: 'dark' }}
+        />
       </View>
     </View>
   );
@@ -216,12 +197,6 @@ const Camera: React.FC = () => {
 
 // Styles that couldn't be migrated to tailwind
 const styles = StyleSheet.create({
-  blurContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-  },
   scanBoxContainer: {
     position: 'absolute',
     top: '50%',

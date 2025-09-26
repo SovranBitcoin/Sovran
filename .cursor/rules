@@ -30,6 +30,11 @@ Run sequentially and output a concise checklist for each phase.
   - Theme access uses `memoizedGetTheme` + `useSelector` + `greys`.
   - No Tailwind styles directly on `<Text />` components.
   - Styling migration away from `createStyles`—colors via `greys` ranges; layout via Tailwind class names.
+  - **Layout Components Migration**:
+    - Use `<VStack spacing={N}>` instead of `flexDirection: 'column'` + `marginBottom`
+    - Use `<HStack spacing={N}>` instead of `flexDirection: 'row'` + `marginLeft/Right`
+    - Use `<Spacer size={N} />` instead of empty `<View />` or manual margin divs
+    - Import from `components/common/View`: `import { VStack, HStack, Spacer, View } from 'components/common/View'`
 - **Expo specifics:**
   - Check `app.json` / `app.config`, Expo plugins, `expo-router` (if used), EAS configs, platform folders.
 
@@ -49,6 +54,12 @@ Run sequentially and output a concise checklist for each phase.
 - **Sovran-specific checks**:
   - Verify `Text` components use props (`size`, `bold`, `color`) instead of inline text styles.
   - Follow existing Sovran helper/util patterns before creating new abstractions.
+  - **Layout Component Usage**:
+    - Flag manual spacing patterns that can be simplified with layout components
+    - Look for repeated `marginBottom`, `marginLeft`, `marginRight` values that indicate VStack/HStack opportunities
+    - Identify `flexDirection: 'row'` + `alignItems: 'center'` patterns → `<HStack align="center">`
+    - Spot `justifyContent: 'space-between'` patterns → `<HStack justify="space-between">`
+    - Find empty `<View />` spacers → `<Spacer size={N} />` opportunities
 
 #### **4. React Native / Expo Quality**
 
@@ -58,6 +69,11 @@ Run sequentially and output a concise checklist for each phase.
 - **Sovran-specific checks**:
   - Theme colors always via `greys(theme)`—no hardcoded hex for theme-driven colors.
   - Inline styles only for non-color props; color via theme system.
+  - **Layout Component Patterns**:
+    - Prefer `<VStack spacing={8}>` over manual `marginBottom: 8` on multiple children
+    - Use `<HStack align="center" spacing={8}>` for icon + text combinations
+    - Replace complex spacing logic with declarative layout components
+    - Keep `View` for basic containers without layout needs; use VStack/HStack for structured layouts
 
 #### **5. Dependencies & Graph**
 
@@ -90,5 +106,10 @@ For each issue found:
   - Reducer actions/selectors typed with `as const`.
   - Use helper utilities before adding new logic.
   - TSDoc for all comments.
+  - **Layout Component Usage**:
+    - Prefer layout components (`VStack`, `HStack`, `Spacer`) over manual flex/margin styling
+    - Use `spacing` prop instead of individual margin declarations
+    - Import layout components from `components/common/View`
+    - Maintain visual consistency while simplifying code structure
 - Maintain Expo compatibility (EAS/OTA, bundling, config).
 - If confidence < 0.6, request more files or metrics (lint output, dep graph) before making changes.
