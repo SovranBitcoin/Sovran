@@ -1,15 +1,11 @@
 import React from 'react';
 import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
-import {
-  BottomTabNavigationOptions,
-  createBottomTabNavigator,
-} from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
 import { useClientOnlyValue } from 'hooks/useClientOnlyValue';
-import Icon, { SovranIcon, UserIcon } from 'assets/icons';
-import CachedImage from 'components/common/Image';
+import Icon, { SovranIcon } from 'assets/icons';
 import { greys, shades, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
@@ -19,31 +15,16 @@ import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
+import { Avatar } from 'components/common/Avatar';
 
 const Tab = createBottomTabNavigator();
 
 // Shared constants (used multiple times)
 const PROFILE_AVATAR_SIZE = 48;
-const CIRCULAR_BORDER_RADIUS = 1000;
 const SPACING_XS = 8;
 const SPACING_SM = 16;
 
 const LIGHT_THEMES = ['light', 'beige'];
-
-// Component for profile avatar
-const ProfileAvatar = ({ picture }: { picture: string }) =>
-  picture ? (
-    <CachedImage
-      source={{ uri: picture }}
-      style={{
-        width: PROFILE_AVATAR_SIZE,
-        height: PROFILE_AVATAR_SIZE,
-        borderRadius: CIRCULAR_BORDER_RADIUS,
-      }}
-    />
-  ) : (
-    <UserIcon />
-  );
 
 // Helper functions for theme-related logic
 const isLightTheme = (theme: Theme) => LIGHT_THEMES.includes(theme.id);
@@ -119,7 +100,7 @@ const TabLayout = () => {
   const HeaderLeft = () => (
     <Pressable onPress={() => navigation.openDrawer()}>
       <View className="ml-2">
-        <ProfileAvatar picture={currentProfile?.picture} />
+        <Avatar picture={currentProfile?.picture} />
       </View>
     </Pressable>
   );
@@ -146,25 +127,6 @@ const TabLayout = () => {
     }
   };
 
-  // Function to create tab screen options
-  const createTabScreenOptions = (
-    title: string,
-    IconComponent: React.ComponentType<{ focused: boolean; theme: Theme }>
-  ): BottomTabNavigationOptions => ({
-    title,
-    tabBarActiveTintColor: shades[300],
-    tabBarInactiveTintColor: greys(theme)[300],
-    headerTitleAlign: 'center',
-    headerTintColor: '#fff',
-    tabBarLabel: '',
-    headerTitleStyle: { fontWeight: 'bold' },
-    headerTitle: getHeaderTitle(title),
-    headerStyle: styles.headerStyle,
-    tabBarIcon: ({ focused }) => <IconComponent focused={focused} theme={theme} />,
-    headerLeft: HeaderLeft,
-    headerRight: HeaderRight,
-  });
-
   return (
     <View className="flex-1">
       <Tab.Navigator
@@ -180,12 +142,25 @@ const TabLayout = () => {
           tabBarBackground: () => <TabBarBackground theme={theme} />,
           lazy: true,
         }}>
-        {TAB_SCREENS().map(({ name, component, title, icon }) => (
+        {TAB_SCREENS().map(({ name, component, title, icon: IconComponent }) => (
           <Tab.Screen
             key={name}
             name={name}
             component={component}
-            options={createTabScreenOptions(title, icon)}
+            options={{
+              title,
+              tabBarActiveTintColor: shades[300],
+              tabBarInactiveTintColor: greys(theme)[300],
+              headerTitleAlign: 'center',
+              headerTintColor: '#fff',
+              tabBarLabel: '',
+              headerTitleStyle: { fontWeight: 'bold' },
+              headerTitle: getHeaderTitle(title),
+              headerStyle: styles.headerStyle,
+              tabBarIcon: ({ focused }) => <IconComponent focused={focused} theme={theme} />,
+              headerLeft: HeaderLeft,
+              headerRight: HeaderRight,
+            }}
           />
         ))}
       </Tab.Navigator>
