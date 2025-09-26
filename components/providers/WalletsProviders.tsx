@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useRef } from 'react';
+import React, { useState, createContext, useRef } from 'react';
 import { CashuMint, CashuWallet } from '@cashu/cashu-ts';
 
 type WalletsContextType = {
@@ -8,14 +8,6 @@ type WalletsContextType = {
 } | null;
 
 const WalletsContext = createContext<WalletsContextType>(null);
-
-export const useWallets = () => {
-  const context = useContext(WalletsContext);
-  if (!context) {
-    throw new Error('useWallets must be used within a WalletsProvider');
-  }
-  return context;
-};
 
 export const WalletsProvider = ({ children }: { children: React.ReactNode }) => {
   const walletsRef = useRef(new Map());

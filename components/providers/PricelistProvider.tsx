@@ -1,16 +1,8 @@
-import React, { useEffect, createContext, useContext } from 'react';
+import React, { useEffect, createContext } from 'react';
 import { usePricelist } from 'helper/redux/pricelist';
 import { PRICELIST_URL } from 'helper/apiClient';
 
 const PricelistContext = createContext<{ btcPrice?: number } | null>(null);
-
-export const usePricelistProvider = () => {
-  const context = useContext(PricelistContext);
-  if (!context) {
-    throw new Error('usePricelistProvider must be used within a PricelistProvider');
-  }
-  return context;
-};
 
 export const PricelistProvider = ({ children }: { children: React.ReactNode }) => {
   const { pricelist, setPricelist } = usePricelist();

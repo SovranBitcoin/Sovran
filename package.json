@@ -19,8 +19,8 @@
     "type-check": "tsc --noEmit",
     "maestro": "maestro test ./.maestro",
     "screenshots": "./process-screenshots.sh",
-    "find-unused": "node scripts/find-unused.js",
-    "find-unused:simple": "./scripts/find-unused-simple.sh"
+    "find-unused": "./scripts/find-unused.sh",
+    "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh"
   },
   "jest": {
     "preset": "jest-expo",

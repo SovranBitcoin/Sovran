@@ -1,10 +1,8 @@
 import { getMint } from 'helper/cashuClient';
 import { toResult } from 'helper/toResult';
 import {
-  ENSURE_PROFILE_EXISTS,
   SET_KEYSETS,
   SET_INFO,
-  SET_TRANSACTIONS,
   APPEND_TRANSACTIONS_V2,
   SET_SELECTED_MINT,
   APPEND_PROOFS_V2,
@@ -12,7 +10,6 @@ import {
   REMOVE_MINTS,
   INCREASE_COUNTER_V2,
   REMOVE_PROOFS,
-  RESET_COUNTER,
   UPDATE_TRANSACTION,
   APPEND_TRANSACTION,
   SET_KEYS,
@@ -35,15 +32,12 @@ export type CashuAction =
   | ReturnType<typeof setKeys>
   | ReturnType<typeof setInfo>
   | ReturnType<typeof setAudit>
-  | ReturnType<typeof setTransactions>
   | ReturnType<typeof updateTransaction>
   | ReturnType<typeof appendTransaction>
   | ReturnType<typeof appendTransactionsV2>
   | ReturnType<typeof appendProofsV2>
   | ReturnType<typeof removeProofs>
   | ReturnType<typeof increaseCounterV2>
-  | ReturnType<typeof resetCounter>
-  | ReturnType<typeof ensureProfileExistsAction>
   | ReturnType<typeof setAllocation>
   | ReturnType<typeof updateCurrencyAllocation>
   | ReturnType<typeof resetAllocation>
@@ -237,18 +231,6 @@ export const setAudit = ({ mintUrl, audit }: { mintUrl: string; audit: any }) =>
     payload: { mintUrl, audit },
   }) as const;
 
-export const setTransactions = ({
-  profileId,
-  transactions,
-}: {
-  profileId: number;
-  transactions: TransactionData[];
-}) =>
-  ({
-    type: SET_TRANSACTIONS,
-    payload: { profileId, transactions },
-  }) as const;
-
 export const updateTransaction = ({
   profileId,
   matcher,
@@ -337,18 +319,6 @@ export const increaseCounterV2 = ({
   ({
     type: INCREASE_COUNTER_V2,
     payload: { profileId, mintUrl, keysetId, amount },
-  }) as const;
-
-export const resetCounter = ({ profileId }: { profileId: number }) =>
-  ({
-    type: RESET_COUNTER,
-    payload: { profileId },
-  }) as const;
-
-export const ensureProfileExistsAction = (profileId: number) =>
-  ({
-    type: ENSURE_PROFILE_EXISTS,
-    payload: { profileId },
   }) as const;
 
 export const updateMint = ({ mintUrl }: { mintUrl: string }): AppThunk<{ success: boolean }> => {
