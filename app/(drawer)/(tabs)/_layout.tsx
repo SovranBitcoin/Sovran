@@ -4,12 +4,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
-import { SovranIcon } from 'assets/icons';
-import { greys, shades, Theme } from 'helper/colors';
+import Icon, { SovranIcon } from 'assets/icons';
+import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
 import { SearchBar } from './payments';
+import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
@@ -23,7 +24,6 @@ const SPACING_SM = 16;
 
 const LIGHT_THEMES = ['light', 'beige'];
 
-// Helper functions for theme-related logic
 const isLightTheme = (theme: Theme) => LIGHT_THEMES.includes(theme.id);
 const getBlurTint = (theme: Theme) => (isLightTheme(theme) ? 'light' : 'dark');
 const getBlurIntensity = (theme: Theme) => (isLightTheme(theme) ? 7.5 : 75);
@@ -43,7 +43,6 @@ const TabBarBackground = ({ theme }: { theme: Theme }) => (
   />
 );
 
-// Header title components
 const WalletHeaderTitle = () => <SovranIcon />;
 
 const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Theme }) => {
@@ -64,7 +63,6 @@ const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Th
   );
 };
 
-// Main component
 const TabLayout = () => {
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
@@ -72,13 +70,20 @@ const TabLayout = () => {
   const settings = useSelector(memoizedGetSettings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
-  // Determine if navigation should be visible
   const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
-  // Component for header left (drawer opener)
+
   const HeaderLeft = () => (
     <Pressable onPress={() => navigation.openDrawer()}>
       <View className="ml-2">
         <Avatar picture={currentProfile?.picture} />
+      </View>
+    </Pressable>
+  );
+
+  const HeaderRight = () => (
+    <Pressable className="opacity-0" onPress={() => showMessage('not_implemented')}>
+      <View className="mr-2 rounded-full p-2" style={{ backgroundColor: greys(theme)[800] }}>
+        <Icon name="solar:card-bold" color={greys(theme)[0]} />
       </View>
     </Pressable>
   );
@@ -116,17 +121,19 @@ const TabLayout = () => {
             display: isNavigationVisible ? 'flex' : 'none',
           },
         }}>
-        {TAB_SCREENS().map(({ name, component, icon: IconComponent }) => (
+        {TAB_SCREENS().map(({ name, component, title, icon: IconComponent }) => (
           <Tab.Screen
             key={name}
             name={name}
             component={component}
             options={{
-              tabBarActiveTintColor: shades[300],
+              headerTitle: getHeaderTitle(title),
+              tabBarActiveTintColor: theme.shades[300],
               tabBarInactiveTintColor: greys(theme)[300],
               tabBarLabel: '',
               tabBarIcon: ({ focused }) => <IconComponent focused={focused} theme={theme} />,
               headerLeft: HeaderLeft,
+              headerRight: HeaderRight,
               headerStyle: {
                 backgroundColor: greys(theme)[950],
                 height: 0,
