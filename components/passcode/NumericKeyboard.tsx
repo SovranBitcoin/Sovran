@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text } from 'react-native';
 import Haptics from 'components/common/Haptics';
-import RippleButton from 'components/common/RippleButton';
+import { Button } from 'components/common/Button';
 
 interface Props {
   onKeyPress: (value: string) => void;
@@ -15,10 +15,15 @@ interface KeyButtonProps {
 }
 
 const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
+  // Handle empty values (don't render button)
+  if (!value) {
+    return <View style={{ flex: 1, marginHorizontal: 0.5 }} />;
+  }
+
   return (
-    <RippleButton
+    <Button
       onPress={() => onPress(value)}
-      rippleConfig={{
+      ripple={{
         color: 'rgba(255,255,255,1)',
         opacity: 0.3,
         duration: 400,
@@ -29,36 +34,39 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
         marginHorizontal: 0.5,
         alignItems: 'center',
         justifyContent: 'center',
-        // backgroundColor: greys(theme)[950],
-      }}>
-      {value === '<' ? (
-        <Text
-          style={{
-            color: 'white',
-            fontSize: 32,
-            textShadowColor: 'rgba(0,0,0,0.5)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 8,
-          }}>
-          ⌫
-        </Text>
-      ) : (
-        <Text
-          style={{
-            padding: 16,
-            paddingHorizontal: 24,
-            fontSize: 32,
-            color: 'white',
-            fontWeight: 'bold',
-            fontFamily: 'OverpassBold',
-            textShadowColor: 'rgba(0,0,0,0.5)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 8,
-          }}>
-          {value}
-        </Text>
-      )}
-    </RippleButton>
+        height: 64,
+        minHeight: 64,
+      }}
+      text={
+        value === '<' ? (
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 32,
+              textShadowColor: 'rgba(0,0,0,0.5)',
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 8,
+            }}>
+            ⌫
+          </Text>
+        ) : (
+          <Text
+            style={{
+              padding: 16,
+              paddingHorizontal: 24,
+              fontSize: 32,
+              color: 'white',
+              fontWeight: 'bold',
+              fontFamily: 'OverpassBold',
+              textShadowColor: 'rgba(0,0,0,0.5)',
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 8,
+            }}>
+            {value}
+          </Text>
+        )
+      }
+    />
   );
 };
 
@@ -98,7 +106,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   return (
     <View className="items-center justify-center bg-transparent">
       {buttons.map((row, rowIndex) => (
-        <View key={rowIndex} className="mb-0.25 flex-row justify-between">
+        <View key={rowIndex} className="mb-0.25 flex-row justify-between" style={{ width: '100%' }}>
           {row.map(renderButton)}
         </View>
       ))}

@@ -9,7 +9,6 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
-import { CreditCardComponent } from 'components/common/NFCCard';
 import Icon, { icons } from 'assets/icons';
 import { greys, hexToRgb, rgbToHsl, shades } from 'helper/colors';
 import { Checkbox } from 'expo-checkbox';
@@ -424,8 +423,6 @@ export default function ModalScreen() {
             width: 32,
             height: 32,
           }}></View>
-
-        <CreditCardComponent />
 
         {/* info message */}
         <Card

@@ -33,7 +33,7 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useAllocation } from 'helper/redux/cashu/hooks';
 import Haptics from 'components/common/Haptics';
-import RippleButton from 'components/common/RippleButton';
+import { Button } from 'components/common/Button';
 import { darken } from 'polished';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -444,27 +444,33 @@ const MintItem = React.memo<MintItemProps>(
               </View>
               <View style={styles.percentageControls}>
                 {/* Set to 0% */}
-                <RippleButton
+                <Button
+                  ripple
                   style={styles.toZeroButton}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onSetPercentage?.(mint.id, 0);
-                  }}>
-                  <Icon name="mdi:chevron-double-left" size={24} color={greys(theme)[0]} />
-                </RippleButton>
-                <RippleButton
+                  }}
+                  variant="secondary"
+                  icon={<Icon name="mdi:chevron-double-left" size={24} color={greys(theme)[0]} />}
+                />
+                <Button
                   style={styles.decrementButton}
                   disabled={percentage <= 0}
+                  ripple
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onDecrement?.();
-                  }}>
-                  <Icon
-                    name="gala:remove"
-                    size={32}
-                    color={percentage <= 0 ? reds[500] : reds[300]}
-                  />
-                </RippleButton>
+                  }}
+                  variant="secondary"
+                  icon={
+                    <Icon
+                      name="gala:remove"
+                      size={32}
+                      color={percentage <= 0 ? reds[500] : reds[300]}
+                    />
+                  }
+                />
                 <View style={styles.percentageContainer}>
                   <View style={styles.percentageOverlayContainer}>
                     {/* Current progress bar behind text */}
@@ -491,28 +497,34 @@ const MintItem = React.memo<MintItemProps>(
                     </View>
                   </View>
                 </View>
-                <RippleButton
+                <Button
                   style={styles.incrementButton}
                   disabled={percentage >= 100}
+                  ripple
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     onIncrement?.();
-                  }}>
-                  <Icon
-                    name="gala:add"
-                    size={32}
-                    color={percentage >= 100 ? greens[500] : greens[300]}
-                  />
-                </RippleButton>
+                  }}
+                  variant="secondary"
+                  icon={
+                    <Icon
+                      name="gala:add"
+                      size={32}
+                      color={percentage >= 100 ? greens[500] : greens[300]}
+                    />
+                  }
+                />
                 {/* Set to 100% */}
-                <RippleButton
+                <Button
                   style={styles.toHundredButton}
+                  ripple
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     onSetPercentage?.(mint.id, 100);
-                  }}>
-                  <Icon name="mdi:chevron-double-right" size={24} color={greys(theme)[0]} />
-                </RippleButton>
+                  }}
+                  variant="secondary"
+                  icon={<Icon name="mdi:chevron-double-right" size={24} color={greys(theme)[0]} />}
+                />
               </View>
             </View>
           ) : (

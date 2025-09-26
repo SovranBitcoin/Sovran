@@ -1,78 +1,69 @@
-import React, { useMemo } from 'react';
-import { Text } from 'react-native';
+import React from 'react';
 import { greys, reds } from 'helper/colors';
 import { TouchableOpacity } from './TouchableOpacity';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View } from 'components/common/View';
-import opacity from 'hex-color-opacity';
-
-type VariantType = 'warning' | 'info';
+import { Text } from 'components/common/Text';
 
 interface CardProps {
   title?: string;
   message: string;
-  variant: VariantType;
+  variant: 'warning' | 'info';
   onPress?: () => void;
   icon?: React.ReactNode;
-}
-
-interface VariantStyle {
-  backgroundColor: string;
-  borderLeftColor: string;
-  color: string;
 }
 
 export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   const theme = useSelector(memoizedGetTheme);
 
-  const variantStyles = useMemo<Record<VariantType, VariantStyle>>(
-    () => ({
-      warning: {
-        backgroundColor: greys(theme)[800],
-        borderLeftColor: reds[300],
-        color: reds[300],
-      },
-      info: {
-        backgroundColor: greys(theme)[800],
-        borderLeftColor: greys(theme)[100],
-        color: greys(theme)[100],
-      },
-    }),
-    [theme]
-  );
+  const getBorderColor = () => {
+    switch (variant) {
+      case 'warning':
+        return reds[300];
+      case 'info':
+      default:
+        return greys(theme)[100];
+    }
+  };
 
-  const currentStyle = useMemo(() => variantStyles[variant], [variantStyles, variant]);
+  const getTextColor = () => {
+    switch (variant) {
+      case 'warning':
+        return reds[300];
+      case 'info':
+      default:
+        return greys(theme)[100];
+    }
+  };
 
   return (
     <TouchableOpacity onPress={onPress}>
       <View
-        blur
-        colorBlur={opacity(currentStyle.backgroundColor, 0.2)}
+        className="flex-col rounded-lg border-l-[5px] shadow-sm"
         style={{
-          backgroundColor: currentStyle.backgroundColor,
-          borderLeftColor: currentStyle.borderLeftColor,
+          backgroundColor: greys(theme)[800],
+          borderLeftColor: getBorderColor(),
         }}
-        className={`flex-row flex-col  rounded-lg border-l-[5px] shadow-sm `}>
+        blur>
         {title && (
           <Text
-            className="pl-4 pr-1 pt-4 text-base font-medium"
+            heavy
+            overpass
+            className="pl-4 pr-1 pt-4 text-base"
             style={{
               color: greys(theme)[300],
-              fontFamily: 'OverpassHeavy',
             }}>
             {title}
           </Text>
         )}
-        <Text
-          className="p-4 pr-1 text-base font-medium"
-          style={{
-            color: currentStyle.color,
-            marginRight: 8,
-          }}>
-          {message}
-        </Text>
-        {icon && <View className="p-4 pl-1">{icon}</View>}
+
+        <View className="flex-row">
+          <Text className="flex-1 p-4 pr-1 text-base" style={{ color: getTextColor() }}>
+            {message}
+          </Text>
+          {icon && <View className="p-4 pl-1">{icon}</View>}
+        </View>
       </View>
     </TouchableOpacity>
   );
