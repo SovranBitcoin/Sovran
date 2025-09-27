@@ -318,7 +318,7 @@ function NoResultsFound({ theme }: { theme: Theme }) {
 
 function EmptyStateView({ theme }: { theme: Theme }) {
   return (
-    <VStack spacing={24} className="items-center px-6">
+    <VStack spacing={24} align="center" className="mt-6">
       <View
         className="h-20 w-20 items-center justify-center rounded-full"
         style={{ backgroundColor: greys(theme)[800] }}>
@@ -357,9 +357,12 @@ function EmptyStateView({ theme }: { theme: Theme }) {
           }}>
           Search Tips:
         </Text>
-        <SearchTip icon="ph:user-bold" text="Search by username or display name" theme={theme} />
-        <SearchTip icon="solar:key-bold" text="Search by public key" theme={theme} />
-        <SearchTip icon="mdi:at" text="Search by NIP-05 identifier" theme={theme} />
+        <Spacer size={8} />
+        <VStack spacing={12}>
+          <SearchTip icon="ph:user-bold" text="Search by username or display name" theme={theme} />
+          <SearchTip icon="solar:key-bold" text="Search by public key" theme={theme} />
+          <SearchTip icon="mdi:at" text="Search by NIP-05 identifier" theme={theme} />
+        </VStack>
       </View>
     </VStack>
   );
@@ -367,7 +370,7 @@ function EmptyStateView({ theme }: { theme: Theme }) {
 
 function SearchTip({ icon, text, theme }: { icon: string; text: string; theme: Theme }) {
   return (
-    <HStack spacing={8} className="items-center">
+    <HStack spacing={0} align="center">
       <Icon name={icon} size={20} color={greys(theme)[300]} />
       <Text className="flex-1 pl-2" size={14} overpass regular style={{ color: greys(theme)[200] }}>
         {text}
