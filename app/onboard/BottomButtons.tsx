@@ -99,8 +99,6 @@ const createStyles = (theme: Theme) =>
     button: {
       padding: 16,
       borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     buttonText: {
       textAlign: 'center',

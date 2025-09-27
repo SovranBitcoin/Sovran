@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greens, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -17,15 +17,20 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
-    <View className="flex-row items-center justify-between bg-transparent py-4 pl-2 pr-4">
-      <View className="bg-transparent">
-        <View className="flex-row items-center bg-transparent">
+    <HStack
+      align="center"
+      justify="space-between"
+      className="bg-transparent"
+      style={{ paddingVertical: 16, paddingLeft: 8, paddingRight: 16 }}>
+      <VStack className="bg-transparent">
+        <HStack align="center" className="bg-transparent">
+          <Spacer size={8} />
           <Text
             size={transaction.isSend ? 32 : 24}
-            color={transaction.isSend ? reds[300] : greens[300]}
-            className="ml-2 mr-2">
+            color={transaction.isSend ? reds[300] : greens[300]}>
             {transaction.isSend ? '-' : '+'}
           </Text>
+          <Spacer size={8} />
           <AmountFormatter
             amount={transaction?.amount}
             unit={transaction?.unit}
@@ -33,10 +38,10 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
             weight="heavy"
             color={transaction.isReceive ? greens[300] : reds[300]}
           />
-        </View>
-        <Text size={18} color={theme.greys[50]} bold className="ml-8">
+        </HStack>
+        <Text size={18} color={theme.greys[50]} bold style={{ marginLeft: 32 }}>
           {transaction?.amount < 0 ? '-' : ''}
-          <Text size={18} color={theme.greys[50]} className="ml-2">
+          <Text size={18} color={theme.greys[50]} style={{ marginLeft: 8 }}>
             {transaction?.amount < 0 ? '-' : ''}
             {formatCurrency(
               {
@@ -57,10 +62,10 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
             )}
           </Text>
         </Text>
-      </View>
+      </VStack>
       <View className="scale-125 transform bg-transparent p-4">
         <TransactionIcon transaction={transaction} />
       </View>
-    </View>
+    </HStack>
   );
 }

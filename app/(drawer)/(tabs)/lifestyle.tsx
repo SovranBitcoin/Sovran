@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
@@ -40,11 +40,12 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="mb-4 items-center justify-center rounded-lg"
+      className="items-center justify-center rounded-lg"
       style={{
         flexBasis: '22%',
         opacity: item.empty ? 0 : 1,
         pointerEvents: item.empty ? 'none' : 'auto',
+        marginBottom: 16,
       }}>
       {item.icon && (
         <View
@@ -56,12 +57,12 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
           <Icon name={item.icon} size={32} color={greys(theme)[0]} />
         </View>
       )}
+      <Spacer size={8} />
       <Text
         className="text-center"
         overpass
         heavy
         style={{
-          marginTop: 8,
           color: greys(theme)[100],
           fontSize: 11,
         }}>
@@ -86,12 +87,12 @@ const TabTwoScreen = () => {
   };
 
   return (
-    <View
-      className="m-0 flex-1 flex-col"
+    <VStack
+      className="flex-1"
       style={{
         backgroundColor: greys(theme)[950],
       }}>
-      <View style={{ paddingTop: 64 + 32 }}>
+      <VStack style={{ paddingTop: 96 }}>
         <Text
           size={32}
           heavy
@@ -103,7 +104,9 @@ const TabTwoScreen = () => {
           }}>
           Lifestyle
         </Text>
-        <View className="flex-row flex-wrap justify-between px-4 pt-1">
+        <HStack
+          className="flex-wrap justify-between"
+          style={{ paddingHorizontal: 16, paddingTop: 4 }}>
           {SERVICE_MENU_ITEMS.filter((item) =>
             ['giftcards', 'donate'].includes(item.id) ? settings?.experimental : true
           ).map((item) => (
@@ -113,9 +116,9 @@ const TabTwoScreen = () => {
               onPress={() => !item.empty && handleNavigation(item)}
             />
           ))}
-        </View>
-      </View>
-    </View>
+        </HStack>
+      </VStack>
+    </VStack>
   );
 };
 

@@ -71,7 +71,6 @@ const createStyles = (theme: Theme) =>
     transactionWrapper: {
       marginVertical: 8,
       position: 'relative',
-      backgroundColor: 'transparent',
     },
     transactionContainer: {
       padding: 16,

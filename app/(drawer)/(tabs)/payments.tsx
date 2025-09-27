@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useNostr } from 'helper/redux/nostr';
 import { useCashu } from 'helper/redux/cashu';
@@ -237,7 +237,6 @@ const Section = () => {
           flex: 1,
           paddingLeft: 16,
           paddingRight: 16,
-          backgroundColor: 'transparent',
         }}>
         <PagerView
           ref={pagerRef}
@@ -299,7 +298,7 @@ const Section = () => {
 export const SearchBar = ({ theme, navigation }: { theme: Theme; navigation: any }) => {
   const styles = createStyles(theme);
   return (
-    <View style={styles.searchContainer}>
+    <View>
       <View style={styles.searchBlurView}>
         <TouchableOpacity
           onPress={() => navigation.navigate('contacts', { unit: 'sat' })}
@@ -363,24 +362,26 @@ const ContactItem = ({
         } else {
         }
       }}>
-      <ProfilePicture
-        imageUri={contact.profile.picture || contact.profile.image}
-        isVerified={isVerified}
-        theme={theme}
-      />
-      <View style={styles.row}>
-        <View style={styles.textContainer}>
-          <Text style={styles.profileName}>
-            {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}
-          </Text>
-          <Text style={styles.previewText}>
-            {previewText.length > 50
-              ? `${previewText.slice(0, 50)}...`
-              : previewText || 'No activity'}
-          </Text>
-        </View>
+      <HStack align="center" justify="space-between" style={styles.row}>
+        <HStack align="center">
+          <ProfilePicture
+            imageUri={contact.profile.picture || contact.profile.image}
+            isVerified={isVerified}
+            theme={theme}
+          />
+          <View style={styles.textContainer}>
+            <Text style={styles.profileName}>
+              {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}
+            </Text>
+            <Text style={styles.previewText}>
+              {previewText.length > 50
+                ? `${previewText.slice(0, 50)}...`
+                : previewText || 'No activity'}
+            </Text>
+          </View>
+        </HStack>
         {formattedDate && <Text style={styles.date}>{formattedDate}</Text>}
-      </View>
+      </HStack>
     </TouchableOpacity>
   );
 };
@@ -396,7 +397,7 @@ const ProfilePicture = ({
 }) => {
   const styles = createStyles(theme);
   return (
-    <View style={styles.profilePictureContainer}>
+    <VStack style={styles.profilePictureContainer} align="center" justify="center">
       {isVerified && (
         <View style={styles.verifiedIconContainer}>
           <VerifiedIcon />
@@ -407,7 +408,7 @@ const ProfilePicture = ({
       ) : (
         <View style={styles.placeholderCircle} />
       )}
-    </View>
+    </VStack>
   );
 };
 
@@ -433,7 +434,6 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: greys(theme)[950],
-      flexDirection: 'column',
       margin: 0,
       flex: 1,
       paddingTop: 64 + 32,
@@ -441,9 +441,6 @@ const createStyles = (theme: Theme) =>
     modalContent: {
       padding: 0,
       paddingTop: 4,
-    },
-    searchContainer: {
-      backgroundColor: 'transparent',
     },
     searchBlurView: {
       marginTop: 64,
@@ -469,21 +466,13 @@ const createStyles = (theme: Theme) =>
       color: greys(theme)[500],
     },
     contactItem: {
-      flexDirection: 'row',
-      backgroundColor: 'transparent',
-      alignItems: 'center',
       marginBottom: 8,
       marginTop: 8,
     },
     row: {
-      backgroundColor: 'transparent',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
       flex: 1,
     },
     textContainer: {
-      backgroundColor: 'transparent',
       flex: 1,
     },
     profileName: {
@@ -507,10 +496,7 @@ const createStyles = (theme: Theme) =>
       position: 'relative',
       width: 48,
       height: 48,
-      backgroundColor: 'transparent',
       marginRight: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     verifiedIconContainer: {
       position: 'absolute',

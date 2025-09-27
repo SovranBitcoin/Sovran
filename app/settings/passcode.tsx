@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Text, StyleSheet, ScrollView } from 'react-native';
+import { View, HStack, VStack } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { useTypedNavigation } from 'helper/navigation';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
@@ -46,19 +47,19 @@ const PasscodeSettings: React.FC = () => {
         <Card
           message="Forgetting your passcode will prevent you from accessing your wallet."
           variant="warning"></Card>
-        <View style={styles.container}>
-          <View style={styles.content}>
+        <VStack justify="space-between" align="center" style={styles.container}>
+          <VStack align="center" justify="center" style={styles.content}>
             <Text style={styles.title}>
               {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
             </Text>
-            <View style={styles.dotsContainer}>
+            <HStack style={styles.dotsContainer}>
               {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
                 <View key={i} style={currentValue.length > i ? styles.dotActive : styles.dot} />
               ))}
-            </View>
-          </View>
+            </HStack>
+          </VStack>
           <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-        </View>
+        </VStack>
         <ButtonHandler
           buttons={[
             {
@@ -98,14 +99,10 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      justifyContent: 'space-between',
-      alignItems: 'center',
       paddingVertical: 32,
     },
     content: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     title: {
       color: greys(theme)[0],
@@ -115,7 +112,6 @@ const createStyles = (theme: Theme) =>
       textAlign: 'center',
     },
     dotsContainer: {
-      flexDirection: 'row',
       marginBottom: 20,
     },
     dot: {

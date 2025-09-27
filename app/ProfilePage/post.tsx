@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { HStack } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { Text } from 'components/common/Text';
@@ -42,18 +43,17 @@ export const PostQuote = React.memo(({ id }: { id: string }) => {
         marginBottom: 8,
         marginLeft: 56,
       }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <HStack align="center">
         <CachedImage
           style={{ width: 32, height: 32, borderRadius: 100000 }}
           source={{ uri: profile?.picture }}
         />
-        <View
+        <HStack
           style={{
             marginLeft: 4,
             marginBottom: 4,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}>
+          }}
+          align="center">
           <Text>{profile?.displayName}</Text>
           <Text
             style={{
@@ -62,8 +62,8 @@ export const PostQuote = React.memo(({ id }: { id: string }) => {
             {'  '}•{'  '}
             {timeAgo}
           </Text>
-        </View>
-      </View>
+        </HStack>
+      </HStack>
       <Text>{events?.[0]?.content}</Text>
     </View>
   );
@@ -134,12 +134,11 @@ function RepostText({ pubkey, repostCounter }) {
   const theme = useSelector(memoizedGetTheme);
 
   return (
-    <View
+    <HStack
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
         marginBottom: 12,
-      }}>
+      }}
+      align="center">
       <Icon name="garden:arrow-retweet-fill-16" size={16} color={greys(theme)[400]} />
 
       <UserNameProfiles
@@ -171,7 +170,7 @@ function RepostText({ pubkey, repostCounter }) {
           {' reposted'}
         </Text>
       )}
-    </View>
+    </HStack>
   );
 }
 
@@ -245,12 +244,13 @@ function PostTop({ post }) {
     profile?.profile?.name;
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        // alignSelf: "flex-start",
-      }}>
+    <HStack
+      style={
+        {
+          // alignSelf: "flex-start",
+        }
+      }
+      align="center">
       {!displayName ? (
         <GradientSkeleton
           startColor={greys(theme)[700]}
@@ -281,7 +281,7 @@ function PostTop({ post }) {
         {' '}
         • {timeAgo}
       </Text>
-    </View>
+    </HStack>
   );
 }
 
@@ -317,26 +317,22 @@ export const Post = React.memo(({ active = false, showNested = false, post, inde
           borderColor: greys(theme)[600],
         }}>
         {post.kind === 6 && <RepostText pubkey={post.pubkey} repostCounter={repostCount} />}
-        <View
-          style={{
-            flexDirection: 'row',
-          }}>
+        <HStack>
           {!active && <ProfileIcon pubkey={post_?.pubkey} />}
           <View style={{ flex: 1 }}>
-            <View
+            <HStack
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
                 alignSelf: 'flex-start',
                 marginBottom: active ? 16 : 0,
-              }}>
+              }}
+              align="center">
               {active && <ProfileIcon pubkey={post_?.pubkey} />}
               <PostTop post={post_} />
-            </View>
+            </HStack>
             <TextContent content={post_.content} fontSize={active ? 18 : 14} />
             <UrlProcessor urls={extractUrls(post_?.content)?.urls} />
           </View>
-        </View>
+        </HStack>
         {showNested && quote && <PostQuote id={quote} />}
         <ActionItems
           id={post_.id}

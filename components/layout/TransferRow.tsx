@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Image from 'components/common/Image';
 import Icon from 'assets/icons';
@@ -36,7 +36,6 @@ const MintBadge = React.memo(function MintBadge({
 
   const containerStyle = useMemo(
     () => ({
-      alignItems: 'center' as const,
       paddingHorizontal: 4,
     }),
     []
@@ -44,7 +43,6 @@ const MintBadge = React.memo(function MintBadge({
 
   const cardStyle = useMemo(
     () => ({
-      alignItems: 'center' as const,
       backgroundColor: greys(theme)[800],
       borderRadius: 10,
       padding: 10,
@@ -61,7 +59,6 @@ const MintBadge = React.memo(function MintBadge({
       height: 28,
       borderRadius: 7,
       backgroundColor: greys(theme)[500],
-      marginBottom: 6,
     }),
     [theme]
   );
@@ -74,24 +71,21 @@ const MintBadge = React.memo(function MintBadge({
       backgroundColor: greys(theme)[500],
       borderWidth: 1,
       borderColor: greys(theme)[400],
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-      marginBottom: 6,
     }),
     [theme]
   );
 
   return (
-    <View style={containerStyle}>
-      <View style={cardStyle}>
+    <VStack align="center" style={containerStyle}>
+      <VStack align="center" style={cardStyle} spacing={6}>
         {iconUrl ? (
           <Image source={{ uri: iconUrl }} style={imageStyle} />
         ) : (
-          <View style={fallbackStyle}>
+          <VStack align="center" justify="center" style={fallbackStyle}>
             <Text size={16} bold color={greys(theme)[100]}>
               {mintName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </VStack>
         )}
         <Text
           size={10}
@@ -102,7 +96,7 @@ const MintBadge = React.memo(function MintBadge({
         </Text>
         {cta && (
           <TouchableOpacity
-            className="mt-1 rounded"
+            className="rounded"
             onPress={cta.onPress}
             style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
             <Text size={10} bold color={greys(theme)[100]}>
@@ -110,8 +104,8 @@ const MintBadge = React.memo(function MintBadge({
             </Text>
           </TouchableOpacity>
         )}
-      </View>
-    </View>
+      </VStack>
+    </VStack>
   );
 });
 
@@ -153,15 +147,14 @@ export const TransferRow = React.memo(function TransferRow({
         borderWidth: 1,
         borderColor: greys(theme)[600],
       }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <HStack align="center" justify="space-between">
         <MintBadge mintUrl={fromMint} cta={leftCta} />
 
-        <View
+        <VStack
+          align="center"
           style={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginHorizontal: 6,
             paddingVertical: 8,
+            marginHorizontal: 6,
           }}>
           <View
             style={{
@@ -192,17 +185,14 @@ export const TransferRow = React.memo(function TransferRow({
               {statusIcon}
             </View>
           </View>
-          <Text
-            size={12}
-            bold
-            color={greys(theme)[0]}
-            style={{ textAlign: 'center', marginTop: 3 }}>
+          <Spacer size={3} />
+          <Text size={12} bold color={greys(theme)[0]} style={{ textAlign: 'center' }}>
             {amount} {unit.toUpperCase()}
           </Text>
-        </View>
+        </VStack>
 
         <MintBadge mintUrl={toMint} cta={rightCta} />
-      </View>
+      </HStack>
     </View>
   );
 });

@@ -4,7 +4,7 @@ import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-ro
 import { useDispatch, useSelector } from 'react-redux';
 import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -111,7 +111,7 @@ const MintDeleteConfirmRoute = () => {
 
       <Spacer size={20} />
 
-      <View style={{ gap: 12 }}>
+      <VStack gap={12}>
         <Button
           text={isDeleting ? 'Deleting...' : 'Delete Mint'}
           onPress={handleDeleteMint}
@@ -129,7 +129,7 @@ const MintDeleteConfirmRoute = () => {
           variant="secondary"
           disabled={isDeleting}
         />
-      </View>
+      </VStack>
     </View>
   );
 };

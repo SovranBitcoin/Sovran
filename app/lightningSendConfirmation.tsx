@@ -3,7 +3,7 @@ import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
-import { Spacer, View, VStack } from 'components/common/View';
+import { Spacer, View, VStack, HStack } from 'components/common/View';
 
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
@@ -127,14 +127,7 @@ export function LightningSendConfirmation({
       showClose
       title="Send Lightning"
       buttons={
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
-            paddingBottom: 8,
-          }}>
+        <HStack className="pb-2" justify="center" align="center">
           <ButtonHandler
             buttons={[
               {
@@ -176,9 +169,9 @@ export function LightningSendConfirmation({
               })),
             ]}
           />
-        </View>
+        </HStack>
       }>
-      <View style={{ backgroundColor: 'transparent' }}>
+      <View>
         <TransactionHeader
           transaction={{
             ...transaction,

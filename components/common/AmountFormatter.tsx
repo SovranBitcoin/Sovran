@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleProp, ViewStyle, Animated } from 'react-native';
 import { StyledText, Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 import { formatCurrencyWrapper } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { greys, greens, shades } from 'helper/colors';
@@ -85,7 +85,7 @@ export function AmountFormatter({
 
   if (unit !== 'sat') {
     return (
-      <View className={containerClass} style={[{ backgroundColor: 'transparent' }, style]}>
+      <View className={containerClass} style={style}>
         <AnimatedWrapper>
           <Text
             size={size}
@@ -104,16 +104,13 @@ export function AmountFormatter({
   }
 
   return (
-    <View className={containerClass} style={[{ backgroundColor: 'transparent' }, style]}>
+    <View className={containerClass} style={style}>
       {displayBtc === 0 && (
         <AnimatedWrapper>
-          <View
-            className="flex-row items-center"
-            style={[{ backgroundColor: 'transparent' }, style]}>
+          <HStack align="center" style={style}>
             <View
               style={{
                 marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
-                backgroundColor: 'transparent',
                 marginRight: centered ? 4 : 0,
               }}>
               <BtcIcon weight={weight} size={size} color={currentColor} />
@@ -130,15 +127,13 @@ export function AmountFormatter({
               }}>
               {formattedAmount}
             </Text>
-          </View>
+          </HStack>
         </AnimatedWrapper>
       )}
 
       {displayBtc === 1 && (
         <AnimatedWrapper>
-          <View
-            className="flex-row items-center"
-            style={[{ backgroundColor: 'transparent' }, style]}>
+          <HStack align="center" style={style}>
             <StyledText
               size={size}
               weight={weight}
@@ -153,20 +148,17 @@ export function AmountFormatter({
             <View
               style={{
                 marginBottom: 4,
-                backgroundColor: 'transparent',
                 marginLeft: centered ? 4 : 0,
               }}>
               <LightningUnit height={size} width={size} color={currentColor} />
             </View>
-          </View>
+          </HStack>
         </AnimatedWrapper>
       )}
 
       {displayBtc === 2 && (
         <AnimatedWrapper>
-          <View
-            className="flex-row items-center"
-            style={[{ backgroundColor: 'transparent' }, style]}>
+          <HStack align="center" style={style}>
             <Text
               size={size}
               weight={weight}
@@ -178,19 +170,16 @@ export function AmountFormatter({
               }}>
               {formattedAmount}
             </Text>
-          </View>
+          </HStack>
         </AnimatedWrapper>
       )}
 
       {displayBtc === 3 && (
         <AnimatedWrapper>
-          <View
-            className="flex-row items-center"
-            style={[{ backgroundColor: 'transparent' }, style]}>
+          <HStack align="center" style={style}>
             <View
               style={{
                 marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
-                backgroundColor: 'transparent',
                 marginRight: centered ? 4 : 0,
               }}>
               <BtcIcon weight={weight} size={size} color={currentColor} />
@@ -207,7 +196,7 @@ export function AmountFormatter({
               }}>
               {formattedAmount}
             </Text>
-          </View>
+          </HStack>
         </AnimatedWrapper>
       )}
     </View>

@@ -744,7 +744,7 @@ const ChainLoadingAnimation = () => {
       <View style={[styles.stepContainer, { opacity }]}>
         <View style={styles.stepContent}>
           {/* Step icon and button */}
-          <View style={[styles.iconContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+          <HStack style={styles.iconContainer} justify="center" align="center">
             <TouchableOpacity
               onPress={() => {
                 setSteps(ensureCompleteStep(steps, findAndInsertAfter(steps, step, step.step)));
@@ -755,7 +755,7 @@ const ChainLoadingAnimation = () => {
               style={[styles.addButtonContainer, { backgroundColor: shades[300] }]}>
               <Icon size={32} name="ic:round-refresh" />
             </TouchableOpacity>
-          </View>
+          </HStack>
 
           {/* Step label */}
           <Text style={styles.stepLabel}>Retry</Text>
@@ -787,7 +787,7 @@ const ChainLoadingAnimation = () => {
       <View style={[styles.stepContainer, { opacity }]}>
         <View style={styles.stepContent}>
           {/* Step icon and button */}
-          <View style={[styles.iconContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+          <HStack style={styles.iconContainer} justify="center" align="center">
             <TouchableOpacity
               testID="add-mint"
               onPress={() => {
@@ -826,7 +826,7 @@ const ChainLoadingAnimation = () => {
               style={[styles.addButtonContainer, { backgroundColor: shades[300] }]}>
               <Icon size={32} name="fluent:add-24-filled" />
             </TouchableOpacity>
-          </View>
+          </HStack>
 
           {/* Step label */}
           <Text style={styles.stepLabel}>{step.label}</Text>
@@ -922,13 +922,12 @@ const ChainLoadingAnimation = () => {
         <Animated.View>
           <View>
             {/* Horizontal Mints */}
-            <View
+            <HStack
               style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
                 marginRight: 100,
-              }}>
+              }}
+              justify="center"
+              align="center">
               {/* Animate all mints */}
               {step.mints.map((mint, mintIndex) => {
                 const activeMintId = activeMints[step.id] || step.mints[0].id;
@@ -949,7 +948,7 @@ const ChainLoadingAnimation = () => {
                   />
                 );
               })}
-            </View>
+            </HStack>
           </View>
         </Animated.View>
         <View style={styles.mintGroupContainer}>

@@ -3,7 +3,7 @@ import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View } from 'components/common/View';
+import { HStack, View } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -54,10 +54,12 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
   };
 
   return (
-    <View
+    <HStack
+      align="center"
+      justify="space-between"
+      spacing={8}
       className={`flex-row p-2 pb-10 ${context === 'tab' ? 'mb-12' : ''}`}
       style={[{ backgroundColor: greys(theme)[950] }, style]}>
-      {/* Main buttons (first 2) */}
       {visibleButtons.slice(0, 2).map((button, index) => (
         <View key={index} className="flex-1">
           <Button
@@ -90,6 +92,6 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
           />
         </View>
       )}
-    </View>
+    </HStack>
   );
 }

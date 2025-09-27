@@ -7,7 +7,7 @@ import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { showMessage } from 'helper/popup/popups';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
 const Profile = () => {
@@ -44,11 +44,14 @@ const Profile = () => {
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
 
     return (
-      <View
+      <VStack
         blur
-        className="mb-2 mt-2 rounded-lg p-2"
+        className="rounded-lg"
         style={{
           backgroundColor: greys(theme)[800],
+          marginBottom: 8,
+          marginTop: 8,
+          padding: 8,
         }}>
         <Text
           bold
@@ -59,7 +62,7 @@ const Profile = () => {
           }}>
           {label}
         </Text>
-        <View className="flex-row items-center justify-between">
+        <HStack align="center" justify="space-between">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <Text
               size={16}
@@ -69,14 +72,16 @@ const Profile = () => {
               {showEyeIcon && !isVisible ? '••••••••' : value || 'N/A'}
             </Text>
           </ScrollView>
-          <View className="flex-row items-center" style={{ marginLeft: 8 }}>
+          <HStack align="center" style={{ marginLeft: 8 }}>
             {showEyeIcon && (
               <TouchableOpacity onPress={() => toggleFieldVisibility(fieldKey)}>
                 <View
                   blur
-                  className="ml-1 rounded p-2"
+                  className="rounded"
                   style={{
                     backgroundColor: greys(theme)[700],
+                    padding: 8,
+                    marginLeft: 4,
                   }}>
                   <Icon
                     name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
@@ -89,28 +94,30 @@ const Profile = () => {
             <TouchableOpacity onPress={() => handleCopy(value, messageKey)}>
               <View
                 blur
-                className="ml-1 rounded p-2"
+                className="rounded"
                 style={{
                   backgroundColor: greys(theme)[700],
+                  padding: 8,
+                  marginLeft: 4,
                 }}>
                 <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
               </View>
             </TouchableOpacity>
-          </View>
-        </View>
+          </HStack>
+        </HStack>
         {description && (
           <Text
             italic
             overpass
             size={12}
-            className="mt-1"
             style={{
               color: greys(theme)[200],
+              marginTop: 4,
             }}>
             {description}
           </Text>
         )}
-      </View>
+      </VStack>
     );
   };
 
@@ -122,14 +129,16 @@ const Profile = () => {
             bold
             overpass
             size={13}
-            className="mb-2 ml-2 uppercase tracking-wide"
+            className="uppercase tracking-wide"
             style={{
               color: greys(theme)[300],
+              marginBottom: 8,
+              marginLeft: 8,
             }}>
             Profile Details
           </Text>
 
-          <View className="mb-4 mt-4 items-center">
+          <VStack align="center" style={{ marginBottom: 16, marginTop: 16 }}>
             <Image
               source={{
                 uri: currentProfile?.picture || 'https://via.placeholder.com/150',
@@ -137,7 +146,7 @@ const Profile = () => {
               className="h-[100px] w-[100px] rounded-full"
               resizeMode="cover"
             />
-          </View>
+          </VStack>
 
           {renderCopyableDetail(
             'NIP06:',

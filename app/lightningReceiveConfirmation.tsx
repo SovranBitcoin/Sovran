@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
@@ -202,12 +202,11 @@ export function MintQuoteTimeline({
       <View>
         {displayStates.map((item, index) => (
           <React.Fragment key={`${item.state}-${index}`}>
-            <View
+            <HStack
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
                 marginVertical: 0,
-              }}>
+              }}
+              align="center">
               <TouchableOpacity
                 onPress={() => {
                   if (transaction?.isCancel && item.state === 'CANCELLED') {
@@ -233,89 +232,88 @@ export function MintQuoteTimeline({
                         borderRadius: 8,
                       }
                     : {}),
-                  flexDirection: 'row',
-                  alignItems: 'center',
                   marginVertical: barMarginVertical,
                   overflow: 'hidden',
                 }}>
-                <View
-                  style={{
-                    width: barWidth,
-                    height: barHeight,
-                    backgroundColor: getBarColor(item),
-                    borderRadius: barWidth / 2,
-                    // marginVertical: barMarginVertical,
-                    opacity: item.isCurrent ? 1 : 0.5,
-                  }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    size={16}
-                    bold
+                <HStack align="center">
+                  <View
                     style={{
-                      color: greys(theme)[0],
-                      marginStart: 12,
-                    }}>
-                    {getStateLabel(item.state)}
-                  </Text>
-                  {item.addedAt ? (
-                    <Text
-                      size={12}
-                      bold
-                      style={{
-                        color: greys(theme)[300],
-                        marginStart: 12,
-                      }}>
-                      {convertTime(new Date(item.addedAt))}
-                    </Text>
-                  ) : transaction?.date && item.state === 'CREATED' ? (
-                    <Text
-                      size={12}
-                      bold
-                      style={{
-                        color: greys(theme)[300],
-                        marginStart: 12,
-                      }}>
-                      {convertTime(new Date(transaction.date))}
-                    </Text>
-                  ) : transaction?.isCancel ? (
-                    <Text
-                      size={12}
-                      bold
-                      style={{
-                        color: greys(theme)[300],
-                        marginStart: 12,
-                      }}>
-                      Open Transaction
-                    </Text>
-                  ) : null}
-                </View>
-                {transaction?.isCancel && item.state === 'CANCELLED' && (
-                  <Icon
-                    style={{
-                      marginRight: 8,
+                      width: barWidth,
+                      height: barHeight,
+                      backgroundColor: getBarColor(item),
+                      borderRadius: barWidth / 2,
+                      // marginVertical: barMarginVertical,
+                      opacity: item.isCurrent ? 1 : 0.5,
                     }}
-                    spin={
-                      loading
-                        ? {
-                            delay: 0,
-                            duration: 1500,
-                            outputRange: ['0deg', '360deg'],
-                            easing: 'easeOut',
-                          }
-                        : undefined
-                    }
-                    size={20}
-                    name="lucide:arrow-right"
                   />
-                )}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      size={16}
+                      bold
+                      style={{
+                        color: greys(theme)[0],
+                        marginStart: 12,
+                      }}>
+                      {getStateLabel(item.state)}
+                    </Text>
+                    {item.addedAt ? (
+                      <Text
+                        size={12}
+                        bold
+                        style={{
+                          color: greys(theme)[300],
+                          marginStart: 12,
+                        }}>
+                        {convertTime(new Date(item.addedAt))}
+                      </Text>
+                    ) : transaction?.date && item.state === 'CREATED' ? (
+                      <Text
+                        size={12}
+                        bold
+                        style={{
+                          color: greys(theme)[300],
+                          marginStart: 12,
+                        }}>
+                        {convertTime(new Date(transaction.date))}
+                      </Text>
+                    ) : transaction?.isCancel ? (
+                      <Text
+                        size={12}
+                        bold
+                        style={{
+                          color: greys(theme)[300],
+                          marginStart: 12,
+                        }}>
+                        Open Transaction
+                      </Text>
+                    ) : null}
+                  </View>
+                  {transaction?.isCancel && item.state === 'CANCELLED' && (
+                    <Icon
+                      style={{
+                        marginRight: 8,
+                      }}
+                      spin={
+                        loading
+                          ? {
+                              delay: 0,
+                              duration: 1500,
+                              outputRange: ['0deg', '360deg'],
+                              easing: 'easeOut',
+                            }
+                          : undefined
+                      }
+                      size={20}
+                      name="lucide:arrow-right"
+                    />
+                  )}
+                </HStack>
               </TouchableOpacity>
-            </View>
+            </HStack>
 
             {shouldCollapse && index === 0 && states.length > 2 && (
-              <View
+              <VStack
                 style={{
-                  flexDirection: 'column',
                   alignItems: 'flex-start',
                   opacity: 0.5,
                 }}>
@@ -331,7 +329,7 @@ export function MintQuoteTimeline({
                     }}
                   />
                 ))}
-              </View>
+              </VStack>
             )}
           </React.Fragment>
         ))}
@@ -526,14 +524,12 @@ export function LightningReceiveConfirmation({
       showClose
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       buttons={
-        <View
+        <HStack
           style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
             paddingBottom: 8,
-          }}>
+          }}
+          justify="center"
+          align="center">
           <ButtonHandler
             buttons={[
               {
@@ -563,7 +559,7 @@ export function LightningReceiveConfirmation({
               })),
             ]}
           />
-        </View>
+        </HStack>
       }>
       <TransactionHeader
         transaction={{
@@ -639,7 +635,7 @@ export function LightningReceiveConfirmation({
           {
             title: 'Status',
             value: (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <HStack align="center">
                 <Text
                   style={{
                     color: greys(theme)[0],
@@ -649,7 +645,7 @@ export function LightningReceiveConfirmation({
                   {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                 </Text>
                 {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-              </View>
+              </HStack>
             ),
           },
         ]}

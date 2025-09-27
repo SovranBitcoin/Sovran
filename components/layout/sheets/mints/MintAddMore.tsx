@@ -13,7 +13,7 @@ import { ButtonHandler } from 'components/common/ButtonHandler';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { getMint } from 'helper/cashuClient';
 import { toResult } from 'helper/toResult';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 
@@ -53,17 +53,27 @@ export function Comment({ pubkey, message, theme }: CommentProps) {
   const g = greys(theme);
 
   return (
-    <View
+    <HStack
       blur
-      className={`mb-2 flex-row items-start rounded-lg p-2.5`}
-      style={[{ backgroundColor: g[800], borderWidth: 0.5, borderColor: g[900] }]}>
+      align="flex-start"
+      className="rounded-lg"
+      style={[
+        {
+          backgroundColor: g[800],
+          borderWidth: 0.5,
+          borderColor: g[900],
+          padding: 10,
+          marginBottom: 8,
+        },
+      ]}>
       <Image
         source={{ uri: avatarSrc }}
-        className={`mr-2.5`}
-        style={[{ width: 32, height: 32, borderRadius: 22, backgroundColor: g[200] }]}
+        style={[
+          { width: 32, height: 32, borderRadius: 22, backgroundColor: g[200], marginRight: 10 },
+        ]}
       />
 
-      <View className={`flex-1`}>
+      <VStack className="flex-1">
         <Text weight="bold" style={[{ color: g[50], fontSize: 14 }]}>
           {displayName}
         </Text>
@@ -77,8 +87,8 @@ export function Comment({ pubkey, message, theme }: CommentProps) {
           }}>
           {message}
         </Text>
-      </View>
-    </View>
+      </VStack>
+    </HStack>
   );
 }
 
@@ -241,33 +251,44 @@ function AddMintItem({
   // const showReviews = isHighlyRated && mint.reviews.length > 0;
 
   return (
-    <View className="mb-3 overflow-hidden rounded-lg" blur style={[{ backgroundColor: g[800] }]}>
+    <View
+      className="overflow-hidden rounded-lg"
+      blur
+      style={[{ backgroundColor: g[800], marginBottom: 12 }]}>
       <TouchableOpacity
         testID={`add-mint-item-${index}`}
         disabled={isDisabled}
         onPress={() => !isDisabled && onToggle(mint.id)}>
-        <View className={`flex-row items-center p-3 ${isDisabled ? `opacity-50` : ''}`}>
+        <HStack align="center" className={`p-3 ${isDisabled ? `opacity-50` : ''}`}>
           <Image
             source={{ uri: mint.logo || 'https://placehold.co/42x42' }}
             style={[{ width: 42, height: 42, borderRadius: 21, backgroundColor: g[200] }]}
           />
 
-          <View className={`ml-3 mr-3 flex-1`}>
+          <VStack className="flex-1" style={{ marginLeft: 12, marginRight: 12 }}>
             <Text style={[{ color: g[0], fontSize: 16 }]}>{mint.name}</Text>
 
-            <View className={`flex-row flex-wrap`}>
+            <HStack className="flex-wrap">
               {mint.supportedUnits.map((unit) => (
                 <View
                   key={unit}
-                  className={`mb-1 mr-1 rounded`}
-                  style={[{ backgroundColor: g[700], paddingHorizontal: 8, paddingVertical: 4 }]}>
+                  className="rounded"
+                  style={[
+                    {
+                      backgroundColor: g[700],
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      marginBottom: 4,
+                      marginRight: 4,
+                    },
+                  ]}>
                   <Text weight="bold" style={[{ color: g[0] }]}>
                     {unit}
                   </Text>
                 </View>
               ))}
-            </View>
-          </View>
+            </HStack>
+          </VStack>
 
           {mint.loading ? (
             <ActivityIndicator />
@@ -276,7 +297,7 @@ function AddMintItem({
           ) : (
             <Icon name="gala:add" color={greens[300]} />
           )}
-        </View>
+        </HStack>
       </TouchableOpacity>
 
       {/* {showReviews && (
@@ -425,15 +446,17 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
               <TouchableOpacity
                 key={option}
                 onPress={() => setSelectedCurrency(option === 'BTC' ? 'SAT' : option)}>
-                <View
+                <HStack
                   blur
-                  className="mr-3 flex-row items-center rounded-lg"
+                  align="center"
+                  className="rounded-lg"
                   style={{
                     padding: 12,
                     minWidth: 100,
                     backgroundColor: isSelected ? g[700] : g[800],
                     borderWidth: 0.5,
                     borderColor: g[900],
+                    marginRight: 12,
                   }}>
                   {option === 'USD' || option === 'EUR' || option === 'GBP' ? (
                     <FlagIcon
@@ -446,10 +469,11 @@ export function MintAddMore({ onClose, payload }: MintAddMoreProps) {
                   ) : (
                     <View className="h-[32px] "></View>
                   )}
-                  <Text weight="bold" style={{ color: g[0], fontSize: 14, marginLeft: 8 }}>
+                  <Spacer size={8} />
+                  <Text weight="bold" style={{ color: g[0], fontSize: 14 }}>
                     {option}
                   </Text>
-                </View>
+                </HStack>
               </TouchableOpacity>
             );
           })}

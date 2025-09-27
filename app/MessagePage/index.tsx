@@ -89,7 +89,7 @@ export default function ModalScreen() {
     ...filteredMessages,
   ].sort((a: TimelineItemType, b: TimelineItemType) => {
     const getDate = (item: TimelineItemType) => {
-      return item?.date || item.created_at * 1000;
+      return (item as any)?.date || item.created_at * 1000;
     };
     return new Date(getDate(a)).getTime() - new Date(getDate(b)).getTime();
   });
@@ -117,7 +117,7 @@ export default function ModalScreen() {
     let cancelButtonIndex = 0;
     let destructiveButtonIndex = -1;
 
-    if (item?.request) {
+    if ((item as any)?.request) {
       options = ['View Details', 'Cancel'];
       destructiveButtonIndex = 0;
       cancelButtonIndex = 1;
@@ -132,8 +132,8 @@ export default function ModalScreen() {
       (buttonIndex) => {
         if (buttonIndex === 0 && options.length > 1) {
           navigation.navigate('transaction', {
-            id: item.request,
-            transactionType: item.transactionType,
+            id: (item as any).request,
+            transactionType: (item as any).transactionType,
           });
         }
       }
@@ -172,7 +172,7 @@ export default function ModalScreen() {
     return Object.keys(timelineItemsGroupedByDate)
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
       .map((date, index) => (
-        <View style={{ backgroundColor: 'transparent' }} key={index}>
+        <View key={index}>
           <Text style={styles.dateHeaderText}>{moment(date).format('dddd, MMMM Do YYYY')}</Text>
           {timelineItemsGroupedByDate[date].map((item, idx) => (
             <Pressable key={idx} onLongPress={() => handleLongPress(item)}>
@@ -261,7 +261,6 @@ export default function ModalScreen() {
         <View
           style={{
             flex: 1,
-            backgroundColor: 'transparent',
             margin: 16,
             marginTop: 128,
             marginBottom: 158,
@@ -281,7 +280,6 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: 'transparent',
     },
     noItemsText: {
       fontFamily: 'OverpassBold',

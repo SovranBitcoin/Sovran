@@ -68,10 +68,7 @@ export function TextContent({
     ?.slice(0, length); // Truncate text to 200 chars
 
   return (
-    <View
-      style={{
-        backgroundColor: 'transparent',
-      }}>
+    <View>
       <HighlightText
         style={{
           fontFamily: 'OverpassRegular',

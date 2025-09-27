@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { HStack, VStack } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import Animated, {
@@ -398,21 +399,17 @@ const MintItem = React.memo<MintItemProps>(
           activeOffsetY={[-10000, 10000]}
           shouldCancelWhenOutside={false}>
           {isEditing ? (
-            <View
+            <VStack
               key={mint.id}
               style={[
-                sovran(theme).listItem,
                 globalLoading && styles.disabledMintItem,
                 {
                   backgroundColor: greys(theme)[900],
-                  marginVertical: 0,
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
                   padding: 16,
                 },
-                // Remove selected styling in editing mode
-              ]}>
-              <View style={styles.mintHeaderRow}>
+              ]}
+              align="flex-start">
+              <HStack style={[styles.mintHeaderRow]} align="center" gap={12}>
                 <View
                   style={{
                     position: 'relative',
@@ -441,8 +438,8 @@ const MintItem = React.memo<MintItemProps>(
                   <Text style={styles.mintName}>{mint.name}</Text>
                   <Text style={styles.mintBalance}>{formattedBalance}</Text>
                 </View>
-              </View>
-              <View style={styles.percentageControls}>
+              </HStack>
+              <HStack style={[styles.percentageControls]} align="center" gap={6}>
                 {/* Set to 0% */}
                 <Button
                   ripple
@@ -471,8 +468,12 @@ const MintItem = React.memo<MintItemProps>(
                     />
                   }
                 />
-                <View style={styles.percentageContainer}>
-                  <View style={styles.percentageOverlayContainer}>
+                <VStack
+                  style={[styles.percentageContainer]}
+                  align="center"
+                  justify="center"
+                  gap={4}>
+                  <VStack align="center" justify="center" style={styles.percentageOverlayContainer}>
                     {/* Current progress bar behind text */}
                     {/* Previous final position bar (only for the actively edited mint) */}
                     {showPreview && (
@@ -490,13 +491,13 @@ const MintItem = React.memo<MintItemProps>(
                     )}
 
                     {/* Text overlay */}
-                    <View style={styles.percentageTextOverlay}>
+                    <VStack align="center" justify="center" style={styles.percentageTextOverlay}>
                       <Animated.Text style={[styles.percentageText, textStyle]}>
                         {`${formatPercentage(percentage)}%`}
                       </Animated.Text>
-                    </View>
-                  </View>
-                </View>
+                    </VStack>
+                  </VStack>
+                </VStack>
                 <Button
                   style={styles.incrementButton}
                   disabled={percentage >= 100}
@@ -525,8 +526,8 @@ const MintItem = React.memo<MintItemProps>(
                   variant="secondary"
                   icon={<Icon name="mdi:chevron-double-right" size={24} color={greys(theme)[0]} />}
                 />
-              </View>
-            </View>
+              </HStack>
+            </VStack>
           ) : (
             <TouchableOpacity
               key={mint.id}
@@ -536,59 +537,59 @@ const MintItem = React.memo<MintItemProps>(
                 {
                   backgroundColor: greys(theme)[900],
                   marginVertical: 0,
-                  flexDirection: 'row',
-                  alignItems: 'center',
                   padding: sovran(theme).listItem.padding,
                 },
                 isSelected && styles.selectedMintItem,
               ]}
               onPress={handlePress}
               disabled={globalLoading}>
-              <View
-                style={{
-                  position: 'relative',
-                }}>
-                {mint.iconUrl ? (
-                  <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
-                ) : (
-                  <View style={styles.mintIcon} />
-                )}
+              <HStack align="center">
                 <View
                   style={{
-                    position: 'absolute',
-                    bottom: -2,
-                    right: -2,
+                    position: 'relative',
                   }}>
-                  {isLoading ? (
-                    <ActivityIndicator animating size="small" color={greys(theme)[0]} />
-                  ) : isSelected ? (
-                    <View style={styles.checkIconContainer}>
-                      <CheckIcon size={16} color={greys(theme)[0]} />
-                    </View>
-                  ) : null}
+                  {mint.iconUrl ? (
+                    <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
+                  ) : (
+                    <View style={styles.mintIcon} />
+                  )}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: -2,
+                      right: -2,
+                    }}>
+                    {isLoading ? (
+                      <ActivityIndicator animating size="small" color={greys(theme)[0]} />
+                    ) : isSelected ? (
+                      <View style={styles.checkIconContainer}>
+                        <CheckIcon size={16} color={greys(theme)[0]} />
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-              <View style={styles.mintDetails}>
-                <Text style={styles.mintName}>{mint.name}</Text>
-                <Text style={styles.mintBalance}>{formattedBalance}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  router?.navigate('mintDetailsPage', {
-                    mintUrl: mint.id,
-                  });
-                }}>
-                <Icon
-                  style={{
-                    padding: 8,
-                    backgroundColor: isSelected
-                      ? opacity(greys(theme)[900], 0.5)
-                      : opacity(greys(theme)[800], 0.75),
-                    borderRadius: 10000,
-                  }}
-                  name="bx:dots-vertical-rounded"
-                />
-              </TouchableOpacity>
+                <View style={styles.mintDetails}>
+                  <Text style={styles.mintName}>{mint.name}</Text>
+                  <Text style={styles.mintBalance}>{formattedBalance}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    router?.navigate('mintDetailsPage', {
+                      mintUrl: mint.id,
+                    });
+                  }}>
+                  <Icon
+                    style={{
+                      padding: 8,
+                      backgroundColor: isSelected
+                        ? opacity(greys(theme)[900], 0.5)
+                        : opacity(greys(theme)[800], 0.75),
+                      borderRadius: 10000,
+                    }}
+                    name="bx:dots-vertical-rounded"
+                  />
+                </TouchableOpacity>
+              </HStack>
             </TouchableOpacity>
           )}
         </PanGestureHandler>
@@ -1489,8 +1490,8 @@ function MintSelectComponent({
       <View>
         {/* Allocation summary header with segmented bar and legend */}
         {isEditing ? (
-          <View style={{ marginBottom: 16 }}>
-            <Text weight="bold" style={[styles.sectionHeader, { marginBottom: 6 }]}>
+          <VStack spacing={6} style={{ marginBottom: 16 }}>
+            <Text weight="bold" style={styles.sectionHeader}>
               {mode === 'mpp' ? 'MPP PAYMENT ALLOCATION' : 'TOTAL BALANCE'}
             </Text>
             {(() => {
@@ -1579,7 +1580,7 @@ function MintSelectComponent({
                       });
                     })()}
                   </View>
-                  <View style={styles.legendContainer}>
+                  <HStack style={[styles.legendContainer]} wrap="wrap" gap={12}>
                     {(() => {
                       const visible = mints.filter((m) => (m.ratio || 0) > 0);
                       const baseline =
@@ -1595,20 +1596,20 @@ function MintSelectComponent({
                             ? ` (${delta > 0 ? '+' : '-'}${formatPercentage(Math.abs(delta))}%)`
                             : '';
                         return (
-                          <View key={m.key} style={styles.legendItem}>
+                          <HStack key={m.key} style={styles.legendItem} align="center">
                             <View style={[styles.legendDot, { backgroundColor: dotColor }]} />
                             <Text style={styles.legendText}>
                               {m.name} {currentPct}%{deltaStr}
                             </Text>
-                          </View>
+                          </HStack>
                         );
                       });
                     })()}
-                  </View>
+                  </HStack>
                 </View>
               );
             })()}
-          </View>
+          </VStack>
         ) : (
           <> </>
         )}
@@ -1658,7 +1659,7 @@ function MintSelectComponent({
                     ]}
                     onPress={() => !isEditing && setSelectedCurrency(currency)}
                     disabled={isEditing}>
-                    <View style={styles.currencyContent}>
+                    <HStack align="center" justify="flex-start" gap={8}>
                       {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                         <FlagIcon
                           country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
@@ -1671,7 +1672,7 @@ function MintSelectComponent({
                       <Text style={styles.currencyText}>
                         {currency === 'SAT' ? 'BTC' : currency}
                       </Text>
-                    </View>
+                    </HStack>
                   </TouchableOpacity>
                 </LinearGradient>
               ))}
@@ -1679,35 +1680,31 @@ function MintSelectComponent({
           </>
         )}
 
-        <View style={styles.sendFromHeader}>
+        <HStack justify="space-between" align="flex-end">
           <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24, marginBottom: 4 }]}>
             {mode === 'mpp' ? 'Allocate from mints' : 'Send from'}
           </Text>
           {isEditing && (
-            <View style={{ flexDirection: 'row' }}>
-              <TouchableOpacity
-                onPress={handleResetToBaseline}
-                style={[styles.editButtonContainer, { marginRight: 8 }]}>
-                <View style={styles.splitButtonContent}>
+            <HStack spacing={8}>
+              <TouchableOpacity onPress={handleResetToBaseline} style={styles.editButtonContainer}>
+                <HStack align="center" justify="center">
                   <Icon
                     name="material-symbols:settings-backup-restore-rounded"
                     size={16}
                     color={theme.shades[200]}
                   />
                   <Text style={[styles.editButton, { marginLeft: 4 }]}>Reset</Text>
-                </View>
+                </HStack>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSplitEvenly}
-                style={[styles.editButtonContainer, { marginRight: 8 }]}>
-                <View style={styles.splitButtonContent}>
+              <TouchableOpacity onPress={handleSplitEvenly} style={styles.editButtonContainer}>
+                <HStack align="center" justify="center">
                   <Icon name="radix-icons:half-2" size={16} color={theme.shades[200]} />
                   <Text style={[styles.editButton, { marginLeft: 4 }]}>Split</Text>
-                </View>
+                </HStack>
               </TouchableOpacity>
-            </View>
+            </HStack>
           )}
-        </View>
+        </HStack>
         <View>
           {filteredMints.map((mint) => {
             // Get the correct percentage to display from ratios
@@ -1800,14 +1797,9 @@ const createStyles = (theme: Theme) =>
       height: '100%',
     },
     legendContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 12,
       marginTop: 8,
     },
     legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
       marginRight: 8,
     },
     legendDot: {
@@ -1820,11 +1812,6 @@ const createStyles = (theme: Theme) =>
       color: greys(theme)[200],
       fontSize: 14,
     },
-    sendFromHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-end',
-    },
     editButtonContainer: {
       marginBottom: 4,
     },
@@ -1833,11 +1820,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       fontWeight: '500',
     },
-    splitButtonContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     currencyScroll: {
       flexGrow: 1,
     },
@@ -1845,12 +1827,6 @@ const createStyles = (theme: Theme) =>
       padding: 12,
       borderRadius: 8,
       minWidth: 100,
-    },
-    currencyContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      gap: 8,
     },
     selectedCurrencyButton: {
       backgroundColor: greys(theme)[700],
@@ -1873,9 +1849,6 @@ const createStyles = (theme: Theme) =>
       backgroundColor: greys(theme)[200],
     },
     mintHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
       marginBottom: 4,
     },
     mintBalanceRow: {
@@ -1903,9 +1876,6 @@ const createStyles = (theme: Theme) =>
       opacity: 0.5,
     },
     percentageControls: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
       alignSelf: 'flex-end',
       width: '100%',
     },
@@ -1942,10 +1912,6 @@ const createStyles = (theme: Theme) =>
     },
     percentageContainer: {
       flex: 1,
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
       minHeight: 48,
     },
 
@@ -1980,8 +1946,6 @@ const createStyles = (theme: Theme) =>
       position: 'relative',
       width: '100%',
       height: 48,
-      justifyContent: 'center',
-      alignItems: 'center',
       backgroundColor: greys(theme)[800],
       borderRadius: 8,
       overflow: 'hidden',
@@ -1991,7 +1955,5 @@ const createStyles = (theme: Theme) =>
       zIndex: 10,
       width: '100%',
       height: '100%',
-      justifyContent: 'center',
-      alignItems: 'center',
     },
   });

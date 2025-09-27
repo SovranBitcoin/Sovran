@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/common/QRCode';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { GradientSkeleton } from '../common/GradientSkeleton';
 import { greys, shades, Theme } from 'helper/colors';
@@ -116,9 +116,9 @@ export function PaymentInfo({
     if (TABS.length === 0) return null;
 
     return (
-      <View className="mx-4 bg-transparent px-4">
-        <View className="mb-0 flex-1 justify-center bg-transparent">
-          <View className="flex-1 flex-row bg-transparent">
+      <View style={{ marginHorizontal: 16, paddingHorizontal: 16 }}>
+        <VStack flex={1} justify="center">
+          <HStack flex={1}>
             {TABS.map((tab, index) => (
               <TabButton
                 key={tab}
@@ -131,8 +131,8 @@ export function PaymentInfo({
                 animatedStyle={animatedUnderscoreStyle}
               />
             ))}
-          </View>
-        </View>
+          </HStack>
+        </VStack>
       </View>
     );
   };
@@ -140,14 +140,14 @@ export function PaymentInfo({
   const renderQRCode = (): React.ReactElement => {
     if (!selectedValue) {
       return (
-        <View className="flex-row items-center justify-center bg-transparent">
+        <HStack align="center" justify="center">
           <GradientSkeleton startColor={greys(theme)[800]} endColor={greys(theme)[950]} />
-        </View>
+        </HStack>
       );
     }
 
     return (
-      <Pressable className="bg-transparent" onPress={handleCopyPress}>
+      <Pressable onPress={handleCopyPress}>
         <ViewShot captureMode="mount" onCapture={setUri}>
           <AnimatedQRCode
             padding={32}
@@ -170,8 +170,7 @@ export function PaymentInfo({
         <Section
           special={true}
           style={{
-            marginLeft: 16,
-            marginRight: 16,
+            marginHorizontal: 16,
             marginBottom: 0,
           }}
           items={[
@@ -217,7 +216,7 @@ const TabButton = React.memo(
     return (
       <TouchableOpacity
         onPress={onPress}
-        className="relative flex-1 items-center bg-transparent pb-2"
+        className="relative flex-1 items-center pb-2"
         onLayout={onLayout}>
         <Text
           style={{
@@ -234,9 +233,9 @@ const TabButton = React.memo(
                 height: 2,
                 width: '100%',
                 backgroundColor: shades[300],
-                marginTop: 8,
                 position: 'absolute',
                 bottom: 0,
+                top: 8,
               },
               animatedStyle,
             ]}

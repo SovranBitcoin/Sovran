@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Spinner } from 'components/common/Spinner';
 import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -29,7 +29,6 @@ const MintComponent = React.memo(
     const containerStyle = useMemo(
       () => ({
         flex: 1,
-        alignItems: 'center' as const,
         paddingHorizontal: 4,
       }),
       []
@@ -37,7 +36,6 @@ const MintComponent = React.memo(
 
     const cardStyle = useMemo(
       () => ({
-        alignItems: 'center' as const,
         backgroundColor: greys(theme)[800],
         borderRadius: 10,
         padding: 10,
@@ -72,8 +70,6 @@ const MintComponent = React.memo(
         backgroundColor: greys(theme)[500],
         borderWidth: 1,
         borderColor: greys(theme)[400],
-        alignItems: 'center' as const,
-        justifyContent: 'center' as const,
         marginBottom: 6,
       }),
       [theme]
@@ -85,18 +81,18 @@ const MintComponent = React.memo(
         return <Image source={{ uri: iconUrl }} style={imageStyle} />;
       } else {
         return (
-          <View style={fallbackStyle}>
+          <VStack align="center" justify="center" style={fallbackStyle}>
             <Text size={16} bold color={greys(theme)[100]}>
               {mintName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </VStack>
         );
       }
     }, [iconUrl, imageStyle, fallbackStyle, mintName, theme]);
 
     return (
-      <View style={containerStyle}>
-        <View style={cardStyle}>
+      <VStack align="center" style={containerStyle}>
+        <VStack align="center" style={cardStyle}>
           {imageComponent}
           <Text
             size={10}
@@ -105,8 +101,8 @@ const MintComponent = React.memo(
             style={{ textAlign: 'center', lineHeight: 12 }}>
             {mintName}
           </Text>
-        </View>
-      </View>
+        </VStack>
+      </VStack>
     );
   },
   (prevProps, nextProps) => {
@@ -270,15 +266,14 @@ const RouteB = () => {
             <Text weight="semibold" color={greys(theme)[0]} style={{ marginBottom: 12 }}>
               Payment Details
             </Text>
-            <View
-              style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+            <HStack style={{ marginBottom: 8 }} justify="space-between">
               <Text color={greys(theme)[200]}>Amount:</Text>
               <Text color={greys(theme)[0]}>
                 {payload.amount} {payload.unit.toUpperCase()}
               </Text>
-            </View>
+            </HStack>
             {payload.pubkey && (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <HStack justify="space-between">
                 <Text color={greys(theme)[200]}>Recipient:</Text>
                 <Text
                   color={greys(theme)[0]}
@@ -286,7 +281,7 @@ const RouteB = () => {
                   style={{ flex: 1, textAlign: 'right' }}>
                   {payload.pubkey.slice(0, 16)}...
                 </Text>
-              </View>
+              </HStack>
             )}
           </View>
 
@@ -330,14 +325,13 @@ const RouteB = () => {
                 const hasError = isCurrentStep && progress.error;
 
                 return (
-                  <View
+                  <HStack
                     key={step.id}
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
                       marginBottom: 12,
                       opacity: isCompleted ? 1 : isCurrentStep ? 1 : 0.5,
-                    }}>
+                    }}
+                    align="center">
                     <View style={{ marginRight: 12 }}>
                       {isCompleted ? (
                         <Icon name="material-symbols:check-circle" size={20} color={greens[300]} />
@@ -371,7 +365,7 @@ const RouteB = () => {
                         </Text>
                       )}
                     </View>
-                  </View>
+                  </HStack>
                 );
               })}
             </View>

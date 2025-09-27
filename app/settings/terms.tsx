@@ -144,14 +144,12 @@ const createStyles = (theme: Theme) => {
     container: {
       backgroundColor: greys(theme)[900],
       // height: screenHeight,
-      flexDirection: 'column',
     },
     titleText: {
       textAlign: 'center',
       fontSize: 32,
       fontFamily: 'OverpassHeavy',
       color: greys(theme)[50],
-      marginBottom: 16,
       paddingVertical: 8,
     },
     termsText: {
@@ -183,9 +181,10 @@ export default function TermsConditionsScreen({ onClose }: TermsConditionsScreen
   return (
     <Container scroll={true} style={styles.container}>
       <ScrollView>
-        <Text style={styles.titleText}>Terms</Text>
-
-        <Text style={styles.termsText}>{terms}</Text>
+        <VStack spacing={16}>
+          <Text style={styles.titleText}>Terms</Text>
+          <Text style={styles.termsText}>{terms}</Text>
+        </VStack>
 
         <Spacer size={64} />
 

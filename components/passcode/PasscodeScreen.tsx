@@ -7,7 +7,7 @@ import NumericKeyboard from './NumericKeyboard';
 import CachedImage from '../common/Image';
 import { useNostr } from 'helper/redux/nostr';
 import { BlurView } from 'expo-blur';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import AnimatedSpriteBackground from 'components/common/SpriteView';
 
@@ -69,25 +69,27 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   return (
     <BlurView style={styles.container}>
       <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
-        <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
+        <VStack align="center" justify="center" flex={1}>
+          <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
 
-        {currentProfile?.picture && (
-          <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
-        )}
+          {currentProfile?.picture && (
+            <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
+          )}
 
-        {currentProfile?.profile?.name ? (
-          <Text style={styles.welcome}>{`Welcome back, ${currentProfile?.profile?.name}`}</Text>
-        ) : (
-          <Text style={styles.title}>Enter Passcode</Text>
-        )}
+          {currentProfile?.profile?.name ? (
+            <Text style={styles.welcome}>{`Welcome back, ${currentProfile?.profile?.name}`}</Text>
+          ) : (
+            <Text style={styles.title}>Enter Passcode</Text>
+          )}
 
-        <View style={styles.dotsContainer}>
-          {Array.from({ length: passcode.length }).map((_, i) => (
-            <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
-          ))}
-        </View>
+          <HStack style={styles.dotsContainer}>
+            {Array.from({ length: passcode.length }).map((_, i) => (
+              <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
+            ))}
+          </HStack>
 
-        <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
+          <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
+        </VStack>
       </Animated.View>
     </BlurView>
   );
@@ -97,8 +99,6 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
       backgroundColor: greys(theme)[950],
     },
     avatar: {
@@ -131,7 +131,6 @@ const createStyles = (theme: Theme) =>
       textShadowRadius: 10,
     },
     dotsContainer: {
-      flexDirection: 'row',
       marginBottom: 20,
     },
     dot: {

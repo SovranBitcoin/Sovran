@@ -31,7 +31,7 @@ import { relays } from 'components/ndk';
 import { storeMnemonic } from 'helper/secureStorage';
 import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
-import { Spacer, VStack } from 'components/common/View';
+import { Spacer, VStack, HStack } from 'components/common/View';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
@@ -115,7 +115,7 @@ const ProfilePictureSelector = ({
   isSubmitting,
   styles,
 }: ProfilePictureSelectorProps) => (
-  <View style={styles.profileImageContainer}>
+  <VStack align="center">
     <View style={styles.selectedProfileContainer}>
       {selectedProfilePicture && (
         <Image source={{ uri: selectedProfilePicture.uri }} style={styles.selectedProfileImage} />
@@ -125,25 +125,28 @@ const ProfilePictureSelector = ({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={styles.profileOptionsScroll}
+      className="max-h-20"
       contentContainerStyle={styles.profileOptionsContent}>
-      {profilePictures.map((profile, index) => (
-        <TouchableOpacity
-          key={index}
-          onPress={() =>
-            handleProfilePictureSelect(profile, setSelectedProfilePicture, isSubmitting)
-          }
-          style={[
-            styles.profileOption,
-            selectedProfilePicture === profile && styles.selectedProfileOption,
-            isSubmitting && styles.disabledControl,
-          ]}
-          disabled={isSubmitting}>
-          <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
-        </TouchableOpacity>
-      ))}
+      <HStack justify="center">
+        {profilePictures.map((profile, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() =>
+              handleProfilePictureSelect(profile, setSelectedProfilePicture, isSubmitting)
+            }
+            className="mx-1"
+            style={[
+              styles.profileOption,
+              selectedProfilePicture === profile && styles.selectedProfileOption,
+              isSubmitting && styles.disabledControl,
+            ]}
+            disabled={isSubmitting}>
+            <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
+          </TouchableOpacity>
+        ))}
+      </HStack>
     </ScrollView>
-  </View>
+  </VStack>
 );
 
 const handleProfilePictureSelect = (
@@ -165,7 +168,7 @@ interface NameInputProps {
 }
 
 const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameInputProps) => (
-  <VStack spacing={16} style={styles.inputContainer}>
+  <VStack spacing={16}>
     <Text weight="medium" size={14} style={styles.inputLabel}>
       Enter your name
     </Text>
@@ -305,13 +308,15 @@ const RecoveryScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
-            <VStack spacing={8} style={{ marginTop: 16, marginBottom: 24 }}>
+            <VStack spacing={8}>
+              <Spacer size={16} />
               <Text weight="bold" size={24} style={styles.headerTitle}>
                 Create Sovran Profile
               </Text>
               <Text weight="regular" size={14} style={styles.headerSubtitle}>
                 Your profile lets others find you and send you bitcoin easily.
               </Text>
+              <Spacer size={24} />
             </VStack>
 
             <ProfilePictureSelector
@@ -372,10 +377,6 @@ const createStyles = (theme: Theme) =>
     headerSubtitle: {
       color: greys(theme)[200],
     },
-    profileImageContainer: {
-      alignItems: 'center',
-      marginBottom: 24,
-    },
     selectedProfileContainer: {
       width: 120,
       height: 120,
@@ -383,7 +384,6 @@ const createStyles = (theme: Theme) =>
       backgroundColor: greys(theme)[800],
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 24,
       overflow: 'hidden',
     },
     selectedProfileImage: {
@@ -391,19 +391,13 @@ const createStyles = (theme: Theme) =>
       height: 120,
       borderRadius: 60,
     },
-    profileOptionsScroll: {
-      maxHeight: 80,
-    },
     profileOptionsContent: {
-      flexDirection: 'row',
-      justifyContent: 'center',
       paddingHorizontal: 4,
     },
     profileOption: {
       width: 60,
       height: 60,
       borderRadius: 30,
-      marginHorizontal: 4,
       overflow: 'hidden',
       borderWidth: 2,
       borderColor: 'transparent',
@@ -416,7 +410,6 @@ const createStyles = (theme: Theme) =>
       height: 56,
       borderRadius: 28,
     },
-    inputContainer: {},
     inputLabel: {
       color: greys(theme)[100],
     },

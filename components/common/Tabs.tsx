@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -37,24 +37,26 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
             borderColor: greys(theme)[600],
           }),
         }}>
-        <Text
-          className="text-center text-sm"
-          style={{
-            color: isSelected ? greys(theme)[0] : greys(theme)[100],
-            fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
-          }}>
-          {tab}
-        </Text>
-        {amount ? (
+        <HStack align="center" spacing={4}>
           <Text
-            className="ml-1 text-xs"
+            className="text-center text-sm"
             style={{
-              fontFamily: 'OverpassBold',
-              color: greys(theme)[300],
+              color: isSelected ? greys(theme)[0] : greys(theme)[100],
+              fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
             }}>
-            {`(${amount})`}
+            {tab}
           </Text>
-        ) : null}
+          {amount ? (
+            <Text
+              className="text-xs"
+              style={{
+                fontFamily: 'OverpassBold',
+                color: greys(theme)[300],
+              }}>
+              {`(${amount})`}
+            </Text>
+          ) : null}
+        </HStack>
       </View>
     </TouchableOpacity>
   );
@@ -84,7 +86,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
     <ScrollView
       className="w-full"
       style={{
-        backgroundColor: 'transparent',
         marginBottom: 0,
         marginTop: 0,
         overflow: 'visible',
@@ -94,13 +95,11 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
-        flexDirection: 'row',
-        backgroundColor: 'transparent',
         width: isScrollable ? undefined : '100%',
       }}>
-      <View
+      <HStack
         blur
-        className="flex-row rounded-3xl p-1.5"
+        className="rounded-3xl p-1.5"
         style={[
           sovran(theme).listItem,
           {
@@ -121,7 +120,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
             isScrollable={isScrollable}
           />
         ))}
-      </View>
+      </HStack>
     </ScrollView>
   );
 }

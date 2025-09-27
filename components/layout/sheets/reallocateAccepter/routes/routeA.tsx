@@ -3,7 +3,7 @@ import { Switch, Animated, View as RNView } from 'react-native';
 
 import { ButtonHandler } from 'components/common/ButtonHandler';
 import { Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Spinner } from 'components/common/Spinner';
 import { greens, greys, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -41,7 +41,6 @@ const MintComponent = React.memo(
     const containerStyle = useMemo(
       () => ({
         flex: 1,
-        alignItems: 'center' as const,
         paddingHorizontal: 4,
       }),
       []
@@ -49,7 +48,6 @@ const MintComponent = React.memo(
 
     const cardStyle = useMemo(
       () => ({
-        alignItems: 'center' as const,
         backgroundColor: greys(theme)[800],
         borderRadius: 10,
         padding: 10,
@@ -84,8 +82,6 @@ const MintComponent = React.memo(
         backgroundColor: greys(theme)[500],
         borderWidth: 1,
         borderColor: greys(theme)[400],
-        alignItems: 'center' as const,
-        justifyContent: 'center' as const,
         marginBottom: 6,
       }),
       [theme]
@@ -99,18 +95,18 @@ const MintComponent = React.memo(
         return <Image source={{ uri: iconUrl }} style={imageStyle} />;
       } else {
         return (
-          <View style={fallbackStyle}>
+          <VStack align="center" justify="center" style={fallbackStyle}>
             <Text size={16} bold color={greys(theme)[100]}>
               {mintName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </VStack>
         );
       }
     }, [iconUrl, imageStyle, fallbackStyle, mintName, theme]);
 
     return (
-      <View style={containerStyle}>
-        <View style={cardStyle}>
+      <VStack align="center" style={containerStyle}>
+        <VStack align="center" style={cardStyle}>
           {imageComponent}
           <Text
             size={10}
@@ -119,8 +115,8 @@ const MintComponent = React.memo(
             style={{ textAlign: 'center', lineHeight: 12 }}>
             {mintName}
           </Text>
-        </View>
-      </View>
+        </VStack>
+      </VStack>
     );
   },
   (prevProps, nextProps) => {
@@ -214,20 +210,15 @@ const ReallocationItem = React.memo(
     return (
       <Animated.View style={containerStyle}>
         {/* Main row with mints and transfer info */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
+        <HStack align="center" justify="space-between">
           {/* Source Mint */}
           <MintComponent mintUrl={reallocation.fromMint} isSource={true} theme={theme} />
 
           {/* Transfer Info */}
-          <View
+          <VStack
+            align="center"
+            justify="center"
             style={{
-              alignItems: 'center',
-              justifyContent: 'center',
               marginHorizontal: 6,
               paddingVertical: 8,
             }}>
@@ -262,11 +253,11 @@ const ReallocationItem = React.memo(
             <Text bold size={10} color={greys(theme)[300]} style={{ textAlign: 'center' }}>
               +{reallocation.percentage.toFixed(1)}%
             </Text>
-          </View>
+          </VStack>
 
           {/* Destination Mint */}
           <MintComponent mintUrl={reallocation.toMint} isSource={false} theme={theme} />
-        </View>
+        </HStack>
 
         {/* Animated error container */}
         {_hasError && (
@@ -383,20 +374,15 @@ const MPPAllocationItem = React.memo(
     return (
       <Animated.View style={containerStyle}>
         {/* Main row with mint and allocation info */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
+        <HStack align="center" justify="space-between">
           {/* Mint */}
           <MintComponent mintUrl={allocation.mintUrl} theme={theme} />
 
           {/* Allocation Info */}
-          <View
+          <VStack
+            align="center"
+            justify="center"
             style={{
-              alignItems: 'center',
-              justifyContent: 'center',
               marginHorizontal: 6,
               paddingVertical: 8,
             }}>
@@ -431,11 +417,11 @@ const MPPAllocationItem = React.memo(
             <Text bold size={10} color={greys(theme)[300]} style={{ textAlign: 'center' }}>
               {allocation.percentage.toFixed(1)}%
             </Text>
-          </View>
+          </VStack>
 
           {/* Empty space for symmetry */}
           <View style={{ width: 90 }} />
-        </View>
+        </HStack>
 
         {/* Animated error container */}
         {_hasError && (
@@ -585,8 +571,6 @@ const ReallocationArrow = React.memo(
       <Animated.View
         style={{
           position: 'relative',
-          alignItems: 'center',
-          justifyContent: 'center',
           width: size,
           height: size,
           transform: [{ scale: animatedScale }, { scale: pulseAnimation }],
@@ -635,13 +619,13 @@ const ReallocationArrow = React.memo(
         <Animated.View
           style={{
             position: 'absolute',
-            alignItems: 'center',
-            justifyContent: 'center',
             width: size,
             height: size,
             opacity: isExecuting ? 1 : 0.8,
           }}>
-          {_hasError ? errorIcon : isActive ? spinner : isCompleted ? successIcon : arrowIcon}
+          <VStack align="center" justify="center" style={{ width: size, height: size }}>
+            {_hasError ? errorIcon : isActive ? spinner : isCompleted ? successIcon : arrowIcon}
+          </VStack>
         </Animated.View>
       </Animated.View>
     );
@@ -1170,11 +1154,10 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                   ? 'Confirm MPP Payment'
                   : 'Confirm Reallocation'}
             </Text>
-            <View
+            <HStack
+              align="center"
+              justify="space-between"
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
                 paddingHorizontal: 16,
                 paddingVertical: 12,
                 backgroundColor: greys(theme)[700],
@@ -1207,7 +1190,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 }}
                 thumbColor={ignoreDust ? theme.shades[200] : greys(theme)[400]}
               />
-            </View>
+            </HStack>
           </View>
         )}
 
@@ -1222,29 +1205,28 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
                 borderRadius: 14,
                 borderWidth: 1,
                 borderColor: greys(theme)[600],
-                alignItems: 'center',
               }}>
-              <Icon name="mdi:cancel" size={24} color={greys(theme)[400]} />
-              <Text
-                size={14}
-                bold
-                color={greys(theme)[300]}
-                style={{
-                  textAlign: 'center',
-                  marginTop: 8,
-                }}>
-                All transactions filtered out as dust
-              </Text>
-              <Text
-                size={12}
-                regular
-                color={greys(theme)[400]}
-                style={{
-                  textAlign: 'center',
-                  marginTop: 4,
-                }}>
-                No reallocations needed under current settings
-              </Text>
+              <VStack align="center" gap={8}>
+                <Icon name="mdi:cancel" size={24} color={greys(theme)[400]} />
+                <Text
+                  size={14}
+                  bold
+                  color={greys(theme)[300]}
+                  style={{
+                    textAlign: 'center',
+                  }}>
+                  All transactions filtered out as dust
+                </Text>
+                <Text
+                  size={12}
+                  regular
+                  color={greys(theme)[400]}
+                  style={{
+                    textAlign: 'center',
+                  }}>
+                  No reallocations needed under current settings
+                </Text>
+              </VStack>
             </View>
           ) : (
             <ScrollView
@@ -1302,14 +1284,8 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             marginBottom: 16,
             borderWidth: 1,
             borderColor: greys(theme)[500],
-            alignItems: 'center',
           }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-            }}>
+          <HStack align="center" gap={8}>
             <Icon name="fluent:arrow-swap-16-filled" size={16} color={greys(theme)[200]} />
             <Text size={14} semibold color={greys(theme)[0]}>
               Total:
@@ -1317,7 +1293,7 @@ function RouteA({}: RouteScreenProps<'reallocate-accepter', 'route-a'>) {
             <Text size={14} bold color={theme.shades[200]}>
               {filteredTotalAmount} {payload.unit.toUpperCase()}
             </Text>
-          </View>
+          </HStack>
 
           {/* Show filtered transactions info - only for reallocation mode */}
           {payload.mode !== 'mpp' &&

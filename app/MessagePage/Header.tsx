@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Dimensions } from 'react-native';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
@@ -51,7 +51,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
   };
 
   return (
-    <Animated.View style={styles.container}>
+    <HStack align="center" justify="center">
       {/* Banner Image */}
       <CachedImage
         style={[styles.bannerImage, { width: maxWidth, height: bannerHeight }]}
@@ -67,7 +67,7 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
       />
 
       {/* Header Content */}
-      <View style={[styles.headerContent, { width: maxWidth }]}>
+      <HStack style={[styles.headerContent, { width: maxWidth }]} align="center" justify="center">
         {/* Back Button */}
         <TouchableOpacity
           onPress={handleGoBack}
@@ -75,13 +75,15 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
             styles.iconButton,
             { marginLeft: 12, backgroundColor: opacity(greys(theme)[950], 0.25) },
           ]}>
-          <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
+          <HStack align="center" justify="center" flex={1}>
+            <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
+          </HStack>
         </TouchableOpacity>
 
         {/* Profile Information */}
-        <View style={styles.profileContainer}>
+        <VStack align="center" justify="center" style={styles.profileContainer}>
           {profileImage && (
-            <Animated.View style={styles.profileImageContainer}>
+            <VStack align="center" style={styles.profileImageContainer}>
               {isVerified && (
                 <View style={[styles.verifiedBadge, { backgroundColor: greys(theme)[950] }]}>
                   <VerifiedIcon />
@@ -94,9 +96,9 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
               <Animated.View style={styles.transparent}>
                 <Text style={styles.displayName}>{displayName}</Text>
               </Animated.View>
-            </Animated.View>
+            </VStack>
           )}
-        </View>
+        </VStack>
 
         {/* Placeholder Button (Hidden) */}
         <TouchableOpacity
@@ -154,21 +156,18 @@ const Header = ({ theme, combinedSearchAndProfiles, params, profiles }: HeaderPr
             styles.iconButton,
             { marginRight: 12, backgroundColor: opacity(greys(theme)[950], 0.25) },
           ]}>
-          <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
+          <HStack align="center" justify="center" flex={1}>
+            <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
+          </HStack>
         </TouchableOpacity>
-      </View>
-    </Animated.View>
+      </HStack>
+    </HStack>
   );
 };
 
 const createStyles = () => ({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   bannerImage: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     left: 0,
     right: 0,
@@ -176,7 +175,7 @@ const createStyles = () => ({
     opacity: 0.66,
   },
   blurView: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     left: 0,
     right: 0,
@@ -184,36 +183,23 @@ const createStyles = () => ({
     paddingTop: 32,
   },
   headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
     marginTop: 32,
   },
   iconButton: {
     borderRadius: 1000,
     width: 48,
     height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   profileContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
     flex: 1,
   },
   profileImageContainer: {
-    position: 'relative',
+    position: 'relative' as const,
     height: 72,
-    backgroundColor: 'transparent',
     marginRight: 8,
-    display: 'flex',
-    alignItems: 'center',
   },
   verifiedBadge: {
-    position: 'absolute',
+    position: 'absolute' as const,
     bottom: -4,
     right: -4,
     zIndex: 100,
@@ -229,14 +215,13 @@ const createStyles = () => ({
     borderWidth: 0.2,
   },
   transparent: {
-    backgroundColor: 'transparent',
-    width: '100%',
+    width: '100%' as const,
     paddingTop: 6,
   },
   displayName: {
     fontSize: 16,
     fontFamily: 'OverpassBold',
-    width: '100%',
+    width: '100%' as const,
   },
 });
 

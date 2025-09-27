@@ -9,7 +9,6 @@ function SheetWithRouter() {
       routes={routes}
       initialRoute="route-a"
       containerStyle={{
-        backgroundColor: 'transparent',
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

@@ -140,7 +140,6 @@ export const Button = ({
   icon,
   style,
   testID,
-  noPadding = false,
   ripple = false,
   blur = false,
 }: ButtonProps) => {
@@ -167,13 +166,9 @@ export const Button = ({
   const getButtonStyles = () => {
     // Standard Button styling
     const base = {
-      margin: noPadding ? 0 : 4, // m-1, but 0 if noPadding
-      marginBottom: noPadding ? 0 : 8, // mb-2, but 0 if noPadding
       paddingVertical: 4, // py-1
       borderRadius: 9999, // rounded-full
       borderWidth: 0.33, // border-[0.33px]
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
@@ -309,12 +304,12 @@ export const Button = ({
       onLayout={handleRippleLayout}
       onPressIn={handlePressIn}>
       <View
-        style={[getButtonStyles(), { position: 'relative' }, style]}
+        style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
         blur={shouldUseBlur}
         blurIntensity={intensity}
         blurTint={tint}>
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
-        <HStack align="center" justify="center" spacing={text && icon ? 8 : 0}>
+        <HStack align="center" justify="center" spacing={text && icon && !loading ? 8 : 0}>
           {loading ? (
             <Icon
               name="ant-design:loading-outlined"

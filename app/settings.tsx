@@ -17,7 +17,7 @@ import Container from 'components/layout/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { device } from 'helper/version';
 import Icon from 'assets/icons';
 
@@ -62,32 +62,33 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
         style={{
           backgroundColor: greys(theme)[800],
         }}>
-        <Image
-          alt=""
-          source={{
-            uri: currentProfile?.picture,
-          }}
-          className="mr-3 h-[60px] w-[60px] rounded-full"
-        />
-        <View className="mr-auto">
-          <Text
-            size={18}
-            bold
-            overpass
-            style={{
-              color: greys(theme)[0],
-            }}>
-            {currentProfile?.profile?.name}
-          </Text>
-          <Text
-            className="mt-0.5"
-            size={16}
-            style={{
-              color: greys(theme)[400],
-            }}>
-            {truncateMiddle(currentProfile?.npub, 8)}
-          </Text>
-        </View>
+        <HStack spacing={12} flex={1}>
+          <Image
+            alt=""
+            source={{
+              uri: currentProfile?.picture,
+            }}
+            className="h-[60px] w-[60px] rounded-full"
+          />
+          <VStack spacing={2} flex={1}>
+            <Text
+              size={18}
+              bold
+              overpass
+              style={{
+                color: greys(theme)[0],
+              }}>
+              {currentProfile?.profile?.name}
+            </Text>
+            <Text
+              size={16}
+              style={{
+                color: greys(theme)[400],
+              }}>
+              {truncateMiddle(currentProfile?.npub, 8)}
+            </Text>
+          </VStack>
+        </HStack>
         <Icon name="fa6-solid:chevron-right" color={greys(theme)[400]} size={22} />
       </View>
     </TouchableOpacity>
@@ -128,7 +129,7 @@ export const RowButton: React.FC<{
         <View className="flex-1" />
         {value && (
           <Text
-            className="mr-1 tracking-tight"
+            className="tracking-tight"
             overpass
             bold
             size={16}
@@ -147,7 +148,7 @@ export const RowButton: React.FC<{
             />
           ))
         ) : (
-          <View className="mr-1" />
+          <Spacer size={4} />
         )}
       </TouchableOpacity>
     </View>
@@ -289,26 +290,28 @@ const ModalScreen = () => {
           onPress={() => {
             navigation.navigate('settings/design');
           }}>
-          <Text
-            className="mt-6 text-center"
-            overpass
-            bold
-            size={13}
-            style={{
-              color: greys(theme)[300],
-            }}>
-            {name}
-          </Text>
-          <Text
-            className="mt-1 text-center"
-            size={13}
-            overpass
-            medium
-            style={{
-              color: greys(theme)[300],
-            }}>
-            App Version {version} ({buildNumber})
-          </Text>
+          <VStack spacing={4}>
+            <Text
+              className="text-center"
+              overpass
+              bold
+              size={13}
+              style={{
+                color: greys(theme)[300],
+              }}>
+              {name}
+            </Text>
+            <Text
+              className="text-center"
+              size={13}
+              overpass
+              medium
+              style={{
+                color: greys(theme)[300],
+              }}>
+              App Version {version} ({buildNumber})
+            </Text>
+          </VStack>
         </TouchableOpacity>
       </ScrollView>
     </Container>

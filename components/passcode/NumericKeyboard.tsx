@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text } from 'react-native';
+import { Text } from 'react-native';
 import Haptics from 'components/common/Haptics';
 import { Button } from 'components/common/Button';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 
 interface Props {
   onKeyPress: (value: string) => void;
@@ -32,39 +33,39 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
       style={{
         flex: 1,
         marginHorizontal: 0.5,
-        alignItems: 'center',
-        justifyContent: 'center',
         height: 64,
         minHeight: 64,
       }}
       text={
-        value === '<' ? (
-          <Text
-            style={{
-              color: 'white',
-              fontSize: 32,
-              textShadowColor: 'rgba(0,0,0,0.5)',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 8,
-            }}>
-            ⌫
-          </Text>
-        ) : (
-          <Text
-            style={{
-              padding: 16,
-              paddingHorizontal: 24,
-              fontSize: 32,
-              color: 'white',
-              fontWeight: 'bold',
-              fontFamily: 'OverpassBold',
-              textShadowColor: 'rgba(0,0,0,0.5)',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 8,
-            }}>
-            {value}
-          </Text>
-        )
+        <VStack align="center" justify="center" flex={1}>
+          {value === '<' ? (
+            <Text
+              style={{
+                color: 'white',
+                fontSize: 32,
+                textShadowColor: 'rgba(0,0,0,0.5)',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 8,
+              }}>
+              ⌫
+            </Text>
+          ) : (
+            <Text
+              style={{
+                padding: 16,
+                paddingHorizontal: 24,
+                fontSize: 32,
+                color: 'white',
+                fontWeight: 'bold',
+                fontFamily: 'OverpassBold',
+                textShadowColor: 'rgba(0,0,0,0.5)',
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 8,
+              }}>
+              {value}
+            </Text>
+          )}
+        </VStack>
       }
     />
   );
@@ -104,13 +105,18 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   ];
 
   return (
-    <View className="items-center justify-center bg-transparent">
+    <VStack align="center" className="bg-transparent">
       {buttons.map((row, rowIndex) => (
-        <View key={rowIndex} className="mb-0.25 flex-row justify-between" style={{ width: '100%' }}>
+        <HStack
+          key={rowIndex}
+          justify="space-between"
+          className="bg-transparent"
+          style={{ width: '100%' }}>
           {row.map(renderButton)}
-        </View>
+          {rowIndex < buttons.length - 1 && <Spacer size={1} />}
+        </HStack>
       ))}
-    </View>
+    </VStack>
   );
 };
 

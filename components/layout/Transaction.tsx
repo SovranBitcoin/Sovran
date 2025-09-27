@@ -12,7 +12,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { TransactionData } from 'helper/redux/cashu';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import React from 'react';
 
 export function npubToPubkey(npub: string): string {
@@ -123,66 +123,67 @@ export const Transaction = React.memo(
           }
           handlePress();
         }}>
-        <TransactionIcon transaction={effectiveTx} />
+        <HStack spacing={12} flex={1}>
+          <TransactionIcon transaction={effectiveTx} />
 
-        <View className="ml-3 flex-grow flex-col bg-transparent">
-          <View className="flex flex-row items-end justify-between bg-transparent">
-            <UntranslatedText color={theme.greys[0]} bold size={14}>
-              {isVirtual
-                ? 'Reallocation'
-                : safeTx.transactionType[0].toUpperCase() + safeTx.transactionType.slice(1)}
-            </UntranslatedText>
-            {isVirtual ? null : (
-              <View className="flex flex-row items-center bg-transparent">
-                <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
-                  {isVirtual ? '' : isSend ? '- ' : isReceive ? '+ ' : ''}
-                </UntranslatedText>
-                <AmountFormatter
-                  amount={safeTx.amount}
-                  unit={safeTx.unit}
-                  size={16}
-                  weight="heavy"
-                  color={isSend ? reds[300] : greens[300]}
-                />
-              </View>
-            )}
-          </View>
-
-          <View className="flex flex-row justify-between bg-transparent">
-            <View className="flex flex-row items-center">
-              <UntranslatedText regular size={10} color={theme.greys[100]}>
-                {safeTx?.date ? convertTime(new Date(safeTx.date)) : 'Unconfirmed'}
+          <VStack spacing={0} flex={1}>
+            <HStack justify="space-between" align="flex-end">
+              <UntranslatedText color={theme.greys[0]} bold size={14}>
+                {isVirtual
+                  ? 'Reallocation'
+                  : safeTx.transactionType[0].toUpperCase() + safeTx.transactionType.slice(1)}
               </UntranslatedText>
-              <View className="pl-1">
-                {safeTx?.paid ? (
-                  <Icon size={10} name="simple-line-icons:check" color={theme.greys[100]} />
-                ) : showLoading ? (
-                  <Icon
-                    size={10}
-                    name="ant-design:loading-outlined"
-                    color={theme.greys[50]}
-                    spin={{
-                      delay: 0,
-                      duration: 1000,
-                      outputRange: ['0deg', '360deg'],
-                      easing: 'linear',
-                    }}
+              {isVirtual ? null : (
+                <HStack align="center" spacing={0}>
+                  <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
+                    {isVirtual ? '' : isSend ? '- ' : isReceive ? '+ ' : ''}
+                  </UntranslatedText>
+                  <AmountFormatter
+                    amount={safeTx.amount}
+                    unit={safeTx.unit}
+                    size={16}
+                    weight="heavy"
+                    color={isSend ? reds[300] : greens[300]}
                   />
-                ) : null}
-              </View>
-            </View>
+                </HStack>
+              )}
+            </HStack>
 
-            {isVirtual ? null : (
-              <UntranslatedText
-                className="font-overpass-heavy self-end text-right text-xs"
-                bold
-                size={10}
-                color={theme.greys[100]}>
-                {fiatAmount}
-              </UntranslatedText>
-            )}
-          </View>
-        </View>
+            <HStack justify="space-between" align="center">
+              <HStack align="center" spacing={4}>
+                <UntranslatedText regular size={10} color={theme.greys[100]}>
+                  {safeTx?.date ? convertTime(new Date(safeTx.date)) : 'Unconfirmed'}
+                </UntranslatedText>
+                <View>
+                  {safeTx?.paid ? (
+                    <Icon size={10} name="simple-line-icons:check" color={theme.greys[100]} />
+                  ) : showLoading ? (
+                    <Icon
+                      size={10}
+                      name="ant-design:loading-outlined"
+                      color={theme.greys[50]}
+                      spin={{
+                        delay: 0,
+                        duration: 1000,
+                        outputRange: ['0deg', '360deg'],
+                        easing: 'linear',
+                      }}
+                    />
+                  ) : null}
+                </View>
+              </HStack>
+              {isVirtual ? null : (
+                <UntranslatedText
+                  className="font-overpass-heavy self-end text-right text-xs"
+                  bold
+                  size={10}
+                  color={theme.greys[100]}>
+                  {fiatAmount}
+                </UntranslatedText>
+              )}
+            </HStack>
+          </VStack>
+        </HStack>
       </TouchableOpacity>
     );
   }

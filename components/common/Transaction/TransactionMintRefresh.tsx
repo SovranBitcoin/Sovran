@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
 import Icon from 'assets/icons';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -36,17 +36,23 @@ export function TransactionMintRefresh({
   const [loading, setLoading] = useState(false);
 
   return (
-    <View
+    <HStack
       blur
+      align="center"
+      justify="space-between"
+      className="rounded-lg"
       style={{
         backgroundColor: theme.greys[800],
-      }}
-      className="mx-4 mb-0 flex-row items-center justify-between rounded-lg p-4">
-      <View className="flex-row items-center">
+        marginHorizontal: 16,
+        marginBottom: 0,
+        padding: 16,
+      }}>
+      <HStack align="center" className="bg-transparent">
         <View>
           <MintIcon size={40} mintInfo={mintInfo} />
         </View>
-        <View>
+        <Spacer size={12} />
+        <VStack className="bg-transparent">
           <Text heavy size={16}>
             {transaction?.transactionType === 'send'
               ? transaction?.paid
@@ -59,8 +65,8 @@ export function TransactionMintRefresh({
           <Text regular size={16} color={greys(theme)[50]}>
             {mintInfo?.name}
           </Text>
-        </View>
-      </View>
+        </VStack>
+      </HStack>
 
       <View>
         {!transaction?.paid && handleCheckStatus && (
@@ -69,9 +75,6 @@ export function TransactionMintRefresh({
               padding: 0,
               width: 40,
               height: 40,
-              margin: 0,
-              marginBottom: 0,
-              marginTop: 0,
             }}
             variant="secondary"
             disabled={loading}
@@ -101,6 +104,6 @@ export function TransactionMintRefresh({
           />
         )}
       </View>
-    </View>
+    </HStack>
   );
 }

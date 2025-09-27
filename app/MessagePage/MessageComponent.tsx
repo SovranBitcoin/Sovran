@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from 'components/common/Text';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { View, HStack, VStack } from 'components/common/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
 import { greys, Theme } from 'helper/colors';
@@ -28,9 +29,9 @@ const MessageComponent = ({
         }
         style={styles.container}>
         <Text style={styles.text}>{message.content}</Text>
-        <View style={styles.footer}>
+        <HStack style={styles.footer}>
           <Text style={styles.timestamp}>{convertTime(new Date(message.created_at * 1000))}</Text>
-        </View>
+        </HStack>
       </LinearGradient>
     </View>
   );
@@ -41,7 +42,6 @@ const createStyles = (theme: Theme, isReceived: boolean) =>
     wrapper: {
       marginVertical: 8,
       position: 'relative',
-      backgroundColor: 'transparent',
       alignSelf: isReceived ? 'flex-start' : 'flex-end',
     },
     container: {
@@ -65,9 +65,7 @@ const createStyles = (theme: Theme, isReceived: boolean) =>
       color: greys(theme)[0],
     },
     footer: {
-      flexDirection: 'row',
       justifyContent: 'flex-end',
-      alignItems: 'center',
     },
     timestamp: {
       color: greys(theme)[0],

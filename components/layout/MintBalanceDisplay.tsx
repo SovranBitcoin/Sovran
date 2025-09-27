@@ -6,7 +6,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { memoizedGetSelectedMint, memoizedGetBalance, useGetMintInfo } from 'helper/redux/cashu';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/common/AmountFormatter';
@@ -80,40 +80,40 @@ const MintBalanceDisplay: React.FC<Props> = ({
 
   return (
     <TouchableOpacity onPress={handlePress}>
-      <View
+      <HStack
         blur
+        align="center"
+        justify="space-between"
         style={[
           sovran(theme).listItem,
           {
             alignSelf: 'center',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
             backgroundColor: greys(theme)[800],
           },
           style,
         ]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <HStack align="center">
           {showMintInfo ? (
             <>
               <MintIcon mintInfo={mintInfo} />
-              <View style={{ flexDirection: 'column', alignItems: 'flex-start', marginRight: 10 }}>
+              <VStack align="flex-start" style={{ marginRight: 10 }}>
                 <Text style={styles.name}>
                   {mintInfo?.name || selectedMint?.replace('https://', '').split('/')[0]}
                 </Text>
                 <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
-              </View>
+              </VStack>
             </>
           ) : (
-            <>
+            <HStack align="center" gap={8}>
               <Icon name="fluent:add-24-filled" size={20} color={greys(theme)[0]} />
-              <Text style={[styles.name, { marginLeft: 8 }]}>Selected mint</Text>
-            </>
+              <Text style={styles.name}>Selected mint</Text>
+            </HStack>
           )}
-        </View>
+        </HStack>
         <View style={styles.chevronContainer}>
           <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
         </View>
-      </View>
+      </HStack>
     </TouchableOpacity>
   );
 };

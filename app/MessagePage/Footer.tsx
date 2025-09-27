@@ -48,7 +48,6 @@ const createStyles = () =>
   StyleSheet.create({
     inputContainer: {
       position: 'relative',
-      backgroundColor: 'transparent',
     },
   });
 

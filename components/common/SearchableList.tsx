@@ -1,6 +1,6 @@
 import React, { useCallback, ReactNode } from 'react';
 import { Pressable, ViewStyle, ScrollView } from 'react-native';
-import { View } from 'components/common/View';
+import { HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greys, Theme } from 'helper/colors';
 import TextInput from 'components/common/TextInput';
@@ -44,28 +44,31 @@ export function SearchableList<T>({
     (item: T) => (
       <Pressable
         key={getKey(item)}
-        className="mb-2 flex-row items-center rounded-full p-2"
+        className="rounded-full p-2"
         style={{
           backgroundColor: greys(theme)[800],
           borderColor: greys(theme)[600],
           borderWidth: 0.2,
+          marginBottom: 8,
           ...itemStyle,
         }}
         onPress={() => onItemPress(item)}>
-        {renderIcon(item)}
-        <Text weight="heavy" size={16} style={{ marginLeft: 8, color: greys(theme)[0] }}>
-          {getLabel(item)}
-        </Text>
+        <HStack align="center" spacing={8}>
+          {renderIcon(item)}
+          <Text weight="heavy" size={16} style={{ color: greys(theme)[0] }}>
+            {getLabel(item)}
+          </Text>
+        </HStack>
       </Pressable>
     ),
     [getKey, renderIcon, getLabel, onItemPress, theme, itemStyle]
   );
 
   return (
-    <View style={{ backgroundColor: greys(theme)[950] }}>
+    <VStack style={{ backgroundColor: greys(theme)[950] }}>
       <TextInput placeholder={searchPlaceholder} value={searchText} onChangeText={onSearchChange} />
-      <View className="h-4" style={{ backgroundColor: 'transparent' }} />
+      <Spacer size={16} />
       <ScrollView>{data.map(renderItem)}</ScrollView>
-    </View>
+    </VStack>
   );
 }

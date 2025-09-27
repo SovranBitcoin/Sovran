@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { View, HStack, VStack } from 'components/common/View';
 import { greys, shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
@@ -16,7 +17,6 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { AmountFormatter } from 'components/common/AmountFormatter';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { MintAddMore } from './MintAddMore';
-import { View } from 'components/common/View';
 import MintDeleteConfirmRoute from './routes/MintDeleteConfirmRoute';
 
 interface SelectedMintDisplayProps {
@@ -107,27 +107,22 @@ const MintSelectorButton: React.FC<MintSelectorButtonProps> = ({
 
   return (
     <TouchableOpacity onPress={handlePress} onPressIn={() => {}} onPressOut={() => {}}>
-      <View
+      <HStack
         style={[
           sovran(theme).listItem,
           { alignSelf: 'center' },
           style,
           {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
             backgroundColor: theme.greys[800],
           },
         ]}
-        blur>
-        <View
-          style={{
-            flexDirection: 'row',
-          }}>
+        blur
+        justify="space-between">
+        <HStack>
           <MintIcon mintInfo={mintInfo} />
-          <View
+          <VStack
+            align="flex-start"
             style={{
-              flexDirection: 'column',
-              alignItems: 'flex-start',
               marginRight: 10,
             }}>
             <Text style={styles.name}>
@@ -149,13 +144,13 @@ const MintSelectorButton: React.FC<MintSelectorButtonProps> = ({
           )}
         </Text> */}
             <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit || 'sat'} />
-          </View>
-        </View>
-        <View style={styles.chevronContainer}>
+          </VStack>
+        </HStack>
+        <HStack justify="flex-end" style={styles.chevronContainer}>
           <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
-        </View>
+        </HStack>
         {/* <Text style={styles.dot}>•</Text> */}
-      </View>
+      </HStack>
     </TouchableOpacity>
   );
 };
@@ -310,16 +305,6 @@ const baseStyles = (theme: Theme) => ({
     borderColor: greys(theme)[700],
   } as ViewStyle,
 
-  // Layout variations
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  } as ViewStyle,
-
-  column: {
-    flexDirection: 'column',
-  } as ViewStyle,
-
   // Utility styles
   overflowHidden: {
     overflow: 'hidden',
@@ -355,7 +340,6 @@ const sovran = (theme: Theme) => ({
 
   listItem: {
     ...baseStyles(theme).container,
-    ...baseStyles(theme).row,
     ...baseStyles(theme).roundedMedium,
     ...baseStyles(theme).borderSubtle,
     ...baseStyles(theme).marginVerticalTight,
@@ -363,7 +347,6 @@ const sovran = (theme: Theme) => ({
 
   section: {
     ...baseStyles(theme).container,
-    ...baseStyles(theme).column,
     ...baseStyles(theme).roundedSmall,
     ...baseStyles(theme).borderSubtle,
     ...baseStyles(theme).spacingRegular,
@@ -516,7 +499,6 @@ export const createStyles = (theme: Theme) =>
     },
     chevronContainer: {
       alignSelf: 'center',
-      justifyContent: 'flex-end',
       padding: 4,
     },
   });

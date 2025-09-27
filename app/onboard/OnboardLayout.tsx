@@ -8,6 +8,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import BottomButtons, { ButtonProps } from './BottomButtons';
 import { useTypedNavigation } from 'helper/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
+import { HStack, VStack } from 'components/common/View';
 
 interface InfoSectionProps {
   title: string;
@@ -63,20 +64,24 @@ export const NavigationFooter = ({
   const iconColor = greys(theme)[0];
 
   return (
-    <View style={[styles.footerContainer, style]}>
+    <HStack style={[styles.footerContainer, style]} justify="space-between">
       <TouchableOpacity style={styles.footerButton} onPress={onBack}>
-        <Icon name="fa6-solid:chevron-left" size={20} color={iconColor} />
-        <Text size={16} style={styles.buttonTextLeft}>
-          {backText}
-        </Text>
+        <HStack align="center">
+          <Icon name="fa6-solid:chevron-left" size={20} color={iconColor} />
+          <Text size={16} style={styles.buttonTextLeft}>
+            {backText}
+          </Text>
+        </HStack>
       </TouchableOpacity>
       <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-        <Text size={18} weight="bold" style={styles.nextButtonText}>
-          {nextText}
-        </Text>
-        <Icon name="fa6-solid:chevron-right" size={22} color={greys(theme)[950]} />
+        <HStack align="center">
+          <Text size={18} weight="bold" style={styles.nextButtonText}>
+            {nextText}
+          </Text>
+          <Icon name="fa6-solid:chevron-right" size={22} color={greys(theme)[950]} />
+        </HStack>
       </TouchableOpacity>
-    </View>
+    </HStack>
   );
 };
 
@@ -105,7 +110,7 @@ export function OnboardingLayout({
   const handleBack = () => navigation.goBack();
 
   return (
-    <View style={styles.centeredContainer}>
+    <VStack align="center" justify="center" style={styles.centeredContainer}>
       <View
         style={{
           width: '100%',
@@ -125,21 +130,21 @@ export function OnboardingLayout({
           }}
         />
       </View>
-      <View style={styles.centeredContent}>
+      <VStack align="flex-start" justify="center" style={styles.centeredContent}>
         <InfoSection
           title={title}
           highlight={highlight}
           description={description}
           highlightColors={highlightColors}
         />
-      </View>
 
-      {actions ? (
-        <BottomButtons buttons={actions} theme={theme} />
-      ) : (
-        <NavigationFooter onBack={handleBack} onNext={handleNext} theme={theme} />
-      )}
-    </View>
+        {actions ? (
+          <BottomButtons buttons={actions} theme={theme} />
+        ) : (
+          <NavigationFooter onBack={handleBack} onNext={handleNext} theme={theme} />
+        )}
+      </VStack>
+    </VStack>
   );
 }
 
@@ -168,32 +173,24 @@ const createStyles = (theme: Theme) =>
     },
     centeredContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
       height: '100%',
       backgroundColor: greys(theme)[950],
     },
     centeredContent: {
-      justifyContent: 'center',
-      alignItems: 'flex-start',
       flex: 1,
       alignSelf: 'stretch',
       margin: 16,
     },
     footerContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       width: '100%',
       padding: 16,
       position: 'absolute',
       bottom: 16,
     },
     footerButton: {
-      flexDirection: 'row',
       alignItems: 'center',
     },
     nextButton: {
-      flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: greys(theme)[0],
       paddingHorizontal: 24,

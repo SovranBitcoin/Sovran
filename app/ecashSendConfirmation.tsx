@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/layout/Modal';
 import { Spinner } from 'components/common/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View, Spacer } from 'components/common/View';
+import { View, Spacer, HStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { PaymentInfo } from 'components/layout/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -228,14 +228,7 @@ export function EcashSendConfirmation({
     <Modal
       showClose
       buttons={
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
-            paddingBottom: 8,
-          }}>
+        <HStack className="pb-2" justify="center" align="center">
           <ButtonHandler
             buttons={[
               {
@@ -308,7 +301,7 @@ export function EcashSendConfirmation({
               })),
             ]}
           />
-        </View>
+        </HStack>
       }>
       <TransactionHeader
         transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
@@ -373,7 +366,7 @@ export function EcashSendConfirmation({
           {
             title: 'Status',
             value: (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <HStack align="center">
                 <Text
                   style={{
                     color: greys(theme)[0],
@@ -383,7 +376,7 @@ export function EcashSendConfirmation({
                   {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
                 </Text>
                 {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-              </View>
+              </HStack>
             ),
           },
           {

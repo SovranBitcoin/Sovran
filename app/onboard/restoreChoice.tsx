@@ -13,7 +13,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { useTypedNavigation } from 'helper/navigation';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import Icon from 'assets/icons';
@@ -152,7 +152,9 @@ const ButtonBar = ({
   theme,
   mnemonic,
 }: ButtonBarProps) => (
-  <View className="px-4 pb-4" style={{ backgroundColor: greys(theme)[950] }}>
+  <VStack
+    className="bg-transparent"
+    style={{ paddingHorizontal: 16, paddingBottom: 16, backgroundColor: greys(theme)[950] }}>
     <View className="px-2">
       <Card
         message="Creating a new account will delete the existing account on this device."
@@ -172,7 +174,7 @@ const ButtonBar = ({
       onPress={handleRestoreDifferent}
       disabled={hasNavigated || !mnemonic}
     />
-  </View>
+  </VStack>
 );
 
 export default function RestoreChoiceScreen() {
@@ -215,25 +217,30 @@ export default function RestoreChoiceScreen() {
   if (error) {
     return (
       <Container style={{ flex: 1 }}>
-        <View className="flex-1 items-center justify-center px-8">
+        <VStack
+          align="center"
+          justify="center"
+          className="flex-1"
+          style={{ paddingHorizontal: 32 }}>
           <Icon name="fa6-solid:triangle-exclamation" size={48} color={greys(theme)[400]} />
-          <Text className="mt-4 text-center text-xl font-bold" style={{ color: greys(theme)[0] }}>
+          <Spacer size={16} />
+          <Text className="text-center text-xl font-bold" style={{ color: greys(theme)[0] }}>
             Unable to Load Account
           </Text>
-          <Text
-            className="mt-3 text-center text-base leading-6"
-            style={{ color: greys(theme)[300] }}>
+          <Spacer size={12} />
+          <Text className="text-center text-base leading-6" style={{ color: greys(theme)[300] }}>
             {error || "We couldn't find account information."}
           </Text>
+          <Spacer size={32} />
           <TouchableOpacity
-            className="mt-8 w-full items-center justify-center rounded-xl"
+            className="w-full items-center justify-center rounded-xl"
             style={{ backgroundColor: greys(theme)[0], paddingVertical: 16 }}
             onPress={handleSkip}>
             <Text className="text-base font-semibold" style={{ color: greys(theme)[950] }}>
               Continue to Create New Account
             </Text>
           </TouchableOpacity>
-        </View>
+        </VStack>
       </Container>
     );
   }
@@ -244,14 +251,15 @@ export default function RestoreChoiceScreen() {
       style={{ flex: 1 }}>
       <Container style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-          <View style={{ flex: 1, paddingTop: 16 }}>
+          <VStack style={{ flex: 1, paddingTop: 16 }}>
             <Text weight="bold" size={18} style={{ color: greys(theme)[0] }}>
               We found an account backup on this device
             </Text>
             <Spacer size={12} />
             <View style={{ backgroundColor: greys(theme)[950], flex: 1 }}>
-              <View
-                className="mb-6 flex-col items-center rounded-2xl"
+              <VStack
+                align="center"
+                className="rounded-2xl"
                 style={{
                   backgroundColor: greys(theme)[800],
                   padding: 12,
@@ -262,8 +270,9 @@ export default function RestoreChoiceScreen() {
                   shadowOpacity: 0.08,
                   shadowRadius: 8,
                   elevation: 2,
+                  marginBottom: 24,
                 }}>
-                <View className="flex-row items-center justify-between">
+                <HStack align="center" justify="space-between">
                   <View style={{ marginRight: 8 }}>
                     {!profileInfo ? (
                       <View
@@ -305,13 +314,14 @@ export default function RestoreChoiceScreen() {
                     </Text>
                     {/* Keep minimal to focus the decision */}
                   </View>
-                </View>
-                <View className="mt-2 w-full">
+                </HStack>
+                <Spacer size={8} />
+                <View className="w-full">
                   <Button variant="primary" text="Restore" onPress={handleRestore} />
                 </View>
-              </View>
+              </VStack>
             </View>
-          </View>
+          </VStack>
         </ScrollView>
       </Container>
       <ButtonBar

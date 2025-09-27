@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, ColorValue } from 'react-native';
+import { StyleSheet, Pressable, ColorValue } from 'react-native';
+import { View, HStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
@@ -73,7 +74,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
         <LinearGradient colors={gradientColors} style={styles.container}>
           <Text style={styles.mintText}>{decoded.mint}</Text>
 
-          <View style={styles.footer}>
+          <HStack justify="space-between">
             <View>
               {unit && (
                 <AmountFormatter
@@ -86,7 +87,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
               )}
               {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
             </View>
-          </View>
+          </HStack>
           <Button
             text={isClaimed ? 'View Transaction' : 'Redeem'}
             variant="primary"
@@ -103,7 +104,6 @@ const createStyles = (theme: Theme) =>
     wrapper: {
       marginVertical: 8,
       position: 'relative',
-      backgroundColor: 'transparent',
       width: '100%',
     },
     container: {
@@ -117,11 +117,6 @@ const createStyles = (theme: Theme) =>
       width: 8,
       height: 8,
       transform: [{ rotate: '45deg' }],
-    },
-    footer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
     },
     memoText: {
       fontFamily: 'OverpassRegular',

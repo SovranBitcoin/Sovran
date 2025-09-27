@@ -19,7 +19,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { useTypedNavigation } from 'helper/navigation';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -43,24 +43,25 @@ const MintItem: React.FC<MintItemProps> = ({
   const styles = createStyles(theme);
   return (
     <TouchableOpacity onPress={onPress} disabled={globalLoading}>
-      <View
+      <HStack
         blur
-        style={[styles.mintItem, balance.amount === 0 && requireBalance && styles.zeroBalance]}>
+        style={[styles.mintItem, balance.amount === 0 && requireBalance && styles.zeroBalance]}
+        align="center">
         {mint.iconUrl ? (
           <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
         ) : (
           <View style={styles.mintIcon} />
         )}
-        <View style={styles.mintDetails}>
+        <VStack style={styles.mintDetails}>
           <Text style={styles.mintName}>{mint.name}</Text>
           <Text style={styles.mintBalance}>
             <AmountFormatter size={14} amount={balance.amount} unit={balance.unit} />
           </Text>
-        </View>
+        </VStack>
         <View style={{ width: 16 }}>
           {isLoading && <ActivityIndicator size="small" color={greys(theme)[0]} />}
         </View>
-      </View>
+      </HStack>
     </TouchableOpacity>
   );
 };
@@ -201,12 +202,10 @@ const ListRoute = () => {
                 { marginRight: 8, borderRadius: 8, padding: 1, backgroundColor: greys(theme)[900] },
               ]}>
               <TouchableOpacity key={currency} onPress={() => setSelectedCurrency(currency)}>
-                <View
-                  style={[
-                    styles.currencyContent,
-                    styles.currencyButton,
-                    styles.selectedCurrencyButton,
-                  ]}>
+                <HStack
+                  align="center"
+                  gap={8}
+                  style={[styles.currencyButton, styles.selectedCurrencyButton]}>
                   {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                     <FlagIcon
                       country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
@@ -217,7 +216,7 @@ const ListRoute = () => {
                     <CurrencyIcon currency={currency.toLowerCase()} />
                   )}
                   <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
-                </View>
+                </HStack>
               </TouchableOpacity>
             </LinearGradient>
           ))}
@@ -226,7 +225,7 @@ const ListRoute = () => {
         <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
           Send from
         </Text>
-        <View style={styles.mintScroll}>
+        <View>
           {filteredMints.map((mint) => (
             <MintItem
               key={mint.mintUrl}
@@ -265,12 +264,6 @@ const createStyles = (theme: Theme) =>
       borderRadius: 8,
       minWidth: 100,
     },
-    currencyContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      gap: 8,
-    },
     selectedCurrencyButton: {
       backgroundColor: greys(theme)[800],
     },
@@ -279,10 +272,7 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       fontFamily: 'OverpassBold',
     },
-    mintScroll: {},
     mintItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
       padding: 12,
       borderRadius: 16,
       backgroundColor: greys(theme)[800],

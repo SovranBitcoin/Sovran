@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
-import { VStack, HStack, View } from 'components/common/View';
+import { VStack, HStack, View, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
@@ -94,16 +94,19 @@ function ReactionProfiles({ reactions }: { reactions: any[] }) {
   const remainingCount = reactions.length - maxProfiles;
 
   return (
-    <View style={styles.reactionRow}>
+    <HStack style={styles.reactionRow} align="center">
       {displayedReactions.map((reaction, index) => (
         <UserReactionProfiles key={reaction.pubkey} pubkey={reaction.pubkey} />
       ))}
       {remainingCount > 0 && (
-        <View style={[styles.profilePictureWrapper, styles.moreCircle, styles.overlappingProfile]}>
+        <HStack
+          align="center"
+          justify="center"
+          style={[styles.profilePictureWrapper, styles.moreCircle, styles.overlappingProfile]}>
           <Text style={styles.moreText}>+{remainingCount}</Text>
-        </View>
+        </HStack>
       )}
-    </View>
+    </HStack>
   );
 }
 
@@ -248,14 +251,14 @@ const TabTwoScreen = () => {
 
       return (
         <>
-          <VStack spacing={8} style={{ marginTop: 12 }}>
+          <VStack spacing={8}>
             <Text style={styles.reactionCount}>
               {reactions.length} {getPersonCountLabel(reactions.length)}{' '}
               {getEventKind(reactions[0]).verb} your {getEventKind(event_).noun}
             </Text>
-            <View style={styles.reactionRow}>
+            <HStack style={styles.reactionRow} align="center">
               <ReactionProfiles reactions={reactions} />
-            </View>
+            </HStack>
 
             {notificationKind === EventKind.Reaction && (
               <HStack>{renderReactions(reactions)}</HStack>
@@ -293,17 +296,15 @@ const TabTwoScreen = () => {
     return Object.keys(reactionCountMap).map((emojiContent) => {
       const { count } = reactionCountMap[emojiContent];
       return (
-        <View key={emojiContent} style={styles.reactionCard}>
-          <View style={styles.reactionContent}>
-            <Text
-              style={{
-                color: 'white',
-              }}>
-              {emojiContent}
-            </Text>
-            <Text style={{ color: 'white', marginLeft: 8 }}>{count}</Text>
-          </View>
-        </View>
+        <HStack key={emojiContent} align="center" justify="center" style={styles.reactionCard}>
+          <Text
+            style={{
+              color: 'white',
+            }}>
+            {emojiContent}
+          </Text>
+          <Text style={{ color: 'white', marginLeft: 8 }}>{count}</Text>
+        </HStack>
       );
     });
   };
@@ -337,7 +338,8 @@ const TabTwoScreen = () => {
         <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
       </View>
       {isLoading ? (
-        <VStack align="center" style={{ marginTop: 20 }}>
+        <VStack align="center">
+          <Spacer size={20} />
           <Text style={styles.loadingText}>Loading...</Text>
         </VStack>
       ) : (
@@ -411,14 +413,12 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[800],
       borderRadius: 8,
       padding: 8,
-      marginBottom: 16,
       borderWidth: 1,
       borderColor: greys(theme)[700],
     },
     eventContent: {
       color: greys(theme)[0],
       fontSize: 16,
-      marginBottom: 8,
     },
     eventDate: {
       color: greys(theme)[200],
@@ -437,19 +437,11 @@ const createStyles = (theme: any) =>
       backgroundColor: greys(theme)[800],
       borderRadius: 50,
       padding: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
       marginRight: 8,
       borderWidth: 1,
       borderColor: greys(theme)[700],
     },
-    reactionContent: {
-      flexDirection: 'row',
-    },
     reactionRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 4,
       paddingLeft: 6,
     },
     profilePictureWrapper: {
@@ -470,8 +462,6 @@ const createStyles = (theme: any) =>
       height: 40,
       borderRadius: 20,
       backgroundColor: greys(theme)[700],
-      justifyContent: 'center',
-      alignItems: 'center',
       borderWidth: 2,
       borderColor: greys(theme)[500],
     },

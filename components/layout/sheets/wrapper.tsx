@@ -52,11 +52,9 @@ const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: n
     scrollContainer: {
       padding: 16,
       height: '100%',
-      backgroundColor: 'transparent',
     },
     buttonContainer: {
       padding: 0,
-      backgroundColor: 'transparent',
       position: 'absolute',
       top: containerHeight - buttonHeight,
       width: '100%',

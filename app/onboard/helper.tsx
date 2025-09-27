@@ -34,8 +34,6 @@ const createStyles = (theme: Theme) =>
       width: 80,
       height: 80,
       borderRadius: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
       backgroundColor: '#ED0C46',
       position: 'absolute',
       zIndex: 10,
@@ -49,8 +47,6 @@ const createStyles = (theme: Theme) =>
     },
     container: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
       backgroundColor: '#000000',
       padding: 16,
     },
@@ -83,14 +79,9 @@ const createStyles = (theme: Theme) =>
     },
     stepWrapper: {
       height: height, // Full height of the screen
-      justifyContent: 'center', // Center the content vertically
     },
     stepContainer: {
-      alignItems: 'center',
       marginBottom: 60,
-    },
-    stepContent: {
-      alignItems: 'center',
     },
     iconContainer: {
       position: 'relative',
@@ -105,8 +96,6 @@ const createStyles = (theme: Theme) =>
       left: 0,
       right: 0,
       bottom: 0,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     profileIcon: {
       width: 100 - 8,
@@ -143,14 +132,11 @@ const createStyles = (theme: Theme) =>
     mintContainer: {
       position: 'absolute',
       width: '100%',
-      alignItems: 'center',
     },
     mintIconContainer: {
       position: 'relative',
       width: 100 - 8,
       height: 100 - 8,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     mintIcon: {
       width: 100 - 8,
@@ -222,7 +208,6 @@ const createStyles = (theme: Theme) =>
       borderRadius: 8,
       padding: 12,
       marginTop: 16,
-      alignItems: 'center',
     },
     resetButtonText: {
       color: 'white',

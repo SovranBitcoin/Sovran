@@ -6,7 +6,7 @@ import Container from 'components/layout/Container';
 import { Section as TableSection } from 'components/common/Section';
 import { RowButton, Section } from '../settings';
 import { ButtonHandler } from 'components/common/ButtonHandler';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { Tabs } from 'components/common/Tabs';
 import Icon, { icons } from 'assets/icons';
@@ -340,7 +340,7 @@ export default function ModalScreen() {
         <Text heavy overpass size={16}>
           OverpassHeavy
         </Text>
-        <View style={{ margin: 8 }}></View>
+        <Spacer size={8} />
 
         <Text thin overpass italic size={16}>
           OverpassThinItalic
@@ -367,12 +367,12 @@ export default function ModalScreen() {
           OverpassHeavyItalic
         </Text>
 
-        <View style={{ margin: 8 }}></View>
+        <Spacer size={8} />
         <Text mono overpass size={16}>
           OverpassMono
         </Text>
 
-        <View style={{ margin: 8 }}></View>
+        <Spacer size={8} />
 
         {/* Lexend isn't really used in this project, only in onboarding flows */}
         <Text thin lexend size={16}>
@@ -455,12 +455,12 @@ export default function ModalScreen() {
           {/* Example with a custom right icon and label */}
           <RowButton
             label={
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <HStack align="center" spacing={8}>
                 <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
-                <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                <Text style={{ color: greys(theme)[50] }} bold>
                   npub1example@npubx.cash
                 </Text>
-              </View>
+              </HStack>
             }
             onPress={() => {}}
             rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
@@ -469,14 +469,7 @@ export default function ModalScreen() {
 
         {/* This is usually added at the bottom of model pages, is shows 2 buttons at once, if 3 buttons are added then it will show a popup to show more options */}
         {/* you need to include this wrapper for now. */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'transparent',
-            paddingBottom: 8,
-          }}>
+        <HStack justify="center" align="center" className="pb-2">
           <ButtonHandler
             buttons={[
               {
@@ -492,7 +485,7 @@ export default function ModalScreen() {
                 onPress: async () => {},
               },
             ]}></ButtonHandler>
-        </View>
+        </HStack>
 
         <Tabs
           amounts={['0', '1', '200']}
@@ -502,7 +495,7 @@ export default function ModalScreen() {
         />
 
         {/* Examples for different tab counts */}
-        <View className="mt-4 space-y-4">
+        <VStack className="space-y-4" style={{ marginTop: 16 }}>
           {[1, 2, 3, 4, 5].map((count) => (
             <Tabs
               key={`example-tabs-${count}`}
@@ -512,53 +505,54 @@ export default function ModalScreen() {
               handleTabPress={() => {}}
             />
           ))}
-        </View>
+        </VStack>
 
-        <View>
+        <VStack>
           {chunkArray(icons, 3).map((row, rowIndex) => (
-            <View key={rowIndex} className="mb-4 flex-row">
+            <HStack key={rowIndex} className="bg-transparent" style={{ marginBottom: 16 }}>
               {row.map((icon) => (
-                <View key={icon} className="m-4 flex-1 items-center">
+                <VStack key={icon} className="flex-1 items-center" style={{ margin: 16 }}>
                   <Icon name={icon} size={48} color={greys(theme)[0]} />
+                  <Spacer size={8} />
                   <Text
                     style={{ color: greys(theme)[0] }}
-                    className="mt-2 w-full truncate text-center text-xs">
+                    className="w-full truncate text-center text-xs">
                     {icon}
                   </Text>
-                </View>
+                </VStack>
               ))}
               {/* Fill empty columns if row has less than 3 icons */}
               {Array.from({ length: 3 - row.length }).map((_, idx) => (
                 <View key={`empty-${idx}`} className="flex-1" />
               ))}
-            </View>
+            </HStack>
           ))}
-        </View>
+        </VStack>
 
         <TouchableOpacity
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
             marginBottom: 16,
             paddingHorizontal: 16,
           }}
           onPress={toggleCheckbox}>
-          <Checkbox
-            value={isChecked}
-            onValueChange={toggleCheckbox}
-            color={isChecked ? shades[300] : undefined}
-          />
-          <Text
-            id="terms-checkbox"
-            style={{
-              flex: 1,
-              fontFamily: 'OverpassRegular',
-              fontSize: 14,
-              color: greys(theme)[0],
-              marginLeft: 8,
-            }}>
-            Toggle experimental features
-          </Text>
+          <HStack align="center">
+            <Checkbox
+              value={isChecked}
+              onValueChange={toggleCheckbox}
+              color={isChecked ? shades[300] : undefined}
+            />
+            <Spacer size={8} />
+            <Text
+              id="terms-checkbox"
+              style={{
+                flex: 1,
+                fontFamily: 'OverpassRegular',
+                fontSize: 14,
+                color: greys(theme)[0],
+              }}>
+              Toggle experimental features
+            </Text>
+          </HStack>
         </TouchableOpacity>
       </ScrollView>
     </Container>

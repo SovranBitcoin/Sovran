@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { Animated, Platform, StyleSheet } from 'react-native';
 
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/layout/PrimaryBalance';
@@ -95,8 +95,6 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
           size={16}
           style={{
             color: isActive ? greys(theme)[0] : greys(theme)[700],
-            marginLeft: 1,
-            marginRight: 1,
             marginTop: 3,
           }}>
           •
@@ -109,8 +107,16 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
 
   return (
     <NonGestureView key={account.unit} index={0} style={styles.nonGestureView}>
-      <View style={styles.transparentBackground}>
-        <View style={styles.transparentBackgroundWithPadding} />
+      <View>
+        <View
+          style={{
+            padding: 16,
+            marginTop: Platform.OS === 'web' ? 64 : 16,
+            paddingBottom: 0,
+            paddingTop: 16,
+            zIndex: 9,
+          }}
+        />
         <View
           style={{
             height: 110,
@@ -118,27 +124,14 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         <PrimaryBalance account={account} />
       </View>
 
-      <View style={styles.maxWidthContainer}>
-        <View style={styles.transparentBackgroundRow} />
+      <VStack align="center" justify="space-around" style={{ width: '100%', alignSelf: 'center' }}>
+        <HStack />
 
-        <View style={styles.transparentBackgroundRow}>
+        <HStack spacing={2}>
           {/* Onchain account indicators */}
           {renderDotIndicators(accounts, 0)}
-
-          {/* Spacer between indicators */}
-          <Text
-            weight="bold"
-            size={10}
-            style={{
-              color: greys(theme)[500],
-              marginLeft: 4,
-              marginRight: 4,
-              marginTop: 6,
-            }}>
-            {' '}
-          </Text>
-        </View>
-      </View>
+        </HStack>
+      </VStack>
 
       <View style={styles.absoluteRightBottomBorder}>
         <View style={styles.bottomNegative}>{!image && renderCurrencyIcon()}</View>
@@ -160,32 +153,6 @@ const createStyles = (theme: Theme) =>
       height: 335,
       width: '100%',
     },
-    transparentBackground: {
-      backgroundColor: 'transparent',
-    },
-    transparentBackgroundWithPadding: {
-      backgroundColor: 'transparent',
-      padding: 16,
-      marginTop: Platform.OS === 'web' ? 64 : 16,
-      paddingBottom: 0,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingTop: 16,
-      zIndex: 9,
-      justifyContent: 'space-around',
-    },
-    transparentBackgroundRow: {
-      flexDirection: 'row',
-      backgroundColor: 'transparent',
-    },
-    maxWidthContainer: {
-      width: '100%', // Fixed invalid CSS value
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      backgroundColor: 'transparent',
-      alignSelf: 'center',
-    },
     absoluteRightBottomBorder: {
       position: 'absolute',
       bottom: PLATFORM_BOTTOM_OFFSET,
@@ -193,14 +160,12 @@ const createStyles = (theme: Theme) =>
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 300,
-      backgroundColor: 'transparent',
       overflow: 'hidden',
       width: '100%',
     },
     bottomNegative: {
       position: 'absolute',
       bottom: 0,
-      backgroundColor: 'transparent',
       borderRadius: 10000,
       right: 0,
     },

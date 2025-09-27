@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'components/common/View';
+import { HStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Icon from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
@@ -125,23 +125,18 @@ const ActionItem = ({
   theme: Theme;
   size: number;
 }) => (
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'transparent',
-    }}>
+  <HStack align="center" className="bg-transparent">
     {icon}
+    <Spacer size={4} />
     <Text
       size={size}
       weight="bold"
       style={{
         color: greys(theme)[400],
-        marginLeft: 4,
       }}>
       {count}
     </Text>
-  </View>
+  </HStack>
 );
 
 export function ActionItems({
@@ -170,12 +165,11 @@ export function ActionItems({
   }
 
   return (
-    <View
+    <HStack
+      justify="space-between"
+      className="bg-transparent"
       style={{
-        flexDirection: 'row',
         marginLeft: size === 16 ? 56 : 0,
-        justifyContent: 'space-between',
-        backgroundColor: 'transparent',
       }}>
       <ActionItem
         size={size}
@@ -203,6 +197,6 @@ export function ActionItems({
         count={formatNumber(zapCount)}
         theme={theme}
       />
-    </View>
+    </HStack>
   );
 }

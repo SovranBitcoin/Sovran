@@ -1,4 +1,4 @@
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -90,120 +90,110 @@ function ModalScreen() {
               selectedCurrency={selectedCurrency.toUpperCase()}
               onCurrencyChange={handleCurrencyChange}
             />
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between', // Changed to space-between to fill the width
-                alignItems: 'center',
-                marginVertical: 8,
-                width: '100%', // Set width to 100% to fill the page
-              }}>
+            <HStack justify="space-between" align="center" className="my-2 w-full">
               <TouchableOpacity
                 onPress={() => toggleAt('at')}
+                className="mr-2 flex-1"
                 style={{
                   backgroundColor: at === 'at' ? greys(theme)[700] : greys(theme)[950],
                   padding: 8,
                   borderRadius: 8,
                   borderWidth: 0.5,
                   borderColor: greys(theme)[700],
-                  flex: 1, // Allow the button to grow
-                  marginRight: 8, // Add margin to separate buttons
-                  alignItems: 'center', // Center the icon inside the container
                 }}>
-                <Icon
-                  name="mdi:at" // Assuming this is the lightning icon
-                  size={24}
-                  color={at === 'at' ? greys(theme)[0] : greys(theme)[500]}
-                />
+                <HStack align="center" justify="center">
+                  <Icon
+                    name="mdi:at" // Assuming this is the lightning icon
+                    size={24}
+                    color={at === 'at' ? greys(theme)[0] : greys(theme)[500]}
+                  />
+                </HStack>
               </TouchableOpacity>
               <View
+                className="mr-2 h-4 w-px"
                 style={{
-                  width: 1,
-                  marginRight: 8,
-                  height: 16,
                   backgroundColor: greys(theme)[700],
                 }}
               />
               <TouchableOpacity
                 onPress={() => toggleType('lightning')}
+                className="mr-2 flex-1"
                 style={{
                   backgroundColor: type === 'lightning' ? greys(theme)[700] : greys(theme)[950],
                   padding: 8,
                   borderRadius: 8,
                   borderWidth: 0.5,
                   borderColor: greys(theme)[700],
-                  flex: 1, // Allow the button to grow
-                  marginRight: 8, // Add margin to separate buttons
-                  alignItems: 'center', // Center the icon inside the container
                 }}>
-                <Icon
-                  name="mingcute:lightning-fill" // Assuming this is the lightning icon
-                  size={24}
-                  color={type === 'lightning' ? greys(theme)[0] : greys(theme)[500]}
-                />
+                <HStack align="center" justify="center">
+                  <Icon
+                    name="mingcute:lightning-fill" // Assuming this is the lightning icon
+                    size={24}
+                    color={type === 'lightning' ? greys(theme)[0] : greys(theme)[500]}
+                  />
+                </HStack>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleType('ecash')}
+                className="mr-2 flex-1"
                 style={{
                   backgroundColor: type === 'ecash' ? greys(theme)[700] : greys(theme)[950],
                   padding: 8,
                   borderRadius: 8,
                   borderWidth: 0.5,
                   borderColor: greys(theme)[700],
-                  flex: 1, // Allow the button to grow
-                  marginRight: 8, // Add margin to separate buttons
-                  alignItems: 'center', // Center the icon inside the container
                 }}>
-                <Icon
-                  name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
-                  size={24}
-                  color={type === 'ecash' ? greys(theme)[0] : greys(theme)[500]}
-                />
+                <HStack align="center" justify="center">
+                  <Icon
+                    name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
+                    size={24}
+                    color={type === 'ecash' ? greys(theme)[0] : greys(theme)[500]}
+                  />
+                </HStack>
               </TouchableOpacity>
               <View
+                className="mr-2 h-4 w-px"
                 style={{
-                  width: 1,
-                  marginRight: 8,
-                  height: 16,
                   backgroundColor: greys(theme)[700],
                 }}
               />
               <TouchableOpacity
                 onPress={() => toggleFilter('incoming')}
+                className="mr-2 flex-1"
                 style={{
                   backgroundColor: filter === 'incoming' ? greys(theme)[700] : greys(theme)[950],
                   padding: 8,
                   borderRadius: 8,
                   borderWidth: 0.5,
                   borderColor: greys(theme)[700],
-                  flex: 1, // Allow the button to grow
-                  marginRight: 8, // Add margin to separate buttons
-                  alignItems: 'center', // Center the icon inside the container
                 }}>
-                <Icon
-                  name="fluent:arrow-download-16-filled"
-                  size={24}
-                  color={filter === 'incoming' ? greys(theme)[0] : greys(theme)[500]}
-                />
+                <HStack align="center" justify="center">
+                  <Icon
+                    name="fluent:arrow-download-16-filled"
+                    size={24}
+                    color={filter === 'incoming' ? greys(theme)[0] : greys(theme)[500]}
+                  />
+                </HStack>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleFilter('outgoing')}
+                className="flex-1"
                 style={{
                   backgroundColor: filter === 'outgoing' ? greys(theme)[700] : greys(theme)[950],
                   padding: 8,
                   borderRadius: 8,
                   borderWidth: 0.5,
                   borderColor: greys(theme)[700],
-                  flex: 1, // Allow the button to grow
-                  alignItems: 'center', // Center the icon inside the container
                 }}>
-                <Icon
-                  name="fluent:arrow-upload-16-filled"
-                  size={24}
-                  color={filter === 'outgoing' ? greys(theme)[0] : greys(theme)[500]}
-                />
+                <HStack align="center" justify="center">
+                  <Icon
+                    name="fluent:arrow-upload-16-filled"
+                    size={24}
+                    color={filter === 'outgoing' ? greys(theme)[0] : greys(theme)[500]}
+                  />
+                </HStack>
               </TouchableOpacity>
-            </View>
+            </HStack>
           </>
         }
         account={{

@@ -20,7 +20,7 @@ import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
 import { sovran } from 'components/layout/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
@@ -95,7 +95,7 @@ function ModalScreen() {
 
   const handleEcashSend = async ({ message }: { message?: string }) => {
     const result = await sendEcash({
-      to: npubToPublicKey(params?.profile?.npub),
+      to: npubToPublicKey(params?.profile?.npub || ''),
       amount: unit === 'sat' ? amount : amount * 100,
       unit: unit,
       memo: message,
@@ -255,7 +255,7 @@ function ModalScreen() {
     const hasPaymentRequest = params?.paymentRequest;
 
     return (
-      <View style={styles.buttonContainer}>
+      <HStack style={styles.buttonContainer} justify="center" align="center">
         {!params?.amount && isEcashSend && !hasPaymentRequest && <Text></Text>}
         <ButtonHandler
           buttons={[
@@ -275,8 +275,10 @@ function ModalScreen() {
               disabled: hasPaymentRequest
                 ? !(
                     isValidAmount &&
-                    params?.mints?.includes(selectedMint) &&
-                    params?.allowedUnits?.includes(unit.toUpperCase())
+                    (params?.mints as unknown as string[])?.includes(selectedMint || '') &&
+                    (params?.allowedUnits as unknown as string[])?.includes(
+                      unit.toUpperCase() || ''
+                    )
                   )
                 : !isValidAmount,
             },
@@ -296,7 +298,7 @@ function ModalScreen() {
             },
           ]}
         />
-      </View>
+      </HStack>
     );
   };
   if (!params) return null;
@@ -308,7 +310,11 @@ function ModalScreen() {
       buttons={
         <>
           {!params?.amount && (
-            <CustomKeyboard loading={loading} unit={unit} onKeyPress={setAmount} />
+            <CustomKeyboard
+              loading={loading}
+              unit={unit}
+              onKeyPress={(value: string) => setAmount(parseFloat(value) || 0)}
+            />
           )}
           {renderButtons()}
         </>
@@ -330,8 +336,8 @@ function ModalScreen() {
       <MintBalanceDisplay
         onMintSelected={handleMintSelected}
         unit={unit}
-        allowedMints={params?.mints}
-        allowedUnits={params?.allowedUnits}
+        allowedMints={params?.mints as unknown as string[]}
+        allowedUnits={params?.allowedUnits as unknown as string[]}
         requireBalance={
           params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
         }
@@ -370,10 +376,6 @@ function ModalScreen() {
 const createStyles = () =>
   StyleSheet.create({
     buttonContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'transparent',
       paddingBottom: 8,
     },
   });

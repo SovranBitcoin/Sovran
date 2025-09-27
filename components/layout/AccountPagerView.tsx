@@ -6,7 +6,7 @@ import { StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { View } from 'components/common/View';
+import { View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
@@ -147,7 +147,7 @@ export function AccountPagerView({
   ];
 
   return (
-    <View className="bg-transparent">
+    <View>
       <View className={`flex h-[350px] w-full`}>
         <Swiper
           containerStyle={{
@@ -165,42 +165,31 @@ export function AccountPagerView({
             dotsPos: 'top',
           }}>
           {loopedAccounts.map((acc, index) => (
-            <View
+            <VStack
               key={`${acc.unit}-${index}`}
+              align="center"
+              justify="center"
               style={{
                 flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
               }}>
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
-            </View>
+            </VStack>
           ))}
         </Swiper>
       </View>
-      <View
+      <HStack
+        justify="space-around"
         style={{
           position: 'absolute',
           width: '100%',
-          flexDirection: 'row',
-          justifyContent: 'space-around',
           padding: 0,
           margin: 0,
           marginTop: 350,
           height: 0,
-          backgroundColor: 'transparent',
           paddingLeft: 16,
           paddingRight: 16,
         }}>
-        <View
-          style={{
-            position: 'absolute',
-            width: '100%',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-around',
-            backgroundColor: 'transparent',
-            bottom: 0,
-          }}>
+        <HStack align="center" justify="space-around" className="absolute bottom-0 w-full">
           {actionButtons.map(({ page, text, icon }) => {
             const isCamera = page === 'camera';
             const isReceive = page === 'receive';
@@ -223,29 +212,31 @@ export function AccountPagerView({
                       ? [theme.shades[100], theme.shades[300]]
                       : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
                   }>
-                  <View style={styles.iconContainer}>
-                    <View
+                  <VStack align="center" justify="center">
+                    <HStack
                       style={[
                         styles.iconView,
                         isCamera && styles.cameraIconView,
                         isReceive && styles.receiveIconView,
                         isSend && styles.sendIconView,
                       ]}
-                      blur={!isCamera}>
-                      <View className="bg-transparent">{icon}</View>
+                      blur={!isCamera}
+                      align="center"
+                      justify="center">
+                      <View>{icon}</View>
                       {!isCamera && (
                         <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
                           {text.children}
                         </Text>
                       )}
-                    </View>
-                  </View>
+                    </HStack>
+                  </VStack>
                 </LinearGradient>
               </TouchableOpacity>
             );
           })}
-        </View>
-      </View>
+        </HStack>
+      </HStack>
     </View>
   );
 }
@@ -255,7 +246,6 @@ const createStyles = (theme: Theme) =>
     touchableOpacity: {
       flex: 1,
       maxWidth: 'auto',
-      backgroundColor: 'transparent',
     },
     cameraButton: {
       maxWidth: 64,
@@ -279,23 +269,13 @@ const createStyles = (theme: Theme) =>
       padding: 8,
       borderRadius: 1000,
     },
-    iconContainer: {
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'transparent',
-    },
     iconView: {
       alignContent: 'center',
-      flexDirection: 'row',
       padding: 12,
       minWidth: 90,
       width: '100%',
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     cameraIconView: {
-      backgroundColor: 'transparent',
       borderRadius: 1000,
     },
     receiveIconView: {

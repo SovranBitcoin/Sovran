@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ViewStyle } from 'react-native';
 import { StyledText, Text } from 'components/common/Text';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { useSelector } from 'react-redux';
 import { greys, shades, Theme } from 'helper/colors';
 import opacity from 'hex-color-opacity';
@@ -43,16 +43,15 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
   return (
     <ContainerView
-      className="mx-4 overflow-hidden rounded-lg"
+      className="overflow-hidden rounded-lg"
       style={{
-        backgroundColor: 'transparent',
+        marginHorizontal: 16,
         ...style,
       }}>
-      <View
+      <VStack
         blur
         style={{
           borderRadius: 8,
-          flexDirection: 'column',
           backgroundColor,
           padding: 8,
         }}>
@@ -64,12 +63,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
 
           return (
-            <View
-              key={index}
-              className="flex flex-row justify-between bg-transparent p-2"
-              style={{
-                flexDirection: item.direction || 'row',
-              }}>
+            <HStack key={index} justify="space-between" className="p-2">
               <Text
                 id={titleId}
                 bold
@@ -77,16 +71,16 @@ export function Section({ items, style, camera = false, special }: SectionProps)
                 color={greys(theme)[300]}
                 style={{
                   fontFamily: 'OverpassRegular',
-                  marginRight: titleText === '' ? 0 : 8,
                 }}>
                 {titleText}
               </Text>
+              {titleText !== '' && <Spacer size={8} />}
 
               {renderValueContent(item, titleText, theme, special)}
-            </View>
+            </HStack>
           );
         })}
-      </View>
+      </VStack>
     </ContainerView>
   );
 
@@ -99,15 +93,15 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   ) {
     if (React.isValidElement(item.value)) {
       return (
-        <View
-          className="flex-row items-center bg-transparent"
+        <HStack
+          align="center"
           style={{
             flex: 1,
             justifyContent: item.align === 'left' ? 'flex-start' : 'flex-end',
-            marginRight: titleText === '' ? 0 : 8,
           }}>
           {item.value}
-        </View>
+          {titleText !== '' && <Spacer size={8} />}
+        </HStack>
       );
     }
 
@@ -115,11 +109,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     if (typeof item.value === 'string' && item.value?.includes?.('@') && special) {
       const [username, domain] = item.value.split('@');
       return (
-        <View
-          className="flex flex-1 flex-col items-center justify-center bg-transparent"
-          style={{
-            marginRight: titleText === '' ? 0 : 8,
-          }}>
+        <VStack align="center" className="flex-1" justify="center">
           <Text
             mono
             size={18}
@@ -145,7 +135,8 @@ export function Section({ items, style, camera = false, special }: SectionProps)
               @{domain}
             </StyledText>
           </TouchableOpacity>
-        </View>
+          {titleText !== '' && <Spacer size={8} />}
+        </VStack>
       );
     }
 
@@ -182,11 +173,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
       item.value.includes('&cashu=')
     ) {
       return (
-        <View
-          className="flex flex-1 flex-col items-center justify-center bg-transparent"
-          style={{
-            marginRight: titleText === '' ? 0 : 8,
-          }}>
+        <VStack align="center" className="flex-1" justify="center">
           <Text
             bold
             size={12}
@@ -198,13 +185,14 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             }}>
             {item.value}
           </Text>
-        </View>
+          {titleText !== '' && <Spacer size={8} />}
+        </VStack>
       );
     }
 
     // Default case - regular text
     return (
-      <View className="bg-transparent">
+      <View>
         <Text
           weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
@@ -222,11 +210,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   // Helper function to render prefixed values (npub, creqA, etc.)
   function renderPrefixedValue(prefix: string, value: string, titleText: string, theme: Theme) {
     return (
-      <View
-        className="flex flex-1 flex-col items-center justify-center bg-transparent"
-        style={{
-          marginRight: titleText === '' ? 0 : 8,
-        }}>
+      <VStack align="center" className="flex-1" justify="center">
         <Text
           heavy
           size={24}
@@ -246,7 +230,8 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           }}>
           {value}
         </Text>
-      </View>
+        {titleText !== '' && <Spacer size={8} />}
+      </VStack>
     );
   }
 }

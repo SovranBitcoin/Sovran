@@ -73,38 +73,42 @@ const MnemonicDisplayScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
-            <Text style={styles.title}>Your Recovery Phrase</Text>
+            <VStack spacing={16}>
+              <Text style={styles.title}>Your Recovery Phrase</Text>
 
-            <Text style={styles.instructions}>
-              These 12 words are the only way to recover your wallet. Write them down in order and
-              keep them in a safe place.
-            </Text>
-
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningText}>
-                Warning: Never share your recovery phrase with anyone!
+              <Text style={styles.instructions}>
+                These 12 words are the only way to recover your wallet. Write them down in order and
+                keep them in a safe place.
               </Text>
-            </View>
 
-            <VStack spacing={8} style={styles.gridContainer} testID="mnemonic-grid">
-              {Array.from({ length: 4 }).map((_, rowIndex) => (
-                <HStack key={rowIndex} justify="space-between">
-                  {Array.from({ length: 3 }).map((_, colIndex) =>
-                    renderWordCell(rowIndex * 3 + colIndex)
-                  )}
-                </HStack>
-              ))}
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningText}>
+                  Warning: Never share your recovery phrase with anyone!
+                </Text>
+              </View>
+
+              <VStack spacing={8} testID="mnemonic-grid">
+                {Array.from({ length: 4 }).map((_, rowIndex) => (
+                  <HStack key={rowIndex} justify="space-between">
+                    {Array.from({ length: 3 }).map((_, colIndex) =>
+                      renderWordCell(rowIndex * 3 + colIndex)
+                    )}
+                  </HStack>
+                ))}
+              </VStack>
+
+              <View style={styles.securityTipsContainer}>
+                <VStack spacing={8}>
+                  <Text style={styles.securityTipsTitle}>Security Tips:</Text>
+                  <Text style={styles.securityTipText}>
+                    • Write these words down on paper (not digitally)
+                  </Text>
+                  <Text style={styles.securityTipText}>• Store in a secure location</Text>
+                  <Text style={styles.securityTipText}>• Never share with anyone</Text>
+                  <Text style={styles.securityTipText}>• This phrase controls ALL your funds</Text>
+                </VStack>
+              </View>
             </VStack>
-
-            <View style={styles.securityTipsContainer}>
-              <Text style={styles.securityTipsTitle}>Security Tips:</Text>
-              <Text style={styles.securityTipText}>
-                • Write these words down on paper (not digitally)
-              </Text>
-              <Text style={styles.securityTipText}>• Store in a secure location</Text>
-              <Text style={styles.securityTipText}>• Never share with anyone</Text>
-              <Text style={styles.securityTipText}>• This phrase controls ALL your funds</Text>
-            </View>
           </View>
         </ScrollView>
       </Container>
@@ -173,29 +177,22 @@ const styles = StyleSheet.create({
     fontFamily: 'OverpassBold',
     fontSize: 20,
     color: greys('dark')[0],
-    marginBottom: 16,
   },
   instructions: {
     fontSize: 16,
     color: greys('dark')[100],
-    marginBottom: 16,
     lineHeight: 22,
   },
   warningContainer: {
     backgroundColor: infuseColors(greys('dark')[950], reds[300]),
     borderRadius: 8,
     padding: 12,
-    marginBottom: 20,
     borderLeftWidth: 4,
     borderLeftColor: reds[300],
   },
   warningText: {
     color: reds[300],
     fontWeight: '600',
-  },
-  gridContainer: {
-    marginTop: 16,
-    marginBottom: 24,
   },
   wordCell: {
     flex: 1,
@@ -211,7 +208,6 @@ const styles = StyleSheet.create({
   wordNumber: {
     color: greys('dark')[300],
     fontSize: 12,
-    marginBottom: 4,
     textAlign: 'left',
   },
   wordText: {
@@ -224,13 +220,11 @@ const styles = StyleSheet.create({
     backgroundColor: greys('dark')[800],
     borderRadius: 8,
     padding: 16,
-    marginTop: 8,
   },
   securityTipsTitle: {
     color: greys('dark')[100],
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
   },
   securityTipText: {
     color: greys('dark')[200],

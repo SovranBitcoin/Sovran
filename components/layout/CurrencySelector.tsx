@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { TouchableOpacity, ScrollView } from 'react-native';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sovran } from './sheets/mints';
 import opacity from 'hex-color-opacity';
@@ -110,7 +110,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                     borderColor: greys(theme)[700],
                     minWidth: 100,
                   }}>
-                  <View style={styles.currencyContent}>
+                  <HStack align="center" gap={8} style={{ width: 36 }}>
                     {currencyItem.country ? (
                       <FlagIcon country={currencyItem.country} height={32} width={32} />
                     ) : (
@@ -124,7 +124,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                       }}>
                       {currency}
                     </Text>
-                  </View>
+                  </HStack>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -134,17 +134,5 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
     </View>
   );
 };
-
-// Keep only the styles that don't depend on theme
-const styles = StyleSheet.create({
-  currencyContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 8,
-    width: 36,
-    height: 36,
-  },
-});
 
 export default React.memo(CurrencySelector);

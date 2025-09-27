@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { View } from 'components/common/View';
+import { View, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { useSettings } from 'helper/redux/settings';
@@ -36,9 +36,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   }, [settings.display_btc, setDisplayBitcoin]);
 
   return (
-    <View
-      className="z-9 flex-row items-center justify-center pt-0"
-      style={{ backgroundColor: 'transparent', flexDirection: 'column' }}>
+    <VStack align="center" className="z-9">
       {btcPrice?.usd?.btc && (
         <View
           blur
@@ -64,6 +62,6 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
         <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
       </TouchableOpacity>
-    </View>
+    </VStack>
   );
 }

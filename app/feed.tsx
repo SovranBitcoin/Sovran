@@ -14,21 +14,18 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
 import { EventKind } from 'helper/constants';
 
-const Feed = ({ theme, filters }) => {
-  const { events, isLoading } = useSubscribe({ filters });
+const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
+  const { events } = useSubscribe({ filters });
 
   const sortedEvents = useMemo(
-    () => (events ? [...events].sort((a, b) => b.created_at - a.created_at) : []),
+    () => (events ? [...events].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)) : []),
     [events]
   );
-  return isLoading ? (
-    <Text>Loading...</Text>
-  ) : (
+  return (
     <FlashList
       data={sortedEvents}
-      renderItem={({ item }) => <Post post={item} key={item.id} />}
-      keyExtractor={(event) => event?.id}
-      estimatedItemSize={400}
+      renderItem={({ item }) => <Post {...({ post: item } as any)} key={item.id} />}
+      keyExtractor={(event) => event?.id || ''}
       extraData={theme}
       onEndReached={() => {}}
       onEndReachedThreshold={0.5}
@@ -57,16 +54,16 @@ const TabTwoScreen = () => {
   );
 
   const onPageSelected = useCallback(
-    (event) => {
+    (event: any) => {
       const pageIndex = event.nativeEvent.position;
       setSelectedTab(tabs[pageIndex]);
     },
     [tabs]
   );
 
-  const handleTabPress = useCallback((tab, index) => {
+  const handleTabPress = useCallback((tab: string, index: number) => {
     setSelectedTab(tab);
-    pagerRef.current?.setPage(index);
+    (pagerRef.current as any)?.setPage(index);
   }, []);
 
   useEffect(() => {
@@ -85,7 +82,7 @@ const TabTwoScreen = () => {
         initialPage={0}>
         {tabs.map((tab, index) => (
           <View key={index.toString()} style={styles.pageContainer}>
-            <Feed theme={theme} filters={filters[tab]} />
+            <Feed theme={theme} filters={filters[tab as keyof typeof filters]} />
           </View>
         ))}
       </PagerView>
@@ -102,7 +99,6 @@ const createStyles = (theme: Theme) =>
     },
     pagerView: {
       height: Dimensions.get('window').height,
-      backgroundColor: 'transparent',
       marginLeft: -16,
       marginRight: -16,
       marginTop: 8,

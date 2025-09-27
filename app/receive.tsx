@@ -17,7 +17,7 @@ import { useGetMintInfo } from 'helper/redux/cashu';
 import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'components/providers/TransactionsProvider';
 import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
-import { Spacer } from 'components/common/View';
+import { Spacer, HStack } from 'components/common/View';
 import { RowButton, Section } from 'app/settings';
 import Icon from 'assets/icons';
 import { Text } from 'components/common/Text';
@@ -191,12 +191,12 @@ const EcashLightningReceiver = () => {
             <Section title="RECEIVE ADDRESS">
               <RowButton
                 label={
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <HStack align="center" gap={8}>
                     <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
-                    <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                    <Text style={{ color: greys(theme)[50] }} bold>
                       {truncateMiddle(currentProfile.npub, 7)}@npubx.cash
                     </Text>
-                  </View>
+                  </HStack>
                 }
                 isFirst
                 onPress={handleCopyLightningAddress}

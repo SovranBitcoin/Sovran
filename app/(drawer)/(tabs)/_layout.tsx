@@ -13,6 +13,7 @@ import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/layout/WalletHeader';
+import { HStack, Spacer } from 'components/common/View';
 import { useTypedNavigation } from 'helper/navigation';
 import { Avatar } from 'components/common/Avatar';
 
@@ -74,17 +75,21 @@ const TabLayout = () => {
 
   const HeaderLeft = () => (
     <Pressable onPress={() => navigation.openDrawer()}>
-      <View className="ml-2">
+      <HStack spacing={12} align="flex-start">
+        <Spacer size={8} />
         <Avatar picture={currentProfile?.picture} />
-      </View>
+      </HStack>
     </Pressable>
   );
 
   const HeaderRight = () => (
     <Pressable className="opacity-0" onPress={() => showMessage('not_implemented')}>
-      <View className="mr-2 rounded-full p-2" style={{ backgroundColor: greys(theme)[800] }}>
-        <Icon name="solar:card-bold" color={greys(theme)[0]} />
-      </View>
+      <HStack spacing={8}>
+        <View className="rounded-full p-2" style={{ backgroundColor: greys(theme)[800] }}>
+          <Icon name="solar:card-bold" color={greys(theme)[0]} />
+        </View>
+        <Spacer size={8} />
+      </HStack>
     </Pressable>
   );
 

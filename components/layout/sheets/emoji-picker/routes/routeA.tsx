@@ -4,7 +4,7 @@ import { TouchableOpacity, StyleSheet } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';
@@ -51,9 +51,9 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
       <Spacer size={12} />
       <Card message={"These encoded emoji's don't work on every platform."} variant="info" />
       <Spacer size={12} />
-      <ScrollView contentContainerStyle={styles.gridContainer}>
+      <ScrollView>
         {emojiRows.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.row}>
+          <HStack key={rowIndex} justify="space-between" style={styles.row}>
             {row.map((emoji, colIndex) => (
               <TouchableOpacity
                 testID={emoji.id}
@@ -63,10 +63,12 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
                   colIndex > 0 && { marginLeft: 8 }, // Only add marginLeft if not the first in the row
                 ]}
                 onPress={() => handleEmojiSelect(emoji.emoji)}>
-                <Text style={styles.emoji}>{emoji.emoji}</Text>
+                <VStack align="center" justify="center" flex={1}>
+                  <Text style={styles.emoji}>{emoji.emoji}</Text>
+                </VStack>
               </TouchableOpacity>
             ))}
-          </View>
+          </HStack>
         ))}
       </ScrollView>
     </View>
@@ -87,19 +89,11 @@ const createStyles = (theme: Theme) =>
       fontSize: 18,
       fontWeight: '600',
     },
-    gridContainer: {
-      flexDirection: 'column',
-      justifyContent: 'flex-start',
-    },
     row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       marginBottom: 12,
     },
     emojiButton: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
       backgroundColor: greys(theme)[800],
       borderRadius: 8,
       padding: 12,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Linking, ScrollView, Alert, StyleSheet, Animated, Image } from 'react-native';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, HStack, VStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import Wrapper from '../wrapper';
@@ -161,10 +161,10 @@ const StatsGrid = ({
   const styles = createStyles(theme);
 
   return (
-    <View style={styles.container3}>
+    <HStack wrap="wrap" className="-m-1.5 mt-2">
       {stats.map((stat, index) => (
-        <View key={index} style={[styles.statCard]}>
-          <View style={styles.cardContent}>
+        <View key={index} className="w-1/2 p-1.5">
+          <VStack justify="space-between" style={styles.cardContent}>
             <Text style={[styles.label, { color: greys(theme)[200] }]}>{stat.label}</Text>
 
             <Text
@@ -179,10 +179,10 @@ const StatsGrid = ({
             <Text style={[styles.description, { color: greys(theme)[300] }]}>
               {stat.description}
             </Text>
-          </View>
+          </VStack>
         </View>
       ))}
-    </View>
+    </HStack>
   );
 };
 
@@ -343,11 +343,11 @@ const MintDetailPage = () => {
       return <Image source={{ uri: iconUrl }} style={styles.logoImage} />;
     } else {
       return (
-        <View style={styles.logo}>
+        <VStack align="center" justify="center" style={styles.logo}>
           <Text style={styles.logoText}>
             {mintInfo?.name ? mintInfo.name.charAt(0).toUpperCase() : 'M'}
           </Text>
-        </View>
+        </VStack>
       );
     }
   };
@@ -412,7 +412,7 @@ const MintDetailPage = () => {
         )}
 
         {/* Mint Header with integrated heatmap */}
-        <View style={styles.headerContainer}>
+        <VStack align="center" style={styles.headerContainer}>
           <View style={styles.logoContainer}>
             <DonutChart
               sections={[
@@ -435,7 +435,7 @@ const MintDetailPage = () => {
           {!hasError && swaps?.length > 0 && (
             <>
               {/* Heatmap visualization */}
-              <View style={styles.heatmapContainer}>
+              <HStack style={styles.heatmapContainer}>
                 {new Array(days).fill(0).map((_, i) => {
                   const date = dayjs()
                     .utc()
@@ -467,7 +467,7 @@ const MintDetailPage = () => {
 
                   return <CellComponent key={date} style={cellStyle} />;
                 })}
-              </View>
+              </HStack>
 
               {/* Stats Grid */}
               <StatsGrid
@@ -479,7 +479,7 @@ const MintDetailPage = () => {
               />
             </>
           )}
-        </View>
+        </VStack>
 
         {/* Description Card */}
         {mintInfo?.description && (
@@ -514,32 +514,32 @@ const MintDetailPage = () => {
                 key={index}
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <HStack align="center" gap={8}>
                       <CurrencyIcon colors={[greys(theme)[400]]} width={20} currency={'nostr'} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                      <Text style={{ color: greys(theme)[50] }} bold>
                         {truncateMiddle(contact.info, 10)}
                       </Text>
-                    </View>
+                    </HStack>
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <HStack align="center" gap={8}>
                       <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[400]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                      <Text style={{ color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
-                    </View>
+                    </HStack>
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <HStack align="center" gap={8}>
                       <Icon name="mdi:at" size={20} color={greys(theme)[400]} />
-                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                      <Text style={{ color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
-                    </View>
+                    </HStack>
                   ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                    <HStack align="center">
+                      <Text style={{ color: greys(theme)[50] }} bold>
                         {contact.info}
                       </Text>
-                    </View>
+                    </HStack>
                   )
                 }
                 onPress={() => handleContactPress(contact.method, contact.info)}
@@ -553,12 +553,12 @@ const MintDetailPage = () => {
           <RowButton
             isFirst={true}
             label={
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <HStack align="center" gap={8}>
                 <Icon name="mdi:trash-can-outline" size={20} color={reds[300]} />
-                <Text style={{ marginLeft: 8, color: reds[300] }} bold>
+                <Text style={{ color: reds[300] }} bold>
                   Delete Mint
                 </Text>
-              </View>
+              </HStack>
             }
             onPress={handleDeleteMint}
           />
@@ -574,7 +574,6 @@ const createStyles = (theme: Theme) =>
       flex: 1,
     },
     headerContainer: {
-      alignItems: 'center',
       paddingVertical: 24,
       paddingBottom: 32,
     },
@@ -586,8 +585,6 @@ const createStyles = (theme: Theme) =>
       height: 84,
       borderRadius: 100,
       backgroundColor: '#3f836d',
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     logoImage: {
       width: 84,
@@ -615,20 +612,9 @@ const createStyles = (theme: Theme) =>
     heatmapContainer: {
       width: '100%',
       marginTop: 16,
-      flexDirection: 'row',
       flex: 1,
       justifyContent: 'flex-end',
       alignItems: 'flex-end',
-    },
-    container3: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      margin: -6,
-      marginTop: 8,
-    },
-    statCard: {
-      width: '50%',
-      padding: 6,
     },
     cardContent: {
       padding: 16,
@@ -638,7 +624,6 @@ const createStyles = (theme: Theme) =>
       position: 'relative',
       overflow: 'hidden',
       minHeight: 90,
-      justifyContent: 'space-between',
       backgroundColor: greys(theme)[800],
       shadowColor: greys(theme)[900],
       flex: 1,

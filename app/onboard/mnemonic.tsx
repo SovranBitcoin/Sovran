@@ -13,6 +13,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds, Theme } from 'helper/colors';
 import Container from 'components/layout/Container';
 import { Text } from 'components/common/Text';
+import { HStack, VStack } from 'components/common/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -242,24 +243,26 @@ const RecoveryScreen: React.FC<{}> = () => {
           setActiveWordIndex(index);
           setCurrentInput(words[index] || '');
         }}>
-        <Text style={[styles.wordNumber, isActive && styles.activeWordText]}>
-          {`${index + 1}.`}
-        </Text>
-        <Text
-          style={[
-            styles.wordText,
-            isFilled && styles.filledWordText,
-            (isVerifyCell ? isCorrectWord : isFilled && isValidWord)
-              ? styles.validWordText
-              : isInvalid
-                ? styles.invalidWordText
-                : null,
-            isActive && styles.activeWordText,
-          ]}
-          numberOfLines={1}
-          ellipsizeMode="tail">
-          {words[index] || ''}
-        </Text>
+        <VStack justify="center" flex={1}>
+          <Text style={[styles.wordNumber, isActive && styles.activeWordText]}>
+            {`${index + 1}.`}
+          </Text>
+          <Text
+            style={[
+              styles.wordText,
+              isFilled && styles.filledWordText,
+              (isVerifyCell ? isCorrectWord : isFilled && isValidWord)
+                ? styles.validWordText
+                : isInvalid
+                  ? styles.invalidWordText
+                  : null,
+              isActive && styles.activeWordText,
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail">
+            {words[index] || ''}
+          </Text>
+        </VStack>
       </TouchableOpacity>
     );
   };
@@ -328,23 +331,23 @@ const RecoveryScreen: React.FC<{}> = () => {
                 }
               />
             </View>
-            <View style={styles.gridContainer}>
+            <VStack style={styles.gridContainer}>
               {!isVerifyMode ? (
                 // For recovery mode, show the full grid
                 Array.from({ length: GRID_ROWS }).map((_, rowIndex) => (
-                  <View key={rowIndex} style={styles.gridRow}>
+                  <HStack key={rowIndex} style={styles.gridRow} justify="space-between">
                     {Array.from({ length: GRID_COLS }).map((_, colIndex) =>
                       renderWordCell(rowIndex * GRID_COLS + colIndex)
                     )}
-                  </View>
+                  </HStack>
                 ))
               ) : (
                 // For verify mode, show only the cells that need verification in a single horizontal row
-                <View style={styles.verifyRow}>
+                <HStack style={styles.verifyRow} justify="space-between">
                   {verifyIndices.map((index) => renderWordCell(index))}
-                </View>
+                </HStack>
               )}
-            </View>
+            </VStack>
           </View>
         </ScrollView>
       </Container>
@@ -355,7 +358,7 @@ const RecoveryScreen: React.FC<{}> = () => {
             ? []
             : [
                 {
-                  variant: 'secondary',
+                  variant: 'secondary' as const,
                   text: "I can't remember my seed phrase",
                   onPress: () => {},
                 },
@@ -363,7 +366,7 @@ const RecoveryScreen: React.FC<{}> = () => {
           {
             text: isVerifyMode ? 'Verify' : 'Submit',
             onPress: handleSubmit,
-            variant: 'primary',
+            variant: 'primary' as const,
             disabled: !isSubmitEnabled(),
           },
         ]}
@@ -433,13 +436,9 @@ const createStyles = (theme: Theme) =>
       marginBottom: 24,
     },
     gridRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       marginBottom: 8,
     },
     verifyRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       marginBottom: 16,
     },
     wordCell: {
@@ -449,7 +448,6 @@ const createStyles = (theme: Theme) =>
       padding: 12,
       marginHorizontal: 4,
       minHeight: 60,
-      justifyContent: 'center',
       borderBottomWidth: 2,
       borderBottomColor: 'transparent',
     },

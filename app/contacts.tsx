@@ -8,7 +8,7 @@ import { TouchableOpacity } from 'components/common/TouchableOpacity';
 import Container from 'components/layout/Container';
 import Icon from 'assets/icons';
 import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
@@ -211,20 +211,19 @@ function ModalScreen() {
                   )}
                 </View>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                  <Text
-                    className="ml-3"
-                    overpass
-                    bold
-                    size={16}
-                    style={{ color: greys(theme)[50] }}>
-                    Cancel
-                  </Text>
+                  <HStack spacing={12}>
+                    <Spacer size={12} />
+                    <Text overpass bold size={16} style={{ color: greys(theme)[50] }}>
+                      Cancel
+                    </Text>
+                  </HStack>
                 </TouchableOpacity>
               </View>
 
               {showResults && (
-                <View className="mt-2">
-                  <View className="mb-3">
+                <VStack spacing={12}>
+                  <Spacer size={8} />
+                  <VStack spacing={12}>
                     <Text
                       loading={loading}
                       overpass
@@ -236,7 +235,7 @@ function ModalScreen() {
                       Found {searchResults.length}{' '}
                       {searchResults.length === 1 ? 'result' : 'results'}
                     </Text>
-                  </View>
+                  </VStack>
                   {displayResults.map((result, index) => (
                     <SearchResult
                       key={result.pubkey}
@@ -252,7 +251,7 @@ function ModalScreen() {
                       }}
                     />
                   ))}
-                </View>
+                </VStack>
               )}
 
               {showEmptyState && <EmptyStateView theme={theme} />}
@@ -267,38 +266,40 @@ function ModalScreen() {
 
 function NoResultsFound({ theme }: { theme: Theme }) {
   return (
-    <View className="mt-10 items-center px-6">
+    <VStack spacing={24} className="items-center px-6">
+      <Spacer size={40} />
       <View
-        className="mb-6 h-20 w-20 items-center justify-center rounded-full"
+        className="h-20 w-20 items-center justify-center rounded-full"
         style={{ backgroundColor: greys(theme)[800] }}>
         <Icon name="nonicons:error-16" size={40} color={greys(theme)[400]} />
       </View>
 
-      <Text
-        className="mb-3 text-center"
-        overpass
-        bold
-        size={20}
-        style={{
-          color: greys(theme)[50],
-        }}>
-        No Results Found
-      </Text>
-
-      <Text
-        className="mb-7 text-center"
-        overpass
-        regular
-        size={16}
-        style={{
-          color: greys(theme)[400],
-        }}>
-        {"We couldn't find any users matching your search"}
-      </Text>
-
-      <View className="mb-4 w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
+      <VStack spacing={12}>
         <Text
-          className="mb-3"
+          className="text-center"
+          overpass
+          bold
+          size={20}
+          style={{
+            color: greys(theme)[50],
+          }}>
+          No Results Found
+        </Text>
+
+        <Text
+          className="text-center"
+          overpass
+          regular
+          size={16}
+          style={{
+            color: greys(theme)[400],
+          }}>
+          {"We couldn't find any users matching your search"}
+        </Text>
+      </VStack>
+
+      <View className="w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
+        <Text
           overpass
           bold
           size={16}
@@ -311,21 +312,21 @@ function NoResultsFound({ theme }: { theme: Theme }) {
         <SearchTip icon="solar:key-bold" text="Try using a complete public key" theme={theme} />
         <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" theme={theme} />
       </View>
-    </View>
+    </VStack>
   );
 }
 
 function EmptyStateView({ theme }: { theme: Theme }) {
   return (
-    <View className="mt-10 items-center px-6">
+    <VStack spacing={24} className="items-center px-6">
       <View
-        className="mb-6 h-20 w-20 items-center justify-center rounded-full"
+        className="h-20 w-20 items-center justify-center rounded-full"
         style={{ backgroundColor: greys(theme)[800] }}>
         <Icon name="majesticons:search-line" size={40} color={greys(theme)[400]} />
       </View>
 
       <Text
-        className="mb-3 text-center"
+        className="text-center"
         overpass
         bold
         size={20}
@@ -336,7 +337,7 @@ function EmptyStateView({ theme }: { theme: Theme }) {
       </Text>
 
       <Text
-        className="mb-7 text-center"
+        className="text-center"
         size={16}
         overpass
         regular
@@ -346,9 +347,8 @@ function EmptyStateView({ theme }: { theme: Theme }) {
         Type a name, public key, or NIP-05 identifier to find users on the network
       </Text>
 
-      <View className="mb-4 w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
+      <View className="w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
         <Text
-          className="mb-1"
           overpass
           bold
           size={16}
@@ -361,18 +361,18 @@ function EmptyStateView({ theme }: { theme: Theme }) {
         <SearchTip icon="solar:key-bold" text="Search by public key" theme={theme} />
         <SearchTip icon="mdi:at" text="Search by NIP-05 identifier" theme={theme} />
       </View>
-    </View>
+    </VStack>
   );
 }
 
 function SearchTip({ icon, text, theme }: { icon: string; text: string; theme: Theme }) {
   return (
-    <View className="mt-3 flex-row items-center">
+    <HStack spacing={8} className="items-center">
       <Icon name={icon} size={20} color={greys(theme)[300]} />
       <Text className="flex-1 pl-2" size={14} overpass regular style={{ color: greys(theme)[200] }}>
         {text}
       </Text>
-    </View>
+    </HStack>
   );
 }
 
@@ -388,30 +388,30 @@ function SearchResult({ result, onPress, loading }: SearchResultProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="mb-2 flex-row items-center rounded-lg p-2"
+      className="flex-row items-center rounded-lg p-2"
       style={{ backgroundColor: greys(theme)[800] }}
       disabled={loading || !result.profile}>
-      <View className="mr-2">
+      <HStack spacing={8}>
         <ProfileImage loading={loading} profile={result.profile} />
-      </View>
-      <View className="flex-1">
-        <Text loading={loading} overpass bold size={16} style={{ color: greys(theme)[50] }}>
-          {result.profile?.displayName || result.profile?.name || 'Loading...'}
-        </Text>
-        {result.profile?.nip05 && (
-          <Text
-            loading={loading}
-            overpass
-            regular
-            size={12}
-            style={{
-              color: result.profile.nip05Valid ? greens[300] : reds[300],
-            }}>
-            {result.profile.nip05Valid ? '✓ ' : '✗ '}
-            {result.profile.nip05}
+        <View className="flex-1">
+          <Text loading={loading} overpass bold size={16} style={{ color: greys(theme)[50] }}>
+            {result.profile?.displayName || result.profile?.name || 'Loading...'}
           </Text>
-        )}
-      </View>
+          {result.profile?.nip05 && (
+            <Text
+              loading={loading}
+              overpass
+              regular
+              size={12}
+              style={{
+                color: result.profile.nip05Valid ? greens[300] : reds[300],
+              }}>
+              {result.profile.nip05Valid ? '✓ ' : '✗ '}
+              {result.profile.nip05}
+            </Text>
+          )}
+        </View>
+      </HStack>
     </TouchableOpacity>
   );
 }

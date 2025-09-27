@@ -13,7 +13,7 @@ import CachedImage from 'components/common/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { Spacer } from 'components/common/View';
+import { Spacer, VStack, HStack } from 'components/common/View';
 
 function ProfileHeader() {
   const { currentProfile } = useNostr();
@@ -47,26 +47,27 @@ function ProfileHeader() {
             }
           }}>
           {currentProfile?.pubkey && (
-            <>
+            <VStack align="center" spacing={16}>
               <CachedImage
                 source={{ uri: currentProfile.picture }}
                 style={{
                   width: 64,
                   height: 64,
                   borderRadius: 32,
-                  marginBottom: 16,
                   backgroundColor: greys(theme)[0],
                 }}
               />
-              <Text
-                weight="bold"
-                size={20}
-                className="mb-2 mt-4 text-center"
-                style={{ color: greys(theme)[0] }}>
-                {currentProfile?.profile?.name}
-              </Text>
-              <Icon size={42} name="stash:qr-code" color={greys(theme)[0]} />
-            </>
+              <VStack align="center" spacing={8}>
+                <Text
+                  weight="bold"
+                  size={20}
+                  className="text-center"
+                  style={{ color: greys(theme)[0] }}>
+                  {currentProfile?.profile?.name}
+                </Text>
+                <Icon size={42} name="stash:qr-code" color={greys(theme)[0]} />
+              </VStack>
+            </VStack>
           )}
         </TouchableOpacity>
       </View>
@@ -86,11 +87,13 @@ function ProfileButton({
   const theme = useSelector(memoizedGetTheme);
 
   return (
-    <Pressable onPress={onPress} className="flex-row items-center justify-start p-8 pb-8 pt-0">
-      <Icon name={icon} color={greys(theme)[0]} />
-      <Text size={18} weight="bold" className="ml-3" style={{ color: greys(theme)[0] }}>
-        {label}
-      </Text>
+    <Pressable onPress={onPress} className="p-8 pb-8 pt-0">
+      <HStack align="center" spacing={12}>
+        <Icon name={icon} color={greys(theme)[0]} />
+        <Text size={18} weight="bold" style={{ color: greys(theme)[0] }}>
+          {label}
+        </Text>
+      </HStack>
     </Pressable>
   );
 }
@@ -110,7 +113,7 @@ const Screen = () => {
         }}>
         <Spacer size={64} />
         <ProfileHeader />
-        <View className="-mt-4 pb-12">
+        <VStack spacing={0} style={{ marginTop: -16, paddingBottom: 48 }}>
           <ProfileButton
             icon="fluent:wallet-20-filled"
             label="Wallet"
@@ -139,7 +142,7 @@ const Screen = () => {
               navigation.navigate('settings', {}, { current: 'drawer' });
             }}
           />
-        </View>
+        </VStack>
       </ScrollView>
     </>
   );

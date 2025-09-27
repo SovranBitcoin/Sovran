@@ -11,7 +11,7 @@ import {
   StyleProp,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { View } from 'components/common/View';
+import { View, HStack } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
 import { greys } from 'helper/colors';
@@ -103,7 +103,7 @@ export default function Modal({
         </TouchableOpacity>
       );
     }
-    return <View className="w-12 bg-transparent" />;
+    return <View className="w-12" />;
   };
 
   const renderHeader = () => {
@@ -129,11 +129,9 @@ export default function Modal({
           right: 0,
           zIndex: 1,
           minHeight: headerHeight,
-          alignItems: 'center',
-          justifyContent: 'center',
           backgroundColor: opacity(greys(theme)[950], 0.9),
         }}>
-        <View className="w-full flex-row items-center justify-between bg-transparent">
+        <HStack className="w-full items-center justify-between">
           {renderHeaderButton()}
           <Text
             style={{
@@ -144,8 +142,8 @@ export default function Modal({
             }}>
             {title}
           </Text>
-          <View className="w-12 bg-transparent" />
-        </View>
+          <View className="w-12" />
+        </HStack>
       </BlurView>
     );
   };
@@ -186,7 +184,6 @@ export default function Modal({
         style={[
           {
             width: '100%',
-            backgroundColor: 'transparent',
             paddingBottom: padding,
           },
           // Position needs specific settings for keyboard avoiding view in message contact page

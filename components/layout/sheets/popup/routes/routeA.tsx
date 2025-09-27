@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { StyleSheet, Animated } from 'react-native';
+import { View, VStack } from 'components/common/View';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
@@ -35,7 +36,8 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   }, [router, progress, isModal, isPersistent]);
 
   return (
-    <View
+    <VStack
+      justify={isModal || isPersistent ? 'center' : 'flex-end'}
       style={{
         marginHorizontal: 16,
         marginBottom: 0,
@@ -43,9 +45,8 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
         overflow: 'hidden',
         backgroundColor: greys(theme)[800],
         padding: 16,
-        justifyContent: isModal || isPersistent ? 'center' : 'flex-end',
       }}>
-      <View style={styles.iconContainer}>
+      <VStack style={styles.iconContainer} align="center" justify="center">
         <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>
         <Text style={styles.text}>{payload?.message || 'Error'}</Text>
         {payload?.submessage &&
@@ -54,7 +55,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
           ) : (
             payload.submessage
           ))}
-      </View>
+      </VStack>
       {payload?.buttons?.map((button) => {
         return (
           <Button
@@ -85,16 +86,13 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
           />
         </View>
       )}
-    </View>
+    </VStack>
   );
 };
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     iconContainer: {
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
       marginBottom: 10,
     },
     icon: {

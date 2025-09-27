@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { View } from 'components/common/View';
+import { View, HStack, VStack, Spacer } from 'components/common/View';
 import SelectedMintDisplay from 'components/layout/sheets/mints';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
@@ -49,7 +49,9 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   };
 
   return (
-    <View className="h-13 pointer-events-box-none absolute left-0 right-0 mt-8 pt-5">
+    <View
+      className="h-13 pointer-events-box-none absolute left-0 right-0 pt-5"
+      style={{ marginTop: 32 }}>
       <SelectedMintDisplay
         style={{
           width: Dimensions.get('window').width - 128,
