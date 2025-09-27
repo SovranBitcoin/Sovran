@@ -38,7 +38,7 @@ export function OnboardingLayout({
       align="center"
       justify="space-between"
       flex={1}
-      className={`h-full p-4 ${children ? '' : 'pt-48'}`}
+      className={`h-full p-4 ${children ? '' : 'pt-64'}`}
       style={{ backgroundColor: greys(theme)[950] }}>
       {children ? (
         children

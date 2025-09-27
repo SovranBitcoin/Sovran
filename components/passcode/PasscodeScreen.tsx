@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Animated } from 'react-native';
+import { Animated } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
-import CachedImage from '../common/Image';
+import { Avatar } from '../common/Avatar';
 import { useNostr } from 'helper/redux/nostr';
 import { BlurView } from 'expo-blur';
 import { View, HStack, VStack } from 'components/common/View';
@@ -16,6 +16,9 @@ interface Props {
   onSuccess: () => void;
 }
 
+const AVATAR_SIZE = 80;
+const SPACING = 16;
+
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
@@ -23,7 +26,34 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
   const shake = useRef(new Animated.Value(0)).current;
-  const styles = createStyles(theme);
+
+  // Shadow styles - cannot be fully replicated with Tailwind in React Native
+  const textShadow = {
+    textShadowColor: 'black',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 3,
+  };
+
+  const dotShadow = {
+    shadowColor: 'black',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+  };
+
+  const avatarShadow = {
+    shadowColor: 'red',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
+  };
+
+  // Helper function for dot styling
+  const getDotStyle = (isActive: boolean) => ({
+    backgroundColor: isActive ? greys(theme)[0] : 'transparent',
+    borderColor: isActive ? 'transparent' : greys(theme)[0],
+    ...dotShadow,
+  });
 
   const handlePress = (val: string) => {
     if (val.length > passcode.length) return;
@@ -67,24 +97,53 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView style={styles.container}>
-      <Animated.View style={[styles.container, { opacity, transform: [{ translateX: shake }] }]}>
-        <VStack align="center" justify="center" flex={1}>
-          <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
+    <BlurView className="flex-1" style={{ backgroundColor: greys(theme)[950] }}>
+      <Animated.View
+        className="flex-1"
+        style={{
+          backgroundColor: greys(theme)[950],
+          opacity,
+          transform: [{ translateX: shake }],
+        }}>
+        <VStack align="center" justify="center" flex={1} spacing={SPACING}>
+          <AnimatedSpriteBackground backgroundColor={greys(theme)[950]} />
 
           {currentProfile?.picture && (
-            <CachedImage style={styles.avatar} source={{ uri: currentProfile.picture }} />
+            <View style={avatarShadow}>
+              <Avatar picture={currentProfile.picture} size={AVATAR_SIZE} />
+            </View>
           )}
 
           {currentProfile?.profile?.name ? (
-            <Text style={styles.welcome}>{`Welcome back, ${currentProfile?.profile?.name}`}</Text>
+            <Text
+              size={18}
+              weight="bold"
+              style={{
+                color: greys(theme)[0],
+                ...textShadow,
+              }}>
+              {`Welcome back, ${currentProfile?.profile?.name}`}
+            </Text>
           ) : (
-            <Text style={styles.title}>Enter Passcode</Text>
+            <Text
+              size={20}
+              weight="bold"
+              style={{
+                color: greys(theme)[0],
+                ...textShadow,
+                textShadowRadius: 10,
+              }}>
+              Enter Passcode
+            </Text>
           )}
 
-          <HStack style={styles.dotsContainer}>
+          <HStack>
             {Array.from({ length: passcode.length }).map((_, i) => (
-              <View key={i} style={value.length > i ? styles.dotActive : styles.dot} />
+              <View
+                key={i}
+                className={`mx-1.5 h-3 w-3 rounded-full ${value.length > i ? '' : 'border'}`}
+                style={getDotStyle(value.length > i)}
+              />
             ))}
           </HStack>
 
@@ -94,65 +153,5 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     </BlurView>
   );
 };
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: greys(theme)[950],
-    },
-    avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      marginBottom: 16,
-
-      shadowColor: 'red',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 1,
-      shadowRadius: 3,
-    },
-    welcome: {
-      color: greys(theme)[0],
-      fontSize: 18,
-      marginBottom: 16,
-      fontFamily: 'OverpassBold',
-      textShadowColor: 'black',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 3,
-    },
-    title: {
-      color: greys(theme)[0],
-      fontSize: 20,
-      marginBottom: 20,
-      fontFamily: 'OverpassBold',
-      textShadowColor: 'black',
-      textShadowOffset: { width: 0, height: 0 },
-      textShadowRadius: 10,
-    },
-    dotsContainer: {
-      marginBottom: 20,
-    },
-    dot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: greys(theme)[0],
-      marginHorizontal: 6,
-
-      shadowColor: 'black',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 1,
-      shadowRadius: 3,
-    },
-    dotActive: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: greys(theme)[0],
-      marginHorizontal: 6,
-    },
-  });
 
 export default PasscodeScreen;
