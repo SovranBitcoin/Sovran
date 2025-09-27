@@ -50,13 +50,6 @@ const createStyles = () =>
       position: 'relative',
       backgroundColor: 'transparent',
     },
-    sendButton: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingLeft: 24,
-      paddingRight: 8,
-      backgroundColor: 'transparent',
-    },
   });
 
 export default Footer;

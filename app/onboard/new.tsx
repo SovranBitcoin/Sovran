@@ -438,39 +438,8 @@ const createStyles = (theme: Theme) =>
       paddingBottom: 16,
       backgroundColor: greys(theme)[950],
     },
-    createButton: {
-      backgroundColor: shades[300],
-      padding: 16,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    createButtonText: {
-      color: greys(theme)[0],
-      textAlign: 'center',
-    },
-    existingButton: {
-      backgroundColor: greys(theme)[800],
-      padding: 16,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    existingButtonText: {
-      color: greys(theme)[0],
-      textAlign: 'center',
-    },
     disabledControl: {
       opacity: 0.6,
-    },
-    disabledButtonText: {
-      color: greys(theme)[200],
-    },
-    loadingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
     },
   });
 

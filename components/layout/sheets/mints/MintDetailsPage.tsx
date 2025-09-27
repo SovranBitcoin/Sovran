@@ -573,36 +573,6 @@ const createStyles = (theme: Theme) =>
     scrollContainer: {
       flex: 1,
     },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 40,
-    },
-    loadingText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: greys(theme)[200],
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 40,
-      paddingHorizontal: 20,
-    },
-    errorText: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: '#D32F2F',
-      textAlign: 'center',
-      marginBottom: 8,
-    },
-    errorSubtext: {
-      fontSize: 14,
-      color: greys(theme)[200],
-      textAlign: 'center',
-    },
     headerContainer: {
       alignItems: 'center',
       paddingVertical: 24,
@@ -705,17 +675,6 @@ const createStyles = (theme: Theme) =>
       lineHeight: 14,
       opacity: 0.8,
       letterSpacing: 0.1,
-    },
-    actionButton: {
-      backgroundColor: greens[300],
-      borderRadius: 8,
-      marginVertical: 2,
-    },
-    actionText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: greys(theme)[0],
-      textAlign: 'center',
     },
   });
 

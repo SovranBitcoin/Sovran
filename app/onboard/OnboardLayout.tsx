@@ -162,9 +162,6 @@ const createStyles = (theme: Theme) =>
     buttonTextLeft: {
       marginLeft: 8,
     },
-    buttonTextRight: {
-      marginRight: 8,
-    },
     infoContainer: {
       alignItems: 'flex-start',
       alignSelf: 'stretch',
@@ -214,18 +211,5 @@ const createStyles = (theme: Theme) =>
     nextButtonText: {
       color: greys(theme)[950],
       marginRight: 8,
-    },
-    actionButton: {
-      padding: 16,
-      borderRadius: 8,
-      flex: 1,
-      marginHorizontal: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    primaryButton: {
-      borderWidth: 0,
     },
   });

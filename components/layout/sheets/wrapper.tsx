@@ -71,10 +71,6 @@ const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: n
       borderWidth: 0.5,
       borderColor: greys(theme)[600],
     },
-    buttonText: {
-      color: greys(theme)[0],
-      fontSize: 16,
-    },
   });
 
 export default Wrapper;

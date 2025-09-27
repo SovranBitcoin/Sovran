@@ -154,16 +154,6 @@ const createStyles = (theme: Theme) => {
       marginBottom: 16,
       paddingVertical: 8,
     },
-    scrollContainer: {
-      flex: 1,
-      backgroundColor: greys(theme)[950],
-      borderRadius: 8,
-      marginBottom: 16,
-    },
-    scrollContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 100, // Add padding to ensure content doesn't overlap with buttons
-    },
     termsText: {
       fontFamily: 'OverpassRegular',
       fontSize: 14,

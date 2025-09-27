@@ -75,13 +75,6 @@ const createStyles = (theme: Theme, isReceived: boolean) =>
       fontFamily: 'OverpassBold',
       fontSize: 12,
     },
-    status: {
-      color: greys(theme)[0],
-      opacity: 0.75,
-      fontFamily: 'OverpassBold',
-      fontSize: 12,
-      marginLeft: 4,
-    },
   });
 
 export default MessageComponent;
