@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { View } from 'components/common/View';
+import { HStack } from 'components/common/View';
 import Icon from 'assets/icons';
 import TextInput from 'components/common/TextInput';
 import { Button } from 'components/common/Button';
@@ -15,7 +15,7 @@ const Footer = ({ message, setMessage, handleSendDM }: FooterProps) => {
   const styles = createStyles();
 
   return (
-    <View style={styles.inputContainer}>
+    <HStack align="center" spacing={8} style={styles.inputContainer}>
       <TextInput
         placeholder="Type your message..."
         value={message}
@@ -23,29 +23,24 @@ const Footer = ({ message, setMessage, handleSendDM }: FooterProps) => {
         style={{
           padding: 12,
           marginLeft: 12,
-          marginRight: 8,
-          margin: 0,
           fontSize: 16,
           flex: 1,
         }}
       />
 
-      <View>
-        <Button
-          variant="secondary"
-          icon={<Icon name="iconamoon:send-fill" />}
-          onPress={handleSendDM}
-          style={{
-            width: 56,
-            height: 56,
-            margin: 0,
-            marginRight: 8,
-            paddingVertical: 0,
-            marginBottom: 0,
-          }}
-          noPadding></Button>
-      </View>
-    </View>
+      <Button
+        variant="secondary"
+        icon={<Icon name="iconamoon:send-fill" />}
+        onPress={handleSendDM}
+        style={{
+          width: 56,
+          height: 56,
+          marginRight: 8,
+          paddingVertical: 0,
+        }}
+        noPadding
+      />
+    </HStack>
   );
 };
 
@@ -54,7 +49,6 @@ const createStyles = () =>
     inputContainer: {
       position: 'relative',
       backgroundColor: 'transparent',
-      flexDirection: 'row',
     },
     sendButton: {
       alignItems: 'center',

@@ -31,7 +31,7 @@ import { relays } from 'components/ndk';
 import { storeMnemonic } from 'helper/secureStorage';
 import { Button } from 'components/common/Button';
 import { Card } from 'components/common/Card';
-import { Spacer } from 'components/common/View';
+import { Spacer, VStack } from 'components/common/View';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
@@ -165,7 +165,7 @@ interface NameInputProps {
 }
 
 const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameInputProps) => (
-  <View style={styles.inputContainer}>
+  <VStack spacing={16} style={styles.inputContainer}>
     <Text weight="medium" size={14} style={styles.inputLabel}>
       Enter your name
     </Text>
@@ -175,19 +175,21 @@ const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameIn
         <Spacer size={8} />
       </>
     )}
-    <TextInput
-      placeholder="Your public profile name"
-      onChangeText={(newText) => setName(newText)}
-      style={[styles.textInput, isSubmitting && styles.disabledControl]}
-      editable={!isSubmitting}
-      placeholderTextColor={greys(theme)[300]}
-      value={name}
-    />
-    <Text weight="regular" size={12} style={styles.privacyNote}>
-      Note that your profile will be public, so anyone can search for you and send funds. While your
-      profile is public, your transactions remain private.
-    </Text>
-  </View>
+    <VStack spacing={16}>
+      <TextInput
+        placeholder="Your public profile name"
+        onChangeText={(newText) => setName(newText)}
+        style={[styles.textInput, isSubmitting && styles.disabledControl]}
+        editable={!isSubmitting}
+        placeholderTextColor={greys(theme)[300]}
+        value={name}
+      />
+      <Text weight="regular" size={12} style={styles.privacyNote}>
+        Note that your profile will be public, so anyone can search for you and send funds. While
+        your profile is public, your transactions remain private.
+      </Text>
+    </VStack>
+  </VStack>
 );
 
 // Main RecoveryScreen component
@@ -303,12 +305,14 @@ const RecoveryScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled">
           <View style={styles.container}>
-            <Text weight="bold" size={24} style={styles.headerTitle}>
-              Create Sovran Profile
-            </Text>
-            <Text weight="regular" size={14} style={styles.headerSubtitle}>
-              Your profile lets others find you and send you bitcoin easily.
-            </Text>
+            <VStack spacing={8} style={{ marginTop: 16, marginBottom: 24 }}>
+              <Text weight="bold" size={24} style={styles.headerTitle}>
+                Create Sovran Profile
+              </Text>
+              <Text weight="regular" size={14} style={styles.headerSubtitle}>
+                Your profile lets others find you and send you bitcoin easily.
+              </Text>
+            </VStack>
 
             <ProfilePictureSelector
               selectedProfilePicture={selectedProfilePicture}
@@ -364,12 +368,9 @@ const createStyles = (theme: Theme) =>
     headerTitle: {
       fontFamily: 'OverpassBold',
       color: greys(theme)[0],
-      marginBottom: 8,
-      marginTop: 16,
     },
     headerSubtitle: {
       color: greys(theme)[200],
-      marginBottom: 24,
     },
     profileImageContainer: {
       alignItems: 'center',
@@ -415,12 +416,9 @@ const createStyles = (theme: Theme) =>
       height: 56,
       borderRadius: 28,
     },
-    inputContainer: {
-      marginTop: 16,
-    },
+    inputContainer: {},
     inputLabel: {
       color: greys(theme)[100],
-      marginBottom: 8,
     },
     textInput: {
       backgroundColor: greys(theme)[800],
@@ -430,11 +428,9 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       borderWidth: 1,
       borderColor: greys(theme)[700],
-      marginBottom: 16,
     },
     privacyNote: {
       color: greys(theme)[200],
-      marginBottom: 16,
       lineHeight: 18,
     },
     bottomButtons: {

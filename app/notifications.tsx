@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
+import { VStack, HStack, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
@@ -247,19 +248,19 @@ const TabTwoScreen = () => {
 
       return (
         <>
-          <Text style={styles.reactionCount}>
-            {reactions.length} {getPersonCountLabel(reactions.length)}{' '}
-            {getEventKind(reactions[0]).verb} your {getEventKind(event_).noun}
-          </Text>
-          <View style={styles.reactionRow}>
-            <ReactionProfiles reactions={reactions} />
-          </View>
-
-          {notificationKind === EventKind.Reaction && (
-            <View style={{ display: 'flex', flexDirection: 'row', marginBottom: 8 }}>
-              {renderReactions(reactions)}
+          <VStack spacing={8} style={{ marginTop: 12 }}>
+            <Text style={styles.reactionCount}>
+              {reactions.length} {getPersonCountLabel(reactions.length)}{' '}
+              {getEventKind(reactions[0]).verb} your {getEventKind(event_).noun}
+            </Text>
+            <View style={styles.reactionRow}>
+              <ReactionProfiles reactions={reactions} />
             </View>
-          )}
+
+            {notificationKind === EventKind.Reaction && (
+              <HStack>{renderReactions(reactions)}</HStack>
+            )}
+          </VStack>
           <View key={id} style={styles.eventCard}>
             {content && (
               <Text style={styles.eventContent}>
@@ -336,7 +337,9 @@ const TabTwoScreen = () => {
         <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
       </View>
       {isLoading ? (
-        <Text style={styles.loadingText}>Loading...</Text>
+        <VStack align="center" style={{ marginTop: 20 }}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </VStack>
       ) : (
         <PagerView
           ref={pagerRef}
@@ -404,9 +407,6 @@ const createStyles = (theme: any) =>
       flex: 1,
       padding: 16,
     },
-    scrollContainer: {
-      marginTop: 8,
-    },
     eventCard: {
       backgroundColor: greys(theme)[800],
       borderRadius: 8,
@@ -428,13 +428,10 @@ const createStyles = (theme: any) =>
       color: greys(theme)[0],
       fontSize: 16,
       textAlign: 'center',
-      marginTop: 20,
     },
     reactionCount: {
       color: greys(theme)[100],
       fontSize: 14,
-      marginBottom: 8,
-      marginTop: 12,
     },
     reactionCard: {
       backgroundColor: greys(theme)[800],

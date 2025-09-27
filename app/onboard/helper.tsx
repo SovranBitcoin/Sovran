@@ -192,7 +192,6 @@ const createStyles = (theme: Theme) =>
       color: '#999999',
       fontWeight: '500',
     },
-    currenciesContainer: {},
     currencyName: {
       width: 50,
       fontSize: 14,

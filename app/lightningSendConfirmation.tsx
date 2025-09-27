@@ -3,7 +3,7 @@ import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp } from 'helper/cashuClient';
 import Modal from 'components/layout/Modal';
 import { useSelector, useDispatch } from 'react-redux';
-import { Spacer, View } from 'components/common/View';
+import { Spacer, View, VStack } from 'components/common/View';
 
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
@@ -200,12 +200,9 @@ export function LightningSendConfirmation({
         <Spacer size={12} />
 
         {getDescription({ pr }) && (
-          <>
-            <View style={{ margin: 16, marginTop: 12, marginBottom: 0 }}>
-              <Card message={getDescription({ pr })} variant="info" />
-            </View>
-            <Spacer size={12} />
-          </>
+          <VStack spacing={12} style={{ margin: 16, marginTop: 12 }}>
+            <Card message={getDescription({ pr })} variant="info" />
+          </VStack>
         )}
 
         {transaction?.paid && (

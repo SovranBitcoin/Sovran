@@ -20,7 +20,8 @@
     "maestro": "maestro test ./.maestro",
     "screenshots": "./process-screenshots.sh",
     "find-unused": "./scripts/find-unused.sh",
-    "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh"
+    "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh",
+    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh"
   },
   "jest": {
     "preset": "jest-expo",

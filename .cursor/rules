@@ -34,6 +34,11 @@ Run sequentially and output a concise checklist for each phase.
     - Use `<VStack spacing={N}>` instead of `flexDirection: 'column'` + `marginBottom`
     - Use `<HStack spacing={N}>` instead of `flexDirection: 'row'` + `marginLeft/Right`
     - Use `<Spacer size={N} />` instead of empty `<View />` or manual margin divs
+    - **Spacer Guidelines**:
+      - Perfect for simple gaps between unrelated elements where VStack/HStack would be overkill
+      - Ideal replacement for single-direction margins (`marginTop`, `marginBottom`, `marginLeft`, `marginRight`)
+      - Avoid when margins are applied in all directions (`margin: X` or multiple directions) - use padding or container styling instead
+      - Use when the intention is purely to create space, not to group related elements
     - Import from `components/common/View`: `import { VStack, HStack, Spacer, View } from 'components/common/View'`
 - **Expo specifics:**
   - Check `app.json` / `app.config`, Expo plugins, `expo-router` (if used), EAS configs, platform folders.
@@ -60,6 +65,11 @@ Run sequentially and output a concise checklist for each phase.
     - Identify `flexDirection: 'row'` + `alignItems: 'center'` patterns → `<HStack align="center">`
     - Spot `justifyContent: 'space-between'` patterns → `<HStack justify="space-between">`
     - Find empty `<View />` spacers → `<Spacer size={N} />` opportunities
+    - **Spacer vs VStack/HStack Decision**:
+      - Use `<Spacer>` for simple gaps between unrelated elements (e.g., after content, before footer)
+      - Use `<VStack>` when grouping related elements with consistent spacing between them
+      - Use `<HStack>` for horizontal layouts with related elements
+      - Avoid `<Spacer>` when margins are multi-directional (`margin: 16` or `marginTop + marginLeft`) - stick with container styles
 
 #### **4. React Native / Expo Quality**
 
@@ -74,6 +84,11 @@ Run sequentially and output a concise checklist for each phase.
     - Use `<HStack align="center" spacing={8}>` for icon + text combinations
     - Replace complex spacing logic with declarative layout components
     - Keep `View` for basic containers without layout needs; use VStack/HStack for structured layouts
+    - **Spacer Usage Patterns**:
+      - `<Spacer size={64} />` for large intentional gaps (replaces `marginTop: 64` on sections)
+      - `<Spacer size={16} />` between content sections when VStack grouping doesn't make semantic sense
+      - Avoid `<Spacer>` for multi-directional spacing - use container padding/margins instead
+      - Good: Single direction gaps. Bad: Replacing `margin: 16` (would need 4 spacers)
 
 #### **5. Dependencies & Graph**
 
@@ -111,5 +126,10 @@ For each issue found:
     - Use `spacing` prop instead of individual margin declarations
     - Import layout components from `components/common/View`
     - Maintain visual consistency while simplifying code structure
+    - **Spacer Decision Matrix**:
+      - ✅ Use `<Spacer>`: Single-direction gaps, unrelated elements, large intentional spacing
+      - ✅ Use `<VStack>`: Multiple related elements with consistent spacing
+      - ✅ Use `<HStack>`: Horizontal layouts with related elements
+      - ❌ Avoid `<Spacer>`: Multi-directional margins, complex positioning, grouped element spacing
 - Maintain Expo compatibility (EAS/OTA, bundling, config).
 - If confidence < 0.6, request more files or metrics (lint output, dep graph) before making changes.

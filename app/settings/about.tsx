@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Card } from 'components/common/Card';
 import Container from 'components/layout/Container';
-import { VStack } from 'components/common/View';
+import { VStack, Spacer } from 'components/common/View';
 import { greys } from 'helper/colors';
 
 type ChangelogItem = {
@@ -100,13 +100,14 @@ export default function ModalScreen() {
           variant="info"
         />
 
-        <View style={{ marginTop: 20, marginBottom: 20 }}>
+        <Spacer size={20} />
+
+        <VStack spacing={8} style={{ marginBottom: 20 }}>
           <Text
             style={{
               fontSize: 18,
               fontWeight: 'bold',
               color: greys(theme)[0],
-              marginBottom: 8,
               textAlign: 'center',
             }}>
             {"What's New in Version 0.0.22 (1)"}
@@ -117,7 +118,7 @@ export default function ModalScreen() {
           <ChangelogSection title="New Features" items={changelogData.newFeatures} emoji="✨" />
 
           <ChangelogSection title="Improvements" items={changelogData.improvements} emoji="🔧" />
-        </View>
+        </VStack>
 
         <Button
           variant="secondary"

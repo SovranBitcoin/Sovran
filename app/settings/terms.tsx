@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from 'components/common/Button';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { StyleSheet, Text, ScrollView } from 'react-native';
 import { greys, shades, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import Container from 'components/layout/Container';
+import { VStack, HStack, Spacer } from 'components/common/View';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/common/TouchableOpacity';
 
@@ -169,18 +170,11 @@ const createStyles = (theme: Theme) => {
       color: greys(theme)[0],
       lineHeight: 22,
     },
-    checkboxContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-      paddingHorizontal: 16,
-    },
     checkboxText: {
       flex: 1,
       fontFamily: 'OverpassRegular',
       fontSize: 14,
       color: greys(theme)[0],
-      marginLeft: 8,
     },
   });
 };
@@ -202,23 +196,25 @@ export default function TermsConditionsScreen({ onClose }: TermsConditionsScreen
         <Text style={styles.titleText}>Terms</Text>
 
         <Text style={styles.termsText}>{terms}</Text>
-        <View
-          style={{
-            marginTop: 64,
-          }}>
+
+        <Spacer size={64} />
+
+        <VStack spacing={16}>
           <Button variant="primary" text="Next" onPress={onClose} disabled={!isChecked} />
 
-          <TouchableOpacity style={styles.checkboxContainer} onPress={toggleCheckbox}>
-            <Checkbox
-              value={isChecked}
-              onValueChange={toggleCheckbox}
-              color={isChecked ? shades[300] : undefined}
-            />
-            <Text id="terms-checkbox" style={styles.checkboxText}>
-              I have read and agree to the Terms and Conditions
-            </Text>
+          <TouchableOpacity onPress={toggleCheckbox}>
+            <HStack align="center" spacing={8} style={{ paddingHorizontal: 16 }}>
+              <Checkbox
+                value={isChecked}
+                onValueChange={toggleCheckbox}
+                color={isChecked ? shades[300] : undefined}
+              />
+              <Text id="terms-checkbox" style={styles.checkboxText}>
+                I have read and agree to the Terms and Conditions
+              </Text>
+            </HStack>
           </TouchableOpacity>
-        </View>
+        </VStack>
       </ScrollView>
     </Container>
   );

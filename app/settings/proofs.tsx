@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Button } from 'components/common/Button';
-import { HStack, View } from 'components/common/View';
+import { VStack, HStack, View } from 'components/common/View';
 import { Text } from 'components/common/Text';
 
 import Container from 'components/layout/Container';
@@ -197,20 +197,26 @@ export default function ModalScreen() {
   return (
     <Container>
       <ScrollView>
-        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>Proof Status</Text>
+        <VStack spacing={16}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>Proof Status</Text>
 
-        {error && <Text style={{ color: reds[300], marginBottom: 12 }}>{error}</Text>}
+          <VStack spacing={12}>
+            {error && <Text style={{ color: reds[300] }}>{error}</Text>}
 
-        <Button
-          variant="primary"
-          text="Refresh All Proofs"
-          onPress={checkAllMints}
-          disabled={checkingSpent}
-        />
+            <Button
+              variant="primary"
+              text="Refresh All Proofs"
+              onPress={checkAllMints}
+              disabled={checkingSpent}
+            />
+          </VStack>
 
-        {checkingSpent && <Text style={{ marginTop: 10 }}>Checking proof status...</Text>}
-        {removingSpent && <Text style={{ marginTop: 10 }}>Removing spent proofs...</Text>}
-        {removingAll && <Text style={{ marginTop: 10 }}>Removing all proofs...</Text>}
+          <VStack spacing={10}>
+            {checkingSpent && <Text>Checking proof status...</Text>}
+            {removingSpent && <Text>Removing spent proofs...</Text>}
+            {removingAll && <Text>Removing all proofs...</Text>}
+          </VStack>
+        </VStack>
 
         {activeMintsData.map((mintData) => {
           const spentOrPendingProofCount = getSpentOrPendingProofCount(mintData.url);
@@ -226,23 +232,24 @@ export default function ModalScreen() {
                 backgroundColor: greys(theme)[900],
                 borderRadius: 8,
               }}>
-              <HStack justify="space-between" style={{ marginBottom: 8 }}>
-                <Text
-                  style={{ fontWeight: 'bold', flex: 1 }}
-                  numberOfLines={1}
-                  ellipsizeMode="middle">
-                  {mintData.url}
-                </Text>
-                <Text style={{ fontWeight: 'bold' }}>Total: {mintData.totalAmount} sats</Text>
-              </HStack>
+              <VStack spacing={8}>
+                <HStack justify="space-between">
+                  <Text
+                    style={{ fontWeight: 'bold', flex: 1 }}
+                    numberOfLines={1}
+                    ellipsizeMode="middle">
+                    {mintData.url}
+                  </Text>
+                  <Text style={{ fontWeight: 'bold' }}>Total: {mintData.totalAmount} sats</Text>
+                </HStack>
 
-              <Button
-                variant="primary"
-                text={`Check ${mintData.proofs.length} Proofs`}
-                onPress={() => checkProofSpentStatus(mintData.url)}
-                disabled={checkingSpent}
-                style={{ marginBottom: 10 }}
-              />
+                <Button
+                  variant="primary"
+                  text={`Check ${mintData.proofs.length} Proofs`}
+                  onPress={() => checkProofSpentStatus(mintData.url)}
+                  disabled={checkingSpent}
+                />
+              </VStack>
 
               {mintData.proofs.length > 0 && (
                 <View>
@@ -276,26 +283,26 @@ export default function ModalScreen() {
                   })}
 
                   {/* Add Remove Spent or Pending Proofs button at the bottom of the list */}
-                  <Button
-                    variant="primary"
-                    text={`Delete ${spentOrPendingProofCount} Spent or Pending Proofs`}
-                    onPress={() => removeSpentOrPendingProofsForMint(mintData.url)}
-                    disabled={removingSpent || removingAll || spentOrPendingProofCount === 0}
-                    style={{
-                      marginTop: 10,
-                      backgroundColor: spentOrPendingProofCount > 0 ? reds[300] : undefined,
-                    }}
-                  />
-                  <Button
-                    variant="primary"
-                    text={`Delete All (${mintData.proofs.length}) Proofs`}
-                    onPress={() => removeAllProofsForMint(mintData.url)}
-                    disabled={removingAll || removingSpent || mintData.proofs.length === 0}
-                    style={{
-                      marginTop: 10,
-                      backgroundColor: mintData.proofs.length > 0 ? reds[300] : undefined,
-                    }}
-                  />
+                  <VStack spacing={10} style={{ marginTop: 10 }}>
+                    <Button
+                      variant="primary"
+                      text={`Delete ${spentOrPendingProofCount} Spent or Pending Proofs`}
+                      onPress={() => removeSpentOrPendingProofsForMint(mintData.url)}
+                      disabled={removingSpent || removingAll || spentOrPendingProofCount === 0}
+                      style={{
+                        backgroundColor: spentOrPendingProofCount > 0 ? reds[300] : undefined,
+                      }}
+                    />
+                    <Button
+                      variant="primary"
+                      text={`Delete All (${mintData.proofs.length}) Proofs`}
+                      onPress={() => removeAllProofsForMint(mintData.url)}
+                      disabled={removingAll || removingSpent || mintData.proofs.length === 0}
+                      style={{
+                        backgroundColor: mintData.proofs.length > 0 ? reds[300] : undefined,
+                      }}
+                    />
+                  </VStack>
                 </View>
               )}
             </View>
