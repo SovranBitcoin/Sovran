@@ -126,7 +126,6 @@ export interface ButtonProps {
   onPress: (event: any) => Promise<void> | void;
   icon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  noPadding?: boolean;
   ripple?: boolean | RippleConfig;
   blur?: boolean | BlurConfig;
 }
@@ -166,6 +165,10 @@ export const Button = ({
   const getButtonStyles = () => {
     // Standard Button styling
     const base = {
+      margin: 4, // m-1, but 0 if noPadding
+      marginBottom: 8, // mb-2, but 0 if noPadding
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
       paddingVertical: 4, // py-1
       borderRadius: 9999, // rounded-full
       borderWidth: 0.33, // border-[0.33px]

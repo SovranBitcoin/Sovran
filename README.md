@@ -89,3 +89,4 @@ We are the only ones to my knowledge who are trying to create a single mnemonic 
 - When opening the wallet lets fetch all the mint infos and keysets just to be up-to-date.
 - When I make a transaction and new proofs are created, and if they produce keysetId's I've never seen before I should automatically fetch the keyset from the mint and it to redux. I think this will ensure I always have all the keysets.
 - Create better Container component that handles: Buttons, Scrolling, Keyboard Avoiding, Safe Area, works in Modals or regular screens, handles titles, handles back buttons, handles navigation.
+- Unify Text and StyledText components to have a similar API - currently Text has props like `lexend`, `bold`, `size` while StyledText uses different props like `custom`, `colors`, `size`. Should standardize the interface for better developer experience.

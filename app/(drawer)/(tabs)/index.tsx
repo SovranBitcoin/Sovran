@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
-import { View } from 'components/common/View';
+import { View, VStack } from 'components/common/View';
 import { Transactions } from 'components/layout/Transactions';
 import {
   useCashu,
@@ -19,7 +19,9 @@ import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
 import { getStructure, store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
-import Welcome from 'app/onboard/welcome';
+import { OnboardingLayout } from 'app/onboard/OnboardLayout';
+import { SovranTextIcon } from 'assets/icons';
+import { Text } from 'components/common/Text';
 import TermsConditionsScreen from 'app/settings/terms';
 import WalletHeader from '../../../components/layout/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
@@ -198,7 +200,25 @@ function TabOneScreen() {
   }
 
   if (!(currentProfile?.pubkey && selectedMint)) {
-    return <Welcome />;
+    return (
+      <OnboardingLayout
+        nextScreen="onboard/ecash"
+        actions={[
+          {
+            text: 'Next',
+            icon: 'fa6-solid:chevron-right',
+            variant: 'primary',
+            onPress: async () => navigation.navigate('onboard/ecash'),
+          },
+        ]}>
+        <VStack align="center" justify="center" flex={1} spacing={4}>
+          <Text size={32} weight="heavy">
+            Welcome to
+          </Text>
+          <SovranTextIcon size={200} />
+        </VStack>
+      </OnboardingLayout>
+    );
   }
 
   return (
