@@ -17,7 +17,7 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
 
 // Define proper types for our component
-interface SearchResult {
+interface SearchResultData {
   pubkey: string;
   profile: UserProfile;
 }
@@ -27,13 +27,13 @@ interface PlaceholderResult {
   profile?: undefined; // Explicitly undefined for loading state
 }
 
-type DisplayResult = SearchResult | PlaceholderResult;
+type DisplayResult = SearchResultData | PlaceholderResult;
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const inputRef = useRef<RNTextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const navigation = useTypedNavigation();
@@ -65,7 +65,7 @@ function ModalScreen() {
         const data = result.value;
 
         if (data.results && Array.isArray(data.results)) {
-          const formattedResults: SearchResult[] = data.results.map((res) => {
+          const formattedResults: SearchResultData[] = data.results.map((res) => {
             const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
 
             return {
@@ -221,8 +221,7 @@ function ModalScreen() {
               </View>
 
               {showResults && (
-                <VStack spacing={12}>
-                  <Spacer size={8} />
+                <VStack spacing={12} className="mt-6">
                   <VStack spacing={12}>
                     <Text
                       loading={loading}
@@ -236,7 +235,7 @@ function ModalScreen() {
                       {searchResults.length === 1 ? 'result' : 'results'}
                     </Text>
                   </VStack>
-                  {displayResults.map((result, index) => (
+                  {displayResults.map((result) => (
                     <SearchResult
                       key={result.pubkey}
                       loading={loading}
@@ -266,8 +265,7 @@ function ModalScreen() {
 
 function NoResultsFound({ theme }: { theme: Theme }) {
   return (
-    <VStack spacing={24} className="items-center px-6">
-      <Spacer size={40} />
+    <VStack spacing={24} align="center" className="mt-6 px-6">
       <View
         className="h-20 w-20 items-center justify-center rounded-full"
         style={{ backgroundColor: greys(theme)[800] }}>
@@ -308,9 +306,12 @@ function NoResultsFound({ theme }: { theme: Theme }) {
           }}>
           Try adjusting your search:
         </Text>
-        <SearchTip icon="lucide:pencil-line" text="Check your spelling" theme={theme} />
-        <SearchTip icon="solar:key-bold" text="Try using a complete public key" theme={theme} />
-        <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" theme={theme} />
+        <Spacer size={8} />
+        <VStack spacing={12}>
+          <SearchTip icon="lucide:pencil-line" text="Check your spelling" theme={theme} />
+          <SearchTip icon="solar:key-bold" text="Try using a complete public key" theme={theme} />
+          <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" theme={theme} />
+        </VStack>
       </View>
     </VStack>
   );
