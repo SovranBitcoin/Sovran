@@ -1,11 +1,11 @@
-import 'app/global';
+import 'helper/global';
 import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
-import { View, VStack } from 'components/common/View';
-import { Transactions } from 'components/layout/Transactions';
+import { View, VStack } from 'components/ui/View';
+import { Transactions } from 'components/blocks/Transactions';
 import {
   useCashu,
   appendTransactionsV2,
@@ -21,21 +21,21 @@ import { getStructure, store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import { OnboardingLayout } from 'app/onboard/OnboardLayout';
 import { SovranTextIcon } from 'assets/icons';
-import { Text } from 'components/common/Text';
-import TermsConditionsScreen from 'app/settings/terms';
-import WalletHeader from '../../../components/layout/WalletHeader';
+import { Text } from 'components/ui/Text';
+import TermsConditionsScreen from 'app/settings-pages/terms';
+import WalletHeader from 'components/blocks/WalletHeader';
 import { useTypedNavigation } from 'helper/navigation';
 import { MintQuoteResponse, MintQuoteState } from '@cashu/cashu-ts';
 import _ from 'lodash';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import AnimatedSpriteBackground from 'components/common/SpriteView';
+import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { AccountPagerView } from 'components/layout/AccountPagerView';
+import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { getLatestVersion } from 'helper/apiClient';
 import semver from 'semver';
-import { version } from 'app/settings';
+import { version } from 'app/settings-pages';
 
 interface NPUBQuote {
   amount: number;

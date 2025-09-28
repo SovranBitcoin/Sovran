@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import HighlightText from '@sanar/react-native-highlight-text';
 import { greys, shades } from 'helper/colors';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 export const extractUrls = (text: string) => {

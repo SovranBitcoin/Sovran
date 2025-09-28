@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
 import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { getDescription, getTimestamp } from 'helper/cashuClient';
-import Modal from 'components/layout/Modal';
+import Modal from 'components/blocks/Modal';
 import { useSelector, useDispatch } from 'react-redux';
-import { Spacer, View, VStack, HStack } from 'components/common/View';
+import { Spacer, View, VStack, HStack } from 'components/ui/View';
 
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
-import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
+import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
 import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { Card } from 'components/common/Card';
-import { ButtonHandler } from 'components/common/ButtonHandler';
-import { Section } from 'components/common/Section';
+import { Card } from 'components/ui/Card';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
+import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
-import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
+import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { RootState } from 'helper/redux/store/reducer';
 import { SheetManager } from 'react-native-actions-sheet';
 

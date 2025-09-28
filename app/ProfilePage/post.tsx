@@ -1,15 +1,15 @@
 import React from 'react';
 import { View } from 'react-native';
-import { HStack } from 'components/common/View';
+import { HStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import { Text } from 'components/common/Text';
+import { Text } from 'components/ui/Text';
 import 'react-native-gesture-handler';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
-import { GradientSkeleton } from 'components/common/GradientSkeleton';
+import { GradientSkeleton } from 'components/ui/GradientSkeleton';
 import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './helper';
 import { nip19 } from 'nostr-tools';
@@ -19,9 +19,9 @@ import { ExternalLink } from './ExternalLink';
 import { VideoScreen } from './VideoPlayer';
 import { ImageContainer } from './ImageContainer';
 import { extractUrls, TextContent } from './TextContent';
-import CachedImage from 'components/common/Image';
+import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { UserNameProfiles } from '../notifications';
+import { UserNameProfiles } from 'components/ui/UserNameProfiles';
 dayjs.extend(relativeTime);
 
 export const PostQuote = React.memo(({ id }: { id: string }) => {

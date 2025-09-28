@@ -10,14 +10,14 @@ import { TransactionBuilder, useCashu } from 'helper/redux/cashu';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Components
-import Modal from 'components/layout/Modal';
+import Modal from 'components/blocks/Modal';
 import { greys, Theme } from 'helper/colors';
-import { View } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import Footer from './Footer';
 import Header from './Header';
 import TimelineItem from './TimeLine';
-import { ButtonHandler } from 'components/common/ButtonHandler';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';

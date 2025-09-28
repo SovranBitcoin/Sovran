@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys, Theme } from 'helper/colors';
-import { Text } from 'components/common/Text';
+import { Text } from 'components/ui/Text';
 import { getLinkPreview as getPreview } from 'link-preview-js';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CachedImage from 'components/common/Image';
+import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 type LinkPreviewData =

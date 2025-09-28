@@ -3,9 +3,9 @@ import { StyleSheet, View, Alert, ScrollView } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds } from 'helper/colors';
-import Container from 'components/layout/Container';
-import { Text } from 'components/common/Text';
-import { VStack, HStack } from 'components/common/View';
+import Container from 'components/blocks/Container';
+import { Text } from 'components/ui/Text';
+import { VStack, HStack } from 'components/ui/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import BottomButtons from './BottomButtons';
 

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { Spacer, View, HStack, VStack } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { Spacer, View, HStack, VStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
-import Modal from 'components/layout/Modal';
-import { PaymentInfo } from 'components/layout/PaymentInfo';
+import Modal from 'components/blocks/Modal';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
-import { ButtonHandler } from 'components/common/ButtonHandler';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
 import {
   appendProofsV2,
@@ -23,29 +23,30 @@ import { useNavigation } from 'expo-router';
 import { getWallet, getRawExpiry } from 'helper/cashuClient';
 import { toResult } from 'helper/toResult';
 import { store } from 'helper/redux/store';
-import { Section } from 'components/common/Section';
+import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
+import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
-import { Card } from 'components/common/Card';
+import { Card } from 'components/ui/Card';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { greens, greys } from 'helper/colors';
 import { publishWalletEvent } from 'helper/nostr/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import Icon from 'assets/icons';
-import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
 import { err } from 'neverthrow';
-import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
-import { Spinner } from 'components/common/Spinner';
+import { Spinner } from 'components/ui/Spinner';
 import { Essential } from 'helper/Essential';
+import { useAutoListenBatch } from 'providers/TransactionsProvider.tsx';
+
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
   meltQuotes?: {

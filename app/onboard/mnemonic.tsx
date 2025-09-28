@@ -11,9 +11,9 @@ import {
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greens, greys, reds, Theme } from 'helper/colors';
-import Container from 'components/layout/Container';
-import { Text } from 'components/common/Text';
-import { HStack, VStack } from 'components/common/View';
+import Container from 'components/blocks/Container';
+import { Text } from 'components/ui/Text';
+import { HStack, VStack } from 'components/ui/View';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';

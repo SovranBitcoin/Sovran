@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
-import { Text } from 'components/common/Text';
+import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import { greys, Theme } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from './ProfilePage/post';
-import { View } from 'components/common/View';
-import { Tabs } from 'components/common/Tabs';
+import { View } from 'components/ui/View';
+import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';

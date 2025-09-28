@@ -1,17 +1,17 @@
-import { View, HStack, VStack } from 'components/common/View';
+import { View, HStack, VStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedRoute } from 'helper/navigation';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
-import { Transactions } from 'components/layout/Transactions';
+import { Transactions } from 'components/blocks/Transactions';
 import { useCashu } from 'helper/redux/cashu';
 import { useTransactionsData } from 'hooks/useTransactionsData';
-import Container from 'components/layout/Container';
-import CurrencySelector from 'components/layout/CurrencySelector';
+import Container from 'components/blocks/Container';
+import CurrencySelector from 'components/blocks/CurrencySelector';
 import Icon from 'assets/icons';
-import { Tabs } from 'components/common/Tabs';
+import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {

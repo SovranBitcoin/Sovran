@@ -14,8 +14,8 @@ import {
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, shades, Theme } from 'helper/colors';
-import Container from 'components/layout/Container';
-import { Text } from 'components/common/Text';
+import Container from 'components/blocks/Container';
+import { Text } from 'components/ui/Text';
 import { useTypedNavigation } from 'helper/navigation';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 // @ts-ignore
@@ -29,9 +29,9 @@ import { store } from 'helper/redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
 import { storeMnemonic } from 'helper/secureStorage';
-import { Button } from 'components/common/Button';
-import { Card } from 'components/common/Card';
-import { Spacer, VStack, HStack } from 'components/common/View';
+import { Button } from 'components/ui/Button';
+import { Card } from 'components/ui/Card';
+import { Spacer, VStack, HStack } from 'components/ui/View';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;

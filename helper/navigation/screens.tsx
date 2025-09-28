@@ -277,39 +277,39 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     },
   },
   {
-    name: 'settings',
+    name: 'settings-pages',
     title: 'Settings',
   },
   {
-    name: 'settings/about',
+    name: 'settings-pages/about',
     title: 'About',
   },
   {
-    name: 'settings/design',
+    name: 'settings-pages/design',
     title: 'Design',
   },
   {
-    name: 'settings/store',
+    name: 'settings-pages/store',
     title: 'Store',
   },
   {
-    name: 'settings/restoreCounter',
+    name: 'settings-pages/restoreCounter',
     title: 'Restore Counter',
   },
   {
-    name: 'settings/proofs',
+    name: 'settings-pages/proofs',
     title: 'Check Proofs',
   },
   {
-    name: 'settings/terms',
+    name: 'settings-pages/terms',
     title: 'Terms & Conditions',
   },
   {
-    name: 'settings/passcode',
+    name: 'settings-pages/passcode',
     title: 'Passcode',
   },
   {
-    name: 'settings/profile',
+    name: 'settings-pages/profile',
     title: 'Profile',
   },
   {
@@ -334,11 +334,11 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     },
   },
   {
-    name: 'languageSettings',
+    name: 'settings-pages/language',
     title: 'Language',
   },
   {
-    name: 'themeSettings',
+    name: 'settings-pages/theme',
     title: 'Theme',
   },
   {

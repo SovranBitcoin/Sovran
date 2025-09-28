@@ -1,14 +1,14 @@
 import React from 'react';
 import { Animated, Dimensions } from 'react-native';
-import { View, HStack, VStack } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View, HStack, VStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { greys, Theme } from 'helper/colors';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import opacity from 'hex-color-opacity';
-import CachedImage from 'components/common/Image';
+import CachedImage from 'components/ui/Image';
 import { useTypedNavigation } from 'helper/navigation';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { SheetManager } from 'react-native-actions-sheet';
 import { muteUser, reportUser, addContact, removeContact } from 'helper/redux/nostr';
 import { useDispatch, useSelector } from 'react-redux';

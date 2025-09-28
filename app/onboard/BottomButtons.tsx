@@ -7,8 +7,8 @@ import {
   ViewStyle,
   GestureResponderEvent,
 } from 'react-native';
-import { Text } from 'components/common/Text';
-import { VStack, HStack } from 'components/common/View';
+import { Text } from 'components/ui/Text';
+import { VStack, HStack } from 'components/ui/View';
 import { greys, shades, Theme } from 'helper/colors';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';

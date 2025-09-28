@@ -1,6 +1,6 @@
 import React from 'react';
-import Camera from 'components/layout/Camera';
-import { View } from 'components/common/View';
+import Camera from 'components/blocks/Camera';
+import { View } from 'components/ui/View';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';

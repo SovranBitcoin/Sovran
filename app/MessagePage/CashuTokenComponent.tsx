@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, Pressable, ColorValue } from 'react-native';
-import { View, HStack } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View, HStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades, Theme } from 'helper/colors';
-import { Button } from 'components/common/Button';
-import { AmountFormatter } from 'components/common/AmountFormatter';
+import { Button } from 'components/ui/Button';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { receiveEcash } from 'helper/cashuClient';
 import { showMessage } from 'helper/popup/popups';
 import { useCashu } from 'helper/redux/cashu';

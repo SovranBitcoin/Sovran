@@ -1,6 +1,6 @@
-import { View } from 'components/common/View';
-import { Text } from 'components/common/Text';
-import Modal from 'components/layout/Modal';
+import { View } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
+import Modal from 'components/blocks/Modal';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useTypedRoute, useTypedNavigation } from 'helper/navigation';
 import { useCashu } from 'helper/redux/cashu';
@@ -8,9 +8,9 @@ import { EcashSendConfirmation } from './ecashSendConfirmation';
 import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
 import { LightningReceiveConfirmation } from './lightningReceiveConfirmation';
 import { LightningSendConfirmation } from './lightningSendConfirmation';
-import { TransferRow } from 'components/layout/TransferRow';
+import { TransferRow } from 'components/blocks/TransferRow';
 import { ScrollView } from 'react-native';
-import { Section } from 'components/common/Section';
+import { Section } from 'components/ui/Section';
 // useTypedNavigation is already imported; removing duplicate
 
 function VirtualBatchTransaction({ batchId }: { batchId: string }) {

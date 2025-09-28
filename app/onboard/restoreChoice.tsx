@@ -11,19 +11,19 @@ import {
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
-import Container from 'components/layout/Container';
-import { Text } from 'components/common/Text';
-import { Spacer, View, HStack, VStack } from 'components/common/View';
+import Container from 'components/blocks/Container';
+import { Text } from 'components/ui/Text';
+import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { useTypedNavigation } from 'helper/navigation';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import Icon from 'assets/icons';
-import Image from 'components/common/Image';
-import { Button } from 'components/common/Button';
+import Image from 'components/ui/Image';
+import { Button } from 'components/ui/Button';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from 'helper/constants';
 import * as nip06 from 'nostr-tools/nip06';
 import { useFocusEffect } from 'expo-router';
-import { Card } from 'components/common/Card';
+import { Card } from 'components/ui/Card';
 
 interface ProfileInfo {
   name?: string;

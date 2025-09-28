@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import Modal from 'components/layout/Modal';
-import { AmountFormatter } from '../components/common/AmountFormatter';
+import Modal from 'components/blocks/Modal';
+import { AmountFormatter } from '../components/ui/AmountFormatter';
 
 import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
 import {
@@ -13,24 +13,24 @@ import {
   npubToPublicKey,
   pubKeyTo02,
 } from 'helper/cashuClient';
-import CustomKeyboard from 'components/layout/CustomKeyboard';
+import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu/actions';
-import MintBalanceDisplay from 'components/layout/MintBalanceDisplay';
-import { sovran } from 'components/layout/sheets/mints';
+import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
+import { sovran } from 'components/blocks/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
-import { View, HStack } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View, HStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
-import Image from 'components/common/Image';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import Image from 'components/ui/Image';
 import Icon from 'assets/icons';
-import { ButtonHandler } from 'components/common/ButtonHandler';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';

@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, HStack, VStack, Spacer } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { Link, Stack } from 'expo-router';
 
 export default function NotFoundScreen() {

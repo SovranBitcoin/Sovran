@@ -1,10 +1,10 @@
 import React, { useCallback } from 'react';
-import Modal from 'components/layout/Modal';
-import { PaymentInfo } from 'components/layout/PaymentInfo';
-import { RowButton, Section } from 'app/settings';
+import Modal from 'components/blocks/Modal';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
+import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Text } from 'components/common/Text';
-import { View, HStack, VStack } from 'components/common/View';
+import { Text } from 'components/ui/Text';
+import { View, HStack, VStack } from 'components/ui/View';
 import { greys } from 'helper/colors';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';

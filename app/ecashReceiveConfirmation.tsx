@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { receiveEcash, giveaways } from 'helper/cashuClient';
-import Modal from 'components/layout/Modal';
+import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { memoizedGetMints, TransactionBuilder, useGetMintInfo } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
-import { ButtonHandler } from 'components/common/ButtonHandler';
-import { Section } from 'components/common/Section';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
+import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
 
 // Main component
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
-import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
-import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
-import { Spacer, View } from 'components/common/View';
-import { Card } from 'components/common/Card';
+import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
+import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
+import { Spacer, View } from 'components/ui/View';
+import { Card } from 'components/ui/Card';
 
 // Types
 interface TokenProps {

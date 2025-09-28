@@ -12,10 +12,10 @@ import { TAB_SCREENS } from 'helper/navigation/screens';
 import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { Background } from 'components/layout/WalletHeader';
-import { HStack, Spacer } from 'components/common/View';
+import { Background } from 'components/blocks/WalletHeader';
+import { HStack, Spacer } from 'components/ui/View';
 import { useTypedNavigation } from 'helper/navigation';
-import { Avatar } from 'components/common/Avatar';
+import { Avatar } from 'components/ui/Avatar';
 
 const Tab = createBottomTabNavigator();
 

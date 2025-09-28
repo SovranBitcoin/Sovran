@@ -9,7 +9,7 @@ import {
 import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
-import Haptics from 'components/common/Haptics';
+import Haptics from 'components/ui/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { ok, err, Result } from 'neverthrow';
 

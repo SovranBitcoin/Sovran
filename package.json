@@ -21,7 +21,8 @@
     "screenshots": "./process-screenshots.sh",
     "find-unused": "./scripts/find-unused.sh",
     "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh",
-    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh"
+    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh",
+    "tree": "node ./scripts/tree.js"
   },
   "jest": {
     "preset": "jest-expo",

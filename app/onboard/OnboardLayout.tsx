@@ -1,12 +1,12 @@
 import React from 'react';
 import { ColorValue } from 'react-native';
-import { StyledText, Text } from 'components/common/Text';
+import { StyledText, Text } from 'components/ui/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
-import { VStack } from 'components/common/View';
-import { ButtonHandler, ButtonHandlerButton } from 'components/common/ButtonHandler';
+import { VStack } from 'components/ui/View';
+import { ButtonHandler, ButtonHandlerButton } from 'components/ui/ButtonHandler';
 
 interface OnboardingLayoutProps {
   title?: string;

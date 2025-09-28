@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { createStyles } from '../helper';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 interface TouchableOpacityProgressProps {
   error: boolean;

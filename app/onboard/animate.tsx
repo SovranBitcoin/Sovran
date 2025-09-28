@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Animated, ScrollView, Dimensions, Easing } from 'react-native';
-import { VStack, HStack } from 'components/common/View';
+import { VStack, HStack } from 'components/ui/View';
 
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { greys, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Text } from 'components/common/Text';
+import { Text } from 'components/ui/Text';
 import { getMint, restoreMint } from 'helper/cashuClient';
 import { createStyles } from './helper';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
@@ -16,7 +16,7 @@ import { addMints, appendProofsV2, increaseCounterV2, setSelectedMint } from 'he
 import { HDKey } from '@scure/bip32';
 import { MintItem } from './MintItem';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { SheetManager } from 'react-native-actions-sheet';
 import _ from 'lodash';
 import { getProfile } from './components/fetchAccountData';

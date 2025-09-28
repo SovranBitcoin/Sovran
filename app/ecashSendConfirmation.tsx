@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import Modal from 'components/layout/Modal';
-import { Spinner } from 'components/common/Spinner';
+import Modal from 'components/blocks/Modal';
+import { Spinner } from 'components/ui/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View, Spacer, HStack } from 'components/common/View';
-import { Text } from 'components/common/Text';
-import { PaymentInfo } from 'components/layout/PaymentInfo';
+import { View, Spacer, HStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { store } from 'helper/redux/store';
@@ -30,22 +30,22 @@ import { toResult } from 'helper/toResult';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
-import { write } from 'components/common/useNfc';
-import { useAutoListenBatch } from 'components/providers/TransactionsProvider';
-import { ButtonHandler } from 'components/common/ButtonHandler';
-import { Section } from 'components/common/Section';
+import { write } from 'components/blocks/useNfc';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/common/Transaction/TransactionHeader';
+import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
-import { Card } from 'components/common/Card';
+import { Card } from 'components/ui/Card';
 
-import type { ButtonHandlerButton } from 'components/common/ButtonHandler';
+import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
-import { TransactionMintRefresh } from 'components/common/Transaction/TransactionMintRefresh';
-import { TransactionDebugCode } from 'components/common/Transaction/TransactionDebugCode';
+import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';
+import { useAutoListenBatch } from 'providers/TransactionsProvider';
 
 export function EcashSendConfirmation({
   unit,

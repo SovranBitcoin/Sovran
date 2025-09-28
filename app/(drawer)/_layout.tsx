@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
-import ProfileComponent from '../Profile';
+import ProfileComponent from '../DrawerProfile';
 import { useNostr } from 'helper/redux/nostr';
 import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';

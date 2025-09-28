@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { HStack, Spacer } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { HStack, Spacer } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';

@@ -1,8 +1,8 @@
 import { SheetManager } from 'react-native-actions-sheet';
 import { router } from 'expo-router';
 import React from 'react';
-import { Text } from 'components/common/Text';
-import { AmountFormatter } from 'components/common/AmountFormatter';
+import { Text } from 'components/ui/Text';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
 
 const MESSAGE_TYPES = {
   ERROR: 'error',

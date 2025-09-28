@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useSelector } from 'react-redux';
-import CachedImage from 'components/common/Image';
+import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Monicon } from '@monicon/native';
 
@@ -10,7 +10,7 @@ import { Monicon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
-import { View } from 'components/common/View';
+import { View } from 'components/ui/View';
 import { greys, shades } from 'helper/colors';
 export { FlagIcon } from './flag';
 

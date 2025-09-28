@@ -2,7 +2,7 @@ import React from 'react';
 import { greys } from 'helper/colors';
 import 'react-native-gesture-handler';
 import { useSelector } from 'react-redux';
-import CachedImage from 'components/common/Image';
+import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function ImageContainer({ url }: { url: string }) {

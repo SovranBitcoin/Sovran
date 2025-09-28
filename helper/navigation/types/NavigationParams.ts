@@ -98,7 +98,7 @@ export type NavigationParams = {
   contacts: {
     unit: string;
   };
-  languageSettings: {
+  'settings-pages/language': {
     countries: string[];
   };
 };

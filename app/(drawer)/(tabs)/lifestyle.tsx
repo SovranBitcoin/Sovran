@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, HStack, VStack, Spacer } from 'components/common/View';
-import { Text } from 'components/common/Text';
+import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
-import { TouchableOpacity } from 'components/common/TouchableOpacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';

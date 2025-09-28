@@ -1,5 +1,5 @@
 import React from 'react';
-import CachedImage from '../../components/common/Image';
+import CachedImage from '../../components/ui/Image';
 
 export function Cashews({ style, ...props }) {
   return (

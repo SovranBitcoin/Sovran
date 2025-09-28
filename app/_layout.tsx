@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Animated, Dimensions, StatusBar, LogBox, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import { View } from 'components/common/View';
+import { View } from 'components/ui/View';
 
 // Import third-party libraries
 import 'intl';
@@ -33,12 +33,12 @@ import { greys } from 'helper/colors';
 import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
-import { TransactionProvider } from 'components/providers/TransactionsProvider';
-import { WalletsProvider } from 'components/providers/WalletsProviders';
-import { PricelistProvider } from 'components/providers/PricelistProvider';
-import { registerAllSheets } from 'components/layout/sheets/registerSheets';
-import PasscodeGate from 'components/passcode/PasscodeGate';
+import { WalletsProvider } from 'providers/WalletsProviders';
+import { PricelistProvider } from 'providers/PricelistProvider';
+import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
+import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
+import { TransactionProvider } from 'providers/TransactionsProvider';
 
 /**
  * Splash screen component

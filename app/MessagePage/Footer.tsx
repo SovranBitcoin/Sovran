@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { HStack } from 'components/common/View';
+import { HStack } from 'components/ui/View';
 import Icon from 'assets/icons';
-import TextInput from 'components/common/TextInput';
-import { Button } from 'components/common/Button';
+import TextInput from 'components/ui/TextInput';
+import { Button } from 'components/ui/Button';
 
 interface FooterProps {
   message: string;

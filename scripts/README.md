@@ -130,7 +130,7 @@ You can modify the configuration in `find-unused.js`:
 ```javascript
 const config = {
   // Add more directories to scan
-  scanDirs: ['app', 'components', 'helper', 'hooks', 'hocs', 'lib'],
+  scanDirs: ['app', 'components', 'helper', 'hooks', 'hocs', 'lib', 'providers'],
 
   // Add more file extensions
   extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs'],
