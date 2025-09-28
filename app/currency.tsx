@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
@@ -42,7 +41,6 @@ interface ScanningData {
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles();
   const dispatch = useDispatch();
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const params = useTypedRoute<'currency'>();
@@ -255,7 +253,7 @@ function ModalScreen() {
     const hasPaymentRequest = params?.paymentRequest;
 
     return (
-      <HStack style={styles.buttonContainer} justify="center" align="center">
+      <HStack className={'pb-2'} justify="center" align="center">
         {!params?.amount && isEcashSend && !hasPaymentRequest && <Text></Text>}
         <ButtonHandler
           buttons={[
@@ -372,12 +370,5 @@ function ModalScreen() {
     </Modal>
   );
 }
-
-const createStyles = () =>
-  StyleSheet.create({
-    buttonContainer: {
-      paddingBottom: 8,
-    },
-  });
 
 export default withSheetProvider(ModalScreen);

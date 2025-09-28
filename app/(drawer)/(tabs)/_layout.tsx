@@ -9,13 +9,13 @@ import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { TAB_SCREENS } from 'helper/navigation/screens';
-import { SearchBar } from './payments';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
 import { useTypedNavigation } from 'helper/navigation';
 import { Avatar } from 'components/ui/Avatar';
+import { SearchBar } from 'components/blocks/payments';
 
 const Tab = createBottomTabNavigator();
 

@@ -14,14 +14,15 @@ import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './helper';
 import { nip19 } from 'nostr-tools';
 
-import { ActionItems, usePostReactions } from './ActionItems';
-import { ExternalLink } from './ExternalLink';
-import { VideoScreen } from './VideoPlayer';
-import { ImageContainer } from './ImageContainer';
-import { extractUrls, TextContent } from './TextContent';
+import { ActionItems, usePostReactions } from 'components/blocks/profilePage';
+import { ExternalLink } from 'components/blocks/profilePage';
+import { VideoScreen } from 'components/blocks/profilePage';
+import { ImageContainer } from 'components/blocks/profilePage';
+import { extractUrls, TextContent } from 'components/blocks/profilePage';
 import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { UserNameProfiles } from 'components/ui/UserNameProfiles';
+import { getTimeAgo } from 'helper/time';
 dayjs.extend(relativeTime);
 
 export const PostQuote = React.memo(({ id }: { id: string }) => {
@@ -32,7 +33,7 @@ export const PostQuote = React.memo(({ id }: { id: string }) => {
 
   const profile = useNostrProfile({ id: authorPubKey });
 
-  let timeAgo = getTime(events?.[0]?.created_at);
+  let timeAgo = getTimeAgo(events?.[0]?.created_at);
 
   return (
     <View
@@ -70,30 +71,6 @@ export const PostQuote = React.memo(({ id }: { id: string }) => {
 });
 
 PostQuote.displayName = 'PostQuote';
-
-function getTime(created_at) {
-  const postDate = dayjs.unix(created_at);
-  const now = dayjs();
-  const diffSeconds = now.diff(postDate, 'second');
-  const diffMinutes = now.diff(postDate, 'minute');
-  const diffHours = now.diff(postDate, 'hour');
-  const diffDays = now.diff(postDate, 'day');
-  let timeAgo;
-
-  if (diffDays >= 7) {
-    timeAgo = postDate.format('MM/DD/YYYY');
-  } else if (diffDays > 0) {
-    timeAgo = `${diffDays}d`;
-  } else if (diffHours > 0) {
-    timeAgo = `${diffHours}h`;
-  } else if (diffMinutes > 0) {
-    timeAgo = `${diffMinutes}m`;
-  } else {
-    timeAgo = `${diffSeconds}s`;
-  }
-
-  return timeAgo;
-}
 
 export function getPost(post) {
   if (typeof post?.content === 'string') {
@@ -233,7 +210,7 @@ export function ProfileIcon({ pubkey }) {
 function PostTop({ post }) {
   const theme = useSelector(memoizedGetTheme);
   const profile = useNostrProfile({ id: post?.pubkey });
-  let timeAgo = getTime(post.created_at);
+  let timeAgo = getTimeAgo(post.created_at);
 
   const displayName =
     profile?.displayName ||

@@ -1,13 +1,12 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
-import { Image, ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
+import { ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greens, greys, reds, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
-import { SkeletonContainer, Skeleton } from 'react-native-skeleton-component';
+import { SkeletonContainer } from 'react-native-skeleton-component';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
+import { NoResultsFound, EmptyStateView, SearchResult } from 'components/blocks/contacts';
 
 // Define proper types for our component
 interface SearchResultData {
@@ -260,203 +260,6 @@ function ModalScreen() {
         </Container>
       </SkeletonContainer>
     </SafeAreaView>
-  );
-}
-
-function NoResultsFound({ theme }: { theme: Theme }) {
-  return (
-    <VStack spacing={24} align="center" className="mt-6 px-6">
-      <View
-        className="h-20 w-20 items-center justify-center rounded-full"
-        style={{ backgroundColor: greys(theme)[800] }}>
-        <Icon name="nonicons:error-16" size={40} color={greys(theme)[400]} />
-      </View>
-
-      <VStack spacing={12}>
-        <Text
-          className="text-center"
-          overpass
-          bold
-          size={20}
-          style={{
-            color: greys(theme)[50],
-          }}>
-          No Results Found
-        </Text>
-
-        <Text
-          className="text-center"
-          overpass
-          regular
-          size={16}
-          style={{
-            color: greys(theme)[400],
-          }}>
-          {"We couldn't find any users matching your search"}
-        </Text>
-      </VStack>
-
-      <View className="w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
-        <Text
-          overpass
-          bold
-          size={16}
-          style={{
-            color: greys(theme)[100],
-          }}>
-          Try adjusting your search:
-        </Text>
-        <Spacer size={8} />
-        <VStack spacing={12}>
-          <SearchTip icon="lucide:pencil-line" text="Check your spelling" theme={theme} />
-          <SearchTip icon="solar:key-bold" text="Try using a complete public key" theme={theme} />
-          <SearchTip icon="mdi:at" text="Use a different NIP-05 identifier" theme={theme} />
-        </VStack>
-      </View>
-    </VStack>
-  );
-}
-
-function EmptyStateView({ theme }: { theme: Theme }) {
-  return (
-    <VStack spacing={24} align="center" className="mt-6">
-      <View
-        className="h-20 w-20 items-center justify-center rounded-full"
-        style={{ backgroundColor: greys(theme)[800] }}>
-        <Icon name="majesticons:search-line" size={40} color={greys(theme)[400]} />
-      </View>
-
-      <Text
-        className="text-center"
-        overpass
-        bold
-        size={20}
-        style={{
-          color: greys(theme)[50],
-        }}>
-        Search for Users
-      </Text>
-
-      <Text
-        className="text-center"
-        size={16}
-        overpass
-        regular
-        style={{
-          color: greys(theme)[400],
-        }}>
-        Type a name, public key, or NIP-05 identifier to find users on the network
-      </Text>
-
-      <View className="w-full rounded-xl p-4" style={{ backgroundColor: greys(theme)[800] }}>
-        <Text
-          overpass
-          bold
-          size={16}
-          style={{
-            color: greys(theme)[100],
-          }}>
-          Search Tips:
-        </Text>
-        <Spacer size={8} />
-        <VStack spacing={12}>
-          <SearchTip icon="ph:user-bold" text="Search by username or display name" theme={theme} />
-          <SearchTip icon="solar:key-bold" text="Search by public key" theme={theme} />
-          <SearchTip icon="mdi:at" text="Search by NIP-05 identifier" theme={theme} />
-        </VStack>
-      </View>
-    </VStack>
-  );
-}
-
-function SearchTip({ icon, text, theme }: { icon: string; text: string; theme: Theme }) {
-  return (
-    <HStack spacing={0} align="center">
-      <Icon name={icon} size={20} color={greys(theme)[300]} />
-      <Text className="flex-1 pl-2" size={14} overpass regular style={{ color: greys(theme)[200] }}>
-        {text}
-      </Text>
-    </HStack>
-  );
-}
-
-interface SearchResultProps {
-  result: DisplayResult;
-  onPress: () => void;
-  loading: boolean;
-}
-
-function SearchResult({ result, onPress, loading }: SearchResultProps) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex-row items-center rounded-lg p-2"
-      style={{ backgroundColor: greys(theme)[800] }}
-      disabled={loading || !result.profile}>
-      <HStack spacing={8}>
-        <ProfileImage loading={loading} profile={result.profile} />
-        <View className="flex-1">
-          <Text loading={loading} overpass bold size={16} style={{ color: greys(theme)[50] }}>
-            {result.profile?.displayName || result.profile?.name || 'Loading...'}
-          </Text>
-          {result.profile?.nip05 && (
-            <Text
-              loading={loading}
-              overpass
-              regular
-              size={12}
-              style={{
-                color: result.profile.nip05Valid ? greens[300] : reds[300],
-              }}>
-              {result.profile.nip05Valid ? '✓ ' : '✗ '}
-              {result.profile.nip05}
-            </Text>
-          )}
-        </View>
-      </HStack>
-    </TouchableOpacity>
-  );
-}
-
-interface ProfileImageProps {
-  profile: UserProfile | undefined;
-  loading: boolean;
-}
-
-function ProfileImage({ profile, loading }: ProfileImageProps) {
-  const theme = useSelector(memoizedGetTheme);
-  const [imageError, setImageError] = useState(false);
-
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-  }, []);
-
-  return (
-    <Skeleton style={{ width: 48, height: 48, borderRadius: 24 }}>
-      {!loading && (
-        <>
-          {profile?.picture && !imageError ? (
-            <Image
-              source={{ uri: profile.picture }}
-              onError={handleImageError}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-              }}
-            />
-          ) : (
-            <View
-              className="h-12 w-12 items-center justify-center rounded-full"
-              style={{ backgroundColor: greys(theme)[950] }}>
-              <Icon name="ph:user-bold" size={24} color={greys(theme)[400]} />
-            </View>
-          )}
-        </>
-      )}
-    </Skeleton>
   );
 }
 

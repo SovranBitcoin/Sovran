@@ -49,14 +49,14 @@ export const TAB_SCREENS = (): TabConfig[] => [
     title: 'Wallet',
     icon: ({ focused, theme }) => (
       <View style={{ position: 'relative', width: 64, height: 64 }}>
-        <View className="absolute h-5 overflow-hidden" style={{ width: 100, bottom: 51 }}>
+        <View className="absolute h-4 overflow-hidden" style={{ width: 100, bottom: 51 }}>
           <BlurView
             tint={getBlurTint(theme)}
             intensity={getBlurIntensity(theme)}
             experimentalBlurMethod="dimezisBlurView"
             className="absolute overflow-hidden rounded-full"
             style={{
-              top: 6,
+              top: 5,
               left: 0,
               backgroundColor: opacity(greys(theme)[900], 0.5),
               zIndex: -2,

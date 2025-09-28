@@ -4,7 +4,7 @@ import { useNostrEvents as useNE } from 'nostr-react';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { extractUrls } from './TextContent';
+import { extractUrls } from 'components/blocks/profilePage';
 import { EventKind } from 'helper/constants';
 
 export const useNostrEvents = (authors, ids, kinds, type) => {

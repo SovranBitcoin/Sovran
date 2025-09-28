@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { TransactionData } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
+import { formatDate } from 'helper/time';
 import { getRawExpiry } from 'helper/cashuClient';
 
 interface Account {
@@ -19,14 +20,6 @@ interface Options {
   showMore?: boolean;
 }
 
-const formatDate = (date: string): string => {
-  const language = store.getState().settings?.settings.lang || 'en';
-  return new Intl.DateTimeFormat(language, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(date));
-};
 
 export function useTransactionsData({
   transactions,

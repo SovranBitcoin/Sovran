@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, Pressable, ColorValue } from 'react-native';
-import { View, HStack } from 'components/ui/View';
+import { Pressable, ColorValue } from 'react-native';
+import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
@@ -20,7 +20,6 @@ interface Props {
 }
 
 const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
-  const styles = createStyles(theme);
   const { transactions } = useCashu();
   const navigation = useTypedNavigation();
 
@@ -59,23 +58,30 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
     : [shades[200], shades[300]];
 
   return (
-    <View style={[styles.wrapper, { alignSelf: isReceived ? 'flex-start' : 'flex-end' }]}>
+    <View className={`relative my-2 w-full ${isReceived ? 'self-start' : 'self-end'}`}>
       <View
-        style={[
-          styles.arrow,
-          {
-            backgroundColor: isReceived ? greys(theme)[500] : shades[300],
-            left: isReceived ? 16 : 'auto',
-            right: isReceived ? 'auto' : 16,
-          },
-        ]}
+        className="absolute -bottom-1 h-2 w-2"
+        style={{
+          backgroundColor: isReceived ? greys(theme)[500] : shades[300],
+          left: isReceived ? 16 : 'auto',
+          right: isReceived ? 'auto' : 16,
+          transform: [{ rotate: '45deg' }],
+        }}
       />
       <Pressable onLongPress={handleViewTransaction}>
-        <LinearGradient colors={gradientColors} style={styles.container}>
-          <Text style={styles.mintText}>{decoded.mint}</Text>
+        <LinearGradient
+          colors={gradientColors}
+          style={{
+            borderRadius: 16,
+            padding: 16,
+            maxWidth: '75%',
+          }}>
+          <Text className="text-xs font-bold opacity-75" style={{ color: greys(theme)[0] }}>
+            {decoded.mint}
+          </Text>
 
-          <HStack justify="space-between">
-            <View>
+          <HStack justify="space-between" className="mt-2">
+            <VStack>
               {unit && (
                 <AmountFormatter
                   amount={amount}
@@ -85,8 +91,17 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
                   color={greys(theme)[0]}
                 />
               )}
-              {decoded.memo && <Text style={styles.memoText}>{decoded.memo}</Text>}
-            </View>
+              {decoded.memo && (
+                <Text
+                  className="mt-2 rounded-lg p-4 text-xs"
+                  style={{
+                    color: greys(theme)[0],
+                    backgroundColor: opacity(greys(theme)[0], 0.1),
+                  }}>
+                  {decoded.memo}
+                </Text>
+              )}
+            </VStack>
           </HStack>
           <Button
             text={isClaimed ? 'View Transaction' : 'Redeem'}
@@ -98,40 +113,5 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
     </View>
   );
 };
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    wrapper: {
-      marginVertical: 8,
-      position: 'relative',
-      width: '100%',
-    },
-    container: {
-      padding: 16,
-      borderRadius: 16,
-      width: '100%',
-    },
-    arrow: {
-      position: 'absolute',
-      bottom: -4,
-      width: 8,
-      height: 8,
-      transform: [{ rotate: '45deg' }],
-    },
-    memoText: {
-      fontFamily: 'OverpassRegular',
-      fontSize: 12,
-      color: greys(theme)[0],
-      backgroundColor: opacity(greys(theme)[0], 0.1),
-      padding: 16,
-      borderRadius: 8,
-    },
-    mintText: {
-      fontFamily: 'OverpassBold',
-      fontSize: 12,
-      color: greys(theme)[0],
-      opacity: 0.75,
-    },
-  });
 
 export default CashuTokenComponent;

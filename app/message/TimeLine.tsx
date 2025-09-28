@@ -1,7 +1,5 @@
-import MessageComponent from './MessageComponent';
-import TransactionComponent from './TransactionComponent';
+import { TextMessage, PaymentMessage, CashuTokenMessage } from './components';
 import { useNostr } from 'helper/redux/nostr';
-import CashuTokenComponent from './CashuTokenComponent';
 import { isValidEcashToken } from 'helper/cashuClient';
 import { Theme } from 'helper/colors';
 import { TimelineItemType } from '.';
@@ -15,8 +13,8 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
   const { currentProfile } = useNostr();
 
   // Determine item type
-  const isMessage = !!item.content;
-  const isTransaction = !!item.unit;
+  const isMessage = 'content' in item && !!item.content;
+  const isTransaction = 'unit' in item && !!item.unit;
 
   const isTokenMessage = isMessage && isValidEcashToken(item.content);
 
@@ -25,22 +23,20 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
     isMessage && (item.receiver === currentProfile.pubkey || item.id === -1);
   const isTransactionReceived =
     isTransaction &&
-    (item?.nostr?.pubkey === currentProfile.pubkey ||
+    (('nostr' in item && item.nostr?.pubkey === currentProfile.pubkey) ||
       (item.receiver && item.receiver === currentProfile.pubkey));
 
-  // Render appropriate component based on item type
+  if (isTokenMessage) {
+    return <CashuTokenMessage token={item.content} theme={theme} isReceived={isMessageReceived} />;
+  }
+
   if (isMessage) {
-    if (isTokenMessage) {
-      return (
-        <CashuTokenComponent token={item.content} theme={theme} isReceived={isMessageReceived} />
-      );
-    }
-    return <MessageComponent message={item} theme={theme} isReceived={isMessageReceived} />;
+    return <TextMessage message={item as any} theme={theme} isReceived={isMessageReceived} />;
   }
 
   if (isTransaction) {
     return (
-      <TransactionComponent transaction={item} theme={theme} isReceived={isTransactionReceived} />
+      <PaymentMessage transaction={item as any} theme={theme} isReceived={isTransactionReceived} />
     );
   }
 

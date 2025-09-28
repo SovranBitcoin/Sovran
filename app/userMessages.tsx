@@ -1,4 +1,4 @@
-import Message from './MessagePage';
+import Message from './message';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
