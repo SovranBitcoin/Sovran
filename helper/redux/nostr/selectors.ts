@@ -11,9 +11,10 @@ export const memoizedGetCurrentProfile = createSelector(
 
 export const memoizedGetNostrProfile = ({ nostrPubkey }: { nostrPubkey: string }) =>
   createSelector(
-    [(state: RootState) => [...state.nostr.search, ...state.nostr.profiles]],
-    (profiles = []) => {
-      return _.find(profiles, { pubkey: nostrPubkey });
+    [(state: RootState) => state.nostr.search, (state: RootState) => state.nostr.profiles],
+    (search, profiles) => {
+      const allProfiles = [...search, ...profiles];
+      return _.find(allProfiles, { pubkey: nostrPubkey });
     }
   );
 

@@ -5,7 +5,7 @@ import { greys, Theme } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
-import { Post } from '../ProfilePage/post';
+import { Post } from 'components/blocks/feed';
 import { View } from 'components/ui/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';

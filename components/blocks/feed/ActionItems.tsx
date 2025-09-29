@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { HStack, Spacer } from 'components/ui/View';
+import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
@@ -126,11 +126,10 @@ const ActionItem = ({
   theme: Theme;
   size: number;
 }) => (
-  <HStack align="center" className="bg-transparent">
+  <HStack align="center" className="bg-transparent" spacing={4}>
     {icon}
-    <Spacer size={4} />
     <Text
-      size={size}
+      size={size - 2}
       weight="bold"
       style={{
         color: greys(theme)[400],
@@ -163,26 +162,32 @@ export function ActionItems({
       <ActionItem
         size={size}
         icon={
-          <Icon name="garden:speech-bubble-typing-fill-12" size={size} color={greys(theme)[400]} />
+          <Icon
+            name="garden:speech-bubble-typing-fill-12"
+            size={size - 4}
+            color={greys(theme)[400]}
+          />
         }
         count={formatNumber(0)}
         theme={theme}
       />
       <ActionItem
         size={size}
-        icon={<Icon name="garden:arrow-retweet-fill-16" size={size} color={greys(theme)[400]} />}
+        icon={
+          <Icon name="garden:arrow-retweet-fill-16" size={size - 4} color={greys(theme)[400]} />
+        }
         count={formatNumber(repostCount)}
         theme={theme}
       />
       <ActionItem
         size={size}
-        icon={<Icon name="garden:heart-fill-16" size={size} color={greys(theme)[400]} />}
+        icon={<Icon name="garden:heart-fill-16" size={size - 4} color={greys(theme)[400]} />}
         count={formatNumber(reactionCount)}
         theme={theme}
       />
       <ActionItem
         size={size}
-        icon={<Icon name="mingcute:lightning-fill" size={size} color={greys(theme)[400]} />}
+        icon={<Icon name="mingcute:lightning-fill" size={size - 4} color={greys(theme)[400]} />}
         count={formatNumber(zapCount)}
         theme={theme}
       />

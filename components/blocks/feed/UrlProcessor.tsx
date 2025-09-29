@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { ImageContainer } from './ImageContainer';
-import { VideoScreen } from './VideoPlayer';
+import { VideoScreen } from '../../ui/VideoPlayer';
 import { ExternalLink } from './ExternalLink';
 
 interface UrlProcessorProps {

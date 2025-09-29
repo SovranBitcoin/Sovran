@@ -6,7 +6,7 @@ import { greys } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import 'react-native-gesture-handler';
 import { useNostrEvents } from 'nostr-react';
-import { useNostrProfile } from 'app/ProfilePage/helper';
+import { useNostrProfile } from './useNostrProfile';
 import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { getTimeAgo } from 'helper/time';

@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import { GradientSkeleton } from 'components/ui/GradientSkeleton';
-import { useNostrProfile } from 'app/ProfilePage/helper';
+import { useNostrProfile } from './useNostrProfile';
 import { getTimeAgo } from 'helper/time';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -18,21 +18,15 @@ export function PostTop({ post }: PostTopProps) {
   let timeAgo = getTimeAgo(post.created_at);
 
   const displayName =
-    profile?.displayName ||
-    profile?.profile?.displayName ||
-    profile?.display_name ||
-    profile?.profile?.display_name ||
-    profile?.name ||
-    profile?.profile?.name;
+    (profile as any)?.displayName ||
+    (profile as any)?.profile?.displayName ||
+    (profile as any)?.display_name ||
+    (profile as any)?.profile?.display_name ||
+    (profile as any)?.name ||
+    (profile as any)?.profile?.name;
 
   return (
-    <HStack
-      style={
-        {
-          // alignSelf: "flex-start",
-        }
-      }
-      align="center">
+    <HStack align="center">
       {!displayName ? (
         <GradientSkeleton
           startColor={greys(theme)[700]}

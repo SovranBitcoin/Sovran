@@ -1,5 +1,5 @@
+export { Post } from './Post';
 export { PostQuote } from './PostQuote';
-export { ProfileIcon } from './ProfileIcon';
 export { PostTop } from './PostTop';
 export { RepostText } from './RepostText';
 export { UrlProcessor } from './UrlProcessor';
@@ -7,4 +7,4 @@ export { ActionItems, usePostReactions } from './ActionItems';
 export { ExternalLink } from './ExternalLink';
 export { ImageContainer } from './ImageContainer';
 export { TextContent, extractUrls } from './TextContent';
-export { VideoScreen } from './VideoPlayer';
+export { VideoScreen } from '../../ui/VideoPlayer';

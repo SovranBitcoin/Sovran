@@ -1,6 +1,6 @@
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
-import { VideoScreen } from 'components/blocks/profilePage';
+import { VideoScreen } from 'components/blocks/feed';
 
 // eslint-disable-next-line no-empty-pattern
 const RouteA = ({}: RouteScreenProps<'video-sheet', 'route-a'>) => {
