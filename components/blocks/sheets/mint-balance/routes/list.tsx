@@ -18,7 +18,7 @@ import { useTypedNavigation } from 'helper/navigation';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { formatCurrency } from 'helper/currency';
-import { MintCurrencySelector } from './MintCurrencySelector';
+import { MintCurrencySelector } from '../MintCurrencySelector';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -31,6 +31,7 @@ interface MintItemProps {
   selectedCurrency: string;
   showDetailsButton?: boolean;
   onDetailsPress?: (mintUrl: string) => void;
+  onInspectPress?: () => void;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
@@ -44,6 +45,7 @@ const MintItem: React.FC<MintItemProps> = ({
   selectedCurrency,
   showDetailsButton = false,
   onDetailsPress,
+  onInspectPress,
 }) => {
   const formattedBalance = balance
     ? formatCurrency(
@@ -104,15 +106,8 @@ const MintItem: React.FC<MintItemProps> = ({
             onPress={() => {
               if (onDetailsPress) {
                 onDetailsPress(mint.id);
-              } else {
-                import('react-native-actions-sheet').then(({ SheetManager }) => {
-                  SheetManager.show('mint', {
-                    payload: {
-                      initialRoute: 'mintDetailsPage',
-                      mintUrl: mint.id,
-                    },
-                  });
-                });
+              } else if (onInspectPress) {
+                onInspectPress();
               }
             }}>
             <Icon
@@ -308,7 +303,7 @@ const ListRoute = () => {
         allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
         currencyLabel="Send payment in"
         mintsLabel="Send from"
-        renderItem={(mint, selectedCurrency) => (
+        renderItem={(mint: any, selectedCurrency: string) => (
           <MintItem
             key={mint.mintUrl}
             mint={{
@@ -324,6 +319,12 @@ const ListRoute = () => {
             selectedCurrency={selectedCurrency}
             showDetailsButton={showDetailsButton}
             onDetailsPress={onDetailsPress}
+            onInspectPress={() => {
+              // Store mintUrl in a global variable temporarily
+              console.log('Setting global.currentMintUrl to:', mint.mintUrl);
+              (global as any).currentMintUrl = mint.mintUrl;
+              router?.navigate('info');
+            }}
             onPress={() => handleMintSelect(mint.mintUrl)}
           />
         )}

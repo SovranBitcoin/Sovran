@@ -26,6 +26,7 @@ interface MintBalanceDisplayProps {
   style?: StyleProp<ViewStyle>;
   requireValidMint?: boolean;
   showAddMintsButton?: boolean;
+  showDetailsButton?: boolean;
 }
 
 const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
@@ -37,6 +38,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   allowedUnits,
   requireValidMint = false,
   showAddMintsButton = false,
+  showDetailsButton = false,
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
@@ -86,6 +88,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         allowedMints,
         allowedUnits,
         showAddMintsButton,
+        showDetailsButton,
         onMintPress: updateSelectedMint ? undefined : onMintSelected,
       },
       onClose: async (mint) => {

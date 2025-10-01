@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
@@ -32,13 +32,19 @@ interface DiscoveredMint {
     mints: number;
     melts: number;
   };
-  // Extended to work with MintCurrencySelector
-  mintUrl?: string;
-  name?: string;
-  amount?: number;
-  unit?: string;
-  iconUrl?: string | null;
-  mintInfo?: any;
+  // Add properties to match MintData interface
+  mintUrl: string;
+  name: string;
+  amount: number;
+  unit: string;
+  iconUrl: string | null;
+  mintInfo?: {
+    nuts?: {
+      '4'?: {
+        methods?: { unit?: string }[];
+      };
+    };
+  };
 }
 
 interface AddMintItemProps {
@@ -51,32 +57,31 @@ interface AddMintItemProps {
 const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, theme }) => {
   const g = greys(theme);
   const isDisabled = !mint.auditorData;
-  const mintUrl = mint.url || mint.mintUrl || '';
-  const mintName =
-    mint.auditorData?.name || mint.name || mintUrl.replace('https://', '').split('/')[0];
 
   return (
     <View
       className="overflow-hidden rounded-lg"
       blur
       style={[{ backgroundColor: g[800], marginBottom: 12 }]}>
-      <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mintUrl)}>
+      <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mint.url)}>
         <HStack
           align="center"
           justify="space-between"
           className={`p-3 ${isDisabled ? 'opacity-50' : ''}`}>
-          <HStack align="center">
+          <HStack align="center" gap={8}>
             <Avatar
-              picture={undefined}
+              picture={mint.auditorData?.name ? undefined : undefined}
               size={42}
               variant="mint"
-              name={mintName}
-              alt={`${mintName} icon`}
+              name={mint.auditorData?.name || mint.url.replace('https://', '').split('/')[0]}
+              alt={`${mint.auditorData?.name || 'Mint'} icon`}
               status={mint.auditorData?.state}
             />
 
-            <VStack className="flex-1" style={{ marginLeft: 12, marginRight: 12 }}>
-              <Text style={[{ color: g[0], fontSize: 16 }]}>{mintName}</Text>
+            <VStack>
+              <Text style={[{ color: g[0], fontSize: 16 }]}>
+                {mint.auditorData?.name || mint.url.replace('https://', '').split('/')[0]}
+              </Text>
 
               <HStack align="center" gap={8}>
                 <Text style={[{ color: g[200], fontSize: 12 }]}>
@@ -99,7 +104,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
 
           <Checkbox
             checked={selected}
-            onCheckedChange={() => onToggle(mintUrl)}
+            onCheckedChange={() => onToggle(mint.url)}
             disabled={isDisabled}
             size={24}
             variant="success"
@@ -121,12 +126,8 @@ const AddRoute = () => {
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Get allowed currencies from payload
-  const allowedCurrencies = useMemo(
-    () =>
-      (payload?.allowedUnits ?? ['SAT', 'USD', 'EUR', 'GBP']).map((c: string) => c.toUpperCase()),
-    [payload?.allowedUnits]
-  );
+  // Get allowed currencies from payload or use defaults
+  const allowedCurrencies = payload?.allowedUnits ?? ['SAT', 'USD', 'EUR', 'GBP'];
 
   // Load discovered mints using cashu-kym
   useEffect(() => {
@@ -179,17 +180,24 @@ const AddRoute = () => {
         const result = await handler.discover();
 
         // Filter out already owned mints and sort by score
+        // Transform to match MintData interface
         const filteredMints = result.results
-          .filter((mint: any) => !ownedMintUrls.has(mint.url))
-          .sort((a: any, b: any) => b.score - a.score)
-          // Transform to match MintCurrencySelector expectations
-          .map((mint: any) => ({
+          .filter((mint) => !ownedMintUrls.has(mint.url))
+          .sort((a, b) => b.score - a.score)
+          .map((mint) => ({
             ...mint,
             mintUrl: mint.url,
             name: mint.auditorData?.name || mint.url.replace('https://', '').split('/')[0],
             amount: 0,
-            unit: 'SAT', // Default unit since KYM doesn't provide this
+            unit: 'SAT', // Default unit
             iconUrl: null,
+            mintInfo: {
+              nuts: {
+                '4': {
+                  methods: [{ unit: 'SAT' }], // Default to SAT, could be fetched from mint info
+                },
+              },
+            },
           }));
 
         setMints(filteredMints);
@@ -322,13 +330,12 @@ const AddRoute = () => {
         theme={theme}
         allowedCurrencies={allowedCurrencies}
         currencyLabel="Currency options"
-        mintsLabel={`Discovered mints (${mints.length})`}
+        mintsLabel="Discovered mints"
         renderItem={(mint) => (
           <AddMintItem
-            key={mint.url || mint.mintUrl}
             mint={mint}
             onToggle={handleToggleMint}
-            selected={selectedMints.has(mint.url || mint.mintUrl || '')}
+            selected={selectedMints.has(mint.url)}
             theme={theme}
           />
         )}
