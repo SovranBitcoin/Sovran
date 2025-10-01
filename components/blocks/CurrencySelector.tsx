@@ -8,7 +8,6 @@ import { useMintManagement } from 'hooks/coco';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View, HStack } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
-import { sovran } from './sheets/mints';
 import opacity from 'hex-color-opacity';
 
 // Define interface for balance items
@@ -115,7 +114,10 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                     : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
                 }
                 style={[
-                  sovran(theme).borderSubtle,
+                  {
+                    borderWidth: 0.2,
+                    borderColor: greys(theme)[600],
+                  },
 
                   {
                     marginRight: 8,

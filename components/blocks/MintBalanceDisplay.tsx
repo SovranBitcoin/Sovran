@@ -7,7 +7,7 @@ import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { useMintManagement } from 'hooks/coco';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { View, HStack, VStack } from 'components/ui/View';
+import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
@@ -131,7 +131,14 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
                 />
               </View>
               <VStack align="flex-start" style={{ marginRight: 10 }}>
-                <Text style={styles.name}>
+                <Text
+                  style={{
+                    color: greys(theme)[50],
+                  }}
+                  className="ml-[-2px]"
+                  size={12}
+                  bold
+                  overpass>
                   {mintInfo?.name ||
                     selectedMint?.replace('https://', '').split('/')[0] ||
                     'Unknown Mint'}
@@ -142,13 +149,23 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           ) : (
             <HStack align="center" gap={8}>
               <Icon name="fluent:add-24-filled" size={20} color={greys(theme)[0]} />
-              <Text style={styles.name}>Selected mint</Text>
+              <Text
+                style={{
+                  color: greys(theme)[50],
+                }}
+                className="ml-[-2px]"
+                size={12}
+                bold
+                overpass>
+                Selected mint
+              </Text>
             </HStack>
           )}
         </HStack>
-        <View style={styles.chevronContainer}>
+        <HStack justify="flex-end" align="center">
           <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
-        </View>
+          <Spacer size={8} />
+        </HStack>
       </HStack>
     </TouchableOpacity>
   );

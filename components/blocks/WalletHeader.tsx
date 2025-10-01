@@ -2,7 +2,7 @@ import React from 'react';
 import { Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/ui/View';
-import { SelectedMintDisplayList } from 'components/blocks/sheets/mints';
+import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -55,10 +55,12 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
     <View
       className="h-13 pointer-events-box-none absolute left-0 right-0 pt-5"
       style={{ marginTop: 32 }}>
-      <SelectedMintDisplayList
-        width={Dimensions.get('window').width - 128}
-        onMintSelected={handleMintSelected}
+      <MintBalanceDisplay
         unit={unit}
+        onMintSelected={handleMintSelected}
+        requireBalance={false}
+        updateSelectedMint={true}
+        style={{ width: Dimensions.get('window').width - 128 }}
       />
     </View>
   );
