@@ -1,10 +1,10 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { TouchableOpacity, ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
-import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
+import { useMintManagement } from 'hooks/coco';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { View, HStack } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +35,31 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
 }) => {
   const theme = useSelector(memoizedGetTheme);
 
-  const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies) as BalanceItem[];
+  const { getBalances } = useMintManagement();
+  const [multipleBalances, setMultipleBalances] = useState<BalanceItem[]>([]);
+
+  // Load balances from Coco
+  useEffect(() => {
+    const loadBalances = async () => {
+      try {
+        const balanceData = await getBalances();
+
+        // Convert Coco balance format to the expected format
+        const formattedBalances = Object.entries(balanceData).map(([mintUrl, amount]) => ({
+          mintUrl,
+          amount: amount || 0,
+          unit: 'sat', // Default unit
+        }));
+
+        setMultipleBalances(formattedBalances);
+      } catch (error) {
+        console.error('Failed to load balances:', error);
+        setMultipleBalances([]);
+      }
+    };
+
+    loadBalances();
+  }, [getBalances]);
 
   const currencies = useMemo(() => {
     const uniqueCurrencies = [

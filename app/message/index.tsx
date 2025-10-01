@@ -22,7 +22,8 @@ import {
   addContact,
   removeContact,
 } from 'helper/redux/nostr';
-import { TransactionBuilder, useCashu } from 'helper/redux/cashu';
+import { TransactionBuilder } from 'helper/redux/cashu';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
 // Components
@@ -57,7 +58,7 @@ export default function ModalScreen() {
   const navigation = useTypedNavigation<'currency'>();
   const { profiles, search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
-  const { transactions } = useCashu();
+  const { history: transactions } = usePaginatedHistory();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');

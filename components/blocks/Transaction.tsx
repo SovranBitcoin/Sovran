@@ -10,10 +10,10 @@ import TransactionIcon from 'components/blocks/TransactionIcon';
 import { useTypedNavigation } from 'helper/navigation';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { TransactionData } from 'helper/redux/cashu';
+import { CocoTransactionAdapter } from 'helper/coco/typeAdapters';
 import { View, HStack, VStack } from 'components/ui/View';
 import React from 'react';
-import { useAutoListenBatch } from 'providers/TransactionsProvider';
+// import { useManager } from 'coco-cashu-react'; // Not used in this component
 
 export function npubToPubkey(npub: string): string {
   if (!npub) return '';
@@ -27,12 +27,15 @@ export function npubToPubkey(npub: string): string {
   return npub;
 }
 
-const useTransaction = (tx: TransactionData) => {
+const useTransaction = (tx: CocoTransactionAdapter) => {
   const navigation = useTypedNavigation();
-  const isSend = tx.transactionType === 'send';
-  const isReceive = tx.transactionType === 'receive';
+  // Use adapted transaction structure
+  const isSend = tx.type === 'send';
+  const isReceive = tx.type === 'mint';
 
-  const { isListening } = useAutoListenBatch([tx], { enabled: false });
+  // For Transaction.tsx, we don't need to actively listen since it's just displaying status
+  // The listening is handled in the confirmation screens
+  const isListening = false;
 
   const fiatAmount = formatCurrency(
     {
@@ -49,34 +52,45 @@ const useTransaction = (tx: TransactionData) => {
   );
 
   const handlePress = (): void => {
-    if (!tx.paid) {
+    // Check if transaction is paid using adapted state
+    const isPaid = tx.paid || tx.state === 'PAID';
+
+    if (!isPaid) {
       switch (tx.type) {
-        case 'lightning': {
-          navigation.navigate('lightningReceiveConfirmation', {
-            unit: tx.unit,
-            request: tx.request,
-            amount: tx.amount,
-            transaction: JSON.stringify(tx),
-            unifiedRequest: tx.unifiedRequest,
-            paymentRequest: tx.paymentRequest,
-          });
-          return;
+        case 'mint': {
+          // Coco uses 'mint' for Lightning-to-ecash
+          if (tx.request) {
+            navigation.navigate('lightningReceiveConfirmation', {
+              unit: tx.unit,
+              request: tx.request,
+              amount: tx.amount,
+              transaction: JSON.stringify(tx),
+              unifiedRequest: tx.unifiedRequest,
+              paymentRequest: tx.paymentRequest,
+            });
+            return;
+          }
+          break;
         }
-        case 'ecash': {
-          navigation.navigate('ecashSendConfirmation', {
-            unit: tx.unit,
-            token: tx.token,
-            amount: tx.amount,
-            paymentRequest: tx.paymentRequest,
-          });
-          return;
+        case 'send': {
+          // Coco uses 'send' for ecash sends
+          if (tx.token) {
+            navigation.navigate('ecashSendConfirmation', {
+              unit: tx.unit,
+              token: tx.token,
+              amount: tx.amount,
+              paymentRequest: tx.paymentRequest,
+            });
+            return;
+          }
+          break;
         }
       }
     }
 
     navigation.navigate('transaction', {
-      id: tx.request || tx.token || tx.txid || tx.id,
-      transactionType: tx.transactionType,
+      id: tx.request || tx.token || tx.id || tx.id,
+      transactionType: tx.type,
     });
   };
 
@@ -90,26 +104,34 @@ const useTransaction = (tx: TransactionData) => {
 };
 
 export const Transaction = React.memo(
-  ({ tx, txs }: { tx?: TransactionData; txs?: TransactionData[] }) => {
+  ({ tx, txs }: { tx?: CocoTransactionAdapter; txs?: CocoTransactionAdapter[] }) => {
     const theme = useSelector(memoizedGetTheme);
     const navigation = useTypedNavigation();
 
-    const selectedTx = (tx ?? (txs && txs[0])) as TransactionData;
+    const selectedTx = (tx ?? (txs && txs[0])) as CocoTransactionAdapter;
     const isVirtual = Array.isArray(txs) && txs.length > 0;
 
     const { isSend, isReceive, showLoading, fiatAmount, handlePress } = useTransaction(selectedTx);
 
     // For unified styles: flag the transaction for icon change and label tweak
-    const effectiveTx: TransactionData & { isVirtual?: boolean } = isVirtual
+    const effectiveTx: CocoTransactionAdapter & { isVirtual?: boolean } = isVirtual
       ? ({ ...selectedTx, isVirtual: true } as any)
       : selectedTx;
 
-    const safeTx = selectedTx as TransactionData;
+    const safeTx = selectedTx as CocoTransactionAdapter;
 
     return (
       <TouchableOpacity
-        key={safeTx?.txid}
-        className="flex flex-row items-center justify-between bg-transparent p-5 pl-4 pr-4"
+        key={safeTx?.id}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'transparent',
+          padding: 20,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
         onPress={() => {
           if (isVirtual) {
             const batchId = txs?.find((t) => t.batchId)?.batchId;
@@ -129,9 +151,7 @@ export const Transaction = React.memo(
           <VStack spacing={0} flex={1}>
             <HStack justify="space-between" align="flex-end">
               <UntranslatedText color={theme.greys[0]} bold size={14}>
-                {isVirtual
-                  ? 'Reallocation'
-                  : safeTx.transactionType[0].toUpperCase() + safeTx.transactionType.slice(1)}
+                {isVirtual ? 'Reallocation' : safeTx.type[0].toUpperCase() + safeTx.type.slice(1)}
               </UntranslatedText>
               {isVirtual ? null : (
                 <HStack align="center" spacing={0}>
@@ -152,10 +172,10 @@ export const Transaction = React.memo(
             <HStack justify="space-between" align="center">
               <HStack align="center" spacing={4}>
                 <UntranslatedText regular size={10} color={theme.greys[100]}>
-                  {safeTx?.date ? convertTime(new Date(safeTx.date)) : 'Unconfirmed'}
+                  {safeTx?.createdAt ? convertTime(new Date(safeTx.createdAt)) : 'Unconfirmed'}
                 </UntranslatedText>
                 <View>
-                  {safeTx?.paid ? (
+                  {safeTx.paid || safeTx.state === 'PAID' ? (
                     <Icon size={10} name="simple-line-icons:check" color={theme.greys[100]} />
                   ) : showLoading ? (
                     <Icon
@@ -174,10 +194,13 @@ export const Transaction = React.memo(
               </HStack>
               {isVirtual ? null : (
                 <UntranslatedText
-                  className="font-overpass-heavy self-end text-right text-xs"
                   bold
                   size={10}
-                  color={theme.greys[100]}>
+                  color={theme.greys[100]}
+                  style={{
+                    alignSelf: 'flex-end',
+                    textAlign: 'right',
+                  }}>
                   {fiatAmount}
                 </UntranslatedText>
               )}

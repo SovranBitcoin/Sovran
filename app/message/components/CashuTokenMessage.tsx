@@ -7,9 +7,10 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import { greys, shades, Theme } from 'helper/colors';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { receiveEcash } from 'helper/cashuClient';
+import { useCashuOperations } from 'hooks/coco';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { showMessage } from 'helper/popup/popups';
-import { useCashu } from 'helper/redux/cashu';
+// Removed useCashu - now using usePaginatedHistory directly
 import { useTypedNavigation } from 'helper/navigation';
 import opacity from 'hex-color-opacity';
 
@@ -20,7 +21,8 @@ interface Props {
 }
 
 const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
-  const { transactions } = useCashu();
+  const { receiveEcash } = useCashuOperations();
+  const { history: transactions } = usePaginatedHistory();
   const navigation = useTypedNavigation();
 
   const decoded = getDecodedToken(token);
@@ -45,11 +47,15 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
       return;
     }
 
-    const res = await receiveEcash({ token, unit });
-    if (res.isOk()) {
+    try {
+      await receiveEcash(token);
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' });
-    } else {
-      showMessage(res.error.message, {}, { emoji: '🚨' });
+    } catch (error) {
+      showMessage(
+        error instanceof Error ? error.message : 'Failed to receive ecash',
+        {},
+        { emoji: '🚨' }
+      );
     }
   };
 

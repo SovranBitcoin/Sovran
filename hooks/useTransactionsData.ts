@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { TransactionData } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
 import { formatDate } from 'helper/time';
-import { getRawExpiry } from 'helper/cashuClient';
+import { useCashuUtilities } from 'hooks/coco';
 
 interface Account {
   unit: string;
@@ -31,11 +31,13 @@ export function useTransactionsData({
   tab = 'All',
   showMore = true,
 }: Options) {
+  const { getLightningExpiry } = useCashuUtilities();
+
   const isExpiredLightning = (tx: TransactionData) => {
     if (tx.type !== 'lightning' || !tx.request || tx.paid) return false;
     try {
-      const expiry = getRawExpiry({ pr: tx.request });
-      return expiry ? new Date() > expiry : false;
+      const expiry = getLightningExpiry(tx.request);
+      return expiry ? new Date() > new Date(expiry * 1000) : false;
     } catch {
       return false;
     }

@@ -15,7 +15,7 @@ import { getMint } from 'helper/cashuClient';
 import { toResult } from 'helper/toResult';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { showMessage } from 'helper/popup/popups';
-import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu';
+import { useMintManagement } from 'hooks/coco';
 
 interface CommentProps {
   pubkey: string;
@@ -126,8 +126,33 @@ function extractSupportedUnits(info?: MintInfo): string[] {
 }
 
 function useRecommendedMints(): { mints: ProcessedMint[] } {
-  /* 0️⃣ Existing balances */
-  const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  /* 0️⃣ Existing balances */
+  const { getBalances } = useMintManagement();
+  const [balances, setBalances] = useState<any[]>([]);
+
+  // Load balances from Coco
+  useEffect(() => {
+    const loadBalances = async () => {
+      try {
+        const balanceData = await getBalances();
+
+        // Convert Coco balance format to the expected format
+        const formattedBalances = Object.entries(balanceData).map(([mintUrl, amount]) => ({
+          mintUrl,
+          amount: amount || 0,
+          unit: 'sat', // Default unit
+        }));
+
+        setBalances(formattedBalances);
+      } catch (error) {
+        console.error('Failed to load balances:', error);
+        setBalances([]);
+      }
+    };
+
+    loadBalances();
+  }, [getBalances]);
+
   const balanceMintUrls = useMemo(() => new Set(balances.map((b) => b.mintUrl)), [balances]);
   /* 1️⃣ Subscribe for reviews */
   const filters = useMemo(() => [{ kinds: [38000], limit: 20000 }], []);

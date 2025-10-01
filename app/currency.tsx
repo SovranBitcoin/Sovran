@@ -1,22 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
 
-import { memoizedGetBalance, memoizedGetSelectedMint } from 'helper/redux/cashu';
-import {
-  getMeltQuote,
-  receiveLightning,
-  sendEcash,
-  maybeConvertNpub,
-  npubToPublicKey,
-  pubKeyTo02,
-} from 'helper/cashuClient';
+import { useMintManagement, useCashuOperations, useLightningOperations } from 'hooks/coco';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { setSelectedMint } from 'helper/redux/cashu/actions';
+// Removed Redux Cashu import - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
-import { sovran } from 'components/blocks/sheets/mints';
 import { showMessage } from 'helper/popup/popups';
 
 import { View, HStack } from 'components/ui/View';
@@ -32,8 +23,10 @@ import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+// Removed memoizedGetCurrentProfile - no longer needed
 import { requestInvoice, utils } from 'lnurl-pay';
+import { Alert } from 'react-native';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 interface ScanningData {
   data: string;
   type?: string;
@@ -41,19 +34,36 @@ interface ScanningData {
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const dispatch = useDispatch();
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
   const params = useTypedRoute<'currency'>();
   const navigation = useTypedNavigation();
 
+  // Use Coco hooks instead of Redux
+  const { getBalances } = useMintManagement();
+  const { sendEcash } = useCashuOperations();
+  const { payLightningInvoice, requestLightningInvoice } = useLightningOperations();
+
   const [amount, setAmount] = useState(params?.amount || 0);
   const [loading, setLoading] = useState(false);
+  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const [balance, setBalance] = useState(0);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
   // const [isValidMint, setIsValidMint] = useState(false);
 
-  const selectedMint = useSelector(memoizedGetSelectedMint);
-  const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+  // Load balance and selected mint from Coco
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const balances = await getBalances();
+        // For now, use the first available mint or a default
+        const mintUrl = Object.keys(balances)[0];
+        setBalance(balances[mintUrl] || 0);
+      } catch (error) {
+        console.error('Failed to load balance:', error);
+      }
+    };
+    loadData();
+  }, [getBalances]);
 
   // Validate the amount whenever it changes
   useEffect(() => {
@@ -63,69 +73,51 @@ function ModalScreen() {
   const urDecoder = new URDecoder();
 
   const handleMintSelected = async (mint: { id: string; unit: string }) => {
-    dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    setSelectedMintState(mint.id);
     const newUnit = mint.unit.toLowerCase();
     setUnit(newUnit);
     navigation.setParams({ ...params, unit: newUnit });
   };
 
-  const handleLightningReceive = async ({ memo }: { memo?: string }) => {
-    const res = await receiveLightning({
-      amount: unit === 'sat' ? amount : amount * 100,
-      unit: unit,
-      memo,
-    });
-    if (res.isOk()) {
-      const response = res.value;
+  const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
+    try {
+      Alert.alert('requestLightningInvoice', JSON.stringify(selectedMint, unit, amount));
+      const quote = await requestLightningInvoice(
+        selectedMint,
+        unit === 'sat' ? amount : amount * 100
+      );
+
       navigation?.goBack();
       navigation.replace(params.to, {
         ...params,
-        unifiedRequest: response.unifiedRequest,
-        paymentRequest: response.paymentRequest,
-        request: response.request,
+        unifiedRequest: quote.request,
+        paymentRequest: quote.request,
+        request: quote.request,
         amount: unit === 'sat' ? amount : amount * 100,
-        transaction: JSON.stringify(response),
+        transaction: JSON.stringify(quote),
       });
-    } else {
-      showMessage(res.error.message, {}, { emoji: '🚨' });
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
     }
   };
 
-  const handleEcashSend = async ({ message }: { message?: string }) => {
-    const result = await sendEcash({
-      to: npubToPublicKey(params?.profile?.npub || ''),
-      amount: unit === 'sat' ? amount : amount * 100,
-      unit: unit,
-      memo: message,
-      paymentRequest: params.paymentRequest,
-      ...(params?.profile?.pubkey || params?.profile?.npub
-        ? {
-            p2pk: {
-              pubkey:
-                pubKeyTo02(params?.profile?.pubkey) || maybeConvertNpub(params?.profile?.npub),
-            },
-          }
-        : {}),
-    });
+  const handleEcashSend = async ({ message: _message }: { message?: string }) => {
+    try {
+      // Use Coco's ecash operations
+      const result = await sendEcash(selectedMint, unit === 'sat' ? amount : amount * 100);
 
-    if (result.isOk()) {
-      const transaction = result.value;
       navigation.replace(params.to, {
         ...params,
-        token: transaction.token,
+        token: JSON.stringify(result), // Use the full result as token
         amount: unit === 'sat' ? amount : amount * 100,
         paymentRequest: params.paymentRequest,
       });
-    } else {
-      console.log(1298372, {
-        result,
-        error: result.error,
-        message: result.error.message,
-        cause: result.error.cause,
-        name: result.error.name,
-        stack: result.error.stack,
+    } catch (error) {
+      console.log('Ecash send error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
       });
-      showMessage(result.error.message, {}, { emoji: '🚨' });
+      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
     }
   };
 
@@ -135,28 +127,23 @@ function ModalScreen() {
       tokens: utils.toSats(amount),
     });
 
-    const meltQuoteRes = await getMeltQuote({
-      pr: invoice,
-      unit: unit,
-      mintUrl: selectedMint,
-    });
-    if (meltQuoteRes.isErr()) {
-      showMessage(meltQuoteRes.error.message, {}, { emoji: '🚨' });
-      return;
-    }
-    const meltQuote = meltQuoteRes.value;
+    try {
+      // Use Coco's Lightning operations
+      const meltQuote = await payLightningInvoice(selectedMint, invoice);
 
-    const totalAmount = Number(amount) + Number(meltQuote.fee_reserve);
+      const totalAmount = Number(amount) + Number(meltQuote.fee_reserve || 0);
 
-    const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
+      const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
 
-    if (!isBalanceSufficient) {
-      showMessage(
-        'insufficient_balance',
-        { amount, unit, fee: meltQuote.fee_reserve },
-        { emoji: '🚨' }
-      );
-    } else {
+      if (!isBalanceSufficient) {
+        showMessage(
+          'insufficient_balance',
+          { amount, unit, fee: meltQuote.fee_reserve || 0 },
+          { emoji: '🚨' }
+        );
+        return;
+      }
+
       navigation.navigate(params.to, {
         ...params,
         pr: invoice,
@@ -164,6 +151,8 @@ function ModalScreen() {
         meltQuote: JSON.stringify(meltQuote),
         lud16: params.lud16,
       });
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
     }
   };
 
@@ -342,7 +331,17 @@ function ModalScreen() {
         requireValidMint={!!params?.allowedUnits}
       />
       {params.to === 'ecashSendConfirmation' && params?.profile && (
-        <TouchableOpacity style={[sovran(theme).listItem, { alignSelf: 'center' }]}>
+        <TouchableOpacity
+          style={[
+            {
+              padding: 8,
+              borderRadius: 16,
+              borderWidth: 0.2,
+              borderColor: greys(theme)[600],
+              marginVertical: 4,
+              alignSelf: 'center',
+            },
+          ]}>
           <Icon
             name="solar:key-bold"
             size={16}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
@@ -9,7 +9,6 @@ import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
-import { store } from 'helper/redux/store';
 import {
   getDecodedToken,
   getEncodedTokenV4,
@@ -19,14 +18,9 @@ import {
 import { nip19 } from 'nostr-tools';
 import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import _, { capitalize } from 'lodash';
-import {
-  memoizedGetTransactionByMatcher,
-  memoizedGetTransactions,
-  updateTransaction,
-  useGetMintInfo,
-} from 'helper/redux/cashu';
-import { cancelEcashTransaction, getWallet } from 'helper/cashuClient';
-import { toResult } from 'helper/toResult';
+// Removed memoizedGetTransactionByMatcher - now using Coco transactions
+import { useCashuOperations, useMintManagement } from 'hooks/coco';
+import { useSend, useManager } from 'coco-cashu-react';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
@@ -45,7 +39,6 @@ import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';
-import { useAutoListenBatch } from 'providers/TransactionsProvider';
 
 export function EcashSendConfirmation({
   unit,
@@ -60,11 +53,16 @@ export function EcashSendConfirmation({
   paymentRequest?: string;
   extraButtons?: ButtonHandlerButton[];
 }) {
+  const { isTokenSpendable, receiveEcash } = useCashuOperations();
+  const { getMintInfo: _getMintInfo } = useMintManagement();
+  const { send, isSending } = useSend();
+  const manager = useManager();
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [sendingNostr, setSendingNostr] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
 
@@ -80,6 +78,35 @@ export function EcashSendConfirmation({
         }),
     })
   );
+
+  // Set up Coco event subscription for ecash token spending
+  useEffect(() => {
+    const currentTx = getCurrentTransaction[0];
+    if (!currentTx || currentTx.paid || !manager) return;
+
+    setIsListening(true);
+
+    // Listen for proof state changes (when ecash token gets spent)
+    const unsubscribe = manager.on('proofs:state-changed', (payload) => {
+      // Check if this transaction's token has been spent
+      const decodedToken = getDecodedToken(token);
+      if (decodedToken && payload.mintUrl === decodedToken.mint) {
+        const tokenSecrets = decodedToken.proofs.map((p) => p.secret);
+        const hasMatchingSecrets = tokenSecrets.some((secret) => payload.secrets.includes(secret));
+
+        if (hasMatchingSecrets && payload.state === 'spent') {
+          // Coco automatically updates transaction status
+          showMessage('Ecash token spent!', { amount: currentTx.amount, unit: currentTx.unit });
+          setIsListening(false);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      setIsListening(false);
+    };
+  }, [getCurrentTransaction, manager, currentProfile.id, token]);
 
   const resolvedPaymentRequest = paymentRequest || getCurrentTransaction[0]?.paymentRequest;
 
@@ -128,53 +155,44 @@ export function EcashSendConfirmation({
   };
 
   const handleCancelSend = async (onClose) => {
-    const profileId = store.getState().nostr?.currentProfile?.id;
-    const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
+    try {
+      // For ecash transactions, "cancelling" means receiving the token back
+      // This effectively cancels the send transaction
+      await receiveEcash(token);
+      showMessage('Transaction cancelled successfully', {}, {}, onClose);
+    } catch (error) {
+      showMessage(
+        error instanceof Error ? error.message : 'Failed to cancel transaction',
+        {},
+        {},
+        onClose
+      );
+    }
+  };
 
-    const transaction = transactions.find((t) => t.token === token && t.transactionType === 'send');
+  const handleSendEcash = async (onClose) => {
+    try {
+      const decodedToken = getDecodedToken(token);
+      const mintUrl = decodedToken.mint;
 
-    const res = await cancelEcashTransaction(transaction, navigation);
-    if (res.isErr()) {
-      showMessage(res.error.message, {}, {}, onClose);
+      // Use Coco's send function to send ecash
+      await send(mintUrl, amount);
+      showMessage('Ecash sent successfully!', { amount, unit }, { emoji: '🎉' }, onClose);
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Failed to send ecash', {}, {}, onClose);
     }
   };
 
   const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
   const isLongToken = formattedToken.length >= 500;
 
-  const { isListening } = useAutoListenBatch(getCurrentTransaction);
-
   const checkProofsSpent = async (token: string): Promise<Result<boolean, Error>> => {
-    const decodedToken = getDecodedToken(token);
-    const { unit, mint: mintUrl, proofs } = decodedToken;
-
-    const walletRes = await getWallet({
-      unit,
-      mintUrl,
-      profile: null,
-    });
-    if (walletRes.isErr()) return err(walletRes.error);
-    const wallet = walletRes.value;
-
-    const spentRes = await toResult(wallet.checkProofsStates(proofs));
-    if (spentRes.isErr()) return err(spentRes.error);
-
-    if (spentRes.value.some((p) => p.state === 'SPENT')) {
-      const profileId = store.getState().nostr?.currentProfile?.id;
-      await store.dispatch(
-        updateTransaction({
-          profileId,
-          matcher: (tx) => tx.token === token,
-          updateFn: (tx) => ({
-            ...tx,
-            paid: true,
-          }),
-        })
-      );
-      return ok(true);
+    try {
+      const isSpendable = await isTokenSpendable(token);
+      return ok(!isSpendable); // Return true if NOT spendable (i.e., spent)
+    } catch (error) {
+      return err(error instanceof Error ? error : new Error('Failed to check proof states'));
     }
-
-    return ok(false);
   };
 
   const handleCheckStatus = async (onClose) => {
@@ -222,7 +240,26 @@ export function EcashSendConfirmation({
     });
   };
 
-  const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+  const { getMintInfo } = useMintManagement();
+  const [mintInfo, setMintInfo] = React.useState<any>({});
+
+  // Load mint info when transaction changes
+  React.useEffect(() => {
+    const loadMintInfo = async () => {
+      if (getCurrentTransaction[0]?.mintUrl) {
+        try {
+          const info = await getMintInfo(getCurrentTransaction[0].mintUrl);
+          setMintInfo(info);
+        } catch (error) {
+          console.error('Failed to load mint info:', error);
+          setMintInfo({});
+        }
+      } else {
+        setMintInfo({});
+      }
+    };
+    loadMintInfo();
+  }, [getCurrentTransaction, getMintInfo]);
 
   return (
     <Modal
@@ -286,6 +323,14 @@ export function EcashSendConfirmation({
                 icon: 'fluent:emoji-24-filled',
                 variant: 'primary',
                 onPress: handleCopyEmoji,
+                condition: !getCurrentTransaction[0].paid,
+              },
+              {
+                text: 'Send Ecash',
+                icon: 'mdi:send',
+                variant: 'primary',
+                loading: isSending,
+                onPress: handleSendEcash,
                 condition: !getCurrentTransaction[0].paid,
               },
               {

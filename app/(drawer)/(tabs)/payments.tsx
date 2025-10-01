@@ -1,29 +1,21 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { View } from 'components/ui/View';
 import { useNostr } from 'helper/redux/nostr';
-import { useCashu } from 'helper/redux/cashu';
+// Removed useCashu - now using usePaginatedHistory directly
 import Modal from 'components/blocks/Modal';
 import { greys, Theme } from 'helper/colors';
 import PagerView from 'react-native-pager-view';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation } from 'helper/navigation';
 import { Tabs } from 'components/ui/Tabs';
-import { maybeConvertNpub } from 'helper/cashuClient';
+import { useCashuUtilities, useMintManagement } from 'hooks/coco';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { nip19 } from 'nostr-tools';
-import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
 import { ContactItem } from 'components/blocks/payments';
 
-export function convertNpub(pubkey: string) {
-  try {
-    const npub = nip19.decode(pubkey);
-    if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
-  } catch {
-    return pubkey;
-  }
-  return maybeConvertNpub(pubkey)?.slice(2);
-}
+// This function is now defined inside the Section component to use the hook
 
 const RenderContactItem = ({ item }: { item: any }) => {
   const { profiles } = useNostr();
@@ -42,11 +34,22 @@ const RenderContactItem = ({ item }: { item: any }) => {
 };
 
 const Section = () => {
+  const { maybeConvertNpub } = useCashuUtilities();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const { profiles, search, currentProfile, messages, contacts } = useNostr();
-  const { transactions } = useCashu();
+  const { history: transactions } = usePaginatedHistory();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
+
+  const convertNpub = (pubkey: string) => {
+    try {
+      const npub = nip19.decode(pubkey);
+      if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
+    } catch {
+      return pubkey;
+    }
+    return maybeConvertNpub(pubkey)?.slice(2);
+  };
 
   const filteredProfiles = profiles.filter((p) => p.pubkey !== currentProfile?.pubkey);
   const filteredSearch = search.filter((s) => s.pubkey !== currentProfile?.pubkey);
@@ -150,8 +153,40 @@ const Section = () => {
       });
     });
 
-  const allBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  const mintInfo = useSelector((state: any) => state.cashu?.info || {});
+  const { getBalances, mints } = useMintManagement();
+  const [allBalances, setAllBalances] = useState<any[]>([]);
+  const [mintInfo, setMintInfo] = useState<any>({});
+
+  // Load balances and mint info from Coco
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const balanceData = await getBalances();
+
+        // Convert Coco balance format to the expected format
+        const formattedBalances = Object.entries(balanceData).map(([mintUrl, amount]) => ({
+          mintUrl,
+          amount: amount || 0,
+          unit: 'sat', // Default unit
+        }));
+
+        setAllBalances(formattedBalances);
+
+        // Convert mints to mintInfo format
+        const infoData: any = {};
+        mints.forEach((mint) => {
+          infoData[mint.mintUrl] = mint.mintInfo || {};
+        });
+        setMintInfo(infoData);
+      } catch (error) {
+        console.error('Failed to load balances:', error);
+        setAllBalances([]);
+        setMintInfo({});
+      }
+    };
+
+    loadData();
+  }, [getBalances, mints]);
 
   const mintsData = useMemo(() => {
     const uniqueMintUrls = [...new Set((allBalances || []).map((b: any) => b.mintUrl))];

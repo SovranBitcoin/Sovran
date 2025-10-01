@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { receiveEcash, giveaways } from 'helper/cashuClient';
+import { useCashuOperations } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
-import { memoizedGetMints, TransactionBuilder, useGetMintInfo } from 'helper/redux/cashu';
+import { memoizedGetMints, TransactionBuilder } from 'helper/redux/cashu';
+import { useMintManagement } from 'hooks/coco';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -56,7 +57,9 @@ export const getGiveaway = ({ token }: TokenProps) => {
   }
 
   if (pubkeys.size === 1) {
-    return Object.values(giveaways).find((p) => p.public_key === Array.from(pubkeys)[0]);
+    // Note: giveaways functionality removed with Coco migration
+    // This would need to be reimplemented if needed
+    return null;
   }
 
   return null;
@@ -95,6 +98,7 @@ export function EcashReceiveConfirmation({
   extraButtons?: ButtonHandlerButton[];
 }) {
   const navigation = useTypedNavigation();
+  const { receiveEcash } = useCashuOperations();
   const mints = useSelector(memoizedGetMints);
 
   const amount = getTokenAmount({ token });
@@ -110,18 +114,14 @@ export function EcashReceiveConfirmation({
 
   const handleRedeem = async () => {
     setLoading(true);
-    const res = await receiveEcash({
-      token: token as string,
-      unit: unit as string,
-    });
-
-    if (res.isOk()) {
+    try {
+      await receiveEcash(token as string);
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
         navigation.navigate('index', {}, { closeParents: true });
       });
-    } else {
-      console.error(res.error);
-      showMessage(res.error.message);
+    } catch (error) {
+      console.error(error);
+      showMessage(error instanceof Error ? error.message : 'Unknown error');
     }
     setLoading(false);
   };
@@ -142,7 +142,26 @@ export function EcashReceiveConfirmation({
     }
   };
 
-  const mintInfo = useGetMintInfo({ mintUrl });
+  const { getMintInfo } = useMintManagement();
+  const [mintInfo, setMintInfo] = React.useState<any>({});
+
+  // Load mint info when mintUrl changes
+  React.useEffect(() => {
+    const loadMintInfo = async () => {
+      if (mintUrl) {
+        try {
+          const info = await getMintInfo(mintUrl);
+          setMintInfo(info);
+        } catch (error) {
+          console.error('Failed to load mint info:', error);
+          setMintInfo({});
+        }
+      } else {
+        setMintInfo({});
+      }
+    };
+    loadMintInfo();
+  }, [mintUrl, getMintInfo]);
 
   return (
     <Modal

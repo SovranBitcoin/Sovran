@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
-import { getDescription, getTimestamp } from 'helper/cashuClient';
+import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Spacer, View, VStack, HStack } from 'components/ui/View';
 
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
 import { handleBarcode } from 'helper/payment-handler/handlers';
-import { setSelectedMint } from 'helper/redux/cashu/actions';
+// Removed Redux Cashu actions - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
-import { useGetMintInfo, memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Card } from 'components/ui/Card';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -20,7 +20,7 @@ import { TransactionHeader } from 'components/blocks/Transaction/TransactionHead
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { RootState } from 'helper/redux/store/reducer';
+// Removed RootState import - no longer needed
 import { SheetManager } from 'react-native-actions-sheet';
 
 export function LightningSendConfirmation({
@@ -45,7 +45,7 @@ export function LightningSendConfirmation({
   lud16?: string;
 }) {
   const navigation = useTypedNavigation();
-  const dispatch = useDispatch();
+  const { getLightningDescription, getLightningTimestamp } = useCashuUtilities();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -54,10 +54,29 @@ export function LightningSendConfirmation({
   const feeReserve = parsedQuote?.fee_reserve;
   const quoteId = parsedQuote?.quote;
 
-  const profileId = useSelector((state: RootState) => state.nostr?.currentProfile?.id);
+  // Removed profileId - no longer needed with Coco
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-  const mintInfo = useGetMintInfo({ mintUrl: selectedMintUrl || '' });
+  const { getMintInfo } = useMintManagement();
+  const [mintInfo, setMintInfo] = React.useState<any>({});
+
+  // Load mint info when selectedMintUrl changes
+  React.useEffect(() => {
+    const loadMintInfo = async () => {
+      if (selectedMintUrl) {
+        try {
+          const info = await getMintInfo(selectedMintUrl);
+          setMintInfo(info);
+        } catch (error) {
+          console.error('Failed to load mint info:', error);
+          setMintInfo({});
+        }
+      } else {
+        setMintInfo({});
+      }
+    };
+    loadMintInfo();
+  }, [selectedMintUrl, getMintInfo]);
 
   const handleMintSelected = async (mint: any, balance: any) => {
     if (pr) {
@@ -74,14 +93,14 @@ export function LightningSendConfirmation({
         balance: balance?.amount,
       });
       if (result.isOk() && result.value) {
-        dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+        // Note: Mint selection now handled by Coco
         setMeltQuote(result.value.params.meltQuote);
         setUnit(result.value.params.unit);
       } else {
         throw new Error('mint_change_failed');
       }
     } else {
-      dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+      // Note: Mint selection now handled by Coco
       setUnit(mint.unit.toLowerCase());
     }
   };
@@ -192,9 +211,9 @@ export function LightningSendConfirmation({
         )}
         <Spacer size={12} />
 
-        {getDescription({ pr }) && (
+        {getLightningDescription(pr) && (
           <VStack spacing={12} style={{ margin: 16, marginTop: 12 }}>
-            <Card message={getDescription({ pr })} variant="info" />
+            <Card message={getLightningDescription(pr)} variant="info" />
           </VStack>
         )}
 
@@ -221,7 +240,7 @@ export function LightningSendConfirmation({
 
         <Section
           items={[
-            { title: 'Date', value: getTimestamp({ pr }) },
+            { title: 'Date', value: getLightningTimestamp(pr) },
             { title: 'Type', value: 'Send • Lightning' },
             { title: 'Request', value: truncateMiddle(lud16 || pr, lud16 ? 10 : 5) },
             { title: 'Quote', value: truncateMiddle(quoteId, 7) },

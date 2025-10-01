@@ -12,14 +12,10 @@ import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Haptics from 'components/ui/Haptics';
 
-import {
-  memoizedGetAllBalancesMultipleCurrencies,
-  memoizedGetBalance,
-  memoizedGetSelectedMint,
-} from 'helper/redux/cashu';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
+import { useMintManagement } from 'hooks/coco';
 import { greys, Theme } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { store } from 'helper/redux/store';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { useTypedNavigation } from 'helper/navigation';
@@ -49,12 +45,32 @@ export function AccountPagerView({
 }: AccountPagerViewProps): React.ReactElement {
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
+  const { getBalances } = useMintManagement();
 
   const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-  const multipleBalances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
+  const [multipleBalances, setMultipleBalances] = React.useState<any[]>([]);
+
+  // Load balances from Coco
+  React.useEffect(() => {
+    const loadBalances = async () => {
+      try {
+        const balances = await getBalances();
+        const balanceArray = Object.entries(balances).map(([mintUrl, amount]) => ({
+          mintUrl,
+          amount,
+          unit: 'SAT', // Coco returns amounts in sats
+        }));
+        setMultipleBalances(balanceArray);
+      } catch (error) {
+        console.error('Failed to load balances:', error);
+        setMultipleBalances([]);
+      }
+    };
+    loadBalances();
+  }, [getBalances]);
 
   // Filter accounts that have a matching balance entry
   const loopedAccounts = accounts.filter((acc) =>
@@ -82,7 +98,15 @@ export function AccountPagerView({
   }, [accounts, account]);
 
   const handleButtonPress = async (page: string, accountUnit: string) => {
-    const balance = memoizedGetBalance(accountUnit)(store.getState());
+    // Get balance from Coco
+    let balance = 0;
+    try {
+      const balances = await getBalances();
+      balance = balances[selectedMintUrl || ''] || 0;
+    } catch (error) {
+      console.error('Failed to get balance:', error);
+      balance = 0;
+    }
 
     if (page === 'currency' && balance <= 0) {
       SheetManager.show('mint-balance', {

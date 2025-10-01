@@ -6,7 +6,7 @@ import { useTypedRoute } from 'helper/navigation';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
 import { Transactions } from 'components/blocks/Transactions';
-import { useCashu } from 'helper/redux/cashu';
+import { useTransactions } from 'providers/CocoTransactionsProvider';
 import { useTransactionsData } from 'hooks/useTransactionsData';
 import Container from 'components/blocks/Container';
 import CurrencySelector from 'components/blocks/CurrencySelector';
@@ -21,7 +21,7 @@ function ModalScreen() {
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<string>('all');
   const [at, setAt] = useState<string>('all');
-  const [tab, setTab] = useState(tab_ || 'All');
+  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending'>(tab_ || 'All');
 
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency.toLowerCase());
@@ -41,9 +41,9 @@ function ModalScreen() {
     setType('all');
   };
 
-  const { transactions } = useCashu();
+  const { history } = useTransactions();
   const txData = useTransactionsData({
-    transactions,
+    transactions: history as any[],
     account: { ...account, unit: selectedCurrency },
     filter,
     type,
@@ -53,7 +53,7 @@ function ModalScreen() {
   });
 
   const totalCounts = useTransactionsData({
-    transactions,
+    transactions: history as any[],
     account: { ...account, unit: selectedCurrency },
     filter: 'all',
     type: 'all',
@@ -73,7 +73,7 @@ function ModalScreen() {
             <Tabs
               tabs={['All', 'Confirmed', 'Pending']}
               selectedTab={tab}
-              handleTabPress={(tab) => setTab(tab)}
+              handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending')}
               amounts={[
                 String(totalCounts.all),
                 String(totalCounts.confirmed),

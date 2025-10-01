@@ -6,7 +6,6 @@ import { View, HStack } from 'components/ui/View';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { sovran } from 'components/blocks/sheets/mints';
 
 interface TabProps {
   tab: string;
@@ -101,8 +100,10 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         blur
         className="rounded-3xl p-1.5"
         style={[
-          sovran(theme).listItem,
           {
+            borderWidth: 0.2,
+            borderColor: greys(theme)[600],
+            marginVertical: 4,
             width: isScrollable ? undefined : '100%',
             minWidth: isScrollable ? undefined : '100%',
             borderRadius: 1000,

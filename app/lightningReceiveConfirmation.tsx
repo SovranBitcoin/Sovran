@@ -9,20 +9,9 @@ import { useSelector } from 'react-redux';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
-import {
-  appendProofsV2,
-  increaseCounterV2,
-  memoizedGetCounterV2,
-  memoizedGetTransactionByMatcher,
-  memoizedGetTransactions,
-  TransactionBuilder,
-  updateTransaction,
-  useGetMintInfo,
-} from 'helper/redux/cashu';
 import { useNavigation } from 'expo-router';
-import { getWallet, getRawExpiry } from 'helper/cashuClient';
-import { toResult } from 'helper/toResult';
-import { store } from 'helper/redux/store';
+import { useCashuUtilities, useMintManagement } from 'hooks/coco';
+import { useTransactions } from 'providers/CocoTransactionsProvider';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
@@ -33,8 +22,6 @@ import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { greens, greys } from 'helper/colors';
-import { publishWalletEvent } from 'helper/nostr/cashu';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -42,10 +29,8 @@ import { TransactionMintRefresh } from 'components/blocks/Transaction/Transactio
 import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import opacity from 'hex-color-opacity';
-import { err } from 'neverthrow';
-import { Spinner } from 'components/ui/Spinner';
 import { Essential } from 'helper/Essential';
-import { useAutoListenBatch } from 'providers/TransactionsProvider.tsx';
+import { useManager } from 'coco-cashu-react';
 
 interface MintQuoteTimelineProps {
   mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
@@ -57,7 +42,7 @@ interface MintQuoteTimelineProps {
   }[];
   type: 'mint' | 'melt';
   transaction?: Essential<
-    TransactionBuilder,
+    any,
     | 'mintQuote'
     | 'request'
     | 'token'
@@ -77,13 +62,14 @@ export function MintQuoteTimeline({
   type = 'melt',
   transaction,
 }: MintQuoteTimelineProps) {
+  const { getLightningExpiry: _getLightningExpiry } = useCashuUtilities();
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const navigation = useTypedNavigation();
 
-  const expiryDate = transaction?.request ? getRawExpiry({ pr: transaction.request }) : null;
-  const isExpired = expiryDate && new Date() > expiryDate;
+  const expiryDate = transaction?.request ? _getLightningExpiry(transaction.request) : null;
+  const isExpired = expiryDate && new Date() > new Date(expiryDate * 1000);
   const getTimeline = () => {
     if (type === 'mint') {
       const quotes = Object.fromEntries(mintQuotes.map((q) => [q.state, q]));
@@ -295,7 +281,7 @@ export function MintQuoteTimeline({
                         marginRight: 8,
                       }}
                       spin={
-                        loading
+                        _loading
                           ? {
                               delay: 0,
                               duration: 1500,
@@ -359,178 +345,111 @@ export function MintQuoteTimeline({
 export function LightningReceiveConfirmation({
   request,
   unit,
-  amount,
   autoGoBackOnPaid = true,
   extraButtons = [],
 }: {
   request: string;
   paymentRequest?: string;
   unit: string;
-  amount: number;
   autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
 }) {
+  const { getMintInfo } = useMintManagement();
+  const manager = useManager();
   const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
-  const [uri, setUri] = useState(null);
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
+  const [uri, setUri] = useState<string | null>(null);
+  const [mintInfo, setMintInfo] = useState<any>(null);
 
-  const getCurrentTransaction = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) => {
-        return _.filter(txs, {
-          request: request,
-          type: 'lightning',
-          unit: unit,
-          amount: amount,
+  const { history } = useTransactions();
+
+  // Find the current transaction using Coco's transaction list
+  const currentTransaction = history.find(
+    (tx: any) => tx.paymentRequest === request && tx.unit === unit
+  ) as any;
+
+  // Load mint info when transaction is found
+  useEffect(() => {
+    if (currentTransaction?.mintUrl) {
+      getMintInfo(currentTransaction.mintUrl)
+        .then(setMintInfo)
+        .catch(() => setMintInfo(null));
+    }
+  }, [currentTransaction?.mintUrl, getMintInfo]);
+
+  // Set up Coco event subscription for Lightning invoice payment
+  useEffect(() => {
+    if (!currentTransaction || currentTransaction.paid || !manager) return;
+
+    // Listen for mint quote state changes
+    const unsubscribe = manager.on('mint-quote:state-changed', (payload) => {
+      if (payload.quoteId === currentTransaction.mintQuote?.quote && payload.state === 'PAID') {
+        showMessage('Lightning invoice paid!', {
+          amount: currentTransaction.amount,
+          unit: currentTransaction.unit,
         });
-      },
-    })
-  );
+      }
+    });
+
+    return unsubscribe;
+  }, [currentTransaction, manager]);
 
   // Auto-navigate back when payment is received
   useEffect(() => {
-    if (autoGoBackOnPaid && getCurrentTransaction?.[0]?.paid) {
+    if (autoGoBackOnPaid && currentTransaction?.paid) {
       const timer = setTimeout(() => {
         navigation.goBack();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [autoGoBackOnPaid, getCurrentTransaction[0]?.paid, navigation]);
+  }, [autoGoBackOnPaid, currentTransaction?.paid, navigation]);
 
-  const handleCopy = async (onClose) => {
+  const handleCopy = async (close: (event: any) => void) => {
     await Clipboard.setStringAsync(request);
-    showSuccess('lightning_address_copied', {}, {}, onClose);
+    showSuccess('lightning_address_copied', {}, {}, () => close({}));
   };
 
-  const handleShare = async (onClose) => {
+  const handleShare = async (close: (event: any) => void) => {
     if (uri) {
-      await Share.share({
-        url: uri,
-        message: request,
-      });
+      await Share.share({ url: uri, message: request });
     }
-    onClose();
+    close({});
   };
+
+  const handleCheckStatus = async (close: (event: any) => void) => {
+    if (!currentTransaction) {
+      showMessage('Transaction not found', {}, {}, () => close({}));
+      return;
+    }
+
+    try {
+      await getMintInfo(currentTransaction.mintUrl);
+      showMessage('Status check completed', {}, {}, () => close({}));
+    } catch {
+      showMessage('Failed to check status', {}, {}, () => close({}));
+    }
+  };
+
+  // Show loading state if transaction is not found
+  if (!currentTransaction) {
+    return (
+      <Modal showClose title="Loading...">
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text>Loading transaction...</Text>
+        </View>
+      </Modal>
+    );
+  }
 
   const isBitcoin = unit === 'sat';
-
-  const { isListening } = useAutoListenBatch(getCurrentTransaction);
-
-  const handleCheckStatus = async (onClose, forceRefresh) => {
-    const currentTx = getCurrentTransaction[0];
-    const walletRes = await getWallet({
-      unit: currentTx.unit,
-      mintUrl: currentTx.mintUrl,
-      profile: null,
-      forceRefresh,
-    });
-    if (walletRes.isErr()) {
-      if (walletRes.error.message === 'keyset id inactive.') {
-        handleCheckStatus(onClose, true);
-      }
-      return;
-    }
-    const wallet = walletRes.value;
-    const activeKeyset = wallet.getActiveKeyset(
-      wallet.keysets.filter((key) => key.unit === currentTx.unit)
-    );
-    const keysetId = activeKeyset.id;
-    wallet.keysetId = keysetId;
-
-    const statusRes = await toResult(wallet.checkMintQuote(currentTx.mintQuote?.quote));
-    if (statusRes.isErr()) {
-      showMessage(statusRes.error.message);
-      return;
-    }
-    const status = statusRes.value;
-
-    if (status.state === 'PAID') {
-      const profileId = store.getState().nostr?.currentProfile?.id;
-
-      const counter = memoizedGetCounterV2({
-        profileId: store.getState().nostr.currentProfile.id,
-        mintUrl: currentTx.mintUrl,
-        keysetId: wallet.keysetId,
-      })(store.getState());
-
-      // Mint proofs
-      const proofsResult = await toResult(
-        wallet.mintProofs(amount, currentTx.mintQuote.quote, {
-          counter,
-          keysetId: wallet.keysetId,
-        })
-      );
-      if (proofsResult.isErr()) return err(proofsResult.error);
-      const proofs = proofsResult.value;
-
-      // Increase counter
-      store.dispatch(
-        increaseCounterV2({
-          profileId: store.getState().nostr.currentProfile.id,
-          mintUrl: currentTx.mintUrl,
-          keysetId: wallet.keysetId,
-          amount: proofs.length,
-        })
-      );
-
-      // Add proofs to redux
-      await store.dispatch(
-        appendProofsV2({
-          profileId: store.getState().nostr.currentProfile.id,
-          mintUrl: currentTx.mintUrl,
-          proofs: proofs,
-        })
-      );
-
-      // Publish wallet event, this basically just makes sure we can restore our account via nostr
-      const currentProfileId = store.getState().nostr.currentProfile.id;
-      const existingTxs = memoizedGetTransactions({ id: currentProfileId })(store.getState());
-      publishWalletEvent([...new Set([...existingTxs.map((t) => t.mintUrl), currentTx.mintUrl])]);
-
-      // Update transaction status to paid
-      showMessage('funds_sent', {
-        amount: currentTx.amount,
-        unit: currentTx.unit,
-      });
-
-      await store.dispatch(
-        updateTransaction({
-          profileId,
-          matcher: (tx) => tx.request === currentTx.request,
-          updateFn: (tx) => ({
-            ...tx,
-            paid: true,
-          }),
-        })
-      );
-
-      showMessage(
-        'funds_received',
-        { amount: currentTx.amount, unit: currentTx.unit },
-        { emoji: '🎉' },
-        onClose
-      );
-    } else if (status.state === 'ISSUED') {
-    } else {
-      showMessage('lightning_transaction_pending', {}, { emoji: '❌' }, onClose);
-    }
-  };
-
-  const mintInfo = useGetMintInfo({ mintUrl: getCurrentTransaction[0].mintUrl });
+  const isPaid = currentTransaction.paid;
 
   return (
     <Modal
       showClose
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       buttons={
-        <HStack
-          style={{
-            paddingBottom: 8,
-          }}
-          justify="center"
-          align="center">
+        <HStack style={{ paddingBottom: 8 }} justify="center" align="center">
           <ButtonHandler
             buttons={[
               {
@@ -538,67 +457,52 @@ export function LightningReceiveConfirmation({
                 icon: 'lets-icons:copy',
                 variant: 'primary',
                 onPress: handleCopy,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Share',
                 icon: 'ri:share-fill',
                 variant: 'secondary',
                 onPress: handleShare,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Check Status',
                 icon: 'humbleicons:refresh',
                 variant: 'secondary',
                 onPress: handleCheckStatus,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
-              ...extraButtons.map((button) => ({
-                ...button,
-                condition: !getCurrentTransaction[0].paid,
-              })),
+              ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
             ]}
           />
         </HStack>
       }>
       <TransactionHeader
         transaction={{
-          ...getCurrentTransaction[0],
+          ...currentTransaction,
           unit,
-          amount,
+          amount: currentTransaction.amount,
           transactionType: 'receive',
         }}
       />
-      {!getCurrentTransaction[0].paid && !getCurrentTransaction[0].fromNIP05 && (
+
+      {!isPaid && !currentTransaction.fromNIP05 && (
         <PaymentInfo
           showSection={false}
           setUri={setUri}
-          data={[
-            { name: 'Lightning', value: request },
-            // { name: 'Ecash', value: paymentRequest },
-          ]}
+          data={[{ name: 'Lightning', value: request }]}
           unit={unit}
-          popupMessage={[
-            {
-              name: 'lightning_address_copied',
-              value: request,
-            },
-            // {
-            //   name: 'payment_request_copied',
-            //   value: paymentRequest,
-            // },
-          ]}
+          popupMessage={[{ name: 'lightning_address_copied' }]}
         />
       )}
+
       <Spacer size={12} />
-      {getCurrentTransaction[0].memo && (
+
+      {currentTransaction.memo && (
         <>
-          <View
-            style={{
-              marginHorizontal: 16,
-            }}>
-            <Card message={getCurrentTransaction[0].memo} variant="info" />
+          <View style={{ marginHorizontal: 16 }}>
+            <Card message={currentTransaction.memo} variant="info" />
           </View>
           <Spacer size={12} />
         </>
@@ -606,15 +510,15 @@ export function LightningReceiveConfirmation({
 
       <TransactionMintRefresh
         mintInfo={mintInfo}
-        transaction={{ ...getCurrentTransaction[0], transactionType: 'receive' }}
+        transaction={{ ...currentTransaction, transactionType: 'receive' }}
         handleCheckStatus={handleCheckStatus}
       />
       <Spacer size={12} />
 
       <MintQuoteTimeline
-        transaction={getCurrentTransaction[0]}
+        transaction={currentTransaction}
         type="mint"
-        mintQuotes={getCurrentTransaction[0].mintQuotes}
+        mintQuotes={currentTransaction.mintQuotes}
       />
       <Spacer size={12} />
 
@@ -623,10 +527,10 @@ export function LightningReceiveConfirmation({
         items={[
           {
             title: 'Request',
-            value: getCurrentTransaction[0].fromNIP05
-              ? truncateMiddle(getCurrentTransaction[0].fromNIP05.split('@')[0], 4) +
+            value: currentTransaction.fromNIP05
+              ? truncateMiddle(currentTransaction.fromNIP05.split('@')[0], 4) +
                 '@' +
-                getCurrentTransaction[0].fromNIP05.split('@')[1]
+                currentTransaction.fromNIP05.split('@')[1]
               : truncateMiddle(request, 10),
           },
           {
@@ -637,15 +541,9 @@ export function LightningReceiveConfirmation({
             title: 'Status',
             value: (
               <HStack align="center">
-                <Text
-                  style={{
-                    color: greys(theme)[0],
-                    fontSize: 16,
-                    fontFamily: 'OverpassBold',
-                  }}>
-                  {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
+                <Text style={{ color: greys(theme)[0], fontSize: 16, fontFamily: 'OverpassBold' }}>
+                  {isPaid ? 'Completed' : 'Pending'}
                 </Text>
-                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
               </HStack>
             ),
           },
@@ -653,27 +551,15 @@ export function LightningReceiveConfirmation({
       />
       <Spacer size={12} />
 
-      <TransactionDebugCode transaction={getCurrentTransaction[0]} />
+      <TransactionDebugCode transaction={currentTransaction} />
     </Modal>
   );
 }
 
 function ModalScreen() {
-  const {
-    request,
-    paymentRequest = '',
-    unit,
-    amount,
-  } = useTypedRoute<'lightningReceiveConfirmation'>();
+  const { request, unit } = useTypedRoute<'lightningReceiveConfirmation'>();
 
-  return (
-    <LightningReceiveConfirmation
-      request={request}
-      paymentRequest={paymentRequest}
-      unit={unit}
-      amount={amount}
-    />
-  );
+  return <LightningReceiveConfirmation request={request} unit={unit} />;
 }
 
 export default withSheetProvider(ModalScreen);

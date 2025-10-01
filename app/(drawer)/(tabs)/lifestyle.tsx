@@ -88,11 +88,12 @@ const TabTwoScreen = () => {
 
   return (
     <VStack
-      className="flex-1"
+      flex={1}
       style={{
         backgroundColor: greys(theme)[950],
       }}>
-      <VStack style={{ paddingTop: 96 }}>
+      <Spacer size={96} />
+      <VStack>
         <Text
           size={32}
           heavy

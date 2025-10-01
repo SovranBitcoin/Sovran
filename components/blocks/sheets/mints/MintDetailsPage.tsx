@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Linking, ScrollView, Alert, StyleSheet, Animated, Image } from 'react-native';
+import { Linking, ScrollView, Alert, StyleSheet, Animated } from 'react-native';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { greens, greys, reds, Theme } from 'helper/colors';
@@ -16,6 +16,7 @@ import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
 import { useTypedNavigation } from 'helper/navigation';
 import { npubToPubkey } from 'components/blocks/Transaction';
+import { Avatar } from 'components/ui/Avatar';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
@@ -338,18 +339,15 @@ const MintDetailPage = () => {
 
   // Render the mint icon/logo even if loading
   const renderMintIcon = () => {
-    const iconUrl = (mintInfo as any)?.icon_url;
-    if (iconUrl) {
-      return <Image source={{ uri: iconUrl }} style={styles.logoImage} />;
-    } else {
-      return (
-        <VStack align="center" justify="center" style={styles.logo}>
-          <Text style={styles.logoText}>
-            {mintInfo?.name ? mintInfo.name.charAt(0).toUpperCase() : 'M'}
-          </Text>
-        </VStack>
-      );
-    }
+    return (
+      <Avatar
+        picture={(mintInfo as any)?.icon_url || undefined}
+        size={60}
+        variant="mint"
+        name={mintInfo?.name}
+        alt={`${mintInfo?.name || 'Mint'} icon`}
+      />
+    );
   };
 
   if (loading) {

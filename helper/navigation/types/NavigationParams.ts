@@ -78,6 +78,11 @@ export type NavigationParams = {
   receive: {
     unit: string;
     type: string;
+    to?: string;
+    amount?: number;
+    token?: string;
+    request?: string;
+    transaction?: string;
   };
   transactions: {
     account: { unit: string };

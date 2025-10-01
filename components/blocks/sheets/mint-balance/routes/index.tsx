@@ -30,6 +30,10 @@ declare module 'react-native-actions-sheet' {
         updateSelectedMint?: boolean;
         allowedMints?: string[];
         allowedUnits?: string[];
+        showAddMintsButton?: boolean;
+        showDetailsButton?: boolean;
+        onAddMintsPress?: () => void;
+        onDetailsPress?: (mintUrl: string) => void;
         onMintPress?: (
           mint: {
             id: string;

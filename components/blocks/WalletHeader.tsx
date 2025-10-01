@@ -1,8 +1,8 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
-import SelectedMintDisplay from 'components/blocks/sheets/mints';
+import { View } from 'components/ui/View';
+import { SelectedMintDisplayList } from 'components/blocks/sheets/mints';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
@@ -40,7 +40,10 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const dispatch = useDispatch();
 
-  const handleMintSelected = async (mint: { id: string; unit: string }) => {
+  const handleMintSelected = async (
+    mint: { id: string; unit: string },
+    _balance?: { amount: number; unit: string }
+  ) => {
     dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
     const index = accounts.findIndex((a) => a.unit === mint.unit);
     if (index !== -1) {
@@ -52,11 +55,8 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
     <View
       className="h-13 pointer-events-box-none absolute left-0 right-0 pt-5"
       style={{ marginTop: 32 }}>
-      <SelectedMintDisplay
-        style={{
-          width: Dimensions.get('window').width - 128,
-          marginLeft: 2,
-        }}
+      <SelectedMintDisplayList
+        width={Dimensions.get('window').width - 128}
         onMintSelected={handleMintSelected}
         unit={unit}
       />

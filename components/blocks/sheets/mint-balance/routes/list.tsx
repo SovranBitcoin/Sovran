@@ -1,25 +1,22 @@
-import React, { useState, useMemo } from 'react';
-import { StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { ScrollView, useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
-import { memoizedGetAllBalancesMultipleCurrencies } from 'helper/redux/cashu/selectors';
+import { useMintManagement } from 'hooks/coco';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { CurrencyIcon, FlagIcon } from 'assets/icons';
+import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import _ from 'lodash';
-import Image from 'components/ui/Image';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { Avatar } from 'components/ui/Avatar';
 import { showMessage } from 'helper/popup/popups';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { useTypedNavigation } from 'helper/navigation';
-import opacity from 'hex-color-opacity';
-import { LinearGradient } from 'expo-linear-gradient';
-import { View, HStack, VStack } from 'components/ui/View';
+import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { formatCurrency } from 'helper/currency';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -29,6 +26,9 @@ interface MintItemProps {
   isLoading: boolean;
   globalLoading: boolean;
   requireBalance?: boolean;
+  selectedCurrency: string;
+  showDetailsButton?: boolean;
+  onDetailsPress?: (mintUrl: string) => void;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
@@ -38,29 +38,92 @@ const MintItem: React.FC<MintItemProps> = ({
   onPress,
   isLoading,
   globalLoading,
-  requireBalance = true,
+  requireBalance: _requireBalance = true,
+  selectedCurrency,
+  showDetailsButton = false,
+  onDetailsPress,
 }) => {
-  const styles = createStyles(theme);
+  const formattedBalance = balance
+    ? formatCurrency(
+        {
+          currency: selectedCurrency === 'SAT' ? 'BTC' : (selectedCurrency as any),
+          value: balance.amount,
+          denomination:
+            selectedCurrency.toLowerCase() === 'sat'
+              ? 'sats'
+              : (selectedCurrency.toLowerCase() as any),
+        },
+        {
+          locale: 'en-US',
+          precision: selectedCurrency === 'SAT' ? 0 : 2,
+          currencyDisplay: selectedCurrency === 'SAT' ? 'name' : 'symbol',
+          denomination:
+            selectedCurrency.toLowerCase() === 'sat'
+              ? 'sats'
+              : (selectedCurrency.toLowerCase() as any),
+        }
+      )
+    : '0';
+
   return (
-    <TouchableOpacity onPress={onPress} disabled={globalLoading}>
-      <HStack
-        blur
-        style={[styles.mintItem, balance.amount === 0 && requireBalance && styles.zeroBalance]}
-        align="center">
-        {mint.iconUrl ? (
-          <Image source={{ uri: mint.iconUrl }} style={styles.mintIcon} />
-        ) : (
-          <View style={styles.mintIcon} />
-        )}
-        <VStack style={styles.mintDetails}>
-          <Text style={styles.mintName}>{mint.name}</Text>
-          <Text style={styles.mintBalance}>
-            <AmountFormatter size={14} amount={balance.amount} unit={balance.unit} />
-          </Text>
-        </VStack>
-        <View style={{ width: 16 }}>
-          {isLoading && <ActivityIndicator size="small" color={greys(theme)[0]} />}
+    <TouchableOpacity
+      style={{
+        padding: 16,
+        marginBottom: 4,
+        borderRadius: 16,
+        backgroundColor: greys(theme)[900],
+        opacity: globalLoading ? 0.5 : balance.amount === 0 && _requireBalance ? 0.5 : 1,
+      }}
+      onPress={onPress}
+      disabled={globalLoading}>
+      <HStack align="center" gap={12}>
+        <View style={{ position: 'relative' }}>
+          <Avatar
+            picture={mint.iconUrl || undefined}
+            size={36}
+            variant="mint"
+            name={mint.name}
+            alt={`${mint.name} mint`}
+          />
+          <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
+            {isLoading && <ActivityIndicator animating size="small" color={greys(theme)[0]} />}
+          </View>
         </View>
+
+        <VStack flex={1}>
+          <Text style={{ color: greys(theme)[0], fontSize: 16, fontWeight: '500' }}>
+            {mint.name}
+          </Text>
+          <Text style={{ color: greys(theme)[200], fontSize: 14 }}>{formattedBalance}</Text>
+        </VStack>
+
+        {showDetailsButton && (
+          <TouchableOpacity
+            onPress={() => {
+              if (onDetailsPress) {
+                onDetailsPress(mint.id);
+              } else {
+                // Navigate to mint details sheet
+                import('react-native-actions-sheet').then(({ SheetManager }) => {
+                  SheetManager.show('mint', {
+                    payload: {
+                      initialRoute: 'mintDetailsPage',
+                      mintUrl: mint.id,
+                    },
+                  });
+                });
+              }
+            }}>
+            <Icon
+              style={{
+                padding: 8,
+                borderRadius: 1000,
+                backgroundColor: `${greys(theme)[800]}BF`,
+              }}
+              name="bx:dots-vertical-rounded"
+            />
+          </TouchableOpacity>
+        )}
       </HStack>
     </TouchableOpacity>
   );
@@ -68,43 +131,122 @@ const MintItem: React.FC<MintItemProps> = ({
 
 const ListRoute = () => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const navigation = useTypedNavigation();
 
   console.log(payload);
 
-  const balances = useSelector(memoizedGetAllBalancesMultipleCurrencies);
-  const allowedBalances = useMemo(
-    () =>
-      balances.filter((b) =>
-        payload?.allowedMints ? payload.allowedMints.includes(b.mintUrl) : true
-      ),
-    [balances, payload?.allowedMints]
-  );
-  const dispatch = useDispatch();
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
+  // Extract configuration from payload
+  const showAddMintsButton = payload?.showAddMintsButton ?? false;
+  const showDetailsButton = payload?.showDetailsButton ?? false;
+  const onAddMintsPress = payload?.onAddMintsPress;
+  const onDetailsPress = payload?.onDetailsPress;
 
-  const currencies: string[] = _.uniq(allowedBalances.map((b) => b.unit?.toUpperCase()))
-    .filter(Boolean)
-    .filter((unit) => {
-      return ['SAT', 'USD', 'EUR', 'GBP'].includes(unit);
-    })
-    .filter((unit) => {
-      return payload?.allowedUnits ? payload?.allowedUnits?.includes(unit) : true;
+  const { getBalances, mints } = useMintManagement();
+  const [filteredMints, setFilteredMints] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Get currencies from mints (unit is in nuts[4].methods) - same as MintSelect.tsx
+  const currencies = useMemo(() => {
+    const units: string[] = [];
+    mints.forEach((mint) => {
+      if (mint.mintInfo?.nuts?.['4']?.methods) {
+        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
+          if (method.unit) {
+            units.push(method.unit.toUpperCase());
+          }
+        });
+      }
     });
+    const uniqueUnits = [...new Set(units)];
+    const filteredUnits = uniqueUnits.filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+
+    console.log('🔍 Currency Debug:', {
+      mints: mints.length,
+      allUnits: uniqueUnits,
+      filteredUnits,
+      mintDetails: mints.map((m) => ({
+        mintUrl: m.mintUrl,
+        nuts4: m.mintInfo?.nuts?.['4']?.methods?.map((method: any) => method.unit),
+      })),
+    });
+
+    return filteredUnits;
+  }, [mints]);
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     (currencies[0] || 'SAT') as string
   );
-  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const filteredMints = useMemo(() => {
-    return allowedBalances
-      .filter((b) => b.unit?.toUpperCase() === selectedCurrency)
-      .sort((a, b) => b.amount - a.amount);
-  }, [allowedBalances, selectedCurrency]);
+  // Load mints with balances - no currency filtering in useEffect
+  useEffect(() => {
+    const loadMints = async () => {
+      try {
+        setLoading(true);
+        console.log('🔍 Debug - Raw mints data:', mints);
+
+        // Get balances for all mints
+        const balances = await getBalances();
+        console.log('🔍 Debug - Balances:', balances);
+
+        // Combine mint info with balance data
+        const mintsWithBalances = mints.map((mint) => {
+          const mintData = {
+            mintUrl: mint.mintUrl,
+            name:
+              mint.name ||
+              mint.mintInfo?.name ||
+              mint.mintUrl.replace('https://', '')?.split('/')?.[0] ||
+              'Unknown Mint',
+            unit: 'SAT', // Default to SAT for now
+            amount: balances[mint.mintUrl] || 0,
+            iconUrl: mint.mintInfo?.icon_url || null,
+            mintInfo: mint.mintInfo, // Keep mint info for filtering
+          };
+
+          console.log('🔍 Debug - Processed mint:', {
+            original: mint,
+            processed: mintData,
+          });
+
+          return mintData;
+        });
+
+        // Sort by balance (highest first)
+        const sortedMints = mintsWithBalances.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+
+        console.log('🔍 Debug - Final mints:', sortedMints);
+        setFilteredMints(sortedMints);
+      } catch (error) {
+        console.error('Failed to load mints:', error);
+        setFilteredMints([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMints();
+  }, [mints, getBalances]);
+
+  // Filter mints by selected currency in render phase
+  const filteredMintsForCurrency = useMemo(() => {
+    return filteredMints.filter((mint) => {
+      if (!mint.mintInfo?.nuts?.['4']?.methods) {
+        // If no nuts data, default to SAT for backward compatibility
+        return selectedCurrency === 'SAT';
+      }
+
+      // Check if this mint supports the selected currency
+      return mint.mintInfo.nuts['4'].methods.some(
+        (method: any) => method.unit?.toUpperCase() === selectedCurrency
+      );
+    });
+  }, [filteredMints, selectedCurrency]);
+
+  const dispatch = useDispatch();
+  const profileId = useSelector(memoizedGetCurrentProfile).id;
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleMintSelect = async (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
@@ -128,7 +270,7 @@ const ListRoute = () => {
         payload.onMintPress(
           {
             id: mint.mintUrl,
-            name: mint.mintUrl.replace('https://', '').split('/')[0],
+            name: mint.name,
             iconUrl: mint.iconUrl,
             unit: mint.unit,
           },
@@ -153,7 +295,7 @@ const ListRoute = () => {
 
       sheetRef.current?.hide({
         id: mint.mintUrl,
-        name: mint.mintUrl.replace('https://', '').split('/')[0],
+        name: mint.name,
         iconUrl: mint.iconUrl,
         unit: mint.unit,
       });
@@ -168,7 +310,31 @@ const ListRoute = () => {
     }
   };
 
-  const displayCurrency = (c: string) => (c === 'SAT' ? 'BTC' : c);
+  if (loading) {
+    return (
+      <Wrapper
+        buttons={
+          <ButtonHandler
+            context="sheet"
+            buttons={[
+              {
+                text: 'Close',
+                variant: 'secondary',
+                onPress: async () => sheetRef.current?.hide(),
+              },
+            ]}
+          />
+        }>
+        <VStack className="items-center p-5">
+          <ActivityIndicator size="large" color={greys(theme)[0]} />
+          <Spacer size={10} />
+          <Text className="text-sm" style={{ color: greys(theme)[200] }}>
+            Loading balances...
+          </Text>
+        </VStack>
+      </Wrapper>
+    );
+  }
 
   return (
     <Wrapper
@@ -181,31 +347,57 @@ const ListRoute = () => {
               variant: 'secondary',
               onPress: async () => sheetRef.current?.hide(),
             },
+            ...(showAddMintsButton
+              ? [
+                  {
+                    text: 'Add mints',
+                    variant: 'primary' as const,
+                    onPress: async () => {
+                      if (onAddMintsPress) {
+                        onAddMintsPress();
+                      } else {
+                        // Navigate to add mints sheet
+                        import('react-native-actions-sheet').then(({ SheetManager }) => {
+                          SheetManager.show('mint', {
+                            payload: {
+                              initialRoute: 'mintAddMore',
+                            },
+                          });
+                        });
+                      }
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       }>
-      <View>
-        <Text weight="bold" style={styles.sectionHeader}>
-          Send payment in
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
-          {currencies.map((currency) => (
-            <LinearGradient
-              key={currency}
-              colors={
-                selectedCurrency === currency
-                  ? [opacity(theme.shades[200], 1), opacity(theme.shades[400], 1)]
-                  : [opacity(theme.greys[600], 1), opacity(theme.greys[700], 1)]
-              }
-              style={[
-                styles.currencyButton,
-                { marginRight: 8, borderRadius: 8, padding: 1, backgroundColor: greys(theme)[900] },
-              ]}>
-              <TouchableOpacity key={currency} onPress={() => setSelectedCurrency(currency)}>
-                <HStack
-                  align="center"
-                  gap={8}
-                  style={[styles.currencyButton, styles.selectedCurrencyButton]}>
+      <VStack flex={1}>
+        <VStack>
+          <Text
+            style={{
+              color: greys(theme)[0],
+              fontSize: 18,
+              fontWeight: '600',
+              marginBottom: 4,
+            }}>
+            Send payment in
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 1 }}>
+            {currencies.map((currency: any) => (
+              <TouchableOpacity
+                key={currency}
+                style={{
+                  marginRight: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  minWidth: 100,
+                  backgroundColor:
+                    selectedCurrency === currency ? greys(theme)[700] : greys(theme)[900],
+                }}
+                onPress={() => setSelectedCurrency(currency)}>
+                <HStack align="center" justify="flex-start" gap={8}>
                   {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
                     <FlagIcon
                       country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
@@ -215,91 +407,51 @@ const ListRoute = () => {
                   ) : (
                     <CurrencyIcon currency={currency.toLowerCase()} />
                   )}
-                  <Text style={styles.currencyText}>{displayCurrency(currency)}</Text>
+                  <Text style={{ color: greys(theme)[0], fontSize: 14, fontWeight: 'bold' }}>
+                    {currency === 'SAT' ? 'BTC' : currency}
+                  </Text>
                 </HStack>
               </TouchableOpacity>
-            </LinearGradient>
-          ))}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        </VStack>
+        <Spacer size={16} />
 
-        <Text weight="bold" style={[styles.sectionHeader, { marginTop: 24 }]}>
-          Send from
-        </Text>
-        <View>
-          {filteredMints.map((mint) => (
-            <MintItem
-              key={mint.mintUrl}
-              mint={{
-                id: mint.mintUrl,
-                name: mint.mintUrl.replace('https://', '').split('/')[0],
-                iconUrl: mint.iconUrl,
-              }}
-              balance={{ amount: mint.amount, unit: mint.unit }}
-              theme={theme}
-              isLoading={loadingId === mint.mintUrl}
-              globalLoading={loadingId !== null}
-              requireBalance={payload?.requireBalance}
-              onPress={() => handleMintSelect(mint.mintUrl)}
-            />
-          ))}
-        </View>
-      </View>
+        <VStack>
+          <Text
+            style={{
+              color: greys(theme)[0],
+              fontSize: 18,
+              fontWeight: '600',
+              marginBottom: 4,
+            }}>
+            Send from
+          </Text>
+          <VStack>
+            {filteredMintsForCurrency.map((mint) => (
+              <MintItem
+                key={mint.mintUrl}
+                mint={{
+                  id: mint.mintUrl,
+                  name: mint.name,
+                  iconUrl: mint.iconUrl,
+                }}
+                balance={{ amount: mint.amount, unit: mint.unit }}
+                theme={theme}
+                isLoading={loadingId === mint.mintUrl}
+                globalLoading={loadingId !== null}
+                requireBalance={payload?.requireBalance}
+                selectedCurrency={selectedCurrency}
+                showDetailsButton={showDetailsButton}
+                onDetailsPress={onDetailsPress}
+                onPress={() => handleMintSelect(mint.mintUrl)}
+              />
+            ))}
+          </VStack>
+        </VStack>
+      </VStack>
     </Wrapper>
   );
 };
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    sectionHeader: {
-      color: greys(theme)[0],
-      fontSize: 18,
-      fontWeight: '600',
-      marginBottom: 4,
-    },
-    currencyScroll: {
-      flexGrow: 1,
-    },
-    currencyButton: {
-      padding: 12,
-      borderRadius: 8,
-      minWidth: 100,
-    },
-    selectedCurrencyButton: {
-      backgroundColor: greys(theme)[800],
-    },
-    currencyText: {
-      color: greys(theme)[0],
-      fontSize: 14,
-      fontFamily: 'OverpassBold',
-    },
-    mintItem: {
-      padding: 12,
-      borderRadius: 16,
-      backgroundColor: greys(theme)[800],
-      marginBottom: 8,
-    },
-    zeroBalance: {
-      opacity: 0.5,
-    },
-    mintIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: greys(theme)[200],
-    },
-    mintDetails: {
-      flex: 1,
-      marginLeft: 12,
-      marginRight: 12,
-    },
-    mintName: {
-      color: greys(theme)[0],
-      fontSize: 16,
-    },
-    mintBalance: {
-      color: greys(theme)[200],
-      fontSize: 14,
-    },
-  });
 
 export default ListRoute;

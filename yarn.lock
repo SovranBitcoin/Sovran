@@ -1158,6 +1158,15 @@
     "@scure/bip32" "^1.5.0"
     buffer "^6.0.3"
 
+"@cashu/cashu-ts@^2.7.2":
+  version "2.7.2"
+  resolved "https://registry.yarnpkg.com/@cashu/cashu-ts/-/cashu-ts-2.7.2.tgz#6aa928229dcd6139fb0fe28aad87cdf854d72173"
+  integrity sha512-AOwL6+10AA0syRf2mtRYgoTvAz31gE4MnElj9TLS9xG3k8Msxy27awBlCX5MsBpBgcZZoqWOReYEuUgnbN3IQQ==
+  dependencies:
+    "@noble/curves" "^1.9.5"
+    "@noble/hashes" "^1.5.0"
+    "@scure/bip32" "^1.5.0"
+
 "@cashu/crypto@^0.2.7":
   version "0.2.7"
   resolved "https://registry.yarnpkg.com/@cashu/crypto/-/crypto-0.2.7.tgz#26467fd2f5ecfeabcc74b9c65189a1e8c6ce85ce"
@@ -5523,6 +5532,23 @@ co@^4.6.0:
   resolved "https://registry.yarnpkg.com/co/-/co-4.6.0.tgz#6ea6bdf3d853ae54ccb8e47bfa0bf3f9031fb184"
   integrity sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==
 
+coco-cashu-core@^1.0.0-rc9:
+  version "1.0.0-rc9"
+  resolved "https://registry.yarnpkg.com/coco-cashu-core/-/coco-cashu-core-1.0.0-rc9.tgz#a59488f26f2f5a5228c2cdf1f7cbcb5d3c158efe"
+  integrity sha512-kU3XVjvPWSIqrTKwtqPe2vYjs256EdrOOdno12+ZGoO5116oWrENuwG/QMZOBy6ceUdmqPM3u13zQef6tYrtUg==
+  dependencies:
+    "@cashu/cashu-ts" "^2.7.2"
+
+coco-cashu-expo-sqlite@^0.6.0:
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/coco-cashu-expo-sqlite/-/coco-cashu-expo-sqlite-0.6.0.tgz#1edd9218a0280cc86ca770e6980d7543b827fe73"
+  integrity sha512-19GRl8zRYZS1r3hWDXIzT8OE7JLR5lyWeA0lWlFuQro/+i7uTAIDRxtVPw0M7EqRXACcu1tEjiZqDIDArq4oSg==
+
+coco-cashu-react@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/coco-cashu-react/-/coco-cashu-react-1.1.0.tgz#0c5e7257e365ed46bf6da862e410028012a35598"
+  integrity sha512-HRClBRuP0dwBuyclOW/sJTA0m64zxJtKaqRBAk1RtYEwtrCWYvvxaY7/HdQbeSVw81LBJsxB1gFjnVIOLH40lQ==
+
 collect-v8-coverage@^1.0.0:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/collect-v8-coverage/-/collect-v8-coverage-1.0.2.tgz#c0b29bcd33bcd0779a1344c2136051e6afd3d9e9"
@@ -5611,15 +5637,13 @@ commander@^9.4.1:
   integrity sha512-KRs7WVDKg86PWiuAqhDrAQnTXZKraVcCc6vFdL14qrZ/DcWwuRo7VoiYXalXO7S5GKpqYiVEwCbgFDfxNHKJBQ==
 
 comment-json@^4.2.5:
-  version "4.2.5"
-  resolved "https://registry.yarnpkg.com/comment-json/-/comment-json-4.2.5.tgz#482e085f759c2704b60bc6f97f55b8c01bc41e70"
-  integrity sha512-bKw/r35jR3HGt5PEPm1ljsQQGyCrR8sFGNiN5L+ykDHdpO8Smxkrkla9Yi6NkQyUrb8V54PGhfMs6NrIwtxtdw==
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/comment-json/-/comment-json-4.3.0.tgz#74e1f35b4a6b76ac000d5cb8d02f950e44ff68ee"
+  integrity sha512-DczdmbvWLd09KATFWY0xcihOO45b32+5V34vZg1oelxqgjtGJotaLrrdFpJRLOdG6Wb031qcg4zOKgnQoBWbEw==
   dependencies:
     array-timsort "^1.0.3"
     core-util-is "^1.0.3"
     esprima "^4.0.1"
-    has-own-prop "^2.0.0"
-    repeat-string "^1.6.1"
 
 component-type@^1.2.1:
   version "1.2.2"
@@ -7948,11 +7972,6 @@ has-flag@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/has-flag/-/has-flag-4.0.0.tgz#944771fd9c81c81265c4d6941860da06bb59479b"
   integrity sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==
-
-has-own-prop@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/has-own-prop/-/has-own-prop-2.0.0.tgz#f0f95d58f65804f5d218db32563bb85b8e0417af"
-  integrity sha512-Pq0h+hvsVm6dDEa8x82GnLSYHOzNDt7f0ddFa3FqcQlgzEiptPqL+XrOJNavjOzSYiYWIrgeVYYgGlLmnxwilQ==
 
 has-property-descriptors@^1.0.0, has-property-descriptors@^1.0.2:
   version "1.0.2"
@@ -10630,7 +10649,7 @@ napi-postinstall@^0.3.0:
   resolved "https://registry.yarnpkg.com/napi-postinstall/-/napi-postinstall-0.3.3.tgz#93d045c6b576803ead126711d3093995198c6eb9"
   integrity sha512-uTp172LLXSxuSYHv/kou+f6KW3SMppU9ivthaVTXian9sOt3XM/zHYHpRZiLgQoxeWfYUnslNWQHF1+G71xcow==
 
-nativewind@^4.2.23:
+nativewind@^4.2.1:
   version "4.2.1"
   resolved "https://registry.yarnpkg.com/nativewind/-/nativewind-4.2.1.tgz#ea1573fa944b84480b7ba42b69eeb2ad7cb2411e"
   integrity sha512-10uUB2Dlli3MH3NDL5nMHqJHz1A3e/E6mzjTj6cl7hHECClJ7HpE6v+xZL+GXdbwQSnWE+UWMIMsNz7yOQkAJQ==
@@ -12223,11 +12242,6 @@ rename-keys@^1.1.2:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/rename-keys/-/rename-keys-1.2.0.tgz#be602fb0b750476b513ebe85ba4465d03254f0a3"
   integrity sha512-U7XpAktpbSgHTRSNRrjKSrjYkZKuhUukfoBlXWXUExCAqhzh1TU3BDRAfJmarcl5voKS+pbKU9MvyLWKZ4UEEg==
-
-repeat-string@^1.6.1:
-  version "1.6.1"
-  resolved "https://registry.yarnpkg.com/repeat-string/-/repeat-string-1.6.1.tgz#8dcae470e1c88abc2d600fff4a776286da75e637"
-  integrity sha512-PV0dzCYDNfRi1jCDbJzpW7jNNDRuCOG/jI5ctQcGKt/clZD+YcPS3yIlWuTJMmESC8aevCFmWJy5wjAFgNqN6w==
 
 require-directory@^2.1.1:
   version "2.1.1"

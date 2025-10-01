@@ -3,7 +3,8 @@ import { Text } from 'components/ui/Text';
 import Modal from 'components/blocks/Modal';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useTypedRoute, useTypedNavigation } from 'helper/navigation';
-import { useCashu } from 'helper/redux/cashu';
+import { usePaginatedHistory } from 'coco-cashu-react';
+import { adaptCocoHistoryToTransaction } from 'helper/coco/typeAdapters';
 import { EcashSendConfirmation } from './ecashSendConfirmation';
 import { EcashReceiveConfirmation } from './ecashReceiveConfirmation';
 import { LightningReceiveConfirmation } from './lightningReceiveConfirmation';
@@ -14,20 +15,23 @@ import { Section } from 'components/ui/Section';
 // useTypedNavigation is already imported; removing duplicate
 
 function VirtualBatchTransaction({ batchId }: { batchId: string }) {
-  const { transactions } = useCashu();
+  const { history } = usePaginatedHistory();
   const navigation = useTypedNavigation();
 
-  const batchTxs = (transactions || []).filter(
-    (t) => t.batchId === batchId && t.type === 'lightning'
-  );
+  // Filter Coco history entries for this batch and adapt them
+  const batchTxs = (history || [])
+    .filter((t) => t.type === 'mint') // Coco uses 'mint' for Lightning-to-ecash
+    .map(adaptCocoHistoryToTransaction)
+    .filter((t) => t.batchId === batchId);
 
   const receivesByRequest = new Map<string, any>();
   const sendsByRequest = new Map<string, any>();
 
   for (const tx of batchTxs) {
-    if (tx.transactionType === 'receive' && tx.request) {
+    // Use adapted transaction structure
+    if (tx.type === 'mint' && tx.request) {
       receivesByRequest.set(tx.request, tx);
-    } else if (tx.transactionType === 'send' && tx.request) {
+    } else if (tx.type === 'send' && tx.request) {
       sendsByRequest.set(tx.request, tx);
     }
   }
@@ -36,11 +40,9 @@ function VirtualBatchTransaction({ batchId }: { batchId: string }) {
     .map(([request, receiveTx]) => {
       const sendTx = sendsByRequest.get(request);
       if (!sendTx) return null;
-      const status: 'success' | 'pending' | 'error' | undefined = receiveTx.paid
-        ? 'success'
-        : receiveTx.isCancel
-          ? 'error'
-          : 'pending';
+      // Use adapted transaction state
+      const status: 'success' | 'pending' | 'error' | undefined =
+        receiveTx.state === 'PAID' ? 'success' : receiveTx.state === 'UNPAID' ? 'pending' : 'error';
 
       return {
         fromMint: sendTx.mintUrl as string,
@@ -111,20 +113,23 @@ function VirtualBatchTransaction({ batchId }: { batchId: string }) {
 
 function ModalScreen() {
   const { id, transactionType } = useTypedRoute<'modal'>();
-  const { transactions } = useCashu();
+  const { history } = usePaginatedHistory();
 
   if (typeof id === 'string' && id.startsWith('batch:')) {
     const batchId = id.replace('batch:', '');
     return <VirtualBatchTransaction batchId={batchId} />;
   }
 
-  const transaction = transactions.find(
+  // Find and adapt the transaction
+  const historyEntry = history.find(
     (t) =>
-      t.txid === id ||
+      t.id === id ||
       String(t.id) === String(id) ||
-      (t.request && t.request === id && t.transactionType === transactionType) ||
-      (t.token && t.token === id && t.transactionType === transactionType)
+      ('request' in t && t.request === id && t.type === transactionType) ||
+      ('token' in t && typeof t.token === 'string' && t.token === id && t.type === transactionType)
   );
+
+  const transaction = historyEntry ? adaptCocoHistoryToTransaction(historyEntry) : null;
 
   if (!transaction) {
     return (
@@ -136,7 +141,8 @@ function ModalScreen() {
     );
   }
 
-  if (transaction?.transactionType === 'send' && transaction.type === 'ecash') {
+  // Use adapted transaction structure
+  if (transaction.type === 'send' && transaction.token) {
     return (
       <EcashSendConfirmation
         unit={transaction.unit}
@@ -146,15 +152,14 @@ function ModalScreen() {
     );
   }
 
-  if (transaction.type === 'ecash' && transaction.transactionType === 'receive') {
+  if (transaction.type === 'mint' && transaction.token) {
     return <EcashReceiveConfirmation transaction={transaction} token={transaction.token} />;
   }
 
-  if (transaction.type === 'lightning' && transaction.transactionType === 'receive') {
+  if (transaction.type === 'mint' && transaction.paymentRequest) {
     return (
       <LightningReceiveConfirmation
-        request={transaction.request}
-        paymentRequest={transaction.paymentRequest}
+        request={transaction.paymentRequest}
         unit={transaction.unit}
         amount={transaction.amount}
         autoGoBackOnPaid={false}
@@ -162,7 +167,7 @@ function ModalScreen() {
     );
   }
 
-  if (transaction.type === 'lightning' && transaction.transactionType === 'send') {
+  if (transaction.type === 'send' && transaction.request) {
     return (
       <LightningSendConfirmation
         transaction={transaction}

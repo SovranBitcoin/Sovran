@@ -1,33 +1,25 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { memoizedGetSelectedMint, memoizedGetBalance, useGetMintInfo } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { useMintManagement } from 'hooks/coco';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { store } from 'helper/redux/store';
-import { MintIcon, createStyles, sovran } from 'components/blocks/sheets/mints';
+import { Avatar } from 'components/ui/Avatar';
 
-interface Props {
+interface MintBalanceDisplayProps {
   unit: string;
   onMintSelected?: (
     mint: { id: string; name: string; iconUrl: string | null; unit: string },
     balance: { amount: number; unit: string }
   ) => void | Promise<void>;
-  /**
-   * When true, prevent selecting mints that have no balance.
-   * Defaults to true.
-   */
   requireBalance?: boolean;
-  /**
-   * When false, the sheet will not automatically update the selected mint.
-   * Defaults to true.
-   */
   updateSelectedMint?: boolean;
   allowedMints?: string[];
   allowedUnits?: string[];
@@ -35,7 +27,7 @@ interface Props {
   requireValidMint?: boolean;
 }
 
-const MintBalanceDisplay: React.FC<Props> = ({
+const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   unit,
   onMintSelected,
   requireBalance = true,
@@ -46,20 +38,44 @@ const MintBalanceDisplay: React.FC<Props> = ({
   style,
 }) => {
   const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const mintInfo = useGetMintInfo({ mintUrl: selectedMint });
-  const balance = useSelector(memoizedGetBalance(unit, selectedMint));
+  const { getMintInfo, getBalances } = useMintManagement();
+
+  // State for Coco data
+  const [mintInfo, setMintInfo] = useState<any>(null);
+  const [balance, setBalance] = useState(0);
+
+  // Load mint info and balance from Coco
+  useEffect(() => {
+    const loadMintData = async () => {
+      if (selectedMint) {
+        try {
+          const [mintInfoData, balances] = await Promise.all([
+            getMintInfo(selectedMint),
+            getBalances(),
+          ]);
+          setMintInfo(mintInfoData);
+          setBalance(balances[selectedMint] || 0);
+        } catch (error) {
+          console.error('Failed to load mint data:', error);
+          setMintInfo(null);
+          setBalance(0);
+        }
+      }
+    };
+
+    loadMintData();
+  }, [selectedMint, getMintInfo, getBalances]);
 
   const isMintAllowed = useMemo(
-    () => (allowedMints ? allowedMints.includes(selectedMint) : true),
+    () => (allowedMints && selectedMint ? allowedMints.includes(selectedMint) : true),
     [allowedMints, selectedMint]
   );
 
   const showMintInfo = !(requireValidMint && !isMintAllowed);
 
-  const handlePress = () => {
+  const handlePress = async () => {
     SheetManager.show('mint-balance', {
       payload: {
         navigate: false,
@@ -69,10 +85,16 @@ const MintBalanceDisplay: React.FC<Props> = ({
         allowedUnits,
         onMintPress: updateSelectedMint ? undefined : onMintSelected,
       },
-      onClose: (mint) => {
+      onClose: async (mint) => {
         if (mint?.id && onMintSelected && updateSelectedMint) {
-          const amt = memoizedGetBalance(unit, mint.id)(store.getState());
-          onMintSelected(mint, { amount: amt, unit });
+          try {
+            const balances = await getBalances();
+            const amt = balances[mint.id] || 0;
+            onMintSelected(mint, { amount: amt, unit });
+          } catch (error) {
+            console.error('Failed to get balance for mint:', error);
+            onMintSelected(mint, { amount: 0, unit });
+          }
         }
       },
     });
@@ -85,8 +107,12 @@ const MintBalanceDisplay: React.FC<Props> = ({
         align="center"
         justify="space-between"
         style={[
-          sovran(theme).listItem,
           {
+            padding: 8,
+            borderRadius: 16,
+            borderWidth: 0.2,
+            borderColor: greys(theme)[600],
+            marginVertical: 4,
             alignSelf: 'center',
             backgroundColor: greys(theme)[800],
           },
@@ -95,10 +121,20 @@ const MintBalanceDisplay: React.FC<Props> = ({
         <HStack align="center">
           {showMintInfo ? (
             <>
-              <MintIcon mintInfo={mintInfo} />
+              <View style={{ marginRight: 8 }}>
+                <Avatar
+                  picture={mintInfo?.icon_url || undefined}
+                  size={32}
+                  variant="mint"
+                  name={mintInfo?.name}
+                  alt={`${mintInfo?.name || 'Mint'} icon`}
+                />
+              </View>
               <VStack align="flex-start" style={{ marginRight: 10 }}>
                 <Text style={styles.name}>
-                  {mintInfo?.name || selectedMint?.replace('https://', '').split('/')[0]}
+                  {mintInfo?.name ||
+                    selectedMint?.replace('https://', '').split('/')[0] ||
+                    'Unknown Mint'}
                 </Text>
                 <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
               </VStack>

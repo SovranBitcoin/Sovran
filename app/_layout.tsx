@@ -33,12 +33,12 @@ import { greys } from 'helper/colors';
 import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
-import { WalletsProvider } from 'providers/WalletsProviders';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
-import { TransactionProvider } from 'providers/TransactionsProvider';
+import { CocoTransactionsProvider } from 'providers/CocoTransactionsProvider';
+import { CocoProvider } from 'helper/coco';
 
 /**
  * Splash screen component
@@ -229,23 +229,23 @@ export default function RootLayout() {
       <NostrProvider relayUrls={RELAY_URLS}>
         <PersistGate loading={null} persistor={persistor}>
           <Provider store={store}>
-            <QueryClientProvider client={queryClient}>
-              <ActionSheetProvider>
-                <SheetProvider context="global">
-                  <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <PricelistProvider>
-                      <WalletsProvider>
-                        <TransactionProvider>
+            <CocoProvider>
+              <QueryClientProvider client={queryClient}>
+                <ActionSheetProvider>
+                  <SheetProvider context="global">
+                    <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+                      <PricelistProvider>
+                        <CocoTransactionsProvider>
                           <PasscodeGate>
                             <MainStack />
                           </PasscodeGate>
-                        </TransactionProvider>
-                      </WalletsProvider>
-                    </PricelistProvider>
-                  </View>
-                </SheetProvider>
-              </ActionSheetProvider>
-            </QueryClientProvider>
+                        </CocoTransactionsProvider>
+                      </PricelistProvider>
+                    </View>
+                  </SheetProvider>
+                </ActionSheetProvider>
+              </QueryClientProvider>
+            </CocoProvider>
           </Provider>
         </PersistGate>
       </NostrProvider>

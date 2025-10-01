@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'; // Assumin
 import { Cache } from 'react-native-cache';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { getLightningAmount } from 'helper/cashuClient';
+import { useCashuUtilities } from 'hooks/coco';
 import { EventKind } from 'helper/constants';
 import { formatNumber } from 'helper/utils';
 
@@ -22,6 +22,7 @@ const reactionCache = new Cache({
 });
 
 export const usePostReactions = ({ id }: { id: string }) => {
+  const { getLightningAmount } = useCashuUtilities();
   const [reactionCount, setReactionCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0); // New state for reposts
   const [zapCount, setZapCount] = useState(0); // New state for zaps
@@ -89,7 +90,7 @@ export const usePostReactions = ({ id }: { id: string }) => {
           .forEach((event) => {
             const ln = event.tags.find((t) => t[0] === 'bolt11')?.[1];
             if (ln) {
-              newZapCount += getLightningAmount({ pr: ln }) || 0;
+              newZapCount += getLightningAmount(ln) || 0;
             }
           });
 

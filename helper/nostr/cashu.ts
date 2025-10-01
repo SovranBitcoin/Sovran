@@ -2,7 +2,7 @@ import { finalizeEvent, nip44, SimplePool } from 'nostr-tools';
 import { store } from 'helper/redux/store';
 import { relays } from 'components/ndk';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { deriveMintBackupKeys } from 'helper/cashuClient';
+import { deriveMintBackupKeys } from 'hooks/coco/useCashuSpecialized';
 import _ from 'lodash';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
