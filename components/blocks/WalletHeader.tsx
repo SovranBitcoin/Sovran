@@ -60,6 +60,7 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
         onMintSelected={handleMintSelected}
         requireBalance={false}
         updateSelectedMint={true}
+        showAddMintsButton={true}
         style={{ width: Dimensions.get('window').width - 128 }}
       />
     </View>

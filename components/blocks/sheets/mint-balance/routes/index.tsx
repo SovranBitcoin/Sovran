@@ -1,5 +1,6 @@
 import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
 import ListRoute from './list';
+import AddRoute from './add';
 
 export const sheetName = 'mint-balance';
 
@@ -8,6 +9,10 @@ export const routes: Route[] = [
     name: 'list',
     component: ListRoute,
   },
+  {
+    name: 'add',
+    component: AddRoute,
+  },
 ];
 
 declare module 'react-native-actions-sheet' {
@@ -15,6 +20,7 @@ declare module 'react-native-actions-sheet' {
     [sheetName]: SheetDefinition<{
       routes: {
         list: RouteDefinition;
+        add: RouteDefinition;
       };
       returnValue: {
         id: string;

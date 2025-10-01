@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator } from 'react-native';
-import { ScrollView, useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
+import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMintManagement } from 'hooks/coco';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Avatar } from 'components/ui/Avatar';
@@ -15,8 +15,10 @@ import { showMessage } from 'helper/popup/popups';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { useTypedNavigation } from 'helper/navigation';
+import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { formatCurrency } from 'helper/currency';
+import { MintCurrencySelector } from './MintCurrencySelector';
 
 interface MintItemProps {
   mint: { id: string; name: string; iconUrl: string | null };
@@ -103,7 +105,6 @@ const MintItem: React.FC<MintItemProps> = ({
               if (onDetailsPress) {
                 onDetailsPress(mint.id);
               } else {
-                // Navigate to mint details sheet
                 import('react-native-actions-sheet').then(({ SheetManager }) => {
                   SheetManager.show('mint', {
                     payload: {
@@ -134,10 +135,8 @@ const ListRoute = () => {
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const navigation = useTypedNavigation();
+  const router = useSheetRouter('mint-balance');
 
-  console.log(payload);
-
-  // Extract configuration from payload
   const showAddMintsButton = payload?.showAddMintsButton ?? false;
   const showDetailsButton = payload?.showDetailsButton ?? false;
   const onAddMintsPress = payload?.onAddMintsPress;
@@ -147,76 +146,33 @@ const ListRoute = () => {
   const [filteredMints, setFilteredMints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get currencies from mints (unit is in nuts[4].methods) - same as MintSelect.tsx
-  const currencies = useMemo(() => {
-    const units: string[] = [];
-    mints.forEach((mint) => {
-      if (mint.mintInfo?.nuts?.['4']?.methods) {
-        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
-          if (method.unit) {
-            units.push(method.unit.toUpperCase());
-          }
-        });
-      }
-    });
-    const uniqueUnits = [...new Set(units)];
-    const filteredUnits = uniqueUnits.filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
+  const dispatch = useDispatch();
+  const profileId = useSelector(memoizedGetCurrentProfile).id;
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-    console.log('🔍 Currency Debug:', {
-      mints: mints.length,
-      allUnits: uniqueUnits,
-      filteredUnits,
-      mintDetails: mints.map((m) => ({
-        mintUrl: m.mintUrl,
-        nuts4: m.mintInfo?.nuts?.['4']?.methods?.map((method: any) => method.unit),
-      })),
-    });
-
-    return filteredUnits;
-  }, [mints]);
-
-  const [selectedCurrency, setSelectedCurrency] = useState<string>(
-    (currencies[0] || 'SAT') as string
-  );
-
-  // Load mints with balances - no currency filtering in useEffect
+  // Load mints with balances
   useEffect(() => {
     const loadMints = async () => {
       try {
         setLoading(true);
-        console.log('🔍 Debug - Raw mints data:', mints);
 
-        // Get balances for all mints
         const balances = await getBalances();
-        console.log('🔍 Debug - Balances:', balances);
 
-        // Combine mint info with balance data
-        const mintsWithBalances = mints.map((mint) => {
-          const mintData = {
-            mintUrl: mint.mintUrl,
-            name:
-              mint.name ||
-              mint.mintInfo?.name ||
-              mint.mintUrl.replace('https://', '')?.split('/')?.[0] ||
-              'Unknown Mint',
-            unit: 'SAT', // Default to SAT for now
-            amount: balances[mint.mintUrl] || 0,
-            iconUrl: mint.mintInfo?.icon_url || null,
-            mintInfo: mint.mintInfo, // Keep mint info for filtering
-          };
+        const mintsWithBalances = mints.map((mint) => ({
+          mintUrl: mint.mintUrl,
+          name:
+            mint.name ||
+            mint.mintInfo?.name ||
+            mint.mintUrl.replace('https://', '')?.split('/')?.[0] ||
+            'Unknown Mint',
+          unit: 'SAT',
+          amount: balances[mint.mintUrl] || 0,
+          iconUrl: mint.mintInfo?.icon_url || null,
+          mintInfo: mint.mintInfo,
+        }));
 
-          console.log('🔍 Debug - Processed mint:', {
-            original: mint,
-            processed: mintData,
-          });
-
-          return mintData;
-        });
-
-        // Sort by balance (highest first)
         const sortedMints = mintsWithBalances.sort((a, b) => (b.amount || 0) - (a.amount || 0));
 
-        console.log('🔍 Debug - Final mints:', sortedMints);
         setFilteredMints(sortedMints);
       } catch (error) {
         console.error('Failed to load mints:', error);
@@ -228,25 +184,6 @@ const ListRoute = () => {
 
     loadMints();
   }, [mints, getBalances]);
-
-  // Filter mints by selected currency in render phase
-  const filteredMintsForCurrency = useMemo(() => {
-    return filteredMints.filter((mint) => {
-      if (!mint.mintInfo?.nuts?.['4']?.methods) {
-        // If no nuts data, default to SAT for backward compatibility
-        return selectedCurrency === 'SAT';
-      }
-
-      // Check if this mint supports the selected currency
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toUpperCase() === selectedCurrency
-      );
-    });
-  }, [filteredMints, selectedCurrency]);
-
-  const dispatch = useDispatch();
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
-  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleMintSelect = async (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
@@ -356,14 +293,7 @@ const ListRoute = () => {
                       if (onAddMintsPress) {
                         onAddMintsPress();
                       } else {
-                        // Navigate to add mints sheet
-                        import('react-native-actions-sheet').then(({ SheetManager }) => {
-                          SheetManager.show('mint', {
-                            payload: {
-                              initialRoute: 'mintAddMore',
-                            },
-                          });
-                        });
+                        router?.navigate('add');
                       }
                     },
                   },
@@ -372,84 +302,32 @@ const ListRoute = () => {
           ]}
         />
       }>
-      <VStack flex={1}>
-        <VStack>
-          <Text
-            style={{
-              color: greys(theme)[0],
-              fontSize: 18,
-              fontWeight: '600',
-              marginBottom: 4,
-            }}>
-            Send payment in
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 1 }}>
-            {currencies.map((currency: any) => (
-              <TouchableOpacity
-                key={currency}
-                style={{
-                  marginRight: 8,
-                  paddingHorizontal: 12,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  minWidth: 100,
-                  backgroundColor:
-                    selectedCurrency === currency ? greys(theme)[700] : greys(theme)[900],
-                }}
-                onPress={() => setSelectedCurrency(currency)}>
-                <HStack align="center" justify="flex-start" gap={8}>
-                  {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
-                    <FlagIcon
-                      country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
-                      height={32}
-                      width={32}
-                    />
-                  ) : (
-                    <CurrencyIcon currency={currency.toLowerCase()} />
-                  )}
-                  <Text style={{ color: greys(theme)[0], fontSize: 14, fontWeight: 'bold' }}>
-                    {currency === 'SAT' ? 'BTC' : currency}
-                  </Text>
-                </HStack>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </VStack>
-        <Spacer size={16} />
-
-        <VStack>
-          <Text
-            style={{
-              color: greys(theme)[0],
-              fontSize: 18,
-              fontWeight: '600',
-              marginBottom: 4,
-            }}>
-            Send from
-          </Text>
-          <VStack>
-            {filteredMintsForCurrency.map((mint) => (
-              <MintItem
-                key={mint.mintUrl}
-                mint={{
-                  id: mint.mintUrl,
-                  name: mint.name,
-                  iconUrl: mint.iconUrl,
-                }}
-                balance={{ amount: mint.amount, unit: mint.unit }}
-                theme={theme}
-                isLoading={loadingId === mint.mintUrl}
-                globalLoading={loadingId !== null}
-                requireBalance={payload?.requireBalance}
-                selectedCurrency={selectedCurrency}
-                showDetailsButton={showDetailsButton}
-                onDetailsPress={onDetailsPress}
-                onPress={() => handleMintSelect(mint.mintUrl)}
-              />
-            ))}
-          </VStack>
-        </VStack>
-      </VStack>
+      <MintCurrencySelector
+        mints={filteredMints}
+        theme={theme}
+        allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
+        currencyLabel="Send payment in"
+        mintsLabel="Send from"
+        renderItem={(mint, selectedCurrency) => (
+          <MintItem
+            key={mint.mintUrl}
+            mint={{
+              id: mint.mintUrl,
+              name: mint.name,
+              iconUrl: mint.iconUrl,
+            }}
+            balance={{ amount: mint.amount, unit: mint.unit }}
+            theme={theme}
+            isLoading={loadingId === mint.mintUrl}
+            globalLoading={loadingId !== null}
+            requireBalance={payload?.requireBalance}
+            selectedCurrency={selectedCurrency}
+            showDetailsButton={showDetailsButton}
+            onDetailsPress={onDetailsPress}
+            onPress={() => handleMintSelect(mint.mintUrl)}
+          />
+        )}
+      />
     </Wrapper>
   );
 };
