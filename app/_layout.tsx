@@ -39,7 +39,7 @@ import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
 import { CocoTransactionsProvider } from 'providers/CocoTransactionsProvider';
 import { CocoProvider } from 'helper/coco';
-
+import { PortalHost } from '@rn-primitives/portal';
 /**
  * Splash screen component
  */
@@ -238,6 +238,7 @@ export default function RootLayout() {
                         <CocoTransactionsProvider>
                           <PasscodeGate>
                             <MainStack />
+                            <PortalHost />
                           </PasscodeGate>
                         </CocoTransactionsProvider>
                       </PricelistProvider>

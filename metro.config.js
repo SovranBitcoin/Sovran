@@ -5,6 +5,11 @@ const { withNativeWind } = require('nativewind/metro');
 const config = getDefaultConfig(__dirname);
 config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
 
+// Add path alias support
+config.resolver.alias = {
+  '@': __dirname,
+};
+
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
   icons: [
@@ -101,6 +106,17 @@ const configWithMonicon = withMonicon(config, {
     'fluent:clock-16-filled',
     'stash:qr-code',
     'fa6-solid:download',
+    'material-symbols:star',
+    'material-symbols:star-rounded',
+    'material-symbols:star-filled',
+    'lucide:star',
+    'tabler:star',
+    'tabler:star-filled',
+    'mdi:star',
+    'mdi:star-outline',
+    'fluent:star-24-filled',
+    'fluent:star-24-regular',
+    'ic:round-star',
   ],
 });
 

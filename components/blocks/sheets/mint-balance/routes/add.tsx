@@ -15,6 +15,7 @@ import { useMintManagement } from 'hooks/coco';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { KYMHandler } from 'cashu-kym';
 import { MintCurrencySelector } from '../MintCurrencySelector';
+import { Badge } from 'components/ui/Badge';
 
 interface DiscoveredMint {
   url: string;
@@ -78,27 +79,28 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
               status={mint.auditorData?.state}
             />
 
-            <VStack>
+            <VStack spacing={2}>
               <Text style={[{ color: g[0], fontSize: 16 }]}>
                 {mint.auditorData?.name || mint.url.replace('https://', '').split('/')[0]}
               </Text>
 
               <HStack align="center" gap={8}>
-                <Text style={[{ color: g[200], fontSize: 12 }]}>
-                  Score: {mint.score.toFixed(1)}/5
-                </Text>
-                <Text style={[{ color: g[200], fontSize: 12 }]}>
-                  ({mint.recommendations.length} reviews)
-                </Text>
+                <Badge variant="warning" icon="ic:round-star" size={12}>
+                  {mint.score % 1 === 0 ? mint.score.toString() : mint.score.toFixed(1)} (
+                  {mint.recommendations?.length || 0})
+                </Badge>
+                {mint.recommendations?.length > 0 && (
+                  <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
+                    {(
+                      (mint.recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
+                        mint.recommendations.length /
+                        5) *
+                      100
+                    ).toFixed(1)}
+                    %
+                  </Badge>
+                )}
               </HStack>
-
-              {mint.auditorData && (
-                <HStack align="center" gap={8}>
-                  <Text style={[{ color: g[300], fontSize: 11 }]}>
-                    {mint.auditorData.mints} mints • {mint.auditorData.melts} melts
-                  </Text>
-                </HStack>
-              )}
             </VStack>
           </HStack>
 

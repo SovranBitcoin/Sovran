@@ -8,7 +8,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { rgba } from 'polished';
 import { VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { greys } from 'helper/colors';
+import { Badge } from './Badge';
 
 type AvatarVariant = 'person' | 'mint';
 
@@ -39,25 +39,22 @@ export const Avatar = ({
       ? size / 2 // Perfect circle for people
       : size * 0.25; // Square rounded for mints (25% of size)
 
-  // Status icon configuration
-  const getStatusIcon = () => {
+  // Status badge configuration
+  const getStatusBadge = () => {
     if (!status) return null;
 
     const statusConfig = {
       OK: {
-        name: 'fluent:checkmark-16-filled',
-        color: '#10b981', // green-500
-        backgroundColor: 'white',
+        variant: 'success' as const,
+        icon: 'fluent:checkmark-16-filled',
       },
       ERROR: {
-        name: 'nonicons:error-16',
-        color: '#ef4444', // red-500
-        backgroundColor: 'white',
+        variant: 'error' as const,
+        icon: 'nonicons:error-16',
       },
       OFFLINE: {
-        name: 'feather:wifi',
-        color: '#6b7280', // gray-500
-        backgroundColor: 'white',
+        variant: 'secondary' as const,
+        icon: 'feather:wifi',
       },
     };
 
@@ -107,7 +104,7 @@ export const Avatar = ({
 
   const defaultAlt = variant === 'person' ? 'User Avatar' : 'Mint Avatar';
 
-  const statusIcon = getStatusIcon();
+  const statusBadge = getStatusBadge();
 
   return (
     <VStack style={{ position: 'relative' }}>
@@ -126,20 +123,15 @@ export const Avatar = ({
         </AvatarPrimitive.Fallback>
       </AvatarPrimitive.Root>
 
-      {/* Status icon in bottom right corner */}
-      {statusIcon && (
+      {/* Status badge in bottom right corner */}
+      {statusBadge && (
         <VStack
           style={{
             position: 'absolute',
             bottom: -2,
             right: -2,
-            padding: 1,
-            backgroundColor: greys(theme)[600],
-            borderRadius: statusIconSize,
-          }}
-          align="center"
-          justify="center">
-          <Icon name={statusIcon.name} color={statusIcon.color} size={statusIconSize} />
+          }}>
+          <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
         </VStack>
       )}
     </VStack>
