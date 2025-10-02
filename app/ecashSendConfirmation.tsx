@@ -9,11 +9,11 @@ import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import {
-  getDecodedToken,
   getEncodedTokenV4,
   decodePaymentRequest,
   PaymentRequestTransportType,
   GetInfoResponse,
+  Token,
 } from '@cashu/cashu-ts';
 import { nip19 } from 'nostr-tools';
 import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
@@ -46,7 +46,7 @@ export function EcashSendConfirmation({
 }: {
   unit: string;
   amount: number;
-  token: string;
+  token: Token;
   paymentRequest?: string;
   extraButtons?: ButtonHandlerButton[];
 }) {
@@ -65,9 +65,7 @@ export function EcashSendConfirmation({
 
   // Find the current transaction using coco's history system
   const currentTransaction = history.find((tx) => {
-    return (
-      tx.type === 'send' && getEncodedTokenV4(tx.token) === getEncodedTokenV4(JSON.parse(token))
-    );
+    return tx.type === 'send' && getEncodedTokenV4(tx.token) === getEncodedTokenV4(token);
   });
 
   // Load mint info when transaction is found
@@ -93,18 +91,18 @@ export function EcashSendConfirmation({
       : undefined);
 
   const handleNFCSend = async () => {
-    await write(token);
+    await write(getEncodedTokenV4(token));
   };
 
   const handleCopy = async (onClose: (event: any) => void) => {
-    await Clipboard.setStringAsync(token);
+    await Clipboard.setStringAsync(getEncodedTokenV4(token));
     showSuccess('ecash_token_copied', {}, {}, () => onClose({}));
   };
 
   const handleShare = async (onClose: (event: any) => void) => {
     await Share.share({
       url: uri,
-      message: 'cashu://' + token,
+      message: 'cashu://' + getEncodedTokenV4(token),
     });
     onClose({});
   };
@@ -120,17 +118,16 @@ export function EcashSendConfirmation({
       const { data } = nip19.decode(receiverTarget);
       const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
 
-      const decodedToken = getDecodedToken(token);
-      if (!decodedToken) {
+      if (!token) {
         showMessage('Invalid token format', {}, {}, () => {});
         return;
       }
 
       await sendGiftWrappedEncryptedDirectMessage({
         message: JSON.stringify({
-          mint: decodedToken.mint,
-          unit: decodedToken.unit,
-          proofs: decodedToken.proofs,
+          mint: token.mint,
+          unit: token.unit,
+          proofs: token.proofs,
           id: decoded.id,
         }),
         recipient: pubkey,
@@ -148,7 +145,7 @@ export function EcashSendConfirmation({
     try {
       // For ecash transactions, "cancelling" means receiving the token back
       // This effectively cancels the send transaction
-      await receiveEcash(token);
+      await receiveEcash(getEncodedTokenV4(token));
       showMessage('Transaction cancelled successfully', {}, {}, () => onClose({}));
     } catch (error) {
       showMessage(
@@ -162,12 +159,11 @@ export function EcashSendConfirmation({
 
   const handleSendEcash = async (onClose: (event: any) => void) => {
     try {
-      const decodedToken = getDecodedToken(token);
-      if (!decodedToken) {
+      if (!token) {
         showMessage('Invalid token format', {}, {}, () => onClose({}));
         return;
       }
-      const mintUrl = decodedToken.mint;
+      const mintUrl = token.mint;
 
       // Use Coco's send function to send ecash
       await send(mintUrl, amount);
@@ -179,23 +175,22 @@ export function EcashSendConfirmation({
     }
   };
 
-  // Safely decode and format the token
-  const getFormattedToken = () => {
+  // Safely format the token
+  const getFormattedToken = (): string => {
     try {
-      const decodedToken = getDecodedToken(token);
-      return getEncodedTokenV4(decodedToken) || token;
+      return getEncodedTokenV4(token);
     } catch (error) {
-      console.warn('Failed to decode token, using original:', error);
-      return token;
+      console.warn('Failed to encode token, using original:', error);
+      return JSON.stringify(token);
     }
   };
 
   const formattedToken = getFormattedToken();
   const isLongToken = formattedToken.length >= 500;
 
-  const checkProofsSpent = async (token: string): Promise<Result<boolean, Error>> => {
+  const checkProofsSpent = async (token: Token): Promise<Result<boolean, Error>> => {
     try {
-      const isSpendable = await isTokenSpendable(token);
+      const isSpendable = await isTokenSpendable(getEncodedTokenV4(token));
       return ok(!isSpendable); // Return true if NOT spendable (i.e., spent)
     } catch (error) {
       return err(error instanceof Error ? error : new Error('Failed to check proof states'));
@@ -212,8 +207,7 @@ export function EcashSendConfirmation({
       const proofsSpent = result.value;
       if (proofsSpent) {
         try {
-          const decodedToken = getDecodedToken(token);
-          const amount = decodedToken.proofs.reduce((sum, proof) => sum + proof.amount, 0);
+          const amount = token.proofs.reduce((sum, proof) => sum + proof.amount, 0);
 
           showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
             navigation.navigate(
@@ -242,7 +236,7 @@ export function EcashSendConfirmation({
   const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
       payload: {
-        token,
+        token: getEncodedTokenV4(token),
       },
       onClose,
     });
@@ -254,7 +248,7 @@ export function EcashSendConfirmation({
       <Modal showClose title="Loading...">
         <View style={{ padding: 20, alignItems: 'center' }}>
           <Text>Loading transaction...</Text>
-          <Text>{getEncodedTokenV4(JSON.parse(token))}</Text>
+          <Text>{getEncodedTokenV4(token)}</Text>
         </View>
       </Modal>
     );
@@ -400,7 +394,7 @@ export function EcashSendConfirmation({
             },
             {
               title: 'Token',
-              value: truncateMiddle(getEncodedTokenV4(JSON.parse(token)), 6),
+              value: truncateMiddle(getEncodedTokenV4(token), 6),
             },
             {
               title: 'Amount',
@@ -417,11 +411,15 @@ export function EcashSendConfirmation({
 
 function ModalScreen() {
   const { unit, amount, token, paymentRequest } = useTypedRoute<'ecashSendConfirmation'>();
+
+  // Convert string token to Token object if needed
+  const tokenObj = typeof token === 'string' ? JSON.parse(token) : token;
+
   return (
     <EcashSendConfirmation
       unit={unit}
       amount={amount}
-      token={token}
+      token={tokenObj}
       paymentRequest={paymentRequest}
     />
   );

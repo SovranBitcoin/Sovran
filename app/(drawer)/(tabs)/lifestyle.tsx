@@ -108,9 +108,7 @@ const TabTwoScreen = () => {
         <HStack
           className="flex-wrap justify-between"
           style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-          {SERVICE_MENU_ITEMS.filter((item) =>
-            ['giftcards', 'donate'].includes(item.id) ? settings?.experimental : true
-          ).map((item) => (
+          {SERVICE_MENU_ITEMS.map((item) => (
             <MenuItem
               key={item.id}
               item={item}
