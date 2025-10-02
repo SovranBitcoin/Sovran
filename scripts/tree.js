@@ -348,6 +348,120 @@ class FunctionTreeGenerator {
     }
   }
 
+  // Extract icons from metro config
+  getConfiguredIcons(rootDir = process.cwd()) {
+    try {
+      // Always look for metro.config.js in the project root, not the analyzed directory
+      const projectRoot = process.cwd();
+      const metroConfigPath = path.join(projectRoot, 'metro.config.js');
+      const metroConfig = fs.readFileSync(metroConfigPath, 'utf8');
+
+      // Extract icons array from metro config using regex
+      const iconsMatch = metroConfig.match(/icons:\s*\[([\s\S]*?)\]/);
+      if (!iconsMatch) {
+        console.warn('Warning: Could not find icons array in metro.config.js');
+        return [];
+      }
+
+      const iconsContent = iconsMatch[1];
+      const iconMatches = iconsContent.match(/'([^']+)'/g);
+
+      if (!iconMatches) {
+        return [];
+      }
+
+      return iconMatches.map((match) => match.slice(1, -1)); // Remove quotes
+    } catch (error) {
+      console.warn(`Warning: Could not read metro.config.js: ${error.message}`);
+      return [];
+    }
+  }
+
+  // Search for icon usage in file content
+  findIconUsage(content) {
+    const iconUsages = [];
+
+    // Pattern 1: name="icon-name" (quoted strings)
+    const quotedPattern = /name=["']([^"']+)["']/g;
+    let match;
+    while ((match = quotedPattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'quoted',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2: name={icon} (variable references)
+    const variablePattern = /name=\{([^}]+)\}/g;
+    while ((match = variablePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'variable',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 3: icon: "icon-name" (in data structures)
+    const dataStructurePattern = /icon:\s*["']([^"']+)["']/g;
+    while ((match = dataStructurePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'data-structure',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 4: icon: 'icon-name' (single quotes in data structures)
+    const dataStructureSinglePattern = /icon:\s*'([^']+)'/g;
+    while ((match = dataStructureSinglePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'data-structure',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    return iconUsages;
+  }
+
+  // Analyze icon usage across all files
+  analyzeIconUsage(rootDir = process.cwd()) {
+    const files = this.getAllFiles(rootDir);
+    const configuredIcons = this.getConfiguredIcons(rootDir);
+    const iconUsage = {};
+    const iconFiles = {};
+
+    // Initialize all configured icons with 0 usage
+    configuredIcons.forEach((icon) => {
+      iconUsage[icon] = 0;
+      iconFiles[icon] = [];
+    });
+
+    files.forEach((filePath) => {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const usages = this.findIconUsage(content);
+
+        usages.forEach((usage) => {
+          // Check if this is a configured icon
+          if (configuredIcons.includes(usage.icon)) {
+            iconUsage[usage.icon]++;
+            iconFiles[usage.icon].push({
+              file: path.relative(rootDir, filePath),
+              line: usage.line,
+              type: usage.type,
+            });
+          }
+        });
+      } catch (error) {
+        // Skip files we can't read
+      }
+    });
+
+    return { iconUsage, iconFiles, configuredIcons };
+  }
+
   // Generate tree structure
   buildTree(rootDir = process.cwd()) {
     const files = this.getAllFiles(rootDir);
@@ -432,6 +546,78 @@ class FunctionTreeGenerator {
 
     sortedUnused.forEach((packageName) => {
       lines.push(`❌ ${packageName}`);
+    });
+
+    return lines;
+  }
+
+  // Render icon usage summary
+  renderIconUsage(iconUsage, iconFiles) {
+    const lines = [];
+    const icons = Object.entries(iconUsage).sort(([, a], [, b]) => b - a); // Sort by usage count descending
+
+    if (icons.length === 0) {
+      return lines;
+    }
+
+    lines.push('\n🎨 Icon Usage Summary:');
+    lines.push('='.repeat(50));
+
+    icons.forEach(([iconName, count]) => {
+      const bar = '█'.repeat(Math.min(Math.floor(count / 2), 20)); // Scale bar to max 20 chars
+      lines.push(`${iconName.padEnd(40)} ${count.toString().padStart(3)} ${bar}`);
+    });
+
+    return lines;
+  }
+
+  // Render unused icons summary
+  renderUnusedIcons(iconUsage, iconFiles) {
+    const lines = [];
+    const unusedIcons = Object.entries(iconUsage)
+      .filter(([, count]) => count === 0)
+      .map(([iconName]) => iconName)
+      .sort();
+
+    if (unusedIcons.length === 0) {
+      return lines;
+    }
+
+    lines.push('\n🚫 Unused Icons (0 usage):');
+    lines.push('='.repeat(50));
+
+    unusedIcons.forEach((iconName) => {
+      lines.push(`❌ ${iconName}`);
+    });
+
+    return lines;
+  }
+
+  // Render icon file locations
+  renderIconFileLocations(iconFiles) {
+    const lines = [];
+    const usedIcons = Object.entries(iconFiles)
+      .filter(([, files]) => files.length > 0)
+      .sort(([, a], [, b]) => b.length - a.length); // Sort by file count descending
+
+    if (usedIcons.length === 0) {
+      return lines;
+    }
+
+    lines.push('\n📍 Icon File Locations:');
+    lines.push('='.repeat(50));
+
+    usedIcons.forEach(([iconName, files]) => {
+      lines.push(`\n${iconName}:`);
+      files.forEach((fileInfo) => {
+        const typeIndicator =
+          fileInfo.type === 'variable'
+            ? ' (var)'
+            : fileInfo.type === 'data-structure'
+              ? ' (data)'
+              : '';
+        lines.push(`  📄 ${fileInfo.file}:${fileInfo.line}${typeIndicator}`);
+      });
     });
 
     return lines;
@@ -573,6 +759,22 @@ class FunctionTreeGenerator {
     const unusedSummary = this.renderUnusedPackages(unusedPackages);
     console.log(unusedSummary.join('\n'));
 
+    // Icon analysis
+    console.log('\n🔍 Analyzing icon usage...');
+    const { iconUsage, iconFiles, configuredIcons } = this.analyzeIconUsage(rootDir);
+
+    // Icon usage summary
+    const iconSummary = this.renderIconUsage(iconUsage, iconFiles);
+    console.log(iconSummary.join('\n'));
+
+    // Unused icons summary
+    const unusedIconsSummary = this.renderUnusedIcons(iconUsage, iconFiles);
+    console.log(unusedIconsSummary.join('\n'));
+
+    // Icon file locations (optional - can be verbose)
+    const iconLocations = this.renderIconFileLocations(iconFiles);
+    console.log(iconLocations.join('\n'));
+
     // Summary
     const totalFiles = Object.keys(tree).length;
     const totalFunctions = Object.values(tree).reduce(
@@ -585,8 +787,10 @@ class FunctionTreeGenerator {
     );
     const totalLines = Object.values(tree).reduce((sum, fileData) => sum + fileData.totalLines, 0);
     const uniquePackages = Object.keys(packageUsage).length;
+    const usedIcons = Object.values(iconUsage).filter((count) => count > 0).length;
+    const unusedIcons = Object.values(iconUsage).filter((count) => count === 0).length;
     console.log(
-      `\n📊 Summary: ${totalFiles} files, ${totalImports} imports, ${totalFunctions} functions, ${totalLines} total lines, ${uniquePackages} used packages, ${unusedPackages.length} unused packages`
+      `\n📊 Summary: ${totalFiles} files, ${totalImports} imports, ${totalFunctions} functions, ${totalLines} total lines, ${uniquePackages} used packages, ${unusedPackages.length} unused packages, ${usedIcons} used icons, ${unusedIcons} unused icons`
     );
   }
 }
@@ -604,6 +808,14 @@ Usage: node function-tree.js [options] [directory]
 
 Options:
   -h, --help    Show this help message
+  
+Features:
+  - Function analysis with hierarchical display
+  - Import/export tracking
+  - Package usage analysis
+  - Icon usage analysis (from metro.config.js)
+  - Unused package detection
+  - Unused icon detection
   
 Examples:
   node function-tree.js           # Analyze current directory
