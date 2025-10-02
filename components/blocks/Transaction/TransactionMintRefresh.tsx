@@ -55,42 +55,6 @@ export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntry
           </Text>
         </VStack>
       </HStack>
-
-      {/* <View>
-        {!('state' in historyEntry && historyEntry.state === 'PAID') && (
-          <Button
-            style={{
-              padding: 0,
-              width: 40,
-              height: 40,
-            }}
-            variant="secondary"
-            disabled={loading}
-            onPress={() => {
-              handleStatusCheck(() => {
-                // Callback after status check completes
-              });
-            }}
-            text=""
-            icon={
-              <Icon
-                spin={
-                  loading
-                    ? {
-                        delay: 0,
-                        duration: 1500,
-                        outputRange: ['0deg', '360deg'],
-                        easing: 'easeOut',
-                      }
-                    : undefined
-                }
-                size={20}
-                name="humbleicons:refresh"
-              />
-            }
-          />
-        )}
-      </View> */}
     </HStack>
   );
 }

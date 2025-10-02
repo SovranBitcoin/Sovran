@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { useCashuOperations } from 'hooks/coco';
+import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { memoizedGetMints, TransactionBuilder } from 'helper/redux/cashu';
-import { useMintManagement } from 'hooks/coco';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -231,7 +230,20 @@ export function EcashReceiveConfirmation({
         )}
 
         <TransactionMintRefresh
-          transaction={{ ...transaction, transactionType: 'receive' }}
+          historyEntry={{
+            id: transaction.id || 'temp-ecash-receive',
+            type: 'mint',
+            amount: amount,
+            unit: unit,
+            createdAt: Date.now(),
+            mintUrl: mintInfo?.mintUrl || 'unknown',
+            state: 'UNPAID',
+            request: transaction.request || '',
+            token: token,
+            mintQuote: transaction.mintQuote || null,
+            isCancel: transaction.isCancel || false,
+            paid: transaction.paid || false,
+          }}
           mintInfo={mintInfo}
         />
         <Spacer size={12} />

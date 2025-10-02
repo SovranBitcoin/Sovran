@@ -7,7 +7,6 @@ import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useNostr } from 'helper/redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
-import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
@@ -48,16 +47,8 @@ const EcashLightningReceiver = () => {
    * Handles ecash token processing and navigation
    */
   const handleEcashToken = ({ token }: TokenHandlerParams): void => {
-    const giveaway = getGiveaway({ token });
-
-    if (giveaway?.id) {
-      // Note: Coco handles token redemption checking internally
-      // The checkIfAlreadyRedeemed function is no longer needed
-      if (!giveaway.condition()) {
-        showMessage('general_error', {}, { emoji: '🚨' });
-        return;
-      }
-    }
+    // Note: Coco handles token redemption checking internally
+    // The giveaway functionality was removed with Coco migration
 
     navigation.navigate('ecashReceiveConfirmation', {
       token,
@@ -219,18 +210,10 @@ const EcashLightningReceiver = () => {
         {showLightningAddress && (
           <TransactionMintRefresh
             mintInfo={mintInfo}
-            transaction={{
-              type: 'mint',
-              transactionType: 'receive',
-              unit: 'sat',
-              amount: 0,
-              date: new Date().toISOString(),
-              token: '',
-              request: '',
-              mintQuote: null,
-              isCancel: false,
-              paid: false,
-              state: 'UNPAID',
+            historyEntry={{
+              type: 'receive',
+
+              mintUrl: mintInfo?.mintUrl,
             }}
             handleCheckStatus={async (callback: () => void) => {
               await getProfile(currentProfile, refresh);

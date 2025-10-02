@@ -21,13 +21,9 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
   const isReceive = historyEntry.type === 'mint';
 
   return (
-    <HStack
-      align="center"
-      justify="space-between"
-      className="bg-transparent"
-      style={{ paddingVertical: 16, paddingLeft: 8, paddingRight: 16 }}>
-      <VStack className="bg-transparent">
-        <HStack align="center" className="bg-transparent">
+    <HStack align="center" justify="space-between" className="p-5">
+      <VStack>
+        <HStack align="center">
           <Spacer size={8} />
           <Text size={isSend ? 32 : 24} color={isSend ? reds[300] : greens[300]}>
             {isSend ? '-' : '+'}
@@ -41,7 +37,7 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
             color={isReceive ? greens[300] : reds[300]}
           />
         </HStack>
-        <Text size={18} color={theme.greys[50]} bold style={{ marginLeft: 32 }}>
+        <Text size={18} color={theme.greys[50]} bold>
           {historyEntry.amount < 0 ? '-' : ''}
           <Text size={18} color={theme.greys[50]} style={{ marginLeft: 8 }}>
             {historyEntry.amount < 0 ? '-' : ''}
