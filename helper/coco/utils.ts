@@ -173,12 +173,3 @@ export function pubKeyTo02(pubkey: string): string {
   // Simple implementation - in real usage you'd convert the key format
   return pubkey;
 }
-
-/**
- * Convert npub to public key (simplified version)
- * This replaces the old npubToPublicKey function
- */
-export function npubToPublicKey(npub: string): string {
-  // Simple implementation - in real usage you'd decode the npub
-  return npub;
-}

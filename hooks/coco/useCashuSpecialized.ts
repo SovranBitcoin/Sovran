@@ -39,25 +39,6 @@ export function useCashuSpecialized() {
   );
 
   /**
-   * Convert keyset ID to BigInt
-   * This replaces the old keysetIdToBigInt function
-   */
-  const keysetIdToBigInt = useCallback((id: string): bigint => {
-    return BigInt('0x' + id);
-  }, []);
-
-  /**
-   * Check if keyset ID collides with existing ones
-   * This replaces the old isCollidingKeysetId function
-   */
-  const isCollidingKeysetId = useCallback(
-    (newKeysetIdHex: string, storedKeysetIds: string[]): boolean => {
-      return storedKeysetIds.includes(newKeysetIdHex);
-    },
-    []
-  );
-
-  /**
    * Check if a token has already been redeemed
    * This replaces the old checkIfAlreadyRedeemed function
    */
@@ -69,8 +50,6 @@ export function useCashuSpecialized() {
 
   return {
     deriveMintBackupKeys,
-    keysetIdToBigInt,
-    isCollidingKeysetId,
     checkIfAlreadyRedeemed,
   };
 }

@@ -225,19 +225,6 @@ export function LightningSendConfirmation({
         )}
         <Spacer size={12} />
 
-        {/* <Section
-            items={[
-              {
-                title: 'Expires at',
-                value: getExpiry({ pr }),
-              },
-              {
-                title: 'Expires in',
-                value: getExpiresIn({ pr }),
-              },
-            ]}
-          /> */}
-
         <Section
           items={[
             { title: 'Date', value: getLightningTimestamp(pr) },

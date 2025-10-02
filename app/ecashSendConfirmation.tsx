@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
-import { Spinner } from 'components/ui/Spinner';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View, Spacer, HStack } from 'components/ui/View';
+import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -14,13 +13,12 @@ import {
   getEncodedTokenV4,
   decodePaymentRequest,
   PaymentRequestTransportType,
+  GetInfoResponse,
 } from '@cashu/cashu-ts';
 import { nip19 } from 'nostr-tools';
 import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
-import _, { capitalize } from 'lodash';
-// Removed memoizedGetTransactionByMatcher - now using Coco transactions
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
-import { useSend, useManager } from 'coco-cashu-react';
+import { useSend, usePaginatedHistory } from 'coco-cashu-react';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { showMessage, showSuccess } from 'helper/popup/popups';
@@ -31,14 +29,13 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
-import { Card } from 'components/ui/Card';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';
+import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 
 export function EcashSendConfirmation({
   unit,
@@ -54,77 +51,62 @@ export function EcashSendConfirmation({
   extraButtons?: ButtonHandlerButton[];
 }) {
   const { isTokenSpendable, receiveEcash } = useCashuOperations();
-  const { getMintInfo: _getMintInfo } = useMintManagement();
+  const { getMintInfo } = useMintManagement();
   const { send, isSending } = useSend();
-  const manager = useManager();
   const theme = useSelector(memoizedGetTheme);
   const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [sendingNostr, setSendingNostr] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
+  const { history } = usePaginatedHistory();
 
-  const getCurrentTransaction = useSelector(
-    memoizedGetTransactionByMatcher({
-      profileId: currentProfile.id,
-      matcher: (txs) =>
-        _.filter(txs, {
-          token,
-          unit,
-          amount,
-          transactionType: 'send',
-        }),
-    })
-  );
+  // Find the current transaction using coco's history system
+  const currentTransaction = history.find((tx) => {
+    return (
+      tx.type === 'send' && getEncodedTokenV4(tx.token) === getEncodedTokenV4(JSON.parse(token))
+    );
+  });
 
-  // Set up Coco event subscription for ecash token spending
+  // Load mint info when transaction is found
   useEffect(() => {
-    const currentTx = getCurrentTransaction[0];
-    if (!currentTx || currentTx.paid || !manager) return;
-
-    setIsListening(true);
-
-    // Listen for proof state changes (when ecash token gets spent)
-    const unsubscribe = manager.on('proofs:state-changed', (payload) => {
-      // Check if this transaction's token has been spent
-      const decodedToken = getDecodedToken(token);
-      if (decodedToken && payload.mintUrl === decodedToken.mint) {
-        const tokenSecrets = decodedToken.proofs.map((p) => p.secret);
-        const hasMatchingSecrets = tokenSecrets.some((secret) => payload.secrets.includes(secret));
-
-        if (hasMatchingSecrets && payload.state === 'spent') {
-          // Coco automatically updates transaction status
-          showMessage('Ecash token spent!', { amount: currentTx.amount, unit: currentTx.unit });
-          setIsListening(false);
+    const loadMintInfo = async () => {
+      if (currentTransaction?.mintUrl) {
+        try {
+          const info = await getMintInfo(currentTransaction.mintUrl);
+          setMintInfo(info);
+        } catch (error) {
+          console.error('Failed to load mint info:', error);
+          setMintInfo(null);
         }
       }
-    });
-
-    return () => {
-      unsubscribe();
-      setIsListening(false);
     };
-  }, [getCurrentTransaction, manager, currentProfile.id, token]);
+    loadMintInfo();
+  }, [currentTransaction?.mintUrl, getMintInfo]);
 
-  const resolvedPaymentRequest = paymentRequest || getCurrentTransaction[0]?.paymentRequest;
+  const resolvedPaymentRequest =
+    paymentRequest ||
+    (currentTransaction && 'paymentRequest' in currentTransaction
+      ? currentTransaction.paymentRequest
+      : undefined);
 
   const handleNFCSend = async () => {
     await write(token);
   };
 
-  const handleCopy = async (onClose) => {
+  const handleCopy = async (onClose: (event: any) => void) => {
     await Clipboard.setStringAsync(token);
-    showSuccess('ecash_token_copied', {}, {}, onClose);
+    showSuccess('ecash_token_copied', {}, {}, () => onClose({}));
   };
 
-  const handleShare = async (onClose) => {
+  const handleShare = async (onClose: (event: any) => void) => {
     await Share.share({
       url: uri,
       message: 'cashu://' + token,
     });
-    onClose();
+    onClose({});
   };
 
   const handleSendNostr = async () => {
@@ -133,11 +115,16 @@ export function EcashSendConfirmation({
     try {
       setSendingNostr(true);
       const decoded = decodePaymentRequest(request);
-      const receiverTarget = decoded.getTransport(PaymentRequestTransportType.NOSTR).target;
+      const receiverTarget = decoded.getTransport(PaymentRequestTransportType.NOSTR)?.target;
+      if (!receiverTarget) return;
       const { data } = nip19.decode(receiverTarget);
-      const { pubkey } = data as { pubkey: string };
+      const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
 
       const decodedToken = getDecodedToken(token);
+      if (!decodedToken) {
+        showMessage('Invalid token format', {}, {}, () => {});
+        return;
+      }
 
       await sendGiftWrappedEncryptedDirectMessage({
         message: JSON.stringify({
@@ -149,41 +136,61 @@ export function EcashSendConfirmation({
         recipient: pubkey,
         nsec: currentProfile.nsec,
       });
+    } catch (error) {
+      console.error('Failed to send via Nostr:', error);
+      showMessage('Failed to send via Nostr', {}, {}, () => {});
     } finally {
       setSendingNostr(false);
     }
   };
 
-  const handleCancelSend = async (onClose) => {
+  const handleCancelSend = async (onClose: (event: any) => void) => {
     try {
       // For ecash transactions, "cancelling" means receiving the token back
       // This effectively cancels the send transaction
       await receiveEcash(token);
-      showMessage('Transaction cancelled successfully', {}, {}, onClose);
+      showMessage('Transaction cancelled successfully', {}, {}, () => onClose({}));
     } catch (error) {
       showMessage(
         error instanceof Error ? error.message : 'Failed to cancel transaction',
         {},
         {},
-        onClose
+        () => onClose({})
       );
     }
   };
 
-  const handleSendEcash = async (onClose) => {
+  const handleSendEcash = async (onClose: (event: any) => void) => {
     try {
       const decodedToken = getDecodedToken(token);
+      if (!decodedToken) {
+        showMessage('Invalid token format', {}, {}, () => onClose({}));
+        return;
+      }
       const mintUrl = decodedToken.mint;
 
       // Use Coco's send function to send ecash
       await send(mintUrl, amount);
-      showMessage('Ecash sent successfully!', { amount, unit }, { emoji: '🎉' }, onClose);
+      showMessage('Ecash sent successfully!', { amount, unit }, { emoji: '🎉' }, () => onClose({}));
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Failed to send ecash', {}, {}, onClose);
+      showMessage(error instanceof Error ? error.message : 'Failed to send ecash', {}, {}, () =>
+        onClose({})
+      );
     }
   };
 
-  const formattedToken = getEncodedTokenV4(getDecodedToken(token)) || token;
+  // Safely decode and format the token
+  const getFormattedToken = () => {
+    try {
+      const decodedToken = getDecodedToken(token);
+      return getEncodedTokenV4(decodedToken) || token;
+    } catch (error) {
+      console.warn('Failed to decode token, using original:', error);
+      return token;
+    }
+  };
+
+  const formattedToken = getFormattedToken();
   const isLongToken = formattedToken.length >= 500;
 
   const checkProofsSpent = async (token: string): Promise<Result<boolean, Error>> => {
@@ -195,7 +202,7 @@ export function EcashSendConfirmation({
     }
   };
 
-  const handleCheckStatus = async (onClose) => {
+  const handleCheckStatus = async (onClose: (event: any) => void) => {
     if (isCheckingStatus) return;
 
     setIsCheckingStatus(true);
@@ -204,34 +211,35 @@ export function EcashSendConfirmation({
     if (result.isOk()) {
       const proofsSpent = result.value;
       if (proofsSpent) {
-        const decodedToken = getDecodedToken(token);
-        const amount = _.sumBy(decodedToken.proofs, 'amount');
+        try {
+          const decodedToken = getDecodedToken(token);
+          const amount = decodedToken.proofs.reduce((sum, proof) => sum + proof.amount, 0);
 
-        showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
-          navigation.navigate(
-            'index',
-            {},
-            {
-              closeParents: true,
-            }
-          );
-          onClose();
-        });
+          showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
+            navigation.navigate(
+              'index',
+              {},
+              {
+                closeParents: true,
+              }
+            );
+            onClose({});
+          });
+        } catch {
+          showMessage('Invalid token format', {}, { emoji: '⚠️' }, () => onClose({}));
+        }
       } else {
-        showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, onClose);
+        showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, () => onClose({}));
       }
     } else {
-      showMessage(
-        'error_checking_status',
-        { error: result.error.message },
-        { emoji: '⚠️' },
-        onClose
+      showMessage('error_checking_status', { error: result.error.message }, { emoji: '⚠️' }, () =>
+        onClose({})
       );
     }
     setIsCheckingStatus(false);
   };
 
-  const handleCopyEmoji = async (onClose) => {
+  const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
       payload: {
         token,
@@ -240,26 +248,19 @@ export function EcashSendConfirmation({
     });
   };
 
-  const { getMintInfo } = useMintManagement();
-  const [mintInfo, setMintInfo] = React.useState<any>({});
+  // Show loading state if transaction is not found
+  if (!currentTransaction) {
+    return (
+      <Modal showClose title="Loading...">
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text>Loading transaction...</Text>
+          <Text>{getEncodedTokenV4(JSON.parse(token))}</Text>
+        </View>
+      </Modal>
+    );
+  }
 
-  // Load mint info when transaction changes
-  React.useEffect(() => {
-    const loadMintInfo = async () => {
-      if (getCurrentTransaction[0]?.mintUrl) {
-        try {
-          const info = await getMintInfo(getCurrentTransaction[0].mintUrl);
-          setMintInfo(info);
-        } catch (error) {
-          console.error('Failed to load mint info:', error);
-          setMintInfo({});
-        }
-      } else {
-        setMintInfo({});
-      }
-    };
-    loadMintInfo();
-  }, [getCurrentTransaction, getMintInfo]);
+  const isPaid = 'state' in currentTransaction && currentTransaction.state === 'PAID';
 
   return (
     <Modal
@@ -273,7 +274,7 @@ export function EcashSendConfirmation({
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => navigation.goBack(),
-                condition: getCurrentTransaction[0].paid,
+                condition: isPaid,
               },
               {
                 text: 'View Messages',
@@ -281,34 +282,32 @@ export function EcashSendConfirmation({
                 variant: 'primary',
                 onPress: async () => {
                   navigation.navigate('userMessages', {
-                    pubkey: getCurrentTransaction[0].nostr.pubkey,
+                    pubkey: currentTransaction.metadata?.nostr as string,
                   });
                   navigation.goBack();
                 },
-                condition: !!(
-                  getCurrentTransaction[0].paid && getCurrentTransaction[0].nostr?.pubkey
-                ),
+                condition: false, // Disabled until nostr property is available in Coco types
               },
               {
                 text: 'Copy',
                 icon: 'lets-icons:copy',
                 variant: 'primary',
                 onPress: handleCopy,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Share',
                 icon: 'ri:share-fill',
                 variant: 'secondary',
                 onPress: handleShare,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'NFC',
                 icon: 'ph:contactless-payment-fill',
                 variant: 'secondary',
                 onPress: handleNFCSend,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Send via Nostr',
@@ -316,14 +315,14 @@ export function EcashSendConfirmation({
                 variant: 'primary',
                 loading: sendingNostr,
                 onPress: handleSendNostr,
-                condition: !!(resolvedPaymentRequest && !getCurrentTransaction[0].paid),
+                condition: !!(resolvedPaymentRequest && !isPaid),
               },
               {
                 text: 'Copy as Emoji',
                 icon: 'fluent:emoji-24-filled',
                 variant: 'primary',
                 onPress: handleCopyEmoji,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Send Ecash',
@@ -331,107 +330,87 @@ export function EcashSendConfirmation({
                 variant: 'primary',
                 loading: isSending,
                 onPress: handleSendEcash,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               {
                 text: 'Cancel Transaction',
                 icon: 'mdi:cancel',
                 variant: 'dangerous',
                 onPress: handleCancelSend,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               },
               ...extraButtons.map((button) => ({
                 ...button,
-                condition: !getCurrentTransaction[0].paid,
+                condition: !isPaid,
               })),
             ]}
           />
         </HStack>
       }>
-      <TransactionHeader
-        transaction={{ ...getCurrentTransaction[0], unit, amount, transactionType: 'send' }}
-      />
-      {!getCurrentTransaction[0].paid && (
-        <PaymentInfo
-          setUri={setUri}
-          popupMessage="ecash_token_copied"
-          unit={unit}
-          data={formattedToken}
-          animated={isLongToken}
-          showSection={false}
-        />
-      )}
-      <Spacer size={12} />
-      {getCurrentTransaction[0].memo && (
-        <>
-          <View
-            style={{
-              marginHorizontal: 16,
-            }}>
-            <Card message={getCurrentTransaction[0].memo} variant="info" />
-          </View>
-          <Spacer size={12} />
-        </>
-      )}
-      <TransactionMintRefresh
-        transaction={{
-          ...getCurrentTransaction[0],
-          unit,
-          amount,
-          transactionType: 'send',
-        }}
-        mintInfo={mintInfo}
-        handleCheckStatus={handleCheckStatus}
-      />
-      <Spacer size={12} />
+      <TransactionHeader historyEntry={currentTransaction} />
 
-      <MintQuoteTimeline
-        transaction={{
-          ...getCurrentTransaction[0],
-          unit,
-          amount,
-          transactionType: 'send',
-        }}
-        meltQuotes={getCurrentTransaction[0].proofStates}
-      />
-      <Spacer size={12} />
-      <Section
-        items={[
-          {
-            title: 'Date',
-            value: convertTime(new Date(getCurrentTransaction[0]?.date)),
-          },
-          {
-            title: 'Type',
-            value:
-              capitalize(String(getCurrentTransaction[0]?.type)) +
-              ' • ' +
-              capitalize(String(getCurrentTransaction[0]?.transactionType)),
-          },
-          {
-            title: 'Status',
-            value: (
-              <HStack align="center">
-                <Text
-                  style={{
-                    color: greys(theme)[0],
-                    fontFamily: 'OverpassBold',
-                    fontSize: 16,
-                  }}>
-                  {getCurrentTransaction[0].paid ? 'Completed' : 'Pending'}
-                </Text>
-                {isListening && <Spinner style={{ marginLeft: 4 }} size={12} />}
-              </HStack>
-            ),
-          },
-          {
-            title: 'Token',
-            value: truncateMiddle(token, 6),
-          },
-        ]}
-      />
-      <Spacer size={12} />
-      <TransactionDebugCode transaction={getCurrentTransaction[0]} />
+      <VStack gap={12}>
+        {!isPaid && (
+          <PaymentInfo
+            setUri={setUri}
+            popupMessage="ecash_token_copied"
+            unit={unit}
+            data={formattedToken}
+            animated={isLongToken}
+            showSection={false}
+          />
+        )}
+
+        {/* Memo display - Coco types don't have memo property directly accessible */}
+
+        {mintInfo && (
+          <TransactionMintRefresh
+            historyEntry={currentTransaction}
+            mintInfo={mintInfo}
+            handleCheckStatus={handleCheckStatus}
+          />
+        )}
+
+        <MintQuoteTimeline historyEntry={currentTransaction} />
+
+        <Section
+          items={[
+            {
+              title: 'Date',
+              value: convertTime(new Date(currentTransaction.createdAt)),
+            },
+            {
+              title: 'Type',
+              value: 'Ecash • Send',
+            },
+            {
+              title: 'Status',
+              value: (
+                <HStack align="center">
+                  <Text
+                    style={{
+                      color: greys(theme)[0],
+                      fontFamily: 'OverpassBold',
+                      fontSize: 16,
+                    }}>
+                    {isPaid ? 'Completed' : 'Pending'}
+                  </Text>
+                </HStack>
+              ),
+            },
+            {
+              title: 'Token',
+              value: truncateMiddle(getEncodedTokenV4(JSON.parse(token)), 6),
+            },
+            {
+              title: 'Amount',
+              value: `${currentTransaction.amount} ${unit.toUpperCase()}`,
+            },
+          ]}
+        />
+
+        <TransactionDebugCode historyEntry={currentTransaction} />
+      </VStack>
     </Modal>
   );
 }

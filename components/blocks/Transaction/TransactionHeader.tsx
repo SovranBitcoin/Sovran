@@ -7,14 +7,18 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { formatCurrency, CurrencyCode, Denomination } from 'helper/currency';
 import TransactionIcon from '../TransactionIcon';
-import { TransactionData } from 'helper/redux/cashu';
+import { HistoryEntry } from 'coco-cashu-core';
 
-interface TransactionHeaderProps {
-  transaction: TransactionData;
+interface HistoryEntryHeaderProps {
+  historyEntry: HistoryEntry;
 }
 
-export function TransactionHeader({ transaction }: TransactionHeaderProps) {
+export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
   const theme = useSelector(memoizedGetTheme);
+
+  // Determine if this is a send or receive transaction
+  const isSend = historyEntry.type === 'send';
+  const isReceive = historyEntry.type === 'mint';
 
   return (
     <HStack
@@ -25,47 +29,48 @@ export function TransactionHeader({ transaction }: TransactionHeaderProps) {
       <VStack className="bg-transparent">
         <HStack align="center" className="bg-transparent">
           <Spacer size={8} />
-          <Text
-            size={transaction.isSend ? 32 : 24}
-            color={transaction.isSend ? reds[300] : greens[300]}>
-            {transaction.isSend ? '-' : '+'}
+          <Text size={isSend ? 32 : 24} color={isSend ? reds[300] : greens[300]}>
+            {isSend ? '-' : '+'}
           </Text>
           <Spacer size={8} />
           <AmountFormatter
-            amount={transaction?.amount}
-            unit={transaction?.unit}
+            amount={historyEntry.amount}
+            unit={historyEntry.unit}
             size={28}
             weight="heavy"
-            color={transaction.isReceive ? greens[300] : reds[300]}
+            color={isReceive ? greens[300] : reds[300]}
           />
         </HStack>
         <Text size={18} color={theme.greys[50]} bold style={{ marginLeft: 32 }}>
-          {transaction?.amount < 0 ? '-' : ''}
+          {historyEntry.amount < 0 ? '-' : ''}
           <Text size={18} color={theme.greys[50]} style={{ marginLeft: 8 }}>
-            {transaction?.amount < 0 ? '-' : ''}
+            {historyEntry.amount < 0 ? '-' : ''}
             {formatCurrency(
               {
                 currency:
-                  transaction?.unit === 'sat'
+                  historyEntry.unit === 'sat'
                     ? 'BTC'
-                    : (transaction?.unit?.toUpperCase() as CurrencyCode),
-                value: Math.abs(transaction?.amount),
+                    : (historyEntry.unit?.toUpperCase() as CurrencyCode),
+                value: Math.abs(historyEntry.amount),
                 denomination:
-                  transaction?.unit === 'sat' ? 'sats' : (transaction?.unit as Denomination),
+                  historyEntry.unit === 'sat' ? 'sats' : (historyEntry.unit as Denomination),
               },
               {
                 locale: 'en-US',
                 precision: 2,
-                currencyDisplay: transaction?.unit === 'usd' ? 'name' : 'symbol',
-                denomination: transaction?.unit === 'usd' ? 'sats' : 'usd',
+                currencyDisplay: historyEntry.unit === 'usd' ? 'name' : 'symbol',
+                denomination: historyEntry.unit === 'usd' ? 'sats' : 'usd',
               }
             )}
           </Text>
         </Text>
       </VStack>
       <View className="scale-125 transform bg-transparent p-4">
-        <TransactionIcon transaction={transaction} />
+        <TransactionIcon transaction={historyEntry} />
       </View>
     </HStack>
   );
 }
+
+// Keep the old export for backward compatibility
+export const TransactionHeader = HistoryEntryHeader;

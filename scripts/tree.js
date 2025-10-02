@@ -58,10 +58,13 @@ class FunctionTreeGenerator {
 
       const functions = [];
 
-      const visit = (node) => {
+      const visit = (node, parentFunction = null) => {
+        let currentFunction = null;
+
         // Function declarations
         if (ts.isFunctionDeclaration(node) && node.name) {
-          functions.push(this.processFunctionNode(node, sourceFile));
+          currentFunction = this.processFunctionNode(node, sourceFile, parentFunction);
+          functions.push(currentFunction);
         }
         // Arrow functions assigned to variables
         else if (
@@ -69,14 +72,18 @@ class FunctionTreeGenerator {
           node.initializer &&
           (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
         ) {
-          functions.push(this.processVariableFunctionNode(node, sourceFile));
+          currentFunction = this.processVariableFunctionNode(node, sourceFile, parentFunction);
+          functions.push(currentFunction);
         }
         // Method declarations in classes
         else if (ts.isMethodDeclaration(node)) {
-          functions.push(this.processFunctionNode(node, sourceFile));
+          currentFunction = this.processFunctionNode(node, sourceFile, parentFunction);
+          functions.push(currentFunction);
         }
 
-        ts.forEachChild(node, visit);
+        // Continue visiting children, passing the current function as parent if it exists
+        const nextParent = currentFunction || parentFunction;
+        ts.forEachChild(node, (child) => visit(child, nextParent));
       };
 
       visit(sourceFile);
@@ -88,7 +95,7 @@ class FunctionTreeGenerator {
   }
 
   // Process function node and extract metadata
-  processFunctionNode(node, sourceFile) {
+  processFunctionNode(node, sourceFile, parentFunction = null) {
     const name = node.name ? node.name.text : 'anonymous';
     const params = this.extractParameters(node);
     const returnType = this.extractReturnType(node);
@@ -101,11 +108,13 @@ class FunctionTreeGenerator {
       returnType,
       description,
       lineRange,
+      parentFunction: parentFunction ? parentFunction.name : null,
+      depth: parentFunction ? (parentFunction.depth || 0) + 1 : 0,
     };
   }
 
   // Process variable function node (arrow functions, function expressions)
-  processVariableFunctionNode(node, sourceFile) {
+  processVariableFunctionNode(node, sourceFile, parentFunction = null) {
     const name = node.name ? node.name.text : 'anonymous';
     const funcNode = node.initializer;
     const params = this.extractParameters(funcNode);
@@ -119,6 +128,8 @@ class FunctionTreeGenerator {
       returnType,
       description,
       lineRange,
+      parentFunction: parentFunction ? parentFunction.name : null,
+      depth: parentFunction ? (parentFunction.depth || 0) + 1 : 0,
     };
   }
 
@@ -238,6 +249,7 @@ class FunctionTreeGenerator {
           functions: result.functions,
           totalLines: result.totalLines,
           functionCount: result.functions.length,
+          rootFunctionCount: result.functions.filter((f) => f.depth === 0).length,
         };
       }
     });
@@ -255,42 +267,69 @@ class FunctionTreeGenerator {
       const filePrefix = isLastFile ? '└── ' : '├── ';
 
       const fileData = tree[filePath];
-      const fileInfo = `${filePath} (${fileData.totalLines} lines, ${fileData.functionCount} functions)`;
+      const fileInfo = `${filePath} (${fileData.totalLines} lines, ${fileData.rootFunctionCount} root functions, ${fileData.functionCount} total functions)`;
       lines.push(`${filePrefix}${fileInfo}`);
 
+      // Group functions by depth and parent for hierarchical display
       const functions = fileData.functions;
-      functions.forEach((func, funcIndex) => {
-        const isLastFunction = funcIndex === functions.length - 1;
-        const funcPrefix = isLastFile ? '    ' : '│   ';
-        const funcBullet = isLastFunction ? '└── ' : '├── ';
+      const rootFunctions = functions.filter((f) => f.depth === 0);
 
-        // Function name with line range
-        const lineRange = `[lines ${func.lineRange.start}-${func.lineRange.end}]`;
-        lines.push(`${funcPrefix}${funcBullet}${func.name}() ${lineRange}`);
-
-        // Function details with proper indentation
-        const detailPrefix = isLastFile ? '    ' : '│   ';
-        const detailIndent = isLastFunction ? '    ' : '│   ';
-
-        // Parameters
-        const paramsStr = this.formatParameters(func.params);
-        lines.push(`${detailPrefix}${detailIndent}├── params: ${paramsStr}`);
-
-        // Return type
-        lines.push(`${detailPrefix}${detailIndent}├── returns: ${func.returnType}`);
-
-        // Description (if available)
-        if (func.description) {
-          lines.push(`${detailPrefix}${detailIndent}└── desc: "${func.description}"`);
-        } else {
-          // If no description, make returns the last item
-          const prevLine = lines[lines.length - 1];
-          lines[lines.length - 1] = prevLine.replace('├── returns:', '└── returns:');
-        }
+      rootFunctions.forEach((func, funcIndex) => {
+        const isLastFunction = funcIndex === rootFunctions.length - 1;
+        this.renderFunctionWithNested(func, functions, lines, isLastFile, isLastFunction, 0);
       });
     });
 
     return lines.join('\n');
+  }
+
+  // Render a function and its nested functions recursively
+  renderFunctionWithNested(func, allFunctions, lines, isLastFile, isLastFunction, indentLevel) {
+    const funcPrefix = isLastFile ? '    ' : '│   ';
+    const baseIndent = '    '.repeat(indentLevel);
+    const funcBullet = isLastFunction ? '└── ' : '├── ';
+
+    // Function name with line range and parent info
+    const lineRange = `[lines ${func.lineRange.start}-${func.lineRange.end}]`;
+    const parentInfo = func.parentFunction ? ` (inside ${func.parentFunction})` : '';
+    lines.push(`${funcPrefix}${baseIndent}${funcBullet}${func.name}() ${lineRange}${parentInfo}`);
+
+    // Function details with proper indentation
+    const detailPrefix = isLastFile ? '    ' : '│   ';
+    const detailIndent = isLastFunction ? '    ' : '│   ';
+    const detailBaseIndent = '    '.repeat(indentLevel);
+
+    // Parameters
+    const paramsStr = this.formatParameters(func.params);
+    lines.push(`${detailPrefix}${detailBaseIndent}${detailIndent}├── params: ${paramsStr}`);
+
+    // Return type
+    lines.push(`${detailPrefix}${detailBaseIndent}${detailIndent}├── returns: ${func.returnType}`);
+
+    // Description (if available)
+    if (func.description) {
+      lines.push(
+        `${detailPrefix}${detailBaseIndent}${detailIndent}└── desc: "${func.description}"`
+      );
+    } else {
+      // If no description, make returns the last item
+      const prevLine = lines[lines.length - 1];
+      lines[lines.length - 1] = prevLine.replace('├── returns:', '└── returns:');
+    }
+
+    // Find and render nested functions
+    const nestedFunctions = allFunctions.filter((f) => f.parentFunction === func.name);
+    nestedFunctions.forEach((nestedFunc, nestedIndex) => {
+      const isLastNested = nestedIndex === nestedFunctions.length - 1;
+      this.renderFunctionWithNested(
+        nestedFunc,
+        allFunctions,
+        lines,
+        isLastFile,
+        isLastNested,
+        indentLevel + 1
+      );
+    });
   }
 
   // Main execution method

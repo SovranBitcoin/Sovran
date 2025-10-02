@@ -26,18 +26,18 @@ import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionD
 import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
 
 interface MintQuoteTimelineProps {
-  transaction: MintHistoryEntry | MeltHistoryEntry;
+  historyEntry: HistoryEntry;
 }
 
-export function MintQuoteTimeline({ transaction }: MintQuoteTimelineProps) {
+export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
 
-  const isMintTransaction = transaction.type === 'mint';
+  const isMintTransaction = historyEntry.type === 'mint';
 
   const getTimeline = () => {
     if (isMintTransaction) {
-      const mintTx = transaction as MintHistoryEntry;
+      const mintTx = historyEntry as MintHistoryEntry;
       const states = ['CREATED', 'UNPAID', 'ISSUED', 'PAID'];
 
       // Find current state index
@@ -51,7 +51,7 @@ export function MintQuoteTimeline({ transaction }: MintQuoteTimelineProps) {
         addedAt: i === 0 ? mintTx.createdAt : undefined,
       }));
     } else {
-      const meltTx = transaction as MeltHistoryEntry;
+      const meltTx = historyEntry as MeltHistoryEntry;
       const states = ['CREATED', 'UNSPENT', 'PENDING', 'SPENT'];
 
       // Find current state index
@@ -70,9 +70,9 @@ export function MintQuoteTimeline({ transaction }: MintQuoteTimelineProps) {
   const states = getTimeline();
 
   const hasIntermediarySteps = isMintTransaction
-    ? (transaction as MintHistoryEntry).state === 'UNPAID'
-    : (transaction as MeltHistoryEntry).state === ('UNSPENT' as any) ||
-      (transaction as MeltHistoryEntry).state === ('PENDING' as any);
+    ? (historyEntry as MintHistoryEntry).state === 'UNPAID'
+    : (historyEntry as MeltHistoryEntry).state === ('UNSPENT' as any) ||
+      (historyEntry as MeltHistoryEntry).state === ('PENDING' as any);
 
   const shouldCollapse = collapsed && !hasIntermediarySteps;
 
@@ -122,8 +122,8 @@ export function MintQuoteTimeline({ transaction }: MintQuoteTimelineProps) {
         }}>
         {getStateLabel(
           isMintTransaction
-            ? (transaction as MintHistoryEntry).state
-            : (transaction as MeltHistoryEntry).state
+            ? (historyEntry as MintHistoryEntry).state
+            : (historyEntry as MeltHistoryEntry).state
         )}
       </Text>
       <View>
@@ -319,15 +319,7 @@ export function LightningReceiveConfirmation({
           />
         </HStack>
       }>
-      <TransactionHeader
-        transaction={{
-          ...currentTransaction,
-          unit,
-          amount: currentTransaction.amount,
-          transactionType: 'receive',
-          date: new Date(currentTransaction.createdAt).toISOString(),
-        }}
-      />
+      <TransactionHeader historyEntry={currentTransaction} />
       <VStack gap={12}>
         {!isPaid && (
           <PaymentInfo
@@ -347,11 +339,11 @@ export function LightningReceiveConfirmation({
 
         <TransactionMintRefresh
           mintInfo={mintInfo}
-          transaction={currentTransaction}
+          historyEntry={currentTransaction}
           handleCheckStatus={async () => {}}
         />
 
-        <MintQuoteTimeline transaction={currentTransaction} />
+        <MintQuoteTimeline historyEntry={currentTransaction} />
 
         <Section
           special={false}
@@ -382,13 +374,7 @@ export function LightningReceiveConfirmation({
           ]}
         />
 
-        <TransactionDebugCode
-          transaction={{
-            ...currentTransaction,
-            transactionType: 'receive',
-            date: new Date(currentTransaction.createdAt).toISOString(),
-          }}
-        />
+        <TransactionDebugCode historyEntry={currentTransaction} />
       </VStack>
     </Modal>
   );

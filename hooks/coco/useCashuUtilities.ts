@@ -167,15 +167,6 @@ export function useCashuUtilities() {
     return pubkey;
   }, []);
 
-  /**
-   * Convert npub to public key (simplified version)
-   * This replaces the old npubToPublicKey function
-   */
-  const npubToPublicKey = useCallback((npub: string): string => {
-    // Simple implementation - in real usage you'd decode the npub
-    return npub;
-  }, []);
-
   return {
     // Token utilities
     isValidEcashToken,
@@ -194,6 +185,5 @@ export function useCashuUtilities() {
     // Key utilities (simplified)
     maybeConvertNpub,
     pubKeyTo02,
-    npubToPublicKey,
   };
 }

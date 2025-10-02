@@ -128,27 +128,10 @@ export function useCashuOperations() {
     resetReceive();
   }, [resetSend, resetReceive]);
 
-  /**
-   * Cancel an ecash transaction by receiving the token back
-   * This replaces the old cancelEcashTransaction function
-   */
-  const cancelEcashTransaction = useCallback(
-    async (token: string): Promise<void> => {
-      try {
-        // Simply receive the token back - this effectively cancels the transaction
-        await receiveEcash(token);
-      } catch (error) {
-        throw error;
-      }
-    },
-    [receiveEcash]
-  );
-
   return {
     // Core operations
     sendEcash,
     receiveEcash,
-    cancelEcashTransaction,
 
     // Validation utilities
     isTokenSpendable,
