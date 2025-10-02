@@ -47,11 +47,5 @@ export const useDeeplink = () => {
         }
       }
     })();
-  }, [
-    url,
-    currentProfile.pubkey,
-    selectedMint,
-    navigation,
-    // we don’t need urDecoderRef in deps because refs are stable
-  ]);
+  }, [url, currentProfile.pubkey, selectedMint, navigation]);
 };
