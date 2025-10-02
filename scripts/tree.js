@@ -402,7 +402,172 @@ class FunctionTreeGenerator {
       });
     }
 
-    // Pattern 3: icon: "icon-name" (in data structures)
+    // Pattern 2b: name={...} with multi-line content (handles cases where icon names are on separate lines)
+    const multilineNamePattern = /name=\{[\s\S]*?['"]([^'"]+)['"][\s\S]*?\}/g;
+    while ((match = multilineNamePattern.exec(content)) !== null) {
+      // Only match if it contains an icon-like string (with colon)
+      if (match[1].includes(':')) {
+        iconUsages.push({
+          icon: match[1],
+          type: 'multiline-name',
+          line: content.substring(0, match.index).split('\n').length,
+        });
+      }
+    }
+
+    // Pattern 2c: icon: 'icon-name' in ternary expressions (handles cases like icon: condition ? 'icon1' : 'icon2')
+    const ternaryIconPattern = /icon:\s*[^?]+\?[^'"]+['"]([^'"]+)['"][^'"]+['"]([^'"]+)['"]/g;
+    while ((match = ternaryIconPattern.exec(content)) !== null) {
+      // Add both icons from the ternary
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+      iconUsages.push({
+        icon: match[2],
+        type: 'ternary',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c2: icon: 'icon-name' in ternary expressions (catches any icon in ternary, including same on both sides)
+    const anyTernaryIconPattern = /icon:\s*[^?]*\?[^:]*['"]([^'"]+)['"]/g;
+    while ((match = anyTernaryIconPattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-any',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c3: name={...} with ternary expressions (catches any icon in ternary within name={})
+    const anyTernaryNamePattern = /name=\{[^}]*\?[^}]*['"]([^'"]+)['"]/gs;
+    while ((match = anyTernaryNamePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name-any',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c4: name={...} with ternary expressions (catches the first icon in ternary within name={})
+    const firstTernaryNamePattern = /name=\{[^}]*\?[^:]*['"]([^'"]+)['"]/gs;
+    while ((match = firstTernaryNamePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name-first',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c5: name={...} with ternary expressions (catches the second icon in ternary within name={})
+    const secondTernaryNamePattern = /name=\{[^}]*\?[^:]*['"][^'"]*['"][^:]*['"]([^'"]+)['"]/gs;
+    while ((match = secondTernaryNamePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name-second',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c6: icon: ... with ternary expressions (catches the second icon in ternary within icon:)
+    const secondTernaryIconPattern = /icon:\s*[^?]*\?[^:]*['"][^'"]*['"][^:]*['"]([^'"]+)['"]/g;
+    while ((match = secondTernaryIconPattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-icon-second',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c7: Comprehensive ternary pattern for any icon in ternary expressions (catches both sides)
+    const comprehensiveTernaryPattern =
+      /(?:icon|name):\s*[^?]+\?[^'"]+['"]([^'"]+)['"][^'"]+['"]([^'"]+)['"]/g;
+    while ((match = comprehensiveTernaryPattern.exec(content)) !== null) {
+      // Add both icons from the ternary
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-comprehensive',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+      iconUsages.push({
+        icon: match[2],
+        type: 'ternary-comprehensive',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c8: Simple ternary pattern for icon: (catches both sides)
+    const simpleTernaryPattern = /icon:\s*[^?]+\?[^'"]+['"]([^'"]+)['"][^'"]+['"]([^'"]+)['"]/g;
+    while ((match = simpleTernaryPattern.exec(content)) !== null) {
+      // Add both icons from the ternary
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-simple',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+      iconUsages.push({
+        icon: match[2],
+        type: 'ternary-simple',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2c9: Simple ternary pattern for name={} (catches both sides)
+    const simpleTernaryNamePattern =
+      /name=\{[^}]+\?[^'"]+['"]([^'"]+)['"][^'"]+['"]([^'"]+)['"]\}/g;
+    while ((match = simpleTernaryNamePattern.exec(content)) !== null) {
+      // Add both icons from the ternary
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name-simple',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+      iconUsages.push({
+        icon: match[2],
+        type: 'ternary-name-simple',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2d: name={...} with ternary expressions (handles cases like name={condition ? 'icon1' : 'icon2'})
+    const ternaryNamePattern = /name=\{[^}]*\?[^}]*['"]([^'"]+)['"][^}]*['"]([^'"]+)['"][^}]*\}/gs;
+    while ((match = ternaryNamePattern.exec(content)) !== null) {
+      // Add both icons from the ternary
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+      iconUsages.push({
+        icon: match[2],
+        type: 'ternary-name',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 2d2: name={...} with ternary expressions where both sides are the same (handles cases like name={condition ? 'icon' : 'icon'})
+    const sameTernaryNamePattern = /name=\{[^}]*\?[^}]*['"]([^'"]+)['"][^}]*['"]\1['"][^}]*\}/gs;
+    while ((match = sameTernaryNamePattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'ternary-name-same',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 3: icon="icon-name" (JSX props)
+    const jsxIconPattern = /icon=["']([^"']+)["']/g;
+    while ((match = jsxIconPattern.exec(content)) !== null) {
+      iconUsages.push({
+        icon: match[1],
+        type: 'jsx-prop',
+        line: content.substring(0, match.index).split('\n').length,
+      });
+    }
+
+    // Pattern 4: icon: "icon-name" (in data structures)
     const dataStructurePattern = /icon:\s*["']([^"']+)["']/g;
     while ((match = dataStructurePattern.exec(content)) !== null) {
       iconUsages.push({
@@ -412,7 +577,7 @@ class FunctionTreeGenerator {
       });
     }
 
-    // Pattern 4: icon: 'icon-name' (single quotes in data structures)
+    // Pattern 5: icon: 'icon-name' (single quotes in data structures)
     const dataStructureSinglePattern = /icon:\s*'([^']+)'/g;
     while ((match = dataStructureSinglePattern.exec(content)) !== null) {
       iconUsages.push({
@@ -420,6 +585,26 @@ class FunctionTreeGenerator {
         type: 'data-structure',
         line: content.substring(0, match.index).split('\n').length,
       });
+    }
+
+    // Pattern 6: Variable assignment with ternary expression (catches icons in variable assignments)
+    const variableAssignmentPattern = /=\s*[^?]+\?[^'"]+['"]([^'"]+)['"][^'"]+['"]([^'"]+)['"]/g;
+    while ((match = variableAssignmentPattern.exec(content)) !== null) {
+      // Only match if it contains an icon-like string (with colon)
+      if (match[1].includes(':')) {
+        iconUsages.push({
+          icon: match[1],
+          type: 'variable-assignment',
+          line: content.substring(0, match.index).split('\n').length,
+        });
+      }
+      if (match[2].includes(':')) {
+        iconUsages.push({
+          icon: match[2],
+          type: 'variable-assignment',
+          line: content.substring(0, match.index).split('\n').length,
+        });
+      }
     }
 
     return iconUsages;
@@ -615,7 +800,37 @@ class FunctionTreeGenerator {
             ? ' (var)'
             : fileInfo.type === 'data-structure'
               ? ' (data)'
-              : '';
+              : fileInfo.type === 'jsx-prop'
+                ? ' (jsx)'
+                : fileInfo.type === 'multiline-name'
+                  ? ' (multiline)'
+                  : fileInfo.type === 'ternary'
+                    ? ' (ternary)'
+                    : fileInfo.type === 'ternary-name'
+                      ? ' (ternary-name)'
+                      : fileInfo.type === 'ternary-same'
+                        ? ' (ternary-same)'
+                        : fileInfo.type === 'ternary-name-same'
+                          ? ' (ternary-name-same)'
+                          : fileInfo.type === 'ternary-any'
+                            ? ' (ternary-any)'
+                            : fileInfo.type === 'ternary-name-any'
+                              ? ' (ternary-name-any)'
+                              : fileInfo.type === 'ternary-name-first'
+                                ? ' (ternary-name-first)'
+                                : fileInfo.type === 'ternary-name-second'
+                                  ? ' (ternary-name-second)'
+                                  : fileInfo.type === 'ternary-icon-second'
+                                    ? ' (ternary-icon-second)'
+                                    : fileInfo.type === 'ternary-comprehensive'
+                                      ? ' (ternary-comprehensive)'
+                                      : fileInfo.type === 'ternary-simple'
+                                        ? ' (ternary-simple)'
+                                        : fileInfo.type === 'ternary-name-simple'
+                                          ? ' (ternary-name-simple)'
+                                          : fileInfo.type === 'variable-assignment'
+                                            ? ' (var-assign)'
+                                            : '';
         lines.push(`  📄 ${fileInfo.file}:${fileInfo.line}${typeIndicator}`);
       });
     });
