@@ -50,6 +50,77 @@ class FunctionTreeGenerator {
     return files;
   }
 
+  // Extract import statements from a file
+  extractImports(filePath) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+
+      const imports = [];
+
+      const visit = (node) => {
+        if (ts.isImportDeclaration(node)) {
+          const importInfo = this.processImportNode(node, sourceFile);
+          if (importInfo) {
+            imports.push(importInfo);
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+
+      visit(sourceFile);
+      return imports;
+    } catch (error) {
+      console.warn(`Warning: Could not parse imports from ${filePath}: ${error.message}`);
+      return [];
+    }
+  }
+
+  // Process import node and extract metadata
+  processImportNode(node, sourceFile) {
+    const moduleSpecifier = node.moduleSpecifier.text;
+    const lineRange = this.getLineRange(node, sourceFile);
+
+    // Handle different import types
+    if (node.importClause) {
+      const namedImports = [];
+      const defaultImport = node.importClause.name ? node.importClause.name.text : null;
+
+      // Handle named imports
+      if (node.importClause.namedBindings) {
+        if (ts.isNamedImports(node.importClause.namedBindings)) {
+          node.importClause.namedBindings.elements.forEach((element) => {
+            namedImports.push({
+              name: element.name.text,
+              alias: element.propertyName ? element.propertyName.text : null,
+            });
+          });
+        } else if (ts.isNamespaceImport(node.importClause.namedBindings)) {
+          namedImports.push({
+            name: '*',
+            alias: node.importClause.namedBindings.name.text,
+          });
+        }
+      }
+
+      return {
+        moduleSpecifier,
+        defaultImport,
+        namedImports,
+        lineRange,
+        type: 'import',
+      };
+    }
+
+    return {
+      moduleSpecifier,
+      defaultImport: null,
+      namedImports: [],
+      lineRange,
+      type: 'import',
+    };
+  }
+
   // Parse TypeScript/JavaScript file and extract functions
   extractFunctions(filePath) {
     try {
@@ -235,6 +306,28 @@ class FunctionTreeGenerator {
     return `(${formatted})`;
   }
 
+  // Format import for display
+  formatImport(importInfo) {
+    const parts = [];
+
+    if (importInfo.defaultImport) {
+      parts.push(importInfo.defaultImport);
+    }
+
+    if (importInfo.namedImports.length > 0) {
+      const namedParts = importInfo.namedImports.map((named) => {
+        if (named.name === '*') {
+          return `* as ${named.alias}`;
+        }
+        return named.alias ? `${named.name} as ${named.alias}` : named.name;
+      });
+      parts.push(`{ ${namedParts.join(', ')} }`);
+    }
+
+    const importStr = parts.length > 0 ? parts.join(', ') : 'default';
+    return `${importStr} (${importInfo.moduleSpecifier})`;
+  }
+
   // Generate tree structure
   buildTree(rootDir = process.cwd()) {
     const files = this.getAllFiles(rootDir);
@@ -242,14 +335,17 @@ class FunctionTreeGenerator {
 
     files.forEach((filePath) => {
       const relativePath = path.relative(rootDir, filePath);
-      const result = this.extractFunctions(filePath);
+      const functionResult = this.extractFunctions(filePath);
+      const imports = this.extractImports(filePath);
 
-      if (result.functions.length > 0) {
+      if (functionResult.functions.length > 0 || imports.length > 0) {
         tree[relativePath] = {
-          functions: result.functions,
-          totalLines: result.totalLines,
-          functionCount: result.functions.length,
-          rootFunctionCount: result.functions.filter((f) => f.depth === 0).length,
+          functions: functionResult.functions,
+          imports: imports,
+          totalLines: functionResult.totalLines,
+          functionCount: functionResult.functions.length,
+          rootFunctionCount: functionResult.functions.filter((f) => f.depth === 0).length,
+          importCount: imports.length,
         };
       }
     });
@@ -267,24 +363,62 @@ class FunctionTreeGenerator {
       const filePrefix = isLastFile ? '└── ' : '├── ';
 
       const fileData = tree[filePath];
-      const fileInfo = `${filePath} (${fileData.totalLines} lines, ${fileData.rootFunctionCount} root functions, ${fileData.functionCount} total functions)`;
+      const importCount = fileData.importCount || 0;
+      const fileInfo = `${filePath} (${fileData.totalLines} lines, ${importCount} imports, ${fileData.rootFunctionCount} root functions, ${fileData.functionCount} total functions)`;
       lines.push(`${filePrefix}${fileInfo}`);
+
+      // Render imports first
+      if (fileData.imports && fileData.imports.length > 0) {
+        const importPrefix = isLastFile ? '    ' : '│   ';
+        lines.push(`${importPrefix}├── imports:`);
+
+        fileData.imports.forEach((importInfo, importIndex) => {
+          const isLastImport = importIndex === fileData.imports.length - 1;
+          const importBullet = isLastImport ? '└── ' : '├── ';
+          const importStr = this.formatImport(importInfo);
+          const lineRange = `[line ${importInfo.lineRange.start}]`;
+          lines.push(`${importPrefix}│   ${importBullet}${importStr} ${lineRange}`);
+        });
+      }
 
       // Group functions by depth and parent for hierarchical display
       const functions = fileData.functions;
       const rootFunctions = functions.filter((f) => f.depth === 0);
 
-      rootFunctions.forEach((func, funcIndex) => {
-        const isLastFunction = funcIndex === rootFunctions.length - 1;
-        this.renderFunctionWithNested(func, functions, lines, isLastFile, isLastFunction, 0);
-      });
+      if (rootFunctions.length > 0) {
+        const functionPrefix = isLastFile ? '    ' : '│   ';
+        const hasImports = fileData.imports && fileData.imports.length > 0;
+        const functionBullet = hasImports ? '├── ' : '└── ';
+        lines.push(`${functionPrefix}${functionBullet}functions:`);
+
+        rootFunctions.forEach((func, funcIndex) => {
+          const isLastFunction = funcIndex === rootFunctions.length - 1;
+          this.renderFunctionWithNested(
+            func,
+            functions,
+            lines,
+            isLastFile,
+            isLastFunction,
+            0,
+            hasImports
+          );
+        });
+      }
     });
 
     return lines.join('\n');
   }
 
   // Render a function and its nested functions recursively
-  renderFunctionWithNested(func, allFunctions, lines, isLastFile, isLastFunction, indentLevel) {
+  renderFunctionWithNested(
+    func,
+    allFunctions,
+    lines,
+    isLastFile,
+    isLastFunction,
+    indentLevel,
+    hasImports = false
+  ) {
     const funcPrefix = isLastFile ? '    ' : '│   ';
     const baseIndent = '    '.repeat(indentLevel);
     const funcBullet = isLastFunction ? '└── ' : '├── ';
@@ -327,7 +461,8 @@ class FunctionTreeGenerator {
         lines,
         isLastFile,
         isLastNested,
-        indentLevel + 1
+        indentLevel + 1,
+        hasImports
       );
     });
   }
@@ -352,9 +487,13 @@ class FunctionTreeGenerator {
       (sum, fileData) => sum + fileData.functionCount,
       0
     );
+    const totalImports = Object.values(tree).reduce(
+      (sum, fileData) => sum + (fileData.importCount || 0),
+      0
+    );
     const totalLines = Object.values(tree).reduce((sum, fileData) => sum + fileData.totalLines, 0);
     console.log(
-      `\n📊 Summary: ${totalFiles} files, ${totalFunctions} functions, ${totalLines} total lines`
+      `\n📊 Summary: ${totalFiles} files, ${totalImports} imports, ${totalFunctions} functions, ${totalLines} total lines`
     );
   }
 }
