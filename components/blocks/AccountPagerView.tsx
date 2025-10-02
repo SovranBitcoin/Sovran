@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
-import { StyleSheet } from 'react-native';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -14,7 +13,7 @@ import Haptics from 'components/ui/Haptics';
 
 import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import { useMintManagement } from 'hooks/coco';
-import { greys, Theme } from 'helper/colors';
+import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
@@ -47,37 +46,13 @@ export function AccountPagerView({
   const theme = useSelector(memoizedGetTheme);
   const { getBalances } = useMintManagement();
 
-  const styles = createStyles(theme);
   const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
-  const [multipleBalances, setMultipleBalances] = React.useState<any[]>([]);
 
-  // Load balances from Coco
-  React.useEffect(() => {
-    const loadBalances = async () => {
-      try {
-        const balances = await getBalances();
-        const balanceArray = Object.entries(balances).map(([mintUrl, amount]) => ({
-          mintUrl,
-          amount,
-          unit: 'SAT', // Coco returns amounts in sats
-        }));
-        setMultipleBalances(balanceArray);
-      } catch (error) {
-        console.error('Failed to load balances:', error);
-        setMultipleBalances([]);
-      }
-    };
-    loadBalances();
-  }, [getBalances]);
-
-  // Filter accounts that have a matching balance entry
-  const loopedAccounts = accounts.filter((acc) =>
-    multipleBalances.some(
-      (balance: any) => balance.unit === acc.unit && balance.mintUrl === selectedMintUrl
-    )
-  );
+  // Use all accounts - don't filter based on balance data
+  // The balance will be displayed as 0 if no data is available
+  const loopedAccounts = accounts;
 
   const swiperRef = useRef<any>(null);
 
@@ -171,8 +146,8 @@ export function AccountPagerView({
   ];
 
   return (
-    <View>
-      <View className={`flex h-[350px] w-full`}>
+    <>
+      <View className="flex h-[350px] w-full">
         <Swiper
           containerStyle={{
             height: 350,
@@ -189,13 +164,7 @@ export function AccountPagerView({
             dotsPos: 'top',
           }}>
           {loopedAccounts.map((acc, index) => (
-            <VStack
-              key={`${acc.unit}-${index}`}
-              align="center"
-              justify="center"
-              style={{
-                flex: 1,
-              }}>
+            <VStack key={`${acc.unit}-${index}`} align="center" justify="center" className="flex-1">
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
             </VStack>
           ))}
@@ -222,15 +191,26 @@ export function AccountPagerView({
             return (
               <TouchableOpacity
                 key={page}
-                style={[
-                  styles.touchableOpacity,
-                  isCamera && styles.cameraButton,
-                  isReceive && styles.receiveButton,
-                  isSend && styles.sendButton,
-                ]}
+                className={`flex-1 ${isReceive ? '-mr-3' : ''} ${isSend ? '-ml-3' : ''}`}
+                style={
+                  isCamera
+                    ? {
+                        maxWidth: 64,
+                        zIndex: 10000,
+                        shadowColor: theme.shades[300],
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.75,
+                        shadowRadius: 8,
+                        elevation: 5,
+                        borderRadius: 10000,
+                        borderColor: theme.shades[100],
+                        borderWidth: 0.5,
+                      }
+                    : { maxWidth: 'auto' }
+                }
                 onPress={() => handleButtonPress(page, account.unit)}>
                 <LinearGradient
-                  style={[isCamera && styles.cameraGradient]}
+                  style={isCamera ? { padding: 8, borderRadius: 1000 } : undefined}
                   colors={
                     isCamera
                       ? [theme.shades[100], theme.shades[300]]
@@ -238,15 +218,25 @@ export function AccountPagerView({
                   }>
                   <VStack align="center" justify="center">
                     <HStack
-                      style={[
-                        styles.iconView,
-                        isCamera && styles.cameraIconView,
-                        isReceive && styles.receiveIconView,
-                        isSend && styles.sendIconView,
-                      ]}
                       blur={!isCamera}
                       align="center"
-                      justify="center">
+                      justify="center"
+                      className="w-full min-w-[90px] p-3"
+                      style={{
+                        ...(isCamera && { borderRadius: 1000 }),
+                        ...(!isCamera && {
+                          backgroundColor: greys(theme)[800],
+                          borderColor: greys(theme)[700],
+                        }),
+                        ...(isReceive && {
+                          borderBottomLeftRadius: 1000,
+                          borderTopLeftRadius: 1000,
+                        }),
+                        ...(isSend && {
+                          borderBottomRightRadius: 1000,
+                          borderTopRightRadius: 1000,
+                        }),
+                      }}>
                       <View>{icon}</View>
                       {!isCamera && (
                         <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
@@ -261,57 +251,6 @@ export function AccountPagerView({
           })}
         </HStack>
       </HStack>
-    </View>
+    </>
   );
 }
-
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    touchableOpacity: {
-      flex: 1,
-      maxWidth: 'auto',
-    },
-    cameraButton: {
-      maxWidth: 64,
-      zIndex: 10000,
-      shadowColor: theme.shades[300],
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.75,
-      shadowRadius: 8,
-      elevation: 5,
-      borderRadius: 10000,
-      borderColor: theme.shades[100],
-      borderWidth: 0.5,
-    },
-    receiveButton: {
-      marginRight: -12,
-    },
-    sendButton: {
-      marginLeft: -12,
-    },
-    cameraGradient: {
-      padding: 8,
-      borderRadius: 1000,
-    },
-    iconView: {
-      alignContent: 'center',
-      padding: 12,
-      minWidth: 90,
-      width: '100%',
-    },
-    cameraIconView: {
-      borderRadius: 1000,
-    },
-    receiveIconView: {
-      backgroundColor: greys(theme)[800],
-      borderBottomLeftRadius: 1000,
-      borderTopLeftRadius: 1000,
-      borderColor: greys(theme)[700],
-    },
-    sendIconView: {
-      backgroundColor: greys(theme)[800],
-      borderBottomRightRadius: 1000,
-      borderTopRightRadius: 1000,
-      borderColor: greys(theme)[700],
-    },
-  });
