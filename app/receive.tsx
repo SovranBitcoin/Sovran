@@ -12,7 +12,6 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
-import { getProfile } from 'app/(drawer)/(tabs)';
 import { useTransactions } from 'providers/CocoTransactionsProvider';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { Spacer } from 'components/ui/View';
@@ -214,10 +213,6 @@ const EcashLightningReceiver = () => {
               type: 'receive',
 
               mintUrl: mintInfo?.mintUrl,
-            }}
-            handleCheckStatus={async (callback: () => void) => {
-              await getProfile(currentProfile, refresh);
-              callback();
             }}
           />
         )}
