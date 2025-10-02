@@ -2,38 +2,30 @@
   "name": "sovran",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "private": true,
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "scripts": {
     "postinstall": "patch-package",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest --watchAll",
     "prebuild": "expo prebuild --clean",
     "build:ios": "eas build -p ios --clear-cache",
-    "submit:ios": "eas submit -p ios",
     "build:android:apk": "eas build -p android --profile preview",
+    "submit:ios": "eas submit -p ios",
     "submit:android": "eas submit -p android",
-    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
+    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "maestro": "maestro test ./.maestro",
     "screenshots": "./process-screenshots.sh",
-    "find-unused": "./scripts/find-unused.sh",
+    "tree": "node ./scripts/tree.js",
     "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh",
-    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh",
-    "tree": "node ./scripts/tree.js"
-  },
-  "jest": {
-    "preset": "jest-expo",
-    "testEnvironment": "node",
-    "moduleDirectories": [
-      "node_modules",
-      "<rootDir>"
-    ]
+    "find-unused": "./scripts/find-unused.sh",
+    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh"
   },
   "dependencies": {
-    "@babel/plugin-transform-class-static-block": "^7.24.7",
     "@cashu/cashu-ts": "2.6.0",
     "@cashu/crypto": "^0.2.7",
     "@expo/metro-runtime": "~6.1.2",
@@ -125,6 +117,7 @@
     "react-native-randombytes": "^3.6.2",
     "react-native-reanimated": "~4.1.0",
     "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "^4.16.0",
     "react-native-skeleton-component": "^1.0.0",
     "react-native-snow-bg": "^1.0.0",
     "react-native-svg": "15.12.1",
@@ -147,11 +140,11 @@
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",
+    "@babel/plugin-transform-class-static-block": "^7.24.7",
     "@babel/preset-env": "^7.28.0",
     "@gandlaf21/bc-ur": "^1.1.12",
     "@iconify/json": "^2.2.360",
     "@react-native-community/cli": "latest",
-    "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.20",
     "@types/react": "~19.1.10",
     "@types/semver": "^7.7.0",
@@ -160,15 +153,12 @@
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-unused-imports": "^4.1.4",
-    "jest": "~29.7.0",
-    "jest-expo": "~54.0.12",
     "patch-package": "^8.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
     "typescript": "~5.9.2"
   },
-  "private": true,
   "react-native": {
     "zlib": "browserify-zlib",
     "console": "console-browserify",
@@ -212,6 +202,5 @@
     "tty": "tty-browserify",
     "vm": "vm-browserify",
     "tls": false
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  }
 }
