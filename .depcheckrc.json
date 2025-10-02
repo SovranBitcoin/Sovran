@@ -1,0 +1,15 @@
+{
+  "ignorePatterns": [
+    "node_modules"
+  ],
+  "ignoreMatches": [
+    "eslint-*",
+    "prettier-*",
+    "@babel/*",
+    "jest-*",
+    "metro-*",
+    "@expo/metro-*",
+    "tailwindcss",
+    "patch-package"
+  ]
+}
