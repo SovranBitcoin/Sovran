@@ -6,10 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { nip19 } from 'nostr-tools';
 import { View, VStack } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import { useTransactions } from 'providers/CocoTransactionsProvider';
-import { TransactionData } from 'helper/redux/cashu/types';
-import { useTransactionsData } from 'hooks/useTransactionsData';
 import { NCSDK } from 'helper/third-party/cashu-address-sdk-rn/sdk';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
@@ -46,13 +43,13 @@ interface NPUBQuote {
 
 export async function getProfile(currentProfile: any, listenToTransaction: any) {
   const sk = nip19.decode(currentProfile?.nsec).data;
-  const signer = new NsecSigner(sk as Uint8Array);
+  const signer = new NsecSigner(sk as unknown as Uint8Array);
   const sdk = new NCSDK('https://npubx.cash', signer);
 
   // TODO: get last transaction that is npubx.cash from fromNIP05
   // Note: This function needs to be refactored to use Coco's transaction system
   // For now, we'll use a placeholder approach
-  const lastTransaction: TransactionData[] = [];
+  const lastTransaction: any[] = [];
 
   const lt = lastTransaction?.[lastTransaction?.length - 1];
 
@@ -73,9 +70,11 @@ export async function getProfile(currentProfile: any, listenToTransaction: any) 
       request: quote.request,
       expiry: quote.expiresAt,
       state: quote.state,
+      amount: quote.amount,
+      unit: 'sat',
     };
 
-    const transaction: TransactionData = {
+    const transaction = {
       request: quote.request,
       amount: quote.amount,
       mintQuote,
@@ -121,16 +120,9 @@ function TabOneScreen() {
   const theme = useSelector(memoizedGetTheme);
 
   const { history } = useTransactions();
-  const txData = useTransactionsData({
-    transactions: history as unknown as TransactionData[],
-    account,
-    days: 1,
-    showMore: true,
-  });
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);
-  const _selectedMint = useSelector(memoizedGetSelectedMint);
   const navigation = useTypedNavigation();
 
   useLayoutEffect(() => {
@@ -233,15 +225,7 @@ function TabOneScreen() {
                 style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
               />
             )}
-            <Transactions
-              account={account}
-              showMore={true}
-              pendingSections={txData.pendingSections}
-              confirmedSections={txData.confirmedSections}
-              allSections={txData.allSections}
-              filteredCount={txData.filteredTransactions.length}
-              morePendingCount={txData.morePendingCount}
-            />
+            <Transactions account={account} showMore={true} history={history} />
           </View>
         </ScrollView>
       </View>

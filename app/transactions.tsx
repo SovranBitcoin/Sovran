@@ -1,4 +1,4 @@
-import { View, HStack, VStack } from 'components/ui/View';
+import { View, HStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -7,7 +7,6 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
 import { Transactions } from 'components/blocks/Transactions';
 import { useTransactions } from 'providers/CocoTransactionsProvider';
-import { useTransactionsData } from 'hooks/useTransactionsData';
 import Container from 'components/blocks/Container';
 import CurrencySelector from 'components/blocks/CurrencySelector';
 import Icon from 'assets/icons';
@@ -19,9 +18,11 @@ function ModalScreen() {
   const { account, tab: tab_ } = useTypedRoute<'transactions'>();
   const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
-  const [type, setType] = useState<string>('all');
-  const [at, setAt] = useState<string>('all');
-  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending'>(tab_ || 'All');
+  const [type, setType] = useState<'all' | 'lightning' | 'ecash'>('all');
+  const [at, setAt] = useState<'all' | 'at'>('all');
+  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending'>(
+    (tab_ as 'All' | 'Confirmed' | 'Pending') || 'All'
+  );
 
   const handleCurrencyChange = (currency: string) => {
     setSelectedCurrency(currency.toLowerCase());
@@ -42,25 +43,6 @@ function ModalScreen() {
   };
 
   const { history } = useTransactions();
-  const txData = useTransactionsData({
-    transactions: history as any[],
-    account: { ...account, unit: selectedCurrency },
-    filter,
-    type,
-    at,
-    tab,
-    showMore: false,
-  });
-
-  const totalCounts = useTransactionsData({
-    transactions: history as any[],
-    account: { ...account, unit: selectedCurrency },
-    filter: 'all',
-    type: 'all',
-    at: 'all',
-    tab: 'All',
-    showMore: false,
-  }).counts;
 
   const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
 
@@ -68,17 +50,20 @@ function ModalScreen() {
     <Container>
       <Transactions
         listKey={listKey}
+        account={{ ...account, unit: selectedCurrency }}
+        showMore={false}
+        history={history}
+        filter={filter}
+        type={type}
+        at={at}
+        tab={tab}
         header={
           <>
             <Tabs
               tabs={['All', 'Confirmed', 'Pending']}
               selectedTab={tab}
               handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending')}
-              amounts={[
-                String(totalCounts.all),
-                String(totalCounts.confirmed),
-                String(totalCounts.pending),
-              ]}
+              amounts={['0', '0', '0']} // TODO: Calculate counts from history
             />
 
             <View
@@ -196,16 +181,6 @@ function ModalScreen() {
             </HStack>
           </>
         }
-        account={{
-          ...account,
-          unit: selectedCurrency,
-        }}
-        showMore={false}
-        pendingSections={txData.pendingSections}
-        confirmedSections={txData.confirmedSections}
-        allSections={txData.allSections}
-        filteredCount={txData.filteredTransactions.length}
-        morePendingCount={txData.morePendingCount}
       />
     </Container>
   );

@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Dimensions, TouchableOpacity } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { Transaction } from 'components/blocks/Transaction';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { View, VStack, Spacer } from 'components/ui/View';
-import { TransactionData } from 'helper/redux/cashu';
 import { useTypedNavigation } from 'helper/navigation';
+import { HistoryEntry } from 'coco-cashu-core';
+import { CocoTransactionAdapter } from 'helper/coco/typeAdapters';
+import { formatDate } from 'helper/time';
+import { Transaction } from 'components/blocks/Transaction';
+import _ from 'lodash';
 
 interface Account {
   unit: string;
@@ -17,7 +20,7 @@ interface Account {
 
 interface Section {
   title: string;
-  data: TransactionData[];
+  data: CocoTransactionAdapter[];
   index?: string;
 }
 
@@ -26,11 +29,13 @@ interface Props {
   listKey?: string;
   account: Account;
   showMore: boolean;
-  pendingSections: Section[];
-  confirmedSections: Section[];
-  allSections: Section[];
-  filteredCount: number;
-  morePendingCount: number;
+  history: HistoryEntry[];
+  // Filtering options
+  filter?: 'all' | 'incoming' | 'outgoing';
+  type?: 'all' | 'lightning' | 'ecash';
+  at?: 'all' | 'at';
+  tab?: 'All' | 'Confirmed' | 'Pending';
+  days?: number;
 }
 
 export const Transactions = React.memo(
@@ -39,11 +44,10 @@ export const Transactions = React.memo(
     listKey,
     account,
     showMore,
-    pendingSections,
-    confirmedSections,
-    allSections,
-    filteredCount,
-    morePendingCount,
+    history,
+    filter = 'all',
+    type = 'all',
+    days = 1,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
     const navigation = useTypedNavigation<'transactions'>();
@@ -51,44 +55,72 @@ export const Transactions = React.memo(
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
 
-    const flattenedData = React.useMemo(() => {
-      const isReallocationTx = (tx: TransactionData) => {
-        console.log('tx', tx);
-        const text =
-          `${(tx as any)?.memo || ''} ${(tx as any)?.message || ''} ${(tx as any)?.note || ''}`.toLowerCase();
-        return text.includes('reallocation') || Boolean(tx.batchId);
-      };
+    const filteredHistory = useMemo(
+      () =>
+        _.filter(history, (historyEntry: HistoryEntry) => {
+          if (historyEntry.unit !== account.unit) return false;
+          if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
+          if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
+          if (type === 'lightning' && historyEntry.type !== 'mint') return false;
+          if (type === 'ecash' && historyEntry.type !== 'send') return false;
+          return true;
+        }),
+      [history, account.unit, filter, type]
+    );
 
-      // Build virtual batch transactions per section
-      const enhanceSection = (section: Section) => {
-        const visibleTx = section.data.filter((tx) => !isReallocationTx(tx));
-        const batchGroups = section.data
-          .filter((tx) => isReallocationTx(tx) && tx.batchId)
-          .reduce((acc: Record<string, TransactionData[]>, tx) => {
-            const key = tx.batchId as string;
-            acc[key] = acc[key] || [];
-            acc[key].push(tx);
-            return acc;
-          }, {});
+    const sortedHistory = useMemo(
+      () => _.orderBy(filteredHistory, ['createdAt'], ['desc']),
+      [filteredHistory]
+    );
 
-        const virtualItems = Object.keys(batchGroups).map((batchId) => ({
-          type: 'virtual' as const,
-          txs: batchGroups[batchId],
-          batchId,
+    const { pending, confirmed } = useMemo(
+      () =>
+        _.groupBy(sortedHistory, (historyEntry: HistoryEntry) => {
+          const isPending =
+            (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
+            (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID');
+
+          return isPending ? 'pending' : 'confirmed';
+        }),
+      [sortedHistory]
+    );
+
+    const sections = useMemo(() => {
+      const createSections = (historyEntries: HistoryEntry[]) => {
+        const groupedByDate = _.groupBy(historyEntries, (historyEntry) =>
+          formatDate(historyEntry.createdAt)
+        );
+        const sortedDates = _.orderBy(Object.keys(groupedByDate), (date) => new Date(date), 'desc');
+        const datesToShow = showMore ? _.take(sortedDates, days) : sortedDates;
+
+        return datesToShow.map((date) => ({
+          title: date,
+          data: groupedByDate[date],
+          index: date,
         }));
-
-        return [
-          { type: 'header' as const, title: section.title },
-          ...virtualItems,
-          ...visibleTx.map((tx) => ({ type: 'item' as const, tx })),
-        ];
       };
 
-      return allSections.flatMap(enhanceSection);
-    }, [allSections]);
+      const pendingSections = createSections(pending || []);
+      const confirmedSections = createSections(confirmed || []);
+
+      return {
+        pending: pendingSections,
+        confirmed: confirmedSections,
+        all: [...pendingSections, ...confirmedSections],
+      };
+    }, [pending, confirmed, showMore, days]);
+
+    const flattenedData = useMemo(
+      () =>
+        _.flatMap(sections.all, (section) => [
+          { type: 'header', title: section.title },
+          ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
+        ]),
+      [sections.all]
+    );
 
     if (showMore) {
-      if (filteredCount === 0) {
+      if (filteredHistory.length === 0) {
         return (
           <View
             className="flex items-center"
@@ -97,10 +129,10 @@ export const Transactions = React.memo(
             }}>
             <Icon name="fluent:clock-12-filled" color={theme.greys[500]} />
             <Text heavy size={16} style={{ color: theme.greys[500] }}>
-              No Transactions
+              No History
             </Text>
             <Text color={theme.greys[500]} heavy size={16}>
-              Your transactions will show up here
+              Your history will show up here
             </Text>
           </View>
         );
@@ -122,65 +154,18 @@ export const Transactions = React.memo(
                       {section.title}
                     </Text>
                     <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
-                      {(() => {
-                        const textOf = (tx: TransactionData) =>
-                          `${(tx as any)?.memo ?? ''} ${(tx as any)?.message ?? ''} ${(tx as any)?.note ?? ''}`.toLowerCase();
-                        const isReallocationTx = (tx: TransactionData) =>
-                          textOf(tx).includes('reallocation') || Boolean(tx.batchId);
-
-                        const visibleTx = section.data.filter((tx) => !isReallocationTx(tx));
-                        const batchIds = Array.from(
-                          new Set(
-                            section.data
-                              .filter((tx) => isReallocationTx(tx) && tx.batchId)
-                              .map((tx) => tx.batchId as string)
-                          )
-                        );
-
-                        return (
-                          <>
-                            {batchIds.map((batchId) => (
-                              <Transaction
-                                key={`batch-${batchId}`}
-                                txs={section.data.filter((t) => t.batchId === batchId)}
-                              />
-                            ))}
-                            {visibleTx.map((tx) => (
-                              <Transaction
-                                key={
-                                  tx.request ||
-                                  tx.token ||
-                                  tx.txid ||
-                                  tx.id ||
-                                  Math.random().toString()
-                                }
-                                tx={tx}
-                              />
-                            ))}
-                          </>
-                        );
-                      })()}
-                      {morePendingCount > 0 && label === 'Pending transactions' && (
-                        <TouchableOpacity
-                          onPress={() =>
-                            navigation.navigate('transactions', { account, tab: 'Pending' })
-                          }>
-                          <View
-                            blur
-                            className="flex items-center rounded-lg border p-3"
-                            style={{
-                              backgroundColor: theme.greys[800],
-                              borderColor: theme.greys[700],
-                            }}>
-                            <Text size={14} bold>
-                              View pending transaction{morePendingCount > 1 ? 's' : ''} {'('}
-                              {morePendingCount}
-                              {')'}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                      {label === 'Confirmed transactions' && (
+                      {section.data.map((historyEntry) => (
+                        <Transaction
+                          key={
+                            historyEntry.id ||
+                            historyEntry.request ||
+                            historyEntry.token ||
+                            Math.random().toString()
+                          }
+                          historyEntry={historyEntry}
+                        />
+                      ))}
+                      {label === 'Confirmed' && (
                         <TouchableOpacity
                           onPress={() =>
                             navigation.navigate('transactions', { account, tab: 'Confirmed' })
@@ -193,7 +178,7 @@ export const Transactions = React.memo(
                               borderColor: theme.greys[700],
                             }}>
                             <Text size={14} bold>
-                              View all ({filteredCount})
+                              View all ({filteredHistory.length})
                             </Text>
                           </View>
                         </TouchableOpacity>
@@ -209,9 +194,8 @@ export const Transactions = React.memo(
 
       return (
         <View className="w-full pb-24">
-          {renderStatus('Pending transactions', pendingSections)}
-
-          {renderStatus('Confirmed transactions', confirmedSections)}
+          {renderStatus('Pending', sections.pending)}
+          {renderStatus('Confirmed', sections.confirmed)}
         </View>
       );
     }
@@ -234,9 +218,6 @@ export const Transactions = React.memo(
               </Text>
             );
           }
-          if (item.type === 'virtual') {
-            return <Transaction txs={item.txs} />;
-          }
 
           const prev = flattenedData[index - 1];
           const next = flattenedData[index + 1];
@@ -255,7 +236,7 @@ export const Transactions = React.memo(
                 borderBottomRightRadius: isLast ? 8 : 0,
                 height: ITEM_HEIGHT,
               }}>
-              <Transaction key={item.tx.request || item.tx.token} tx={item.tx} />
+              <Transaction historyEntry={item.historyEntry} />
             </View>
           );
         }}

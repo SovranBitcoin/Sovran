@@ -8,6 +8,8 @@ import { greys } from 'helper/colors';
 import { memoizedGetNostrProfile } from 'helper/redux/nostr';
 
 export default function TransactionIcon({ transaction }: any): React.ReactNode {
+  // TODO refactor after coco npub cash module is added
+  return;
   const theme = useSelector(memoizedGetTheme);
   const nostrData = useSelector(memoizedGetNostrProfile({ nostrPubkey: transaction.nostrPubkey }));
 
