@@ -328,15 +328,55 @@ class FunctionTreeGenerator {
     return `${importStr} (${importInfo.moduleSpecifier})`;
   }
 
+  // Get installed packages from package.json
+  getInstalledPackages(rootDir = process.cwd()) {
+    try {
+      const packageJsonPath = path.join(rootDir, 'package.json');
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+      const allDeps = {
+        ...(packageJson.dependencies || {}),
+        ...(packageJson.devDependencies || {}),
+        ...(packageJson.peerDependencies || {}),
+        ...(packageJson.optionalDependencies || {}),
+      };
+
+      return Object.keys(allDeps);
+    } catch (error) {
+      console.warn(`Warning: Could not read package.json: ${error.message}`);
+      return [];
+    }
+  }
+
   // Generate tree structure
   buildTree(rootDir = process.cwd()) {
     const files = this.getAllFiles(rootDir);
     const tree = {};
+    const packageUsage = {};
+    const installedPackages = this.getInstalledPackages(rootDir);
 
     files.forEach((filePath) => {
       const relativePath = path.relative(rootDir, filePath);
       const functionResult = this.extractFunctions(filePath);
       const imports = this.extractImports(filePath);
+
+      // Track package usage
+      imports.forEach((importInfo) => {
+        const moduleSpecifier = importInfo.moduleSpecifier;
+
+        // Only track node modules (not relative imports)
+        if (!moduleSpecifier.startsWith('.') && !moduleSpecifier.startsWith('/')) {
+          // Extract package name (handle scoped packages like @types/react)
+          const packageName = moduleSpecifier.split('/')[0];
+          if (packageName.startsWith('@')) {
+            // For scoped packages, include the scope
+            const scopedPackage = moduleSpecifier.split('/').slice(0, 2).join('/');
+            packageUsage[scopedPackage] = (packageUsage[scopedPackage] || 0) + 1;
+          } else {
+            packageUsage[packageName] = (packageUsage[packageName] || 0) + 1;
+          }
+        }
+      });
 
       if (functionResult.functions.length > 0 || imports.length > 0) {
         tree[relativePath] = {
@@ -350,7 +390,51 @@ class FunctionTreeGenerator {
       }
     });
 
-    return tree;
+    // Find packages with 0 imports
+    const unusedPackages = installedPackages.filter((pkg) => !packageUsage[pkg]);
+
+    return { tree, packageUsage, unusedPackages };
+  }
+
+  // Render package usage summary
+  renderPackageSummary(packageUsage) {
+    const lines = [];
+    const packages = Object.entries(packageUsage).sort(([, a], [, b]) => b - a); // Sort by usage count descending
+
+    if (packages.length === 0) {
+      return lines;
+    }
+
+    lines.push('\n📦 Package Usage Summary:');
+    lines.push('='.repeat(50));
+
+    packages.forEach(([packageName, count]) => {
+      const bar = '█'.repeat(Math.min(Math.floor(count / 2), 20)); // Scale bar to max 20 chars
+      lines.push(`${packageName.padEnd(30)} ${count.toString().padStart(3)} ${bar}`);
+    });
+
+    return lines;
+  }
+
+  // Render unused packages summary
+  renderUnusedPackages(unusedPackages) {
+    const lines = [];
+
+    if (unusedPackages.length === 0) {
+      return lines;
+    }
+
+    lines.push('\n🚫 Unused Packages (0 imports):');
+    lines.push('='.repeat(50));
+
+    // Sort alphabetically for better readability
+    const sortedUnused = unusedPackages.sort();
+
+    sortedUnused.forEach((packageName) => {
+      lines.push(`❌ ${packageName}`);
+    });
+
+    return lines;
   }
 
   // Render tree in the specified format
@@ -471,7 +555,7 @@ class FunctionTreeGenerator {
   generate(rootDir = process.cwd()) {
     console.log('🌳 Generating function tree...\n');
 
-    const tree = this.buildTree(rootDir);
+    const { tree, packageUsage, unusedPackages } = this.buildTree(rootDir);
 
     if (Object.keys(tree).length === 0) {
       console.log('No files with functions found.');
@@ -480,6 +564,14 @@ class FunctionTreeGenerator {
 
     const output = this.renderTree(tree);
     console.log(output);
+
+    // Package usage summary
+    const packageSummary = this.renderPackageSummary(packageUsage);
+    console.log(packageSummary.join('\n'));
+
+    // Unused packages summary
+    const unusedSummary = this.renderUnusedPackages(unusedPackages);
+    console.log(unusedSummary.join('\n'));
 
     // Summary
     const totalFiles = Object.keys(tree).length;
@@ -492,8 +584,9 @@ class FunctionTreeGenerator {
       0
     );
     const totalLines = Object.values(tree).reduce((sum, fileData) => sum + fileData.totalLines, 0);
+    const uniquePackages = Object.keys(packageUsage).length;
     console.log(
-      `\n📊 Summary: ${totalFiles} files, ${totalImports} imports, ${totalFunctions} functions, ${totalLines} total lines`
+      `\n📊 Summary: ${totalFiles} files, ${totalImports} imports, ${totalFunctions} functions, ${totalLines} total lines, ${uniquePackages} used packages, ${unusedPackages.length} unused packages`
     );
   }
 }
