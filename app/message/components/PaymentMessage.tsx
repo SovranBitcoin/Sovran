@@ -41,7 +41,10 @@ const TransactionComponent = ({
     );
 
   return (
-    <View className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}>
+    <View
+      className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}
+      style={{ minHeight: 80 }} // Ensure minimum height for payment messages
+    >
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -57,6 +60,7 @@ const TransactionComponent = ({
           borderRadius: 16,
           padding: 16,
           maxWidth: '75%',
+          minHeight: 70, // Ensure minimum height for content
         }}>
         <View className="mb-1 rounded-2xl bg-black/25 p-1">
           <Text className="text-center text-sm font-bold" style={{ color: greys(theme)[0] }}>

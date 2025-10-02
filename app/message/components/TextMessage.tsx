@@ -16,7 +16,10 @@ const MessageComponent = ({
   isReceived: boolean;
 }) => {
   return (
-    <View className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}>
+    <View
+      className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}
+      style={{ minHeight: 60 }} // Ensure minimum height
+    >
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -35,13 +38,14 @@ const MessageComponent = ({
           borderRadius: 16,
           padding: 16,
           maxWidth: '75%',
+          minHeight: 50, // Ensure minimum height for content
         }}>
         <Text className="mb-2 text-base font-black" style={{ color: greys(theme)[0] }}>
           {message.content}
         </Text>
         <HStack className="justify-end">
           <Text className="text-xs font-bold opacity-75" style={{ color: greys(theme)[0] }}>
-            {convertTime(new Date(message.created_at * 1000))}
+            {message.created_at ? convertTime(new Date(message.created_at * 1000)) : 'Unknown time'}
           </Text>
         </HStack>
       </LinearGradient>

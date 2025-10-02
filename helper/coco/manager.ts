@@ -1,6 +1,5 @@
-import { Manager } from 'coco-cashu-core';
+import { Manager, ConsoleLogger } from 'coco-cashu-core';
 import { ExpoSqliteRepositories } from 'coco-cashu-expo-sqlite';
-import { ConsoleLogger } from 'coco-cashu-core';
 import * as SQLite from 'expo-sqlite';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import { mnemonicToSeedSync } from 'bip39';
@@ -25,7 +24,7 @@ export class CocoManager {
     if (this.isInitializing) {
       // Wait for ongoing initialization
       while (this.isInitializing) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
       if (this.instance) {
         return this.instance;
@@ -60,7 +59,9 @@ export class CocoManager {
       );
 
       // Enable watchers for real-time updates
-      await this.instance.enableMintQuoteWatcher();
+      await this.instance.enableMintQuoteWatcher({
+        watchExistingPendingOnStart: true,
+      });
       await this.instance.enableProofStateWatcher();
       console.log('Coco Manager initialized successfully');
 

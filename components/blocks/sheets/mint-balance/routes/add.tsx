@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
@@ -16,6 +16,10 @@ import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { KYMHandler } from 'cashu-kym';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { Badge } from 'components/ui/Badge';
+import { MintSearchInput } from 'components/ui/MintSearchInput';
+import { useDebouncedMintValidation } from 'hooks/useDebouncedMintValidation';
+import { filterMints, createPseudoMint, looksLikeMintUrl } from 'helper/fuzzySearch';
+import { CocoManager } from 'helper/coco/manager';
 
 interface DiscoveredMint {
   url: string;
@@ -48,8 +52,26 @@ interface DiscoveredMint {
   };
 }
 
+// Union type for both discovered mints and pseudo mints
+type SearchableMint =
+  | DiscoveredMint
+  | {
+      url: string;
+      name: string;
+      mintUrl?: string;
+      auditorData?: {
+        name?: string;
+      };
+      score?: number;
+      recommendations?: any[];
+      amount?: number;
+      unit?: string;
+      iconUrl?: string | null;
+      mintInfo?: any;
+    };
+
 interface AddMintItemProps {
-  mint: DiscoveredMint;
+  mint: SearchableMint;
   onToggle: (url: string) => void;
   selected: boolean;
   theme: any;
@@ -57,7 +79,19 @@ interface AddMintItemProps {
 
 const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, theme }) => {
   const g = greys(theme);
-  const isDisabled = !mint.auditorData;
+  const isPseudoMint = !mint.auditorData && !mint.score;
+  // Pseudo mints (custom URLs) should be selectable if they look like valid URLs
+  const isDisabled = !mint.auditorData && !isPseudoMint && !looksLikeMintUrl(mint.url);
+
+  // Type guards for safe property access
+  const hasAuditorData = mint.auditorData && 'state' in mint.auditorData;
+  const hasScore = typeof mint.score === 'number';
+  const hasRecommendations = Array.isArray(mint.recommendations);
+
+  // Safe property access
+  const auditorState = hasAuditorData ? (mint.auditorData as any).state : undefined;
+  const score = hasScore ? mint.score! : 0;
+  const recommendations = hasRecommendations ? mint.recommendations! : [];
 
   return (
     <View
@@ -76,7 +110,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
               variant="mint"
               name={mint.auditorData?.name || mint.url.replace('https://', '').split('/')[0]}
               alt={`${mint.auditorData?.name || 'Mint'} icon`}
-              status={mint.auditorData?.state}
+              status={auditorState}
             />
 
             <VStack spacing={2}>
@@ -85,20 +119,30 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
               </Text>
 
               <HStack align="center" gap={8}>
-                <Badge variant="warning" icon="ic:round-star" size={12}>
-                  {mint.score % 1 === 0 ? mint.score.toString() : mint.score.toFixed(1)} (
-                  {mint.recommendations?.length || 0})
-                </Badge>
-                {mint.recommendations?.length > 0 && (
-                  <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
-                    {(
-                      (mint.recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
-                        mint.recommendations.length /
-                        5) *
-                      100
-                    ).toFixed(1)}
-                    %
+                {isPseudoMint ? (
+                  <Badge variant="warning" icon="ic:round-warning" size={12}>
+                    Custom URL
                   </Badge>
+                ) : (
+                  <>
+                    {hasScore && (
+                      <Badge variant="warning" icon="ic:round-star" size={12}>
+                        {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
+                        {recommendations.length})
+                      </Badge>
+                    )}
+                    {hasRecommendations && recommendations.length > 0 && (
+                      <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
+                        {(
+                          (recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
+                            recommendations.length /
+                            5) *
+                          100
+                        ).toFixed(1)}
+                        %
+                      </Badge>
+                    )}
+                  </>
                 )}
               </HStack>
             </VStack>
@@ -128,8 +172,27 @@ const AddRoute = () => {
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
+  // Search functionality
+  const { url, setUrl, validationState, reset } = useDebouncedMintValidation(800);
+
   // Get allowed currencies from payload or use defaults
   const allowedCurrencies = payload?.allowedUnits ?? ['SAT', 'USD', 'EUR', 'GBP'];
+
+  // Filter mints based on search query
+  const filteredMints = useMemo((): SearchableMint[] => {
+    if (!url.trim()) return mints;
+
+    const filtered = filterMints(mints, url);
+
+    // If the search query looks like a URL and doesn't match any existing mints,
+    // add a pseudo mint for the custom URL
+    if (looksLikeMintUrl(url) && !filtered.some((mint) => mint.url === url)) {
+      const pseudoMint = createPseudoMint(url);
+      return [pseudoMint, ...filtered];
+    }
+
+    return filtered;
+  }, [mints, url]);
 
   // Load discovered mints using cashu-kym
   useEffect(() => {
@@ -226,6 +289,85 @@ const AddRoute = () => {
     });
   };
 
+  const handleAddCustomMint = async () => {
+    console.log('🚀 Add button clicked!');
+    console.log('🚀 URL:', url);
+    console.log('🚀 Validation state:', validationState);
+
+    if (!url.trim()) {
+      console.log('❌ No URL provided');
+      showMessage('Please enter a mint URL');
+      return;
+    }
+
+    // Temporarily bypass validation to test mint addition
+    if (validationState.isValid !== true) {
+      console.log('⚠️ Validation failed, but proceeding anyway for testing...');
+      console.log('⚠️ Validation state:', validationState);
+    }
+
+    try {
+      console.log('🔍 Starting mint addition process...');
+      console.log('🔍 URL:', url);
+      console.log('🔍 Validation state:', validationState);
+
+      // Check if CocoManager is initialized
+      if (!CocoManager.isInitialized()) {
+        console.error('❌ CocoManager not initialized');
+        showMessage('Manager not initialized. Please try again.');
+        return;
+      }
+
+      console.log('✅ CocoManager is initialized');
+
+      // Use CocoManager directly, same as migration
+      const manager = CocoManager.getInstance();
+      console.log('✅ Got manager instance:', !!manager);
+
+      console.log('🔍 Calling manager.mint.addMint...');
+      const result = await manager.mint.addMint(url);
+      console.log('✅ Add mint result:', result);
+
+      // Try to get mint info to ensure it's loaded (same as migration)
+      try {
+        console.log('🔍 Getting mint info...');
+        const mintInfo = await manager.mint.getMintInfo(url);
+        console.log(`✅ Mint info loaded for ${url}:`, mintInfo);
+      } catch (infoError) {
+        console.warn(`⚠️ Failed to load mint info for ${url}:`, infoError);
+      }
+
+      // Check if mint was actually added by listing all mints
+      try {
+        console.log('🔍 Checking all mints...');
+        const allMints = await manager.mint.getAllMints();
+        console.log(
+          '📋 All mints:',
+          allMints.map((m) => (m as any).url || m)
+        );
+        const isAdded = allMints.some((m) => (m as any).url === url);
+        console.log(`✅ Mint ${url} is in list:`, isAdded);
+      } catch (listError) {
+        console.warn('⚠️ Failed to list mints:', listError);
+      }
+
+      // Also add it to the selected mints for immediate selection
+      setSelectedMints((prev) => new Set([...prev, url]));
+
+      showMessage('Mint added successfully');
+      reset();
+    } catch (err) {
+      console.error('❌ Failed to add custom mint:', err);
+      console.error('❌ Error details:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        name: err instanceof Error ? err.name : undefined,
+        cause: err instanceof Error ? err.cause : undefined,
+      });
+      showMessage(`Failed to add mint: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
   const handleSave = async () => {
     if (selectedMints.size === 0) {
       showMessage('Please select at least one mint to add');
@@ -233,8 +375,51 @@ const AddRoute = () => {
     }
 
     try {
-      showMessage(`Added ${selectedMints.size} mint(s) successfully`);
+      console.log('🚀 Starting to add selected mints:', Array.from(selectedMints));
 
+      // Check if CocoManager is initialized
+      if (!CocoManager.isInitialized()) {
+        console.error('❌ CocoManager not initialized');
+        showMessage('Manager not initialized. Please try again.');
+        return;
+      }
+
+      const manager = CocoManager.getInstance();
+      const results = [];
+      const errors = [];
+
+      // Add each selected mint to the manager
+      for (const mintUrl of selectedMints) {
+        try {
+          console.log(`🔍 Adding mint: ${mintUrl}`);
+          const result = await manager.mint.addMint(mintUrl);
+          console.log(`✅ Added mint ${mintUrl}:`, result);
+          results.push(mintUrl);
+
+          // Try to get mint info to ensure it's loaded
+          try {
+            const mintInfo = await manager.mint.getMintInfo(mintUrl);
+            console.log(`✅ Mint info loaded for ${mintUrl}:`, mintInfo);
+          } catch (infoError) {
+            console.warn(`⚠️ Failed to load mint info for ${mintUrl}:`, infoError);
+          }
+        } catch (err) {
+          console.error(`❌ Failed to add mint ${mintUrl}:`, err);
+          errors.push({ mintUrl, error: err });
+        }
+      }
+
+      // Show results
+      if (errors.length === 0) {
+        showMessage(`Successfully added ${results.length} mint(s)`);
+      } else if (results.length > 0) {
+        showMessage(`Added ${results.length} mint(s), ${errors.length} failed`);
+      } else {
+        showMessage('Failed to add any mints. Please try again.');
+        return;
+      }
+
+      // Close the sheet
       sheetRef.current?.hide({
         id: 'add-mints',
         name: 'Add Mints',
@@ -242,7 +427,7 @@ const AddRoute = () => {
         unit: 'sat',
       });
     } catch (err) {
-      console.error('Failed to add mints:', err);
+      console.error('❌ Failed to add mints:', err);
       showMessage('Failed to add mints. Please try again.');
     }
   };
@@ -327,21 +512,31 @@ const AddRoute = () => {
           ]}
         />
       }>
-      <MintCurrencySelector
-        mints={mints}
-        theme={theme}
-        allowedCurrencies={allowedCurrencies}
-        currencyLabel="Currency options"
-        mintsLabel="Discovered mints"
-        renderItem={(mint) => (
-          <AddMintItem
-            mint={mint}
-            onToggle={handleToggleMint}
-            selected={selectedMints.has(mint.url)}
-            theme={theme}
-          />
-        )}
-      />
+      <VStack spacing={16}>
+        <MintSearchInput
+          value={url}
+          onChangeText={setUrl}
+          validationState={validationState}
+          onAddMint={handleAddCustomMint}
+          canAddMint={url.trim().length > 0}
+        />
+
+        <MintCurrencySelector
+          mints={filteredMints as any}
+          theme={theme}
+          allowedCurrencies={allowedCurrencies}
+          currencyLabel="Currency options"
+          mintsLabel={url.trim() ? 'Search results' : 'Discovered mints'}
+          renderItem={(mint: any) => (
+            <AddMintItem
+              mint={mint}
+              onToggle={handleToggleMint}
+              selected={selectedMints.has(mint.url)}
+              theme={theme}
+            />
+          )}
+        />
+      </VStack>
     </Wrapper>
   );
 };

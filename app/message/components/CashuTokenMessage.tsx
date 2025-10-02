@@ -64,7 +64,10 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
     : [shades[200], shades[300]];
 
   return (
-    <View className={`relative my-2 w-full ${isReceived ? 'self-start' : 'self-end'}`}>
+    <View
+      className={`relative my-2 w-full ${isReceived ? 'self-start' : 'self-end'}`}
+      style={{ minHeight: 120 }} // Ensure minimum height for token messages
+    >
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -81,6 +84,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
             borderRadius: 16,
             padding: 16,
             maxWidth: '75%',
+            minHeight: 100, // Ensure minimum height for content
           }}>
           <Text className="text-xs font-bold opacity-75" style={{ color: greys(theme)[0] }}>
             {decoded.mint}

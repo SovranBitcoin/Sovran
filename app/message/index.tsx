@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Alert,
   Pressable,
@@ -6,6 +6,7 @@ import {
   Platform,
   Animated,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -34,7 +35,6 @@ import { Text } from 'components/ui/Text';
 import TimelineItem from './TimeLine';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
-import { convertNpub } from 'app/(drawer)/(tabs)/payments';
 import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
 import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
@@ -46,8 +46,20 @@ import { showMessage } from 'helper/popup/popups';
 import { RootState } from 'helper/redux/store/reducer';
 import TextInput from 'components/ui/TextInput';
 import { Button } from 'components/ui/Button';
+import { nip19 } from 'nostr-tools';
+import { maybeConvertNpub } from '@/helper/cashuClient';
 
 export type TimelineItemType = Message | TransactionBuilder;
+
+export function convertNpub(pubkey: string) {
+  try {
+    const npub = nip19.decode(pubkey);
+    if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
+  } catch {
+    return pubkey;
+  }
+  return maybeConvertNpub(pubkey)?.slice(2);
+}
 
 export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -62,6 +74,7 @@ export default function ModalScreen() {
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const targetPubkey = convertNpub(params.pubkey);
 
@@ -83,6 +96,14 @@ export default function ModalScreen() {
     'Unknown User';
   const contacts = useSelector((state: RootState) => state.nostr.contacts || []);
   const isContact = contacts.some((c) => c.pubkey === params.pubkey);
+
+  // Auto-scroll to bottom when component mounts or timeline changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [timelineItemsGroupedByDate]);
 
   // ONE STEP: Get all timeline items for this user
   const timelineItemsGroupedByDate = useMemo(() => {
@@ -187,7 +208,11 @@ export default function ModalScreen() {
           {moment(date).format('dddd, MMMM Do YYYY')}
         </Text>
         {timelineItemsGroupedByDate[date].map((item, idx) => (
-          <Pressable key={idx} onLongPress={() => handleLongPress(item)}>
+          <Pressable
+            key={idx}
+            onLongPress={() => handleLongPress(item)}
+            style={{ minHeight: 60 }} // Ensure minimum height for each item
+          >
             <TimelineItem item={item} theme={theme} />
           </Pressable>
         ))}
@@ -411,7 +436,16 @@ export default function ModalScreen() {
           </>
         }
         className="flex-1">
-        <View className="m-4 mb-40 mt-32 flex-1">
+        <ScrollView
+          ref={scrollViewRef}
+          className="flex-1"
+          contentContainerStyle={{
+            paddingTop: 128, // Account for header
+            paddingBottom: 160, // Account for input area
+            paddingHorizontal: 16,
+            minHeight: 200,
+          }}
+          showsVerticalScrollIndicator={false}>
           {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
             <Text
               className="my-4 text-center text-sm font-bold"
@@ -421,7 +455,7 @@ export default function ModalScreen() {
           ) : (
             renderGroupedItems()
           )}
-        </View>
+        </ScrollView>
       </Modal>
     </KeyboardAvoidingView>
   );

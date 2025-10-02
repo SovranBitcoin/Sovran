@@ -21,11 +21,11 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
 
   // Determine if message is received
   const isMessageReceived =
-    isMessage && (item.receiver === currentProfile.pubkey || item.id === -1);
+    isMessage && (item.receiver === currentProfile?.pubkey || item.id === -1);
   const isTransactionReceived =
     isTransaction &&
-    (('nostr' in item && item.nostr?.pubkey === currentProfile.pubkey) ||
-      (item.receiver && item.receiver === currentProfile.pubkey));
+    (('nostr' in item && item.nostr?.pubkey === currentProfile?.pubkey) ||
+      (item.receiver && item.receiver === currentProfile?.pubkey));
 
   if (isTokenMessage) {
     return <CashuTokenMessage token={item.content} theme={theme} isReceived={isMessageReceived} />;
