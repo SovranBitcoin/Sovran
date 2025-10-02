@@ -3,6 +3,7 @@ import { Dimensions, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
 import { greys, Theme } from 'helper/colors';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+// todo migrate to legendlist
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from 'components/blocks/feed';

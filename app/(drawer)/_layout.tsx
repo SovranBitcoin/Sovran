@@ -8,6 +8,7 @@ import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
+// migrate to using polished for opacity
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import CachedImage from 'components/ui/Image';
