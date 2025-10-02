@@ -840,9 +840,7 @@ export const getStructure = (obj: any): any => {
   return structure;
 };
 
-store.subscribe(() => {
-  console.log('STATE', JSON.stringify(store.getState(), null, 2));
-});
+store.subscribe(() => { });
 
 export const persistor = persistStore(store);
 

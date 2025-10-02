@@ -34,13 +34,10 @@ export class CocoManager {
     this.isInitializing = true;
 
     try {
-      console.log('Initializing Coco Manager...');
-
       // Initialize SQLite database
       const db = SQLite.openDatabaseSync('coco.db');
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
-      console.log('Database initialized');
 
       // Seed management - reuse existing secure storage
       const seedGetter = async (): Promise<Uint8Array> => {
@@ -58,13 +55,17 @@ export class CocoManager {
         new ConsoleLogger('sovran', { level: 'info' })
       );
 
-      // Enable watchers for real-time updates
+      // Enable watchers and processors for real-time updates
       await this.instance.enableMintQuoteWatcher({
         watchExistingPendingOnStart: true,
       });
+      await this.instance.enableMintQuoteProcessor({
+        processIntervalMs: 5000, // Check every 5 seconds
+        maxRetries: 3,
+        baseRetryDelayMs: 1000,
+        initialEnqueueDelayMs: 2000,
+      });
       await this.instance.enableProofStateWatcher();
-      console.log('Coco Manager initialized successfully');
-
       return this.instance;
     } catch (error) {
       console.error('Failed to initialize Coco Manager:', error);

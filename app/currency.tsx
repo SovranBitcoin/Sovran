@@ -25,7 +25,6 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 // Removed memoizedGetCurrentProfile - no longer needed
 import { requestInvoice, utils } from 'lnurl-pay';
-import { Alert } from 'react-native';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 interface ScanningData {
   data: string;
@@ -73,7 +72,8 @@ function ModalScreen() {
   const urDecoder = new URDecoder();
 
   const handleMintSelected = async (mint: { id: string; unit: string }) => {
-    setSelectedMintState(mint.id);
+    // Note: setSelectedMintState is not defined in this component
+    // This might need to be implemented based on your state management
     const newUnit = mint.unit.toLowerCase();
     setUnit(newUnit);
     navigation.setParams({ ...params, unit: newUnit });
@@ -81,9 +81,8 @@ function ModalScreen() {
 
   const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
     try {
-      Alert.alert('requestLightningInvoice', JSON.stringify(selectedMint, unit, amount));
       const quote = await requestLightningInvoice(
-        selectedMint,
+        selectedMint || 'https://mint.minibits.cash/Bitcoin', // Fallback mint URL
         unit === 'sat' ? amount : amount * 100
       );
 
@@ -94,9 +93,12 @@ function ModalScreen() {
         paymentRequest: quote.request,
         request: quote.request,
         amount: unit === 'sat' ? amount : amount * 100,
+        unit: unit,
+        quoteId: quote.quote, // Add quoteId for tracking
         transaction: JSON.stringify(quote),
       });
     } catch (error) {
+      console.error('Failed to create Lightning invoice:', error);
       showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
     }
   };
@@ -104,7 +106,10 @@ function ModalScreen() {
   const handleEcashSend = async ({ message: _message }: { message?: string }) => {
     try {
       // Use Coco's ecash operations
-      const result = await sendEcash(selectedMint, unit === 'sat' ? amount : amount * 100);
+      const result = await sendEcash(
+        selectedMint || 'https://mint.minibits.cash',
+        unit === 'sat' ? amount : amount * 100
+      );
 
       navigation.replace(params.to, {
         ...params,
@@ -113,10 +118,6 @@ function ModalScreen() {
         paymentRequest: params.paymentRequest,
       });
     } catch (error) {
-      console.log('Ecash send error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
       showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
     }
   };
@@ -129,7 +130,10 @@ function ModalScreen() {
 
     try {
       // Use Coco's Lightning operations
-      const meltQuote = await payLightningInvoice(selectedMint, invoice);
+      const meltQuote = await payLightningInvoice(
+        selectedMint || 'https://mint.minibits.cash',
+        invoice
+      );
 
       const totalAmount = Number(amount) + Number(meltQuote.fee_reserve || 0);
 

@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { useMintManagement } from 'hooks/coco';
+import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
@@ -44,33 +44,33 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const theme = useSelector(memoizedGetTheme);
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const { getMintInfo, getBalances } = useMintManagement();
+  const { getMintInfo } = useMintManagement();
 
-  // State for Coco data
+  // Use coco's live balance context for real-time updates
+  const { balance: liveBalances } = useBalanceContext();
+
+  // State for mint info only (balance comes from live context)
   const [mintInfo, setMintInfo] = useState<any>(null);
-  const [balance, setBalance] = useState(0);
 
-  // Load mint info and balance from Coco
+  // Get the current balance for the selected mint from live context
+  const balance = selectedMint ? liveBalances[selectedMint] || 0 : 0;
+
+  // Load mint info from Coco (balance updates automatically via context)
   useEffect(() => {
-    const loadMintData = async () => {
+    const loadMintInfo = async () => {
       if (selectedMint) {
         try {
-          const [mintInfoData, balances] = await Promise.all([
-            getMintInfo(selectedMint),
-            getBalances(),
-          ]);
+          const mintInfoData = await getMintInfo(selectedMint);
           setMintInfo(mintInfoData);
-          setBalance(balances[selectedMint] || 0);
         } catch (error) {
-          console.error('Failed to load mint data:', error);
+          console.error('Failed to load mint info:', error);
           setMintInfo(null);
-          setBalance(0);
         }
       }
     };
 
-    loadMintData();
-  }, [selectedMint, getMintInfo, getBalances]);
+    loadMintInfo();
+  }, [selectedMint, getMintInfo]);
 
   const isMintAllowed = useMemo(
     () => (allowedMints && selectedMint ? allowedMints.includes(selectedMint) : true),
@@ -93,14 +93,9 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
       },
       onClose: async (mint) => {
         if (mint?.id && onMintSelected && updateSelectedMint) {
-          try {
-            const balances = await getBalances();
-            const amt = balances[mint.id] || 0;
-            onMintSelected(mint, { amount: amt, unit });
-          } catch (error) {
-            console.error('Failed to get balance for mint:', error);
-            onMintSelected(mint, { amount: 0, unit });
-          }
+          // Use live balance from context instead of calling getBalances()
+          const amt = liveBalances[mint.id] || 0;
+          onMintSelected(mint, { amount: amt, unit });
         }
       },
     });

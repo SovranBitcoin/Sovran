@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Button } from 'components/ui/Button';
-import Icon from 'assets/icons';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { greys } from 'helper/colors';
@@ -29,11 +27,7 @@ interface TransactionMintRefreshProps {
   handleCheckStatus?: (onClose: () => void) => Promise<void>;
 }
 
-export function TransactionMintRefresh({
-  mintInfo,
-  transaction,
-  handleCheckStatus,
-}: TransactionMintRefreshProps) {
+export function TransactionMintRefresh({ mintInfo, transaction }: TransactionMintRefreshProps) {
   const theme = useSelector(memoizedGetTheme);
   const manager = useManager();
   const [loading, setLoading] = useState(false);
@@ -76,7 +70,7 @@ export function TransactionMintRefresh({
         marginBottom: 0,
         padding: 16,
       }}>
-      <HStack align="center" className="bg-transparent">
+      <HStack align="center" gap={4}>
         <View>
           <Avatar
             picture={mintInfo?.icon_url || undefined}
@@ -87,7 +81,7 @@ export function TransactionMintRefresh({
           />
         </View>
         <Spacer size={12} />
-        <VStack className="bg-transparent">
+        <VStack>
           <Text heavy size={16}>
             {transaction?.transactionType === 'send'
               ? transaction?.paid
@@ -103,7 +97,7 @@ export function TransactionMintRefresh({
         </VStack>
       </HStack>
 
-      <View>
+      {/* <View>
         {!transaction?.paid && (
           <Button
             style={{
@@ -137,7 +131,7 @@ export function TransactionMintRefresh({
             }
           />
         )}
-      </View>
+      </View> */}
     </HStack>
   );
 }

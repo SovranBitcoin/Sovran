@@ -52,10 +52,6 @@ export async function retrieveMnemonic(): Promise<string | null> {
     const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
 
     const mnemonic = await SecureStore.getItemAsync(STORAGE_KEYS.USER_MNEMONIC, options);
-    console.log('mnemonic', mnemonic);
-    if (mnemonic) {
-      console.log('Mnemonic retrieved successfully');
-    }
 
     return mnemonic;
   } catch (error) {

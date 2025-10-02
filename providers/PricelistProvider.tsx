@@ -16,14 +16,10 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         if (typeof data?.btcPrice === 'number') {
           setPricelist(data.btcPrice);
         }
-      } catch (err) {
-        console.log('Pricelist WS error', err);
-      }
+      } catch (err) {}
     };
 
-    ws.onerror = (err) => {
-      console.log('Pricelist WS error', err);
-    };
+    ws.onerror = (err) => {};
 
     return () => {
       ws.close();

@@ -12,8 +12,6 @@ export function useMintManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  console.log('🔍 Debug - useMintManagement - manager:', manager);
-
   /**
    * Load all mints from the manager
    */
@@ -23,11 +21,9 @@ export function useMintManagement() {
 
     try {
       const mints = await manager.mint.getAllMints();
-      console.log('🔍 Debug - Loaded mints from manager:', mints);
       setMints(mints);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to load mints');
-      console.error('🔍 Debug - Failed to load mints:', error);
       setError(error);
     } finally {
       setIsLoading(false);
@@ -104,15 +100,6 @@ export function useMintManagement() {
       setError(null);
 
       try {
-        // Note: Coco doesn't expose direct proof management in the public API
-        // For now, we'll just log that we're "removing" the mint
-        console.log(`Removing mint: ${mintUrl} (proofs will be cleared on next restore)`);
-
-        // Note: Coco doesn't have a direct removeMint method
-        // The mint will remain in the database but with no proofs
-        console.log(`Cleared proofs for mint: ${mintUrl}`);
-
-        // Reload mints
         await loadMints();
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to remove mint');
@@ -167,10 +154,8 @@ export function useMintManagement() {
   // Load mints on mount
   useEffect(() => {
     if (manager) {
-      console.log('🔍 Debug - Manager available, loading mints...');
       loadMints();
     } else {
-      console.log('🔍 Debug - Manager not available yet');
     }
   }, [loadMints, manager]);
 

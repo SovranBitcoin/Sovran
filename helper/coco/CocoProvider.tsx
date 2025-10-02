@@ -73,11 +73,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
             setIsMigrating(false);
           }
         } else {
-          console.log('No migration needed');
         }
 
         setIsReady(true);
-        console.log('Coco Provider initialized successfully');
       } catch (error) {
         console.error('Failed to initialize Coco Provider:', error);
         setMigrationError(error instanceof Error ? error : new Error('Initialization failed'));

@@ -89,7 +89,9 @@ export function useLightningOperations() {
   const waitForMintQuotePaid = useCallback(
     async (mintUrl: string, quoteId: string) => {
       try {
-        return await manager.subscription.awaitMintQuotePaid(mintUrl, quoteId);
+        // Use the quotes service to wait for payment and auto-redeem
+        const result = await (manager.quotes as any).redeemOnPaid(mintUrl, quoteId);
+        return result.completed;
       } catch (err) {
         const error =
           err instanceof Error ? err : new Error('Failed to wait for mint quote payment');

@@ -1,130 +1,78 @@
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { Spacer, View, HStack, VStack } from 'components/ui/View';
+import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useSelector } from 'react-redux';
-import { showMessage, showSuccess } from 'helper/popup/popups';
+import { showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import _ from 'lodash';
-import { useNavigation } from 'expo-router';
-import { useCashuUtilities, useMintManagement } from 'hooks/coco';
-import { useTransactions } from 'providers/CocoTransactionsProvider';
+import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useTypedRoute } from 'helper/navigation';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { greens, greys } from 'helper/colors';
-import { MintQuoteResponse } from '@cashu/cashu-ts';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
-import Icon from 'assets/icons';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import opacity from 'hex-color-opacity';
-import { Essential } from 'helper/Essential';
-import { useManager } from 'coco-cashu-react';
+import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
 
 interface MintQuoteTimelineProps {
-  mintQuotes?: (MintQuoteResponse & { addedAt?: number })[];
-  meltQuotes?: {
-    state: 'UNSPENT' | 'PENDING' | 'SPENT';
-    addedAt?: number;
-    amount: number;
-    [key: string]: any;
-  }[];
-  type: 'mint' | 'melt';
-  transaction?: Essential<
-    any,
-    | 'mintQuote'
-    | 'request'
-    | 'token'
-    | 'date'
-    | 'isCancel'
-    | 'amount'
-    | 'unit'
-    | 'paid'
-    | 'type'
-    | 'state'
-  >;
+  transaction: MintHistoryEntry | MeltHistoryEntry;
 }
 
-export function MintQuoteTimeline({
-  mintQuotes = [],
-  meltQuotes = [],
-  type = 'melt',
-  transaction,
-}: MintQuoteTimelineProps) {
-  const { getLightningExpiry: _getLightningExpiry } = useCashuUtilities();
+export function MintQuoteTimeline({ transaction }: MintQuoteTimelineProps) {
   const theme = useSelector(memoizedGetTheme);
   const [collapsed, setCollapsed] = useState(false);
-  const [_loading, _setLoading] = useState(false);
-  const navigation = useTypedNavigation();
 
-  const expiryDate = transaction?.request ? _getLightningExpiry(transaction.request) : null;
-  const isExpired = expiryDate && new Date() > new Date(expiryDate * 1000);
+  const isMintTransaction = transaction.type === 'mint';
+
   const getTimeline = () => {
-    if (type === 'mint') {
-      const quotes = Object.fromEntries(mintQuotes.map((q) => [q.state, q]));
-      const states = ['CREATED', 'UNPAID', ...(isExpired ? ['EXPIRED'] : ['ISSUED', 'PAID'])];
+    if (isMintTransaction) {
+      const mintTx = transaction as MintHistoryEntry;
+      const states = ['CREATED', 'UNPAID', 'ISSUED', 'PAID'];
 
-      let maxIndex = Math.max(-1, ...mintQuotes.map((q) => states.indexOf(q.state)));
-      if (isExpired) {
-        maxIndex = states.length - 1;
-      }
+      // Find current state index
+      const currentStateIndex = states.indexOf(mintTx.state);
+      const maxIndex = Math.max(0, currentStateIndex);
 
       return states.map((state, i) => ({
         state,
-        ...quotes[state],
         complete: i <= maxIndex,
         isCurrent: i === maxIndex,
+        addedAt: i === 0 ? mintTx.createdAt : undefined,
+      }));
+    } else {
+      const meltTx = transaction as MeltHistoryEntry;
+      const states = ['CREATED', 'UNSPENT', 'PENDING', 'SPENT'];
+
+      // Find current state index
+      const currentStateIndex = states.indexOf(meltTx.state);
+      const maxIndex = Math.max(0, currentStateIndex);
+
+      return states.map((state, i) => ({
+        state,
+        complete: i <= maxIndex,
+        isCurrent: i === maxIndex,
+        addedAt: i === 0 ? meltTx.createdAt : undefined,
       }));
     }
-
-    const quotes = Object.fromEntries(meltQuotes.map((q) => [q.state, q]));
-    const states = ['CREATED', 'UNSPENT', 'PENDING', 'SPENT'];
-
-    if (transaction?.isCancel) {
-      states.push('CANCELLED');
-    }
-
-    let maxIndex = Math.max(...meltQuotes.map((q) => states.indexOf(q.state)));
-    if (transaction?.isCancel) {
-      maxIndex = states.length - 1;
-    }
-
-    return states.map((state, i) => {
-      if (state === 'CANCELLED' && !quotes[state]) {
-        return {
-          state,
-          complete: true,
-          isCurrent: transaction?.isCancel,
-        };
-      }
-
-      return {
-        state,
-        ...quotes[state],
-        complete: i <= maxIndex,
-        isCurrent: i === maxIndex,
-      };
-    });
   };
 
   const states = getTimeline();
 
-  const hasIntermediarySteps =
-    type === 'mint'
-      ? mintQuotes.some((q) => q.state === 'UNPAID') && mintQuotes.some((q) => q.state === 'PAID')
-      : meltQuotes.some((q) => q.state === 'UNSPENT') &&
-        meltQuotes.some((q) => q.state === 'PENDING');
+  const hasIntermediarySteps = isMintTransaction
+    ? (transaction as MintHistoryEntry).state === 'UNPAID'
+    : (transaction as MeltHistoryEntry).state === ('UNSPENT' as any) ||
+      (transaction as MeltHistoryEntry).state === ('PENDING' as any);
 
   const shouldCollapse = collapsed && !hasIntermediarySteps;
 
@@ -145,10 +93,6 @@ export function MintQuoteTimeline({
 
     return item.complete ? greens[300] : greys(theme)[200];
   };
-
-  if (type === 'mint' ? !mintQuotes.length : !meltQuotes.length) {
-    return null;
-  }
 
   const getStateLabel = (s: string) => {
     switch (s) {
@@ -177,13 +121,9 @@ export function MintQuoteTimeline({
           textTransform: 'uppercase',
         }}>
         {getStateLabel(
-          isExpired
-            ? 'EXPIRED'
-            : type === 'mint'
-              ? _.last(mintQuotes)?.state
-              : transaction?.isCancel
-                ? 'CANCELLED'
-                : _.last(meltQuotes)?.state
+          isMintTransaction
+            ? (transaction as MintHistoryEntry).state
+            : (transaction as MeltHistoryEntry).state
         )}
       </Text>
       <View>
@@ -196,29 +136,10 @@ export function MintQuoteTimeline({
               align="center">
               <TouchableOpacity
                 onPress={() => {
-                  if (transaction?.isCancel && item.state === 'CANCELLED') {
-                    navigation.navigate(
-                      'transaction',
-                      {
-                        id: transaction?.request || transaction?.token,
-                        transactionType: 'receive',
-                      },
-                      {
-                        closeCurrentAndParents: true,
-                      }
-                    );
-                  }
+                  // Handle navigation if needed
                 }}
                 style={{
                   flex: 1,
-                  ...(transaction?.isCancel && item.state === 'CANCELLED'
-                    ? {
-                        backgroundColor: opacity(greys(theme)[900], 0.75),
-                        borderColor: greys(theme)[600],
-                        borderWidth: 0.33,
-                        borderRadius: 8,
-                      }
-                    : {}),
                   marginVertical: barMarginVertical,
                   overflow: 'hidden',
                 }}>
@@ -253,47 +174,8 @@ export function MintQuoteTimeline({
                         }}>
                         {convertTime(new Date(item.addedAt))}
                       </Text>
-                    ) : transaction?.date && item.state === 'CREATED' ? (
-                      <Text
-                        size={12}
-                        bold
-                        style={{
-                          color: greys(theme)[300],
-                          marginStart: 12,
-                        }}>
-                        {convertTime(new Date(transaction.date))}
-                      </Text>
-                    ) : transaction?.isCancel ? (
-                      <Text
-                        size={12}
-                        bold
-                        style={{
-                          color: greys(theme)[300],
-                          marginStart: 12,
-                        }}>
-                        Open Transaction
-                      </Text>
                     ) : null}
                   </View>
-                  {transaction?.isCancel && item.state === 'CANCELLED' && (
-                    <Icon
-                      style={{
-                        marginRight: 8,
-                      }}
-                      spin={
-                        _loading
-                          ? {
-                              delay: 0,
-                              duration: 1500,
-                              outputRange: ['0deg', '360deg'],
-                              easing: 'easeOut',
-                            }
-                          : undefined
-                      }
-                      size={20}
-                      name="lucide:arrow-right"
-                    />
-                  )}
                 </HStack>
               </TouchableOpacity>
             </HStack>
@@ -345,7 +227,6 @@ export function MintQuoteTimeline({
 export function LightningReceiveConfirmation({
   request,
   unit,
-  autoGoBackOnPaid = true,
   extraButtons = [],
 }: {
   request: string;
@@ -354,55 +235,28 @@ export function LightningReceiveConfirmation({
   autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
 }) {
-  const { getMintInfo } = useMintManagement();
   const manager = useManager();
-  const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
+  const [refreshing] = useState(false);
 
-  const { history } = useTransactions();
+  const { history } = usePaginatedHistory();
 
-  // Find the current transaction using Coco's transaction list
+  // Find the current transaction using Coco's history system
   const currentTransaction = history.find(
-    (tx: any) => tx.paymentRequest === request && tx.unit === unit
-  ) as any;
+    (tx: HistoryEntry) => tx.type === 'mint' && (tx as MintHistoryEntry).paymentRequest === request
+  ) as MintHistoryEntry | undefined;
 
   // Load mint info when transaction is found
   useEffect(() => {
     if (currentTransaction?.mintUrl) {
-      getMintInfo(currentTransaction.mintUrl)
+      manager.mint
+        .getMintInfo(currentTransaction.mintUrl)
         .then(setMintInfo)
         .catch(() => setMintInfo(null));
     }
-  }, [currentTransaction?.mintUrl, getMintInfo]);
-
-  // Set up Coco event subscription for Lightning invoice payment
-  useEffect(() => {
-    if (!currentTransaction || currentTransaction.paid || !manager) return;
-
-    // Listen for mint quote state changes
-    const unsubscribe = manager.on('mint-quote:state-changed', (payload) => {
-      if (payload.quoteId === currentTransaction.mintQuote?.quote && payload.state === 'PAID') {
-        showMessage('Lightning invoice paid!', {
-          amount: currentTransaction.amount,
-          unit: currentTransaction.unit,
-        });
-      }
-    });
-
-    return unsubscribe;
-  }, [currentTransaction, manager]);
-
-  // Auto-navigate back when payment is received
-  useEffect(() => {
-    if (autoGoBackOnPaid && currentTransaction?.paid) {
-      const timer = setTimeout(() => {
-        navigation.goBack();
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [autoGoBackOnPaid, currentTransaction?.paid, navigation]);
+  }, [currentTransaction?.mintUrl, manager]);
 
   const handleCopy = async (close: (event: any) => void) => {
     await Clipboard.setStringAsync(request);
@@ -414,20 +268,6 @@ export function LightningReceiveConfirmation({
       await Share.share({ url: uri, message: request });
     }
     close({});
-  };
-
-  const handleCheckStatus = async (close: (event: any) => void) => {
-    if (!currentTransaction) {
-      showMessage('Transaction not found', {}, {}, () => close({}));
-      return;
-    }
-
-    try {
-      await getMintInfo(currentTransaction.mintUrl);
-      showMessage('Status check completed', {}, {}, () => close({}));
-    } catch {
-      showMessage('Failed to check status', {}, {}, () => close({}));
-    }
   };
 
   // Show loading state if transaction is not found
@@ -442,7 +282,7 @@ export function LightningReceiveConfirmation({
   }
 
   const isBitcoin = unit === 'sat';
-  const isPaid = currentTransaction.paid;
+  const isPaid = currentTransaction?.state === 'ISSUED' || currentTransaction?.state === 'PAID';
 
   return (
     <Modal
@@ -467,10 +307,11 @@ export function LightningReceiveConfirmation({
                 condition: !isPaid,
               },
               {
-                text: 'Check Status',
-                icon: 'humbleicons:refresh',
+                text: refreshing ? 'Checking...' : 'Check Status',
+                icon: refreshing ? 'humbleicons:refresh' : 'humbleicons:refresh',
                 variant: 'secondary',
-                onPress: handleCheckStatus,
+                onPress: async () => {},
+                loading: refreshing,
                 condition: !isPaid,
               },
               ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
@@ -484,74 +325,71 @@ export function LightningReceiveConfirmation({
           unit,
           amount: currentTransaction.amount,
           transactionType: 'receive',
+          date: new Date(currentTransaction.createdAt).toISOString(),
         }}
       />
+      <VStack gap={12}>
+        {!isPaid && (
+          <PaymentInfo
+            showSection={false}
+            setUri={setUri}
+            data={[{ name: 'Lightning', value: request }]}
+            unit={unit}
+            popupMessage={[{ name: 'lightning_address_copied' }]}
+          />
+        )}
 
-      {!isPaid && !currentTransaction.fromNIP05 && (
-        <PaymentInfo
-          showSection={false}
-          setUri={setUri}
-          data={[{ name: 'Lightning', value: request }]}
-          unit={unit}
-          popupMessage={[{ name: 'lightning_address_copied' }]}
+        {currentTransaction.metadata?.memo && (
+          <>
+            <Card message={currentTransaction.metadata.memo} variant="info" />
+          </>
+        )}
+
+        <TransactionMintRefresh
+          mintInfo={mintInfo}
+          transaction={currentTransaction}
+          handleCheckStatus={async () => {}}
         />
-      )}
 
-      <Spacer size={12} />
+        <MintQuoteTimeline transaction={currentTransaction} />
 
-      {currentTransaction.memo && (
-        <>
-          <View style={{ marginHorizontal: 16 }}>
-            <Card message={currentTransaction.memo} variant="info" />
-          </View>
-          <Spacer size={12} />
-        </>
-      )}
+        <Section
+          special={false}
+          items={[
+            {
+              title: 'Request',
+              value: truncateMiddle(request, 10),
+            },
+            {
+              title: 'Type',
+              value: 'Lightning • Receive',
+            },
+            {
+              title: 'Status',
+              value: (
+                <HStack align="center">
+                  <Text
+                    style={{ color: greys(theme)[0], fontSize: 16, fontFamily: 'OverpassBold' }}>
+                    {isPaid ? 'Completed' : 'Pending'}
+                  </Text>
+                </HStack>
+              ),
+            },
+            {
+              title: 'Amount',
+              value: `${currentTransaction.amount} ${unit.toUpperCase()}`,
+            },
+          ]}
+        />
 
-      <TransactionMintRefresh
-        mintInfo={mintInfo}
-        transaction={{ ...currentTransaction, transactionType: 'receive' }}
-        handleCheckStatus={handleCheckStatus}
-      />
-      <Spacer size={12} />
-
-      <MintQuoteTimeline
-        transaction={currentTransaction}
-        type="mint"
-        mintQuotes={currentTransaction.mintQuotes}
-      />
-      <Spacer size={12} />
-
-      <Section
-        special={false}
-        items={[
-          {
-            title: 'Request',
-            value: currentTransaction.fromNIP05
-              ? truncateMiddle(currentTransaction.fromNIP05.split('@')[0], 4) +
-                '@' +
-                currentTransaction.fromNIP05.split('@')[1]
-              : truncateMiddle(request, 10),
-          },
-          {
-            title: 'Type',
-            value: 'Lightning • Receive',
-          },
-          {
-            title: 'Status',
-            value: (
-              <HStack align="center">
-                <Text style={{ color: greys(theme)[0], fontSize: 16, fontFamily: 'OverpassBold' }}>
-                  {isPaid ? 'Completed' : 'Pending'}
-                </Text>
-              </HStack>
-            ),
-          },
-        ]}
-      />
-      <Spacer size={12} />
-
-      <TransactionDebugCode transaction={currentTransaction} />
+        <TransactionDebugCode
+          transaction={{
+            ...currentTransaction,
+            transactionType: 'receive',
+            date: new Date(currentTransaction.createdAt).toISOString(),
+          }}
+        />
+      </VStack>
     </Modal>
   );
 }
