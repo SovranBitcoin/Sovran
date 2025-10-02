@@ -1,4 +1,7 @@
 export type NavigationParams = {
+  camera: {
+    unit: string;
+  };
   currency: {
     amount: number;
     unit: string;
@@ -14,13 +17,6 @@ export type NavigationParams = {
     allowedUnits: string[];
     mints?: string;
   };
-  bitrefill: {
-    product: {
-      _id: string;
-    };
-    amount: number;
-    email: string;
-  };
   giftcard: {
     slug: string;
     image: string;
@@ -31,9 +27,6 @@ export type NavigationParams = {
   animate: {
     mnemonic: string;
     type: string;
-  };
-  feed: {
-    pubkey: string;
   };
   mnemonic: {
     type: string;
@@ -55,9 +48,6 @@ export type NavigationParams = {
     amount: number;
     token: string;
     paymentRequest?: string;
-  };
-  userMessages: {
-    pubkey: string;
   };
   lightningReceiveConfirmation: {
     request: string;
@@ -91,19 +81,17 @@ export type NavigationParams = {
   wallets: {
     accounts: string;
   };
-  camera: {
-    unit: string;
-    accountIndex: number;
-  };
-
   send: {
     unit: string;
     type: string;
   };
+  feed: {
+    pubkey: string;
+  };
+  userMessages: {
+    pubkey: string;
+  };
   contacts: {
     unit: string;
-  };
-  'settings-pages/language': {
-    countries: string[];
   };
 };

@@ -65,7 +65,7 @@ export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const dispatch = useDispatch();
 
-  const params = useTypedRoute<'userMessages'>();
+  const { pubkey } = useTypedRoute<'userMessages'>();
 
   const navigation = useTypedNavigation<'currency'>();
   const { profiles, search, addMessage, currentProfile } = useNostr();
@@ -76,7 +76,7 @@ export default function ModalScreen() {
   const [message, setMessage] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const targetPubkey = convertNpub(params.pubkey);
+  const targetPubkey = convertNpub(pubkey);
 
   // Header data
   const maxWidth = Math.min(Dimensions.get('window').width, 600);
@@ -85,8 +85,8 @@ export default function ModalScreen() {
     pubkey: convertNpub(s.pubkey),
     ...s.profile,
   }));
-  const profile = combinedSearchAndProfiles.find((p) => p.pubkey === params.pubkey);
-  const isVerified = profiles.some((p) => p.pubkey === params.pubkey);
+  const profile = combinedSearchAndProfiles.find((p) => p.pubkey === pubkey);
+  const isVerified = profiles.some((p) => p.pubkey === pubkey);
   const profileImage = profile?.picture || profile?.image;
   const displayName =
     profile?.displayName ||
@@ -95,7 +95,7 @@ export default function ModalScreen() {
     profile?.name ||
     'Unknown User';
   const contacts = useSelector((state: RootState) => state.nostr.contacts || []);
-  const isContact = contacts.some((c) => c.pubkey === params.pubkey);
+  const isContact = contacts.some((c) => c.pubkey === pubkey);
 
   // Auto-scroll to bottom when component mounts or timeline changes
   useEffect(() => {
@@ -313,7 +313,7 @@ export default function ModalScreen() {
                             text: 'Feed',
                             onPress: async () => {
                               navigation.navigate('feed/index', {
-                                pubkey: params.pubkey,
+                                pubkey,
                               });
                             },
                           },
@@ -323,10 +323,10 @@ export default function ModalScreen() {
                             text: isContact ? 'Remove Contact' : 'Add Contact',
                             onPress: async () => {
                               if (isContact) {
-                                dispatch(removeContact(params.pubkey));
+                                dispatch(removeContact(pubkey));
                                 await showMessage('Contact removed');
                               } else {
-                                dispatch(addContact({ pubkey: params.pubkey, profile }));
+                                dispatch(addContact({ pubkey, profile }));
                                 await showMessage('Contact added');
                               }
                             },
@@ -337,7 +337,7 @@ export default function ModalScreen() {
                             text: 'Mute User',
                             onPress: async () => {
                               await showMessage('User muted successfully');
-                              dispatch(muteUser(params.pubkey));
+                              dispatch(muteUser(pubkey));
                             },
                           },
                           {
@@ -346,7 +346,7 @@ export default function ModalScreen() {
                             text: 'Report User',
                             onPress: async () => {
                               await showMessage('User reported successfully');
-                              dispatch(reportUser(params.pubkey));
+                              dispatch(reportUser(pubkey));
                             },
                           },
                         ],

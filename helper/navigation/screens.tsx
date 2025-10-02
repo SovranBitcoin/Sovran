@@ -212,10 +212,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
 
 export const MODAL_SCREENS_ALT: ModalConfig[] = [
   {
-    name: 'bitrefill',
-    title: 'Gift Cards',
-  },
-  {
     name: 'onboard/welcome',
     title: '',
   },
@@ -332,10 +328,6 @@ export const MODAL_SCREENS_ALT: ModalConfig[] = [
     options: {
       presentation: 'modal',
     },
-  },
-  {
-    name: 'settings-pages/language',
-    title: 'Language',
   },
   {
     name: 'settings-pages/theme',
