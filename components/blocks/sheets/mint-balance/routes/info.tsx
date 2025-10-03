@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ScrollView, Animated, Alert } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
@@ -9,7 +9,7 @@ import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack, Spacer, HStack, View } from 'components/ui/View';
 import { useMintManagement } from 'hooks/coco';
-import { KYMHandler } from 'cashu-kym';
+import { useDiscoveredMints } from 'hooks/coco/useDiscoveredMints';
 import { Card } from 'components/ui/Card';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -286,7 +286,6 @@ const InfoRoute = () => {
   const { getMintInfo } = useMintManagement();
 
   const [mintInfo, setMintInfo] = useState<any>(null);
-  const [auditData, setAuditData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -297,10 +296,20 @@ const InfoRoute = () => {
   // Get mintUrl from global variable or payload
   const mintUrl = (global as any).currentMintUrl || payload?.mintUrl;
 
+  // Use discovered mints hook to get audit data
+  const { mints: discoveredMints, loading: auditLoading, error: auditError } = useDiscoveredMints();
+
+  // Find the specific mint data from discovered mints
+  const auditData = useMemo(() => {
+    if (!mintUrl || !discoveredMints.length) return null;
+    return discoveredMints.find((mint) => mint.url === mintUrl);
+  }, [discoveredMints, mintUrl]);
+
   // Debug logging
   console.log('InfoRoute - mintUrl:', mintUrl);
   console.log('InfoRoute - global.currentMintUrl:', (global as any).currentMintUrl);
   console.log('InfoRoute - payload:', payload);
+  console.log('InfoRoute - auditData:', auditData);
 
   // Helper functions
   const handleCopy = async (text: string) => {
@@ -368,7 +377,7 @@ const InfoRoute = () => {
   }, [pulseAnim, opacityAnim]);
 
   useEffect(() => {
-    const fetchMintData = async () => {
+    const fetchMintInfo = async () => {
       if (!mintUrl) {
         setError('No mint URL provided');
         setLoading(false);
@@ -379,80 +388,41 @@ const InfoRoute = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch mint info using Coco
+        // Fetch mint info using Coco - audit data comes from useDiscoveredMints
         const mintInfoData = await getMintInfo(mintUrl);
         setMintInfo(mintInfoData);
-
-        // Fetch audit data using cashu-kym
-        const handler = new KYMHandler({
-          auditorBaseUrl: 'https://api.audit.8333.space',
-          relays: [
-            'wss://purplepag.es',
-            'wss://relay.primal.net',
-            'wss://nostr.thank.eu',
-            'wss://relay.vanderwarker.family',
-            'wss://nostr-relay.bitcoin.ninja',
-            'wss://lnbits.btc-payserver.eu/nostrrelay/1',
-            'wss://relay.damus.io',
-            'wss://nostr.girino.org',
-            'wss://relay.8333.space/',
-            'wss://relay.snort.social',
-            'wss://nostr.mutinywallet.com',
-            'wss://nos.lol',
-            'wss://relay.nostr.band/all',
-            'wss://relay.roli.social',
-            'wss://deschooling.us',
-            'wss://relay-verified.deschooling.us',
-            'wss://feeds.nostr.band/nostrhispano',
-            'wss://search.nos.today',
-            'wss://nostr-relay.app',
-            'wss://nb.relay.center',
-            'wss://nostrja-kari-nip50.heguro.com',
-            'wss://nfdn.betanet.dotalgo.io',
-            'wss://saltivka.org',
-            'wss://filter.stealth.wine?broadcast=true',
-            'wss://nostr.novacisko.cz',
-            'wss://relay.noswhere.com',
-            'wss://relay1.nostrchat.io',
-            'wss://relay2.nostrchat.io',
-          ],
-          timeout: 5000,
-        });
-
-        const result = await handler.discover();
-        const mintAuditData = result.results.find((mint) => mint.url === mintUrl);
-        console.log('InfoRoute - mintAuditData:', mintAuditData, mintUrl, result.results);
-        setAuditData(mintAuditData);
       } catch (err) {
-        console.error('Failed to fetch mint data:', err);
+        console.error('Failed to fetch mint info:', err);
         setError('Failed to load mint information');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchMintData();
+    fetchMintInfo();
   }, [mintUrl, getMintInfo]);
 
-  // Render the mint icon/logo
   const renderMintIcon = () => {
     return (
       <Avatar
-        picture={mintInfo?.icon_url || auditData?.auditorData?.name ? undefined : undefined}
+        picture={mintInfo?.icon_url || auditData?.mintInfo?.icon_url}
         size={70}
         variant="mint"
         name={
           mintInfo?.name ||
-          auditData?.auditorData?.name ||
+          auditData?.auditInfo?.auditorData?.name ||
           mintUrl?.replace('https://', '').split('/')[0]
         }
-        alt={`${mintInfo?.name || auditData?.auditorData?.name || 'Mint'} icon`}
-        status={auditData?.auditorData?.state}
+        alt={`${mintInfo?.name || auditData?.auditInfo?.auditorData?.name || 'Mint'} icon`}
+        status={auditData?.auditInfo?.auditorData?.state}
       />
     );
   };
 
-  if (loading) {
+  // Combined loading state - show loading if either mint info or audit data is loading
+  const isLoading = loading || auditLoading;
+
+  if (isLoading) {
     return (
       <Wrapper
         buttons={
@@ -498,24 +468,24 @@ const InfoRoute = () => {
     );
   }
 
-  const hasError = error || !mintInfo;
+  const hasError = error || auditError || !mintInfo;
 
   // Fallback mint name from URL if no mint info available
   const displayName =
     mintInfo?.name ||
-    auditData?.auditorData?.name ||
+    auditData?.auditInfo?.auditorData?.name ||
     mintUrl?.split('//')[1]?.split('/')[0] ||
     'Unknown Mint';
 
   // Calculate stats from audit data
-  const successRate = auditData?.recommendations?.length
-    ? auditData.recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
-      auditData.recommendations.length /
+  const successRate = auditData?.auditInfo?.recommendations?.length
+    ? auditData.auditInfo.recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
+      auditData.auditInfo.recommendations.length /
       5
     : undefined;
 
-  const totalMints = auditData?.auditorData?.mints;
-  const totalMelts = auditData?.auditorData?.melts;
+  const totalMints = auditData?.auditInfo?.auditorData?.mints;
+  const totalMelts = auditData?.auditInfo?.auditorData?.melts;
 
   return (
     <Wrapper
@@ -537,7 +507,9 @@ const InfoRoute = () => {
           <>
             <Card
               variant="warning"
-              message={`Failed to load complete mint details: ${error || 'Some information may be missing'}`}
+              message={`Failed to load complete mint details: ${
+                error || auditError || 'Some information may be missing'
+              }`}
             />
             <Spacer size={12} />
           </>

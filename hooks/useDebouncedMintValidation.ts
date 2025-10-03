@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useMintManagement } from './coco/useMintManagement';
 import { looksLikeMintUrl } from 'helper/fuzzySearch';
+import { fetchMintInfo } from '@/helper/apiClient';
 
 interface ValidationState {
   isValid: boolean | null; // null = not checked, true = valid, false = invalid
@@ -20,6 +21,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     error: null,
   });
   const [url, setUrl] = useState('');
+  const [mintInfo, setMintInfo] = useState<any>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const validateUrl = useCallback(async (mintUrl: string) => {
@@ -29,6 +31,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
         isLoading: false,
         error: null,
       });
+      setMintInfo(null);
       return;
     }
 
@@ -41,22 +44,17 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
         isLoading: false,
         error: 'Invalid URL format',
       });
+      setMintInfo(null);
       return;
     }
 
-    setValidationState(prev => ({ ...prev, isLoading: true, error: null }));
+    setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    try {
-      // For validation, we just need to check if we can get mint info
-      // We don't need to check if it's already known since we want to add new mints
-      const mintInfo = await getMintInfo(mintUrl);
+    // For validation, we just need to check if we can get mint info
+    // We don't need to check if it's already known since we want to add new mints
+    const mintInfoResult = await fetchMintInfo(mintUrl);
 
-      setValidationState({
-        isValid: mintInfo !== null,
-        isLoading: false,
-        error: mintInfo ? null : 'Mint not accessible or invalid',
-      });
-    } catch (error) {
+    if (mintInfoResult.isErr()) {
       // If we can't get mint info, it might still be a valid URL
       // Let's check if it looks like a valid mint URL
       const looksValid = looksLikeMintUrl(mintUrl);
@@ -66,35 +64,47 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
         isLoading: false,
         error: looksValid ? null : 'Invalid mint URL format',
       });
-    }
-  }, [getMintInfo]);
-
-  const debouncedValidate = useCallback((mintUrl: string) => {
-    setUrl(mintUrl);
-
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Reset state if URL is empty
-    if (!mintUrl.trim()) {
+      setMintInfo(null);
+    } else {
       setValidationState({
-        isValid: null,
+        isValid: mintInfoResult.value !== null,
         isLoading: false,
-        error: null,
+        error: mintInfoResult.value ? null : 'Mint not accessible or invalid',
       });
-      return;
+      setMintInfo(mintInfoResult.value);
     }
+  }, []);
 
-    // Set loading state immediately for better UX
-    setValidationState(prev => ({ ...prev, isLoading: true, error: null }));
+  const debouncedValidate = useCallback(
+    (mintUrl: string) => {
+      setUrl(mintUrl);
 
-    // Debounce the validation
-    debounceTimeoutRef.current = setTimeout(() => {
-      validateUrl(mintUrl);
-    }, debounceMs);
-  }, [validateUrl, debounceMs]);
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+
+      // Reset state if URL is empty
+      if (!mintUrl.trim()) {
+        setValidationState({
+          isValid: null,
+          isLoading: false,
+          error: null,
+        });
+        setMintInfo(null);
+        return;
+      }
+
+      // Set loading state immediately for better UX
+      setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      // Debounce the validation
+      debounceTimeoutRef.current = setTimeout(() => {
+        validateUrl(mintUrl);
+      }, debounceMs);
+    },
+    [validateUrl, debounceMs]
+  );
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -112,6 +122,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       isLoading: false,
       error: null,
     });
+    setMintInfo(null);
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
@@ -121,6 +132,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     url,
     setUrl: debouncedValidate,
     validationState,
+    mintInfo,
     reset,
   };
 }

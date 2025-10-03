@@ -19,9 +19,11 @@ import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-ro
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { formatCurrency } from 'helper/currency';
 import { MintCurrencySelector } from '../MintCurrencySelector';
+import _ from 'lodash';
+import { Mint } from 'coco-cashu-core';
 
 interface MintItemProps {
-  mint: { id: string; name: string; iconUrl: string | null };
+  mint: Mint & { amount: number; unit: string };
   balance: { amount: number; unit: string };
   theme: Theme;
   onPress: () => void;
@@ -83,7 +85,7 @@ const MintItem: React.FC<MintItemProps> = ({
       <HStack align="center" gap={12}>
         <View style={{ position: 'relative' }}>
           <Avatar
-            picture={mint.iconUrl || undefined}
+            picture={mint.mintInfo.icon_url || undefined}
             size={36}
             variant="mint"
             name={mint.name}
@@ -105,7 +107,7 @@ const MintItem: React.FC<MintItemProps> = ({
           <TouchableOpacity
             onPress={() => {
               if (onDetailsPress) {
-                onDetailsPress(mint.id);
+                onDetailsPress(mint.mintUrl);
               } else if (onInspectPress) {
                 onInspectPress();
               }
@@ -137,7 +139,9 @@ const ListRoute = () => {
   const onDetailsPress = payload?.onDetailsPress;
 
   const { getBalances, mints } = useMintManagement();
-  const [filteredMints, setFilteredMints] = useState<any[]>([]);
+  const [filteredMints, setFilteredMints] = useState<(Mint & { amount: number; unit: string })[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
   const dispatch = useDispatch();
@@ -153,19 +157,12 @@ const ListRoute = () => {
         const balances = await getBalances();
 
         const mintsWithBalances = mints.map((mint) => ({
-          mintUrl: mint.mintUrl,
-          name:
-            mint.name ||
-            mint.mintInfo?.name ||
-            mint.mintUrl.replace('https://', '')?.split('/')?.[0] ||
-            'Unknown Mint',
           unit: 'SAT',
           amount: balances[mint.mintUrl] || 0,
-          iconUrl: mint.mintInfo?.icon_url || null,
-          mintInfo: mint.mintInfo,
+          ...mint,
         }));
 
-        const sortedMints = mintsWithBalances.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+        const sortedMints = _.orderBy(mintsWithBalances, ['amount'], ['desc']);
 
         setFilteredMints(sortedMints);
       } catch (error) {
@@ -202,7 +199,7 @@ const ListRoute = () => {
           {
             id: mint.mintUrl,
             name: mint.name,
-            iconUrl: mint.iconUrl,
+            iconUrl: mint.mintInfo.icon_url,
             unit: mint.unit,
           },
           {
@@ -230,7 +227,7 @@ const ListRoute = () => {
       sheetRef.current?.hide({
         id: mint.mintUrl,
         name: mint.name,
-        iconUrl: mint.iconUrl,
+        iconUrl: mint.mintInfo.icon_url,
         unit: mint.unit,
       });
     } catch (e) {
@@ -308,11 +305,7 @@ const ListRoute = () => {
         renderItem={(mint: any, selectedCurrency: string) => (
           <MintItem
             key={mint.mintUrl}
-            mint={{
-              id: mint.mintUrl,
-              name: mint.name,
-              iconUrl: mint.iconUrl,
-            }}
+            mint={mint}
             balance={{ amount: mint.amount, unit: mint.unit }}
             theme={theme}
             isLoading={loadingId === mint.mintUrl}

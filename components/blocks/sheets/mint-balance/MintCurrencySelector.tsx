@@ -2,23 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { CurrencyIcon, FlagIcon } from 'assets/icons';
+import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { HStack, VStack, Spacer } from 'components/ui/View';
 import { greys, Theme } from 'helper/colors';
 
 interface MintData {
-  mintUrl: string;
-  name: string;
-  amount: number;
-  unit: string;
-  iconUrl: string | null;
-  mintInfo?: {
-    nuts?: {
-      '4'?: {
-        methods?: { unit?: string }[];
-      };
-    };
-  };
+  mintUrl?: string;
+  url?: string;
+  name?: string;
+  amount?: number;
+  unit?: string;
+  iconUrl?: string | null;
+  mintInfo?: any; // Make this completely flexible
+  auditInfo?: any; // Add this for compatibility
   [key: string]: any;
 }
 
@@ -31,6 +27,8 @@ interface MintCurrencySelectorProps<T extends MintData = MintData> {
   currencyLabel?: string;
   mintsLabel?: string;
   onCurrencyChange?: (currency: string) => void;
+  customEmptyState?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 export function MintCurrencySelector<T extends MintData = MintData>({
@@ -42,6 +40,8 @@ export function MintCurrencySelector<T extends MintData = MintData>({
   currencyLabel = 'Send payment in',
   mintsLabel = 'Send from',
   onCurrencyChange,
+  customEmptyState,
+  isLoading = false,
 }: MintCurrencySelectorProps<T>) {
   const g = greys(theme);
 
@@ -50,7 +50,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
     const units: string[] = [];
     mints.forEach((mint) => {
       if (mint.mintInfo?.nuts?.['4']?.methods) {
-        mint.mintInfo.nuts['4'].methods.forEach((method) => {
+        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
           if (method.unit) {
             units.push(method.unit.toUpperCase());
           }
@@ -61,15 +61,23 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       }
     });
     const uniqueUnits = [...new Set(units)];
-    return uniqueUnits.filter((c) => allowedCurrencies.includes(c));
+    const filtered = uniqueUnits.filter((c) => allowedCurrencies.includes(c));
+
+    // Always include "ALL" option at the beginning
+    return ['ALL', ...filtered];
   }, [mints, allowedCurrencies]);
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
-    defaultCurrency || availableCurrencies[0] || 'SAT'
+    defaultCurrency || availableCurrencies[0] || 'ALL'
   );
 
   // Filter mints by selected currency
   const filteredMints = useMemo(() => {
+    // If "ALL" is selected, show all mints
+    if (selectedCurrency === 'ALL') {
+      return mints;
+    }
+
     return mints.filter((mint) => {
       if (!mint.mintInfo?.nuts?.['4']?.methods) {
         // If no nuts data, default to SAT for backward compatibility
@@ -78,7 +86,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
 
       // Check if this mint supports the selected currency
       return mint.mintInfo.nuts['4'].methods.some(
-        (method) => method.unit?.toUpperCase() === selectedCurrency
+        (method: any) => method.unit?.toUpperCase() === selectedCurrency
       );
     });
   }, [mints, selectedCurrency]);
@@ -121,11 +129,13 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                       height={32}
                       width={32}
                     />
+                  ) : currency === 'ALL' ? (
+                    <Icon name="clarity:internet-of-things-solid" color={g[0]} size={32} />
                   ) : (
-                    <CurrencyIcon currency={currency.toLowerCase()} />
+                    <CurrencyIcon width={32} currency={currency.toLowerCase()} />
                   )}
                   <Text style={{ color: g[0], fontSize: 14, fontWeight: 'bold' }}>
-                    {currency === 'SAT' ? 'BTC' : currency}
+                    {currency === 'SAT' ? 'BTC' : currency === 'ALL' ? 'ALL' : currency}
                   </Text>
                 </HStack>
               </TouchableOpacity>
@@ -148,17 +158,19 @@ export function MintCurrencySelector<T extends MintData = MintData>({
           {mintsLabel}
         </Text>
         <VStack>
-          {filteredMints.length === 0 ? (
-            <Text style={{ color: g[400], textAlign: 'center', marginTop: 20 }}>
-              No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
-            </Text>
-          ) : (
-            filteredMints.map((mint) => (
-              <React.Fragment key={mint.mintUrl}>
-                {renderItem(mint, selectedCurrency)}
-              </React.Fragment>
-            ))
-          )}
+          {filteredMints.length === 0
+            ? customEmptyState || (
+                <Text style={{ color: g[400], textAlign: 'center', marginTop: 20 }}>
+                  {selectedCurrency === 'ALL'
+                    ? 'No mints available'
+                    : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+                </Text>
+              )
+            : filteredMints.map((mint) => (
+                <React.Fragment key={mint.mintUrl || mint.url || Math.random()}>
+                  {renderItem(mint, selectedCurrency)}
+                </React.Fragment>
+              ))}
         </VStack>
       </VStack>
     </VStack>

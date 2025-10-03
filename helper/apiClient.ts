@@ -137,3 +137,41 @@ export const getLatestVersion = ({
     store: object;
   };
 }) => safePost<{ version: string }>(`${BASE_URL}/app/latest-version`, storage);
+
+// Fetch mint info directly from the mint's /v1/info endpoint
+export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResponse, Error>> => {
+  // Ensure the URL ends with a slash for consistency
+  const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
+  const infoUrl = `${normalizedUrl}v1/info`;
+
+  try {
+    // Create a timeout promise that rejects after 10 seconds
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Request timeout for ${infoUrl}`)), 10000);
+    });
+
+    // Race the fetch against the timeout
+    const fetchPromise = fetch(infoUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (!res.ok) {
+      return err(
+        new Error(`Mint info fetch error: ${res.status} ${res.statusText} for ${infoUrl}`)
+      );
+    }
+
+    const data = await res.json();
+    return ok(data as GetInfoResponse);
+  } catch (e) {
+    return err(
+      e instanceof Error ? e : new Error(`Unknown error fetching mint info from ${infoUrl}`)
+    );
+  }
+};
