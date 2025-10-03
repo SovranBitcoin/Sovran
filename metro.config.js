@@ -4,6 +4,7 @@ const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
 config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'cjs'];
 
 // Add path alias support
 config.resolver.alias = {

@@ -1,5 +1,6 @@
 import 'text-encoding-polyfill';
 import 'react-native-get-random-values';
+import './polyfills';
 
 import * as c from 'expo-crypto';
 
