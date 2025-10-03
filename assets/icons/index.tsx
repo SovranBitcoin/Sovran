@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useSelector } from 'react-redux';
-import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { Monicon } from '@monicon/native';
 
@@ -150,44 +149,11 @@ export function SovranTextIcon({ size = 300 }: { size?: number }) {
   );
 }
 
-export function UserIcon() {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <View
-      style={{
-        backgroundColor: theme.greys[800],
-        borderRadius: 50,
-        padding: 4,
-        marginLeft: 8,
-      }}>
-      <Svg fill={theme.greys[100]} height="24" viewBox="0 -960 960 960" width="24">
-        <Path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z" />
-      </Svg>
-    </View>
-  );
-}
-
 export function ThemeIcon({ color }: { color: string }) {
   return (
     <Svg width="24" height="24" viewBox="0 0 20 20">
       <Path fill={color} d="M10 3.5a6.5 6.5 0 1 1 0 13zM10 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16" />
     </Svg>
-  );
-}
-
-export function SovranIcon({
-  size = 32,
-  transform = [{ scale: 1.5 }],
-}: {
-  size?: number;
-  transform?: ViewStyle['transform'];
-}) {
-  return (
-    <CachedImage
-      style={{ width: size, height: size, transform }}
-      source={require('assets/images/sovran_transparent.png')}
-    />
   );
 }
 
@@ -305,44 +271,6 @@ export function PoundMaskIcon() {
   );
 }
 
-export function CloseIcon({
-  color,
-  width,
-  height,
-}: {
-  color: string;
-  width: number;
-  height: number;
-}) {
-  return (
-    <Svg width={width} height={height} viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        d="M18.3 5.71a.996.996 0 0 0-1.41 0L12 10.59L7.11 5.7A.996.996 0 1 0 5.7 7.11L10.59 12L5.7 16.89a.996.996 0 1 0 1.41 1.41L12 13.41l4.89 4.89a.996.996 0 1 0 1.41-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4"
-      />
-    </Svg>
-  );
-}
-
-export function CloseIcon2({
-  color,
-  width,
-  height,
-}: {
-  color: string;
-  width: number;
-  height: number;
-}) {
-  return (
-    <Svg width={width} height={height} viewBox="0 0 24 24">
-      <Path
-        fill={color}
-        d="M19 11H7.83l4.88-4.88c.39-.39.39-1.03 0-1.42a.996.996 0 0 0-1.41 0l-6.59 6.59a.996.996 0 0 0 0 1.41l6.59 6.59a.996.996 0 1 0 1.41-1.41L7.83 13H19c.55 0 1-.45 1-1s-.45-1-1-1"
-      />
-    </Svg>
-  );
-}
-
 export function LightningUnit({
   style,
   color,
@@ -382,14 +310,6 @@ export function LightningUnit({
         width="27.89"
         height="198.86"
         transform="translate(431.52 71.5) rotate(90)"></Rect>
-    </Svg>
-  );
-}
-
-export function ProfileIcon() {
-  return (
-    <Svg height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
-      <Path d="M234-276q51-39 114-61.5T480-360q69 0 132 22.5T726-276q35-41 54.5-93T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 59 19.5 111t54.5 93Zm246-164q-59 0-99.5-40.5T340-580q0-59 40.5-99.5T480-720q59 0 99.5 40.5T620-580q0 59-40.5 99.5T480-440Zm0 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q53 0 100-15.5t86-44.5q-39-29-86-44.5T480-280q-53 0-100 15.5T294-220q39 29 86 44.5T480-160Zm0-360q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm0-60Zm0 360Z" />
     </Svg>
   );
 }
@@ -748,25 +668,4 @@ export function BtcIcon({
       : 'material-symbols-light:currency-bitcoin';
 
   return <Icon name={iconName} color={color || theme.greys[0]} size={size * 1.2} />;
-}
-
-export function CheckIcon({
-  color,
-  style,
-  size = 24,
-}: {
-  color: string;
-  style?: StyleProp<ViewStyle>;
-  size?: number;
-}) {
-  const theme = useSelector(memoizedGetTheme);
-
-  return (
-    <Svg style={style} width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fill={color || theme.greys[0]}
-        d="m10.6 13.8l-2.15-2.15q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7L9.9 15.9q.3.3.7.3t.7-.3l5.65-5.65q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
-      />
-    </Svg>
-  );
 }

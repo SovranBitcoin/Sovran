@@ -8,7 +8,7 @@ import Modal from 'components/blocks/Modal';
 import { greys, Theme } from 'helper/colors';
 import PagerView from 'react-native-pager-view';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation } from 'helper/navigation';
+import { useNavigation } from 'expo-router';
 import { Tabs } from 'components/ui/Tabs';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
@@ -20,7 +20,7 @@ import { ContactItem } from 'components/blocks/payments';
 const RenderContactItem = ({ item }: { item: any }) => {
   const { profiles } = useNostr();
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
+  const navigation = useNavigation();
   const muted = item.profile?.muted;
   if (muted) return null;
   return (

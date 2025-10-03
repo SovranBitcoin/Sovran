@@ -4,18 +4,19 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
-import Icon, { SovranIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
-import { TAB_SCREENS } from 'helper/navigation/screens';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { Background } from 'components/blocks/WalletHeader';
+import WalletHeader, { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
-import { useTypedNavigation } from 'helper/navigation';
 import { Avatar } from 'components/ui/Avatar';
 import { SearchBar } from 'components/blocks/payments';
+import { TAB_SCREENS } from '@/app/(drawer)/(tabs)/_layout.tabs';
+import { useNavigation } from 'expo-router';
+import { DrawerActions } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 
@@ -44,8 +45,6 @@ const TabBarBackground = ({ theme }: { theme: Theme }) => (
   />
 );
 
-const WalletHeaderTitle = () => <SovranIcon />;
-
 const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Theme }) => {
   const screenWidth = Dimensions.get('window').width;
   const searchContainerWidth = screenWidth - PROFILE_AVATAR_SIZE + SPACING_SM;
@@ -64,9 +63,17 @@ const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Th
   );
 };
 
+const WalletHeaderTitle = () => {
+  const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
+  const accounts = supportedUnits.map((unit) => ({ unit }));
+  const [account, setAccount] = React.useState(accounts[0]);
+
+  return <WalletHeader unit={account.unit} accounts={accounts} setAccount={setAccount} />;
+};
+
 const TabLayout = () => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
+  const navigation = useNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);
   const selectedMint = useSelector(memoizedGetSelectedMint);
@@ -74,7 +81,7 @@ const TabLayout = () => {
   const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
 
   const HeaderLeft = () => (
-    <Pressable onPress={() => navigation.openDrawer()}>
+    <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
       <HStack spacing={12} align="flex-start">
         <Spacer size={8} />
         <Avatar picture={currentProfile?.picture} />
@@ -126,7 +133,7 @@ const TabLayout = () => {
             display: isNavigationVisible ? 'flex' : 'none',
           },
         }}>
-        {TAB_SCREENS().map(({ name, component, title, icon: IconComponent }) => (
+        {TAB_SCREENS.map(({ name, component, title, icon: IconComponent }) => (
           <Tab.Screen
             key={name}
             name={name}

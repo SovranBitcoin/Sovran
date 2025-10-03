@@ -17,7 +17,7 @@ import { Text } from 'components/ui/Text';
 import { greys } from 'helper/colors';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
-import { CloseIcon, CloseIcon2 } from 'assets/icons';
+import Icon from 'assets/icons';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
@@ -92,13 +92,13 @@ export default function Modal({
     if (showBack) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <CloseIcon2 width={24} height={24} color={greys(theme)[0]} />
+          <Icon name="material-symbols:arrow-back-rounded" size={24} color={greys(theme)[0]} />
         </TouchableOpacity>
       );
     } else if (showClose) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <CloseIcon width={24} height={24} color={greys(theme)[0]} />
+          <Icon name="material-symbols:close-rounded" size={24} color={greys(theme)[0]} />
         </TouchableOpacity>
       );
     }

@@ -44,9 +44,10 @@ function ProfileHeader() {
           onPress={() => {
             if (currentProfile?.pubkey) {
               router.push({
-                pathname: 'profileShare',
+                pathname: 'share',
                 params: {
-                  npub: currentProfile?.npub || nip19.npubEncode(currentProfile?.pubkey),
+                  type: 'profile',
+                  data: currentProfile?.npub || nip19.npubEncode(currentProfile?.pubkey),
                 },
               });
             } else {

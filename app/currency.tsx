@@ -14,8 +14,7 @@ import { View, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
-import { useLocalSearchParams } from 'expo-router';
-import { router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -101,12 +100,13 @@ function ModalScreen() {
         params: {
           ...params,
           unifiedRequest: quote.request,
-        paymentRequest: quote.request,
-        request: quote.request,
-        amount: unit === 'sat' ? amount : amount * 100,
-        unit: unit,
-        quoteId: quote.quote, // Add quoteId for tracking
-        transaction: JSON.stringify(quote),
+          paymentRequest: quote.request,
+          request: quote.request,
+          amount: unit === 'sat' ? amount : amount * 100,
+          unit: unit,
+          quoteId: quote.quote, // Add quoteId for tracking
+          transaction: JSON.stringify(quote),
+        },
       });
     } catch (error) {
       console.error('Failed to create Lightning invoice:', error);

@@ -33,7 +33,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
 import ndk, { relays } from 'components/ndk';
-import { MODAL_SCREENS, MODAL_SCREENS_ALT } from 'helper/navigation/screens';
+import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
@@ -108,9 +108,6 @@ function MySplashScreen() {
   );
 }
 
-/**
- * Stack navigation component
- */
 function MainStack() {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const { addMessage, messages } = useNostr();
@@ -120,30 +117,38 @@ function MainStack() {
   useNostrDMs(currentProfile, addMessage, messages);
 
   // Screen options builder
-  const getScreenOptions = (screenName, isModal = false) => {
-    if (isModal) return screenName.options || {};
+  const getScreenOptions = (screen: ModalConfig) => {
+    // If the screen has explicit options, use them
+    if (screen.options) {
+      return screen.options;
+    }
 
-    return {
-      headerShown: true,
-      headerTitle: screenName.title,
-      headerTitleStyle: {
-        color: greys(theme)[0],
-      },
-      headerBlurEffect: 'regular',
-      headerTransparent: true,
-      headerBackTitle: 'Back',
-      headerTintColor: greys(theme)[0],
-      headerBackTitleStyle: {
-        fontSize: 16,
-      },
-      headerStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
-      },
-      headerLargeStyle: {
-        backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
-      },
-      ...screenName.options,
-    };
+    // Default options for screens with titles (non-modal screens)
+    if (screen.title !== undefined) {
+      return {
+        headerShown: true,
+        headerTitle: screen.title,
+        headerTitleStyle: {
+          color: greys(theme)[0],
+        },
+        headerBlurEffect: 'regular',
+        headerTransparent: true,
+        headerBackTitle: 'Back',
+        headerTintColor: greys(theme)[0],
+        headerBackTitleStyle: {
+          fontSize: 16,
+        },
+        headerStyle: {
+          backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
+        },
+        headerLargeStyle: {
+          backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
+        },
+      };
+    }
+
+    // Default: no special options
+    return {};
   };
 
   return (
@@ -161,18 +166,9 @@ function MainStack() {
         }}>
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
-        {/* Modal screens */}
-        {MODAL_SCREENS.map(({ name, options }) => (
-          <Stack.Screen options={options} key={name} name={name} />
-        ))}
-
-        {/* Regular screens with headers */}
-        {MODAL_SCREENS_ALT.map((screenName) => (
-          <Stack.Screen
-            options={getScreenOptions(screenName)}
-            key={screenName.name}
-            name={screenName.name}
-          />
+        {/* All screens */}
+        {MODAL_SCREENS.map((screen) => (
+          <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
         ))}
       </Stack>
     </>

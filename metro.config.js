@@ -52,6 +52,8 @@ const configWithMonicon = withMonicon(config, {
     'fluent:wallet-20-filled',
     'majesticons:coins',
     'solar:card-bold',
+    'material-symbols:arrow-back-rounded',
+    'material-symbols:close-rounded',
     'ph:contactless-payment-fill',
     'majesticons:percent',
     'majesticons:text',

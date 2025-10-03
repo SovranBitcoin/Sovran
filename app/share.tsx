@@ -14,32 +14,56 @@ import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
 
-function ModalScreen() {
-  const { npub } = useLocalSearchParams<{ npub: string }>();
+// Configuration for different share types
+const SHARE_CONFIGS = {
+  profile: {
+    title: 'Profile Details',
+    sectionTitle: 'PROFILE',
+    unit: 'nostr',
+    popupMessage: 'npub_copied',
+    dataKey: 'npub',
+    iconCurrency: 'nostr',
+  },
+};
+
+function ShareModal() {
+  const params = useLocalSearchParams<{
+    type: keyof typeof SHARE_CONFIGS;
+    data: string;
+  }>();
+
+  const { type = 'profile', data } = params;
+  const config = SHARE_CONFIGS[type];
   const theme = useSelector(memoizedGetTheme);
 
   const handleCopy = useCallback(async () => {
-    await Clipboard.setStringAsync(npub);
-    showMessage('npub_copied');
-  }, [npub]);
+    await Clipboard.setStringAsync(data);
+    showMessage(config.popupMessage);
+  }, [data, config.popupMessage]);
 
   return (
-    <Modal showClose title="Profile Details" buttons={<></>}>
-      <PaymentInfo popupMessage={'npub_copied'} data={npub} showSection={false} unit="nostr" />
-      <View
-        style={{
-          marginHorizontal: 16,
-        }}>
-        <Section title="PROFILE">
+    <Modal showClose title={config.title} buttons={<></>}>
+      <PaymentInfo
+        popupMessage={config.popupMessage}
+        data={data}
+        showSection={false}
+        unit={config.unit}
+      />
+      <View style={{ marginHorizontal: 16 }}>
+        <Section title={config.sectionTitle}>
           <RowButton
             isFirst
             onPress={handleCopy}
             rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
             label={
               <HStack align="center" gap={8}>
-                <CurrencyIcon colors={[greys(theme)[400]]} width={20} currency={'nostr'} />
+                <CurrencyIcon
+                  colors={[greys(theme)[400]]}
+                  width={20}
+                  currency={config.iconCurrency}
+                />
                 <Text style={{ color: greys(theme)[50] }} bold>
-                  {truncateMiddle(npub, 10)}
+                  {truncateMiddle(data, 10)}
                 </Text>
               </HStack>
             }
@@ -50,4 +74,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default withSheetProvider(ShareModal);
