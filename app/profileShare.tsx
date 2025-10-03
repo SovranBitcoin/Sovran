@@ -4,18 +4,18 @@ import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
-import { View, HStack, VStack } from 'components/ui/View';
+import { View, HStack } from 'components/ui/View';
 import { greys } from 'helper/colors';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { truncateMiddle } from 'helper/strings';
-import { useTypedRoute } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { useLocalSearchParams } from 'expo-router';
 
 function ModalScreen() {
-  const { npub } = useTypedRoute<'profileShare'>();
+  const { npub } = useLocalSearchParams<{ npub: string }>();
   const theme = useSelector(memoizedGetTheme);
 
   const handleCopy = useCallback(async () => {

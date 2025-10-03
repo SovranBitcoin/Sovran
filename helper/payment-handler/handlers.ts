@@ -12,6 +12,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/ui/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { ok, err, Result } from 'neverthrow';
+import { router } from 'expo-router';
 
 interface NavigationResult {
   screen: string;
@@ -214,20 +215,16 @@ export const handleBarcode = async ({
 
 // Wrapper function to maintain current navigation behavior
 export const barcodeHandler = async (
-  props: BarcodeHandlerProps & { navigation: any }
+  props: BarcodeHandlerProps
 ): Promise<HandlerResult> => {
-  const { navigation, ...handlerProps } = props;
 
-  if (!navigation.isFocused()) {
-    return ok(null);
-  }
-
-  const result = await handleBarcode(handlerProps);
+  const result = await handleBarcode(props);
   if (result.isOk()) {
     const value = result.value;
     if (value) {
-      navigation.navigate(value.screen, value.params, {
-        closeCurrentAndParent: true,
+      router.push({
+        pathname: `/${value.screen}` as any,
+        params: value.params,
       });
     }
     return ok(null);

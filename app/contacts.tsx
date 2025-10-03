@@ -2,13 +2,14 @@ import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
 import { SkeletonContainer } from 'react-native-skeleton-component';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
+import { greys } from 'helper/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
@@ -36,7 +37,6 @@ function ModalScreen() {
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const navigation = useTypedNavigation();
 
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -138,14 +138,17 @@ function ModalScreen() {
 
   const navigateToUserMessages = useCallback(
     ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
-      navigation.goBack();
-      navigation.goBack();
-      navigation.navigate('userMessages', {
-        pubkey: pubkey,
-        profile,
+      router.back();
+      router.back();
+      router.push({
+        pathname: '/userMessages',
+        params: {
+          pubkey: pubkey,
+          profile: JSON.stringify(profile),
+        },
       });
     },
-    [navigation]
+    []
   );
 
   // Memoized computed values
@@ -210,7 +213,7 @@ function ModalScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+                <TouchableOpacity onPress={() => router.back()}>
                   <HStack spacing={12}>
                     <Spacer size={12} />
                     <Text overpass bold size={16} style={{ color: greys(theme)[50] }}>

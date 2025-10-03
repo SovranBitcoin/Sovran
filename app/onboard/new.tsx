@@ -16,7 +16,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, shades, Theme } from 'helper/colors';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 // @ts-ignore
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
@@ -199,7 +199,6 @@ const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameIn
 const RecoveryScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useTypedNavigation();
   const { setProfiles, setCurrentProfile } = useNostr();
 
   // State
@@ -209,7 +208,7 @@ const RecoveryScreen = () => {
   const [name, setName] = useState('');
   const [error, setError] = useState(false);
 
-  const prevScreen = navigation.getState().routes[navigation.getState().routes.length - 2].name;
+  // Note: prevScreen logic removed as it's not needed with new router
 
   const handleCreateProfile = runWithAnimationFrame(async () => {
     try {
@@ -285,7 +284,10 @@ const RecoveryScreen = () => {
       setProfiles([newProfile]); // for now we force it to create account at index 0 only
       setCurrentProfile(newProfile);
       // Skip seed phrase display and verification - go directly to animation
-      navigation.navigate('onboard/animate', { mnemonic, type: 'new' });
+      router.push({
+        pathname: '/onboard/animate',
+        params: { mnemonic, type: 'new' },
+      });
     } catch (err) {
       console.error(err);
     }
@@ -293,9 +295,12 @@ const RecoveryScreen = () => {
 
   const handleExistingAccount = () => {
     if (isSubmitting) return;
-    navigation.navigate('onboard/mnemonic', {
-      type: 'recover',
-      mnemonic: null,
+    router.push({
+      pathname: '/onboard/mnemonic',
+      params: {
+        type: 'recover',
+        mnemonic: '',
+      },
     });
   };
 

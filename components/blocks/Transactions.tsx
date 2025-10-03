@@ -6,7 +6,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { View, VStack, Spacer } from 'components/ui/View';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { HistoryEntry } from 'coco-cashu-core';
 import { CocoTransactionAdapter } from 'helper/coco/typeAdapters';
 import { formatDate } from 'helper/time';
@@ -50,7 +50,6 @@ export const Transactions = React.memo(
     days = 1,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
-    const navigation = useTypedNavigation<'transactions'>();
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -168,7 +167,13 @@ export const Transactions = React.memo(
                       {label === 'Confirmed' && (
                         <TouchableOpacity
                           onPress={() =>
-                            navigation.navigate('transactions', { account, tab: 'Confirmed' })
+                            router.push({
+                              pathname: '/transactions',
+                              params: {
+                                account: JSON.stringify(account),
+                                tab: 'Confirmed',
+                              },
+                            })
                           }>
                           <View
                             blur

@@ -1,11 +1,9 @@
 import React from 'react';
 import { shades } from 'helper/colors';
 import { OnboardingLayout } from './OnboardLayout';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 
 export default function ModalScreen() {
-  const navigation = useTypedNavigation();
-
   return (
     <OnboardingLayout
       title="READY TO"
@@ -18,14 +16,17 @@ export default function ModalScreen() {
           variant: 'primary',
           text: 'Recover Wallet',
           onPress: () =>
-            navigation.navigate('onboard/mnemonic', {
-              type: 'recover',
-              mnemonic: null,
+            router.push({
+              pathname: '/onboard/mnemonic',
+              params: {
+                type: 'recover',
+                mnemonic: '',
+              },
             }),
         },
         {
           text: 'New Wallet',
-          onPress: () => navigation.navigate('onboard/displayMnemonic'),
+          onPress: () => router.push('/onboard/displayMnemonic'),
           variant: 'primary',
         },
       ]}

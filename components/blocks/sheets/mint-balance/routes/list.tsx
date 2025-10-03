@@ -14,7 +14,7 @@ import { Avatar } from 'components/ui/Avatar';
 import { showMessage } from 'helper/popup/popups';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { useTypedNavigation } from 'helper/navigation';
+import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { formatCurrency } from 'helper/currency';
@@ -129,7 +129,6 @@ const ListRoute = () => {
   const theme = useSelector(memoizedGetTheme);
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
-  const navigation = useTypedNavigation();
   const router = useSheetRouter('mint-balance');
 
   const showAddMintsButton = payload?.showAddMintsButton ?? false;
@@ -217,11 +216,14 @@ const ListRoute = () => {
       if (payload?.navigate) {
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        navigation.navigate('currency', {
-          to: 'ecashSendConfirmation',
-          unit: mint.unit.toLowerCase(),
-          type: payload?.accountType,
-          accountIndex: payload?.accountIndex,
+        expoRouter.push({
+          pathname: '/currency',
+          params: {
+            to: 'ecashSendConfirmation',
+            unit: mint.unit.toLowerCase(),
+            type: payload?.accountType,
+            accountIndex: payload?.accountIndex?.toString(),
+          },
         });
       }
 

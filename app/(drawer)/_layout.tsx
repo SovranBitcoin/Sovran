@@ -14,16 +14,15 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import CachedImage from 'components/ui/Image';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
-import { useTypedNavigation } from 'helper/navigation';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
+import { router } from 'expo-router';
 
 const screenWidth = Dimensions.get('screen').width;
 
 function ProfileHeader() {
   const { currentProfile } = useNostr();
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
 
   return (
     <LinearGradient
@@ -44,11 +43,14 @@ function ProfileHeader() {
           className="items-center"
           onPress={() => {
             if (currentProfile?.pubkey) {
-              navigation.navigate('profileShare', {
-                npub: currentProfile?.npub || nip19.npubEncode(currentProfile?.pubkey),
+              router.push({
+                pathname: 'profileShare',
+                params: {
+                  npub: currentProfile?.npub || nip19.npubEncode(currentProfile?.pubkey),
+                },
               });
             } else {
-              navigation.navigate('onboard');
+              router.push('/onboard');
             }
           }}>
           {currentProfile?.pubkey && (
@@ -105,7 +107,6 @@ function ProfileButton({
 
 function SovranDrawer() {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
 
   return (
     <>
@@ -122,28 +123,28 @@ function SovranDrawer() {
             icon="fluent:wallet-20-filled"
             label="Wallet"
             onPress={() => {
-              navigation.navigate('index', {}, { current: 'drawer' });
+              router.push('/(drawer)/(tabs)');
             }}
           />
           <ProfileButton
             icon="fluent:arrow-swap-16-filled"
             label="Payments"
             onPress={() => {
-              navigation.navigate('payments', {}, { current: 'drawer' });
+              router.push('/(drawer)/(tabs)/payments');
             }}
           />
           <ProfileButton
             icon="clarity:internet-of-things-solid"
             label="Lifestyle"
             onPress={() => {
-              navigation.navigate('lifestyle', {}, { current: 'drawer' });
+              router.push('/(drawer)/(tabs)/lifestyle');
             }}
           />
           <ProfileButton
             icon="material-symbols:settings-rounded"
             label="Settings"
             onPress={() => {
-              navigation.navigate('settings-pages/index', {}, { current: 'drawer' });
+              router.push('/settings-pages');
             }}
           />
         </VStack>

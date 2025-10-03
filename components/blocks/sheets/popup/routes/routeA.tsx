@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
 import { Button } from 'components/ui/Button';
-import { useTypedNavigation } from 'helper/navigation';
+import { router as expoRouter } from 'expo-router';
 
 const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   const theme = useSelector(memoizedGetTheme);
@@ -17,7 +17,6 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   const payload = useSheetPayload('popup-sheet');
   const isModal = payload?.variant === 'modal';
   const isPersistent = payload?.variant === 'persistent';
-  const navigation = useTypedNavigation();
 
   useEffect(() => {
     if (!isModal && !isPersistent) {
@@ -64,7 +63,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
               if (button.onPress) {
                 button.onPress();
               } else if (button.page) {
-                navigation.navigate(button.page);
+                expoRouter.push(`/${button.page}` as any);
               }
             }}
             text={button.text}

@@ -20,7 +20,7 @@ import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import { useSend, usePaginatedHistory } from 'coco-cashu-react';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams, router } from 'expo-router';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -54,7 +54,6 @@ export function EcashSendConfirmation({
   const { getMintInfo } = useMintManagement();
   const { send, isSending } = useSend();
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [sendingNostr, setSendingNostr] = useState(false);
@@ -210,13 +209,8 @@ export function EcashSendConfirmation({
           const amount = token.proofs.reduce((sum, proof) => sum + proof.amount, 0);
 
           showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
-            navigation.navigate(
-              'index',
-              {},
-              {
-                closeParents: true,
-              }
-            );
+            router.dismissAll();
+            router.push('/(drawer)/(tabs)');
             onClose({});
           });
         } catch {
@@ -267,7 +261,7 @@ export function EcashSendConfirmation({
                 text: 'Close',
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
-                onPress: async () => navigation.goBack(),
+                onPress: async () => router.back(),
                 condition: isPaid,
               },
               {
@@ -275,10 +269,13 @@ export function EcashSendConfirmation({
                 icon: 'mdi:message-reply',
                 variant: 'primary',
                 onPress: async () => {
-                  navigation.navigate('userMessages', {
-                    pubkey: currentTransaction.metadata?.nostr as string,
+                  router.push({
+                    pathname: '/userMessages',
+                    params: {
+                      pubkey: currentTransaction.metadata?.nostr as string,
+                    },
                   });
-                  navigation.goBack();
+                  router.back();
                 },
                 condition: false, // Disabled until nostr property is available in Coco types
               },
@@ -410,7 +407,12 @@ export function EcashSendConfirmation({
 }
 
 function ModalScreen() {
-  const { unit, amount, token, paymentRequest } = useTypedRoute<'ecashSendConfirmation'>();
+  const { unit, amount, token, paymentRequest } = useLocalSearchParams<{
+    unit: string;
+    amount: string;
+    token: string;
+    paymentRequest?: string;
+  }>();
 
   // Convert string token to Token object if needed
   const tokenObj = typeof token === 'string' ? JSON.parse(token) : token;
@@ -418,7 +420,7 @@ function ModalScreen() {
   return (
     <EcashSendConfirmation
       unit={unit}
-      amount={amount}
+      amount={amount ? parseFloat(amount) : 0}
       token={tokenObj}
       paymentRequest={paymentRequest}
     />

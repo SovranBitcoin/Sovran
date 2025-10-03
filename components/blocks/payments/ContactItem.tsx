@@ -7,12 +7,12 @@ import { greys, Theme } from 'helper/colors';
 import { VerifiedIcon } from 'assets/icons';
 import CachedImage from 'components/ui/Image';
 import { formatCustomDate } from 'helper/time';
+import { router } from 'expo-router';
 
 interface ContactItemProps {
   contact: any;
   isVerified: boolean;
   theme: Theme;
-  navigation: any;
 }
 
 const ProfilePicture = ({
@@ -101,7 +101,7 @@ const styles = {
   },
 };
 
-export const ContactItem = ({ contact, isVerified, theme, navigation }: ContactItemProps) => {
+export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) => {
   const mostRecentTransaction = contact?.transactions?.[0];
   const mostRecentMessage = contact?.messages?.[0];
 
@@ -134,9 +134,12 @@ export const ContactItem = ({ contact, isVerified, theme, navigation }: ContactI
       style={styles.contactItem}
       onPress={() => {
         if (contact.profile) {
-          navigation.navigate('userMessages', {
-            pubkey: contact.profile?.pubkey,
-            profile: contact.profile,
+          router.push({
+            pathname: '/userMessages',
+            params: {
+              pubkey: contact.profile?.pubkey,
+              profile: JSON.stringify(contact.profile),
+            },
           });
         } else {
         }

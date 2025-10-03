@@ -11,7 +11,7 @@ import { View } from 'components/ui/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
 import { EventKind } from 'helper/constants';
 
 const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
@@ -34,7 +34,7 @@ const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
 };
 
 const TabTwoScreen = () => {
-  const { pubkey } = useTypedRoute<'feed'>();
+  const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
   const pagerRef = useRef(null);

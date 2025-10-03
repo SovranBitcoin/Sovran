@@ -11,7 +11,7 @@ import {
   connectActionSheet,
   useActionSheet,
 } from '@expo/react-native-action-sheet';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -49,12 +49,10 @@ export const Section: React.FC<{
 };
 
 const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: Theme }) => {
-  const navigation = useTypedNavigation();
-
   return (
     <TouchableOpacity
       onPress={() => {
-        navigation.navigate('settings-pages/profile');
+        router.push('/settings-pages/profile');
       }}>
       <View
         blur
@@ -159,8 +157,6 @@ const ModalScreen = () => {
   const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
 
-  const navigation = useTypedNavigation();
-
   const { showActionSheetWithOptions } = useActionSheet();
 
   const handleBTCFormatPress = () => {
@@ -209,14 +205,14 @@ const ModalScreen = () => {
           <RowButton
             label="Theme"
             onPress={() => {
-              navigation.navigate('settings-pages/theme');
+              router.push('/settings-pages/theme');
             }}
           />
           {device.platform('ios').gte(10) && (
             <RowButton
               label="Background Image"
               onPress={() => {
-                navigation.navigate('backgroundImageSettings');
+                router.push('/backgroundImageSettings');
               }}
             />
           )}
@@ -226,7 +222,7 @@ const ModalScreen = () => {
             isFirst
             label="About This Release"
             onPress={() => {
-              navigation.navigate('settings-pages/about');
+              router.push('/settings-pages/about');
             }}
           />
           <RowButton
@@ -246,7 +242,7 @@ const ModalScreen = () => {
           <RowButton
             label="Passcode"
             onPress={() => {
-              navigation.navigate('settings-pages/passcode');
+              router.push('/settings-pages/passcode');
             }}
             isFirst
           />
@@ -267,19 +263,19 @@ const ModalScreen = () => {
               <RowButton
                 label="Restore Counter"
                 onPress={() => {
-                  navigation.navigate('settings-pages/restoreCounter');
+                  router.push('/settings-pages/restoreCounter');
                 }}
               />
               <RowButton
                 label="Websocket Connections"
                 onPress={() => {
-                  navigation.navigate('settings-pages/websocketConnections');
+                  router.push('/settings-pages/websocketConnections');
                 }}
               />
               <RowButton
                 label="Check Proofs"
                 onPress={() => {
-                  navigation.navigate('settings-pages/proofs');
+                  router.push('/settings-pages/proofs');
                 }}
               />
             </Section>
@@ -288,7 +284,7 @@ const ModalScreen = () => {
 
         <TouchableOpacity
           onPress={() => {
-            navigation.navigate('settings-pages/design');
+            router.push('/settings-pages/design');
           }}>
           <VStack spacing={4}>
             <Text

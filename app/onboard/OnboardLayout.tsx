@@ -4,7 +4,7 @@ import { StyledText, Text } from 'components/ui/Text';
 import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { VStack } from 'components/ui/View';
 import { ButtonHandler, ButtonHandlerButton } from 'components/ui/ButtonHandler';
 
@@ -28,10 +28,8 @@ export function OnboardingLayout({
   children,
 }: OnboardingLayoutProps) {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
-
-  const handleNext = () => navigation.navigate(nextScreen || '/');
-  const handleBack = () => navigation.goBack();
+  const handleNext = () => router.push(nextScreen || '/(drawer)/(tabs)');
+  const handleBack = () => router.back();
 
   return (
     <VStack

@@ -9,7 +9,8 @@ import { useNostr } from 'helper/redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
 import { useTransactions } from 'providers/CocoTransactionsProvider';
@@ -34,8 +35,7 @@ interface TokenHandlerParams {
  * Component for receiving Bitcoin or other cryptocurrency via Lightning or Ecash
  */
 const EcashLightningReceiver = () => {
-  const { unit } = useTypedRoute<'receive'>();
-  const navigation = useTypedNavigation();
+  const { unit } = useLocalSearchParams<{ unit: string }>();
   const { currentProfile } = useNostr();
   const theme = useSelector(memoizedGetTheme);
   const [hasPermission, requestPermission] = useCameraPermissions();
@@ -49,9 +49,12 @@ const EcashLightningReceiver = () => {
     // Note: Coco handles token redemption checking internally
     // The giveaway functionality was removed with Coco migration
 
-    navigation.navigate('ecashReceiveConfirmation', {
-      token,
-      unit,
+    router.push({
+      pathname: '/ecashReceiveConfirmation',
+      params: {
+        token,
+        unit,
+      },
     });
   };
 
@@ -90,16 +93,22 @@ const EcashLightningReceiver = () => {
       return;
     }
 
-    navigation.navigate('camera', { unit });
+    router.push({
+      pathname: '/camera',
+      params: { unit },
+    });
   };
 
   /**
    * Handles fixed amount button press
    */
   const handleFixedAmount = async (): Promise<void> => {
-    navigation.navigate('currency', {
-      to: 'lightningReceiveConfirmation',
-      unit,
+    router.push({
+      pathname: '/currency',
+      params: {
+        to: 'lightningReceiveConfirmation',
+        unit,
+      },
     });
   };
 

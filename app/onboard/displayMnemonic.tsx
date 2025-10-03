@@ -6,13 +6,12 @@ import { greens, greys, reds } from 'helper/colors';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { VStack, HStack } from 'components/ui/View';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams, router } from 'expo-router';
 import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
-  const { mnemonic } = useTypedRoute();
+  const { mnemonic } = useLocalSearchParams<{ mnemonic: string }>();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 
   const words = mnemonic.split(' ');
@@ -39,9 +38,12 @@ const MnemonicDisplayScreen = () => {
   };
 
   const navigateToVerification = () => {
-    navigation.navigate('onboard/mnemonic', {
-      type: 'verify',
-      mnemonic,
+    router.push({
+      pathname: '/onboard/mnemonic',
+      params: {
+        type: 'verify',
+        mnemonic,
+      },
     });
   };
 

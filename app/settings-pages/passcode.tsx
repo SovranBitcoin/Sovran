@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text, StyleSheet, ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { greys, Theme } from 'helper/colors';
 import NumericKeyboard from 'components/blocks/passcode/NumericKeyboard';
@@ -16,7 +16,6 @@ const PASSCODE_LENGTH = 4;
 const PasscodeSettings: React.FC = () => {
   const theme = useSelector(memoizedGetTheme);
   const { setPasscode } = useSettings();
-  const navigation = useTypedNavigation();
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -82,7 +81,7 @@ const PasscodeSettings: React.FC = () => {
               onPress: async () => {
                 if (code === confirm && code.length === PASSCODE_LENGTH) {
                   setPasscode(code);
-                  navigation.goBack();
+                  router.back();
                 } else {
                   showMessage('passcode_not_match', {}, { emoji: '🚨' });
                 }

@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import TransactionIcon from 'components/blocks/TransactionIcon';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { CocoTransactionAdapter } from 'helper/coco/typeAdapters';
@@ -27,8 +27,6 @@ export function npubToPubkey(npub: string): string {
 }
 
 const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
-  const navigation = useTypedNavigation();
-
   const isSend = historyEntry.type === 'send';
   const isReceive = historyEntry.type === 'mint';
   const isPaid = historyEntry.state === 'PAID';
@@ -57,13 +55,16 @@ const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
         case 'mint': {
           // Coco uses 'mint' for Lightning-to-ecash
           if (historyEntry.request) {
-            navigation.navigate('lightningReceiveConfirmation', {
-              unit: historyEntry.unit,
-              request: historyEntry.request,
-              amount: historyEntry.amount,
-              historyEntry: JSON.stringify(historyEntry),
-              unifiedRequest: historyEntry.unifiedRequest,
-              paymentRequest: historyEntry.paymentRequest,
+            router.push({
+              pathname: '/lightningReceiveConfirmation',
+              params: {
+                unit: historyEntry.unit,
+                request: historyEntry.request,
+                amount: historyEntry.amount.toString(),
+                historyEntry: JSON.stringify(historyEntry),
+                unifiedRequest: historyEntry.unifiedRequest,
+                paymentRequest: historyEntry.paymentRequest,
+              },
             });
             return;
           }
@@ -72,11 +73,14 @@ const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
         case 'send': {
           // Coco uses 'send' for ecash sends
           if (historyEntry.token) {
-            navigation.navigate('ecashSendConfirmation', {
-              unit: historyEntry.unit,
-              token: historyEntry.token,
-              amount: historyEntry.amount,
-              paymentRequest: historyEntry.paymentRequest,
+            router.push({
+              pathname: '/ecashSendConfirmation',
+              params: {
+                unit: historyEntry.unit,
+                token: historyEntry.token,
+                amount: historyEntry.amount.toString(),
+                paymentRequest: historyEntry.paymentRequest,
+              },
             });
             return;
           }
@@ -85,9 +89,12 @@ const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
       }
     }
 
-    navigation.navigate('transaction', {
-      id: historyEntry.request || historyEntry.token || historyEntry.id,
-      historyEntryType: historyEntry.type,
+    router.push({
+      pathname: '/transaction',
+      params: {
+        id: historyEntry.request || historyEntry.token || historyEntry.id,
+        historyEntryType: historyEntry.type,
+      },
     });
   };
 

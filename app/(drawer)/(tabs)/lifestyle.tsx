@@ -6,7 +6,7 @@ import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 
 const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
 
@@ -75,14 +75,16 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
 // Root component (ServicesSection logic merged here)
 const TabTwoScreen = () => {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
   const settings = useSelector(memoizedGetSettings);
 
   const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
-      navigation.navigate(item.navigateTo, item.params, {});
+      router.push({
+        pathname: `/${item.navigateTo}` as any,
+        params: item.params,
+      });
     } else {
-      navigation.navigate(item.navigateTo, {}, {});
+      router.push(`/${item.navigateTo}` as any);
     }
   };
 

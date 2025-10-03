@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import { greys } from 'helper/colors';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
@@ -9,7 +9,7 @@ import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import Icon from 'assets/icons';
@@ -35,8 +35,7 @@ const Camera: React.FC = () => {
   const [progress, setProgress] = useState<number>(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const navigation = useNavigation();
-  const { unit } = useTypedRoute<'camera'>();
+  const { unit } = useLocalSearchParams<{ unit: string }>();
   const [hasPermission] = useCameraPermissions();
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
@@ -91,14 +90,12 @@ const Camera: React.FC = () => {
   }, []);
 
   const handleClosePress = useCallback((): void => {
-    navigation.goBack();
-  }, [navigation]);
+    router.back();
+  }, []);
 
   const handleBarcodeScanned = useCallback(
     async (scanning: ScanningData): Promise<void> => {
-      if (!navigation.isFocused()) {
-        return;
-      }
+      // Note: Removed navigation.isFocused() check as it's not needed with new router
 
       if (!scanned || scanning.data.startsWith('ur:')) {
         setLoading(true);

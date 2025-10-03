@@ -2,7 +2,7 @@ import { View, HStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
 import { Transactions } from 'components/blocks/Transactions';
@@ -15,8 +15,13 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const { account, tab: tab_ } = useTypedRoute<'transactions'>();
-  const [selectedCurrency, setSelectedCurrency] = useState(account.unit);
+  const { account, tab: tab_ } = useLocalSearchParams<{
+    account: string;
+    tab: 'All' | 'Incoming' | 'Outgoing';
+  }>();
+  const [selectedCurrency, setSelectedCurrency] = useState(
+    account ? JSON.parse(account).unit : 'sat'
+  );
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<'all' | 'lightning' | 'ecash'>('all');
   const [at, setAt] = useState<'all' | 'at'>('all');

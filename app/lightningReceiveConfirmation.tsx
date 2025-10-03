@@ -15,7 +15,7 @@ import { TransactionHeader } from 'components/blocks/Transaction/TransactionHead
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
-import { useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { greens, greys } from 'helper/colors';
@@ -381,7 +381,10 @@ export function LightningReceiveConfirmation({
 }
 
 function ModalScreen() {
-  const { request, unit } = useTypedRoute<'lightningReceiveConfirmation'>();
+  const { request, unit } = useLocalSearchParams<{
+    request: string;
+    unit: string;
+  }>();
 
   return <LightningReceiveConfirmation request={request} unit={unit} />;
 }

@@ -23,7 +23,6 @@ import {
   addContact,
   removeContact,
 } from 'helper/redux/nostr';
-import { TransactionBuilder } from 'helper/redux/cashu';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -35,7 +34,7 @@ import { Text } from 'components/ui/Text';
 import TimelineItem from './TimeLine';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams, router } from 'expo-router';
 import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
@@ -49,7 +48,7 @@ import { Button } from 'components/ui/Button';
 import { nip19 } from 'nostr-tools';
 import { maybeConvertNpub } from '@/helper/cashuClient';
 
-export type TimelineItemType = Message | TransactionBuilder;
+export type TimelineItemType = Message | any; // TODO: Replace with proper Coco transaction type
 
 export function convertNpub(pubkey: string) {
   try {
@@ -65,9 +64,7 @@ export default function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
   const dispatch = useDispatch();
 
-  const { pubkey } = useTypedRoute<'userMessages'>();
-
-  const navigation = useTypedNavigation<'currency'>();
+  const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const { profiles, search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
   const { history: transactions } = usePaginatedHistory();
@@ -98,13 +95,6 @@ export default function ModalScreen() {
   const isContact = contacts.some((c) => c.pubkey === pubkey);
 
   // Auto-scroll to bottom when component mounts or timeline changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [timelineItemsGroupedByDate]);
-
   // ONE STEP: Get all timeline items for this user
   const timelineItemsGroupedByDate = useMemo(() => {
     const allItems = [
@@ -130,13 +120,21 @@ export default function ModalScreen() {
     );
   }, [transactions, messages, targetPubkey]);
 
+  // Auto-scroll to bottom when component mounts or timeline changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [timelineItemsGroupedByDate]);
+
   // Get profile only when needed
   const currentUserProfile = search.find((s) => convertNpub(s.pubkey) === targetPubkey)?.profile;
 
   // Header handlers
   const handleGoBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    if (router.canGoBack()) {
+      router.back();
     } else {
       console.warn('No previous screen to go back to.');
     }
@@ -162,9 +160,12 @@ export default function ModalScreen() {
       },
       (buttonIndex) => {
         if (buttonIndex === 0 && options.length > 1) {
-          navigation.navigate('transaction', {
-            id: (item as any).request,
-            transactionType: (item as any).transactionType,
+          router.push({
+            pathname: '/transaction',
+            params: {
+              id: (item as any).request,
+              transactionType: (item as any).transactionType,
+            },
           });
         }
       }
@@ -174,7 +175,7 @@ export default function ModalScreen() {
   // Send DM handler
   const handleSendDM = async () => {
     try {
-      const recipientPubKey = convertNpub(params.pubkey);
+      const recipientPubKey = convertNpub(pubkey);
 
       const sentEvent = await sendEncryptedDirectMessage({
         nsec: currentProfile.nsec,
@@ -312,8 +313,11 @@ export default function ModalScreen() {
                             icon: 'majesticons:text',
                             text: 'Feed',
                             onPress: async () => {
-                              navigation.navigate('feed/index', {
-                                pubkey,
+                              router.push({
+                                pathname: '/feed',
+                                params: {
+                                  pubkey,
+                                },
                               });
                             },
                           },
@@ -383,12 +387,15 @@ export default function ModalScreen() {
                             icon: 'mingcute:lightning-fill',
                             variant: 'primary',
                             onPress: async () => {
-                              navigation.navigate('currency', {
-                                to: 'lightningSendConfirmation',
-                                unit: 'sat',
-                                lud16: currentUserProfile?.lud16,
-                                pubkey: currentUserProfile?.pubkey,
-                                profile: currentUserProfile,
+                              router.push({
+                                pathname: '/currency',
+                                params: {
+                                  to: 'lightningSendConfirmation',
+                                  unit: 'sat',
+                                  lud16: currentUserProfile?.lud16,
+                                  pubkey: currentUserProfile?.pubkey,
+                                  profile: JSON.stringify(currentUserProfile),
+                                },
                               });
                             },
                           },
@@ -397,10 +404,13 @@ export default function ModalScreen() {
                             icon: 'solar:key-bold',
                             variant: 'primary',
                             onPress: async () => {
-                              navigation.navigate('currency', {
-                                to: 'ecashSendConfirmation',
-                                unit: 'sat',
-                                profile: currentUserProfile,
+                              router.push({
+                                pathname: '/currency',
+                                params: {
+                                  to: 'ecashSendConfirmation',
+                                  unit: 'sat',
+                                  profile: JSON.stringify(currentUserProfile),
+                                },
                               });
                             },
                           },

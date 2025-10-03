@@ -2,7 +2,8 @@ import { View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Modal from 'components/blocks/Modal';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useTypedRoute, useTypedNavigation } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { adaptCocoHistoryToTransaction } from 'helper/coco/typeAdapters';
 import { EcashSendConfirmation } from './ecashSendConfirmation';
@@ -16,7 +17,6 @@ import { Section } from 'components/ui/Section';
 
 function VirtualBatchTransaction({ batchId }: { batchId: string }) {
   const { history } = usePaginatedHistory();
-  const navigation = useTypedNavigation();
 
   // Filter Coco history entries for this batch and adapt them
   const batchTxs = (history || [])
@@ -80,17 +80,23 @@ function VirtualBatchTransaction({ batchId }: { batchId: string }) {
                   leftCta={{
                     label: 'View Invoice',
                     onPress: () =>
-                      navigation.navigate('transaction', {
-                        id: p.request,
-                        transactionType: 'send',
+                      router.push({
+                        pathname: '/transaction',
+                        params: {
+                          id: p.request,
+                          transactionType: 'send',
+                        },
                       }),
                   }}
                   rightCta={{
                     label: 'View Invoice',
                     onPress: () =>
-                      navigation.navigate('transaction', {
-                        id: p.request,
-                        transactionType: 'receive',
+                      router.push({
+                        pathname: '/transaction',
+                        params: {
+                          id: p.request,
+                          transactionType: 'receive',
+                        },
                       }),
                   }}
                 />
@@ -112,7 +118,10 @@ function VirtualBatchTransaction({ batchId }: { batchId: string }) {
 }
 
 function ModalScreen() {
-  const { id, transactionType } = useTypedRoute<'modal'>();
+  const { id, transactionType } = useLocalSearchParams<{
+    id: string;
+    transactionType: string;
+  }>();
   const { history } = usePaginatedHistory();
 
   if (typeof id === 'string' && id.startsWith('batch:')) {

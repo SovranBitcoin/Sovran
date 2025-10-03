@@ -14,7 +14,7 @@ import { greys, Theme } from 'helper/colors';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import Icon from 'assets/icons';
 import Image from 'components/ui/Image';
@@ -179,7 +179,6 @@ const ButtonBar = ({
 
 export default function RestoreChoiceScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useTypedNavigation();
 
   const [hasNavigated, setHasNavigated] = useState(false);
 
@@ -191,9 +190,12 @@ export default function RestoreChoiceScreen() {
     try {
       setHasNavigated(true);
       if (mnemonic) {
-        navigation.navigate('onboard/animate', {
-          mnemonic,
-          type: 'recover',
+        router.push({
+          pathname: '/onboard/animate',
+          params: {
+            mnemonic,
+            type: 'recover',
+          },
         });
       }
     } catch {
@@ -205,13 +207,19 @@ export default function RestoreChoiceScreen() {
   const handleSkip = () => {
     if (hasNavigated) return;
     setHasNavigated(true);
-    navigation.navigate('onboard/new', { fromRestoreChoice: true });
+    router.push({
+      pathname: '/onboard/new',
+      params: { fromRestoreChoice: 'true' },
+    });
   };
 
   const handleRestoreDifferent = () => {
     if (hasNavigated) return;
     setHasNavigated(true);
-    navigation.navigate('onboard/mnemonic', { type: 'recover', mnemonic });
+    router.push({
+      pathname: '/onboard/mnemonic',
+      params: { type: 'recover', mnemonic },
+    });
   };
 
   if (error) {

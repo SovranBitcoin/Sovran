@@ -14,7 +14,7 @@ import { greens, greys, reds, Theme } from 'helper/colors';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { HStack, VStack } from 'components/ui/View';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams, router } from 'expo-router';
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import BottomButtons from './BottomButtons';
@@ -31,8 +31,10 @@ const VERIFICATION_INDICES = [2, 5, 11]; // Fixed indices for predictability
 const RecoveryScreen: React.FC<{}> = () => {
   const theme = useSelector(memoizedGetTheme);
   const styles = createStyles(theme);
-  const navigation = useTypedNavigation();
-  const { type = 'recover', mnemonic = null } = useTypedRoute<'mnemonic'>();
+  const { type = 'recover', mnemonic = null } = useLocalSearchParams<{
+    type?: string;
+    mnemonic?: string;
+  }>();
   const inputRef = useRef<TextInput>(null);
 
   // State for managing word input
@@ -178,7 +180,10 @@ const RecoveryScreen: React.FC<{}> = () => {
           {
             text: 'Continue',
             onPress: () => {
-              navigation.navigate('onboard/animate', { mnemonic, type: 'new' });
+              router.push({
+                pathname: '/onboard/animate',
+                params: { mnemonic, type: 'new' },
+              });
             },
           },
         ]);
@@ -208,7 +213,10 @@ const RecoveryScreen: React.FC<{}> = () => {
 
       // Proceed with recovery
       const recoveredMnemonic = words.join(' ');
-      navigation.navigate('onboard/animate', { mnemonic: recoveredMnemonic });
+      router.push({
+        pathname: '/onboard/animate',
+        params: { mnemonic: recoveredMnemonic, type: 'recover' },
+      });
     }
   };
 

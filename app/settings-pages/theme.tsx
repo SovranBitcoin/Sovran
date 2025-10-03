@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 import { greys } from 'helper/colors';
 import { View } from 'components/ui/View';
-import { useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
 import { useSelector } from 'react-redux';
 import { ThemeIcon } from 'assets/icons';
@@ -34,7 +34,6 @@ const themeNameMap: Record<string, string> = {
 
 function ThemeSettings() {
   const theme = useSelector(memoizedGetTheme);
-  const navigation = useNavigation();
   const [searchText, setSearchText] = useState('');
   const { setTheme, setBackgroundImage } = useSettings();
 
@@ -45,7 +44,7 @@ function ThemeSettings() {
   const handleThemePress = (themeName: string) => {
     setTheme(themeName);
     setBackgroundImage('');
-    navigation.goBack();
+    router.back();
   };
 
   const renderThemeIcon = (themeName: string) => (

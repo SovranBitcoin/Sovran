@@ -17,7 +17,7 @@ import { greys } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 
 interface ActionButton {
   page: 'receive' | 'camera' | 'currency';
@@ -45,8 +45,6 @@ export function AccountPagerView({
   const { handlePermission } = useHandleCameraPermission();
   const theme = useSelector(memoizedGetTheme);
   const { getBalances } = useMintManagement();
-
-  const navigation = useTypedNavigation();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
 
@@ -108,9 +106,12 @@ export function AccountPagerView({
       }
     }
 
-    navigation.navigate(page, {
-      to: 'ecashSendConfirmation',
-      unit: accountUnit,
+    router.push({
+      pathname: `/${page}`,
+      params: {
+        to: 'ecashSendConfirmation',
+        unit: accountUnit,
+      },
     });
   };
 

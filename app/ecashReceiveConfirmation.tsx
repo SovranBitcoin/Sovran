@@ -5,7 +5,8 @@ import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { memoizedGetMints, TransactionBuilder } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -96,7 +97,6 @@ export function EcashReceiveConfirmation({
   ) => void;
   extraButtons?: ButtonHandlerButton[];
 }) {
-  const navigation = useTypedNavigation();
   const { receiveEcash } = useCashuOperations();
   const mints = useSelector(memoizedGetMints);
 
@@ -108,7 +108,7 @@ export function EcashReceiveConfirmation({
   const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
-    navigation.goBack();
+    router.back();
   };
 
   const handleRedeem = async () => {
@@ -116,7 +116,8 @@ export function EcashReceiveConfirmation({
     try {
       await receiveEcash(token as string);
       showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
-        navigation.navigate('index', {}, { closeParents: true });
+        router.dismissAll();
+        router.push('/(drawer)/(tabs)');
       });
     } catch (error) {
       console.error(error);
@@ -175,16 +176,13 @@ export function EcashReceiveConfirmation({
               text: 'View Send Transaction',
               variant: 'secondary',
               onPress: async () => {
-                navigation.navigate(
-                  'transaction',
-                  {
+                router.push({
+                  pathname: '/transaction',
+                  params: {
                     id: transaction.request || transaction.token,
                     transactionType: 'send',
                   },
-                  {
-                    closeCurrentAndParents: true,
-                  }
-                );
+                });
               },
               condition: !!(transaction.isCancel && transaction.transactionType === 'receive'),
             },
@@ -266,7 +264,7 @@ export function EcashReceiveConfirmation({
 }
 
 function ModalScreen() {
-  const { token } = useTypedRoute<'ecashReceiveConfirmation'>();
+  const { token } = useLocalSearchParams<{ token: string }>();
 
   return (
     <EcashReceiveConfirmation

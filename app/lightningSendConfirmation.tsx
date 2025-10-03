@@ -5,7 +5,8 @@ import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import { Spacer, View, VStack, HStack } from 'components/ui/View';
 
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation/index';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 // Removed Redux Cashu actions - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
@@ -44,7 +45,6 @@ export function LightningSendConfirmation({
   extraButtons?: ButtonHandlerButton[];
   lud16?: string;
 }) {
-  const navigation = useTypedNavigation();
   const { getLightningDescription, getLightningTimestamp } = useCashuUtilities();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
@@ -120,7 +120,8 @@ export function LightningSendConfirmation({
   };
 
   const handleCancel = () => {
-    navigation.navigate('index', {}, { closeCurrentAndParents: true });
+    router.dismissAll();
+    router.push('/(drawer)/(tabs)');
   };
 
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
@@ -161,10 +162,13 @@ export function LightningSendConfirmation({
                 icon: 'ri:message-2-line',
                 variant: 'primary',
                 onPress: async () => {
-                  navigation.navigate('userMessages', {
-                    pubkey: transaction.nostr.pubkey,
+                  router.push({
+                    pathname: '/userMessages',
+                    params: {
+                      pubkey: transaction.nostr.pubkey,
+                    },
                   });
-                  navigation.goBack();
+                  router.back();
                 },
                 condition: !!(transaction?.paid && transaction.nostr.pubkey),
               },
@@ -246,7 +250,13 @@ export function LightningSendConfirmation({
 }
 
 function ModalScreen() {
-  const { pr, unit, pubkey, meltQuote, redirect } = useTypedRoute<'lightningSendConfirmation'>();
+  const { pr, unit, pubkey, meltQuote, redirect } = useLocalSearchParams<{
+    pr: string;
+    unit: string;
+    pubkey?: string;
+    meltQuote?: string;
+    redirect?: string;
+  }>();
 
   return (
     <LightningSendConfirmation

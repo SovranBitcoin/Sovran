@@ -1,5 +1,5 @@
 import 'helper/global';
-import React, { memo, useCallback, useState, useLayoutEffect, useEffect } from 'react';
+import React, { memo, useCallback, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -13,8 +13,7 @@ import { OnboardingLayout } from 'app/onboard/OnboardLayout';
 import { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import TermsConditionsScreen from 'app/settings-pages/terms';
-import WalletHeader from 'components/blocks/WalletHeader';
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,15 +52,8 @@ function TabOneScreen() {
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);
-  const navigation = useTypedNavigation();
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: () => (
-        <WalletHeader unit={account.unit} accounts={accounts} setAccount={setAccount} />
-      ),
-    });
-  }, [navigation, account, accounts]);
+  // Note: Header options are now handled by the layout file in Expo Router
 
   useDeeplink();
 
@@ -111,7 +103,7 @@ function TabOneScreen() {
             text: 'Next',
             icon: 'fa6-solid:chevron-right',
             variant: 'primary',
-            onPress: async () => navigation.navigate('onboard/ecash'),
+            onPress: async () => router.push('/onboard/ecash'),
           },
         ]}>
         <VStack align="center" justify="center" flex={1} spacing={4}>

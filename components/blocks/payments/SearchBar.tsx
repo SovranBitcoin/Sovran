@@ -3,10 +3,10 @@ import { View } from 'components/ui/View';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Text } from 'components/ui/Text';
 import { greys, Theme } from 'helper/colors';
+import { router } from 'expo-router';
 
 interface SearchBarProps {
   theme: Theme;
-  navigation: any;
 }
 
 const styles = (theme: Theme) => ({
@@ -35,14 +35,19 @@ const styles = (theme: Theme) => ({
   },
 });
 
-export const SearchBar = ({ theme, navigation }: SearchBarProps) => {
+export const SearchBar = ({ theme }: SearchBarProps) => {
   const stylesheet = styles(theme);
 
   return (
     <View>
       <View style={stylesheet.searchBlurView}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('contacts', { unit: 'sat' })}
+          onPress={() =>
+            router.push({
+              pathname: '/contacts',
+              params: { unit: 'sat' },
+            })
+          }
           style={stylesheet.searchPressable}>
           <Text style={stylesheet.searchPlaceholder}>Search for contacts</Text>
         </TouchableOpacity>

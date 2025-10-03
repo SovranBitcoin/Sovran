@@ -18,7 +18,7 @@ import { greys } from 'helper/colors';
 import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 import { CloseIcon, CloseIcon2 } from 'assets/icons';
-import { useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { memoizedGetTheme } from 'helper/redux/settings';
 
@@ -57,7 +57,6 @@ export default function Modal({
   backgroundColor,
   scrollEnabled = true,
 }: ModalProps) {
-  const navigation = useNavigation();
   const theme = useSelector(memoizedGetTheme);
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -86,7 +85,7 @@ export default function Modal({
   };
 
   const handleBackPress = (): void => {
-    navigation.goBack();
+    router.back();
   };
 
   const renderHeaderButton = () => {

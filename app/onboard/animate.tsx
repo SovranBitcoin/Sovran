@@ -9,7 +9,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { Text } from 'components/ui/Text';
 import { getMint, restoreMint } from 'helper/cashuClient';
 import { createStyles } from './helper';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams, router } from 'expo-router';
 import { setCurrentProfile, setProfiles } from 'helper/redux/nostr';
 import { store } from 'helper/redux/store';
 import { addMints, appendProofsV2, increaseCounterV2, setSelectedMint } from 'helper/redux/cashu';
@@ -338,7 +338,10 @@ const ChainLoadingAnimation = () => {
     }
   }
 
-  const { mnemonic, type } = useTypedRoute<'animate'>();
+  const { mnemonic, type } = useLocalSearchParams<{
+    mnemonic: string;
+    type: string;
+  }>();
 
   // Initialize with processing step
   const [steps, setSteps] = useState([
@@ -420,8 +423,6 @@ const ChainLoadingAnimation = () => {
     }, 500);
   };
 
-  const navigation = useTypedNavigation();
-
   // Handle completion
   const handleComplete = () => {
     const profileSteps = _.filter(steps, { type: 'profile' });
@@ -473,18 +474,8 @@ const ChainLoadingAnimation = () => {
       });
     });
 
-    navigation?.goBack();
-    navigation?.goBack();
-    navigation?.goBack();
-    navigation?.goBack();
-    navigation?.goBack();
-    navigation.navigate(
-      '',
-      {},
-      {
-        closeCurrentAndParents: true,
-      }
-    );
+    router.dismissAll();
+    router.push('/(drawer)/(tabs)');
   };
 
   // Corrected function for calculating global progress

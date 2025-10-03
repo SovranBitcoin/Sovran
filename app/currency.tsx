@@ -14,7 +14,8 @@ import { View, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
-import { useTypedNavigation, useTypedRoute } from 'helper/navigation';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -33,15 +34,23 @@ interface ScanningData {
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
-  const params = useTypedRoute<'currency'>();
-  const navigation = useTypedNavigation();
+  const params = useLocalSearchParams<{
+    amount?: string;
+    unit: string;
+    to: string;
+    paymentRequest?: string;
+    profile?: string;
+    lud16?: string;
+    allowedUnits?: string;
+    mints?: string;
+  }>();
 
   // Use Coco hooks instead of Redux
   const { getBalances } = useMintManagement();
   const { sendEcash } = useCashuOperations();
   const { payLightningInvoice, requestLightningInvoice } = useLightningOperations();
 
-  const [amount, setAmount] = useState(params?.amount || 0);
+  const [amount, setAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
   const [loading, setLoading] = useState(false);
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const [balance, setBalance] = useState(0);
@@ -86,10 +95,12 @@ function ModalScreen() {
         unit === 'sat' ? amount : amount * 100
       );
 
-      navigation?.goBack();
-      navigation.replace(params.to, {
-        ...params,
-        unifiedRequest: quote.request,
+      router.back();
+      router.replace({
+        pathname: `/${params.to}` as any,
+        params: {
+          ...params,
+          unifiedRequest: quote.request,
         paymentRequest: quote.request,
         request: quote.request,
         amount: unit === 'sat' ? amount : amount * 100,
@@ -111,11 +122,14 @@ function ModalScreen() {
         unit === 'sat' ? amount : amount * 100
       );
 
-      navigation.replace(params.to, {
-        ...params,
-        token: JSON.stringify(result), // Use the full result as token
-        amount: unit === 'sat' ? amount : amount * 100,
-        paymentRequest: params.paymentRequest,
+      router.replace({
+        pathname: `/${params.to}` as any,
+        params: {
+          ...params,
+          token: JSON.stringify(result), // Use the full result as token
+          amount: (unit === 'sat' ? amount : amount * 100).toString(),
+          paymentRequest: params.paymentRequest,
+        },
       });
     } catch (error) {
       showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
@@ -148,12 +162,15 @@ function ModalScreen() {
         return;
       }
 
-      navigation.navigate(params.to, {
-        ...params,
-        pr: invoice,
-        amount: unit === 'sat' ? amount : amount * 100,
-        meltQuote: JSON.stringify(meltQuote),
-        lud16: params.lud16,
+      router.push({
+        pathname: `/${params.to}` as any,
+        params: {
+          ...params,
+          pr: invoice,
+          amount: (unit === 'sat' ? amount : amount * 100).toString(),
+          meltQuote: JSON.stringify(meltQuote),
+          lud16: params.lud16,
+        },
       });
     } catch (error) {
       showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
@@ -277,14 +294,18 @@ function ModalScreen() {
               text: 'Scan QR',
               icon: 'stash:qr-code',
               variant: 'secondary',
-              onPress: () => navigation.navigate('camera', { unit }),
+              onPress: () =>
+                router.push({
+                  pathname: '/camera',
+                  params: { unit },
+                }),
               condition: isEcashSend && !isP2PK && !hasPaymentRequest,
             },
             {
               text: 'Contacts',
               icon: 'mdi:contact',
               variant: 'secondary',
-              onPress: () => navigation.navigate('contacts'),
+              onPress: () => router.push('/contacts'),
               condition: isEcashSend && !isP2PK && !hasPaymentRequest,
             },
           ]}

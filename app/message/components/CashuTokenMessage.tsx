@@ -11,7 +11,7 @@ import { useCashuOperations } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { showMessage } from 'helper/popup/popups';
 // Removed useCashu - now using usePaginatedHistory directly
-import { useTypedNavigation } from 'helper/navigation';
+import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 
 interface Props {
@@ -23,7 +23,6 @@ interface Props {
 const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   const { receiveEcash } = useCashuOperations();
   const { history: transactions } = usePaginatedHistory();
-  const navigation = useTypedNavigation();
 
   const decoded = getDecodedToken(token);
   const amount = decoded.proofs.reduce((a, p) => a + p.amount, 0);
@@ -34,9 +33,12 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
 
   const handleViewTransaction = () => {
     if (transaction) {
-      navigation.navigate('transaction', {
-        id: transaction.token || transaction.request || '',
-        transactionType: transaction.transactionType,
+      router.push({
+        pathname: '/transaction',
+        params: {
+          id: transaction.token || transaction.request || '',
+          transactionType: transaction.transactionType,
+        },
       });
     }
   };
