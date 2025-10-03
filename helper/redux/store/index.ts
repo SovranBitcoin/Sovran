@@ -2,6 +2,7 @@ import { applyMiddleware, createStore } from 'redux';
 import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PUBLIC_KEYS } from 'helper/constants';
 import _ from 'lodash/fp';
 import { Alert } from 'react-native';
 import bip39 from 'bip39';
@@ -90,7 +91,7 @@ const migrations = {
       (search = []) => {
         return [
           {
-            pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+            pubkey: PUBLIC_KEYS.SUPPORT,
             profile: {
               created_at: 1724764804,
               profileEvent:
@@ -101,7 +102,7 @@ const migrations = {
               about: 'Working on a Bitcoin wallet that I like to use.',
               lud16: 'maskedroom40@walletofsatoshi.com',
               image: 'https://m.primal.net/IEAX.png',
-              pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+              pubkey: PUBLIC_KEYS.SUPPORT,
               npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
               banner: 'https://m.primal.net/Kgxi.png',
             },

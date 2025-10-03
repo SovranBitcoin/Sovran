@@ -21,6 +21,7 @@ export const icons = [
   'material-symbols:info-rounded',
   'la:user-slash',
   'material-symbols:report-rounded',
+  'material-symbols:verified-rounded',
   'fluent:emoji-24-filled',
   'mdi:lightbulb-on-outline',
   'mdi:lightbulb-on',

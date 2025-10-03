@@ -54,6 +54,8 @@ const configWithMonicon = withMonicon(config, {
     'solar:card-bold',
     'material-symbols:arrow-back-rounded',
     'material-symbols:close-rounded',
+    'material-symbols:verified-rounded',
+    'material-symbols:verified',
     'ph:contactless-payment-fill',
     'majesticons:percent',
     'majesticons:text',

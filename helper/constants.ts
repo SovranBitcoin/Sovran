@@ -24,3 +24,22 @@ export const EventKind = {
   ZapReceipt: 9735, // NIP 57
   HttpAuthentication: 27235, // NIP XX - HTTP Authentication
 } as const;
+
+/**
+ * Important public keys for well-known Nostr profiles
+ * These are public keys for official accounts, support, and other important entities
+ */
+export const PUBLIC_KEYS = {
+  /**
+   * Sovran Bitcoin support account
+   * Used for customer support and official communications
+   */
+  SUPPORT: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+
+  /**
+   * Add other important public keys here as needed
+   * Example:
+   * OFFICIAL_ANNOUNCEMENTS: 'pubkey_here',
+   * DEVELOPER_ACCOUNT: 'pubkey_here',
+   */
+} as const;

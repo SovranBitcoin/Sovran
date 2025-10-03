@@ -4,41 +4,16 @@ import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { formatCurrency } from 'helper/currency';
 import { greys, Theme } from 'helper/colors';
-import { VerifiedIcon } from 'assets/icons';
-import CachedImage from 'components/ui/Image';
+import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
 import { router } from 'expo-router';
+import { PUBLIC_KEYS } from '@/helper/constants';
 
 interface ContactItemProps {
   contact: any;
   isVerified: boolean;
   theme: Theme;
 }
-
-const ProfilePicture = ({
-  imageUri,
-  isVerified,
-  theme: _theme,
-}: {
-  imageUri: string;
-  isVerified: boolean;
-  theme: Theme;
-}) => {
-  return (
-    <VStack style={styles.profilePictureContainer} align="center" justify="center">
-      {isVerified && (
-        <VStack style={styles.verifiedIconContainer}>
-          <VerifiedIcon />
-        </VStack>
-      )}
-      {imageUri ? (
-        <CachedImage style={styles.profilePicture} source={{ uri: imageUri }} />
-      ) : (
-        <VStack style={styles.placeholderCircle} />
-      )}
-    </VStack>
-  );
-};
 
 const styles = {
   contactItem: {
@@ -68,37 +43,6 @@ const styles = {
     fontSize: 16,
     marginTop: 2,
   }),
-  profilePictureContainer: {
-    position: 'relative' as const,
-    width: 48,
-    height: 48,
-    marginRight: 8,
-  },
-  verifiedIconContainer: {
-    position: 'absolute' as const,
-    bottom: -4,
-    right: -4,
-    zIndex: 100,
-    borderRadius: 100,
-    height: 20,
-    width: 20,
-    backgroundColor: greys('dark')[800],
-  },
-  profilePicture: {
-    width: 48,
-    height: 48,
-    borderRadius: 1000,
-    borderColor: greys('dark')[600],
-    borderWidth: 0.2,
-  },
-  placeholderCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 1000,
-    borderColor: greys('dark')[950],
-    borderWidth: 0.2,
-    backgroundColor: greys('dark')[600],
-  },
 };
 
 export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) => {
@@ -146,11 +90,15 @@ export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) =>
       }}>
       <HStack align="center" justify="space-between" style={styles.row}>
         <HStack align="center">
-          <ProfilePicture
-            imageUri={contact.profile.picture || contact.profile.image}
-            isVerified={isVerified}
-            theme={theme}
-          />
+          <VStack style={{ marginRight: 8 }}>
+            <Avatar
+              picture={contact.profile.picture || contact.profile.image}
+              status={
+                Object.values(PUBLIC_KEYS).includes(contact.profile.pubkey) ? 'VERIFIED' : undefined
+              }
+              size={48}
+            />
+          </VStack>
           <VStack style={styles.textContainer}>
             <Text style={styles.profileName(theme)}>
               {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}

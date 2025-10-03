@@ -7,8 +7,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
 import { router } from 'expo-router';
-
-const SUPPORT_PUBKEY = '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2';
+import { PUBLIC_KEYS } from 'helper/constants';
 
 interface MenuItemData {
   id: string;
@@ -25,7 +24,7 @@ const SERVICE_MENU_ITEMS: MenuItemData[] = [
     icon: 'mdi:help-circle',
     label: 'Support',
     navigateTo: 'userMessages',
-    params: { pubkey: SUPPORT_PUBKEY },
+    params: { pubkey: PUBLIC_KEYS.SUPPORT },
   },
 ];
 

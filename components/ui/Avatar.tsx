@@ -43,18 +43,29 @@ export const Avatar = ({
   const getStatusBadge = () => {
     if (!status) return null;
 
-    const statusConfig = {
+    const statusConfig: Record<
+      string,
+      { variant: 'success' | 'error' | 'secondary'; icon: string; badge: boolean }
+    > = {
       OK: {
         variant: 'success' as const,
         icon: 'fluent:checkmark-16-filled',
+        badge: true,
       },
       ERROR: {
         variant: 'error' as const,
         icon: 'nonicons:error-16',
+        badge: true,
       },
       OFFLINE: {
         variant: 'secondary' as const,
         icon: 'feather:wifi',
+        badge: true,
+      },
+      VERIFIED: {
+        variant: 'success' as const,
+        icon: 'material-symbols:verified-rounded',
+        badge: false, // No badge background for verified
       },
     };
 
@@ -130,8 +141,13 @@ export const Avatar = ({
             position: 'absolute',
             bottom: -2,
             right: -2,
+            zIndex: 50,
           }}>
-          <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
+          {statusBadge.badge ? (
+            <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
+          ) : (
+            <Icon name={statusBadge.icon} size={statusIconSize} />
+          )}
         </VStack>
       )}
     </VStack>

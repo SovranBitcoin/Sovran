@@ -15,6 +15,7 @@ import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ScrollView } from 'react-native';
 import { Transaction } from 'components/blocks/Transaction';
+import { PUBLIC_KEYS } from 'helper/constants';
 
 function chunkArray(array: any[], size: number) {
   const result = [];
@@ -172,7 +173,7 @@ export default function ModalScreen() {
             },
             mintUrl: 'https://mint.bitcointxoko.com',
             nostr: {
-              pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+              pubkey: PUBLIC_KEYS.SUPPORT,
             },
             counter: 63,
           },

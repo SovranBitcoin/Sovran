@@ -29,14 +29,14 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 // Components
 import Modal from 'components/blocks/Modal';
 import { greys } from 'helper/colors';
-import { View, VStack, HStack } from 'components/ui/View';
+import { VStack, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import TimelineItem from './TimeLine';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useLocalSearchParams, router } from 'expo-router';
 import { sendEncryptedDirectMessage } from 'helper/nostrClient';
-import Icon, { ArrowIcon, VerifiedIcon } from 'assets/icons';
+import Icon, { ArrowIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import opacity from 'hex-color-opacity';
 import CachedImage from 'components/ui/Image';
@@ -47,6 +47,8 @@ import TextInput from 'components/ui/TextInput';
 import { Button } from 'components/ui/Button';
 import { nip19 } from 'nostr-tools';
 import { maybeConvertNpub } from '@/helper/cashuClient';
+import { Avatar } from 'components/ui/Avatar';
+import { PUBLIC_KEYS } from 'helper/constants';
 
 export type TimelineItemType = Message | any; // TODO: Replace with proper Coco transaction type
 
@@ -274,22 +276,15 @@ export default function ModalScreen() {
                 <VStack align="center" justify="center" className="flex-1">
                   {profileImage && (
                     <VStack align="center" className="h-18 relative mr-2">
-                      {isVerified && (
-                        <View
-                          className="absolute -bottom-1 -right-1 z-50 h-7 w-7 rounded-full p-0.5"
-                          style={{ backgroundColor: greys(theme)[950] }}>
-                          <VerifiedIcon />
-                        </View>
-                      )}
-                      <CachedImage
-                        style={{
-                          width: 72,
-                          height: 72,
-                          borderRadius: 1000,
-                          borderWidth: 0.2,
-                          borderColor: greys(theme)[600],
-                        }}
-                        source={{ uri: profileImage }}
+                      <Avatar
+                        picture={profileImage}
+                        variant="person"
+                        status={
+                          Object.values(PUBLIC_KEYS).includes(profile?.pubkey)
+                            ? 'VERIFIED'
+                            : undefined
+                        }
+                        size={72}
                       />
                       <Animated.View className="w-full pt-1.5">
                         <Text

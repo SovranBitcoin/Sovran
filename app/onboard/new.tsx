@@ -18,6 +18,7 @@ import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { router } from 'expo-router';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
+import { PUBLIC_KEYS } from 'helper/constants';
 // @ts-ignore
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
 import { useNostr } from 'helper/redux/nostr';
@@ -233,13 +234,7 @@ const RecoveryScreen = () => {
       const event: EventTemplate = {
         kind: 0,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          [
-            'client',
-            'sovran.money',
-            '31990:1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2:sovran-app',
-          ],
-        ],
+        tags: [['client', 'sovran.money', `31990:${PUBLIC_KEYS.SUPPORT}:sovran-app`]],
         content: JSON.stringify({
           name,
           picture: selectedProfilePicture.uri,

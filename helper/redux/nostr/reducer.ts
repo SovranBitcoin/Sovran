@@ -10,6 +10,7 @@ import {
   ADD_CONTACT,
   REMOVE_CONTACT,
 } from './actionTypes';
+import { PUBLIC_KEYS } from '../../constants';
 import { NostrAction } from './actions';
 
 type NostrProfile = {
@@ -102,7 +103,7 @@ const initialState: NostrState = {
   },
   search: [
     {
-      pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+      pubkey: PUBLIC_KEYS.SUPPORT,
       profile: {
         created_at: 1724764804,
         profileEvent:
@@ -113,7 +114,7 @@ const initialState: NostrState = {
         about: 'Working on a Bitcoin wallet that I like to use.',
         lud16: 'maskedroom40@walletofsatoshi.com',
         image: 'https://m.primal.net/IEAX.png',
-        pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+        pubkey: PUBLIC_KEYS.SUPPORT,
         npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
         banner: 'https://m.primal.net/Kgxi.png',
       },
