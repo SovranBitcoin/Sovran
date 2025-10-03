@@ -130,19 +130,30 @@ export default function Modal({
           minHeight: headerHeight,
           backgroundColor: opacity(greys(theme)[950], 0.9),
         }}>
-        <HStack className="w-full items-center justify-between">
+        <HStack align="center" justify="space-between">
           {renderHeaderButton()}
+          <View className="w-12" />
+        </HStack>
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            pointerEvents: 'none',
+          }}>
           <Text
             style={{
               fontFamily: 'OverpassHeavy',
               fontSize: 18,
               color: greys(theme)[0],
-              width: 'auto',
             }}>
             {title}
           </Text>
-          <View className="w-12" />
-        </HStack>
+        </View>
       </BlurView>
     );
   };

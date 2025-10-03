@@ -5,8 +5,7 @@ import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
-import { useLocalSearchParams } from 'expo-router';
-import { router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { memoizedGetMints, TransactionBuilder } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -257,7 +256,7 @@ export function EcashReceiveConfirmation({
 
         <Spacer size={12} />
 
-        <TransactionDebugCode transaction={transaction} />
+        <TransactionDebugCode historyEntry={transaction} />
       </>
     </Modal>
   );
