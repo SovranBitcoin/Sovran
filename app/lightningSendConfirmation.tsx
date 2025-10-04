@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { formatAmount } from 'helper/currency';
 import { useCashuUtilities, useMintManagement, useMelt } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
-import { useSelector } from 'react-redux';
 import { VStack, HStack } from 'components/ui/View';
 import { useLocalSearchParams, router } from 'expo-router';
 import { handleBarcode } from 'helper/payment-handler/handlers';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Card } from 'components/ui/Card';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -22,37 +20,30 @@ import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 
 export function LightningSendConfirmation({
-  pr,
-  unit: initialUnit,
-  pubkey: _pubkey,
-  meltQuote: initialMeltQuote,
-  redirect: _redirect,
-  email: _email,
+  meltHistoryEntry,
   extraButtons = [],
-  lud16,
 }: {
-  pr: string;
-  unit: string;
-  pubkey?: string;
-  meltQuote?: string;
-  redirect?: string;
-  email?: string;
+  meltHistoryEntry: MeltHistoryEntry;
   extraButtons?: ButtonHandlerButton[];
-  lud16?: string;
 }) {
   const { getLightningDescription, getLightningTimestamp } = useCashuUtilities();
   const { history } = usePaginatedHistory();
   const { melt, isLoading: isMelting, error: meltError, reset: resetMelt } = useMelt();
 
-  const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
-  const [unit, setUnit] = useState(initialUnit);
-  const parsedQuote = JSON.parse(meltQuote || '{}');
-  const amount = parsedQuote?.amount;
+  const [_meltQuote, setMeltQuote] = useState(
+    'meltQuote' in meltHistoryEntry
+      ? JSON.stringify((meltHistoryEntry as any).meltQuote)
+      : undefined
+  );
+  const [unit, setUnit] = useState(meltHistoryEntry.unit);
+  const parsedQuote =
+    ('meltQuote' in meltHistoryEntry ? (meltHistoryEntry as any).meltQuote : {}) || {};
+  const amount = parsedQuote?.amount || meltHistoryEntry.amount;
   const feeReserve = parsedQuote?.fee_reserve;
-  const quoteId = parsedQuote?.quote;
+  const quoteId = meltHistoryEntry.quoteId;
 
-  const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const { getMintInfo } = useMintManagement();
+  const selectedMintUrl = meltHistoryEntry.mintUrl;
   const [mintInfo, setMintInfo] = React.useState<any>({});
 
   // Find the current transaction using Coco's history system
@@ -86,6 +77,8 @@ export function LightningSendConfirmation({
   }, [currentTransaction?.mintUrl, selectedMintUrl, getMintInfo]);
 
   const handleMintSelected = async (mint: any, balance: any) => {
+    const pr =
+      'paymentRequest' in meltHistoryEntry ? (meltHistoryEntry as any).paymentRequest : undefined;
     if (pr) {
       // Avoid UI bugs with setTimeout
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -120,6 +113,8 @@ export function LightningSendConfirmation({
         throw new Error('No mint selected');
       }
 
+      const pr =
+        'paymentRequest' in meltHistoryEntry ? (meltHistoryEntry as any).paymentRequest : undefined;
       if (!pr) {
         throw new Error('No payment request available');
       }
@@ -157,7 +152,6 @@ export function LightningSendConfirmation({
   };
 
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
-
   return (
     <Modal
       showClose
@@ -225,8 +219,19 @@ export function LightningSendConfirmation({
           />
         )}
 
-        {getLightningDescription(pr) && (
-          <Card message={getLightningDescription(pr)} variant="info" />
+        {getLightningDescription(
+          'paymentRequest' in meltHistoryEntry
+            ? (meltHistoryEntry as any).paymentRequest
+            : undefined
+        ) && (
+          <Card
+            message={getLightningDescription(
+              'paymentRequest' in meltHistoryEntry
+                ? (meltHistoryEntry as any).paymentRequest
+                : undefined
+            )}
+            variant="info"
+          />
         )}
 
         {currentTransaction?.metadata?.memo && (
@@ -247,9 +252,23 @@ export function LightningSendConfirmation({
 
         <Section
           items={[
-            { title: 'Date', value: getLightningTimestamp(pr) },
+            {
+              title: 'Date',
+              value: getLightningTimestamp(
+                'paymentRequest' in meltHistoryEntry ? (meltHistoryEntry as any).paymentRequest : ''
+              ),
+            },
             { title: 'Type', value: 'Send • Lightning' },
-            { title: 'Request', value: truncateMiddle(lud16 || pr, lud16 ? 10 : 5) },
+            {
+              title: 'Request',
+              value: truncateMiddle(
+                ('lud16' in meltHistoryEntry ? (meltHistoryEntry as any).lud16 : undefined) ||
+                  ('paymentRequest' in meltHistoryEntry
+                    ? (meltHistoryEntry as any).paymentRequest
+                    : ''),
+                ('lud16' in meltHistoryEntry ? (meltHistoryEntry as any).lud16 : undefined) ? 10 : 5
+              ),
+            },
             { title: 'Quote', value: truncateMiddle(quoteId, 7) },
             {
               title: `Fee (${getCurrencyDisplay()})`,
@@ -269,23 +288,13 @@ export function LightningSendConfirmation({
 }
 
 function ModalScreen() {
-  const { pr, unit, pubkey, meltQuote, redirect } = useLocalSearchParams<{
-    pr: string;
-    unit: string;
-    pubkey?: string;
-    meltQuote?: string;
-    redirect?: string;
+  const { meltHistoryEntry: meltHistoryEntryString } = useLocalSearchParams<{
+    meltHistoryEntry: string;
   }>();
 
-  return (
-    <LightningSendConfirmation
-      pr={pr}
-      unit={unit}
-      pubkey={pubkey}
-      meltQuote={meltQuote}
-      redirect={redirect}
-    />
-  );
+  const meltHistoryEntry = JSON.parse(meltHistoryEntryString) as MeltHistoryEntry;
+
+  return <LightningSendConfirmation meltHistoryEntry={meltHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

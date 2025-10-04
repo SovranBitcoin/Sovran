@@ -11,7 +11,7 @@ import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { View, HStack, VStack } from 'components/ui/View';
 import React from 'react';
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 
@@ -43,33 +43,46 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const handlePress = (): void => {
     switch (historyEntry.type) {
       case 'mint': {
-        // Coco uses 'mint' for Lightning-to-ecash
-        if (historyEntry.paymentRequest) {
-          router.push({
-            pathname: '/lightningReceiveConfirmation',
-            params: {
-              mintHistoryEntry: JSON.stringify(historyEntry),
-            },
-          });
-          return;
-        }
-        break;
+        // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)
+        router.push({
+          pathname: '/lightningReceiveConfirmation',
+          params: {
+            mintHistoryEntry: JSON.stringify(historyEntry),
+          },
+        });
+        return;
+      }
+      case 'melt': {
+        // Coco uses 'melt' for ecash-to-Lightning (Lightning send)
+        router.push({
+          pathname: '/lightningSendConfirmation',
+          params: {
+            meltHistoryEntry: JSON.stringify(historyEntry),
+          },
+        });
+        return;
       }
       case 'send': {
         // Coco uses 'send' for ecash sends
-        if (historyEntry.token) {
-          router.push({
-            pathname: '/ecashSendConfirmation',
-            params: {
-              unit: historyEntry.unit,
-              token: JSON.stringify(historyEntry.token),
-              amount: historyEntry.amount.toString(),
-              paymentRequest: historyEntry.paymentRequest,
-            },
-          });
-          return;
-        }
-        break;
+        router.push({
+          pathname: '/ecashSendConfirmation',
+          params: {
+            sendHistoryEntry: JSON.stringify(historyEntry),
+          },
+        });
+        return;
+      }
+      case 'receive': {
+        // Coco uses 'receive' for ecash receives
+        // Extended ReceiveHistoryEntry with token property
+        const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
+        router.push({
+          pathname: '/ecashReceiveConfirmation',
+          params: {
+            receiveHistoryEntry: JSON.stringify(receiveEntry),
+          },
+        });
+        return;
       }
     }
 

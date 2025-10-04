@@ -13,6 +13,7 @@ import Haptics from 'components/ui/Haptics';
 import { isLightningAddress, isLightningInvoice, isLnurlp, lnTrim } from 'helper/third-party/lnurl';
 import { ok, err, Result } from 'neverthrow';
 import { router } from 'expo-router';
+import type { MeltHistoryEntry, SendHistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
 
 interface NavigationResult {
   screen: string;
@@ -61,13 +62,24 @@ const handleUR = async ({
   if (urDecoder.isComplete() && urDecoder.isSuccess()) {
     const ur = urDecoder.resultUR();
     const decoded = ur.decodeCBOR();
-    const tokenString = new TextDecoder().decode(decoded);
+    const _tokenString = new TextDecoder().decode(decoded);
     setProgress(0);
+    // Create a receive history entry for ecash receive
+    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+      id: `receive-${Date.now()}`,
+      type: 'receive',
+      amount: 0, // Will be calculated from token
+      unit: unit,
+      mintUrl: '', // Will be extracted from token
+      createdAt: Date.now(),
+      metadata: {},
+      token: _tokenString,
+    };
+
     return ok({
       screen: 'ecashReceiveConfirmation',
       params: {
-        token: tokenString,
-        unit,
+        receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
       },
     });
   }
@@ -82,20 +94,31 @@ const handleEcash = async ({
   unit: string;
 }): Promise<HandlerResult> => {
   const giveaway = getGiveaway({ token: data });
-  if (giveaway?.id) {
+  if (giveaway && 'id' in giveaway) {
     if (checkIfAlreadyRedeemed(data)) {
       return err(new Error('already_redeemed'));
     }
-    const error = giveaway.error();
-    if (!giveaway.condition() && error) {
+    const error = 'error' in giveaway ? (giveaway as any).error() : null;
+    if ('condition' in giveaway && !(giveaway as any).condition() && error) {
       return err(new Error('general_error'));
     }
   }
+  // Create a receive history entry for ecash receive
+  const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+    id: `receive-${Date.now()}`,
+    type: 'receive',
+    amount: 0, // Will be calculated from token
+    unit: unit,
+    mintUrl: '', // Will be extracted from token
+    createdAt: Date.now(),
+    metadata: {},
+    token: data,
+  };
+
   return ok({
     screen: 'ecashReceiveConfirmation',
     params: {
-      token: data,
-      unit,
+      receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
     },
   });
 };
@@ -138,13 +161,23 @@ const handleLightning = async ({
     if (balance !== undefined && balance < totalAmount) {
       return err(new Error('insufficient_balance'));
     }
+    // Create a melt history entry for Lightning send
+    const meltHistoryEntry: MeltHistoryEntry = {
+      id: `melt-${Date.now()}`,
+      type: 'melt',
+      amount: unit === 'sat' ? amount : amount * 100,
+      unit: unit,
+      mintUrl: selectedMint,
+      createdAt: Date.now(),
+      state: 'UNPAID',
+      quoteId: meltQuote.quote,
+      metadata: {},
+    };
+
     return ok({
       screen: 'lightningSendConfirmation',
       params: {
-        pr: lnurl,
-        amount: unit === 'sat' ? amount : amount * 100,
-        meltQuote: JSON.stringify(meltQuote),
-        unit,
+        meltHistoryEntry: JSON.stringify(meltHistoryEntry),
       },
     });
   }
@@ -154,20 +187,31 @@ const handleLightning = async ({
 function handlePaymentRequest({ data }: { data: string }): HandlerResult {
   const decodedPaymentRequest = decodePaymentRequest(data);
 
+  // Create a send history entry for ecash send with payment request
+  const sendHistoryEntry: SendHistoryEntry = {
+    id: `send-${Date.now()}`,
+    type: 'send',
+    amount:
+      decodedPaymentRequest.amount === undefined
+        ? 0
+        : decodedPaymentRequest.unit === 'sat'
+          ? decodedPaymentRequest.amount
+          : decodedPaymentRequest.amount / 100,
+    unit: decodedPaymentRequest.unit || 'sat',
+    mintUrl: decodedPaymentRequest.mints?.[0] || '',
+    createdAt: Date.now(),
+    token: {
+      mint: decodedPaymentRequest.mints?.[0] || '',
+      unit: decodedPaymentRequest.unit || 'sat',
+      proofs: [],
+    },
+    metadata: {},
+  };
+
   return ok({
-    screen: 'currency',
+    screen: 'ecashSendConfirmation',
     params: {
-      unit: decodedPaymentRequest.unit,
-      amount:
-        decodedPaymentRequest.amount === undefined
-          ? 0
-          : decodedPaymentRequest.unit === 'sat'
-            ? decodedPaymentRequest.amount
-            : decodedPaymentRequest.amount / 100,
-      mints: decodedPaymentRequest.mints,
-      allowedUnits: [decodedPaymentRequest.unit?.toUpperCase()],
-      paymentRequest: data,
-      to: 'ecashSendConfirmation',
+      sendHistoryEntry: JSON.stringify(sendHistoryEntry),
     },
   });
 }
@@ -214,10 +258,7 @@ export const handleBarcode = async ({
 };
 
 // Wrapper function to maintain current navigation behavior
-export const barcodeHandler = async (
-  props: BarcodeHandlerProps
-): Promise<HandlerResult> => {
-
+export const barcodeHandler = async (props: BarcodeHandlerProps): Promise<HandlerResult> => {
   const result = await handleBarcode(props);
   if (result.isOk()) {
     const value = result.value;

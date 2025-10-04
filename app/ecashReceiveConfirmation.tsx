@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
-import { getDecodedToken } from '@cashu/cashu-ts';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
-import { useSelector } from 'react-redux';
-import Snow from 'react-native-snow-bg';
 import { showMessage } from 'helper/popup/popups';
 import { useLocalSearchParams, router } from 'expo-router';
-import { memoizedGetMints, TransactionBuilder } from 'helper/redux/cashu';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -18,92 +14,20 @@ import { truncateMiddle } from 'helper/strings';
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { Spacer, View } from 'components/ui/View';
-import { Card } from 'components/ui/Card';
-
-// Types
-interface TokenProps {
-  token: string;
-}
-
-// Token utility functions
-export const getGiveaway = ({ token }: TokenProps) => {
-  const pubkeys = new Set<string>();
-  const proofs = getDecodedToken(token).proofs;
-
-  proofs.forEach(({ secret }) => {
-    let parsed;
-    try {
-      parsed = JSON.parse(secret);
-    } catch {
-      // If parsing fails, assume it's a hex string
-      parsed = secret;
-    }
-
-    if (Array.isArray(parsed)) {
-      if (parsed[0] === 'P2PK') {
-        pubkeys.add(parsed[1].data as string);
-      } else {
-        throw new Error('Unsupported well-known secret');
-      }
-    }
-  });
-
-  if (pubkeys.size > 1) {
-    throw new Error(
-      'Received a token with multiple pubkeys. This is not supported yet. Please report this.'
-    );
-  }
-
-  if (pubkeys.size === 1) {
-    // Note: giveaways functionality removed with Coco migration
-    // This would need to be reimplemented if needed
-    return null;
-  }
-
-  return null;
-};
-
-function getTokenAmount({ token }: TokenProps): number {
-  const decodedToken = getDecodedToken(token);
-  return decodedToken.proofs.reduce((a, b) => a + b.amount, 0);
-}
-
-function getTokenMemo({ token }: TokenProps) {
-  return getDecodedToken(token).memo;
-}
-
-function getTokenUnit({ token }: TokenProps) {
-  return getDecodedToken(token).unit;
-}
-
-function getTokenMints({ token }: TokenProps) {
-  return getDecodedToken(token).mint;
-}
-
+import { Spacer } from 'components/ui/View';
+import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 export function EcashReceiveConfirmation({
-  token,
-  transaction,
+  receiveHistoryEntry,
   extraButtons = [],
 }: {
-  token: string;
-  transaction: any;
-  showConfirmation?: (
-    title: string,
-    message: string,
-    onConfirm: () => void,
-    onCancel: () => void
-  ) => void;
+  receiveHistoryEntry: ReceiveHistoryEntry & { token?: string };
   extraButtons?: ButtonHandlerButton[];
 }) {
   const { receiveEcash } = useCashuOperations();
-  const mints = useSelector(memoizedGetMints);
+  const { isKnownMint } = useMintManagement();
 
-  const amount = getTokenAmount({ token });
-  const memo = getTokenMemo({ token });
-  const unit = getTokenUnit({ token });
-  const giveaway = getGiveaway({ token });
-  const mintUrl = getTokenMints({ token });
+  const token = receiveHistoryEntry?.token;
+
   const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
@@ -114,10 +38,15 @@ export function EcashReceiveConfirmation({
     setLoading(true);
     try {
       await receiveEcash(token as string);
-      showMessage('funds_received', { amount, unit }, { emoji: '🎉' }, () => {
-        router.dismissAll();
-        router.push('/(drawer)/(tabs)');
-      });
+      showMessage(
+        'funds_received',
+        { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
+        { emoji: '🎉' },
+        () => {
+          router.dismissAll();
+          router.push('/(drawer)/(tabs)');
+        }
+      );
     } catch (error) {
       console.error(error);
       showMessage(error instanceof Error ? error.message : 'Unknown error');
@@ -126,12 +55,12 @@ export function EcashReceiveConfirmation({
   };
 
   const handleRedeemPress = async () => {
-    const isMintTrusted = mints?.includes(mintUrl);
+    const isMintTrusted = await isKnownMint(receiveHistoryEntry.mintUrl);
     if (isMintTrusted) {
       await handleRedeem();
     } else {
       SheetManager.show('mint-accepter', {
-        payload: { mint: mintUrl },
+        payload: { mint: receiveHistoryEntry.mintUrl },
         onClose: async (result) => {
           if (result?.trusted) {
             await handleRedeem();
@@ -147,9 +76,9 @@ export function EcashReceiveConfirmation({
   // Load mint info when mintUrl changes
   React.useEffect(() => {
     const loadMintInfo = async () => {
-      if (mintUrl) {
+      if (receiveHistoryEntry.mintUrl) {
         try {
-          const info = await getMintInfo(mintUrl);
+          const info = await getMintInfo(receiveHistoryEntry.mintUrl);
           setMintInfo(info);
         } catch (error) {
           console.error('Failed to load mint info:', error);
@@ -160,7 +89,7 @@ export function EcashReceiveConfirmation({
       }
     };
     loadMintInfo();
-  }, [mintUrl, getMintInfo]);
+  }, [receiveHistoryEntry.mintUrl, getMintInfo]);
 
   return (
     <Modal
@@ -171,50 +100,47 @@ export function EcashReceiveConfirmation({
       buttons={
         <ButtonHandler
           buttons={[
-            {
-              text: 'View Send Transaction',
-              variant: 'secondary',
-              onPress: async () => {
-                router.push({
-                  pathname: '/transaction',
-                  params: {
-                    id: transaction.request || transaction.token,
-                    transactionType: 'send',
-                  },
-                });
-              },
-              condition: !!(transaction.isCancel && transaction.transactionType === 'receive'),
-            },
+            // {
+            //   text: 'View Send Transaction',
+            //   variant: 'secondary',
+            //   onPress: async () => {
+            //     router.push({
+            //       pathname: '/transaction',
+            //       params: {
+            //         id:
+            //           ('request' in receiveHistoryEntry
+            //             ? receiveHistoryEntry.request
+            //             : undefined) ||
+            //           ('token' in receiveHistoryEntry ? (receiveHistoryEntry as any).token : ''),
+            //         transactionType: 'send',
+            //       },
+            //     });
+            //   },
+            //   condition: !!(
+            //     receiveHistoryEntry.metadata?.isCancel && receiveHistoryEntry.type === 'receive'
+            //   ),
+            // },
             {
               text: 'Cancel',
               variant: 'secondary',
               onPress: async () => handleCancel(),
-              condition: !transaction?.paid,
+              condition: !('state' in receiveHistoryEntry && receiveHistoryEntry.state === 'PAID'),
             },
             {
               text: 'Redeem Ecash',
               variant: 'primary',
               onPress: handleRedeemPress,
               loading: loading,
-              condition: !transaction?.paid,
+              condition: !('state' in receiveHistoryEntry && receiveHistoryEntry.state === 'PAID'),
             },
             ...extraButtons,
           ]}
         />
       }>
       <>
-        {giveaway?.id && <Snow fullScreen snowflakesCount={75} fallSpeed="medium" />}
+        <TransactionHeader historyEntry={receiveHistoryEntry} />
 
-        <TransactionHeader
-          transaction={{
-            ...transaction,
-            amount,
-            unit,
-            transactionType: 'receive',
-          }}
-        />
-
-        {memo && (
+        {/* {memo && (
           <>
             <View
               style={{
@@ -224,31 +150,15 @@ export function EcashReceiveConfirmation({
             </View>
             <Spacer size={12} />
           </>
-        )}
+        )} */}
 
-        <TransactionMintRefresh
-          historyEntry={{
-            id: transaction.id || 'temp-ecash-receive',
-            type: 'mint',
-            amount: amount,
-            unit: unit,
-            createdAt: Date.now(),
-            mintUrl: mintInfo?.mintUrl || 'unknown',
-            state: 'UNPAID',
-            request: transaction.request || '',
-            token: token,
-            mintQuote: transaction.mintQuote || null,
-            isCancel: transaction.isCancel || false,
-            paid: transaction.paid || false,
-          }}
-          mintInfo={mintInfo}
-        />
+        <TransactionMintRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
         <Spacer size={12} />
 
         <Section
           items={[
             { title: 'Type', value: 'Ecash • Receive' },
-            { title: 'Token', value: truncateMiddle(token, 6) },
+            ...(token ? [{ title: 'Token', value: truncateMiddle(token, 6) }] : []),
           ]}
           style={{}}
           camera={false}
@@ -256,27 +166,22 @@ export function EcashReceiveConfirmation({
 
         <Spacer size={12} />
 
-        <TransactionDebugCode historyEntry={transaction} />
+        <TransactionDebugCode historyEntry={receiveHistoryEntry} />
       </>
     </Modal>
   );
 }
 
 function ModalScreen() {
-  const { token } = useLocalSearchParams<{ token: string }>();
+  const { receiveHistoryEntry: receiveHistoryEntryString } = useLocalSearchParams<{
+    receiveHistoryEntry: string;
+  }>();
 
-  return (
-    <EcashReceiveConfirmation
-      token={token}
-      transaction={
-        new TransactionBuilder({
-          token,
-          transactionType: 'receive',
-          type: 'ecash',
-        })
-      }
-    />
-  );
+  const receiveHistoryEntry = JSON.parse(receiveHistoryEntryString) as ReceiveHistoryEntry & {
+    token?: string;
+  };
+
+  return <EcashReceiveConfirmation receiveHistoryEntry={receiveHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

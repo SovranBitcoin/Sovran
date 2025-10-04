@@ -9,6 +9,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 // Removed Redux Cashu import - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { showMessage } from 'helper/popup/popups';
+import type { MintHistoryEntry, MeltHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 
 import { View, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -84,7 +85,8 @@ function ModalScreen() {
     // This might need to be implemented based on your state management
     const newUnit = mint.unit.toLowerCase();
     setUnit(newUnit);
-    navigation.setParams({ ...params, unit: newUnit });
+    // Note: navigation.setParams is not available in this context
+    // The unit change will be handled by the parent component
   };
 
   const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
@@ -94,18 +96,27 @@ function ModalScreen() {
         unit === 'sat' ? amount : amount * 100
       );
 
+      // Create a mint history entry for Lightning receive
+      const mintHistoryEntry: MintHistoryEntry = {
+        id: `mint-${Date.now()}`,
+        type: 'mint',
+        amount: unit === 'sat' ? amount : amount * 100,
+        unit: unit,
+        mintUrl: selectedMint || 'https://mint.minibits.cash/Bitcoin',
+        createdAt: Date.now(),
+        state: 'UNPAID',
+        paymentRequest: quote.request,
+        quoteId: quote.quote,
+        metadata: {
+          memo: _memo || '',
+        },
+      };
+
       router.back();
       router.replace({
         pathname: `/${params.to}` as any,
         params: {
-          ...params,
-          unifiedRequest: quote.request,
-          paymentRequest: quote.request,
-          request: quote.request,
-          amount: unit === 'sat' ? amount : amount * 100,
-          unit: unit,
-          quoteId: quote.quote, // Add quoteId for tracking
-          transaction: JSON.stringify(quote),
+          mintHistoryEntry: JSON.stringify(mintHistoryEntry),
         },
       });
     } catch (error) {
@@ -122,13 +133,24 @@ function ModalScreen() {
         unit === 'sat' ? amount : amount * 100
       );
 
+      // Create a send history entry for ecash send
+      const sendHistoryEntry: SendHistoryEntry = {
+        id: `send-${Date.now()}`,
+        type: 'send',
+        amount: unit === 'sat' ? amount : amount * 100,
+        unit: unit,
+        mintUrl: selectedMint || 'https://mint.minibits.cash',
+        createdAt: Date.now(),
+        token: result,
+        metadata: {
+          memo: _message || '',
+        },
+      };
+
       router.replace({
         pathname: `/${params.to}` as any,
         params: {
-          ...params,
-          token: JSON.stringify(result), // Use the full result as token
-          amount: (unit === 'sat' ? amount : amount * 100).toString(),
-          paymentRequest: params.paymentRequest,
+          sendHistoryEntry: JSON.stringify(sendHistoryEntry),
         },
       });
     } catch (error) {
@@ -137,6 +159,11 @@ function ModalScreen() {
   };
 
   const handleDefaultSend = async () => {
+    if (!params.lud16) {
+      showMessage('No Lightning address provided', {}, { emoji: '🚨' });
+      return;
+    }
+
     const { invoice } = await requestInvoice({
       lnUrlOrAddress: params.lud16,
       tokens: utils.toSats(amount),
@@ -162,14 +189,23 @@ function ModalScreen() {
         return;
       }
 
+      // Create a melt history entry for Lightning send
+      const meltHistoryEntry: MeltHistoryEntry = {
+        id: `melt-${Date.now()}`,
+        type: 'melt',
+        amount: unit === 'sat' ? amount : amount * 100,
+        unit: unit,
+        mintUrl: selectedMint || 'https://mint.minibits.cash',
+        createdAt: Date.now(),
+        state: 'UNPAID',
+        quoteId: meltQuote.quote,
+        metadata: {},
+      };
+
       router.push({
         pathname: `/${params.to}` as any,
         params: {
-          ...params,
-          pr: invoice,
-          amount: (unit === 'sat' ? amount : amount * 100).toString(),
-          meltQuote: JSON.stringify(meltQuote),
-          lud16: params.lud16,
+          meltHistoryEntry: JSON.stringify(meltHistoryEntry),
         },
       });
     } catch (error) {
@@ -245,7 +281,6 @@ function ModalScreen() {
     setLoading(true);
     const res = await barcodeHandler({
       scanning,
-      navigation,
       urDecoder,
       unit,
       selectedMint,
@@ -294,7 +329,7 @@ function ModalScreen() {
               text: 'Scan QR',
               icon: 'stash:qr-code',
               variant: 'secondary',
-              onPress: () =>
+              onPress: async () =>
                 router.push({
                   pathname: '/camera',
                   params: { unit },
@@ -305,7 +340,7 @@ function ModalScreen() {
               text: 'Contacts',
               icon: 'mdi:contact',
               variant: 'secondary',
-              onPress: () => router.push('/contacts'),
+              onPress: async () => router.push('/contacts'),
               condition: isEcashSend && !isP2PK && !hasPaymentRequest,
             },
           ]}
@@ -377,18 +412,21 @@ function ModalScreen() {
             }}
           />
           <Text>{'  →  '}</Text>
-          {params?.profile?.picture || params?.profile?.image ? (
-            <Image
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 1000,
-              }}
-              source={{ uri: params.profile?.picture || params.profile?.image }}
-            />
-          ) : (
-            <View />
-          )}
+          {(() => {
+            const profile = params?.profile ? JSON.parse(params.profile) : null;
+            return profile?.picture || profile?.image ? (
+              <Image
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 1000,
+                }}
+                source={{ uri: profile.picture || profile.image }}
+              />
+            ) : (
+              <View />
+            );
+          })()}
         </TouchableOpacity>
       )}
     </Modal>

@@ -9,8 +9,7 @@ import { useNostr } from 'helper/redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
 import { showMessage } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { useLocalSearchParams } from 'expo-router';
-import { router } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
 import { useTransactions } from 'providers/CocoTransactionsProvider';
@@ -18,12 +17,14 @@ import { TransactionMintRefresh } from 'components/blocks/Transaction/Transactio
 import { Spacer } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
+import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys } from 'helper/colors';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { Proof } from '@cashu/cashu-ts';
 
 export const pool = new SimplePool();
 
@@ -49,11 +50,25 @@ const EcashLightningReceiver = () => {
     // Note: Coco handles token redemption checking internally
     // The giveaway functionality was removed with Coco migration
 
+    // Create a receive history entry for ecash receive
+    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+      id: `receive-${Date.now()}`,
+      type: 'receive',
+      amount: getDecodedToken(token).proofs.reduce(
+        (sum: number, proof: Proof) => sum + proof.amount,
+        0
+      ),
+      unit: unit,
+      mintUrl: getDecodedToken(token).mint,
+      createdAt: Date.now(),
+      metadata: {},
+      token: token,
+    };
+
     router.push({
       pathname: '/ecashReceiveConfirmation',
       params: {
-        token,
-        unit,
+        receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
       },
     });
   };

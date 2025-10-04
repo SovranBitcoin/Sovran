@@ -3,7 +3,7 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { SheetManager } from 'react-native-actions-sheet';
-import { HStack, VStack } from 'components/ui/View';
+import { HStack, View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -36,23 +36,18 @@ import { TransactionMintRefresh } from 'components/blocks/Transaction/Transactio
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
+import type { SendHistoryEntry } from 'coco-cashu-core';
 
 export function EcashSendConfirmation({
-  unit,
-  amount,
-  token,
-  paymentRequest,
+  sendHistoryEntry,
   extraButtons = [],
 }: {
-  unit: string;
-  amount: number;
-  token: Token;
-  paymentRequest?: string;
+  sendHistoryEntry: SendHistoryEntry;
   extraButtons?: ButtonHandlerButton[];
 }) {
   const { isTokenSpendable, receiveEcash } = useCashuOperations();
   const { getMintInfo } = useMintManagement();
-  const { send, isSending } = useSend();
+  const { send: _send, isSending: _isSending } = useSend();
   const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -64,7 +59,10 @@ export function EcashSendConfirmation({
 
   // Find the current transaction using coco's history system
   const currentTransaction = history.find((tx) => {
-    return tx.type === 'send' && getEncodedTokenV4(tx.token) === getEncodedTokenV4(token);
+    return (
+      tx.type === 'send' &&
+      getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry.token)
+    );
   });
 
   // Load mint info when transaction is found
@@ -84,24 +82,24 @@ export function EcashSendConfirmation({
   }, [currentTransaction?.mintUrl, getMintInfo]);
 
   const resolvedPaymentRequest =
-    paymentRequest ||
+    ('paymentRequest' in sendHistoryEntry ? (sendHistoryEntry as any).paymentRequest : undefined) ||
     (currentTransaction && 'paymentRequest' in currentTransaction
       ? currentTransaction.paymentRequest
       : undefined);
 
   const handleNFCSend = async () => {
-    await write(getEncodedTokenV4(token));
+    await write(getEncodedTokenV4(sendHistoryEntry.token));
   };
 
   const handleCopy = async (onClose: (event: any) => void) => {
-    await Clipboard.setStringAsync(getEncodedTokenV4(token));
+    await Clipboard.setStringAsync(getEncodedTokenV4(sendHistoryEntry.token));
     showSuccess('ecash_token_copied', {}, {}, () => onClose({}));
   };
 
   const handleShare = async (onClose: (event: any) => void) => {
     await Share.share({
       url: uri,
-      message: 'cashu://' + getEncodedTokenV4(token),
+      message: 'cashu://' + getEncodedTokenV4(sendHistoryEntry.token),
     });
     onClose({});
   };
@@ -117,16 +115,16 @@ export function EcashSendConfirmation({
       const { data } = nip19.decode(receiverTarget);
       const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
 
-      if (!token) {
+      if (!sendHistoryEntry.token) {
         showMessage('Invalid token format', {}, {}, () => {});
         return;
       }
 
       await sendGiftWrappedEncryptedDirectMessage({
         message: JSON.stringify({
-          mint: token.mint,
-          unit: token.unit,
-          proofs: token.proofs,
+          mint: sendHistoryEntry.token.mint,
+          unit: sendHistoryEntry.token.unit,
+          proofs: sendHistoryEntry.token.proofs,
           id: decoded.id,
         }),
         recipient: pubkey,
@@ -144,7 +142,7 @@ export function EcashSendConfirmation({
     try {
       // For ecash transactions, "cancelling" means receiving the token back
       // This effectively cancels the send transaction
-      await receiveEcash(getEncodedTokenV4(token));
+      await receiveEcash(getEncodedTokenV4(sendHistoryEntry.token));
       showMessage('Transaction cancelled successfully', {}, {}, () => onClose({}));
     } catch (error) {
       showMessage(
@@ -159,10 +157,10 @@ export function EcashSendConfirmation({
   // Safely format the token
   const getFormattedToken = (): string => {
     try {
-      return getEncodedTokenV4(token);
+      return getEncodedTokenV4(sendHistoryEntry.token);
     } catch (error) {
       console.warn('Failed to encode token, using original:', error);
-      return JSON.stringify(token);
+      return JSON.stringify(sendHistoryEntry.token);
     }
   };
 
@@ -182,19 +180,27 @@ export function EcashSendConfirmation({
     if (isCheckingStatus) return;
 
     setIsCheckingStatus(true);
-    const result = await checkProofsSpent(token);
+    const result = await checkProofsSpent(sendHistoryEntry.token);
 
     if (result.isOk()) {
       const proofsSpent = result.value;
       if (proofsSpent) {
         try {
-          const amount = token.proofs.reduce((sum, proof) => sum + proof.amount, 0);
+          const amount = sendHistoryEntry.token.proofs.reduce(
+            (sum, proof) => sum + proof.amount,
+            0
+          );
 
-          showMessage('funds_sent', { amount, unit }, { emoji: '🎉' }, () => {
-            router.dismissAll();
-            router.push('/(drawer)/(tabs)');
-            onClose({});
-          });
+          showMessage(
+            'funds_sent',
+            { amount, unit: sendHistoryEntry.unit },
+            { emoji: '🎉' },
+            () => {
+              router.dismissAll();
+              router.push('/(drawer)/(tabs)');
+              onClose({});
+            }
+          );
         } catch {
           showMessage('Invalid token format', {}, { emoji: '⚠️' }, () => onClose({}));
         }
@@ -212,7 +218,7 @@ export function EcashSendConfirmation({
   const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
       payload: {
-        token: getEncodedTokenV4(token),
+        token: getEncodedTokenV4(sendHistoryEntry.token),
       },
       onClose,
     });
@@ -220,7 +226,13 @@ export function EcashSendConfirmation({
 
   // Show loading state if transaction is not found
   if (!currentTransaction) {
-    return <Modal showClose title="Loading..."></Modal>;
+    return (
+      <Modal showClose title="Loading...">
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text>Loading transaction...</Text>
+        </View>
+      </Modal>
+    );
   }
 
   const isPaid = 'state' in currentTransaction && currentTransaction.state === 'PAID';
@@ -313,7 +325,7 @@ export function EcashSendConfirmation({
           <PaymentInfo
             setUri={setUri}
             popupMessage="ecash_token_copied"
-            unit={unit}
+            unit={sendHistoryEntry.unit}
             data={formattedToken}
             animated={isLongToken}
             showSection={false}
@@ -359,11 +371,11 @@ export function EcashSendConfirmation({
             },
             {
               title: 'Token',
-              value: truncateMiddle(getEncodedTokenV4(token), 6),
+              value: truncateMiddle(getEncodedTokenV4(sendHistoryEntry.token), 6),
             },
             {
               title: 'Amount',
-              value: `${currentTransaction.amount} ${unit.toUpperCase()}`,
+              value: `${currentTransaction.amount} ${sendHistoryEntry.unit.toUpperCase()}`,
             },
           ]}
         />
@@ -375,23 +387,13 @@ export function EcashSendConfirmation({
 }
 
 function ModalScreen() {
-  const { unit, amount, token, paymentRequest } = useLocalSearchParams<{
-    unit: string;
-    amount: string;
-    token: string;
-    paymentRequest?: string;
+  const { sendHistoryEntry: sendHistoryEntryString } = useLocalSearchParams<{
+    sendHistoryEntry: string;
   }>();
 
-  // Convert string token to Token object if needed
+  const sendHistoryEntry = JSON.parse(sendHistoryEntryString) as SendHistoryEntry;
 
-  return (
-    <EcashSendConfirmation
-      unit={unit}
-      amount={amount ? parseFloat(amount) : 0}
-      token={JSON.parse(token)}
-      paymentRequest={paymentRequest}
-    />
-  );
+  return <EcashSendConfirmation sendHistoryEntry={sendHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);
