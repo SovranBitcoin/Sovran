@@ -4,9 +4,11 @@ import { Button } from 'components/ui/Button';
 import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View } from 'components/ui/View';
-import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
+import { LinearGradient } from 'expo-linear-gradient';
+import { greys } from '@/helper/colors';
+import opacity from 'hex-color-opacity';
 
 export interface ButtonHandlerButton {
   testID?: string;
@@ -58,8 +60,22 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
       align="center"
       justify="space-between"
       spacing={8}
-      className={`flex-row p-2 pb-10 ${context === 'tab' ? 'mb-12' : ''}`}
-      style={[{ backgroundColor: greys(theme)[950] }, style]}>
+      className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''}`}
+      style={[style]}>
+      <LinearGradient
+        colors={[opacity(greys(theme)[950], 0.75), opacity(greys(theme)[950], 0)]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+        }}
+      />
+
       {visibleButtons.slice(0, 2).map((button, index) => (
         <View key={index} className="flex-1">
           <Button

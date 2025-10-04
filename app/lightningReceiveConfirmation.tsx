@@ -289,7 +289,7 @@ export function LightningReceiveConfirmation({
       showClose
       title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
       buttons={
-        <HStack style={{ paddingBottom: 8 }} justify="center" align="center">
+        <HStack justify="center" align="center">
           <ButtonHandler
             buttons={[
               {

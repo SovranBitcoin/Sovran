@@ -53,7 +53,7 @@ export default function Modal({
   showClose = false,
   inverted = false,
   showHeader = true,
-  padding = 40,
+  padding = 39,
   backgroundColor,
   scrollEnabled = true,
 }: ModalProps) {

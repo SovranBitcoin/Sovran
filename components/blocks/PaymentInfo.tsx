@@ -186,7 +186,7 @@ export function PaymentInfo({
 
   return (
     <>
-      {renderTabs()}
+      {/* {renderTabs()} */}
       {renderQRCode()}
       {renderSection()}
     </>

@@ -84,6 +84,7 @@ const configWithMonicon = withMonicon(config, {
     'fluent:clock-12-filled',
     'stash:qr-code',
     'ic:round-star',
+    'humbleicons:url',
   ],
 });
 

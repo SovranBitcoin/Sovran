@@ -100,7 +100,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
 
               <HStack align="center" gap={4}>
                 {pseudo && (
-                  <Badge variant="warning" icon="ic:round-warning" size={12}>
+                  <Badge variant="warning" icon="humbleicons:url" size={12}>
                     Custom URL
                   </Badge>
                 )}
@@ -215,72 +215,21 @@ const AddRoute = () => {
     });
   };
 
-  const handleAddCustomMint = async () => {
-    console.log('🚀 Add button clicked!');
-    console.log('🚀 URL:', url);
-    console.log('🚀 Validation state:', validationState);
-
+  const handleSelectCustomMint = () => {
     if (!url.trim()) {
-      console.log('❌ No URL provided');
       showMessage('Please enter a mint URL');
       return;
     }
 
-    if (validationState.isValid !== true) {
-      console.log('⚠️ Validation failed, but proceeding anyway for testing...');
-      console.log('⚠️ Validation state:', validationState);
+    if (!looksLikeMintUrl(url)) {
+      showMessage('Please enter a valid mint URL');
+      return;
     }
 
-    try {
-      console.log('🔍 Starting mint addition process...');
-
-      if (!CocoManager.isInitialized()) {
-        console.error('❌ CocoManager not initialized');
-        showMessage('Manager not initialized. Please try again.');
-        return;
-      }
-
-      console.log('✅ CocoManager is initialized');
-
-      const manager = CocoManager.getInstance();
-      console.log('🔍 Calling manager.mint.addMint...');
-      const result = await manager.mint.addMint(url);
-      console.log('✅ Add mint result:', result);
-
-      try {
-        console.log('🔍 Getting mint info...');
-        const mintInfo = await manager.mint.getMintInfo(url);
-        console.log(`✅ Mint info loaded for ${url}:`, mintInfo);
-      } catch (infoError) {
-        console.warn(`⚠️ Failed to load mint info for ${url}:`, infoError);
-      }
-
-      try {
-        console.log('🔍 Checking all mints...');
-        const allMints = await manager.mint.getAllMints();
-        console.log(
-          '📋 All mints:',
-          allMints.map((m) => (m as any).url || m)
-        );
-        const isAdded = allMints.some((m) => (m as any).url === url);
-        console.log(`✅ Mint ${url} is in list:`, isAdded);
-      } catch (listError) {
-        console.warn('⚠️ Failed to list mints:', listError);
-      }
-
-      setSelectedMints((prev) => new Set([...prev, url]));
-      showMessage('Mint added successfully');
-      reset();
-    } catch (err) {
-      console.error('❌ Failed to add custom mint:', err);
-      console.error('❌ Error details:', {
-        message: err instanceof Error ? err.message : 'Unknown error',
-        stack: err instanceof Error ? err.stack : undefined,
-        name: err instanceof Error ? err.name : undefined,
-        cause: err instanceof Error ? err.cause : undefined,
-      });
-      showMessage(`Failed to add mint: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
+    // Just select/check the mint - it will be added when user clicks the main "Add" button
+    setSelectedMints((prev) => new Set([...prev, url]));
+    showMessage('Mint selected for addition');
+    reset();
   };
 
   const handleSave = async () => {
@@ -375,7 +324,7 @@ const AddRoute = () => {
             value={url}
             onChangeText={setUrl}
             validationState={validationState}
-            onAddMint={handleAddCustomMint}
+            onAddMint={handleSelectCustomMint}
             canAddMint={url.trim().length > 0}
           />
 
@@ -448,7 +397,7 @@ const AddRoute = () => {
           value={url}
           onChangeText={setUrl}
           validationState={validationState}
-          onAddMint={handleAddCustomMint}
+          onAddMint={handleSelectCustomMint}
           canAddMint={url.trim().length > 0}
         />
 

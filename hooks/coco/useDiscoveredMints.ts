@@ -3,32 +3,14 @@ import { KYMHandler } from 'cashu-kym';
 import { fetchMintInfo } from 'helper/apiClient';
 import type { CashuMint } from '@cashu/cashu-ts';
 
+// Infer types from KYMHandler's discover method
+type KYMDiscoverResult = Awaited<ReturnType<KYMHandler['discover']>>;
+type AuditInfo = KYMDiscoverResult['results'][number];
 type MintInfo = Awaited<ReturnType<CashuMint['getInfo']>>;
-
-interface AuditorEntry {
-  url: string;
-  name: string;
-  updated_at: Date;
-  state: string;
-  errors: number;
-  mints: number;
-  melts: number;
-}
-
-interface AggregatedMintRecommendation {
-  score: number;
-  recommendations: {
-    score: number;
-    comment: string;
-  }[];
-}
 
 export interface DiscoveredMintData {
   url: string;
-  auditInfo: AggregatedMintRecommendation & {
-    auditorData: AuditorEntry;
-    speedIndex?: number;
-  };
+  auditInfo: AuditInfo;
   mintInfo: MintInfo | null;
 }
 

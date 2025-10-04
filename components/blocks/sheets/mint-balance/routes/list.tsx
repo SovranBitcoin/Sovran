@@ -44,29 +44,24 @@ const MintItem: React.FC<MintItemProps> = ({
   isLoading,
   globalLoading,
   requireBalance: _requireBalance = true,
-  selectedCurrency,
   showDetailsButton = false,
   onDetailsPress,
   onInspectPress,
 }) => {
-  const formattedBalance = balance
+  const formattedBalance = balance.amount
     ? formatCurrency(
         {
-          currency: selectedCurrency === 'SAT' ? 'BTC' : (selectedCurrency as any),
+          currency: balance.unit === 'SAT' ? 'BTC' : (balance.unit as any),
           value: balance.amount,
           denomination:
-            selectedCurrency.toLowerCase() === 'sat'
-              ? 'sats'
-              : (selectedCurrency.toLowerCase() as any),
+            balance.unit.toLowerCase() === 'sat' ? 'sats' : (balance.unit.toLowerCase() as any),
         },
         {
           locale: 'en-US',
-          precision: selectedCurrency === 'SAT' ? 0 : 2,
-          currencyDisplay: selectedCurrency === 'SAT' ? 'name' : 'symbol',
+          precision: balance.unit === 'SAT' ? 0 : 2,
+          currencyDisplay: balance.unit === 'SAT' ? 'name' : 'symbol',
           denomination:
-            selectedCurrency.toLowerCase() === 'sat'
-              ? 'sats'
-              : (selectedCurrency.toLowerCase() as any),
+            balance.unit.toLowerCase() === 'sat' ? 'sats' : (balance.unit.toLowerCase() as any),
         }
       )
     : '0';
@@ -302,7 +297,7 @@ const ListRoute = () => {
         allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
         currencyLabel="Send payment in"
         mintsLabel="Send from"
-        renderItem={(mint: any, selectedCurrency: string) => (
+        renderItem={(mint: any) => (
           <MintItem
             key={mint.mintUrl}
             mint={mint}
@@ -311,7 +306,6 @@ const ListRoute = () => {
             isLoading={loadingId === mint.mintUrl}
             globalLoading={loadingId !== null}
             requireBalance={payload?.requireBalance}
-            selectedCurrency={selectedCurrency}
             showDetailsButton={showDetailsButton}
             onDetailsPress={onDetailsPress}
             onInspectPress={() => {

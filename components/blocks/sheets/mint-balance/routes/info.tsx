@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, Animated, Alert } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
@@ -9,7 +9,7 @@ import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack, Spacer, HStack, View } from 'components/ui/View';
 import { useMintManagement } from 'hooks/coco';
-import { useDiscoveredMints } from 'hooks/coco/useDiscoveredMints';
+import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Card } from 'components/ui/Card';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -296,20 +296,20 @@ const InfoRoute = () => {
   // Get mintUrl from global variable or payload
   const mintUrl = (global as any).currentMintUrl || payload?.mintUrl;
 
-  // Use discovered mints hook to get audit data
-  const { mints: discoveredMints, loading: auditLoading, error: auditError } = useDiscoveredMints();
-
-  // Find the specific mint data from discovered mints
-  const auditData = useMemo(() => {
-    if (!mintUrl || !discoveredMints.length) return null;
-    return discoveredMints.find((mint) => mint.url === mintUrl);
-  }, [discoveredMints, mintUrl]);
+  // Use audited mint hook to get audit data for this specific mint
+  const {
+    auditInfo,
+    mintInfo: auditMintInfo,
+    loading: auditLoading,
+    error: auditError,
+  } = useAuditedMint(mintUrl);
 
   // Debug logging
   console.log('InfoRoute - mintUrl:', mintUrl);
   console.log('InfoRoute - global.currentMintUrl:', (global as any).currentMintUrl);
   console.log('InfoRoute - payload:', payload);
-  console.log('InfoRoute - auditData:', auditData);
+  console.log('InfoRoute - auditInfo:', auditInfo);
+  console.log('InfoRoute - auditMintInfo:', auditMintInfo);
 
   // Helper functions
   const handleCopy = async (text: string) => {
@@ -405,16 +405,14 @@ const InfoRoute = () => {
   const renderMintIcon = () => {
     return (
       <Avatar
-        picture={mintInfo?.icon_url || auditData?.mintInfo?.icon_url}
+        picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
         size={70}
         variant="mint"
         name={
-          mintInfo?.name ||
-          auditData?.auditInfo?.auditorData?.name ||
-          mintUrl?.replace('https://', '').split('/')[0]
+          mintInfo?.name || auditMintInfo?.name || mintUrl?.replace('https://', '').split('/')[0]
         }
-        alt={`${mintInfo?.name || auditData?.auditInfo?.auditorData?.name || 'Mint'} icon`}
-        status={auditData?.auditInfo?.auditorData?.state}
+        alt={`${mintInfo?.name || auditMintInfo?.name || 'Mint'} icon`}
+        status={auditInfo?.auditorData?.state}
       />
     );
   };
@@ -473,19 +471,23 @@ const InfoRoute = () => {
   // Fallback mint name from URL if no mint info available
   const displayName =
     mintInfo?.name ||
-    auditData?.auditInfo?.auditorData?.name ||
+    auditMintInfo?.name ||
+    auditInfo?.auditorData?.name ||
     mintUrl?.split('//')[1]?.split('/')[0] ||
     'Unknown Mint';
 
   // Calculate stats from audit data
-  const successRate = auditData?.auditInfo?.recommendations?.length
-    ? auditData.auditInfo.recommendations.reduce((acc: number, rec: any) => acc + rec.score, 0) /
-      auditData.auditInfo.recommendations.length /
-      5
-    : undefined;
+  const totalMints = auditInfo?.auditorData?.mints;
+  const totalMelts = auditInfo?.auditorData?.melts;
+  const totalErrors = auditInfo?.auditorData?.errors;
 
-  const totalMints = auditData?.auditInfo?.auditorData?.mints;
-  const totalMelts = auditData?.auditInfo?.auditorData?.melts;
+  // Calculate success rate: prefer KYM score, fallback to error-based calculation
+  const successRate = auditInfo?.score
+    ? auditInfo.score / 5 // KYM score is 0-5, normalize to 0-1
+    : (() => {
+        const totalOps = (totalMints || 0) + (totalMelts || 0);
+        return totalOps > 0 ? 1 - (totalErrors || 0) / totalOps : undefined;
+      })();
 
   return (
     <Wrapper
@@ -547,6 +549,7 @@ const InfoRoute = () => {
           <StatsGrid
             theme={theme}
             successRate={successRate}
+            mintSpeed={auditInfo?.speedIndex}
             totalMints={totalMints}
             totalMelts={totalMelts}
           />

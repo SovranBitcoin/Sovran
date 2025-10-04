@@ -95,7 +95,7 @@ export function useMintManagement() {
    * but we can implement it by clearing proofs and counters
    */
   const removeMint = useCallback(
-    async (mintUrl: string) => {
+    async (_mintUrl: string) => {
       setIsLoading(true);
       setError(null);
 
@@ -109,7 +109,7 @@ export function useMintManagement() {
         setIsLoading(false);
       }
     },
-    [manager, loadMints]
+    [loadMints]
   );
 
   /**
@@ -124,7 +124,7 @@ export function useMintManagement() {
       setError(error);
       throw error;
     }
-  }, []);
+  }, [manager]);
 
   /**
    * Restore a mint from seed

@@ -255,7 +255,7 @@ export function EcashSendConfirmation({
       title="Send Ecash"
       showClose
       buttons={
-        <HStack className="pb-2" justify="center" align="center">
+        <HStack justify="center" align="center">
           <ButtonHandler
             buttons={[
               {

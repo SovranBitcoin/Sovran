@@ -91,7 +91,7 @@ export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: numb
   return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
-interface AuditMintResponse {
+export interface AuditMintResponse {
   id: number;
   url: string;
   info: GetInfoResponse;
