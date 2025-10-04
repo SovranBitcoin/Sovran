@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/ui/Button';
-import Icon from 'assets/icons';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View } from 'components/ui/View';
 import { useSelector } from 'react-redux';
@@ -9,6 +8,7 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import { LinearGradient } from 'expo-linear-gradient';
 import { greys } from '@/helper/colors';
 import opacity from 'hex-color-opacity';
+import Icon from '@/assets/icons';
 
 export interface ButtonHandlerButton {
   testID?: string;
@@ -59,7 +59,7 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
     <HStack
       align="center"
       justify="space-between"
-      spacing={8}
+      spacing={0}
       className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''}`}
       style={[style]}>
       <LinearGradient
@@ -91,7 +91,7 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
 
       {/* More button (if more than 2 buttons) */}
       {visibleButtons.length > 2 && (
-        <View className="w-16">
+        <View>
           <Button
             testID="more-button"
             icon={
