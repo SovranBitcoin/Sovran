@@ -87,6 +87,10 @@ export function CocoProvider({ children }: CocoProviderProps) {
     // Cleanup function
     return () => {
       console.log('CocoProvider unmounting, cleaning up...');
+      // Cleanup the manager to prevent transaction conflicts
+      CocoManager.cleanup().catch((error) => {
+        console.error('Failed to cleanup Coco Manager on unmount:', error);
+      });
     };
   }, []);
 
@@ -107,9 +111,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            height: '100vh',
+            height: '100%',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: 16,
           }}>
           <View>Initializing Coco...</View>
           {isMigrating && <div>Migrating data...</div>}

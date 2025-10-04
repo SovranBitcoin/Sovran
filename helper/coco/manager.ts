@@ -123,13 +123,13 @@ export class CocoManager {
       }
 
       // Enable watchers and processors for real-time updates
-      // Add small delays between watcher initializations to prevent conflicts
+      // Add longer delays between watcher initializations to prevent transaction conflicts
       try {
         await this.instance.enableMintQuoteWatcher({
           watchExistingPendingOnStart: true,
         });
         console.log('Mint quote watcher enabled');
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Longer delay
       } catch (error) {
         console.warn('Failed to enable mint quote watcher:', error);
       }
@@ -142,18 +142,29 @@ export class CocoManager {
           initialEnqueueDelayMs: 2000,
         });
         console.log('Mint quote processor enabled');
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Longer delay
       } catch (error) {
         console.warn('Failed to enable mint quote processor:', error);
       }
 
-      // Temporarily disable ProofStateWatcher to prevent transaction conflicts
-      // TODO: Re-enable once transaction issues are resolved
+      // Enable ProofStateWatcher with proper error handling and retry logic
       try {
+        // Add a longer delay before enabling proof state watcher to ensure
+        // all previous database operations are complete
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         await this.instance.enableProofStateWatcher();
         console.log('Proof state watcher enabled');
       } catch (error) {
         console.warn('Failed to enable proof state watcher:', error);
+        // Try again after a longer delay
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await this.instance.enableProofStateWatcher();
+          console.log('Proof state watcher enabled on retry');
+        } catch (retryError) {
+          console.error('Failed to enable proof state watcher after retry:', retryError);
+        }
       }
       return this.instance;
     } catch (error) {
@@ -180,6 +191,47 @@ export class CocoManager {
    */
   static isInitialized(): boolean {
     return this.instance !== null;
+  }
+
+  /**
+   * Cleanup method to properly shutdown watchers and prevent transaction conflicts
+   */
+  static async cleanup(): Promise<void> {
+    if (!this.instance) {
+      return;
+    }
+
+    try {
+      console.log('Cleaning up Coco Manager...');
+
+      // Disable watchers in reverse order to prevent conflicts
+      try {
+        await this.instance.disableProofStateWatcher();
+        console.log('Proof state watcher disabled');
+      } catch (error) {
+        console.warn('Failed to disable proof state watcher:', error);
+      }
+
+      try {
+        await this.instance.disableMintQuoteProcessor();
+        console.log('Mint quote processor disabled');
+      } catch (error) {
+        console.warn('Failed to disable mint quote processor:', error);
+      }
+
+      try {
+        await this.instance.disableMintQuoteWatcher();
+        console.log('Mint quote watcher disabled');
+      } catch (error) {
+        console.warn('Failed to disable mint quote watcher:', error);
+      }
+
+      // Clear the instance
+      this.instance = null;
+      console.log('Coco Manager cleanup completed');
+    } catch (error) {
+      console.error('Failed to cleanup Coco Manager:', error);
+    }
   }
 
   /**
