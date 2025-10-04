@@ -12,6 +12,8 @@ import CurrencySelector from 'components/blocks/CurrencySelector';
 import Icon from 'assets/icons';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { MintHistoryEntry } from 'coco-cashu-core';
+import { mintHistoryEntryExpired } from 'helper/utils';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -25,8 +27,8 @@ function ModalScreen() {
   const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
   const [type, setType] = useState<'all' | 'lightning' | 'ecash'>('all');
   const [at, setAt] = useState<'all' | 'at'>('all');
-  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending'>(
-    (tab_ as 'All' | 'Confirmed' | 'Pending') || 'All'
+  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending' | 'Expired'>(
+    (tab_ as 'All' | 'Confirmed' | 'Pending' | 'Expired') || 'All'
   );
 
   const handleCurrencyChange = (currency: string) => {
@@ -63,22 +65,46 @@ function ModalScreen() {
     });
   }, [history, selectedCurrency, filter, type]);
 
-  const { pendingCount, confirmedCount } = React.useMemo(() => {
-    const pending = filteredHistory.filter((historyEntry) => {
+  const { pendingCount, confirmedCount, expiredCount } = React.useMemo(() => {
+    const expired = filteredHistory.filter((historyEntry) => {
+      // Check if it's an unpaid mint transaction that has expired
       return (
-        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')
+        historyEntry.type === 'mint' &&
+        historyEntry.state === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry as MintHistoryEntry)
       );
     });
+
+    const pending = filteredHistory.filter((historyEntry) => {
+      const isExpired =
+        historyEntry.type === 'mint' &&
+        historyEntry.state === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+
+      return (
+        ((historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
+          (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')) &&
+        !isExpired
+      );
+    });
+
     const confirmed = filteredHistory.filter((historyEntry) => {
-      return !(
+      const isPending =
         (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')
-      );
+        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID');
+
+      const isExpired =
+        historyEntry.type === 'mint' &&
+        historyEntry.state === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+
+      return !isPending || isExpired;
     });
+
     return {
       pendingCount: pending.length,
       confirmedCount: confirmed.length,
+      expiredCount: expired.length,
     };
   }, [filteredHistory]);
 
@@ -100,10 +126,15 @@ function ModalScreen() {
         header={
           <>
             <Tabs
-              tabs={['All', 'Confirmed', 'Pending']}
+              tabs={['All', 'Confirmed', 'Pending', 'Expired']}
               selectedTab={tab}
-              handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending')}
-              amounts={[String(allCount), String(confirmedCount), String(pendingCount)]}
+              handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending' | 'Expired')}
+              amounts={[
+                String(allCount),
+                String(confirmedCount),
+                String(pendingCount),
+                String(expiredCount),
+              ]}
             />
 
             <View

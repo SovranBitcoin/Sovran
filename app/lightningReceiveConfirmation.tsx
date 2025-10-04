@@ -24,6 +24,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
+import { mintHistoryEntryExpired } from 'helper/utils';
 
 interface MintQuoteTimelineProps {
   historyEntry: HistoryEntry;
@@ -38,6 +39,21 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
   const getTimeline = () => {
     if (isMintTransaction) {
       const mintTx = historyEntry as MintHistoryEntry;
+
+      // Check if the transaction is expired
+      const isExpired = mintTx.state === 'UNPAID' && mintHistoryEntryExpired(mintTx);
+
+      if (isExpired) {
+        // Show EXPIRED state instead of normal flow
+        const states = ['CREATED', 'UNPAID', 'EXPIRED'];
+        return states.map((state, i) => ({
+          state,
+          complete: i <= 2, // All states up to EXPIRED are complete
+          isCurrent: i === 2, // EXPIRED is current
+          addedAt: i === 0 ? mintTx.createdAt : undefined,
+        }));
+      }
+
       const states = ['CREATED', 'UNPAID', 'ISSUED', 'PAID'];
 
       // Find current state index
@@ -69,8 +85,10 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
 
   const states = getTimeline();
 
+  const isExpired = isMintTransaction && mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+
   const hasIntermediarySteps = isMintTransaction
-    ? (historyEntry as MintHistoryEntry).state === 'UNPAID'
+    ? (historyEntry as MintHistoryEntry).state === 'UNPAID' && !isExpired
     : (historyEntry as MeltHistoryEntry).state === ('UNSPENT' as any) ||
       (historyEntry as MeltHistoryEntry).state === ('PENDING' as any);
 
@@ -120,11 +138,13 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
-        {getStateLabel(
-          isMintTransaction
-            ? (historyEntry as MintHistoryEntry).state
-            : (historyEntry as MeltHistoryEntry).state
-        )}
+        {isExpired
+          ? 'EXPIRED'
+          : getStateLabel(
+              isMintTransaction
+                ? (historyEntry as MintHistoryEntry).state
+                : (historyEntry as MeltHistoryEntry).state
+            )}
       </Text>
       <View>
         {displayStates.map((item, index) => (

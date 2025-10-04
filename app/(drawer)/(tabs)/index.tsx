@@ -147,7 +147,7 @@ function TabOneScreen() {
                 style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
               />
             )}
-            <Transactions account={account} showMore={true} history={history} />
+            <Transactions account={account} showMore={true} history={history} hideExpired={true} />
           </View>
         </ScrollView>
       </View>

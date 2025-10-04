@@ -7,11 +7,12 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { View, VStack, Spacer } from 'components/ui/View';
 import { router } from 'expo-router';
-import { HistoryEntry } from 'coco-cashu-core';
-import { CocoTransactionAdapter } from 'helper/coco/typeAdapters';
+import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
 import _ from 'lodash';
+import { mintHistoryEntryExpired } from 'helper/utils';
+import { adaptCocoHistoryToTransaction } from 'helper/coco/typeAdapters';
 
 interface Account {
   unit: string;
@@ -20,7 +21,7 @@ interface Account {
 
 interface Section {
   title: string;
-  data: CocoTransactionAdapter[];
+  data: HistoryEntry[];
   index?: string;
 }
 
@@ -34,8 +35,9 @@ interface Props {
   filter?: 'all' | 'incoming' | 'outgoing';
   type?: 'all' | 'lightning' | 'ecash';
   at?: 'all' | 'at';
-  tab?: 'All' | 'Confirmed' | 'Pending';
+  tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
+  hideExpired?: boolean; // If true, expired transactions will be filtered out
 }
 
 export const Transactions = React.memo(
@@ -49,6 +51,7 @@ export const Transactions = React.memo(
     type = 'all',
     tab = 'All',
     days = 1,
+    hideExpired = false,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
 
@@ -63,9 +66,19 @@ export const Transactions = React.memo(
           if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
           if (type === 'lightning' && historyEntry.type !== 'mint') return false;
           if (type === 'ecash' && historyEntry.type !== 'send') return false;
+
+          // Filter out expired transactions if hideExpired is true
+          if (hideExpired) {
+            const isExpired =
+              historyEntry.type === 'mint' &&
+              historyEntry.state === 'UNPAID' &&
+              mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+            if (isExpired) return false;
+          }
+
           return true;
         }),
-      [history, account.unit, filter, type]
+      [history, account.unit, filter, type, hideExpired]
     );
 
     const sortedHistory = useMemo(
@@ -73,13 +86,20 @@ export const Transactions = React.memo(
       [filteredHistory]
     );
 
-    const { pending, confirmed } = useMemo(
+    const { pending, confirmed, expired } = useMemo(
       () =>
         _.groupBy(sortedHistory, (historyEntry: HistoryEntry) => {
           const isPending =
             (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
             (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID');
 
+          // Check if it's an expired mint transaction
+          const isExpired =
+            historyEntry.type === 'mint' &&
+            historyEntry.state === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+
+          if (isExpired) return 'expired';
           return isPending ? 'pending' : 'confirmed';
         }),
       [sortedHistory]
@@ -90,7 +110,11 @@ export const Transactions = React.memo(
         const groupedByDate = _.groupBy(historyEntries, (historyEntry) =>
           formatDate(historyEntry.createdAt)
         );
-        const sortedDates = _.orderBy(Object.keys(groupedByDate), (date) => new Date(date), 'desc');
+        const sortedDates = _.orderBy(
+          Object.keys(groupedByDate),
+          (date) => new Date(date).getTime(),
+          'desc'
+        );
         const datesToShow = showMore ? _.take(sortedDates, days) : sortedDates;
 
         return datesToShow.map((date) => ({
@@ -102,13 +126,15 @@ export const Transactions = React.memo(
 
       const pendingSections = createSections(pending || []);
       const confirmedSections = createSections(confirmed || []);
+      const expiredSections = createSections(expired || []);
 
       return {
         pending: pendingSections,
         confirmed: confirmedSections,
-        all: [...pendingSections, ...confirmedSections],
+        expired: expiredSections,
+        all: [...pendingSections, ...confirmedSections, ...expiredSections],
       };
-    }, [pending, confirmed, showMore, days]);
+    }, [pending, confirmed, expired, showMore, days]);
 
     const flattenedData = useMemo(() => {
       let sectionsToDisplay;
@@ -116,6 +142,8 @@ export const Transactions = React.memo(
         sectionsToDisplay = sections.pending;
       } else if (tab === 'Confirmed') {
         sectionsToDisplay = sections.confirmed;
+      } else if (tab === 'Expired') {
+        sectionsToDisplay = sections.expired;
       } else {
         sectionsToDisplay = sections.all;
       }
@@ -124,7 +152,7 @@ export const Transactions = React.memo(
         { type: 'header', title: section.title },
         ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
       ]);
-    }, [sections.all, sections.pending, sections.confirmed, tab]);
+    }, [sections.all, sections.pending, sections.confirmed, sections.expired, tab]);
 
     if (showMore) {
       if (filteredHistory.length === 0) {
@@ -161,17 +189,15 @@ export const Transactions = React.memo(
                       {section.title}
                     </Text>
                     <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
-                      {section.data.map((historyEntry) => (
-                        <Transaction
-                          key={
-                            historyEntry.id ||
-                            historyEntry.request ||
-                            historyEntry.token ||
-                            Math.random().toString()
-                          }
-                          historyEntry={historyEntry}
-                        />
-                      ))}
+                      {section.data.map((historyEntry) => {
+                        const adaptedEntry = adaptCocoHistoryToTransaction(historyEntry);
+                        const key =
+                          adaptedEntry.id ||
+                          adaptedEntry.request ||
+                          adaptedEntry.token ||
+                          Math.random().toString();
+                        return <Transaction key={key} historyEntry={adaptedEntry} />;
+                      })}
                       {label === 'Confirmed' && (
                         <TouchableOpacity
                           onPress={() =>
@@ -208,6 +234,7 @@ export const Transactions = React.memo(
       return (
         <View className="w-full pb-24">
           {renderStatus('Pending', sections.pending)}
+          {renderStatus('Expired', sections.expired)}
           {renderStatus('Confirmed', sections.confirmed)}
         </View>
       );
@@ -249,7 +276,9 @@ export const Transactions = React.memo(
                 borderBottomRightRadius: isLast ? 8 : 0,
                 height: ITEM_HEIGHT,
               }}>
-              {'historyEntry' in item && <Transaction historyEntry={item.historyEntry} />}
+              {'historyEntry' in item && (
+                <Transaction historyEntry={adaptCocoHistoryToTransaction(item.historyEntry)} />
+              )}
             </View>
           );
         }}

@@ -156,24 +156,6 @@ export function EcashSendConfirmation({
     }
   };
 
-  const handleSendEcash = async (onClose: (event: any) => void) => {
-    try {
-      if (!token) {
-        showMessage('Invalid token format', {}, {}, () => onClose({}));
-        return;
-      }
-      const mintUrl = token.mint;
-
-      // Use Coco's send function to send ecash
-      await send(mintUrl, amount);
-      showMessage('Ecash sent successfully!', { amount, unit }, { emoji: '🎉' }, () => onClose({}));
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Failed to send ecash', {}, {}, () =>
-        onClose({})
-      );
-    }
-  };
-
   // Safely format the token
   const getFormattedToken = (): string => {
     try {
@@ -307,14 +289,6 @@ export function EcashSendConfirmation({
                 icon: 'fluent:emoji-24-filled',
                 variant: 'primary',
                 onPress: handleCopyEmoji,
-                condition: !isPaid,
-              },
-              {
-                text: 'Send Ecash',
-                icon: 'mdi:send',
-                variant: 'primary',
-                loading: isSending,
-                onPress: handleSendEcash,
                 condition: !isPaid,
               },
               {

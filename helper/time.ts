@@ -35,7 +35,7 @@ export function formatCustomDate(date: Date): string {
 /**
  * Formats a date for display in a long format (e.g., "January 15, 2024")
  */
-export function formatDate(date: string): string {
+export function formatDate(date: string | number): string {
   const language = store.getState().settings?.settings.lang || 'en';
   return new Intl.DateTimeFormat(language, {
     year: 'numeric',
