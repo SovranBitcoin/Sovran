@@ -38,7 +38,6 @@ import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
-import { CocoTransactionsProvider } from 'providers/CocoTransactionsProvider';
 import { CocoProvider } from 'helper/coco';
 import { PortalHost } from '@rn-primitives/portal';
 /**
@@ -231,12 +230,10 @@ export default function RootLayout() {
                 <SheetProvider context="global">
                   <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
                     <PricelistProvider>
-                      <CocoTransactionsProvider>
-                        <PasscodeGate>
-                          <MainStack />
-                          <PortalHost />
-                        </PasscodeGate>
-                      </CocoTransactionsProvider>
+                      <PasscodeGate>
+                        <MainStack />
+                        <PortalHost />
+                      </PasscodeGate>
                     </PricelistProvider>
                   </View>
                 </SheetProvider>

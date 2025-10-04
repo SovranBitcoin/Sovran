@@ -16,6 +16,8 @@ import { TransactionMintRefresh } from 'components/blocks/Transaction/Transactio
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { Spacer } from 'components/ui/View';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
+import { Text } from 'components/ui/Text';
+
 export function EcashReceiveConfirmation({
   receiveHistoryEntry,
   extraButtons = [],
@@ -131,7 +133,7 @@ export function EcashReceiveConfirmation({
               variant: 'primary',
               onPress: handleRedeemPress,
               loading: loading,
-              condition: !('state' in receiveHistoryEntry && receiveHistoryEntry.state === 'PAID'),
+              condition: !!token,
             },
             ...extraButtons,
           ]}
@@ -154,6 +156,8 @@ export function EcashReceiveConfirmation({
 
         <TransactionMintRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
         <Spacer size={12} />
+
+        <Text>{JSON.stringify(receiveHistoryEntry, null, 2)}</Text>
 
         <Section
           items={[

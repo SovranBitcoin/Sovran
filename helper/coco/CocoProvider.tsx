@@ -46,7 +46,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       try {
         console.log('Initializing Coco Provider...');
 
-        // Initialize the manager
+        // Initialize the manager (includes enabling proof state watcher)
         const mgr = await CocoManager.initialize();
         setManager(mgr);
 
@@ -83,6 +83,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
     };
 
     initializeCoco();
+
+    // Cleanup function
+    return () => {
+      console.log('CocoProvider unmounting, cleaning up...');
+    };
   }, []);
 
   const contextValue: CocoContextValue = {

@@ -12,7 +12,6 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
-import { useTransactions } from 'providers/CocoTransactionsProvider';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { Spacer } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
@@ -149,8 +148,6 @@ const EcashLightningReceiver = () => {
     };
     loadMintInfo();
   }, [getMintInfo]);
-
-  const { refresh } = useTransactions();
 
   return (
     <Modal

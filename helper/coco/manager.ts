@@ -29,12 +29,18 @@ export class CocoManager {
 
     if (this.isInitializing) {
       console.log('Manager initialization in progress, waiting...');
-      // Wait for ongoing initialization
-      while (this.isInitializing) {
+      // Wait for ongoing initialization with timeout
+      let attempts = 0;
+      while (this.isInitializing && attempts < 50) {
+        // 5 second timeout
         await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
       }
       if (this.instance) {
         return this.instance;
+      }
+      if (attempts >= 50) {
+        throw new Error('Manager initialization timeout');
       }
     }
 
@@ -117,16 +123,38 @@ export class CocoManager {
       }
 
       // Enable watchers and processors for real-time updates
-      await this.instance.enableMintQuoteWatcher({
-        watchExistingPendingOnStart: true,
-      });
-      await this.instance.enableMintQuoteProcessor({
-        processIntervalMs: 5000, // Check every 5 seconds
-        maxRetries: 3,
-        baseRetryDelayMs: 1000,
-        initialEnqueueDelayMs: 2000,
-      });
-      await this.instance.enableProofStateWatcher();
+      // Add small delays between watcher initializations to prevent conflicts
+      try {
+        await this.instance.enableMintQuoteWatcher({
+          watchExistingPendingOnStart: true,
+        });
+        console.log('Mint quote watcher enabled');
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+      } catch (error) {
+        console.warn('Failed to enable mint quote watcher:', error);
+      }
+
+      try {
+        await this.instance.enableMintQuoteProcessor({
+          processIntervalMs: 5000, // Check every 5 seconds
+          maxRetries: 3,
+          baseRetryDelayMs: 1000,
+          initialEnqueueDelayMs: 2000,
+        });
+        console.log('Mint quote processor enabled');
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+      } catch (error) {
+        console.warn('Failed to enable mint quote processor:', error);
+      }
+
+      // Temporarily disable ProofStateWatcher to prevent transaction conflicts
+      // TODO: Re-enable once transaction issues are resolved
+      try {
+        await this.instance.enableProofStateWatcher();
+        console.log('Proof state watcher enabled');
+      } catch (error) {
+        console.warn('Failed to enable proof state watcher:', error);
+      }
       return this.instance;
     } catch (error) {
       console.error('Failed to initialize Coco Manager:', error);
@@ -177,9 +205,55 @@ export class CocoManager {
   }
 
   /**
+   * Enable ProofStateWatcher separately to avoid transaction conflicts
+   */
+  static async enableProofStateWatcher(): Promise<void> {
+    if (!this.instance) {
+      throw new Error('Manager not initialized. Call initialize() first.');
+    }
+
+    try {
+      await this.instance.enableProofStateWatcher();
+      console.log('Proof state watcher enabled separately');
+    } catch (error) {
+      console.warn('Failed to enable proof state watcher:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Safely disable all watchers before resetting
+   */
+  static async disableWatchers(): Promise<void> {
+    if (this.instance) {
+      try {
+        await this.instance.disableProofStateWatcher();
+        console.log('Proof state watcher disabled');
+      } catch (error) {
+        console.warn('Failed to disable proof state watcher:', error);
+      }
+
+      try {
+        await this.instance.disableMintQuoteWatcher();
+        console.log('Mint quote watcher disabled');
+      } catch (error) {
+        console.warn('Failed to disable mint quote watcher:', error);
+      }
+
+      try {
+        await this.instance.disableMintQuoteProcessor();
+        console.log('Mint quote processor disabled');
+      } catch (error) {
+        console.warn('Failed to disable mint quote processor:', error);
+      }
+    }
+  }
+
+  /**
    * Reset the manager (useful for testing or logout)
    */
-  static reset(): void {
+  static async reset(): Promise<void> {
+    await this.disableWatchers();
     this.instance = null;
     this.isInitializing = false;
   }

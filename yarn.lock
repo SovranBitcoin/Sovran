@@ -4336,10 +4336,10 @@ clsx@^2.1.1:
   resolved "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz"
   integrity sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==
 
-coco-cashu-core@^1.0.0-rc6:
-  version "1.0.0-rc9"
-  resolved "https://registry.npmjs.org/coco-cashu-core/-/coco-cashu-core-1.0.0-rc9.tgz"
-  integrity sha512-kU3XVjvPWSIqrTKwtqPe2vYjs256EdrOOdno12+ZGoO5116oWrENuwG/QMZOBy6ceUdmqPM3u13zQef6tYrtUg==
+coco-cashu-core@^1.0.0-rc10:
+  version "1.0.0-rc10"
+  resolved "https://registry.yarnpkg.com/coco-cashu-core/-/coco-cashu-core-1.0.0-rc10.tgz#5b94db100aa10cdc7d81b94d5341843680cd204c"
+  integrity sha512-EQVVFgkakGqWMloDJR2bJ4d4Skpahz8/UgKwCzjxuyIxhVeSswKBcUQNHCGMZiZR1BxpLjTH8l9wwuPb4xoS8A==
   dependencies:
     "@cashu/cashu-ts" "^2.7.2"
 
@@ -5709,10 +5709,10 @@ expo-splash-screen@~31.0.10:
   dependencies:
     "@expo/prebuild-config" "^54.0.3"
 
-expo-sqlite@~16.0.8:
-  version "16.0.8"
-  resolved "https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-16.0.8.tgz"
-  integrity sha512-xw776gFgH4ZM5oGs0spSLNmkHO/kJ/EuRXGzE4/22yII9EmG84vm7aM/M2aEb8taBTqwhSGYUpkwkRT5YFFmsg==
+expo-sqlite@~15.2.14:
+  version "15.2.14"
+  resolved "https://registry.yarnpkg.com/expo-sqlite/-/expo-sqlite-15.2.14.tgz#53a63d1bab5e6ab3f5e515bf79d2070dd4fe08c4"
+  integrity sha512-6tWnEE0fcir30/e7eVwjeC7eKdncfVnIgo2JvnKpRndedyiFMXLMyOQWNVGnuhnSrPV2BHvGGjLByS/j5VgH4w==
   dependencies:
     await-lock "^2.2.2"
 

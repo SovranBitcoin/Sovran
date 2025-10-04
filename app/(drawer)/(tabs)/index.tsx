@@ -5,7 +5,6 @@ import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { View, VStack } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
-import { useTransactions } from 'providers/CocoTransactionsProvider';
 import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
 import { getStructure, store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
@@ -23,6 +22,7 @@ import { useDeeplink } from 'hooks/useDeeplink';
 import { getLatestVersion } from 'helper/apiClient';
 import semver from 'semver';
 import { version } from 'app/settings-pages';
+import { usePaginatedHistory } from 'coco-cashu-react';
 
 function TabOneScreen() {
   const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
@@ -48,7 +48,7 @@ function TabOneScreen() {
 
   const theme = useSelector(memoizedGetTheme);
 
-  const { history } = useTransactions();
+  const { history } = usePaginatedHistory();
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);

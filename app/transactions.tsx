@@ -6,7 +6,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
 import { Transactions } from 'components/blocks/Transactions';
-import { useTransactions } from 'providers/CocoTransactionsProvider';
 import Container from 'components/blocks/Container';
 import CurrencySelector from 'components/blocks/CurrencySelector';
 import Icon from 'assets/icons';
@@ -14,6 +13,7 @@ import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MintHistoryEntry } from 'coco-cashu-core';
 import { mintHistoryEntryExpired } from 'helper/utils';
+import { usePaginatedHistory } from 'coco-cashu-react';
 
 function ModalScreen() {
   const theme = useSelector(memoizedGetTheme);
@@ -49,7 +49,7 @@ function ModalScreen() {
     setType('all');
   };
 
-  const { history } = useTransactions();
+  const { history } = usePaginatedHistory();
 
   const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
 
