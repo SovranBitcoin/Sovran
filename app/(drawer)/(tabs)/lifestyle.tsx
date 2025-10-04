@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
-import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetTheme } from 'helper/redux/settings';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from 'helper/constants';
 
@@ -74,7 +74,6 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
 // Root component (ServicesSection logic merged here)
 const TabTwoScreen = () => {
   const theme = useSelector(memoizedGetTheme);
-  const settings = useSelector(memoizedGetSettings);
 
   const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
