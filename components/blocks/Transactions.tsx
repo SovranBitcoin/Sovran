@@ -47,6 +47,7 @@ export const Transactions = React.memo(
     history,
     filter = 'all',
     type = 'all',
+    tab = 'All',
     days = 1,
   }: Props) => {
     const theme = useSelector(memoizedGetTheme);
@@ -109,14 +110,21 @@ export const Transactions = React.memo(
       };
     }, [pending, confirmed, showMore, days]);
 
-    const flattenedData = useMemo(
-      () =>
-        _.flatMap(sections.all, (section) => [
-          { type: 'header', title: section.title },
-          ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
-        ]),
-      [sections.all]
-    );
+    const flattenedData = useMemo(() => {
+      let sectionsToDisplay;
+      if (tab === 'Pending') {
+        sectionsToDisplay = sections.pending;
+      } else if (tab === 'Confirmed') {
+        sectionsToDisplay = sections.confirmed;
+      } else {
+        sectionsToDisplay = sections.all;
+      }
+
+      return _.flatMap(sectionsToDisplay, (section) => [
+        { type: 'header', title: section.title },
+        ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
+      ]);
+    }, [sections.all, sections.pending, sections.confirmed, tab]);
 
     if (showMore) {
       if (filteredHistory.length === 0) {
@@ -219,7 +227,7 @@ export const Transactions = React.memo(
           if (item.type === 'header') {
             return (
               <Text size={14} heavy color={theme.greys[500]} style={{ height: HEADER_HEIGHT }}>
-                {item.title}
+                {'title' in item ? item.title : ''}
               </Text>
             );
           }
@@ -241,7 +249,7 @@ export const Transactions = React.memo(
                 borderBottomRightRadius: isLast ? 8 : 0,
                 height: ITEM_HEIGHT,
               }}>
-              <Transaction historyEntry={item.historyEntry} />
+              {'historyEntry' in item && <Transaction historyEntry={item.historyEntry} />}
             </View>
           );
         }}

@@ -51,11 +51,46 @@ function ModalScreen() {
 
   const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
 
+  // Calculate counts for tabs
+  const filteredHistory = React.useMemo(() => {
+    return history.filter((historyEntry) => {
+      if (historyEntry.unit !== selectedCurrency) return false;
+      if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
+      if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
+      if (type === 'lightning' && historyEntry.type !== 'mint') return false;
+      if (type === 'ecash' && historyEntry.type !== 'send') return false;
+      return true;
+    });
+  }, [history, selectedCurrency, filter, type]);
+
+  const { pendingCount, confirmedCount } = React.useMemo(() => {
+    const pending = filteredHistory.filter((historyEntry) => {
+      return (
+        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
+        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')
+      );
+    });
+    const confirmed = filteredHistory.filter((historyEntry) => {
+      return !(
+        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
+        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')
+      );
+    });
+    return {
+      pendingCount: pending.length,
+      confirmedCount: confirmed.length,
+    };
+  }, [filteredHistory]);
+
+  const allCount = filteredHistory.length;
+
+  const parsedAccount = account ? JSON.parse(account) : { unit: selectedCurrency };
+
   return (
     <Container>
       <Transactions
         listKey={listKey}
-        account={{ ...account, unit: selectedCurrency }}
+        account={{ ...parsedAccount, unit: selectedCurrency }}
         showMore={false}
         history={history}
         filter={filter}
@@ -68,7 +103,7 @@ function ModalScreen() {
               tabs={['All', 'Confirmed', 'Pending']}
               selectedTab={tab}
               handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending')}
-              amounts={['0', '0', '0']} // TODO: Calculate counts from history
+              amounts={[String(allCount), String(confirmedCount), String(pendingCount)]}
             />
 
             <View
