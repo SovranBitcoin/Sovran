@@ -3,7 +3,7 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { SheetManager } from 'react-native-actions-sheet';
-import { View, HStack, VStack } from 'components/ui/View';
+import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { greys } from 'helper/colors';
@@ -238,14 +238,7 @@ export function EcashSendConfirmation({
 
   // Show loading state if transaction is not found
   if (!currentTransaction) {
-    return (
-      <Modal showClose title="Loading...">
-        <View style={{ padding: 20, alignItems: 'center' }}>
-          <Text>Loading transaction...</Text>
-          <Text>{getEncodedTokenV4(token)}</Text>
-        </View>
-      </Modal>
-    );
+    return <Modal showClose title="Loading..."></Modal>;
   }
 
   const isPaid = 'state' in currentTransaction && currentTransaction.state === 'PAID';
@@ -416,13 +409,12 @@ function ModalScreen() {
   }>();
 
   // Convert string token to Token object if needed
-  const tokenObj = typeof token === 'string' ? JSON.parse(token) : token;
 
   return (
     <EcashSendConfirmation
       unit={unit}
       amount={amount ? parseFloat(amount) : 0}
-      token={tokenObj}
+      token={JSON.parse(token)}
       paymentRequest={paymentRequest}
     />
   );

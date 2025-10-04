@@ -99,7 +99,7 @@ export const Avatar = ({
       const fallbackIcon =
         variant === 'person'
           ? 'ph:user-bold' // User icon for people
-          : 'material-symbols:account-balance'; // Bank/mint icon for mints
+          : 'majesticons:coins'; // Coins icon for mints
       return (
         <Icon
           name={fallbackIcon}

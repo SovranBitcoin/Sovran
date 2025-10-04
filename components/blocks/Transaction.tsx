@@ -77,7 +77,7 @@ const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
               pathname: '/ecashSendConfirmation',
               params: {
                 unit: historyEntry.unit,
-                token: historyEntry.token,
+                token: JSON.stringify(historyEntry.token),
                 amount: historyEntry.amount.toString(),
                 paymentRequest: historyEntry.paymentRequest,
               },
