@@ -12,7 +12,6 @@ import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
 import _ from 'lodash';
 import { mintHistoryEntryExpired } from 'helper/utils';
-import { adaptCocoHistoryToTransaction } from 'helper/coco/typeAdapters';
 
 interface Account {
   unit: string;
@@ -107,20 +106,34 @@ export const Transactions = React.memo(
 
     const sections = useMemo(() => {
       const createSections = (historyEntries: HistoryEntry[]) => {
+        // Group by date string for display, but keep track of the original date for sorting
         const groupedByDate = _.groupBy(historyEntries, (historyEntry) =>
           formatDate(historyEntry.createdAt)
         );
-        const sortedDates = _.orderBy(
-          Object.keys(groupedByDate),
-          (date) => new Date(date).getTime(),
+
+        // Create an array of {dateString, originalDate} pairs for proper sorting
+        const dateEntries = Object.keys(groupedByDate).map((dateString) => {
+          // Find the first history entry for this date to get the original createdAt
+          const firstEntry = groupedByDate[dateString][0];
+          return {
+            dateString,
+            originalDate: new Date(firstEntry.createdAt),
+          };
+        });
+
+        // Sort by original date in descending order (newest first)
+        const sortedDateEntries = _.orderBy(
+          dateEntries,
+          (entry) => entry.originalDate.getTime(),
           'desc'
         );
-        const datesToShow = showMore ? _.take(sortedDates, days) : sortedDates;
 
-        return datesToShow.map((date) => ({
-          title: date,
-          data: groupedByDate[date],
-          index: date,
+        const datesToShow = showMore ? _.take(sortedDateEntries, days) : sortedDateEntries;
+
+        return datesToShow.map(({ dateString }) => ({
+          title: dateString,
+          data: groupedByDate[dateString],
+          index: dateString,
         }));
       };
 
@@ -190,13 +203,15 @@ export const Transactions = React.memo(
                     </Text>
                     <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
                       {section.data.map((historyEntry) => {
-                        const adaptedEntry = adaptCocoHistoryToTransaction(historyEntry);
-                        const key =
-                          adaptedEntry.id ||
-                          adaptedEntry.request ||
-                          adaptedEntry.token ||
-                          Math.random().toString();
-                        return <Transaction key={key} historyEntry={adaptedEntry} />;
+                        const key = (() => {
+                          if (historyEntry.id) return historyEntry.id;
+                          if ('token' in historyEntry && historyEntry.token)
+                            return typeof historyEntry.token === 'string'
+                              ? historyEntry.token
+                              : JSON.stringify(historyEntry.token);
+                          return Math.random().toString();
+                        })();
+                        return <Transaction key={key} historyEntry={historyEntry} />;
                       })}
                       {label === 'Confirmed' && (
                         <TouchableOpacity
@@ -276,9 +291,7 @@ export const Transactions = React.memo(
                 borderBottomRightRadius: isLast ? 8 : 0,
                 height: ITEM_HEIGHT,
               }}>
-              {'historyEntry' in item && (
-                <Transaction historyEntry={adaptCocoHistoryToTransaction(item.historyEntry)} />
-              )}
+              {'historyEntry' in item && <Transaction historyEntry={item.historyEntry} />}
             </View>
           );
         }}
