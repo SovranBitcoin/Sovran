@@ -6,7 +6,7 @@ import { cn } from 'lib/utils';
 import Icon from 'assets/icons';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { greys, greens, reds } from 'helper/colors';
 
 const badgeVariants = cva(
   'rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
@@ -62,7 +62,7 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
         };
       case 'success':
         return {
-          backgroundColor: '#10b981',
+          backgroundColor: greens[300],
           borderColor: 'transparent',
         };
       default:
@@ -82,11 +82,11 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
       case 'secondary':
         return g[800];
       case 'warning':
-        return '#92400e';
+        return reds[500];
       case 'error':
-        return '#7f1d1d';
+        return reds[500];
       case 'success':
-        return '#064e3b';
+        return greens[500];
       default:
         return g[900];
     }

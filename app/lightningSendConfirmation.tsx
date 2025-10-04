@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatAmount } from 'helper/currency';
-import { useCashuUtilities, useMintManagement } from 'hooks/coco';
+import { useCashuUtilities, useMintManagement, useMelt } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
 import { VStack, HStack } from 'components/ui/View';
@@ -17,7 +17,6 @@ import { TransactionHeader } from 'components/blocks/Transaction/TransactionHead
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { SheetManager } from 'react-native-actions-sheet';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { MintQuoteTimeline } from './lightningReceiveConfirmation';
@@ -25,10 +24,10 @@ import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 export function LightningSendConfirmation({
   pr,
   unit: initialUnit,
-  pubkey,
+  pubkey: _pubkey,
   meltQuote: initialMeltQuote,
-  redirect,
-  email,
+  redirect: _redirect,
+  email: _email,
   extraButtons = [],
   lud16,
 }: {
@@ -43,6 +42,7 @@ export function LightningSendConfirmation({
 }) {
   const { getLightningDescription, getLightningTimestamp } = useCashuUtilities();
   const { history } = usePaginatedHistory();
+  const { melt, isLoading: isMelting, error: meltError, reset: resetMelt } = useMelt();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -112,18 +112,27 @@ export function LightningSendConfirmation({
     }
   };
 
-  const handleOpenSheet = () => {
-    SheetManager.show('lightning-mpp', {
-      payload: {
-        pr,
-        unit,
-        amount,
-        pubkey,
-        email,
-        lud16,
-        redirect,
-      },
-    });
+  const handleMelt = async () => {
+    try {
+      resetMelt(); // Clear any previous errors
+
+      if (!selectedMintUrl) {
+        throw new Error('No mint selected');
+      }
+
+      if (!pr) {
+        throw new Error('No payment request available');
+      }
+
+      // Melt tokens to pay the Lightning invoice
+      await melt(selectedMintUrl, pr);
+
+      // Payment successful - the transaction will appear in history automatically
+      // via Coco's event system
+    } catch (error) {
+      console.error('Failed to melt tokens:', error);
+      // Error is handled by the melt hook and will be displayed in the UI
+    }
   };
 
   const handleCancel = () => {
@@ -190,11 +199,12 @@ export function LightningSendConfirmation({
                 condition: !isPaid && !hasTransaction,
               },
               {
-                text: 'Send',
-                icon: 'ri:send-plane-2-fill',
+                text: isMelting ? 'Sending...' : 'Send',
+                icon: isMelting ? 'ri:loader-line' : 'ri:send-plane-2-fill',
                 variant: 'primary',
-                onPress: async () => handleOpenSheet(),
+                onPress: async () => handleMelt(),
                 condition: !isPaid && !hasTransaction,
+                disabled: isMelting,
               },
               ...extraButtons.map((button) => ({
                 ...button,
@@ -222,6 +232,8 @@ export function LightningSendConfirmation({
         {currentTransaction?.metadata?.memo && (
           <Card message={currentTransaction.metadata.memo} variant="info" />
         )}
+
+        {meltError && <Card message={`Payment failed: ${meltError.message}`} variant="warning" />}
 
         {hasTransaction && isPaid && (
           <TransactionMintRefresh

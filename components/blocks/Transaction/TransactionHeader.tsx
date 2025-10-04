@@ -52,7 +52,7 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
         </Text>
       </VStack>
       <View className="scale-125 transform bg-transparent p-4">
-        <TransactionIcon transaction={historyEntry} />
+        <TransactionIcon historyEntry={historyEntry} />
       </View>
     </HStack>
   );

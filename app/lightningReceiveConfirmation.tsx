@@ -245,13 +245,10 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
 }
 
 export function LightningReceiveConfirmation({
-  request,
-  unit,
+  mintHistoryEntry,
   extraButtons = [],
 }: {
-  request: string;
-  paymentRequest?: string;
-  unit: string;
+  mintHistoryEntry: MintHistoryEntry;
   autoGoBackOnPaid?: boolean;
   extraButtons?: ButtonHandlerButton[];
 }) {
@@ -264,8 +261,10 @@ export function LightningReceiveConfirmation({
 
   // Find the current transaction using Coco's history system
   const currentTransaction = history.find(
-    (tx: HistoryEntry) => tx.type === 'mint' && (tx as MintHistoryEntry).paymentRequest === request
-  ) as MintHistoryEntry | undefined;
+    (historyEntry: HistoryEntry) =>
+      historyEntry.type === 'mint' &&
+      historyEntry.paymentRequest === mintHistoryEntry.paymentRequest
+  );
 
   // Load mint info when transaction is found
   useEffect(() => {
@@ -278,13 +277,13 @@ export function LightningReceiveConfirmation({
   }, [currentTransaction?.mintUrl, manager]);
 
   const handleCopy = async (close: (event: any) => void) => {
-    await Clipboard.setStringAsync(request);
+    await Clipboard.setStringAsync(mintHistoryEntry.paymentRequest);
     showSuccess('lightning_address_copied', {}, {}, () => close({}));
   };
 
   const handleShare = async (close: (event: any) => void) => {
     if (uri) {
-      await Share.share({ url: uri, message: request });
+      await Share.share({ url: uri, message: mintHistoryEntry.paymentRequest });
     }
     close({});
   };
@@ -300,13 +299,13 @@ export function LightningReceiveConfirmation({
     );
   }
 
-  const isBitcoin = unit === 'sat';
+  const isBitcoin = mintHistoryEntry.unit === 'sat';
   const isPaid = currentTransaction?.state === 'ISSUED' || currentTransaction?.state === 'PAID';
 
   return (
     <Modal
       showClose
-      title={`Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`}
+      title={`Receive ${isBitcoin ? 'Bitcoin' : mintHistoryEntry.unit.toUpperCase()}`}
       buttons={
         <HStack justify="center" align="center">
           <ButtonHandler
@@ -336,8 +335,8 @@ export function LightningReceiveConfirmation({
           <PaymentInfo
             showSection={false}
             setUri={setUri}
-            data={[{ name: 'Lightning', value: request }]}
-            unit={unit}
+            data={[{ name: 'Lightning', value: mintHistoryEntry.paymentRequest }]}
+            unit={mintHistoryEntry.unit}
             popupMessage={[{ name: 'lightning_address_copied' }]}
           />
         )}
@@ -361,7 +360,7 @@ export function LightningReceiveConfirmation({
           items={[
             {
               title: 'Request',
-              value: truncateMiddle(request, 10),
+              value: truncateMiddle(mintHistoryEntry.paymentRequest, 10),
             },
             {
               title: 'Type',
@@ -380,7 +379,7 @@ export function LightningReceiveConfirmation({
             },
             {
               title: 'Amount',
-              value: `${currentTransaction.amount} ${unit.toUpperCase()}`,
+              value: `${currentTransaction.amount} ${mintHistoryEntry.unit.toUpperCase()}`,
             },
           ]}
         />
@@ -392,12 +391,13 @@ export function LightningReceiveConfirmation({
 }
 
 function ModalScreen() {
-  const { request, unit } = useLocalSearchParams<{
-    request: string;
-    unit: string;
+  const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
+    mintHistoryEntry: string;
   }>();
 
-  return <LightningReceiveConfirmation request={request} unit={unit} />;
+  const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
+
+  return <LightningReceiveConfirmation mintHistoryEntry={mintHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

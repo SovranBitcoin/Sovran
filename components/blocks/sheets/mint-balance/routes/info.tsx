@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ScrollView, Animated, Alert } from 'react-native';
+import { ScrollView, Animated, Alert, Linking } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
+import { router } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { greys, greens, reds } from 'helper/colors';
@@ -8,6 +9,7 @@ import { Text } from 'components/ui/Text';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack, Spacer, HStack, View } from 'components/ui/View';
+import { npubToPubkey } from 'components/blocks/Transaction';
 import { useMintManagement } from 'hooks/coco';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Card } from 'components/ui/Card';
@@ -128,7 +130,6 @@ const DonutChart = ({
         width: containerSize,
         height: containerSize,
         borderRadius: borderRadius,
-        overflow: 'hidden',
         ...style,
       }}>
       <Canvas style={{ width: containerSize, height: containerSize }}>
@@ -320,22 +321,43 @@ const InfoRoute = () => {
     }
   };
 
-  const handleContactPress = (method: string, info: string) => {
-    switch (method) {
-      case 'email':
-        // Linking.openURL(`mailto:${info}`);
-        handleCopy(info);
-        break;
-      case 'twitter':
-      case 'x':
-        // Linking.openURL(`https://x.com/${info.replace('@', '')}`);
-        handleCopy(info);
-        break;
-      case 'nostr':
-        handleCopy(info);
-        break;
-      default:
-        handleCopy(info);
+  const handleContactPress = async (method: string, info: string) => {
+    try {
+      switch (method.toLowerCase()) {
+        case 'email':
+          await Linking.openURL(`mailto:${info}`);
+          break;
+        case 'twitter':
+        case 'x':
+          // Remove @ symbol if present and open X app
+          const username = info.replace('@', '');
+          await Linking.openURL(`https://x.com/${username}`);
+          break;
+        case 'nostr':
+          // Convert npub to pubkey if needed and navigate to userMessages
+          const pubkey = npubToPubkey(info);
+          router.push({
+            pathname: '/userMessages',
+            params: {
+              pubkey: pubkey,
+            },
+          });
+          // Close the current sheet
+          sheetRef.current?.hide();
+          break;
+        default:
+          // Fallback to copying to clipboard
+          await handleCopy(info);
+      }
+    } catch (error) {
+      console.error('Error opening contact link:', error);
+      // Fallback to copying to clipboard if opening fails
+      Alert.alert('Unable to open', 'Copying to clipboard instead', [
+        {
+          text: 'OK',
+          onPress: () => handleCopy(info),
+        },
+      ]);
     }
   };
 
@@ -407,7 +429,7 @@ const InfoRoute = () => {
       <Avatar
         picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
         size={70}
-        variant="mint"
+        variant="person"
         name={
           mintInfo?.name || auditMintInfo?.name || mintUrl?.replace('https://', '').split('/')[0]
         }
@@ -440,11 +462,15 @@ const InfoRoute = () => {
             <VStack align="center" className="mb-4">
               <DonutChart
                 size={84}
-                variant="mint"
+                variant="round"
                 sections={[
                   {
-                    value: 1,
+                    value: 5,
                     color: greys(theme)[600],
+                  },
+                  {
+                    value: 5,
+                    color: greys(theme)[700],
                   },
                 ]}>
                 {renderMintIcon()}
@@ -522,14 +548,14 @@ const InfoRoute = () => {
           <VStack align="center" className="mb-4">
             <DonutChart
               size={84}
-              variant="mint"
+              variant="round"
               sections={[
                 {
-                  value: successRate ? successRate * 10 : 1,
+                  value: hasError ? 3 : (successRate || 0.5) * 10,
                   color: hasError ? greys(theme)[600] : greens[300],
                 },
                 {
-                  value: successRate ? (1 - successRate) * 10 : 0,
+                  value: hasError ? 7 : (1 - (successRate || 0.5)) * 10,
                   color: hasError ? greys(theme)[700] : reds[300],
                 },
               ]}>

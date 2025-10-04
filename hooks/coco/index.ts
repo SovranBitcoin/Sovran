@@ -15,6 +15,7 @@ export { useCashuUtilities } from './useCashuUtilities';
 export { useCashuSpecialized } from './useCashuSpecialized';
 export { useAuditedMint } from './useAuditedMint';
 export { useDiscoveredMints } from './useDiscoveredMints';
+export { useMelt } from './useMelt';
 
 // Re-export coco-cashu-react hooks for direct use when needed
 export {
