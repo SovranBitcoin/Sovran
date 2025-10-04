@@ -17,11 +17,11 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
   const theme = useSelector(memoizedGetTheme);
 
   // Determine if this is a send or receive transaction
-  const isSend = historyEntry.type === 'send';
-  const isReceive = historyEntry.type === 'mint';
+  const isSend = historyEntry.type === 'send' || historyEntry.type === 'melt';
+  const isReceive = historyEntry.type === 'mint' || historyEntry.type === 'receive';
 
   return (
-    <HStack align="center" justify="space-between" className="p-5">
+    <HStack align="center" justify="space-between" className="p-5 pb-0">
       <VStack>
         <HStack align="center">
           <Spacer size={8} />

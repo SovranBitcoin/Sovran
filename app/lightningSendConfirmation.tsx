@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
-import { Spacer, View, VStack, HStack } from 'components/ui/View';
-
-import { useLocalSearchParams } from 'expo-router';
-import { router } from 'expo-router';
+import { VStack, HStack } from 'components/ui/View';
+import { useLocalSearchParams, router } from 'expo-router';
 import { handleBarcode } from 'helper/payment-handler/handlers';
-// Removed Redux Cashu actions - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { truncateMiddle } from 'helper/strings';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
@@ -17,15 +14,15 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
-
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-// Removed RootState import - no longer needed
 import { SheetManager } from 'react-native-actions-sheet';
+import { usePaginatedHistory } from 'coco-cashu-react';
+import type { MeltHistoryEntry } from 'coco-cashu-core';
+import { MintQuoteTimeline } from './lightningReceiveConfirmation';
 
 export function LightningSendConfirmation({
-  transaction,
   pr,
   unit: initialUnit,
   pubkey,
@@ -35,7 +32,6 @@ export function LightningSendConfirmation({
   extraButtons = [],
   lud16,
 }: {
-  transaction?: any;
   pr: string;
   unit: string;
   pubkey?: string;
@@ -46,6 +42,7 @@ export function LightningSendConfirmation({
   lud16?: string;
 }) {
   const { getLightningDescription, getLightningTimestamp } = useCashuUtilities();
+  const { history } = usePaginatedHistory();
 
   const [meltQuote, setMeltQuote] = useState(initialMeltQuote);
   const [unit, setUnit] = useState(initialUnit);
@@ -54,16 +51,28 @@ export function LightningSendConfirmation({
   const feeReserve = parsedQuote?.fee_reserve;
   const quoteId = parsedQuote?.quote;
 
-  // Removed profileId - no longer needed with Coco
-
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
   const { getMintInfo } = useMintManagement();
   const [mintInfo, setMintInfo] = React.useState<any>({});
 
-  // Load mint info when selectedMintUrl changes
-  React.useEffect(() => {
+  // Find the current transaction using Coco's history system
+  // MeltHistoryEntry stores quoteId, not the payment request
+  const currentTransaction = history.find(
+    (tx) => tx.type === 'melt' && (tx as MeltHistoryEntry).quoteId === quoteId
+  ) as MeltHistoryEntry | undefined;
+
+  // Load mint info when transaction is found
+  useEffect(() => {
     const loadMintInfo = async () => {
-      if (selectedMintUrl) {
+      if (currentTransaction?.mintUrl) {
+        try {
+          const info = await getMintInfo(currentTransaction.mintUrl);
+          setMintInfo(info);
+        } catch (error) {
+          console.error('Failed to load mint info:', error);
+          setMintInfo({});
+        }
+      } else if (selectedMintUrl) {
         try {
           const info = await getMintInfo(selectedMintUrl);
           setMintInfo(info);
@@ -71,12 +80,10 @@ export function LightningSendConfirmation({
           console.error('Failed to load mint info:', error);
           setMintInfo({});
         }
-      } else {
-        setMintInfo({});
       }
     };
     loadMintInfo();
-  }, [selectedMintUrl, getMintInfo]);
+  }, [currentTransaction?.mintUrl, selectedMintUrl, getMintInfo]);
 
   const handleMintSelected = async (mint: any, balance: any) => {
     if (pr) {
@@ -124,6 +131,22 @@ export function LightningSendConfirmation({
     router.push('/(drawer)/(tabs)');
   };
 
+  const isPaid = currentTransaction?.state === 'PAID';
+  const hasTransaction = !!currentTransaction;
+
+  // Create a synthetic history entry for pre-send mode
+  const displayTransaction: MeltHistoryEntry = currentTransaction || {
+    id: 'pending',
+    type: 'melt',
+    quoteId: quoteId || 'pending',
+    state: 'UNPAID',
+    amount: amount || 0,
+    unit: unit,
+    mintUrl: selectedMintUrl || '',
+    createdAt: Date.now(),
+    metadata: {},
+  };
+
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
 
   const formatAmount = (value: number, displayDenomination = unit === 'sat' ? 'btc' : unit) => {
@@ -155,79 +178,76 @@ export function LightningSendConfirmation({
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => handleCancel(),
-                condition: !!transaction?.paid,
+                condition: isPaid,
               },
               {
                 text: 'View Message',
                 icon: 'ri:message-2-line',
                 variant: 'primary',
                 onPress: async () => {
-                  router.push({
-                    pathname: '/userMessages',
-                    params: {
-                      pubkey: transaction.nostr.pubkey,
-                    },
-                  });
-                  router.back();
+                  const nostrPubkey = currentTransaction?.metadata?.nostr as string;
+                  if (nostrPubkey) {
+                    router.push({
+                      pathname: '/userMessages',
+                      params: {
+                        pubkey: nostrPubkey,
+                      },
+                    });
+                    router.back();
+                  }
                 },
-                condition: !!(transaction?.paid && transaction.nostr.pubkey),
+                condition: !!(isPaid && currentTransaction?.metadata?.nostr),
               },
               {
                 text: 'Cancel',
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => handleCancel(),
-                condition: !transaction?.paid,
+                condition: !isPaid && !hasTransaction,
               },
               {
                 text: 'Send',
                 icon: 'ri:send-plane-2-fill',
                 variant: 'primary',
                 onPress: async () => handleOpenSheet(),
-                condition: !transaction?.paid,
+                condition: !isPaid && !hasTransaction,
               },
               ...extraButtons.map((button) => ({
                 ...button,
-                condition: !transaction?.paid,
+                condition: !isPaid && !hasTransaction,
               })),
             ]}
           />
         </HStack>
       }>
-      <View>
-        <TransactionHeader
-          transaction={{
-            ...transaction,
-            isSend: true,
-            unit,
-            amount,
-            transactionType: 'send',
-            type: 'lightning',
-            nostrPubkey: pubkey,
-          }}
-        />
-        {!transaction?.paid && (
+      <VStack gap={12}>
+        <TransactionHeader historyEntry={displayTransaction} />
+
+        {!hasTransaction && (
           <MintBalanceDisplay
             onMintSelected={handleMintSelected}
             unit={unit}
             updateSelectedMint={false}
           />
         )}
-        <Spacer size={12} />
 
         {getLightningDescription(pr) && (
-          <VStack spacing={12} style={{ margin: 16, marginTop: 12 }}>
-            <Card message={getLightningDescription(pr)} variant="info" />
-          </VStack>
+          <Card message={getLightningDescription(pr)} variant="info" />
         )}
 
-        {transaction?.paid && (
+        {currentTransaction?.metadata?.memo && (
+          <Card message={currentTransaction.metadata.memo} variant="info" />
+        )}
+
+        {hasTransaction && isPaid && (
           <TransactionMintRefresh
             mintInfo={mintInfo}
-            transaction={{ ...transaction, transactionType: 'send' }}
+            historyEntry={currentTransaction}
+            handleCheckStatus={async () => {}}
           />
         )}
-        <Spacer size={12} />
+
+        {hasTransaction && <MintQuoteTimeline historyEntry={currentTransaction} />}
 
         <Section
           items={[
@@ -239,12 +259,15 @@ export function LightningSendConfirmation({
               title: `Fee (${getCurrencyDisplay()})`,
               value: formatAmount(feeReserve),
             },
+            {
+              title: 'Amount',
+              value: `${displayTransaction.amount} ${unit.toUpperCase()}`,
+            },
           ]}
         />
-        <Spacer size={12} />
 
-        {transaction && <TransactionDebugCode transaction={transaction} />}
-      </View>
+        {hasTransaction && <TransactionDebugCode historyEntry={currentTransaction} />}
+      </VStack>
     </Modal>
   );
 }

@@ -33,8 +33,8 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   const flattenedStyle = StyleSheet.flatten(style);
   const { backgroundColor: _backgroundColor, ...cleanStyle } = flattenedStyle || {};
 
-  if (!blur || !image) {
-    // 🔁 Normal unwrapped View – identical to before
+  if (!blur) {
+    // 🔁 Normal unwrapped View – no blur requested
     return (
       <RNView ref={ref} style={style} {...rest}>
         {children}
@@ -42,7 +42,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
     );
   }
 
-  // 🧊 Blur-enhanced View
+  // 🧊 Blur-enhanced View - works with or without background image
   return (
     <RNView
       ref={ref}

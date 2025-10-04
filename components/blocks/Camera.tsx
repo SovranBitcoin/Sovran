@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { greys } from 'helper/colors';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
@@ -9,7 +9,6 @@ import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { useSelector } from 'react-redux';
 import { memoizedGetTheme } from 'helper/redux/settings';
-import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import Icon from 'assets/icons';
@@ -40,15 +39,14 @@ const Camera: React.FC = () => {
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
   // Reset state when component comes into focus
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+  useFocusEffect(
+    useCallback(() => {
       setScanned(false);
       setLoading(false);
       setProgress(0);
       setUrDecoder(new URDecoder());
-    });
-    return unsubscribe;
-  }, [navigation]);
+    }, [])
+  );
 
   const toggleFlashlight = useCallback((): void => {
     setFlashlightOn((prev) => !prev);
@@ -62,7 +60,6 @@ const Camera: React.FC = () => {
     setLoading(true);
     const res = await barcodeHandler({
       scanning,
-      navigation,
       urDecoder,
       unit,
       selectedMint,
@@ -73,7 +70,7 @@ const Camera: React.FC = () => {
     if (res.isErr()) {
       showMessage(res.error.message, {}, { emoji: '🚨' });
     }
-  }, [navigation, urDecoder, unit, selectedMint]);
+  }, [urDecoder, unit, selectedMint]);
 
   const handleCameraReady = useCallback(async (): Promise<void> => {
     try {
@@ -101,7 +98,6 @@ const Camera: React.FC = () => {
         setLoading(true);
         const res = await barcodeHandler({
           scanning,
-          navigation,
           urDecoder,
           unit,
           selectedMint,
@@ -114,7 +110,7 @@ const Camera: React.FC = () => {
         }
       }
     },
-    [navigation, scanned, urDecoder, unit, selectedMint]
+    [scanned, urDecoder, unit, selectedMint]
   );
 
   // Return empty container if no camera permissions

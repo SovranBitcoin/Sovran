@@ -133,7 +133,7 @@ export async function getWallet({
       if (res.isOk()) {
         const data = res.value;
         const auditWithTimestamp = { ...data, lastFetched: Date.now() };
-        store.dispatch(setAudit({ mintUrl, audit: auditWithTimestamp }));
+        // Note: Coco now manages audit state internally, no need to dispatch to Redux
         wallet.audits = auditWithTimestamp;
       } else {
         console.error(`Audit fetch failed for ${mintUrl}:`, res.error.message);
