@@ -239,7 +239,6 @@ export function LightningReceiveConfirmation({
   const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
-  const [refreshing] = useState(false);
 
   const { history } = usePaginatedHistory();
 
@@ -304,14 +303,6 @@ export function LightningReceiveConfirmation({
                 icon: 'ri:share-fill',
                 variant: 'secondary',
                 onPress: handleShare,
-                condition: !isPaid,
-              },
-              {
-                text: refreshing ? 'Checking...' : 'Check Status',
-                icon: refreshing ? 'humbleicons:refresh' : 'humbleicons:refresh',
-                variant: 'secondary',
-                onPress: async () => {},
-                loading: refreshing,
                 condition: !isPaid,
               },
               ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
