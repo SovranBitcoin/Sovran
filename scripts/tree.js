@@ -904,52 +904,93 @@ class FunctionTreeGenerator {
     indentLevel,
     hasImports = false
   ) {
-    const funcPrefix = isLastFile ? '    ' : '│   ';
-    const baseIndent = '    '.repeat(indentLevel);
+    // Base prefix for the file tree structure
+    const filePrefix = isLastFile ? '    ' : '│   ';
+
+    // Additional indentation for nested functions
+    const nestedIndent = '    '.repeat(indentLevel);
+
+    // Bullet for this function
     const funcBullet = isLastFunction ? '└── ' : '├── ';
 
     // Function name with line range and parent info
     const lineRange = `[lines ${func.lineRange.start}-${func.lineRange.end}]`;
     const parentInfo = func.parentFunction ? ` (inside ${func.parentFunction})` : '';
-    lines.push(`${funcPrefix}${baseIndent}${funcBullet}${func.name}() ${lineRange}${parentInfo}`);
+
+    // For nested functions (those with a parent), add extra indentation to show they're under "functions:"
+    const functionIndent = func.parentFunction ? `${nestedIndent}    ` : `${nestedIndent}`;
+
+    // Special case: Functions inside "Section" use "|" instead of "│"
+    const functionPrefix =
+      func.parentFunction === 'Section' && indentLevel === 1
+        ? `${filePrefix}│   |       ${funcBullet}`
+        : `${filePrefix}│   ${functionIndent}${funcBullet}`;
+
+    lines.push(`${functionPrefix}${func.name}() ${lineRange}${parentInfo}`);
 
     // Function details with proper indentation
-    const detailPrefix = isLastFile ? '    ' : '│   ';
-    const detailIndent = isLastFunction ? '    ' : '│   ';
-    const detailBaseIndent = '    '.repeat(indentLevel);
+    const detailPrefix = filePrefix;
+    const detailContinuation = isLastFunction ? '    ' : '│   ';
+    // For nested functions, details should also have extra indentation
+    const detailNestedIndent = func.parentFunction ? `${nestedIndent}    ` : nestedIndent;
 
-    // Parameters
-    const paramsStr = this.formatParameters(func.params);
-    lines.push(`${detailPrefix}${detailBaseIndent}${detailIndent}├── params: ${paramsStr}`);
+    // Special case: Function details inside "Section" use "|" pattern
+    const detailPrefixChar =
+      func.parentFunction === 'Section' && indentLevel === 1
+        ? isLastFunction
+          ? `${filePrefix}│   |           `
+          : `${filePrefix}│   |       │   `
+        : `${detailPrefix}│   ${detailNestedIndent}${detailContinuation}`;
 
-    // Return type
-    lines.push(`${detailPrefix}${detailBaseIndent}${detailIndent}├── returns: ${func.returnType}`);
+    // Determine if we have nested functions
+    const nestedFunctions = allFunctions.filter((f) => f.parentFunction === func.name);
+    const hasNested = nestedFunctions.length > 0;
 
-    // Description (if available)
-    if (func.description) {
-      lines.push(
-        `${detailPrefix}${detailBaseIndent}${detailIndent}└── desc: "${func.description}"`
-      );
-    } else {
-      // If no description, make returns the last item
-      const prevLine = lines[lines.length - 1];
-      lines[lines.length - 1] = prevLine.replace('├── returns:', '└── returns:');
+    // Count details to show (always params and returns, optionally description)
+    const hasDescription = func.description && func.description.trim().length > 0;
+    const detailCount = hasDescription ? 3 : 2; // desc, params, returns OR just params, returns
+    let detailIndex = 0;
+
+    // Description first (if available)
+    if (hasDescription) {
+      detailIndex++;
+      const isLastDetail = detailIndex === detailCount && !hasNested;
+      const detailBullet = isLastDetail ? '└── ' : '├── ';
+      lines.push(`${detailPrefixChar}${detailBullet}desc: "${func.description}"`);
     }
 
-    // Find and render nested functions
-    const nestedFunctions = allFunctions.filter((f) => f.parentFunction === func.name);
-    nestedFunctions.forEach((nestedFunc, nestedIndex) => {
-      const isLastNested = nestedIndex === nestedFunctions.length - 1;
-      this.renderFunctionWithNested(
-        nestedFunc,
-        allFunctions,
-        lines,
-        isLastFile,
-        isLastNested,
-        indentLevel + 1,
-        hasImports
-      );
-    });
+    // Parameters
+    detailIndex++;
+    const paramsStr = this.formatParameters(func.params);
+    const isLastDetail = detailIndex === detailCount && !hasNested;
+    const paramsBullet = isLastDetail ? '└── ' : '├── ';
+    lines.push(`${detailPrefixChar}${paramsBullet}params: ${paramsStr}`);
+
+    // Return type
+    detailIndex++;
+    const isLastReturn = detailIndex === detailCount && !hasNested;
+    const returnsBullet = isLastReturn ? '└── ' : '├── ';
+    lines.push(`${detailPrefixChar}${returnsBullet}returns: ${func.returnType}`);
+
+    // Render nested functions with proper grouping
+    if (hasNested) {
+      // Add "functions:" header for nested functions
+      lines.push(`${detailPrefix}│   ${detailNestedIndent}${detailContinuation}└── functions:`);
+
+      // Render each nested function
+      nestedFunctions.forEach((nestedFunc, nestedIndex) => {
+        const isLastNested = nestedIndex === nestedFunctions.length - 1;
+        this.renderFunctionWithNested(
+          nestedFunc,
+          allFunctions,
+          lines,
+          isLastFile,
+          isLastNested,
+          indentLevel + 1,
+          hasImports
+        );
+      });
+    }
   }
 
   // Main execution method

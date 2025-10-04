@@ -3,7 +3,7 @@ import { ColorValue } from 'react-native';
 import { View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
 import { greys, Theme } from 'helper/colors';
 import { TransactionData } from 'helper/redux/cashu';
@@ -25,18 +25,10 @@ const TransactionComponent = ({
 
   const formattedAmount =
     transaction.unit &&
-    formatCurrency(
+    formatAmount(
+      { amount: transaction.amount, unit: transaction.unit },
       {
-        currency:
-          transaction.unit === 'sat' ? 'BTC' : (transaction.unit.toUpperCase() as CurrencyCode),
-        value: transaction.amount,
-        denomination: transaction.unit === 'sat' ? 'sats' : (transaction.unit as Denomination),
-      },
-      {
-        locale: 'en-US',
-        precision: transaction.unit === 'sat' ? 0 : 2,
         currencyDisplay: transaction.unit === 'sat' ? 'name' : 'symbol',
-        denomination: transaction.unit === 'sat' ? 'sats' : (transaction.unit as Denomination),
       }
     );
 

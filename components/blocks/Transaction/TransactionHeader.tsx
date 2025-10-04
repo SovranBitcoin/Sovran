@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { greens, reds } from 'helper/colors';
 import { memoizedGetTheme } from 'helper/redux/settings';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { formatCurrency, CurrencyCode, Denomination } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import TransactionIcon from '../TransactionIcon';
 import { HistoryEntry } from 'coco-cashu-core';
 
@@ -41,21 +41,11 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
           {historyEntry.amount < 0 ? '-' : ''}
           <Text size={18} color={theme.greys[50]} style={{ marginLeft: 8 }}>
             {historyEntry.amount < 0 ? '-' : ''}
-            {formatCurrency(
+            {formatAmount(
+              { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
               {
-                currency:
-                  historyEntry.unit === 'sat'
-                    ? 'BTC'
-                    : (historyEntry.unit?.toUpperCase() as CurrencyCode),
-                value: Math.abs(historyEntry.amount),
-                denomination:
-                  historyEntry.unit === 'sat' ? 'sats' : (historyEntry.unit as Denomination),
-              },
-              {
-                locale: 'en-US',
-                precision: 2,
+                displayAs: historyEntry.unit === 'usd' ? 'sats' : 'usd',
                 currencyDisplay: historyEntry.unit === 'usd' ? 'name' : 'symbol',
-                denomination: historyEntry.unit === 'usd' ? 'sats' : 'usd',
               }
             )}
           </Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CurrencyCode, Denomination, formatCurrency } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { useSelector } from 'react-redux';
@@ -149,22 +149,6 @@ export function LightningSendConfirmation({
 
   const getCurrencyDisplay = () => (unit === 'sat' ? 'BTC' : unit.toUpperCase());
 
-  const formatAmount = (value: number, displayDenomination = unit === 'sat' ? 'btc' : unit) => {
-    return formatCurrency(
-      {
-        currency: getCurrencyDisplay() as CurrencyCode,
-        value: value,
-        denomination: unit === 'sat' ? 'sats' : (unit as Denomination),
-      },
-      {
-        locale: 'en-US',
-        precision: displayDenomination === 'btc' ? 8 : 2,
-        currencyDisplay: 'symbol',
-        denomination: displayDenomination as Denomination,
-      }
-    );
-  };
-
   return (
     <Modal
       showClose
@@ -257,7 +241,7 @@ export function LightningSendConfirmation({
             { title: 'Quote', value: truncateMiddle(quoteId, 7) },
             {
               title: `Fee (${getCurrencyDisplay()})`,
-              value: formatAmount(feeReserve),
+              value: formatAmount({ amount: feeReserve, unit }),
             },
             {
               title: 'Amount',

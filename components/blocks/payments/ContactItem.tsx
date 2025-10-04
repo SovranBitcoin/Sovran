@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { formatCurrency } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import { greys, Theme } from 'helper/colors';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
@@ -55,18 +55,10 @@ export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) =>
     : null;
 
   const previewText = mostRecentTransaction
-    ? `You sent ${formatCurrency(
+    ? `You sent ${formatAmount(
+        { amount: mostRecentTransaction.amount, unit: mostRecentTransaction.unit },
         {
-          currency:
-            mostRecentTransaction.unit === 'sat' ? 'BTC' : mostRecentTransaction.unit.toUpperCase(),
-          value: mostRecentTransaction.amount,
-          denomination: mostRecentTransaction.unit === 'sat' ? 'sats' : mostRecentTransaction.unit,
-        },
-        {
-          locale: 'en-US',
-          precision: mostRecentTransaction.unit === 'sat' ? 0 : 2,
           currencyDisplay: mostRecentTransaction.unit === 'sat' ? 'name' : 'symbol',
-          denomination: mostRecentTransaction.unit === 'sat' ? 'sats' : mostRecentTransaction.unit,
         }
       )}`
     : mostRecentMessage

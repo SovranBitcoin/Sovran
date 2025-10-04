@@ -17,7 +17,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
-import { formatCurrency } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
@@ -49,19 +49,10 @@ const MintItem: React.FC<MintItemProps> = ({
   onInspectPress,
 }) => {
   const formattedBalance = balance.amount
-    ? formatCurrency(
+    ? formatAmount(
+        { amount: balance.amount, unit: balance.unit },
         {
-          currency: balance.unit === 'SAT' ? 'BTC' : (balance.unit as any),
-          value: balance.amount,
-          denomination:
-            balance.unit.toLowerCase() === 'sat' ? 'sats' : (balance.unit.toLowerCase() as any),
-        },
-        {
-          locale: 'en-US',
-          precision: balance.unit === 'SAT' ? 0 : 2,
-          currencyDisplay: balance.unit === 'SAT' ? 'name' : 'symbol',
-          denomination:
-            balance.unit.toLowerCase() === 'sat' ? 'sats' : (balance.unit.toLowerCase() as any),
+          currencyDisplay: balance.unit.toLowerCase() === 'sat' ? 'name' : 'symbol',
         }
       )
     : '0';

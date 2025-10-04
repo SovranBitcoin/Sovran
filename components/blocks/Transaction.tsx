@@ -1,5 +1,5 @@
 import { UntranslatedText } from 'components/ui/Text';
-import { formatCurrency } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import Icon from 'assets/icons';
 import { convertTime } from 'helper/time';
 import { greens, reds } from 'helper/colors';
@@ -35,18 +35,9 @@ const useHistoryEntry = (historyEntry: CocoTransactionAdapter) => {
   // The listening is handled in the confirmation screens
   const isListening = false;
 
-  const fiatAmount = formatCurrency(
-    {
-      currency: historyEntry.unit === 'sat' ? 'BTC' : (historyEntry.unit.toUpperCase() as any),
-      value: Math.abs(historyEntry.amount),
-      denomination: historyEntry.unit === 'sat' ? 'sats' : (historyEntry.unit as any),
-    },
-    {
-      locale: 'en-US',
-      precision: historyEntry.unit === 'sat' ? 4 : 2,
-      currencyDisplay: 'symbol',
-      denomination: 'usd',
-    }
+  const fiatAmount = formatAmount(
+    { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
+    { displayAs: 'usd' }
   );
 
   const handlePress = (): void => {

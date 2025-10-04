@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { StyleProp, ViewStyle, Animated } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
-import { formatCurrencyWrapper } from 'helper/currency';
+import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { greys, greens, shades } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -47,7 +47,7 @@ export function AmountFormatter({
 
   // Animation setup (only if animated is true)
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const formattedAmount = formatCurrencyWrapper(amount, unit, displayBtc);
+  const formattedAmount = formatAmount({ amount, unit }, { useUserPreference: true });
 
   // Dynamic color logic (only if useTypeColors is true)
   const getTypeColor = (): string => {
