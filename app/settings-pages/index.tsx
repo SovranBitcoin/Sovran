@@ -212,7 +212,7 @@ const ModalScreen = () => {
             <RowButton
               label="Background Image"
               onPress={() => {
-                router.push('/backgroundImageSettings');
+                router.push('/settings-pages/backgroundImages');
               }}
             />
           )}

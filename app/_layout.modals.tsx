@@ -230,7 +230,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   // Other
   {
-    name: 'backgroundImageSettings',
+    name: 'settings-pages/backgroundImages',
     title: 'Background Image',
   },
   {
