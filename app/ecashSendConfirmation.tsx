@@ -318,9 +318,9 @@ export function EcashSendConfirmation({
           />
         </HStack>
       }>
-      <TransactionHeader historyEntry={currentTransaction} />
-
       <VStack gap={12}>
+        <TransactionHeader historyEntry={currentTransaction} />
+
         {!isPaid && (
           <PaymentInfo
             setUri={setUri}

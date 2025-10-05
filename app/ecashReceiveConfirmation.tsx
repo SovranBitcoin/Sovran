@@ -14,9 +14,8 @@ import { truncateMiddle } from 'helper/strings';
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
-import { Text } from 'components/ui/Text';
 
 export function EcashReceiveConfirmation({
   receiveHistoryEntry,
@@ -139,7 +138,7 @@ export function EcashReceiveConfirmation({
           ]}
         />
       }>
-      <>
+      <VStack gap={12}>
         <TransactionHeader historyEntry={receiveHistoryEntry} />
 
         {/* {memo && (
@@ -155,23 +154,17 @@ export function EcashReceiveConfirmation({
         )} */}
 
         <TransactionMintRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
-        <Spacer size={12} />
-
-        <Text>{JSON.stringify(receiveHistoryEntry, null, 2)}</Text>
 
         <Section
           items={[
             { title: 'Type', value: 'Ecash • Receive' },
             ...(token ? [{ title: 'Token', value: truncateMiddle(token, 6) }] : []),
           ]}
-          style={{}}
           camera={false}
         />
 
-        <Spacer size={12} />
-
         <TransactionDebugCode historyEntry={receiveHistoryEntry} />
-      </>
+      </VStack>
     </Modal>
   );
 }

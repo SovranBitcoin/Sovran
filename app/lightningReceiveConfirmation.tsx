@@ -329,8 +329,8 @@ export function LightningReceiveConfirmation({
           />
         </HStack>
       }>
-      <TransactionHeader historyEntry={currentTransaction} />
       <VStack gap={12}>
+        <TransactionHeader historyEntry={currentTransaction} />
         {!isPaid && (
           <PaymentInfo
             showSection={false}

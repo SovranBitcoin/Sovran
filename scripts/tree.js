@@ -20,7 +20,15 @@ class FunctionTreeGenerator {
     if (!this.options.extensions.includes(ext)) return false;
 
     const relativePath = path.relative(process.cwd(), filePath);
-    return !this.options.ignorePatterns.some((pattern) => relativePath.includes(pattern));
+    return !this.options.ignorePatterns.some((pattern) => {
+      // Support both simple string matching and glob patterns
+      if (pattern.includes('*') || pattern.includes('?')) {
+        // Simple glob pattern matching
+        const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'));
+        return regex.test(relativePath) || regex.test(path.basename(filePath));
+      }
+      return relativePath.includes(pattern) || path.basename(filePath).includes(pattern);
+    });
   }
 
   // Get all files recursively
@@ -1064,6 +1072,7 @@ Usage: node function-tree.js [options] [directory]
 
 Options:
   -h, --help    Show this help message
+  -I, --ignore  Ignore files/directories matching pattern (can be used multiple times)
   
 Features:
   - Function analysis with hierarchical display
@@ -1074,15 +1083,39 @@ Features:
   - Unused icon detection
   
 Examples:
-  node function-tree.js           # Analyze current directory
-  node function-tree.js src/      # Analyze src directory
+  node function-tree.js                           # Analyze current directory
+  node function-tree.js src/                       # Analyze src directory
+  node function-tree.js -I "*.test.*"             # Ignore test files
+  node function-tree.js -I "node_modules" -I "*.spec.*"  # Ignore multiple patterns
+  node function-tree.js --ignore "coverage" --ignore "*.d.ts"  # Long form
 `);
     process.exit(0);
   }
 
-  const targetDir = args[0] || process.cwd();
-  const generator = new FunctionTreeGenerator();
-  generator.generate(targetDir);
+  // Parse command line arguments
+  const ignorePatterns = [];
+  const targetDir = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '-I' || arg === '--ignore') {
+      if (i + 1 < args.length) {
+        ignorePatterns.push(args[i + 1]);
+        i++; // Skip the next argument as it's the pattern
+      }
+    } else if (!arg.startsWith('-')) {
+      targetDir.push(arg);
+    }
+  }
+
+  const finalTargetDir = targetDir.length > 0 ? targetDir[0] : process.cwd();
+
+  // Create generator with ignore patterns
+  const generator = new FunctionTreeGenerator({
+    ignorePatterns: ['node_modules', '.git', 'dist', 'build', '.next', ...ignorePatterns],
+  });
+
+  generator.generate(finalTargetDir);
 }
 
 module.exports = FunctionTreeGenerator;

@@ -44,10 +44,12 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
 
         <TextInput
           testID="message-input"
-          className="min-h-[120px] rounded-lg border border-gray-950 bg-gray-900 p-3 text-base"
+          className="min-h-[120px] rounded-lg border p-3 text-base"
           style={{
             color: greys(theme)[100],
             textAlignVertical: 'top',
+            borderColor: greys(theme)[950],
+            backgroundColor: greys(theme)[900],
           }}
           multiline
           numberOfLines={4}
