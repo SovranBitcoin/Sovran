@@ -28,13 +28,13 @@ interface ScanningData {
  * Camera component for QR code scanning
  */
 const Camera: React.FC = () => {
+  const { unit } = useLocalSearchParams<{ unit: string }>();
   const theme = useSelector(memoizedGetTheme);
   const [scanned, setScanned] = useState<boolean>(false);
   const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const [progress, setProgress] = useState<number>(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const { unit } = useLocalSearchParams<{ unit: string }>();
   const [hasPermission] = useCameraPermissions();
   const selectedMint = useSelector(memoizedGetSelectedMint);
 
@@ -122,7 +122,13 @@ const Camera: React.FC = () => {
     <View className="relative flex-1 bg-black">
       <CameraView
         mute
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+        }}
         facing="back"
         enableTorch={flashlightOn ?? false}
         barcodeScannerSettings={{
@@ -137,34 +143,20 @@ const Camera: React.FC = () => {
         <Button
           onPress={handleClosePress}
           icon={<Icon name="material-symbols:close-rounded" color={greys(theme)[0]} />}
-          blur={{ intensity: 75, tint: 'dark' }}
+          blur
         />
       </View>
 
       {/* Scanning overlay with white corners and progress text */}
       <View
-        className="absolute"
+        className="absolute left-1/2 top-1/2"
         style={{
-          top: '50%',
-          left: '50%',
           width: scanBoxSize,
           height: scanBoxSize,
           transform: [{ translateX: -scanBoxSize / 2 }, { translateY: -scanBoxSize / 2 }],
         }}>
         {/* Top-left corner */}
-        <View
-          className="absolute left-0 top-0 h-[30px] w-[30px] shadow-sm"
-          style={{
-            borderTopWidth: 4,
-            borderLeftWidth: 4,
-            borderColor: 'white',
-            shadowColor: 'black',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.2,
-            shadowRadius: 1,
-            elevation: 2,
-          }}
-        />
+        <View className="absolute left-0 top-0 h-[30px] w-[30px] border-l-4 border-t-4 border-white shadow-sm shadow-black" />
 
         {/* Top-right corner */}
         <View
@@ -230,12 +222,12 @@ const Camera: React.FC = () => {
         <Button
           onPress={handleClipboardPress}
           icon={<Icon name="lets-icons:copy" color={greys(theme)[0]} />}
-          blur={{ intensity: 75, tint: 'dark' }}
+          blur
         />
         <Button
           onPress={handleGalleryPress}
           icon={<Icon name="proicons:photo" color={greys(theme)[0]} />}
-          blur={{ intensity: 75, tint: 'dark' }}
+          blur
         />
         <Button
           onPress={toggleFlashlight}
@@ -246,7 +238,7 @@ const Camera: React.FC = () => {
               <Icon name="mdi:lightbulb-on" color={greys(theme)[0]} />
             )
           }
-          blur={{ intensity: 75, tint: 'dark' }}
+          blur
         />
       </HStack>
     </View>

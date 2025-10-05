@@ -1,6 +1,5 @@
 import { UntranslatedText } from 'components/ui/Text';
 import { formatAmount } from 'helper/currency';
-import Icon from 'assets/icons';
 import { convertTime } from 'helper/time';
 import { greens, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
@@ -9,10 +8,9 @@ import { memoizedGetTheme } from 'helper/redux/settings';
 import TransactionIcon from 'components/blocks/TransactionIcon';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { View, HStack, VStack } from 'components/ui/View';
+import { HStack, VStack } from 'components/ui/View';
 import React from 'react';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { Alert } from 'react-native';
 import { router } from 'expo-router';
 
 export function npubToPubkey(npub: string): string {
@@ -30,10 +28,6 @@ export function npubToPubkey(npub: string): string {
 const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const isSend = historyEntry.type === 'send' || historyEntry.type === 'melt';
   const isReceive = historyEntry.type === 'mint' || historyEntry.type === 'receive';
-
-  // For HistoryEntryItem, we don't need to actively listen since it's just displaying status
-  // The listening is handled in the confirmation screens
-  const isListening = false;
 
   const fiatAmount = formatAmount(
     { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
@@ -85,21 +79,11 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
         return;
       }
     }
-
-    Alert.alert('Transaction', JSON.stringify(historyEntry));
-    // router.push({
-    //   pathname: '/transaction',
-    //   params: {
-    //     id: historyEntry.request || historyEntry.token || historyEntry.id,
-    //     historyEntryType: historyEntry.type,
-    //   },
-    // });
   };
 
   return {
     isSend,
     isReceive,
-    showLoading: isListening,
     fiatAmount,
     handlePress,
   };
@@ -152,19 +136,6 @@ export const Transaction = React.memo(({ historyEntry }: { historyEntry: History
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
               </UntranslatedText>
-              <View>
-                <Icon
-                  size={10}
-                  name="ant-design:loading-outlined"
-                  color={theme.greys[50]}
-                  spin={{
-                    delay: 0,
-                    duration: 1000,
-                    outputRange: ['0deg', '360deg'],
-                    easing: 'linear',
-                  }}
-                />
-              </View>
             </HStack>
             <UntranslatedText
               bold

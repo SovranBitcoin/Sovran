@@ -220,13 +220,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerLargeTitle: true,
     },
   },
-  {
-    name: 'transaction',
-    title: '',
-    options: {
-      presentation: 'modal',
-    },
-  },
   // Donate
   {
     name: 'donate/donate',
