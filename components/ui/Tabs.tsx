@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';

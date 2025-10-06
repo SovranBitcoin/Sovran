@@ -17,7 +17,7 @@ import { TransactionMintRefresh } from 'components/blocks/Transaction/Transactio
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import type { MeltHistoryEntry } from 'coco-cashu-core';
-import { MintQuoteTimeline } from './lightningReceiveConfirmation';
+import { MintQuoteTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 
 export function LightningSendConfirmation({
   meltHistoryEntry,

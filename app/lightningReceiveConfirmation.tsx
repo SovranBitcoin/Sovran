@@ -11,238 +11,14 @@ import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
-import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
 import { useLocalSearchParams } from 'expo-router';
-
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
-import { convertTime } from 'helper/time';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
-import { mintHistoryEntryExpired } from 'helper/utils';
-
-interface MintQuoteTimelineProps {
-  historyEntry: HistoryEntry;
-}
-
-export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
-  const { getPrimaryColor, getGreenColor } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
-
-  const isMintTransaction = historyEntry.type === 'mint';
-
-  const getTimeline = () => {
-    if (isMintTransaction) {
-      const mintTx = historyEntry as MintHistoryEntry;
-
-      // Check if the transaction is expired
-      const isExpired = mintTx.state === 'UNPAID' && mintHistoryEntryExpired(mintTx);
-
-      if (isExpired) {
-        // Show EXPIRED state instead of normal flow
-        const states = ['CREATED', 'UNPAID', 'EXPIRED'];
-        return states.map((state, i) => ({
-          state,
-          complete: i <= 2, // All states up to EXPIRED are complete
-          isCurrent: i === 2, // EXPIRED is current
-          addedAt: i === 0 ? mintTx.createdAt : undefined,
-        }));
-      }
-
-      const states = ['CREATED', 'UNPAID', 'ISSUED', 'PAID'];
-
-      // Find current state index
-      const currentStateIndex = states.indexOf(mintTx.state);
-      const maxIndex = Math.max(0, currentStateIndex);
-
-      return states.map((state, i) => ({
-        state,
-        complete: i <= maxIndex,
-        isCurrent: i === maxIndex,
-        addedAt: i === 0 ? mintTx.createdAt : undefined,
-      }));
-    } else {
-      const meltTx = historyEntry as MeltHistoryEntry;
-      const states = ['CREATED', 'UNSPENT', 'PENDING', 'SPENT'];
-
-      // Find current state index
-      const currentStateIndex = states.indexOf(meltTx.state);
-      const maxIndex = Math.max(0, currentStateIndex);
-
-      return states.map((state, i) => ({
-        state,
-        complete: i <= maxIndex,
-        isCurrent: i === maxIndex,
-        addedAt: i === 0 ? meltTx.createdAt : undefined,
-      }));
-    }
-  };
-
-  const states = getTimeline();
-
-  const isExpired = isMintTransaction && mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
-
-  const hasIntermediarySteps = isMintTransaction
-    ? (historyEntry as MintHistoryEntry).state === 'UNPAID' && !isExpired
-    : (historyEntry as MeltHistoryEntry).state === ('UNSPENT' as any) ||
-      (historyEntry as MeltHistoryEntry).state === ('PENDING' as any);
-
-  const shouldCollapse = collapsed && !hasIntermediarySteps;
-
-  const displayStates = shouldCollapse
-    ? states.filter((_, i) => i === 0 || i === states.length - 1)
-    : states;
-
-  const barWidth = 4.5;
-  const barHeight = 48;
-  const barMarginVertical = 4;
-  const dotSize = barWidth;
-  const dotSpacing = 8;
-
-  const getBarColor = (item: any) => {
-    if (item.state === 'CANCELLED' || item.state === 'EXPIRED') {
-      return '#ef4444';
-    }
-
-    return item.complete ? getGreenColor('300') : getPrimaryColor('200');
-  };
-
-  const getStateLabel = (s: string) => {
-    switch (s) {
-      case 'UNPAID':
-        return 'PENDING';
-      default:
-        return s;
-    }
-  };
-
-  return (
-    <View
-      blur
-      className="bg-primary-800"
-      style={{
-        padding: 16,
-        marginHorizontal: 16,
-        borderRadius: 12,
-      }}>
-      <Text
-        size={14}
-        bold
-        className="text-primary-200"
-        style={{
-          marginBottom: 8,
-          textTransform: 'uppercase',
-        }}>
-        {isExpired
-          ? 'EXPIRED'
-          : getStateLabel(
-              isMintTransaction
-                ? (historyEntry as MintHistoryEntry).state
-                : (historyEntry as MeltHistoryEntry).state
-            )}
-      </Text>
-      <View>
-        {displayStates.map((item, index) => (
-          <React.Fragment key={`${item.state}-${index}`}>
-            <HStack
-              style={{
-                marginVertical: 0,
-              }}
-              align="center">
-              <TouchableOpacity
-                onPress={() => {
-                  // Handle navigation if needed
-                }}
-                style={{
-                  flex: 1,
-                  marginVertical: barMarginVertical,
-                  overflow: 'hidden',
-                }}>
-                <HStack align="center">
-                  <View
-                    style={{
-                      width: barWidth,
-                      height: barHeight,
-                      backgroundColor: getBarColor(item),
-                      borderRadius: barWidth / 2,
-                      // marginVertical: barMarginVertical,
-                      opacity: item.isCurrent ? 1 : 0.5,
-                    }}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      size={16}
-                      bold
-                      className="text-primary-0"
-                      style={{
-                        marginStart: 12,
-                      }}>
-                      {getStateLabel(item.state)}
-                    </Text>
-                    {item.addedAt ? (
-                      <Text
-                        size={12}
-                        bold
-                        className="text-primary-300"
-                        style={{
-                          marginStart: 12,
-                        }}>
-                        {convertTime(new Date(item.addedAt))}
-                      </Text>
-                    ) : null}
-                  </View>
-                </HStack>
-              </TouchableOpacity>
-            </HStack>
-
-            {shouldCollapse && index === 0 && states.length > 2 && (
-              <VStack
-                style={{
-                  alignItems: 'flex-start',
-                  opacity: 0.5,
-                }}>
-                {[...Array(3)].map((_, i) => (
-                  <View
-                    key={i}
-                    style={{
-                      width: dotSize,
-                      height: dotSize,
-                      backgroundColor: states[1].complete
-                        ? getGreenColor('300')
-                        : getPrimaryColor('200'),
-                      borderRadius: dotSize / 3,
-                      marginVertical: dotSpacing / 3,
-                    }}
-                  />
-                ))}
-              </VStack>
-            )}
-          </React.Fragment>
-        ))}
-      </View>
-
-      {/* Collapse toggle */}
-      {!hasIntermediarySteps && (
-        <TouchableOpacity onPress={() => setCollapsed(!collapsed)}>
-          <Text
-            size={14}
-            bold
-            className="text-primary-200"
-            style={{
-              marginBottom: 8,
-              textTransform: 'uppercase',
-              textAlign: 'right',
-            }}>
-            {collapsed ? 'EXPAND' : 'COLLAPSE'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
+import { TransactionTimeline } from 'components/blocks/Transaction/TransactionTimeline';
+import type { MintHistoryEntry, HistoryEntry } from 'coco-cashu-core';
 
 export function LightningReceiveConfirmation({
   mintHistoryEntry,
@@ -299,7 +75,9 @@ export function LightningReceiveConfirmation({
   }
 
   const isBitcoin = mintHistoryEntry.unit === 'sat';
-  const isPaid = currentTransaction?.state === 'ISSUED' || currentTransaction?.state === 'PAID';
+  const isPaid =
+    (currentTransaction as any)?.state === 'ISSUED' ||
+    (currentTransaction as any)?.state === 'PAID';
 
   return (
     <Modal
@@ -352,7 +130,7 @@ export function LightningReceiveConfirmation({
           handleCheckStatus={async () => {}}
         />
 
-        <MintQuoteTimeline historyEntry={currentTransaction} />
+        <TransactionTimeline historyEntry={currentTransaction} />
 
         <Section
           special={false}
