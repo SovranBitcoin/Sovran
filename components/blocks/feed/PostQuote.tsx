@@ -5,7 +5,7 @@ import { Text } from 'components/ui/Text';
 import 'react-native-gesture-handler';
 import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './useNostrProfile';
-import CachedImage from 'components/ui/Image';
+import { Avatar } from 'components/ui/Avatar';
 import { useTheme } from 'providers/ThemeProvider';
 import { getTimeAgo } from 'helper/time';
 
@@ -23,6 +23,21 @@ export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
 
   let timeAgo = getTimeAgo(events?.[0]?.created_at);
 
+  const avatarPicture =
+    (profile as any)?.picture ||
+    (profile as any)?.profile?.picture ||
+    (profile as any)?.image ||
+    (profile as any)?.profile?.image;
+
+  const displayName =
+    (profile as any)?.displayName ||
+    (profile as any)?.profile?.displayName ||
+    (profile as any)?.display_name ||
+    (profile as any)?.profile?.display_name ||
+    (profile as any)?.name ||
+    (profile as any)?.profile?.name ||
+    'User';
+
   return (
     <View
       style={{
@@ -33,17 +48,14 @@ export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
         marginLeft: 56,
       }}>
       <HStack align="center">
-        <CachedImage
-          style={{ width: 32, height: 32, borderRadius: 100000 }}
-          source={{ uri: profile?.picture }}
-        />
+        <Avatar picture={avatarPicture} size={32} variant="person" alt={displayName} />
         <HStack
           style={{
             marginLeft: 4,
             marginBottom: 4,
           }}
           align="center">
-          <Text>{profile?.displayName}</Text>
+          <Text>{displayName}</Text>
           <Text
             style={{
               color: getPrimaryColor('100'),

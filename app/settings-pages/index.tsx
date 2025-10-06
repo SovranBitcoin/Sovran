@@ -18,7 +18,6 @@ import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
-import { device } from 'helper/version';
 import Icon from 'assets/icons';
 
 export const name = Application.applicationName;
@@ -210,14 +209,6 @@ const ModalScreen = () => {
               router.push('/settings-pages/theme');
             }}
           />
-          {device.platform('ios').gte(10) && (
-            <RowButton
-              label="Background Image"
-              onPress={() => {
-                router.push('/settings-pages/backgroundImages');
-              }}
-            />
-          )}
         </Section>
         <Section title="App Information">
           <RowButton

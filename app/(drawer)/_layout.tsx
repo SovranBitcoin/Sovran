@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // migrate to using polished for opacity
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import CachedImage from 'components/ui/Image';
+import { Avatar } from 'components/ui/Avatar';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
@@ -55,17 +55,14 @@ function ProfileHeader() {
           }}>
           {currentProfile?.pubkey && (
             <VStack align="center" spacing={16}>
-              <CachedImage
-                source={{ uri: currentProfile.picture }}
-                className="bg-primary-0"
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 32,
-                }}
+              <Avatar
+                picture={currentProfile.picture}
+                size={64}
+                variant="person"
+                alt={currentProfile?.profile?.name || 'Profile'}
               />
               <VStack align="center" spacing={8}>
-                <Text weight="bold" size={20} className="text-center" className="text-primary-0">
+                <Text weight="bold" size={20} className="text-primary-0 text-center">
                   {currentProfile?.profile?.name}
                 </Text>
                 <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
