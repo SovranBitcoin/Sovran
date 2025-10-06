@@ -3,16 +3,15 @@ import { Dimensions, View, Pressable, ScrollView } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { nip19 } from 'nostr-tools';
 import Icon from 'assets/icons';
-import { useNostr } from 'helper/redux/nostr';
-import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
+import { useNostr } from 'helper/redux/nostr';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 // migrate to using polished for opacity
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import CachedImage from 'components/ui/Image';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
@@ -22,18 +21,18 @@ const screenWidth = Dimensions.get('screen').width;
 
 function ProfileHeader() {
   const { currentProfile } = useNostr();
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   return (
     <LinearGradient
       colors={[
-        greys(theme)[900],
-        greys(theme)[900],
-        greys(theme)[900],
-        greys(theme)[900],
-        greys(theme)[900],
-        greys(theme)[900],
-        opacity(greys(theme)[900], 0),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        opacity(getPrimaryColor('900'), 0),
       ]}
       className="flex-1 p-4"
       start={{ x: 0, y: 0 }}
@@ -58,22 +57,18 @@ function ProfileHeader() {
             <VStack align="center" spacing={16}>
               <CachedImage
                 source={{ uri: currentProfile.picture }}
+                className="bg-primary-0"
                 style={{
                   width: 64,
                   height: 64,
                   borderRadius: 32,
-                  backgroundColor: greys(theme)[0],
                 }}
               />
               <VStack align="center" spacing={8}>
-                <Text
-                  weight="bold"
-                  size={20}
-                  className="text-center"
-                  style={{ color: greys(theme)[0] }}>
+                <Text weight="bold" size={20} className="text-center" className="text-primary-0">
                   {currentProfile?.profile?.name}
                 </Text>
-                <Icon size={42} name="stash:qr-code" color={greys(theme)[0]} />
+                <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
               </VStack>
             </VStack>
           )}
@@ -92,13 +87,13 @@ function ProfileButton({
   label: string;
   onPress: () => void;
 }) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   return (
     <Pressable onPress={onPress} className="p-8 pb-8 pt-0">
       <HStack align="center" spacing={12}>
-        <Icon name={icon} color={greys(theme)[0]} />
-        <Text size={18} weight="bold" style={{ color: greys(theme)[0] }}>
+        <Icon name={icon} color={getPrimaryColor('0')} />
+        <Text size={18} weight="bold" className="text-primary-0">
           {label}
         </Text>
       </HStack>
@@ -107,16 +102,12 @@ function ProfileButton({
 }
 
 function SovranDrawer() {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <>
       <ScrollView
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={false}
-        style={{
-          backgroundColor: greys(theme)[900],
-        }}>
+        className="bg-primary-900">
         <Spacer size={64} />
         <ProfileHeader />
         <VStack spacing={0} style={{ marginTop: -16, paddingBottom: 48 }}>

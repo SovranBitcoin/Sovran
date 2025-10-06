@@ -13,8 +13,7 @@ import Haptics from 'components/ui/Haptics';
 
 import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
 import { useMintManagement } from 'hooks/coco';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { router } from 'expo-router';
@@ -42,8 +41,8 @@ export function AccountPagerView({
   setAccount,
   account,
 }: AccountPagerViewProps): React.ReactElement {
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { handlePermission } = useHandleCameraPermission();
-  const theme = useSelector(memoizedGetTheme);
   const { getBalances } = useMintManagement();
 
   const selectedMintUrl = useSelector(memoizedGetSelectedMint);
@@ -122,27 +121,21 @@ export function AccountPagerView({
       text: {
         children: 'Receive',
       },
-      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={180} />,
+      icon: <ArrowIcon size={24} color={getPrimaryColor('0')} rotate={180} />,
     },
     {
       page: 'camera',
       text: {
         children: 'Scan',
       },
-      icon: (
-        <Icon
-          name="stash:qr-code"
-          size={24}
-          color={theme.id === 'light' ? greys(theme)[950] : greys(theme)[0]}
-        />
-      ),
+      icon: <Icon name="stash:qr-code" size={24} color={getPrimaryColor('0')} />,
     },
     {
       page: 'currency',
       text: {
         children: 'Send',
       },
-      icon: <ArrowIcon size={24} color={greys(theme)[0]} rotate={0} />,
+      icon: <ArrowIcon size={24} color={getPrimaryColor('0')} rotate={0} />,
     },
   ];
 
@@ -198,13 +191,13 @@ export function AccountPagerView({
                     ? {
                         maxWidth: 64,
                         zIndex: 10000,
-                        shadowColor: theme.shades[300],
+                        shadowColor: getShadeColor('300'),
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.75,
                         shadowRadius: 8,
                         elevation: 5,
                         borderRadius: 10000,
-                        borderColor: theme.shades[100],
+                        borderColor: getShadeColor('100'),
                         borderWidth: 0.5,
                       }
                     : { maxWidth: 'auto' }
@@ -214,20 +207,20 @@ export function AccountPagerView({
                   style={isCamera ? { padding: 8, borderRadius: 1000 } : undefined}
                   colors={
                     isCamera
-                      ? [theme.shades[100], theme.shades[300]]
+                      ? [getShadeColor('100'), getShadeColor('300')]
                       : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
                   }>
                   <VStack align="center" justify="center">
                     <HStack
                       blur={!isCamera}
                       align="center"
-                      justify="center"
+                      justify={isReceive ? 'flex-start' : isSend ? 'center' : 'center'}
                       className="w-full min-w-[90px] p-3"
                       style={{
                         ...(isCamera && { borderRadius: 1000 }),
                         ...(!isCamera && {
-                          backgroundColor: greys(theme)[800],
-                          borderColor: greys(theme)[700],
+                          backgroundColor: getPrimaryColor('800'),
+                          borderColor: getPrimaryColor('700'),
                         }),
                         ...(isReceive && {
                           borderBottomLeftRadius: 1000,
@@ -236,11 +229,12 @@ export function AccountPagerView({
                         ...(isSend && {
                           borderBottomRightRadius: 1000,
                           borderTopRightRadius: 1000,
+                          paddingLeft: 0,
                         }),
                       }}>
-                      <View>{icon}</View>
+                      {icon}
                       {!isCamera && (
-                        <Text weight="bold" size={14} style={{ color: greys(theme)[0] }}>
+                        <Text weight="bold" size={14} className="text-primary-0">
                           {text.children}
                         </Text>
                       )}

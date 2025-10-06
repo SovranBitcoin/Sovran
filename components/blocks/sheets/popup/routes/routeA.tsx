@@ -4,14 +4,13 @@ import { View, VStack } from 'components/ui/View';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Button } from 'components/ui/Button';
 import { router as expoRouter } from 'expo-router';
 
 const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const [progress] = useState(new Animated.Value(0));
 
   const payload = useSheetPayload('popup-sheet');
@@ -42,15 +41,21 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[800],
+        backgroundColor: getPrimaryColor('800'),
         padding: 16,
       }}>
       <VStack style={styles.iconContainer} align="center" justify="center">
-        <Text style={styles.icon}>{payload?.emoji || '🎉'}</Text>
-        <Text style={styles.text}>{payload?.message || 'Error'}</Text>
+        <Text style={styles.icon} className="text-primary-0">
+          {payload?.emoji || '🎉'}
+        </Text>
+        <Text style={styles.text} className="text-primary-0">
+          {payload?.message || 'Error'}
+        </Text>
         {payload?.submessage &&
           (typeof payload.submessage === 'string' ? (
-            <Text style={styles.subText}>{payload.submessage}</Text>
+            <Text style={styles.subText} className="text-primary-0">
+              {payload.submessage}
+            </Text>
           ) : (
             payload.submessage
           ))}
@@ -89,36 +94,36 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     iconContainer: {
       marginBottom: 10,
     },
     icon: {
       fontSize: 30,
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       marginBottom: 10,
     },
     text: {
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       textAlign: 'center',
       fontSize: 20,
       fontFamily: 'OverpassBold',
     },
     subText: {
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       textAlign: 'center',
       fontSize: 14,
       fontFamily: 'OverpassRegular',
     },
     progressBar: {
       height: '100%',
-      backgroundColor: greys(theme)[0],
+      backgroundColor: getPrimaryColor('0'),
       borderRadius: 10000,
     },
     progressBarContainer: {
       height: 4,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
       borderRadius: 10000,
       marginTop: 10,
       width: 30,

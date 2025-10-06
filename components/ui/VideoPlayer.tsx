@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import 'react-native-gesture-handler';
 import { useVideoPlayer, VideoView, VideoSource } from 'expo-video';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface VideoScreenProps {
   videoSource: VideoSource;
 }
 
 export function VideoScreen({ videoSource }: VideoScreenProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const ref = useRef(null);
   const [, setIsPlaying] = useState(true);
   const player = useVideoPlayer(videoSource, (player) => {
@@ -35,7 +33,7 @@ export function VideoScreen({ videoSource }: VideoScreenProps) {
         height: 300,
         borderRadius: 16,
         marginVertical: 8,
-        backgroundColor: greys(theme)[700],
+        backgroundColor: getPrimaryColor('700'),
       }}
       ref={ref}
       player={player}

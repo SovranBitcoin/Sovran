@@ -6,9 +6,7 @@ import { AnimatedQRCode } from 'components/ui/QRCode';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { GradientSkeleton } from 'components/ui/GradientSkeleton';
-import { greys, shades, Theme } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Animated, {
   Easing,
@@ -45,7 +43,7 @@ export function PaymentInfo({
   variant = 'primary',
   showSection = true,
 }: PaymentInfoProps): React.ReactElement {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const underscoreWidth = useSharedValue(0);
   const underscorePosition = useSharedValue(0);
 
@@ -126,7 +124,7 @@ export function PaymentInfo({
                 isActive={index === activeTab}
                 onPress={() => handleTabPress(index)}
                 onLayout={(event) => measureTab(event, index)}
-                theme={theme}
+                getPrimaryColor={getPrimaryColor}
                 isFirst={index === 0}
                 animatedStyle={animatedUnderscoreStyle}
               />
@@ -141,7 +139,7 @@ export function PaymentInfo({
     if (!selectedValue) {
       return (
         <HStack align="center" justify="center">
-          <GradientSkeleton startColor={greys(theme)[800]} endColor={greys(theme)[950]} />
+          <GradientSkeleton startColor={getPrimaryColor('800')} endColor={getPrimaryColor('950')} />
         </HStack>
       );
     }
@@ -198,7 +196,7 @@ interface TabButtonProps {
   isActive: boolean;
   onPress: () => void;
   onLayout: (event: any) => void;
-  theme: Theme;
+  getPrimaryColor: (shade: string) => string;
   isFirst: boolean;
   animatedStyle: any;
 }
@@ -209,7 +207,7 @@ const TabButton = React.memo(
     isActive,
     onPress,
     onLayout,
-    theme,
+    getPrimaryColor,
     isFirst,
     animatedStyle,
   }: TabButtonProps): React.ReactElement => {
@@ -222,7 +220,7 @@ const TabButton = React.memo(
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: isActive ? greys(theme)[0] : greys(theme)[400],
+            color: isActive ? getPrimaryColor('0') : getPrimaryColor('400'),
           }}>
           {label}
         </Text>
@@ -232,7 +230,7 @@ const TabButton = React.memo(
               {
                 height: 2,
                 width: '100%',
-                backgroundColor: shades[300],
+                backgroundColor: getShadeColor('300'),
                 position: 'absolute',
                 bottom: 0,
                 top: 8,

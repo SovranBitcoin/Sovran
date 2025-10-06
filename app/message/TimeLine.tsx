@@ -1,17 +1,17 @@
 import { TextMessage, PaymentMessage, CashuTokenMessage } from './components';
 import { useNostr } from 'helper/redux/nostr';
 import { useCashuUtilities } from 'hooks/coco';
-import { Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { TimelineItemType } from '.';
 
 interface TimelineItemProps {
-  theme: Theme;
   item: TimelineItemType;
 }
 
-const TimelineItem = ({ item, theme }: TimelineItemProps) => {
+const TimelineItem = ({ item }: TimelineItemProps) => {
   const { isValidEcashToken } = useCashuUtilities();
   const { currentProfile } = useNostr();
+  const { getPrimaryColor } = useTheme();
 
   // Determine item type
   const isMessage = 'content' in item && !!item.content;
@@ -28,17 +28,15 @@ const TimelineItem = ({ item, theme }: TimelineItemProps) => {
       (item.receiver && item.receiver === currentProfile?.pubkey));
 
   if (isTokenMessage) {
-    return <CashuTokenMessage token={item.content} theme={theme} isReceived={isMessageReceived} />;
+    return <CashuTokenMessage token={item.content} isReceived={isMessageReceived} />;
   }
 
   if (isMessage) {
-    return <TextMessage message={item as any} theme={theme} isReceived={isMessageReceived} />;
+    return <TextMessage message={item as any} isReceived={isMessageReceived} />;
   }
 
   if (isTransaction) {
-    return (
-      <PaymentMessage transaction={item as any} theme={theme} isReceived={isTransactionReceived} />
-    );
+    return <PaymentMessage transaction={item as any} isReceived={isTransactionReceived} />;
   }
 
   return null;

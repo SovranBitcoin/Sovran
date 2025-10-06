@@ -1,7 +1,6 @@
 import { View, HStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { useLocalSearchParams } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import React, { useState } from 'react';
@@ -16,7 +15,7 @@ import { mintHistoryEntryExpired } from 'helper/utils';
 import { usePaginatedHistory } from 'coco-cashu-react';
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const { account, tab: tab_ } = useLocalSearchParams<{
     account: string;
     tab: 'All' | 'Incoming' | 'Outgoing';
@@ -150,102 +149,72 @@ function ModalScreen() {
               <TouchableOpacity
                 onPress={() => toggleAt('at')}
                 className="mr-2 flex-1"
-                style={{
-                  backgroundColor: at === 'at' ? greys(theme)[700] : greys(theme)[950],
-                  padding: 8,
-                  borderRadius: 8,
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                }}>
+                className={`rounded-lg border p-2 ${at === 'at' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="mdi:at" // Assuming this is the lightning icon
                     size={24}
-                    color={at === 'at' ? greys(theme)[0] : greys(theme)[500]}
+                    color={at === 'at' ? getPrimaryColor('0') : getPrimaryColor('500')}
                   />
                 </HStack>
               </TouchableOpacity>
               <View
                 className="mr-2 h-4 w-px"
                 style={{
-                  backgroundColor: greys(theme)[700],
+                  backgroundColor: getPrimaryColor('700'),
                 }}
               />
               <TouchableOpacity
                 onPress={() => toggleType('lightning')}
                 className="mr-2 flex-1"
-                style={{
-                  backgroundColor: type === 'lightning' ? greys(theme)[700] : greys(theme)[950],
-                  padding: 8,
-                  borderRadius: 8,
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                }}>
+                className={`rounded-lg border p-2 ${type === 'lightning' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="mingcute:lightning-fill" // Assuming this is the lightning icon
                     size={24}
-                    color={type === 'lightning' ? greys(theme)[0] : greys(theme)[500]}
+                    color={type === 'lightning' ? getPrimaryColor('0') : getPrimaryColor('500')}
                   />
                 </HStack>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleType('ecash')}
                 className="mr-2 flex-1"
-                style={{
-                  backgroundColor: type === 'ecash' ? greys(theme)[700] : greys(theme)[950],
-                  padding: 8,
-                  borderRadius: 8,
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                }}>
+                className={`rounded-lg border p-2 ${type === 'ecash' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
                     size={24}
-                    color={type === 'ecash' ? greys(theme)[0] : greys(theme)[500]}
+                    color={type === 'ecash' ? getPrimaryColor('0') : getPrimaryColor('500')}
                   />
                 </HStack>
               </TouchableOpacity>
               <View
                 className="mr-2 h-4 w-px"
                 style={{
-                  backgroundColor: greys(theme)[700],
+                  backgroundColor: getPrimaryColor('700'),
                 }}
               />
               <TouchableOpacity
                 onPress={() => toggleFilter('incoming')}
                 className="mr-2 flex-1"
-                style={{
-                  backgroundColor: filter === 'incoming' ? greys(theme)[700] : greys(theme)[950],
-                  padding: 8,
-                  borderRadius: 8,
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                }}>
+                className={`rounded-lg border p-2 ${filter === 'incoming' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="fluent:arrow-download-16-filled"
                     size={24}
-                    color={filter === 'incoming' ? greys(theme)[0] : greys(theme)[500]}
+                    color={filter === 'incoming' ? getPrimaryColor('0') : getPrimaryColor('500')}
                   />
                 </HStack>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleFilter('outgoing')}
                 className="flex-1"
-                style={{
-                  backgroundColor: filter === 'outgoing' ? greys(theme)[700] : greys(theme)[950],
-                  padding: 8,
-                  borderRadius: 8,
-                  borderWidth: 0.5,
-                  borderColor: greys(theme)[700],
-                }}>
+                className={`rounded-lg border p-2 ${filter === 'outgoing' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="fluent:arrow-upload-16-filled"
                     size={24}
-                    color={filter === 'outgoing' ? greys(theme)[0] : greys(theme)[500]}
+                    color={filter === 'outgoing' ? getPrimaryColor('0') : getPrimaryColor('500')}
                   />
                 </HStack>
               </TouchableOpacity>

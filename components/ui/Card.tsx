@@ -1,8 +1,6 @@
 import React from 'react';
-import { greys, reds } from 'helper/colors';
 import { TouchableOpacity } from './TouchableOpacity';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
@@ -15,25 +13,25 @@ interface CardProps {
 }
 
 export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
   const getBorderColor = () => {
     switch (variant) {
       case 'warning':
-        return reds[300];
+        return getShadeColor('300');
       case 'info':
       default:
-        return greys(theme)[100];
+        return getPrimaryColor('100');
     }
   };
 
   const getTextColor = () => {
     switch (variant) {
       case 'warning':
-        return reds[300];
+        return getShadeColor('300');
       case 'info':
       default:
-        return greys(theme)[100];
+        return getPrimaryColor('100');
     }
   };
 
@@ -42,7 +40,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
       <View
         className="rounded-lg border-l-[5px] shadow-sm"
         style={{
-          backgroundColor: greys(theme)[800],
+          backgroundColor: getPrimaryColor('800'),
           borderLeftColor: getBorderColor(),
         }}
         blur>
@@ -53,7 +51,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
               overpass
               className="text-base"
               style={{
-                color: greys(theme)[300],
+                color: getPrimaryColor('300'),
                 paddingLeft: 16,
                 paddingRight: 4,
                 paddingTop: 16,

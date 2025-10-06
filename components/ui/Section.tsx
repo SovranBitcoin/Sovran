@@ -2,12 +2,9 @@ import React, { useMemo } from 'react';
 import { ViewStyle } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
-import { useSelector } from 'react-redux';
-import { greys, shades, Theme } from 'helper/colors';
 import opacity from 'hex-color-opacity';
 import { BlurView } from 'expo-blur';
-
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { truncateMiddle } from 'helper/strings';
 
@@ -31,14 +28,14 @@ interface SectionProps {
 }
 
 export function Section({ items, style, camera = false, special }: SectionProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
   const ContainerView = camera ? BlurView : View;
 
   // Memoize background color calculation
   const backgroundColor = useMemo(
-    () => (camera ? opacity(greys(theme)[800], 0.75) : greys(theme)[800]),
-    [camera, theme]
+    () => (camera ? opacity(getPrimaryColor('800'), 0.75) : getPrimaryColor('800')),
+    [camera, getPrimaryColor]
   );
 
   return (
@@ -50,9 +47,9 @@ export function Section({ items, style, camera = false, special }: SectionProps)
       }}>
       <VStack
         blur
+        className={`bg-primary-800${camera ? '/75' : ''}`}
         style={{
           borderRadius: 8,
-          backgroundColor,
           padding: 8,
         }}>
         {items.map((item, index) => {
@@ -68,7 +65,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
                 id={titleId}
                 bold
                 size={16}
-                color={greys(theme)[300]}
+                className="text-primary-300"
                 style={{
                   fontFamily: 'OverpassRegular',
                 }}>
@@ -76,7 +73,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
               </Text>
               {titleText !== '' && <Spacer size={8} />}
 
-              {renderValueContent(item, titleText, theme, special)}
+              {renderValueContent(item, titleText, getPrimaryColor, special)}
             </HStack>
           );
         })}
@@ -88,7 +85,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   function renderValueContent(
     item: SectionItem,
     titleText: string,
-    theme: Theme,
+    getPrimaryColor: (shade: string) => string,
     special?: boolean
   ) {
     if (React.isValidElement(item.value)) {
@@ -113,7 +110,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             mono
             size={18}
-            color={greys(theme)[50]}
+            className="text-primary-50"
             style={{
               textAlign: 'center',
             }}>
@@ -123,7 +120,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             <StyledText
               primary
               style={{
-                color: shades[200],
+                color: getShadeColor('200'),
                 fontFamily: 'OverpassHeavy',
                 fontSize: 24,
                 textAlign: 'center',
@@ -142,17 +139,17 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
     // Handle npub format
     if (typeof item.value === 'string' && item.value?.startsWith?.('npub') && special) {
-      return renderPrefixedValue('npub', item.value.split('npub')[1], titleText, theme);
+      return renderPrefixedValue('npub', item.value.split('npub')[1], titleText, getPrimaryColor);
     }
 
     // Handle creqA format
     if (typeof item.value === 'string' && item.value?.startsWith?.('creqA')) {
-      return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText, theme);
+      return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText, getPrimaryColor);
     }
 
     // Handle lnbc1 format
     if (typeof item.value === 'string' && item.value?.startsWith?.('lnbc1') && special) {
-      return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText, theme);
+      return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText, getPrimaryColor);
     }
 
     // Handle cashu format
@@ -163,7 +160,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     ) {
       const prefix = item.value.startsWith('cashuA') ? 'cashuA' : 'cashuB';
       const value = item.value.split(prefix)[1];
-      return renderPrefixedValue(prefix, value, titleText, theme);
+      return renderPrefixedValue(prefix, value, titleText, getPrimaryColor);
     }
 
     // Handle bitcoin lightning+cashu format
@@ -177,7 +174,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             bold
             size={12}
-            color={greys(theme)[50]}
+            className="text-primary-50"
             style={{
               textAlign: 'left',
               fontFamily: 'OverpassMono',
@@ -196,7 +193,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
-          color={greys(theme)[0]}
+          className="text-primary-0"
           style={{
             textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
             flex: 1,
@@ -208,13 +205,18 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   }
 
   // Helper function to render prefixed values (npub, creqA, etc.)
-  function renderPrefixedValue(prefix: string, value: string, titleText: string, theme: Theme) {
+  function renderPrefixedValue(
+    prefix: string,
+    value: string,
+    titleText: string,
+    getPrimaryColor: (shade: string) => string
+  ) {
     return (
       <VStack align="center" className="flex-1" justify="center">
         <Text
           heavy
           size={24}
-          color={shades[300]}
+          color={getShadeColor('300')}
           style={{
             textAlign: 'center',
           }}>
@@ -223,7 +225,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           bold
           size={12}
-          color={greys(theme)[50]}
+          className="text-primary-50"
           style={{
             textAlign: 'center',
             fontFamily: 'OverpassMono',

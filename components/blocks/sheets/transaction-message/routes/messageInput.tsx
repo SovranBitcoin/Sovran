@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { TextInput } from 'react-native';
 import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
@@ -12,7 +11,7 @@ import { Text } from 'components/ui/Text';
 const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input'>) => {
   const [message, setMessage] = useState('');
   const sheetRef = useSheetRef('transaction-message');
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   // Handler for confirming with message
   const handleConfirm = async () => {
@@ -31,36 +30,31 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
   };
 
   return (
-    <View
-      className="overflow-hidden rounded-2xl p-4"
-      style={{ backgroundColor: greys(theme)[800] }}>
+    <View className="bg-primary-800 overflow-hidden rounded-2xl p-4">
       <VStack gap={6}>
         <Text heavy size={20}>
           Add a note
         </Text>
-        <Text regular size={16} color={greys(theme)[100]}>
+        <Text regular size={16} className="text-primary-100">
           Add an optional message to your transaction
         </Text>
 
         <TextInput
           testID="message-input"
-          className="min-h-[120px] rounded-lg border p-3 text-base"
+          className="text-primary-100 border-primary-950 bg-primary-900 min-h-[120px] rounded-lg border p-3 text-base"
           style={{
-            color: greys(theme)[100],
             textAlignVertical: 'top',
-            borderColor: greys(theme)[950],
-            backgroundColor: greys(theme)[900],
           }}
           multiline
           numberOfLines={4}
           placeholder="Enter your message here (optional)"
-          placeholderTextColor={greys(theme)[500]}
+          placeholderTextColor={getPrimaryColor('500')}
           value={message}
           onChangeText={setMessage}
           textAlignVertical="top"
         />
         <ButtonHandler
-          style={{ backgroundColor: greys(theme)[800] }}
+          className="bg-primary-800"
           context="sheet"
           buttons={[
             {

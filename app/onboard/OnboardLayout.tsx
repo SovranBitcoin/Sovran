@@ -1,9 +1,7 @@
 import React from 'react';
 import { ColorValue } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
-import { greys } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
 import { VStack } from 'components/ui/View';
 import { ButtonHandler, ButtonHandlerButton } from 'components/ui/ButtonHandler';
@@ -27,7 +25,7 @@ export function OnboardingLayout({
   actions,
   children,
 }: OnboardingLayoutProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const handleNext = () => router.push(nextScreen || '/(drawer)/(tabs)');
   const handleBack = () => router.back();
 
@@ -36,8 +34,7 @@ export function OnboardingLayout({
       align="center"
       justify="space-between"
       flex={1}
-      className={`h-full p-4 ${children ? '' : 'pt-64'}`}
-      style={{ backgroundColor: greys(theme)[950] }}>
+      className={`bg-primary-950 h-full p-4 ${children ? '' : 'pt-64'}`}>
       {children ? (
         children
       ) : (
@@ -47,9 +44,9 @@ export function OnboardingLayout({
               size={36}
               lexend
               bold
+              className="text-primary-0"
               style={{
                 lineHeight: 36,
-                color: greys(theme)[0],
               }}>
               {title}
             </Text>
@@ -72,10 +69,10 @@ export function OnboardingLayout({
               size={16}
               regular
               lexend
+              className="text-primary-0"
               style={{
                 textAlign: 'left',
                 marginVertical: 8,
-                color: greys(theme)[0],
               }}>
               {description}
             </Text>

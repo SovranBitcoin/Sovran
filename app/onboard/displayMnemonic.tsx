@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Alert, ScrollView } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, greys, reds } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { VStack, HStack } from 'components/ui/View';
@@ -10,11 +8,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { mnemonic } = useLocalSearchParams<{ mnemonic: string }>();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 
   const words = mnemonic.split(' ');
+  const styles = createStyles(getPrimaryColor);
 
   const handleContinue = () => {
     if (!hasConfirmedBackup) {
@@ -166,73 +165,74 @@ const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075)
   return rgbToHex(r, g, b);
 };
 
-const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: greys('dark')[950],
-    paddingBottom: 16,
-  },
-  title: {
-    fontFamily: 'OverpassBold',
-    fontSize: 20,
-    color: greys('dark')[0],
-  },
-  instructions: {
-    fontSize: 16,
-    color: greys('dark')[100],
-    lineHeight: 22,
-  },
-  warningContainer: {
-    backgroundColor: infuseColors(greys('dark')[950], reds[300]),
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: reds[300],
-  },
-  warningText: {
-    color: reds[300],
-    fontWeight: '600',
-  },
-  wordCell: {
-    flex: 1,
-    backgroundColor: greys('dark')[800],
-    borderRadius: 8,
-    padding: 12,
-    marginHorizontal: 4,
-    minHeight: 60,
-    justifyContent: 'center',
-    borderLeftWidth: 3,
-    borderLeftColor: greens[300],
-  },
-  wordNumber: {
-    color: greys('dark')[300],
-    fontSize: 12,
-    textAlign: 'left',
-  },
-  wordText: {
-    color: greys('dark')[100],
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  securityTipsContainer: {
-    backgroundColor: greys('dark')[800],
-    borderRadius: 8,
-    padding: 16,
-  },
-  securityTipsTitle: {
-    color: greys('dark')[100],
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  securityTipText: {
-    color: greys('dark')[200],
-    fontSize: 14,
-    marginVertical: 4,
-  },
-});
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
+  StyleSheet.create({
+    scrollContainer: {
+      flexGrow: 1,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: getPrimaryColor('950'),
+      paddingBottom: 16,
+    },
+    title: {
+      fontFamily: 'OverpassBold',
+      fontSize: 20,
+      color: getPrimaryColor('0'),
+    },
+    instructions: {
+      fontSize: 16,
+      color: getPrimaryColor('100'),
+      lineHeight: 22,
+    },
+    warningContainer: {
+      backgroundColor: infuseColors(getPrimaryColor('950'), getShadeColor('300')),
+      borderRadius: 8,
+      padding: 12,
+      borderLeftWidth: 4,
+      borderLeftColor: getShadeColor('300'),
+    },
+    warningText: {
+      color: getShadeColor('300'),
+      fontWeight: '600',
+    },
+    wordCell: {
+      flex: 1,
+      backgroundColor: getPrimaryColor('800'),
+      borderRadius: 8,
+      padding: 12,
+      marginHorizontal: 4,
+      minHeight: 60,
+      justifyContent: 'center',
+      borderLeftWidth: 3,
+      borderLeftColor: getShadeColor('300'),
+    },
+    wordNumber: {
+      color: getPrimaryColor('300'),
+      fontSize: 12,
+      textAlign: 'left',
+    },
+    wordText: {
+      color: getPrimaryColor('100'),
+      textAlign: 'center',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    securityTipsContainer: {
+      backgroundColor: getPrimaryColor('800'),
+      borderRadius: 8,
+      padding: 16,
+    },
+    securityTipsTitle: {
+      color: getPrimaryColor('100'),
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    securityTipText: {
+      color: getPrimaryColor('200'),
+      fontSize: 14,
+      marginVertical: 4,
+    },
+  });
 
 export default MnemonicDisplayScreen;

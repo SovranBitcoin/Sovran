@@ -1,70 +1,13 @@
 import { BACKGROUND_IMAGE_ATTRIBUTES } from './backgroundImages';
 
-export interface Theme {
-  id: string;
-  greys: {
-    0: string;
-    50: string;
-    100: string;
-    200: string;
-    300: string;
-    400: string;
-    500: string;
-    600: string;
-    700: string;
-    800: string;
-    900: string;
-    950: string;
-  };
-  shades: {
-    100: string;
-    200: string;
-    300: string;
-    400: string;
-    500: string;
-  };
-}
-
-export type ShadeKey = 100 | 200 | 300 | 400 | 500;
-export type Shades = Record<ShadeKey, string>;
-
-export const shades: Shades = {
-  100: '#FF5841',
-  200: '#FF353C',
-  300: '#ED0C46',
-  400: '#CF014E',
-  500: '#BF004E',
-};
-
-export const reds: Shades = {
-  100: '#F8E0E6',
-  200: '#E4A3B4',
-  300: shades[300],
-  400: '#BF0A39',
-  500: '#9A082E',
-};
-
-export const greens: Shades = {
-  100: '#E0F8E0',
-  200: '#A3E4A3',
-  300: '#0CED3E',
-  400: '#0ABF35',
-  500: '#089A2C',
-};
-
-export const purples: Shades = {
-  100: '#E0E0F8',
-  200: '#A3A3E4',
-  300: '#8A2BE2',
-  400: '#6A0DAD',
-  500: '#4B0082',
-};
+// Legacy color constants - now using useTheme hook with getShadeColor, getRedColor, getGreenColor, getPurpleColor
+// These are kept for backward compatibility but should be replaced with useTheme functions
 
 export type GreyKey = 0 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 export type Greys = Record<GreyKey, string>;
 
-export const greys = (t: string | Theme): Greys => {
-  const name = typeof t === 'string' ? t : t.id;
+export const greys = (t: string): Greys => {
+  const name = t;
   if (BACKGROUND_IMAGE_ATTRIBUTES?.[name]) {
     return BACKGROUND_IMAGE_ATTRIBUTES[name].greys;
   }

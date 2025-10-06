@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
-import { greys, Theme } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { useCashuUtilities } from 'hooks/coco';
 import { EventKind } from 'helper/constants';
@@ -116,25 +114,10 @@ export const usePostReactions = ({ id }: { id: string }) => {
   };
 };
 
-const ActionItem = ({
-  icon,
-  count,
-  theme,
-  size,
-}: {
-  icon: any;
-  count: string;
-  theme: Theme;
-  size: number;
-}) => (
+const ActionItem = ({ icon, count, size }: { icon: any; count: string; size: number }) => (
   <HStack align="center" className="bg-transparent" spacing={4}>
     {icon}
-    <Text
-      size={size - 2}
-      weight="bold"
-      style={{
-        color: greys(theme)[400],
-      }}>
+    <Text size={size - 2} weight="bold" className="text-primary-400">
       {count}
     </Text>
   </HStack>
@@ -151,8 +134,6 @@ export function ActionItems({
   zapCount: number;
   size: number;
 }) {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <HStack
       justify="space-between"
@@ -166,31 +147,27 @@ export function ActionItems({
           <Icon
             name="garden:speech-bubble-typing-fill-12"
             size={size - 4}
-            color={greys(theme)[400]}
+            className="text-primary-400"
           />
         }
         count={formatNumber(0)}
-        theme={theme}
       />
       <ActionItem
         size={size}
         icon={
-          <Icon name="garden:arrow-retweet-fill-16" size={size - 4} color={greys(theme)[400]} />
+          <Icon name="garden:arrow-retweet-fill-16" size={size - 4} className="text-primary-400" />
         }
         count={formatNumber(repostCount)}
-        theme={theme}
       />
       <ActionItem
         size={size}
-        icon={<Icon name="garden:heart-fill-16" size={size - 4} color={greys(theme)[400]} />}
+        icon={<Icon name="garden:heart-fill-16" size={size - 4} className="text-primary-400" />}
         count={formatNumber(reactionCount)}
-        theme={theme}
       />
       <ActionItem
         size={size}
-        icon={<Icon name="mingcute:lightning-fill" size={size - 4} color={greys(theme)[400]} />}
+        icon={<Icon name="mingcute:lightning-fill" size={size - 4} className="text-primary-400" />}
         count={formatNumber(zapCount)}
-        theme={theme}
       />
     </HStack>
   );

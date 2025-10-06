@@ -509,14 +509,11 @@ const organizedKeys = {
     'termsAccepted',
     'experimental',
     'backgroundImage',
-    'backgroundImageAttrs',
     'allocation',
   ],
 
   // Settings sub-objects
   termsAccepted: ['termsAccepted', 'date'],
-
-  backgroundImageAttrs: ['id', 'shades', 'greys', 'text', 'tint', 'dominantColors'],
 
   // Allocation structure (currency -> mint URL -> ratio)
   allocation: ['sat', 'usd', 'eur', 'gbp'],

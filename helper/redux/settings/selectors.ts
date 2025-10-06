@@ -1,7 +1,5 @@
 import { createSelector } from 'reselect';
 import { RootState } from '../store/reducer';
-import { shades as baseShades, greys, Theme } from 'helper/colors';
-import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
 
 export const selectSettings = (state: RootState) => state.settings.settings;
 
@@ -19,32 +17,14 @@ export const selectBackgroundImage = createSelector(
   (settings) => settings.backgroundImage
 );
 
-export const selectBackgroundImageAttrs = createSelector(
-  [selectSettings],
-  (settings) => settings.backgroundImageAttrs
-);
+// Legacy backgroundImageAttrs selector removed - using human names directly now
 
 export const memoizedGetSettings = createSelector([selectSettings], (settings) => {
   return settings;
 });
 
-export const memoizedGetTheme = createSelector(
-  [
-    (state: RootState) => state.settings.settings.theme,
-    (state: RootState) => state.settings.settings.backgroundImage,
-  ],
-  (themeName, image): Theme => {
-    if (image) {
-      return BACKGROUND_IMAGE_ATTRIBUTES[image];
-    }
-
-    return {
-      id: themeName,
-      shades: baseShades,
-      greys: greys(themeName),
-    };
-  }
-);
+// Legacy theme selector - now using useTheme hook from ThemeProvider
+// export const memoizedGetTheme = createSelector(...)
 
 export const memoizedGetBackgroundImage = createSelector(
   [

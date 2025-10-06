@@ -3,9 +3,8 @@ import { useSelector } from 'react-redux';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { memoizedGetTheme } from 'helper/redux/settings';
 
 interface TabProps {
   tab: string;
@@ -17,7 +16,7 @@ interface TabProps {
 }
 
 function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const handlePress = useCallback(() => {
     onPress(tab, index);
@@ -30,17 +29,17 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
         className="shrink-0 flex-row items-center justify-center rounded-3xl px-4 py-2.5"
         style={{
           ...(isSelected && {
-            backgroundColor: greys(theme)[600],
+            backgroundColor: getPrimaryColor('600'),
             borderWidth: 0,
             borderRadius: 1000,
-            borderColor: greys(theme)[600],
+            borderColor: getPrimaryColor('600'),
           }),
         }}>
         <HStack align="center" spacing={4}>
           <Text
             className="text-center text-sm"
             style={{
-              color: isSelected ? greys(theme)[0] : greys(theme)[100],
+              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('100'),
               fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
             }}>
             {tab}
@@ -50,7 +49,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
               className="text-xs"
               style={{
                 fontFamily: 'OverpassBold',
-                color: greys(theme)[300],
+                color: getPrimaryColor('300'),
               }}>
               {`(${amount})`}
             </Text>
@@ -69,7 +68,7 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const isScrollable = contentWidth ? contentWidth > containerWidth && containerWidth > 0 : true;
@@ -102,7 +101,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         style={[
           {
             borderWidth: 0.2,
-            borderColor: greys(theme)[600],
+            borderColor: getPrimaryColor('600'),
             marginVertical: 4,
             width: isScrollable ? undefined : '100%',
             minWidth: isScrollable ? undefined : '100%',

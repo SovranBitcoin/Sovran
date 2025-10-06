@@ -1,8 +1,6 @@
 import React, { FC, ComponentType } from 'react';
 import { StyleProp, TextStyle } from 'react-native';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface TextInputBaseProps {
   Component: ComponentType<any>;
@@ -11,7 +9,7 @@ interface TextInputBaseProps {
 }
 
 const TextInputBase: FC<TextInputBaseProps> = ({ Component, style, ...props }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   // Instead of creating styles in each render, we can use inline styles
   // according to the refactoring guidelines
@@ -19,16 +17,16 @@ const TextInputBase: FC<TextInputBaseProps> = ({ Component, style, ...props }) =
     <Component
       style={[
         {
-          backgroundColor: greys(theme)[800],
+          backgroundColor: getPrimaryColor('800'),
           borderWidth: 1,
-          borderColor: greys(theme)[600],
-          shadowColor: greys(theme)[950],
+          borderColor: getPrimaryColor('600'),
+          shadowColor: getPrimaryColor('950'),
           shadowOffset: { width: 1, height: 4 },
           shadowOpacity: 0.25,
           shadowRadius: 6,
           borderRadius: 32,
           padding: 10,
-          color: greys(theme)[0],
+          color: getPrimaryColor('0'),
           paddingLeft: 16,
           fontFamily: 'OverpassBold',
           marginBottom: 0,

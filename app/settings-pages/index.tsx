@@ -2,9 +2,9 @@ import React from 'react';
 import { TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
-import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetSettings } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
-import { greys, reds, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
 import {
   ActionSheetProvider,
@@ -30,7 +30,7 @@ export const Section: React.FC<{
   children: React.ReactNode;
   isDanger?: boolean;
 }> = ({ title, children, isDanger }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getRedColor } = useTheme();
   return (
     <View className="py-3">
       <Text
@@ -39,7 +39,7 @@ export const Section: React.FC<{
         medium
         overpass
         style={{
-          color: isDanger ? reds[300] : greys(theme)[300],
+          color: isDanger ? getRedColor('300') : getPrimaryColor('300'),
         }}>
         {title}
       </Text>
@@ -48,7 +48,9 @@ export const Section: React.FC<{
   );
 };
 
-const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: Theme }) => {
+const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
+  const { getPrimaryColor, getRedColor } = useTheme();
+
   return (
     <TouchableOpacity
       onPress={() => {
@@ -58,7 +60,7 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
         blur
         className="flex-row items-center justify-start bg-transparent p-3"
         style={{
-          backgroundColor: greys(theme)[800],
+          backgroundColor: getPrimaryColor('800'),
         }}>
         <HStack spacing={12} flex={1}>
           <Image
@@ -74,20 +76,20 @@ const ProfileButton = ({ currentProfile, theme }: { currentProfile: any; theme: 
               bold
               overpass
               style={{
-                color: greys(theme)[0],
+                color: getPrimaryColor('0'),
               }}>
               {currentProfile?.profile?.name}
             </Text>
             <Text
               size={16}
               style={{
-                color: greys(theme)[400],
+                color: getPrimaryColor('400'),
               }}>
               {truncateMiddle(currentProfile?.npub, 8)}
             </Text>
           </VStack>
         </HStack>
-        <Icon name="fa6-solid:chevron-right" color={greys(theme)[400]} size={22} />
+        <Icon name="fa6-solid:chevron-right" color={getPrimaryColor('400')} size={22} />
       </View>
     </TouchableOpacity>
   );
@@ -102,14 +104,14 @@ export const RowButton: React.FC<{
   isDanger?: boolean;
   rightIcon?: React.ReactNode;
 }> = ({ label, value, onPress, isFirst, isLast, isDanger, rightIcon }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getRedColor } = useTheme();
   return (
     <View
       blur
       className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
       style={{
-        backgroundColor: greys(theme)[800],
-        borderColor: greys(theme)[700],
+        backgroundColor: getPrimaryColor('800'),
+        borderColor: getPrimaryColor('700'),
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
       <TouchableOpacity
@@ -120,7 +122,7 @@ export const RowButton: React.FC<{
           className="tracking-tight"
           size={16}
           style={{
-            color: isDanger ? reds[300] : greys(theme)[0],
+            color: isDanger ? getRedColor('300') : getPrimaryColor('0'),
           }}>
           {label}
         </Text>
@@ -132,7 +134,7 @@ export const RowButton: React.FC<{
             bold
             size={16}
             style={{
-              color: isDanger ? reds[300] : greys(theme)[400],
+              color: isDanger ? getRedColor('300') : getPrimaryColor('400'),
             }}>
             {value}
           </Text>
@@ -141,7 +143,7 @@ export const RowButton: React.FC<{
           (rightIcon ?? (
             <Icon
               name="fa6-solid:chevron-right"
-              color={isDanger ? reds[300] : greys(theme)[400]}
+              color={isDanger ? getRedColor('300') : getPrimaryColor('400')}
               size={19}
             />
           ))
@@ -154,7 +156,7 @@ export const RowButton: React.FC<{
 };
 
 const ModalScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getRedColor } = useTheme();
   const { currentProfile } = useNostr();
 
   const { showActionSheetWithOptions } = useActionSheet();
@@ -197,7 +199,7 @@ const ModalScreen = () => {
     <Container>
       <ScrollView>
         <Section title="Account">
-          <ProfileButton currentProfile={currentProfile} theme={theme} />
+          <ProfileButton currentProfile={currentProfile} />
         </Section>
         <Section title="Preferences">
           <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
@@ -293,7 +295,7 @@ const ModalScreen = () => {
               bold
               size={13}
               style={{
-                color: greys(theme)[300],
+                color: getPrimaryColor('300'),
               }}>
               {name}
             </Text>
@@ -303,7 +305,7 @@ const ModalScreen = () => {
               overpass
               medium
               style={{
-                color: greys(theme)[300],
+                color: getPrimaryColor('300'),
               }}>
               App Version {version} ({buildNumber})
             </Text>

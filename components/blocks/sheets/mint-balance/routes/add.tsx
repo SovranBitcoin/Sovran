@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Wrapper from '../../wrapper';
@@ -52,11 +50,10 @@ interface AddMintItemProps {
   mint: SearchableMint;
   onToggle: (url: string) => void;
   selected: boolean;
-  theme: any;
 }
 
-const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, theme }) => {
-  const g = greys(theme);
+const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) => {
+  const { getPrimaryColor } = useTheme();
   const pseudo = isPseudoMint(mint);
   const isDisabled = pseudo ? !looksLikeMintUrl(mint.url) : false;
 
@@ -79,7 +76,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
     <View
       className="overflow-hidden rounded-lg"
       blur
-      style={[{ backgroundColor: g[800], marginBottom: 12 }]}>
+      style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
       <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mint.url)}>
         <HStack
           align="center"
@@ -96,7 +93,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
             />
 
             <VStack spacing={2}>
-              <Text style={[{ color: g[0], fontSize: 16 }]}>{displayName}</Text>
+              <Text style={[{ color: getPrimaryColor('0'), fontSize: 16 }]}>{displayName}</Text>
 
               <HStack align="center" gap={4}>
                 {pseudo && (
@@ -139,7 +136,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected, the
 };
 
 const AddRoute = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const { getBalances } = useMintManagement();
@@ -291,14 +288,12 @@ const AddRoute = () => {
     }
   };
 
-  const g = greys(theme);
-
   // Loading state component for the mints section
   const LoadingMintsList = () => (
     <VStack className="items-center p-8">
-      <ActivityIndicator size="large" color={g[0]} />
+      <ActivityIndicator size="large" color={getPrimaryColor('0')} />
       <Spacer size={12} />
-      <Text className="text-center text-sm" style={{ color: g[200] }}>
+      <Text className="text-center text-sm" style={{ color: getPrimaryColor('200') }}>
         Discovering mints...
       </Text>
     </VStack>
@@ -330,7 +325,6 @@ const AddRoute = () => {
 
           <MintCurrencySelector
             mints={[]}
-            theme={theme}
             allowedCurrencies={allowedCurrencies}
             currencyLabel="Currency options"
             mintsLabel="Discovered mints"
@@ -364,7 +358,7 @@ const AddRoute = () => {
           />
         }>
         <VStack className="items-center p-5">
-          <Text className="text-center text-base" style={{ color: g[200] }}>
+          <Text className="text-center text-base" style={{ color: getPrimaryColor('200') }}>
             {error}
           </Text>
         </VStack>
@@ -403,7 +397,6 @@ const AddRoute = () => {
 
         <MintCurrencySelector
           mints={filteredMints as any[]}
-          theme={theme}
           allowedCurrencies={allowedCurrencies}
           currencyLabel="Currency options"
           mintsLabel={url.trim() ? 'Search results' : 'Discovered mints'}
@@ -412,7 +405,6 @@ const AddRoute = () => {
               mint={mint}
               onToggle={handleToggleMint}
               selected={selectedMints.has(mint.url)}
-              theme={theme}
             />
           )}
         />

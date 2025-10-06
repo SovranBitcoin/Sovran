@@ -14,13 +14,11 @@ import Constants from 'expo-constants';
 import { View, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
-import { greys } from 'helper/colors';
 import { BlurView } from 'expo-blur';
-import { useSelector } from 'react-redux';
 import Icon from 'assets/icons';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 
@@ -57,14 +55,14 @@ export default function Modal({
   backgroundColor,
   scrollEnabled = true,
 }: ModalProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const [blurIntensity, setBlurIntensity] = useState<number>(0);
   const [buttonHeight, setButtonHeight] = useState<number>(0);
 
   const titleOffset = showClose || showBack || typeof title !== 'string' ? 0 : 64;
-  const bgColor = transparent ? 'transparent' : (backgroundColor ?? greys(theme)[950]);
+  const bgColor = transparent ? 'transparent' : (backgroundColor ?? getPrimaryColor('950'));
 
   useEffect(() => {
     const listener = scrollY.addListener(({ value }) => {
@@ -92,13 +90,13 @@ export default function Modal({
     if (showBack) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <Icon name="material-symbols:arrow-back-rounded" size={24} color={greys(theme)[0]} />
+          <Icon name="material-symbols:arrow-back-rounded" size={24} color={getPrimaryColor('0')} />
         </TouchableOpacity>
       );
     } else if (showClose) {
       return (
         <TouchableOpacity onPress={handleBackPress} className="p-3">
-          <Icon name="material-symbols:close-rounded" size={24} color={greys(theme)[0]} />
+          <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
         </TouchableOpacity>
       );
     }
@@ -128,7 +126,7 @@ export default function Modal({
           right: 0,
           zIndex: 1,
           minHeight: headerHeight,
-          backgroundColor: opacity(greys(theme)[950], 0.9),
+          backgroundColor: opacity(getPrimaryColor('950'), 0.9),
         }}>
         <HStack align="center" justify="space-between">
           {renderHeaderButton()}
@@ -146,10 +144,10 @@ export default function Modal({
             pointerEvents: 'none',
           }}>
           <Text
+            className="text-primary-0"
             style={{
               fontFamily: 'OverpassHeavy',
               fontSize: 18,
-              color: greys(theme)[0],
             }}>
             {title}
           </Text>

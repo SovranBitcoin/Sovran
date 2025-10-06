@@ -5,11 +5,9 @@ import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
-import { greys } from 'helper/colors';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
@@ -34,7 +32,7 @@ function ShareModal() {
 
   const { type = 'profile', data } = params;
   const config = SHARE_CONFIGS[type];
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(data);
@@ -54,15 +52,15 @@ function ShareModal() {
           <RowButton
             isFirst
             onPress={handleCopy}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
+            rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
             label={
               <HStack align="center" gap={8}>
                 <CurrencyIcon
-                  colors={[greys(theme)[400]]}
+                  colors={[getPrimaryColor('400')]}
                   width={20}
                   currency={config.iconCurrency}
                 />
-                <Text style={{ color: greys(theme)[50] }} bold>
+                <Text className="text-primary-50" bold>
                   {truncateMiddle(data, 10)}
                 </Text>
               </HStack>

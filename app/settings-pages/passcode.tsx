@@ -3,8 +3,8 @@ import { Text, StyleSheet, ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
-import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
+import { useSettings } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import NumericKeyboard from 'components/blocks/passcode/NumericKeyboard';
 import Container from 'components/blocks/Container';
 import { Card } from 'components/ui/Card';
@@ -14,13 +14,13 @@ import { showMessage } from 'helper/popup/popups';
 const PASSCODE_LENGTH = 4;
 
 const PasscodeSettings: React.FC = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const { setPasscode } = useSettings();
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
-  const styles = createStyles(theme);
+  const styles = createStyles(getPrimaryColor);
 
   const handlePress = (val: string) => {
     if (step === 'create') {
@@ -48,7 +48,7 @@ const PasscodeSettings: React.FC = () => {
           variant="warning"></Card>
         <VStack justify="space-between" align="center" style={styles.container}>
           <VStack align="center" justify="center" style={styles.content}>
-            <Text style={styles.title}>
+            <Text style={styles.title} className="text-primary-0">
               {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
             </Text>
             <HStack style={styles.dotsContainer}>
@@ -94,7 +94,7 @@ const PasscodeSettings: React.FC = () => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -104,7 +104,6 @@ const createStyles = (theme: Theme) =>
       flex: 1,
     },
     title: {
-      color: greys(theme)[0],
       fontSize: 20,
       marginBottom: 20,
       fontFamily: 'OverpassBold',
@@ -118,14 +117,14 @@ const createStyles = (theme: Theme) =>
       height: 12,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: greys(theme)[0],
+      borderColor: getPrimaryColor('0'),
       marginHorizontal: 6,
     },
     dotActive: {
       width: 12,
       height: 12,
       borderRadius: 6,
-      backgroundColor: greys(theme)[0],
+      backgroundColor: getPrimaryColor('0'),
       marginHorizontal: 6,
     },
   });

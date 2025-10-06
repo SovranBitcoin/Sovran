@@ -1,16 +1,14 @@
 import React from 'react';
 import Icon from 'assets/icons';
-import { greys } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 export function Spinner({ size = 8, style }: { size?: number; style?: any }) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   return (
     <Icon
       name="ant-design:loading-outlined"
       size={size}
-      color={greys(theme)[50]}
+      color={getPrimaryColor('50')}
       style={style}
       spin={{
         delay: 0,

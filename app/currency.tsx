@@ -5,7 +5,7 @@ import { AmountFormatter } from '../components/ui/AmountFormatter';
 
 import { useMintManagement, useCashuOperations, useLightningOperations } from 'hooks/coco';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 // Removed Redux Cashu import - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { showMessage } from 'helper/popup/popups';
@@ -17,7 +17,6 @@ import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
-import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Image from 'components/ui/Image';
 import Icon from 'assets/icons';
@@ -33,7 +32,7 @@ interface ScanningData {
 }
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const params = useLocalSearchParams<{
     amount?: string;
     unit: string;
@@ -397,7 +396,7 @@ function ModalScreen() {
               padding: 8,
               borderRadius: 16,
               borderWidth: 0.2,
-              borderColor: greys(theme)[600],
+              borderColor: getPrimaryColor('600'),
               marginVertical: 4,
               alignSelf: 'center',
             },
@@ -406,7 +405,7 @@ function ModalScreen() {
             name="solar:key-bold"
             size={16}
             style={{
-              backgroundColor: greys(theme)[500],
+              backgroundColor: getPrimaryColor('500'),
               borderRadius: 100,
               padding: 8,
             }}

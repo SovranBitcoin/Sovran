@@ -5,16 +5,15 @@ import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/ui/View';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { useWindowDimensions, StyleSheet, ViewStyle } from 'react-native';
-import { greys } from 'helper/colors';
 import EQRCode from 'react-native-qrcode-svg';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Circle background for the QR code center logo
  */
 export const Circle = memo(() => {
+  const { getPrimaryColor } = useTheme();
   return (
     <View
       className="absolute z-10"
@@ -25,7 +24,7 @@ export const Circle = memo(() => {
         transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.63 }],
         left: '50%' as any,
         top: '50%' as any,
-        backgroundColor: greys('dark')[0],
+        backgroundColor: getPrimaryColor('0'),
       }}
     />
   );
@@ -60,7 +59,7 @@ export const QRCode = memo(function QRCode({
   hasBackground = false,
   ...props
 }: QRCodeProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { width: w } = useWindowDimensions();
   const width = Math.min(w, 600);
 
@@ -75,19 +74,21 @@ export const QRCode = memo(function QRCode({
     <View style={containerStyle}>
       <LinearGradient
         colors={
-          !animate ? [theme.shades[200], theme.shades[300]] : [theme.greys[700], theme.greys[700]]
+          !animate
+            ? [getShadeColor('200'), getShadeColor('300')]
+            : [getPrimaryColor('700'), getPrimaryColor('700')]
         }
+        className={hasBackground ? 'bg-primary-950' : ''}
         style={{
           ...(hasBackground
             ? {
-                backgroundColor: theme.greys[950],
                 padding: 16,
                 borderRadius: 16,
               }
             : {}),
         }}>
         <EQRCode
-          color={animate ? theme.greys[0] : theme.greys[0]}
+          color={getPrimaryColor('0')}
           backgroundColor={'transparent'}
           value={props.data}
           size={width - 2 * padding}

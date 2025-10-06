@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { greys, Theme } from 'helper/colors';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 import { ScrollView } from 'react-native-actions-sheet'; // <- important this is from react-native-actions-sheet
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { Spacer } from 'components/ui/View';
 
 interface WrapperProps {
@@ -19,10 +17,10 @@ const Wrapper: React.FC<WrapperProps> = ({
   containerStyle,
   scrollContainerStyle,
 }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const [containerHeight, setContainerHeight] = useState(0);
   const [buttonHeight, setButtonHeight] = useState(0);
-  const styles = createStyles(theme, buttonHeight, containerHeight);
+  const styles = createStyles(getPrimaryColor, buttonHeight, containerHeight);
 
   return (
     <View
@@ -43,11 +41,15 @@ const Wrapper: React.FC<WrapperProps> = ({
   );
 };
 
-const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: number = 0) =>
+const createStyles = (
+  getPrimaryColor: (shade: string) => string,
+  buttonHeight: number = 0,
+  containerHeight: number = 0
+) =>
   StyleSheet.create({
     actionSheetContainer: {
       height: '100%',
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     scrollContainer: {
       padding: 16,
@@ -63,11 +65,11 @@ const createStyles = (theme: Theme, buttonHeight: number = 0, containerHeight: n
       padding: 16,
       marginTop: 12,
       alignItems: 'center',
-      backgroundColor: greys(theme)[800],
+      backgroundColor: getPrimaryColor('800'),
       borderBottomRightRadius: 1000,
       borderRadius: 1000,
       borderWidth: 0.5,
-      borderColor: greys(theme)[600],
+      borderColor: getPrimaryColor('600'),
     },
   });
 

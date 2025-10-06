@@ -5,7 +5,8 @@ import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { View, VStack } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
-import { memoizedGetSettings, memoizedGetTheme, termsAccepted } from 'helper/redux/settings';
+import { memoizedGetSettings, termsAccepted } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { getStructure, store } from 'helper/redux/store';
 import { showMessage } from 'helper/popup/popups';
 import { OnboardingLayout } from 'app/onboard/OnboardLayout';
@@ -46,7 +47,7 @@ function TabOneScreen() {
 
   const onRefresh = useCallback(async () => {}, []);
 
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, currentTheme } = useTheme();
 
   const { history } = usePaginatedHistory();
 
@@ -123,30 +124,27 @@ function TabOneScreen() {
         width: '100%',
         height: '100%',
       }}>
-      <AnimatedSpriteBackground backgroundColor={theme.greys[950]} />
+      <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
 
       <View className="flex-1">
         <ScrollView
           className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
+
           <View
             className="p-4 pt-0"
-            style={{
-              backgroundColor: opacity(theme.greys[950], 0.99),
-            }}>
-            {theme.shades && (
-              <LinearGradient
-                colors={[
-                  opacity(theme.greys[950], 0.99),
-                  opacity(theme.greys[950], 0.5),
-                  opacity(theme.greys[950], 0),
-                ]}
-                start={{ x: 0.5, y: 1 }}
-                end={{ x: 0.5, y: 0 }}
-                style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
-              />
-            )}
+            style={{ backgroundColor: opacity(getPrimaryColor('950'), 0.99) }}>
+            <LinearGradient
+              colors={[
+                opacity(getPrimaryColor('950'), 0.99),
+                opacity(getPrimaryColor('950'), 0.5),
+                opacity(getPrimaryColor('950'), 0),
+              ]}
+              start={{ x: 0.5, y: 1 }}
+              end={{ x: 0.5, y: 0 }}
+              style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
+            />
             <Transactions account={account} showMore={true} history={history} hideExpired={true} />
           </View>
         </ScrollView>

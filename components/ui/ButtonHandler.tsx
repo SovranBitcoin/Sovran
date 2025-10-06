@@ -3,10 +3,8 @@ import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/ui/Button';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View } from 'components/ui/View';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { LinearGradient } from 'expo-linear-gradient';
-import { greys } from '@/helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';
 
@@ -29,7 +27,7 @@ interface ButtonHandlerProps {
 
 export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
   const [loading, setLoading] = useState(false);
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   // Filter buttons based on condition
   const visibleButtons = buttons.filter((button) => button.condition !== false);
@@ -63,7 +61,7 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
       className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''}`}
       style={[style]}>
       <LinearGradient
-        colors={[opacity(greys(theme)[950], 0.75), opacity(greys(theme)[950], 0)]}
+        colors={[opacity(getPrimaryColor('950'), 0.75), opacity(getPrimaryColor('950'), 0)]}
         start={{ x: 0, y: 1 }}
         end={{ x: 0, y: 0 }}
         style={{

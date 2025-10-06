@@ -1,9 +1,7 @@
 import React from 'react';
 import { View } from 'components/ui/View';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { HistoryEntry } from 'coco-cashu-core';
 
 interface TransactionIconProps {
@@ -11,7 +9,7 @@ interface TransactionIconProps {
 }
 
 export default function TransactionIcon({ historyEntry }: TransactionIconProps): React.ReactNode {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const getIconName = (type: string) => {
     switch (type) {
@@ -30,7 +28,7 @@ export default function TransactionIcon({ historyEntry }: TransactionIconProps):
 
   return (
     <View className="relative h-7 w-7 bg-transparent">
-      <Icon name={getIconName(historyEntry.type)} color={greys(theme)[50]} size={28} />
+      <Icon name={getIconName(historyEntry.type)} color={getPrimaryColor('50')} size={28} />
     </View>
   );
 }

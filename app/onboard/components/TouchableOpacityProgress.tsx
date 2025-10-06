@@ -1,9 +1,7 @@
 import React from 'react';
 import { View, Image } from 'react-native';
 
-import { shades, Theme } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { createStyles } from '../helper';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -37,15 +35,15 @@ export function TouchableOpacityProgress({
   steps,
   ensureCompleteStep,
 }: TouchableOpacityProgressProps) {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
 
   return (
     <View style={styles.iconContainer}>
       {renderProgressCircle(
         step.type === 'complete' ? 100 : isActive ? progress : isComplete ? 1 : 0,
         100,
-        theme
+        getPrimaryColor
       )}
 
       {/* Icon */}
@@ -81,7 +79,7 @@ export function TouchableOpacityProgress({
                   isComplete
                     ? '#ED0C46'
                     : isActive && step.type === 'complete'
-                      ? shades[300]
+                      ? getShadeColor('300')
                       : 'white'
                 }
               />

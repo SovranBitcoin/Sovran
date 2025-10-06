@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { Dimensions, TouchableOpacity } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { View, VStack, Spacer } from 'components/ui/View';
@@ -52,7 +51,7 @@ export const Transactions = React.memo(
     days = 1,
     hideExpired = false,
   }: Props) => {
-    const theme = useSelector(memoizedGetTheme);
+    const { getPrimaryColor } = useTheme();
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -175,11 +174,11 @@ export const Transactions = React.memo(
             style={{
               minHeight: Dimensions.get('screen').height / 2,
             }}>
-            <Icon name="fluent:clock-12-filled" color={theme.greys[500]} />
-            <Text heavy size={16} style={{ color: theme.greys[500] }}>
+            <Icon name="fluent:clock-12-filled" color={getPrimaryColor('500')} />
+            <Text heavy size={16} className="text-primary-500">
               No History
             </Text>
-            <Text color={theme.greys[500]} heavy size={16}>
+            <Text color={getPrimaryColor('500')} heavy size={16}>
               Your history will show up here
             </Text>
           </View>
@@ -192,16 +191,16 @@ export const Transactions = React.memo(
           <View>
             <VStack spacing={8}>
               <Spacer size={8} />
-              <Text heavy size={16} color={theme.greys[100]}>
+              <Text heavy size={16} color={getPrimaryColor('100')}>
                 {label}
               </Text>
               {sections.map((section) => (
                 <View key={section.title}>
                   <VStack spacing={4}>
-                    <Text size={14} heavy color={theme.greys[100]}>
+                    <Text size={14} heavy color={getPrimaryColor('100')}>
                       {section.title}
                     </Text>
-                    <View style={{ backgroundColor: theme.greys[900] }} className="rounded-lg" blur>
+                    <View className="bg-primary-900 rounded-lg" blur>
                       {section.data.map((historyEntry) => {
                         const key = (() => {
                           if (historyEntry.id) return historyEntry.id;
@@ -226,11 +225,7 @@ export const Transactions = React.memo(
                           }>
                           <View
                             blur
-                            className="flex items-center rounded-lg border p-3"
-                            style={{
-                              backgroundColor: theme.greys[800],
-                              borderColor: theme.greys[700],
-                            }}>
+                            className="bg-primary-800 border-primary-700 flex items-center rounded-lg border p-3">
                             <Text size={14} bold>
                               View all ({filteredHistory.length})
                             </Text>
@@ -268,7 +263,11 @@ export const Transactions = React.memo(
         renderItem={({ item, index }) => {
           if (item.type === 'header') {
             return (
-              <Text size={14} heavy color={theme.greys[500]} style={{ height: HEADER_HEIGHT }}>
+              <Text
+                size={14}
+                heavy
+                color={getPrimaryColor('500')}
+                style={{ height: HEADER_HEIGHT }}>
                 {'title' in item ? item.title : ''}
               </Text>
             );
@@ -282,8 +281,8 @@ export const Transactions = React.memo(
           return (
             <View
               blur
+              className="bg-primary-800"
               style={{
-                backgroundColor: theme.greys[800],
                 borderRadius: 8,
                 borderTopLeftRadius: isFirst ? 8 : 0,
                 borderTopRightRadius: isFirst ? 8 : 0,

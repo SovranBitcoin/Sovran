@@ -8,9 +8,7 @@ import {
   TextInput,
   Keyboard,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greens, greys, reds, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { HStack, VStack } from 'components/ui/View';
@@ -29,8 +27,8 @@ const TOTAL_WORDS = GRID_ROWS * GRID_COLS;
 const VERIFICATION_INDICES = [2, 5, 11]; // Fixed indices for predictability
 
 const RecoveryScreen: React.FC<{}> = () => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const { type = 'recover', mnemonic = null } = useLocalSearchParams<{
     type?: string;
     mnemonic?: string;
@@ -332,7 +330,7 @@ const RecoveryScreen: React.FC<{}> = () => {
                     ? `Enter word ${activeWordIndex + 1}`
                     : `Enter word ${activeWordIndex + 1} of 12`
                 }
-                placeholderTextColor={greys(theme)[400]}
+                placeholderTextColor={getPrimaryColor('400')}
                 returnKeyType={
                   // if on last one
                   activeWordIndex === words.length - 1 ? 'done' : 'next'
@@ -418,25 +416,25 @@ const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075)
   return rgbToHex(r, g, b);
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,
     },
     container: {
       flex: 1,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     title: {
       fontFamily: 'OverpassBold',
       fontSize: 20,
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       marginBottom: 8,
     },
     subtitle: {
       fontFamily: 'OverpassRegular',
       fontSize: 16,
-      color: greys(theme)[100],
+      color: getPrimaryColor('100'),
       marginBottom: 16,
     },
     gridContainer: {
@@ -451,7 +449,7 @@ const createStyles = (theme: Theme) =>
     },
     wordCell: {
       flex: 1,
-      backgroundColor: greys(theme)[800],
+      backgroundColor: getPrimaryColor('800'),
       borderRadius: 8,
       padding: 12,
       marginHorizontal: 4,
@@ -460,51 +458,51 @@ const createStyles = (theme: Theme) =>
       borderBottomColor: 'transparent',
     },
     activeWordCell: {
-      backgroundColor: greys(theme)[700],
-      borderBottomColor: greys(theme)[400],
+      backgroundColor: getPrimaryColor('700'),
+      borderBottomColor: getPrimaryColor('400'),
     },
     activeWordText: {
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
     },
     invalidWordCell: {
-      backgroundColor: infuseColors(greys(theme)[950], reds[300]),
-      borderBottomColor: reds[300],
+      backgroundColor: infuseColors(getPrimaryColor('950'), getRedColor('300')),
+      borderBottomColor: getRedColor('300'),
     },
     validWordCell: {
-      backgroundColor: infuseColors(greys(theme)[950], greens[300]),
-      borderBottomColor: greens[300],
+      backgroundColor: infuseColors(getPrimaryColor('950'), getGreenColor('300')),
+      borderBottomColor: getGreenColor('300'),
     },
     wordNumber: {
-      color: greys(theme)[300],
+      color: getPrimaryColor('300'),
       fontSize: 12,
       marginBottom: 4,
       textAlign: 'left',
     },
     wordText: {
-      color: greys(theme)[300],
+      color: getPrimaryColor('300'),
       textAlign: 'center',
       fontSize: 14,
     },
     filledWordText: {
-      color: greys(theme)[100],
+      color: getPrimaryColor('100'),
     },
     invalidWordText: {
-      color: reds[300],
+      color: getRedColor('300'),
     },
     validWordText: {
-      color: greens[300],
+      color: getGreenColor('300'),
     },
     inputContainer: {
       marginBottom: 8,
     },
     textInput: {
-      backgroundColor: greys(theme)[800],
-      color: greys(theme)[0],
+      backgroundColor: getPrimaryColor('800'),
+      color: getPrimaryColor('0'),
       borderRadius: 8,
       padding: 16,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: greys(theme)[700],
+      borderColor: getPrimaryColor('700'),
     },
   });
 

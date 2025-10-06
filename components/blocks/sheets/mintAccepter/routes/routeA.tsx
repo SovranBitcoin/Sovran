@@ -3,9 +3,8 @@ import React from 'react';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { StyledText, Text } from 'components/ui/Text';
 import { View } from 'components/ui/View';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useDispatch, useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
+import { useDispatch } from 'react-redux';
 import { store } from 'helper/redux/store';
 import { addMintsAction } from 'helper/redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
@@ -15,7 +14,7 @@ import { showMessage } from 'helper/popup/popups';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const ref = useSheetRef('mint-accepter');
   const payload = useSheetPayload('mint-accepter');
   const dispatch = useDispatch();
@@ -27,7 +26,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[800],
+        backgroundColor: getPrimaryColor('800'),
         padding: 8,
         paddingTop: 24,
       }}>
@@ -36,7 +35,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         style={{
           fontSize: 20,
           fontFamily: 'OverpassHeavy',
-          color: greys(theme)[0],
+          color: getPrimaryColor('0'),
           marginLeft: 16,
           textAlign: 'center',
           marginBottom: 16,
@@ -57,10 +56,10 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
       </Text>
       <ButtonHandler
         colors={[
-          opacity(greys(theme)[800], 0),
-          opacity(greys(theme)[800], 0.75),
-          opacity(greys(theme)[800], 0.9),
-          greys(theme)[800],
+          opacity(getPrimaryColor('800'), 0),
+          opacity(getPrimaryColor('800'), 0.75),
+          opacity(getPrimaryColor('800'), 0.9),
+          getPrimaryColor('800'),
         ]}
         buttons={[
           {

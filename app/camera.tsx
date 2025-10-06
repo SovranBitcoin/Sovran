@@ -2,13 +2,12 @@ import React, { useState, useCallback } from 'react';
 import { Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import Icon from 'assets/icons';
@@ -29,7 +28,7 @@ interface ScanningData {
  */
 const Camera: React.FC = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const [scanned, setScanned] = useState<boolean>(false);
   const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const [progress, setProgress] = useState<number>(0);
@@ -142,7 +141,7 @@ const Camera: React.FC = () => {
       <View className="absolute left-6 top-12 z-10">
         <Button
           onPress={handleClosePress}
-          icon={<Icon name="material-symbols:close-rounded" color={greys(theme)[0]} />}
+          icon={<Icon name="material-symbols:close-rounded" color={getPrimaryColor('0')} />}
           blur
         />
       </View>
@@ -206,13 +205,17 @@ const Camera: React.FC = () => {
         {/* Progress text */}
         <View className="absolute bottom-0 self-center rounded-lg bg-black/50 p-2">
           {progress > 0 ? (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>
+            <Text className="text-primary-0" style={{ fontSize: 16 }}>
               Progress: {Math.round(progress * 100)}%
             </Text>
           ) : loading ? (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>Loading...</Text>
+            <Text className="text-primary-0" style={{ fontSize: 16 }}>
+              Loading...
+            </Text>
           ) : (
-            <Text style={{ color: greys(theme)[0], fontSize: 16 }}>Scanning...</Text>
+            <Text className="text-primary-0" style={{ fontSize: 16 }}>
+              Scanning...
+            </Text>
           )}
         </View>
       </View>
@@ -221,21 +224,21 @@ const Camera: React.FC = () => {
       <HStack justify="space-between" className="absolute bottom-24 left-0 right-0 w-full px-8">
         <Button
           onPress={handleClipboardPress}
-          icon={<Icon name="lets-icons:copy" color={greys(theme)[0]} />}
+          icon={<Icon name="lets-icons:copy" color={getPrimaryColor('0')} />}
           blur
         />
         <Button
           onPress={handleGalleryPress}
-          icon={<Icon name="proicons:photo" color={greys(theme)[0]} />}
+          icon={<Icon name="proicons:photo" color={getPrimaryColor('0')} />}
           blur
         />
         <Button
           onPress={toggleFlashlight}
           icon={
             !flashlightOn ? (
-              <Icon name="mdi:lightbulb-on-outline" color={greys(theme)[0]} />
+              <Icon name="mdi:lightbulb-on-outline" color={getPrimaryColor('0')} />
             ) : (
-              <Icon name="mdi:lightbulb-on" color={greys(theme)[0]} />
+              <Icon name="mdi:lightbulb-on" color={getPrimaryColor('0')} />
             )
           }
           blur

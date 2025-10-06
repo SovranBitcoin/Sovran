@@ -6,10 +6,8 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
 } from 'react-native';
-import { greys, black, reds } from 'helper/colors';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
 import { View, HStack } from 'components/ui/View';
@@ -142,7 +140,7 @@ export const Button = ({
   ripple = false,
   blur = false,
 }: ButtonProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};
@@ -196,20 +194,20 @@ export const Button = ({
       case 'primary':
         return {
           ...base,
-          backgroundColor: greys(theme)[0], // White/light background for primary
-          borderColor: greys(theme)[50],
+          backgroundColor: getPrimaryColor('0'), // White/light background for primary
+          borderColor: getPrimaryColor('50'),
         };
       case 'secondary':
         return {
           ...base,
-          backgroundColor: greys(theme)[700],
-          borderColor: greys(theme)[500],
+          backgroundColor: getPrimaryColor('700'),
+          borderColor: getPrimaryColor('500'),
         };
       case 'dangerous':
         return {
           ...base,
-          backgroundColor: reds[300],
-          borderColor: reds[300],
+          backgroundColor: getShadeColor('300'),
+          borderColor: getShadeColor('300'),
         };
       default:
         return base;
@@ -219,11 +217,11 @@ export const Button = ({
   const getTextColor = () => {
     switch (variant) {
       case 'primary':
-        return black;
+        return getPrimaryColor('0');
       case 'secondary':
       case 'dangerous':
       default:
-        return greys(theme)[0];
+        return getPrimaryColor('0');
     }
   };
 

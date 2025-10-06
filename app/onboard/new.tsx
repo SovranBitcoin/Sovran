@@ -11,9 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, shades, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { router } from 'expo-router';
@@ -164,42 +162,44 @@ interface NameInputProps {
   setName: (name: string) => void;
   isSubmitting: boolean;
   styles: any;
-  theme: Theme;
   error: boolean;
 }
 
-const NameInput = ({ name, setName, isSubmitting, styles, theme, error }: NameInputProps) => (
-  <VStack spacing={16}>
-    <Text weight="medium" size={14} style={styles.inputLabel}>
-      Enter your name
-    </Text>
-    {error && (
-      <>
-        <Card message="You must enter something for your profile name" variant="warning" />
-        <Spacer size={8} />
-      </>
-    )}
+const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProps) => {
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  return (
     <VStack spacing={16}>
-      <TextInput
-        placeholder="Your public profile name"
-        onChangeText={(newText) => setName(newText)}
-        style={[styles.textInput, isSubmitting && styles.disabledControl]}
-        editable={!isSubmitting}
-        placeholderTextColor={greys(theme)[300]}
-        value={name}
-      />
-      <Text weight="regular" size={12} style={styles.privacyNote}>
-        Note that your profile will be public, so anyone can search for you and send funds. While
-        your profile is public, your transactions remain private.
+      <Text weight="medium" size={14} style={styles.inputLabel}>
+        Enter your name
       </Text>
+      {error && (
+        <>
+          <Card message="You must enter something for your profile name" variant="warning" />
+          <Spacer size={8} />
+        </>
+      )}
+      <VStack spacing={16}>
+        <TextInput
+          placeholder="Your public profile name"
+          onChangeText={(newText) => setName(newText)}
+          style={[styles.textInput, isSubmitting && styles.disabledControl]}
+          editable={!isSubmitting}
+          placeholderTextColor={getPrimaryColor('300')}
+          value={name}
+        />
+        <Text weight="regular" size={12} style={styles.privacyNote}>
+          Note that your profile will be public, so anyone can search for you and send funds. While
+          your profile is public, your transactions remain private.
+        </Text>
+      </VStack>
     </VStack>
-  </VStack>
-);
+  );
+};
 
 // Main RecoveryScreen component
 const RecoveryScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const { setProfiles, setCurrentProfile } = useNostr();
 
   // State
@@ -331,7 +331,6 @@ const RecoveryScreen = () => {
               setName={setName}
               isSubmitting={isSubmitting}
               styles={styles}
-              theme={theme}
               error={error}
             />
           </View>
@@ -360,7 +359,7 @@ const RecoveryScreen = () => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,
@@ -368,20 +367,20 @@ const createStyles = (theme: Theme) =>
     container: {
       flex: 1,
       padding: 16,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     headerTitle: {
       fontFamily: 'OverpassBold',
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
     },
     headerSubtitle: {
-      color: greys(theme)[200],
+      color: getPrimaryColor('200'),
     },
     selectedProfileContainer: {
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: greys(theme)[800],
+      backgroundColor: getPrimaryColor('800'),
       justifyContent: 'center',
       alignItems: 'center',
       overflow: 'hidden',
@@ -403,7 +402,7 @@ const createStyles = (theme: Theme) =>
       borderColor: 'transparent',
     },
     selectedProfileOption: {
-      borderColor: shades[300],
+      borderColor: getShadeColor('300'),
     },
     profileOptionImage: {
       width: 56,
@@ -411,25 +410,25 @@ const createStyles = (theme: Theme) =>
       borderRadius: 28,
     },
     inputLabel: {
-      color: greys(theme)[100],
+      color: getPrimaryColor('100'),
     },
     textInput: {
-      backgroundColor: greys(theme)[800],
-      color: greys(theme)[0],
+      backgroundColor: getPrimaryColor('800'),
+      color: getPrimaryColor('0'),
       borderRadius: 8,
       padding: 16,
       fontSize: 16,
       borderWidth: 1,
-      borderColor: greys(theme)[700],
+      borderColor: getPrimaryColor('700'),
     },
     privacyNote: {
-      color: greys(theme)[200],
+      color: getPrimaryColor('200'),
       lineHeight: 18,
     },
     bottomButtons: {
       paddingHorizontal: 16,
       paddingBottom: 16,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     disabledControl: {
       opacity: 0.6,

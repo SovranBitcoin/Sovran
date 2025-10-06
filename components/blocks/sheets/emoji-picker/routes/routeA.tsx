@@ -1,9 +1,7 @@
-import { greys, Theme } from 'helper/colors';
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import chunk from 'lodash/chunk';
@@ -13,8 +11,8 @@ import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/ui/Card';
 
 const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
 
   const payload = useSheetPayload('emoji-picker');
 
@@ -75,17 +73,17 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     container: {
       marginHorizontal: 16,
       marginBottom: 0,
       borderRadius: 16,
       overflow: 'hidden',
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     title: {
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       fontSize: 18,
       fontWeight: '600',
     },
@@ -94,7 +92,7 @@ const createStyles = (theme: Theme) =>
     },
     emojiButton: {
       flex: 1,
-      backgroundColor: greys(theme)[800],
+      backgroundColor: getPrimaryColor('800'),
       borderRadius: 8,
       padding: 12,
     },

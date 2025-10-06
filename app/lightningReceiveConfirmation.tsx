@@ -5,20 +5,18 @@ import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { useSelector } from 'react-redux';
 import { showSuccess } from 'helper/popup/popups';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
 import { useLocalSearchParams } from 'expo-router';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
-import { greens, greys } from 'helper/colors';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
@@ -31,7 +29,7 @@ interface MintQuoteTimelineProps {
 }
 
 export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getGreenColor } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
 
   const isMintTransaction = historyEntry.type === 'mint';
@@ -109,7 +107,7 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
       return '#ef4444';
     }
 
-    return item.complete ? greens[300] : greys(theme)[200];
+    return item.complete ? getGreenColor('300') : getPrimaryColor('200');
   };
 
   const getStateLabel = (s: string) => {
@@ -124,8 +122,8 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
   return (
     <View
       blur
+      className="bg-primary-800"
       style={{
-        backgroundColor: greys(theme)[800],
         padding: 16,
         marginHorizontal: 16,
         borderRadius: 12,
@@ -133,8 +131,8 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
       <Text
         size={14}
         bold
+        className="text-primary-200"
         style={{
-          color: greys(theme)[200],
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
@@ -178,8 +176,8 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
                     <Text
                       size={16}
                       bold
+                      className="text-primary-0"
                       style={{
-                        color: greys(theme)[0],
                         marginStart: 12,
                       }}>
                       {getStateLabel(item.state)}
@@ -188,8 +186,8 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
                       <Text
                         size={12}
                         bold
+                        className="text-primary-300"
                         style={{
-                          color: greys(theme)[300],
                           marginStart: 12,
                         }}>
                         {convertTime(new Date(item.addedAt))}
@@ -212,7 +210,9 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
                     style={{
                       width: dotSize,
                       height: dotSize,
-                      backgroundColor: states[1].complete ? greens[300] : greys(theme)[200],
+                      backgroundColor: states[1].complete
+                        ? getGreenColor('300')
+                        : getPrimaryColor('200'),
                       borderRadius: dotSize / 3,
                       marginVertical: dotSpacing / 3,
                     }}
@@ -230,8 +230,8 @@ export function MintQuoteTimeline({ historyEntry }: MintQuoteTimelineProps) {
           <Text
             size={14}
             bold
+            className="text-primary-200"
             style={{
-              color: greys(theme)[200],
               marginBottom: 8,
               textTransform: 'uppercase',
               textAlign: 'right',
@@ -253,7 +253,6 @@ export function LightningReceiveConfirmation({
   extraButtons?: ButtonHandlerButton[];
 }) {
   const manager = useManager();
-  const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
 
@@ -371,7 +370,8 @@ export function LightningReceiveConfirmation({
               value: (
                 <HStack align="center">
                   <Text
-                    style={{ color: greys(theme)[0], fontSize: 16, fontFamily: 'OverpassBold' }}>
+                    className="text-primary-0"
+                    style={{ fontSize: 16, fontFamily: 'OverpassBold' }}>
                     {isPaid ? 'Completed' : 'Pending'}
                   </Text>
                 </HStack>

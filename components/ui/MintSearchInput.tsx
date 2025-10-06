@@ -1,11 +1,8 @@
 import React from 'react';
-import { View, TextInput as RNTextInput } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { TextInput as RNTextInput, ActivityIndicator } from 'react-native';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from './Text';
 import { HStack, VStack } from './View';
-import { ActivityIndicator } from 'react-native';
 
 interface MintSearchInputProps {
   value: string;
@@ -28,19 +25,18 @@ export function MintSearchInput({
   onAddMint,
   canAddMint = false,
 }: MintSearchInputProps) {
-  const theme = useSelector(memoizedGetTheme);
-  const g = greys(theme);
+  const { getPrimaryColor } = useTheme();
 
   const getStatusColor = () => {
-    if (validationState.isLoading) return g[400];
+    if (validationState.isLoading) return getPrimaryColor('400');
     if (validationState.isValid === true) return '#10B981'; // green-500
     if (validationState.isValid === false) return '#EF4444'; // red-500
-    return g[400];
+    return getPrimaryColor('400');
   };
 
   const getStatusIcon = () => {
     if (validationState.isLoading) {
-      return <ActivityIndicator size="small" color={g[400]} />;
+      return <ActivityIndicator size="small" color={getPrimaryColor('400')} />;
     }
     if (validationState.isValid === true) {
       return <Text style={{ color: '#10B981', fontSize: 16 }}>✓</Text>;
@@ -57,7 +53,7 @@ export function MintSearchInput({
         align="center"
         className="rounded-lg border px-3 py-2"
         style={{
-          backgroundColor: g[800],
+          backgroundColor: getPrimaryColor('800'),
           borderColor: getStatusColor(),
           borderWidth: 1,
         }}>
@@ -65,10 +61,10 @@ export function MintSearchInput({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={g[400]}
+          placeholderTextColor={getPrimaryColor('400')}
           style={{
             flex: 1,
-            color: g[0],
+            color: getPrimaryColor('0'),
             fontSize: 16,
             paddingVertical: 4,
           }}

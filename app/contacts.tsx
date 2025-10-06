@@ -1,7 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { ScrollView, Keyboard, TextInput as RNTextInput } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Container from 'components/blocks/Container';
@@ -9,7 +8,6 @@ import Icon from 'assets/icons';
 import { SkeletonContainer } from 'react-native-skeleton-component';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { greys } from 'helper/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { store } from 'helper/redux/store';
 import { setSearch } from 'helper/redux/nostr';
@@ -31,7 +29,7 @@ interface PlaceholderResult {
 type DisplayResult = SearchResultData | PlaceholderResult;
 
 function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const inputRef = useRef<RNTextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
@@ -164,16 +162,16 @@ function ModalScreen() {
   // Skeleton configuration
   const skeletonConfig = useMemo(
     () => ({
-      backgroundColor: greys(theme)[800],
-      highlightColor: greys(theme)[600],
+      backgroundColor: getPrimaryColor('800'),
+      highlightColor: getPrimaryColor('600'),
       speed: 800,
       animation: loading ? ('pulse' as const) : ('none' as const),
     }),
-    [theme, loading]
+    [getPrimaryColor, loading]
   );
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: greys(theme)[950] }}>
+    <SafeAreaView className="bg-primary-950 flex-1">
       <SkeletonContainer
         backgroundColor={skeletonConfig.backgroundColor}
         highlightColor={skeletonConfig.highlightColor}
@@ -181,11 +179,10 @@ function ModalScreen() {
         animation={skeletonConfig.animation}>
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
-            className="flex-1"
-            style={{ backgroundColor: greys(theme)[950] }}
+            className="bg-primary-950 flex-1"
             onScrollBeginDrag={handleScroll}
             scrollEventThrottle={16}>
-            <View className="bg-transparent px-4" style={{ backgroundColor: greys(theme)[950] }}>
+            <View className="bg-primary-950 bg-transparent px-4">
               <View className="flex-row items-center">
                 <View className="relative flex-1">
                   <RNTextInput
@@ -193,30 +190,33 @@ function ModalScreen() {
                     value={searchQuery}
                     onChangeText={handleSearchQueryChange}
                     placeholder="Search users..."
-                    placeholderTextColor={greys(theme)[500]}
+                    placeholderTextColor={getPrimaryColor('500')}
+                    className="bg-primary-800 text-primary-0"
                     style={{
                       flex: 1,
                       paddingRight: 30,
-                      backgroundColor: greys(theme)[800],
                       borderRadius: 16,
                       padding: 14,
                       fontSize: 16,
                       fontFamily: 'OverpassRegular',
-                      color: greys(theme)[0],
                     }}
                   />
                   {searchQuery.length > 0 && (
                     <TouchableOpacity
                       onPress={clearSearchInput}
                       className="absolute right-0 z-10 p-3.5">
-                      <Icon name="simple-line-icons:close" size={20} color={greys(theme)[50]} />
+                      <Icon
+                        name="simple-line-icons:close"
+                        size={20}
+                        color={getPrimaryColor('50')}
+                      />
                     </TouchableOpacity>
                   )}
                 </View>
                 <TouchableOpacity onPress={() => router.back()}>
                   <HStack spacing={12}>
                     <Spacer size={12} />
-                    <Text overpass bold size={16} style={{ color: greys(theme)[50] }}>
+                    <Text overpass bold size={16} className="text-primary-50">
                       Cancel
                     </Text>
                   </HStack>
@@ -226,14 +226,7 @@ function ModalScreen() {
               {showResults && (
                 <VStack spacing={12} className="mt-6">
                   <VStack spacing={12}>
-                    <Text
-                      loading={loading}
-                      overpass
-                      bold
-                      size={16}
-                      style={{
-                        color: greys(theme)[400],
-                      }}>
+                    <Text loading={loading} overpass bold size={16} className="text-primary-400">
                       Found {searchResults.length}{' '}
                       {searchResults.length === 1 ? 'result' : 'results'}
                     </Text>
@@ -256,8 +249,8 @@ function ModalScreen() {
                 </VStack>
               )}
 
-              {showEmptyState && <EmptyStateView theme={theme} />}
-              {showNoResults && <NoResultsFound theme={theme} />}
+              {showEmptyState && <EmptyStateView />}
+              {showNoResults && <NoResultsFound />}
             </View>
           </ScrollView>
         </Container>

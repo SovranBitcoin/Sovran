@@ -24,11 +24,10 @@ import {
   removeContact,
 } from 'helper/redux/nostr';
 import { usePaginatedHistory } from 'coco-cashu-react';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 // Components
 import Modal from 'components/blocks/Modal';
-import { greys } from 'helper/colors';
 import { VStack, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import TimelineItem from './TimeLine';
@@ -38,9 +37,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
-import opacity from 'hex-color-opacity';
 import CachedImage from 'components/ui/Image';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { showMessage } from 'helper/popup/popups';
 import { RootState } from 'helper/redux/store/reducer';
 import TextInput from 'components/ui/TextInput';
@@ -63,7 +60,7 @@ export function convertNpub(pubkey: string) {
 }
 
 export default function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const dispatch = useDispatch();
 
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
@@ -207,7 +204,7 @@ export default function ModalScreen() {
       new Date(date).getTime()
     ).map((date, index) => (
       <VStack key={index}>
-        <Text className="my-4 text-center text-sm font-bold" style={{ color: greys(theme)[400] }}>
+        <Text className="text-primary-400 my-4 text-center text-sm font-bold">
           {moment(date).format('dddd, MMMM Do YYYY')}
         </Text>
         {timelineItemsGroupedByDate[date].map((item, idx) => (
@@ -216,7 +213,7 @@ export default function ModalScreen() {
             onLongPress={() => handleLongPress(item)}
             style={{ minHeight: 60 }} // Ensure minimum height for each item
           >
-            <TimelineItem item={item} theme={theme} />
+            <TimelineItem item={item} />
           </Pressable>
         ))}
       </VStack>
@@ -263,14 +260,11 @@ export default function ModalScreen() {
                 align="center"
                 justify="space-around">
                 {/* Back Button */}
-                <TouchableOpacity
+                <Button
                   onPress={handleGoBack}
-                  className="ml-3 h-12 w-12 rounded-full"
-                  style={{ backgroundColor: opacity(greys(theme)[950], 0.25) }}>
-                  <HStack align="center" justify="center" flex={1}>
-                    <ArrowIcon size={24} rotate={-135} color={greys(theme)[0]} />
-                  </HStack>
-                </TouchableOpacity>
+                  icon={<ArrowIcon size={24} rotate={-135} color={getPrimaryColor('0')} />}
+                  blur
+                />
 
                 {/* Profile Information */}
                 <VStack align="center" justify="center" className="flex-1">
@@ -287,9 +281,7 @@ export default function ModalScreen() {
                         size={72}
                       />
                       <Animated.View className="w-full pt-1.5">
-                        <Text
-                          className="w-full text-base font-bold"
-                          style={{ color: greys(theme)[0] }}>
+                        <Text className="text-primary-0 w-full text-base font-bold">
                           {displayName}
                         </Text>
                       </Animated.View>
@@ -298,7 +290,7 @@ export default function ModalScreen() {
                 </VStack>
 
                 {/* Info Button */}
-                <TouchableOpacity
+                <Button
                   onPress={() => {
                     SheetManager.show('button-handler', {
                       payload: {
@@ -352,12 +344,15 @@ export default function ModalScreen() {
                       },
                     });
                   }}
-                  className="mr-3 h-12 w-12 rounded-full"
-                  style={{ backgroundColor: opacity(greys(theme)[950], 0.25) }}>
-                  <HStack align="center" justify="center" flex={1}>
-                    <Icon name="material-symbols:info-rounded" size={24} color={greys(theme)[0]} />
-                  </HStack>
-                </TouchableOpacity>
+                  icon={
+                    <Icon
+                      name="material-symbols:info-rounded"
+                      size={24}
+                      color={getPrimaryColor('0')}
+                    />
+                  }
+                  blur
+                />
               </HStack>
             </HStack>
           </>
@@ -452,9 +447,7 @@ export default function ModalScreen() {
           }}
           showsVerticalScrollIndicator={false}>
           {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
-            <Text
-              className="my-4 text-center text-sm font-bold"
-              style={{ color: greys(theme)[400] }}>
+            <Text className="text-primary-400 my-4 text-center text-sm font-bold">
               No activity yet
             </Text>
           ) : (

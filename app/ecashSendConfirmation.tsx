@@ -6,7 +6,6 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { greys } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import {
   getEncodedTokenV4,
@@ -19,7 +18,6 @@ import { nip19 } from 'nostr-tools';
 import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import { useSend, usePaginatedHistory } from 'coco-cashu-react';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { useLocalSearchParams, router } from 'expo-router';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'helper/nfc';
@@ -48,7 +46,6 @@ export function EcashSendConfirmation({
   const { isTokenSpendable, receiveEcash } = useCashuOperations();
   const { getMintInfo } = useMintManagement();
   const { send: _send, isSending: _isSending } = useSend();
-  const theme = useSelector(memoizedGetTheme);
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [sendingNostr, setSendingNostr] = useState(false);
@@ -359,8 +356,8 @@ export function EcashSendConfirmation({
               value: (
                 <HStack align="center">
                   <Text
+                    className="text-primary-0"
                     style={{
-                      color: greys(theme)[0],
                       fontFamily: 'OverpassBold',
                       fontSize: 16,
                     }}>

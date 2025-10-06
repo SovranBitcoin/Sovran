@@ -1,19 +1,17 @@
 import React from 'react';
 import { HStack } from 'components/ui/View';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import { GradientSkeleton } from 'components/ui/GradientSkeleton';
 import { useNostrProfile } from './useNostrProfile';
 import { getTimeAgo } from 'helper/time';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface PostTopProps {
   post: any;
 }
 
 export function PostTop({ post }: PostTopProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const profile = useNostrProfile({ id: post?.pubkey });
   let timeAgo = getTimeAgo(post.created_at);
 
@@ -29,8 +27,8 @@ export function PostTop({ post }: PostTopProps) {
     <HStack align="center">
       {!displayName ? (
         <GradientSkeleton
-          startColor={greys(theme)[700]}
-          endColor={greys(theme)[600]}
+          startColor={getPrimaryColor('700')}
+          endColor={getPrimaryColor('600')}
           width={100}
           height={16}
           style={{
@@ -40,19 +38,19 @@ export function PostTop({ post }: PostTopProps) {
         />
       ) : (
         <Text
+          className="text-primary-0"
           style={{
             fontFamily: 'OverpassBold',
             fontSize: 14,
-            color: greys(theme)[0],
           }}>
           {displayName}
         </Text>
       )}
       <Text
+        className="text-primary-200"
         style={{
           fontFamily: 'OverpassRegular',
           fontSize: 14,
-          color: greys(theme)[200],
         }}>
         {' '}
         • {timeAgo}

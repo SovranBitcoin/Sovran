@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { SafeAreaView, TouchableOpacity, Clipboard, ScrollView, Image } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { useNostr } from 'helper/redux/nostr';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
@@ -11,7 +9,7 @@ import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
 const Profile = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const { currentProfile } = useNostr();
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
@@ -48,7 +46,7 @@ const Profile = () => {
         blur
         className="rounded-lg"
         style={{
-          backgroundColor: greys(theme)[800],
+          backgroundColor: getPrimaryColor('800'),
           marginBottom: 8,
           marginTop: 8,
           padding: 8,
@@ -58,7 +56,7 @@ const Profile = () => {
           overpass
           size={14}
           style={{
-            color: greys(theme)[400],
+            color: getPrimaryColor('400'),
           }}>
           {label}
         </Text>
@@ -67,7 +65,7 @@ const Profile = () => {
             <Text
               size={16}
               style={{
-                color: greys(theme)[0],
+                color: getPrimaryColor('0'),
               }}>
               {showEyeIcon && !isVisible ? '••••••••' : value || 'N/A'}
             </Text>
@@ -79,14 +77,14 @@ const Profile = () => {
                   blur
                   className="rounded"
                   style={{
-                    backgroundColor: greys(theme)[700],
+                    backgroundColor: getPrimaryColor('700'),
                     padding: 8,
                     marginLeft: 4,
                   }}>
                   <Icon
                     name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
                     size={16}
-                    color={greys(theme)[400]}
+                    color={getPrimaryColor('400')}
                   />
                 </View>
               </TouchableOpacity>
@@ -96,11 +94,11 @@ const Profile = () => {
                 blur
                 className="rounded"
                 style={{
-                  backgroundColor: greys(theme)[700],
+                  backgroundColor: getPrimaryColor('700'),
                   padding: 8,
                   marginLeft: 4,
                 }}>
-                <Icon name="lets-icons:copy" size={16} color={greys(theme)[400]} />
+                <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('400')} />
               </View>
             </TouchableOpacity>
           </HStack>
@@ -111,7 +109,7 @@ const Profile = () => {
             overpass
             size={12}
             style={{
-              color: greys(theme)[200],
+              color: getPrimaryColor('200'),
               marginTop: 4,
             }}>
             {description}
@@ -131,7 +129,7 @@ const Profile = () => {
             size={13}
             className="uppercase tracking-wide"
             style={{
-              color: greys(theme)[300],
+              color: getPrimaryColor('300'),
               marginBottom: 8,
               marginLeft: 8,
             }}>

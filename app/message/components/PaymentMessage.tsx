@@ -5,23 +5,22 @@ import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { TransactionData } from 'helper/redux/cashu';
 
 const TransactionComponent = ({
   transaction,
-  theme,
   isReceived,
 }: {
   transaction: TransactionData;
-  theme: Theme;
   isReceived: boolean;
 }) => {
+  const { getPrimaryColor, currentTheme, getShadeColor, getRedColor, getGreenColor } = useTheme();
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
-    ? [greys(theme)[500], greys(theme)[500]]
-    : [theme.shades[200], theme.shades[300]];
+    ? [getPrimaryColor('500'), getPrimaryColor('500')]
+    : [getShadeColor('200'), getShadeColor('300')];
 
-  const arrowBackgroundColor = isReceived ? greys(theme)[500] : theme.shades[300];
+  const arrowBackgroundColor = isReceived ? getPrimaryColor('500') : getShadeColor('300');
 
   const formattedAmount =
     transaction.unit &&
@@ -55,16 +54,12 @@ const TransactionComponent = ({
           minHeight: 70, // Ensure minimum height for content
         }}>
         <View className="mb-1 rounded-2xl bg-black/25 p-1">
-          <Text className="text-center text-sm font-bold" style={{ color: greys(theme)[0] }}>
+          <Text className="text-primary-0 text-center text-sm font-bold">
             {isReceived ? 'You received' : 'You sent'}
           </Text>
         </View>
-        <Text className="mb-2 text-base font-black" style={{ color: greys(theme)[0] }}>
-          {formattedAmount}
-        </Text>
-        <Text
-          className="text-right text-xs font-bold opacity-75"
-          style={{ color: greys(theme)[0] }}>
+        <Text className="text-primary-0 mb-2 text-base font-black">{formattedAmount}</Text>
+        <Text className="text-primary-0 text-right text-xs font-bold opacity-75">
           {transaction?.date ? convertTime(new Date(transaction.date)) : null}
         </Text>
       </LinearGradient>

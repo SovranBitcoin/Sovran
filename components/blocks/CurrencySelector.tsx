@@ -1,11 +1,9 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { TouchableOpacity, ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { useMintManagement } from 'hooks/coco';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { View, HStack } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -32,7 +30,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
   selectedCurrency,
   onCurrencyChange,
 }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
 
   const { getBalances } = useMintManagement();
   const [multipleBalances, setMultipleBalances] = useState<BalanceItem[]>([]);
@@ -105,18 +103,18 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                 colors={
                   selectedCurrency === currency
                     ? ([
-                        opacity(theme.shades[200], 0.88),
-                        opacity(theme.shades[200], 0.88),
-                        opacity(theme.shades[300], 0.88),
-                        opacity(theme.shades[200], 0.88),
-                        opacity(theme.shades[300], 0.88),
+                        opacity(getShadeColor('200'), 0.88),
+                        opacity(getShadeColor('200'), 0.88),
+                        opacity(getShadeColor('300'), 0.88),
+                        opacity(getShadeColor('200'), 0.88),
+                        opacity(getShadeColor('300'), 0.88),
                       ] as const)
-                    : [opacity(theme.shades[200], 0), opacity(theme.shades[200], 0)]
+                    : [opacity(getShadeColor('200'), 0), opacity(getShadeColor('200'), 0)]
                 }
                 style={[
                   {
                     borderWidth: 0.2,
-                    borderColor: greys(theme)[600],
+                    borderColor: getPrimaryColor('600'),
                   },
 
                   {
@@ -124,16 +122,18 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                     borderRadius: 8,
                     padding: 0.5,
                     backgroundColor:
-                      selectedCurrency === currency ? greys(theme)[900] : greys(theme)[700],
+                      selectedCurrency === currency
+                        ? getPrimaryColor('900')
+                        : getPrimaryColor('700'),
                   },
                 ]}>
                 <View
                   style={{
                     padding: 12,
                     borderRadius: 8,
-                    backgroundColor: isSelected ? greys(theme)[700] : greys(theme)[950],
+                    backgroundColor: isSelected ? getPrimaryColor('700') : getPrimaryColor('950'),
                     borderWidth: 0.5,
-                    borderColor: greys(theme)[700],
+                    borderColor: getPrimaryColor('700'),
                     minWidth: 100,
                   }}>
                   <HStack align="center" gap={8} style={{ width: 36 }}>
@@ -144,7 +144,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                     )}
                     <Text
                       style={{
-                        color: greys(theme)[0],
+                        color: getPrimaryColor('0'),
                         fontSize: 14,
                         fontFamily: 'OverpassBold',
                       }}>

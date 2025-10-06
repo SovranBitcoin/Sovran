@@ -4,7 +4,7 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
 import { HStack, VStack, Spacer } from 'components/ui/View';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from '@/providers/ThemeProvider';
 
 interface MintData {
   mintUrl?: string;
@@ -20,7 +20,6 @@ interface MintData {
 
 interface MintCurrencySelectorProps<T extends MintData = MintData> {
   mints: T[];
-  theme: Theme;
   renderItem: (mint: T, selectedCurrency: string) => React.ReactNode;
   allowedCurrencies?: string[];
   defaultCurrency?: string;
@@ -33,7 +32,6 @@ interface MintCurrencySelectorProps<T extends MintData = MintData> {
 
 export function MintCurrencySelector<T extends MintData = MintData>({
   mints,
-  theme,
   renderItem,
   allowedCurrencies = ['SAT', 'USD', 'EUR', 'GBP'],
   defaultCurrency,
@@ -41,9 +39,8 @@ export function MintCurrencySelector<T extends MintData = MintData>({
   mintsLabel = 'Send from',
   onCurrencyChange,
   customEmptyState,
-  isLoading = false,
 }: MintCurrencySelectorProps<T>) {
-  const g = greys(theme);
+  const { getPrimaryColor } = useTheme();
 
   // Extract available currencies from mints
   const availableCurrencies = useMemo(() => {
@@ -102,7 +99,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       <VStack>
         <Text
           style={{
-            color: g[0],
+            color: getPrimaryColor('0'),
             fontSize: 18,
             fontWeight: '600',
             marginBottom: 4,
@@ -119,7 +116,8 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                   paddingVertical: 12,
                   borderRadius: 8,
                   minWidth: 100,
-                  backgroundColor: selectedCurrency === currency ? g[700] : g[900],
+                  backgroundColor:
+                    selectedCurrency === currency ? getPrimaryColor('700') : getPrimaryColor('900'),
                 }}
                 onPress={() => handleCurrencyChange(currency)}>
                 <HStack align="center" justify="flex-start" gap={8}>
@@ -130,11 +128,15 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                       width={32}
                     />
                   ) : currency === 'ALL' ? (
-                    <Icon name="clarity:internet-of-things-solid" color={g[0]} size={32} />
+                    <Icon
+                      name="clarity:internet-of-things-solid"
+                      color={getPrimaryColor('0')}
+                      size={32}
+                    />
                   ) : (
                     <CurrencyIcon width={32} currency={currency.toLowerCase()} />
                   )}
-                  <Text style={{ color: g[0], fontSize: 14, fontWeight: 'bold' }}>
+                  <Text style={{ color: getPrimaryColor('0'), fontSize: 14, fontWeight: 'bold' }}>
                     {currency === 'SAT' ? 'BTC' : currency === 'ALL' ? 'ALL' : currency}
                   </Text>
                 </HStack>
@@ -150,7 +152,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       <VStack>
         <Text
           style={{
-            color: g[0],
+            color: getPrimaryColor('0'),
             fontSize: 18,
             fontWeight: '600',
             marginBottom: 4,
@@ -160,7 +162,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
         <VStack>
           {filteredMints.length === 0
             ? customEmptyState || (
-                <Text style={{ color: g[400], textAlign: 'center', marginTop: 20 }}>
+                <Text style={{ color: getPrimaryColor('0'), textAlign: 'center', marginTop: 20 }}>
                   {selectedCurrency === 'ALL'
                     ? 'No mints available'
                     : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}

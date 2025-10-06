@@ -1,10 +1,8 @@
 import React, { useState, useCallback, memo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { greys } from 'helper/colors';
-import { useSelector } from 'react-redux';
 import Icon from 'assets/icons';
 import Haptics from 'components/ui/Haptics';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -16,7 +14,7 @@ type KeyboardValue = string | number;
 
 const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loading = false }) => {
   const [, setInputValue] = useState<string>('');
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const handlePress = useCallback(
     (value: KeyboardValue) => {
@@ -73,7 +71,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         key={String(value)}
         className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{
-          backgroundColor: greys(theme)[950],
+          backgroundColor: getPrimaryColor('950'),
           opacity: loading ? 0.5 : 1,
         }}
         disabled={loading}
@@ -95,7 +93,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         )}
       </TouchableOpacity>
     ),
-    [handlePress, loading, theme]
+    [handlePress, loading, getPrimaryColor]
   );
 
   const buttons: KeyboardValue[][] = [

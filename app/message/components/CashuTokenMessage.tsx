@@ -4,7 +4,7 @@ import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken } from '@cashu/cashu-ts';
-import { greys, shades, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useCashuOperations } from 'hooks/coco';
@@ -12,15 +12,14 @@ import { usePaginatedHistory } from 'coco-cashu-react';
 import { showMessage } from 'helper/popup/popups';
 // Removed useCashu - now using usePaginatedHistory directly
 import { router } from 'expo-router';
-import opacity from 'hex-color-opacity';
 
 interface Props {
   token: string;
-  theme: Theme;
   isReceived: boolean;
 }
 
-const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
+const CashuTokenComponent = ({ token, isReceived }: Props) => {
+  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
   const { receiveEcash } = useCashuOperations();
   const { history: transactions } = usePaginatedHistory();
 
@@ -62,8 +61,8 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
   };
 
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
-    ? [greys(theme)[500], greys(theme)[500]]
-    : [shades[200], shades[300]];
+    ? [getPrimaryColor('500'), getPrimaryColor('500')]
+    : [getShadeColor('200'), getShadeColor('300')];
 
   return (
     <View
@@ -73,7 +72,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
-          backgroundColor: isReceived ? greys(theme)[500] : shades[300],
+          backgroundColor: isReceived ? getPrimaryColor('500') : getRedColor('300'),
           left: isReceived ? 16 : 'auto',
           right: isReceived ? 'auto' : 16,
           transform: [{ rotate: '45deg' }],
@@ -88,9 +87,7 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
             maxWidth: '75%',
             minHeight: 100, // Ensure minimum height for content
           }}>
-          <Text className="text-xs font-bold opacity-75" style={{ color: greys(theme)[0] }}>
-            {decoded.mint}
-          </Text>
+          <Text className="text-primary-0 text-xs font-bold opacity-75">{decoded.mint}</Text>
 
           <HStack justify="space-between" className="mt-2">
             <VStack>
@@ -100,16 +97,11 @@ const CashuTokenComponent = ({ token, theme, isReceived }: Props) => {
                   unit={unit}
                   size={24}
                   weight="heavy"
-                  color={greys(theme)[0]}
+                  color={getPrimaryColor('0')}
                 />
               )}
               {decoded.memo && (
-                <Text
-                  className="mt-2 rounded-lg p-4 text-xs"
-                  style={{
-                    color: greys(theme)[0],
-                    backgroundColor: opacity(greys(theme)[0], 0.1),
-                  }}>
+                <Text className="text-primary-0 bg-primary-0/10 mt-2 rounded-lg p-4 text-xs">
                   {decoded.memo}
                 </Text>
               )}

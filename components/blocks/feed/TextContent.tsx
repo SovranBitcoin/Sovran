@@ -1,15 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
 import HighlightText from '@sanar/react-native-highlight-text';
-import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { nip19 } from 'nostr-tools';
 import { useNostrProfile } from './useNostrProfile';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from 'helper/constants';
+import { useTheme } from 'providers/ThemeProvider';
 
 export const extractUrls = (text: string) => {
   try {
@@ -109,8 +107,8 @@ const NostrProfileReference = ({ nostrRef, theme }: { nostrRef: string; theme: a
 
   return (
     <Text
+      className="text-primary-400"
       style={{
-        color: theme.shades[400],
         fontWeight: 'bold',
       }}>
       @{displayName}
@@ -140,8 +138,8 @@ export function TextContent({
   length?: number;
   fontSize?: number;
 }) {
-  const theme = useSelector(memoizedGetTheme);
   const [showFullText, setShowFullText] = useState(false);
+  const { getShadeColor } = useTheme();
 
   const { contentWithoutUrls } = extractUrls(content);
 
@@ -161,26 +159,24 @@ export function TextContent({
     <View>
       {hasNostrProfiles ? (
         <Text
+          className="text-primary-0 mb-2"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
-            color: greys(theme)[0],
-            marginBottom: 8,
             lineHeight: fontSize * 1.4,
           }}>
           {renderTextWithNostrProfiles(displayText || '', theme)}
         </Text>
       ) : (
         <HighlightText
+          className="text-primary-0 mb-2"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
-            color: greys(theme)[0],
-            marginBottom: 8,
           }}
           highlightStyle={{
             fontFamily: 'OverpassHeavy',
-            color: theme.shades[300],
+            color: getShadeColor('300'),
           }}
           // @ts-ignore: HighlightText does not type 'searchWords', but it works
           searchWords={[...(content.match(/#\w+/g) || []), ...(content.match(/@\w+/g) || [])]}
@@ -190,12 +186,10 @@ export function TextContent({
       {contentWithoutUrls?.length > 200 && (
         <TouchableOpacity onPress={() => setShowFullText(!showFullText)}>
           <Text
+            className="text-primary-300 mb-1 text-right"
             style={{
               fontFamily: 'OverpassBold',
               fontSize,
-              color: theme.shades[300],
-              marginBottom: 4,
-              textAlign: 'right',
             }}>
             {showFullText ? 'Show less' : 'Show more'}
           </Text>

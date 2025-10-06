@@ -1,5 +1,4 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
@@ -13,14 +12,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
-import { Spacer } from 'components/ui/View';
+import { Spacer, View } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Proof } from '@cashu/cashu-ts';
@@ -37,7 +34,7 @@ interface TokenHandlerParams {
 const EcashLightningReceiver = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
   const { currentProfile } = useNostr();
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const [hasPermission, requestPermission] = useCameraPermissions();
   const { isValidEcashToken } = useCashuUtilities();
   const { getMintInfo } = useMintManagement();
@@ -213,15 +210,15 @@ const EcashLightningReceiver = () => {
               <RowButton
                 label={
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
-                    <Text style={{ marginLeft: 8, color: greys(theme)[50] }} bold>
+                    <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
+                    <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
                       {truncateMiddle(currentProfile.npub, 7)}@npubx.cash
                     </Text>
                   </View>
                 }
                 isFirst
                 onPress={handleCopyLightningAddress}
-                rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
+                rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
               />
             </Section>
           </View>
@@ -232,7 +229,6 @@ const EcashLightningReceiver = () => {
             mintInfo={mintInfo}
             historyEntry={{
               type: 'receive',
-
               mintUrl: mintInfo?.mintUrl,
             }}
           />

@@ -1,4 +1,5 @@
 const { hairlineWidth } = require('nativewind/theme');
+const { THEMES } = require('./themes');
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -8,6 +9,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Existing shadcn/ui colors
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -41,6 +43,98 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+
+        // NativeWind Primary Color System (dynamic using CSS variables)
+        // These will be updated by the ThemeProvider at runtime
+        primary: {
+          950: 'var(--color-primary-950)',
+          900: 'var(--color-primary-900)',
+          800: 'var(--color-primary-800)',
+          700: 'var(--color-primary-700)',
+          600: 'var(--color-primary-600)',
+          500: 'var(--color-primary-500)',
+          400: 'var(--color-primary-400)',
+          300: 'var(--color-primary-300)',
+          200: 'var(--color-primary-200)',
+          100: 'var(--color-primary-100)',
+          50: 'var(--color-primary-50)',
+          0: 'var(--color-primary-0)',
+        },
+
+        // Shade colors (persist across themes)
+        shade: {
+          100: 'var(--color-shade-100)',
+          200: 'var(--color-shade-200)',
+          300: 'var(--color-shade-300)',
+          400: 'var(--color-shade-400)',
+          500: 'var(--color-shade-500)',
+        },
+
+        // Red colors
+        red: {
+          100: 'var(--color-red-100)',
+          200: 'var(--color-red-200)',
+          300: 'var(--color-red-300)',
+          400: 'var(--color-red-400)',
+          500: 'var(--color-red-500)',
+        },
+
+        // Green colors
+        green: {
+          100: 'var(--color-green-100)',
+          200: 'var(--color-green-200)',
+          300: 'var(--color-green-300)',
+          400: 'var(--color-green-400)',
+          500: 'var(--color-green-500)',
+        },
+
+        // Purple colors
+        purple: {
+          100: 'var(--color-purple-100)',
+          200: 'var(--color-purple-200)',
+          300: 'var(--color-purple-300)',
+          400: 'var(--color-purple-400)',
+          500: 'var(--color-purple-500)',
+        },
+
+        // Named themes (static access) - All themes from colors.tsx
+        neon: THEMES['neon-dream'],
+        cosmic: THEMES['cosmic-ember'],
+        digital: THEMES['digital-oasis'],
+        celestial: THEMES['celestial-aura'],
+        urban: THEMES['urban-concrete'],
+        volcanic: THEMES['volcanic-crimson'],
+        crimson: THEMES['crimson-night'],
+        velvet: THEMES['velvet-emerald'],
+        twilight: THEMES['twilight-amber'],
+        retro: THEMES['retro-outrun'],
+        lightbeige: THEMES['light-beige'],
+        beige: THEMES['beige'],
+        middlebeige: THEMES['middle-beige'],
+        light: THEMES['light'],
+        navy: THEMES['navy'],
+        forest: THEMES['forest'],
+        sunset: THEMES['sunset'],
+        ocean: THEMES['ocean'],
+        darkgrey: THEMES['dark-grey'],
+        slate: THEMES['slate-shadow'],
+        mystic: THEMES['mystic-fog'],
+        eclipse: THEMES['eclipse-steel'],
+        aurora: THEMES['aurora-twilight'],
+        rose: THEMES['rose'],
+        autumn: THEMES['autumn'],
+        dark: THEMES['dark'],
+        coral: THEMES['coral-sunrise'],
+        ice: THEMES['ice-queen'],
+        tropical: THEMES['tropical-forest'],
+        desert: THEMES['desert-dune'],
+        misty: THEMES['misty-morning'],
+
+        // Background Image Themes
+        deepocean: THEMES['deepocean'],
+        cosmicpurple: THEMES['cosmicpurple'],
+        mysticblue: THEMES['mysticblue'],
+        royalpurple: THEMES['royalpurple'],
       },
       borderRadius: {
         lg: 'var(--radius)',

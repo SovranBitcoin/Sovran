@@ -3,7 +3,7 @@ import { Dimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/ui/View';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { setSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,11 +20,11 @@ interface WalletHeaderProps {
 }
 
 export function Background() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   return (
     <LinearGradient
-      colors={[theme.greys[950], opacity(theme.greys[950], 0)]}
+      colors={[getPrimaryColor('950'), opacity(getPrimaryColor('950'), 0)]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={{

@@ -1,25 +1,4 @@
-import { BlurTint } from 'expo-blur';
 import { ImageSource } from 'expo-image';
-import {
-  computeShades,
-  GreyKey,
-  greys,
-  Greys,
-  hexToRgb,
-  hslToRgb,
-  rgbToHex,
-  rgbToHsl,
-} from './colors';
-import { darken, getLuminance, parseToHsl } from 'polished';
-
-export interface BackgroundImageAttributes {
-  id: string;
-  shades: Record<100 | 200 | 300 | 400 | 500, string>;
-  greys: Greys;
-  text: string;
-  tint: BlurTint;
-  dominantColors?: string[];
-}
 
 export interface BackgroundImageMeta {
   id: string;
@@ -28,222 +7,29 @@ export interface BackgroundImageMeta {
   source: ImageSource;
 }
 
-type GreyStrategy = 'darkest' | 'brightest' | 'pastel';
-
-type BackgroundConfig = {
-  id: string;
-  base: string | string[];
-  tint?: BlurTint;
-  darkenAmount?: number;
-  strategy?: GreyStrategy;
-};
-
-// Utility scoring
-const darkest = (colors: string[]) =>
-  colors.reduce((a, b) => (getLuminance(a) < getLuminance(b) ? a : b));
-
-const brightest = (colors: string[]) =>
-  colors.reduce((a, b) => (getLuminance(a) > getLuminance(b) ? a : b));
-
-const pastelScore = (hex: string) => {
-  const { lightness, saturation } = parseToHsl(hex);
-  return lightness - saturation * 0.5;
-};
-
-const mostPastel = (colors: string[]) =>
-  colors.reduce((a, b) => (pastelScore(a) > pastelScore(b) ? a : b));
-
-const pickByStrategy = (colors: string[], strategy: GreyStrategy) => {
-  switch (strategy) {
-    case 'darkest':
-      return darkest(colors);
-    case 'brightest':
-      return brightest(colors);
-    case 'pastel':
-      return mostPastel(colors);
-    default:
-      return darkest(colors); // fallback
-  }
-};
-
-function learnedBlurTransform(hex: string) {
-  const { r, g, b } = hexToRgb(hex);
-
-  const red = 0.4533 * r + 0.1569 * g + 0.1992 * b + 10.8973;
-  const green = 0.1467 * r + 0.3137 * g - 0.2816 * b + 18.3145;
-  const blue = 0.12 * r - 0.3529 * g + 0.5718 * b + 16.7012;
-
-  return rgbToHex(
-    Math.min(255, Math.max(0, Math.round(red))),
-    Math.min(255, Math.max(0, Math.round(green))),
-    Math.min(255, Math.max(0, Math.round(blue)))
-  );
-}
-
-export const adjustLuminanceOfHex = (hex: string, newL: number): string => {
-  const { r, g, b } = hexToRgb(hex);
-  const { h, s } = rgbToHsl(r, g, b);
-  const { r: nr, g: ng, b: nb } = hslToRgb(h, s, Math.min(100, Math.max(0, newL)));
-  return rgbToHex(nr, ng, nb);
-};
-
-export const getLuminanceFromHex = (hex: string): number => {
-  const { r, g, b } = hexToRgb(hex);
-  const { l } = rgbToHsl(r, g, b);
-  return l;
-};
-
-const makeBackgroundAttributes = ({
-  id,
-  base,
-  tint = 'prominent',
-  darkenAmount,
-  strategy = 'darkest',
-}: BackgroundConfig): BackgroundImageAttributes => {
-  const isArray = Array.isArray(base);
-  const baseColor = isArray ? brightest(base) : base;
-  const greysBase = greys('dark');
-
-  const buildDarkenedGreys = (base_: string[]): Greys => {
-    const chosen = pickByStrategy(base_, strategy);
-    const darkened = darken(darkenAmount!, chosen);
-    const blurred = learnedBlurTransform(darkened);
-
-    // Only the keys 50–800, statically typed to exclude 900 & 950
-    const darkenedKeys: Exclude<GreyKey, 900 | 950>[] = [
-      50, 100, 200, 300, 400, 500, 600, 700, 800,
-    ];
-
-    const adjustedEntries = darkenedKeys.map((key) => {
-      const originalL = getLuminanceFromHex(greysBase[key]);
-      const hex = adjustLuminanceOfHex(blurred, originalL);
-      return [key, hex];
-    });
-
-    return {
-      ...greysBase,
-      ...Object.fromEntries(adjustedEntries),
-      900: blurred,
-      950: darkened,
-    };
-  };
-
-  // Now choose which greys to use
-  const g = isArray && darkenAmount != null ? buildDarkenedGreys(base as string[]) : greysBase;
-
-  return {
-    id,
-    shades: computeShades(baseColor),
-    greys: g,
-    text: '#FFFFFF',
-    tint,
-    ...(isArray ? { dominantColors: base } : {}),
-  };
-};
-export const BACKGROUND_IMAGE_ATTRIBUTES: Record<string, BackgroundImageAttributes> = {
-  'bg.png': makeBackgroundAttributes({ id: 'bg.png', base: '#A855F7' }),
-  'bg2.png': makeBackgroundAttributes({ id: 'bg2.png', base: '#F97316' }),
-  'bg3.png': makeBackgroundAttributes({ id: 'bg3.png', base: '#38BDF8' }),
-  'bg4.png': makeBackgroundAttributes({ id: 'bg4.png', base: '#34D399' }),
-  'bg5.png': makeBackgroundAttributes({
-    id: 'bg5.png',
-    base: ['#b3a6d6', '#4811fd', '#9f0ffa', '#f936d3', '#3ad9fa'],
-    darkenAmount: 0.2,
-    tint: 'extraLight',
-    strategy: 'pastel',
-  }),
-
-  'bg6.png': makeBackgroundAttributes({
-    id: 'bg6.png',
-    base: ['#f328a7', '#120871', '#5135ae', '#9e0aa5', '#51048b'],
-    darkenAmount: 0.2,
-  }),
-  'bg7.png': makeBackgroundAttributes({
-    id: 'bg7.png',
-    base: ['#a63365', '#510e5f', '#0e2663', '#060437', '#117f98'],
-    darkenAmount: 0.075,
-  }),
-  'bg8.png': makeBackgroundAttributes({
-    id: 'bg8.png',
-    base: ['#03aabe', '#ad0257', '#0b0824'],
-    darkenAmount: 0.05,
-  }),
-  'bg9.png': makeBackgroundAttributes({
-    id: 'bg9.png',
-    base: ['#0C051C', '#3F92B2', '#0D1240', '#2C2575', '#4C75B0'],
-    darkenAmount: 0.025,
-  }),
-  'bg10.png': makeBackgroundAttributes({
-    id: 'bg10.png',
-    base: ['#492295', '#6d38b2', '#331766', '#281242', '#150b27'],
-    darkenAmount: 0.05,
-  }),
-  'bg11.gif': makeBackgroundAttributes({
-    id: 'bg11.gif',
-    base: ['#687cbd', '#7dbce1', '#8156aa', '#af6bbb', '#9f90ca'],
-    darkenAmount: 0.05,
-  }),
-  'bg12.png': makeBackgroundAttributes({
-    id: 'bg12.png',
-    base: ['#79874f', '#0c0943', '#811669', '#1c7a94', '#111c82'],
-    darkenAmount: 0.1,
-  }),
-  'bg14.png': makeBackgroundAttributes({
-    id: 'bg14.png',
-    base: ['#335f00', '#092a00', '#7ba901', '#99c4ea', '#1587f0'],
-    darkenAmount: 0.05,
-  }),
-  'bg15.png': makeBackgroundAttributes({
-    id: 'bg15.png',
-    base: ['#2F234F', '#106B8B', '#263D6B', '#1191AD'],
-    darkenAmount: 0.1,
-  }),
-  'bg16.png': makeBackgroundAttributes({
-    id: 'bg16.png',
-    base: [
-      '#3A032C',
-      '#321F49',
-      '#363A6D',
-      '#1F4F6D',
-      '#4F1E52',
-      '#0F6D83',
-      '#405981',
-      '#6F205E',
-      '#5E3F72',
-      '#5F5E82',
-    ],
-    darkenAmount: 0,
-  }),
-  'bg17.png': makeBackgroundAttributes({
-    id: 'bg17.png',
-    base: ['#013F4D', '#030D10', '#045F6E', '#012032', '#018F8A'],
-    darkenAmount: 0,
-  }),
-};
-
 export const BACKGROUND_IMAGES: Record<string, BackgroundImageMeta> = {
-  'bg6.png': {
-    id: 'bg6.png',
-    name: 'Static 2',
+  royalpurple: {
+    id: 'royalpurple',
+    name: 'Royal Purple',
     category: 'Static',
-    source: require('assets/images/backgrounds/bg6.png'),
+    source: require('assets/images/backgrounds/royalpurple.png'),
   },
-  'bg8.png': {
-    id: 'bg8.png',
-    name: 'Static 4',
+  mysticblue: {
+    id: 'mysticblue',
+    name: 'Mystic Blue',
     category: 'Static',
-    source: require('assets/images/backgrounds/bg8.png'),
+    source: require('assets/images/backgrounds/mysticblue.png'),
   },
-  'bg9.png': {
-    id: 'bg9.png',
-    name: 'Static 5',
+  cosmicpurple: {
+    id: 'cosmicpurple',
+    name: 'Cosmic Purple',
     category: 'Static',
-    source: require('assets/images/backgrounds/bg9.png'),
+    source: require('assets/images/backgrounds/cosmicpurple.png'),
   },
-  'bg17.png': {
-    id: 'bg17.png',
-    name: 'Static 12',
+  deepocean: {
+    id: 'deepocean',
+    name: 'Deep Ocean',
     category: 'Static',
-    source: require('assets/images/backgrounds/bg17.png'),
+    source: require('assets/images/backgrounds/deepocean.png'),
   },
 };

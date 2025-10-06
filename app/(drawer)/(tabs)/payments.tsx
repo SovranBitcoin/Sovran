@@ -1,13 +1,11 @@
 import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { View } from 'components/ui/View';
 import { useNostr } from 'helper/redux/nostr';
 // Removed useCashu - now using usePaginatedHistory directly
 import Modal from 'components/blocks/Modal';
-import { greys, Theme } from 'helper/colors';
 import PagerView from 'react-native-pager-view';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { useNavigation } from 'expo-router';
 import { Tabs } from 'components/ui/Tabs';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
@@ -19,7 +17,7 @@ import { ContactItem } from 'components/blocks/payments';
 
 const RenderContactItem = ({ item }: { item: any }) => {
   const { profiles } = useNostr();
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const navigation = useNavigation();
   const muted = item.profile?.muted;
   if (muted) return null;
@@ -27,7 +25,7 @@ const RenderContactItem = ({ item }: { item: any }) => {
     <ContactItem
       isVerified={profiles.some((profile) => profile.pubkey === item.pubkey)}
       contact={item}
-      theme={theme}
+      getPrimaryColor={getPrimaryColor}
       navigation={navigation}
     />
   );
@@ -35,8 +33,8 @@ const RenderContactItem = ({ item }: { item: any }) => {
 
 const Section = () => {
   const { maybeConvertNpub } = useCashuUtilities();
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const { profiles, search, currentProfile, messages, contacts } = useNostr();
   const { history: transactions } = usePaginatedHistory();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
@@ -274,7 +272,7 @@ const Section = () => {
           onPageSelected={onPageSelected}
           style={{
             height: Dimensions.get('window').height,
-            backgroundColor: greys(theme)[950],
+            backgroundColor: getPrimaryColor('950'),
           }}
           initialPage={0}
           scrollEnabled={contacts.length > 0}>
@@ -287,7 +285,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[950],
+                backgroundColor: getPrimaryColor('950'),
                 paddingBottom: 256,
               }}
             />
@@ -301,7 +299,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[950],
+                backgroundColor: getPrimaryColor('950'),
                 paddingBottom: 256,
               }}
             />
@@ -315,7 +313,7 @@ const Section = () => {
               getItemCount={getItemCount}
               getItem={getItem}
               style={{
-                backgroundColor: greys(theme)[950],
+                backgroundColor: getPrimaryColor('950'),
                 paddingBottom: 256,
               }}
             />
@@ -327,8 +325,8 @@ const Section = () => {
 };
 
 const TabOneScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
 
   return (
     <View style={styles.container}>
@@ -337,10 +335,10 @@ const TabOneScreen = () => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
       margin: 0,
       flex: 1,
       paddingTop: 64 + 32,

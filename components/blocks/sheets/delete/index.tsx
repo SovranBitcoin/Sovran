@@ -1,19 +1,17 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 
 function SheetWithRouter() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   return (
     <ActionSheet
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="route-a"
       containerStyle={{
-        backgroundColor: greys(theme)[800],
+        backgroundColor: getPrimaryColor('800'),
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

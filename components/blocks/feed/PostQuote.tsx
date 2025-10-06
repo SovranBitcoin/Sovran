@@ -1,14 +1,12 @@
 import React from 'react';
 import { View } from 'react-native';
 import { HStack } from 'components/ui/View';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import 'react-native-gesture-handler';
 import { useNostrEvents } from 'nostr-react';
 import { useNostrProfile } from './useNostrProfile';
 import CachedImage from 'components/ui/Image';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { getTimeAgo } from 'helper/time';
 
 interface PostQuoteProps {
@@ -16,7 +14,7 @@ interface PostQuoteProps {
 }
 
 export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const { events } = useNostrEvents({ filter: { ids: [id] } });
   const authorPubKey = events?.[0]?.pubkey;
@@ -28,7 +26,7 @@ export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
   return (
     <View
       style={{
-        backgroundColor: greys(theme)[800],
+        backgroundColor: getPrimaryColor('800'),
         borderRadius: 8,
         padding: 8,
         marginBottom: 8,
@@ -48,7 +46,7 @@ export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
           <Text>{profile?.displayName}</Text>
           <Text
             style={{
-              color: greys(theme)[100],
+              color: getPrimaryColor('100'),
             }}>
             {'  '}•{'  '}
             {timeAgo}

@@ -7,7 +7,6 @@ import {
   SET_PASSCODE,
   SET_BACKGROUND_IMAGE,
 } from './actionTypes';
-import { BACKGROUND_IMAGE_ATTRIBUTES } from '../../backgroundImages';
 import { SettingsAction } from './actions';
 import { Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
@@ -23,7 +22,6 @@ export interface Settings {
   passcode: string;
   experimental?: boolean;
   backgroundImage?: string;
-  backgroundImageAttrs?: (typeof BACKGROUND_IMAGE_ATTRIBUTES)[string];
   termsAccepted: TermsAccepted | null;
 }
 
@@ -57,16 +55,7 @@ export const settingsReducer: Reducer<SettingsState, SettingsAction> = (
       return typedUpdate('settings.theme' as const, () => action.payload, state);
     }
     case SET_BACKGROUND_IMAGE: {
-      return typedUpdate(
-        'settings' as const,
-        (settings) => ({
-          ...settings,
-          backgroundImage: action.payload,
-          backgroundImageAttrs:
-            BACKGROUND_IMAGE_ATTRIBUTES[action.payload] || settings.backgroundImageAttrs,
-        }),
-        state
-      );
+      return typedUpdate('settings.backgroundImage' as const, () => action.payload, state);
     }
     case TERMS_ACCEPTED: {
       return typedUpdate(

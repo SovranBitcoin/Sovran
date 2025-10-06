@@ -108,7 +108,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
       fullScreenGestureEnabled: true,
     },
   },
-  // Onboarding screens
   {
     name: 'onboard/welcome',
     title: '',
@@ -157,21 +156,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'onboard/restoreChoice',
     title: '',
   },
-  // Gift cards
-  {
-    name: 'giftcards/all',
-    title: 'Gift cards',
-    options: {
-      headerLargeTitle: true,
-    },
-  },
-  {
-    name: 'giftcards/giftcard',
-    options: {
-      headerLargeTitle: true,
-    },
-  },
-  // Settings
   {
     name: 'settings-pages',
     title: 'Settings',
@@ -219,19 +203,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
     options: {
       headerLargeTitle: true,
     },
-  },
-  // Donate
-  {
-    name: 'donate/donate',
-    title: 'Donate',
-    options: {
-      headerLargeTitle: true,
-    },
-  },
-  // Other
-  {
-    name: 'settings-pages/backgroundImages',
-    title: 'Background Image',
   },
   {
     name: 'ecashSendConfirmation',

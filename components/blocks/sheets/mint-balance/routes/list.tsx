@@ -3,8 +3,7 @@ import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMintManagement } from 'hooks/coco';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
@@ -25,7 +24,6 @@ import { Mint } from 'coco-cashu-core';
 interface MintItemProps {
   mint: Mint & { amount: number; unit: string };
   balance: { amount: number; unit: string };
-  theme: Theme;
   onPress: () => void;
   isLoading: boolean;
   globalLoading: boolean;
@@ -48,6 +46,7 @@ const MintItem: React.FC<MintItemProps> = ({
   onDetailsPress,
   onInspectPress,
 }) => {
+  const { getPrimaryColor } = useTheme();
   const formattedBalance = balance.amount
     ? formatAmount(
         { amount: balance.amount, unit: balance.unit },
@@ -59,11 +58,11 @@ const MintItem: React.FC<MintItemProps> = ({
 
   return (
     <TouchableOpacity
+      className="bg-primary-900"
       style={{
         padding: 16,
         marginBottom: 4,
         borderRadius: 16,
-        backgroundColor: greys(theme)[900],
         opacity: globalLoading ? 0.5 : balance.amount === 0 && _requireBalance ? 0.5 : 1,
       }}
       onPress={onPress}
@@ -78,15 +77,17 @@ const MintItem: React.FC<MintItemProps> = ({
             alt={`${mint.name} mint`}
           />
           <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
-            {isLoading && <ActivityIndicator animating size="small" color={greys(theme)[0]} />}
+            {isLoading && <ActivityIndicator animating size="small" color={getPrimaryColor('0')} />}
           </View>
         </View>
 
         <VStack flex={1}>
-          <Text style={{ color: greys(theme)[0], fontSize: 16, fontWeight: '500' }}>
+          <Text className="text-primary-0" style={{ fontSize: 16, fontWeight: '500' }}>
             {mint.name}
           </Text>
-          <Text style={{ color: greys(theme)[200], fontSize: 14 }}>{formattedBalance}</Text>
+          <Text className="text-primary-200" style={{ fontSize: 14 }}>
+            {formattedBalance}
+          </Text>
         </VStack>
 
         {showDetailsButton && (
@@ -99,10 +100,10 @@ const MintItem: React.FC<MintItemProps> = ({
               }
             }}>
             <Icon
+              className="bg-primary-800/75"
               style={{
                 padding: 8,
                 borderRadius: 1000,
-                backgroundColor: `${greys(theme)[800]}BF`,
               }}
               name="bx:dots-vertical-rounded"
             />
@@ -114,7 +115,7 @@ const MintItem: React.FC<MintItemProps> = ({
 };
 
 const ListRoute = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const router = useSheetRouter('mint-balance');
@@ -243,11 +244,9 @@ const ListRoute = () => {
           />
         }>
         <VStack className="items-center p-5">
-          <ActivityIndicator size="large" color={greys(theme)[0]} />
+          <ActivityIndicator size="large" color={getPrimaryColor('0')} />
           <Spacer size={10} />
-          <Text className="text-sm" style={{ color: greys(theme)[200] }}>
-            Loading balances...
-          </Text>
+          <Text className="text-primary-200 text-sm">Loading balances...</Text>
         </VStack>
       </Wrapper>
     );
@@ -284,7 +283,6 @@ const ListRoute = () => {
       }>
       <MintCurrencySelector
         mints={filteredMints}
-        theme={theme}
         allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
         currencyLabel="Send payment in"
         mintsLabel="Send from"
@@ -293,7 +291,6 @@ const ListRoute = () => {
             key={mint.mintUrl}
             mint={mint}
             balance={{ amount: mint.amount, unit: mint.unit }}
-            theme={theme}
             isLoading={loadingId === mint.mintUrl}
             globalLoading={loadingId !== null}
             requireBalance={payload?.requireBalance}

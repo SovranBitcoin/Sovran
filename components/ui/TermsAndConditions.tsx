@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'components/ui/Button';
 import { StyleSheet, Text, ScrollView } from 'react-native';
-import { greys, shades, Theme } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { VStack, HStack, Spacer } from 'components/ui/View';
 import { Checkbox } from 'expo-checkbox';
@@ -139,29 +137,29 @@ Using ecash involves significant risks including legal, market, liquidity, count
 
 These Terms represent the entire agreement between you and Sovran.`;
 
-const createStyles = (theme: Theme) => {
+const createStyles = (getPrimaryColor: (shade: string) => string) => {
   return StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[900],
+      backgroundColor: getPrimaryColor('900'),
     },
     titleText: {
       textAlign: 'center',
       fontSize: 32,
       fontFamily: 'OverpassHeavy',
-      color: greys(theme)[50],
+      color: getPrimaryColor('50'),
       paddingVertical: 8,
     },
     termsText: {
       fontFamily: 'OverpassRegular',
       fontSize: 14,
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
       lineHeight: 22,
     },
     checkboxText: {
       flex: 1,
       fontFamily: 'OverpassRegular',
       fontSize: 14,
-      color: greys(theme)[0],
+      color: getPrimaryColor('0'),
     },
   });
 };
@@ -181,8 +179,8 @@ export default function TermsAndConditions({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsProps) {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const [isChecked, setIsChecked] = useState(false);
 
   const toggleCheckbox = () => setIsChecked(!isChecked);
@@ -211,7 +209,7 @@ export default function TermsAndConditions({
                 <Checkbox
                   value={isChecked}
                   onValueChange={toggleCheckbox}
-                  color={isChecked ? shades[300] : undefined}
+                  color={isChecked ? getShadeColor('300') : undefined}
                 />
                 <Text id="terms-checkbox" style={styles.checkboxText}>
                   {checkboxText}

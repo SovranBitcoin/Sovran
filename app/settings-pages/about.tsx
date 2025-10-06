@@ -1,13 +1,11 @@
 import React from 'react';
 import { Button } from 'components/ui/Button';
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { Linking, ScrollView, Text } from 'react-native';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { VStack, Spacer } from 'components/ui/View';
-import { greys } from 'helper/colors';
 
 type ChangelogItem = {
   title: string;
@@ -21,15 +19,15 @@ interface ChangelogSectionProps {
 }
 
 export default function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const ChangelogSection = ({ title, items, emoji }: ChangelogSectionProps) => (
     <VStack spacing={8} style={{ marginBottom: 16 }}>
       <Text
+        className="text-primary-0"
         style={{
           fontSize: 16,
           fontWeight: 'bold',
-          color: greys(theme)[0],
         }}>
         {emoji} {title}
       </Text>
@@ -37,13 +35,16 @@ export default function ModalScreen() {
         {items.map((item, index) => (
           <VStack key={index} style={{ paddingLeft: 12 }}>
             <Text
+              className="text-primary-200"
               style={{
                 fontSize: 14,
-                color: greys(theme)[200],
                 lineHeight: 20,
               }}>
-              • <Text style={{ fontWeight: '600', color: greys(theme)[0] }}>{item.title}</Text>:{' '}
-              {item.description}
+              •{' '}
+              <Text style={{ fontWeight: '600' }} className="text-primary-0">
+                {item.title}
+              </Text>
+              : {item.description}
             </Text>
           </VStack>
         ))}
@@ -104,10 +105,10 @@ export default function ModalScreen() {
 
         <VStack spacing={8} style={{ marginBottom: 20 }}>
           <Text
+            className="text-primary-0"
             style={{
               fontSize: 18,
               fontWeight: 'bold',
-              color: greys(theme)[0],
               textAlign: 'center',
             }}>
             {"What's New in Version 0.0.22 (1)"}

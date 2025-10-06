@@ -29,8 +29,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 // Import local components and utilities
 import { persistor, store } from 'helper/redux/store';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
 import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
@@ -110,7 +109,7 @@ function MySplashScreen() {
 function MainStack() {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const { addMessage, messages } = useNostr();
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, currentTheme } = useTheme();
 
   // Set up DM subscriptions
   useNostrDMs(currentProfile, addMessage, messages);
@@ -128,20 +127,20 @@ function MainStack() {
         headerShown: true,
         headerTitle: screen.title,
         headerTitleStyle: {
-          color: greys(theme)[0],
+          color: getPrimaryColor('0'),
         },
         headerBlurEffect: 'regular',
         headerTransparent: true,
         headerBackTitle: 'Back',
-        headerTintColor: greys(theme)[0],
+        headerTintColor: getPrimaryColor('0'),
         headerBackTitleStyle: {
           fontSize: 16,
         },
         headerStyle: {
-          backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
+          backgroundColor: currentProfile.pubkey ? getPrimaryColor('950') : 'transparent',
         },
         headerLargeStyle: {
-          backgroundColor: currentProfile.pubkey ? greys(theme)[950] : 'transparent',
+          backgroundColor: currentProfile.pubkey ? getPrimaryColor('950') : 'transparent',
         },
       };
     }
@@ -153,8 +152,8 @@ function MainStack() {
   return (
     <>
       <StatusBar
-        backgroundColor={greys(theme)[950]}
-        barStyle={theme.id.includes('light') ? 'dark-content' : 'light-content'}
+        backgroundColor={getPrimaryColor('950')}
+        barStyle={currentTheme.includes('light') ? 'dark-content' : 'light-content'}
       />
       <Stack
         screenOptions={{
@@ -225,20 +224,22 @@ export default function RootLayout() {
       <NostrProvider relayUrls={RELAY_URLS}>
         <PersistGate loading={null} persistor={persistor}>
           <Provider store={store}>
-            <CocoProvider>
-              <ActionSheetProvider>
-                <SheetProvider context="global">
-                  <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <PricelistProvider>
-                      <PasscodeGate>
-                        <MainStack />
-                        <PortalHost />
-                      </PasscodeGate>
-                    </PricelistProvider>
-                  </View>
-                </SheetProvider>
-              </ActionSheetProvider>
-            </CocoProvider>
+            <ThemeProvider>
+              <CocoProvider>
+                <ActionSheetProvider>
+                  <SheetProvider context="global">
+                    <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+                      <PricelistProvider>
+                        <PasscodeGate>
+                          <MainStack />
+                          <PortalHost />
+                        </PasscodeGate>
+                      </PricelistProvider>
+                    </View>
+                  </SheetProvider>
+                </ActionSheetProvider>
+              </CocoProvider>
+            </ThemeProvider>
           </Provider>
         </PersistGate>
       </NostrProvider>

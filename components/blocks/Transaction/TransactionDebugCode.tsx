@@ -1,7 +1,6 @@
-import { memoizedGetTheme } from 'helper/redux/settings';
 import React from 'react';
 import { ScrollView } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View';
 import { HistoryEntry } from 'coco-cashu-core';
@@ -13,16 +12,16 @@ interface HistoryEntryDebugCodeProps {
 export function HistoryEntryDebugCode({ historyEntry }: HistoryEntryDebugCodeProps) {
   return null;
   // eslint-disable-next-line no-unreachable
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   return (
     <ScrollView horizontal>
       <View
         blur
+        className="bg-primary-800"
         style={{
           padding: 16,
           marginHorizontal: 16,
           borderRadius: 8,
-          backgroundColor: theme.greys[800],
         }}>
         <Text mono>{JSON.stringify(historyEntry, null, 2)}</Text>
       </View>

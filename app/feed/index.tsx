@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
-import { useSelector } from 'react-redux';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 // todo migrate to legendlist
 import { FlashList } from '@shopify/flash-list';
@@ -10,11 +9,10 @@ import { Post } from 'components/blocks/feed';
 import { View } from 'components/ui/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { useLocalSearchParams } from 'expo-router';
 import { EventKind } from 'helper/constants';
 
-const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
+const Feed = ({ filters }: { filters: any }) => {
   const { events } = useSubscribe({ filters });
 
   const sortedEvents = useMemo(
@@ -26,7 +24,7 @@ const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
       data={sortedEvents}
       renderItem={({ item }) => <Post {...({ post: item } as any)} key={item.id} />}
       keyExtractor={(event) => event?.id || ''}
-      extraData={theme}
+      extraData={sortedEvents.length}
       onEndReached={() => {}}
       onEndReachedThreshold={0.5}
     />
@@ -35,8 +33,8 @@ const Feed = ({ theme, filters }: { theme: any; filters: any }) => {
 
 const TabTwoScreen = () => {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const pagerRef = useRef(null);
   const [selectedTab, setSelectedTab] = useState('Feed');
   const tabs = useMemo(() => ['Feed'], []);
@@ -82,7 +80,7 @@ const TabTwoScreen = () => {
         initialPage={0}>
         {tabs.map((tab, index) => (
           <View key={index.toString()} style={styles.pageContainer}>
-            <Feed theme={theme} filters={filters[tab as keyof typeof filters]} />
+            <Feed filters={filters[tab as keyof typeof filters]} />
           </View>
         ))}
       </PagerView>
@@ -90,10 +88,10 @@ const TabTwoScreen = () => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     container: {
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
       flex: 1,
       padding: 16,
     },
@@ -105,7 +103,7 @@ const createStyles = (theme: Theme) =>
     },
     pageContainer: {
       flex: 1,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
       height: '100%',
       overflow: 'hidden',
     },

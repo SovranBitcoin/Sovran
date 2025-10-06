@@ -1,7 +1,5 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import * as CheckboxPrimitive from '@rn-primitives/checkbox';
 
@@ -20,34 +18,33 @@ export const Checkbox = ({
   size = 20,
   variant = 'default',
 }: CheckboxProps) => {
-  const theme = useSelector(memoizedGetTheme);
-  const g = greys(theme);
+  const { getPrimaryColor } = useTheme();
 
   // Variant color configuration
   const getVariantColors = () => {
     const variants = {
       default: {
-        border: g[400],
-        background: checked ? g[0] : 'transparent',
-        checkmark: g[900],
+        border: getPrimaryColor('400'),
+        background: checked ? getPrimaryColor('0') : 'transparent',
+        checkmark: getPrimaryColor('900'),
       },
       primary: {
-        border: checked ? '#3b82f6' : g[400],
+        border: checked ? '#3b82f6' : getPrimaryColor('400'),
         background: checked ? '#3b82f6' : 'transparent',
         checkmark: 'white',
       },
       success: {
-        border: checked ? '#10b981' : g[400],
+        border: checked ? '#10b981' : getPrimaryColor('400'),
         background: checked ? '#10b981' : 'transparent',
         checkmark: 'white',
       },
       warning: {
-        border: checked ? '#f59e0b' : g[400],
+        border: checked ? '#f59e0b' : getPrimaryColor('400'),
         background: checked ? '#f59e0b' : 'transparent',
         checkmark: 'white',
       },
       error: {
-        border: checked ? '#ef4444' : g[400],
+        border: checked ? '#ef4444' : getPrimaryColor('400'),
         background: checked ? '#ef4444' : 'transparent',
         checkmark: 'white',
       },

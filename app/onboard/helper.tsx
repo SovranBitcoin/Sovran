@@ -1,4 +1,4 @@
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { StyleSheet, Dimensions } from 'react-native';
 
 const calculatePosition = (index: number) => {
@@ -28,7 +28,7 @@ const calculateOpacity = (index: number) => {
 
 const height = Dimensions.get('window').height;
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     addButtonContainer: {
       width: 80,
@@ -39,7 +39,7 @@ const createStyles = (theme: Theme) =>
       zIndex: 10,
     },
     message: {
-      color: greys(theme)[300],
+      color: getPrimaryColor('300'),
       fontSize: 10,
       fontWeight: '500',
       textAlign: 'left',
@@ -169,7 +169,7 @@ const createStyles = (theme: Theme) =>
     },
     mintUrl: {
       fontSize: 12,
-      color: greys(theme)[200],
+      color: getPrimaryColor('200'),
       fontWeight: '500',
       marginBottom: 8,
     },
@@ -217,7 +217,7 @@ const createStyles = (theme: Theme) =>
     remainingSteps: {
       position: 'absolute',
       bottom: 64,
-      color: greys(theme)[200],
+      color: getPrimaryColor('200'),
       fontSize: 16,
       fontWeight: '500',
       textAlign: 'center',

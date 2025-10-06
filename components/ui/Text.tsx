@@ -1,8 +1,7 @@
 import React from 'react';
 import { Text as DefaultText, TextStyle, ColorValue } from 'react-native';
 import { useSelector } from 'react-redux';
-import { greys, shades, greens } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { Skeleton } from 'react-native-skeleton-component';
@@ -16,7 +15,7 @@ interface GradientTextProps extends TextProps {
 const GradientText = ({
   children,
   style,
-  gradientColors = [shades[200], shades[300]],
+  gradientColors = [getShadeColor('200'), getShadeColor('300')],
   ...rest
 }: GradientTextProps) => {
   return (
@@ -53,7 +52,7 @@ export const StyledText = ({
   children,
   ...props
 }: StyledTextProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
   if (primary) {
     return (
@@ -63,13 +62,13 @@ export const StyledText = ({
     );
   } else if (secondary) {
     return (
-      <GradientText gradientColors={[greys(theme)[400], greys(theme)[500]]} style={style}>
+      <GradientText gradientColors={[getPrimaryColor('400'), getPrimaryColor('500')]} style={style}>
         {children}
       </GradientText>
     );
   } else if (negative) {
     return (
-      <GradientText gradientColors={[greens[300], greens[300]]} style={style}>
+      <GradientText gradientColors={[getShadeColor('300'), getShadeColor('300')]} style={style}>
         {children}
       </GradientText>
     );
@@ -144,7 +143,7 @@ function getFamilyFromProps(props: CustomTextProps): string {
 }
 
 export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { style, children, ...otherProps } = props;
 
   const weight = getWeightFromProps(props);
@@ -247,7 +246,7 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
       testID={props.testID}
       style={[
         {
-          color: greys(theme)[0],
+          color: getPrimaryColor('0'),
           fontFamily: fontFamily,
           fontSize: size,
         },

@@ -1,24 +1,11 @@
 import React from 'react';
-import { greys } from 'helper/colors';
 import 'react-native-gesture-handler';
-import { useSelector } from 'react-redux';
 import CachedImage from 'components/ui/Image';
-import { memoizedGetTheme } from 'helper/redux/settings';
 
 export function ImageContainer({ url }: { url: string }) {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <CachedImage
-      style={{
-        width: '100%',
-        height: 250,
-        marginBottom: 8,
-        borderRadius: 8,
-        backgroundColor: greys(theme)[700],
-        borderColor: greys(theme)[600],
-        borderWidth: 0.5,
-      }}
+      className="bg-primary-700 border-primary-600 mb-2 h-[250px] w-full rounded-lg border"
       source={{ uri: url }}
       // resizeMode="contain"
     />

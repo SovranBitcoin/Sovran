@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, Animated, Alert, Linking } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { router } from 'expo-router';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, greens, reds } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -193,20 +191,19 @@ const DonutChart = ({
 
 // StatsGrid component
 const StatsGrid = ({
-  theme,
   successRate,
   avgResponse,
   mintSpeed,
   totalMints,
   totalMelts,
 }: {
-  theme: any;
   successRate?: number;
   avgResponse?: number;
   mintSpeed?: number;
   totalMints?: number;
   totalMelts?: number;
 }) => {
+  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
   const stats = [
     {
       label: 'Success Rate',
@@ -244,33 +241,26 @@ const StatsGrid = ({
         <View key={index} className="w-1/2 p-1.5">
           <VStack
             justify="space-between"
-            className="rounded-xl border p-4"
+            className="border-primary-700 bg-primary-800 rounded-xl border p-4"
             style={{
-              borderColor: greys(theme)[700],
-              backgroundColor: greys(theme)[800],
-              shadowColor: greys(theme)[900],
+              shadowColor: getPrimaryColor('950'),
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
               shadowRadius: 8,
               elevation: 3,
             }}>
-            <Text
-              className="mb-1 text-xs font-semibold uppercase tracking-wide"
-              style={{ color: greys(theme)[200] }}>
+            <Text className="text-primary-200 mb-1 text-xs font-semibold uppercase tracking-wide">
               {stat.label}
             </Text>
 
             <Text
-              className={`mb-0.5 text-2xl font-semibold leading-7 tracking-tight ${
+              className={`text-primary-0 mb-0.5 text-2xl font-semibold leading-7 tracking-tight ${
                 stat.accent ? 'text-2xl leading-8' : ''
-              }`}
-              style={{ color: greys(theme)[0] }}>
+              }`}>
               {stat.value}
             </Text>
 
-            <Text
-              className="text-xs leading-4 tracking-wide opacity-80"
-              style={{ color: greys(theme)[300] }}>
+            <Text className="text-primary-300 text-xs leading-4 tracking-wide opacity-80">
               {stat.description}
             </Text>
           </VStack>
@@ -281,7 +271,7 @@ const StatsGrid = ({
 };
 
 const InfoRoute = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const { getMintInfo } = useMintManagement();
@@ -466,25 +456,21 @@ const InfoRoute = () => {
                 sections={[
                   {
                     value: 5,
-                    color: greys(theme)[600],
+                    color: getPrimaryColor('600'),
                   },
                   {
                     value: 5,
-                    color: greys(theme)[700],
+                    color: getPrimaryColor('700'),
                   },
                 ]}>
                 {renderMintIcon()}
               </DonutChart>
             </VStack>
-            <Text
-              className="mb-1 text-center text-3xl font-bold"
-              style={{ color: greys(theme)[0] }}>
+            <Text className="text-primary-0 mb-1 text-center text-3xl font-bold">
               {mintInfo?.name || 'Loading...'}
             </Text>
             {mintInfo?.version && (
-              <Text className="text-center text-sm" style={{ color: greys(theme)[100] }}>
-                {mintInfo.version}
-              </Text>
+              <Text className="text-primary-100 text-center text-sm">{mintInfo.version}</Text>
             )}
           </VStack>
         </ScrollView>
@@ -552,28 +538,23 @@ const InfoRoute = () => {
               sections={[
                 {
                   value: hasError ? 3 : (successRate || 0.5) * 10,
-                  color: hasError ? greys(theme)[600] : greens[300],
+                  color: hasError ? getPrimaryColor('600') : getGreenColor('300'),
                 },
                 {
                   value: hasError ? 7 : (1 - (successRate || 0.5)) * 10,
-                  color: hasError ? greys(theme)[700] : reds[300],
+                  color: hasError ? getPrimaryColor('700') : getRedColor('300'),
                 },
               ]}>
               {renderMintIcon()}
             </DonutChart>
           </VStack>
-          <Text className="mb-1 text-center text-3xl font-bold" style={{ color: greys(theme)[0] }}>
-            {displayName}
-          </Text>
+          <Text className="text-primary-0 mb-1 text-center text-3xl font-bold">{displayName}</Text>
           {mintInfo?.version && (
-            <Text className="text-center text-sm" style={{ color: greys(theme)[100] }}>
-              {mintInfo.version}
-            </Text>
+            <Text className="text-primary-100 text-center text-sm">{mintInfo.version}</Text>
           )}
 
           {/* Stats Grid */}
           <StatsGrid
-            theme={theme}
             successRate={successRate}
             mintSpeed={auditInfo?.speedIndex}
             totalMints={totalMints}
@@ -615,28 +596,32 @@ const InfoRoute = () => {
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
                     <HStack align="center" gap={8}>
-                      <CurrencyIcon colors={[greys(theme)[400]]} width={20} currency={'nostr'} />
-                      <Text style={{ color: greys(theme)[50] }} bold>
+                      <CurrencyIcon
+                        colors={[getPrimaryColor('400')]}
+                        width={20}
+                        currency={'nostr'}
+                      />
+                      <Text className="text-primary-50" bold>
                         {truncateMiddle(contact.info, 10)}
                       </Text>
                     </HStack>
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
                     <HStack align="center" gap={8}>
-                      <Icon name="hugeicons:new-twitter" size={20} color={greys(theme)[400]} />
-                      <Text style={{ color: greys(theme)[50] }} bold>
+                      <Icon name="hugeicons:new-twitter" size={20} color={getPrimaryColor('400')} />
+                      <Text className="text-primary-50" bold>
                         {contact.info}
                       </Text>
                     </HStack>
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
                     <HStack align="center" gap={8}>
-                      <Icon name="mdi:at" size={20} color={greys(theme)[400]} />
-                      <Text style={{ color: greys(theme)[50] }} bold>
+                      <Icon name="mdi:at" size={20} color={getPrimaryColor('400')} />
+                      <Text className="text-primary-50" bold>
                         {contact.info}
                       </Text>
                     </HStack>
                   ) : (
                     <HStack align="center">
-                      <Text style={{ color: greys(theme)[50] }} bold>
+                      <Text className="text-primary-50" bold>
                         {contact.info}
                       </Text>
                     </HStack>

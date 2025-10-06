@@ -8,13 +8,10 @@ import {
   Platform,
   InteractionManager,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, Theme } from 'helper/colors';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import Icon from 'assets/icons';
 import Image from 'components/ui/Image';
@@ -22,8 +19,8 @@ import { Button } from 'components/ui/Button';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from 'helper/constants';
 import * as nip06 from 'nostr-tools/nip06';
-import { useFocusEffect } from 'expo-router';
 import { Card } from 'components/ui/Card';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface ProfileInfo {
   name?: string;
@@ -35,7 +32,6 @@ interface ButtonBarProps {
   handleSkip: () => void;
   handleRestoreDifferent: () => void;
   hasNavigated: boolean;
-  theme: Theme;
   mnemonic: string | null;
 }
 
@@ -149,12 +145,11 @@ const ButtonBar = ({
   handleSkip,
   handleRestoreDifferent,
   hasNavigated,
-  theme,
   mnemonic,
 }: ButtonBarProps) => (
   <VStack
-    className="bg-transparent"
-    style={{ paddingHorizontal: 16, paddingBottom: 16, backgroundColor: greys(theme)[950] }}>
+    className="bg-primary-950 bg-transparent"
+    style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
     <View className="px-2">
       <Card
         message="Creating a new account will delete the existing account on this device."
@@ -178,8 +173,7 @@ const ButtonBar = ({
 );
 
 export default function RestoreChoiceScreen() {
-  const theme = useSelector(memoizedGetTheme);
-
+  const { getPrimaryColor } = useTheme();
   const [hasNavigated, setHasNavigated] = useState(false);
 
   const { profileInfo, mnemonic, error } = useRestoreCandidate();
@@ -230,21 +224,21 @@ export default function RestoreChoiceScreen() {
           justify="center"
           className="flex-1"
           style={{ paddingHorizontal: 32 }}>
-          <Icon name="fa6-solid:triangle-exclamation" size={48} color={greys(theme)[400]} />
+          <Icon name="fa6-solid:triangle-exclamation" size={48} color="#9ca3af" />
           <Spacer size={16} />
-          <Text className="text-center text-xl font-bold" style={{ color: greys(theme)[0] }}>
+          <Text className="text-primary-0 text-center text-xl font-bold">
             Unable to Load Account
           </Text>
           <Spacer size={12} />
-          <Text className="text-center text-base leading-6" style={{ color: greys(theme)[300] }}>
+          <Text className="text-primary-300 text-center text-base leading-6">
             {error || "We couldn't find account information."}
           </Text>
           <Spacer size={32} />
           <TouchableOpacity
-            className="w-full items-center justify-center rounded-xl"
-            style={{ backgroundColor: greys(theme)[0], paddingVertical: 16 }}
+            className="bg-primary-0 w-full items-center justify-center rounded-xl"
+            style={{ paddingVertical: 16 }}
             onPress={handleSkip}>
-            <Text className="text-base font-semibold" style={{ color: greys(theme)[950] }}>
+            <Text className="text-primary-950 text-base font-semibold">
               Continue to Create New Account
             </Text>
           </TouchableOpacity>
@@ -260,19 +254,17 @@ export default function RestoreChoiceScreen() {
       <Container style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flex: 1 }} keyboardShouldPersistTaps="handled">
           <VStack style={{ flex: 1, paddingTop: 16 }}>
-            <Text weight="bold" size={18} style={{ color: greys(theme)[0] }}>
+            <Text weight="bold" size={18} className="text-primary-0">
               We found an account backup on this device
             </Text>
             <Spacer size={12} />
-            <View style={{ backgroundColor: greys(theme)[950], flex: 1 }}>
+            <View className="bg-primary-950" style={{ flex: 1 }}>
               <VStack
                 align="center"
-                className="rounded-2xl"
+                className="bg-primary-800 border-primary-700 rounded-2xl"
                 style={{
-                  backgroundColor: greys(theme)[800],
                   padding: 12,
                   borderWidth: 1,
-                  borderColor: greys(theme)[700],
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.08,
@@ -284,13 +276,11 @@ export default function RestoreChoiceScreen() {
                   <View style={{ marginRight: 8 }}>
                     {!profileInfo ? (
                       <View
-                        className="h-[48px] w-[48px] items-center justify-center rounded-full"
+                        className="bg-primary-700 border-primary-700 h-[48px] w-[48px] items-center justify-center rounded-full"
                         style={{
-                          backgroundColor: greys(theme)[700],
                           borderWidth: 2,
-                          borderColor: greys(theme)[700],
                         }}>
-                        <ActivityIndicator size="small" color={greys(theme)[0]} />
+                        <ActivityIndicator size="small" color={getPrimaryColor('0')} />
                       </View>
                     ) : profileInfo?.picture ? (
                       <Image
@@ -300,24 +290,22 @@ export default function RestoreChoiceScreen() {
                           height: 48,
                           borderRadius: 36,
                           borderWidth: 2,
-                          borderColor: greys(theme)[700],
+                          borderColor: getPrimaryColor('700'),
                         }}
                       />
                     ) : (
                       <View
-                        className="h-[72px] w-[72px] items-center justify-center rounded-full"
+                        className="bg-primary-700 border-primary-700 h-[72px] w-[72px] items-center justify-center rounded-full"
                         style={{
-                          backgroundColor: greys(theme)[700],
                           borderWidth: 2,
-                          borderColor: greys(theme)[700],
                         }}>
-                        <Icon name="fa6-solid:user" size={28} color={greys(theme)[400]} />
+                        <Icon name="fa6-solid:user" size={28} color="#9ca3af" />
                       </View>
                     )}
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text weight="bold" size={20} style={{ color: greys(theme)[0] }}>
+                    <Text weight="bold" size={20} className="text-primary-0">
                       {profileInfo?.name || 'Loading...'}
                     </Text>
                     {/* Keep minimal to focus the decision */}
@@ -336,7 +324,6 @@ export default function RestoreChoiceScreen() {
         handleSkip={handleSkip}
         handleRestoreDifferent={handleRestoreDifferent}
         hasNavigated={false}
-        theme={theme}
         mnemonic={mnemonic}
       />
     </KeyboardAvoidingView>

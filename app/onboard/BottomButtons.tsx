@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { VStack, HStack } from 'components/ui/View';
-import { greys, shades, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'info' | 'default';
 
@@ -27,7 +27,6 @@ export interface ButtonProps {
 interface BottomButtonsProps {
   buttons: ButtonProps[];
   vertical?: boolean;
-  theme: Theme;
   textStyle?: StyleProp<TextStyle>;
   buttonStyle?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
@@ -36,12 +35,12 @@ interface BottomButtonsProps {
 const BottomButtons = ({
   buttons,
   vertical = false,
-  theme,
   containerStyle,
   buttonStyle,
   textStyle,
 }: BottomButtonsProps) => {
-  const styles = createStyles(theme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
   const Stack = vertical ? VStack : HStack;
   const spacing = vertical ? 12 : 8;
 
@@ -55,7 +54,7 @@ const BottomButtons = ({
           key={index}
           style={[
             styles.button,
-            getButtonStyle(button.variant, theme),
+            getButtonStyle(button.variant, getPrimaryColor),
             !vertical && { flex: 1 },
             button.disabled && styles.disabledButton,
             buttonStyle,
@@ -77,24 +76,24 @@ const BottomButtons = ({
 };
 
 // Helper function to get button style based on variant
-const getButtonStyle = (variant: ButtonVariant, theme: Theme) => {
+const getButtonStyle = (variant: ButtonVariant, getPrimaryColor: (shade: string) => string) => {
   const variantStyles: Record<ButtonVariant, ViewStyle> = {
-    primary: { backgroundColor: shades[300] },
-    secondary: { backgroundColor: greys(theme)[500] },
-    tertiary: { backgroundColor: greys(theme)[800] },
-    info: { backgroundColor: shades[300] },
-    default: { backgroundColor: greys(theme)[800] },
+    primary: { backgroundColor: getShadeColor('300') },
+    secondary: { backgroundColor: getPrimaryColor('500') },
+    tertiary: { backgroundColor: getPrimaryColor('800') },
+    info: { backgroundColor: getShadeColor('300') },
+    default: { backgroundColor: getPrimaryColor('800') },
   };
 
   return variantStyles[variant as ButtonVariant] ?? variantStyles.default;
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     bottomButtons: {
       width: '100%',
       padding: 16,
-      backgroundColor: greys(theme)[950],
+      backgroundColor: getPrimaryColor('950'),
     },
     button: {
       padding: 16,

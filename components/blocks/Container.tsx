@@ -1,8 +1,7 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View';
 
 const Container: React.FC<{
@@ -11,11 +10,11 @@ const Container: React.FC<{
   contentContainerStyle?: any;
   scroll?: boolean;
 }> = ({ children, style = {}, contentContainerStyle = {} }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const styles = createStyles();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: greys(theme)[950], ...style }}>
+    <SafeAreaView style={{ flex: 1, ...style }} className="bg-primary-950">
       <View
         style={[
           styles.content,

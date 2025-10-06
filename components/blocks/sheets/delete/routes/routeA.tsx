@@ -2,17 +2,16 @@ import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Spacer, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { resetApp } from 'helper/redux/store';
 import * as Updates from 'expo-updates';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 
 // eslint-disable-next-line no-empty-pattern
 const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const dispatch = useDispatch();
   const handleDeleteProfile = async () => {
     try {
@@ -22,7 +21,7 @@ const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) =>
   };
 
   return (
-    <View style={{ padding: 20, backgroundColor: greys(theme)[950] }}>
+    <View className="bg-primary-950" style={{ padding: 20 }}>
       <Text style={{ fontSize: 18, marginBottom: 20 }}>
         Are you sure you want to delete your profile?
       </Text>

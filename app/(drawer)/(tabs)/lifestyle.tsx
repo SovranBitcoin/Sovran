@@ -1,11 +1,9 @@
 import React from 'react';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from 'helper/constants';
 
@@ -34,7 +32,7 @@ interface MenuItemProps {
 }
 
 const MenuItem = ({ item, onPress }: MenuItemProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   return (
     <TouchableOpacity
@@ -47,22 +45,16 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
         marginBottom: 16,
       }}>
       {item.icon && (
-        <View
-          className="items-center justify-center rounded-lg"
-          style={{
-            padding: 16,
-            backgroundColor: greys(theme)[800],
-          }}>
-          <Icon name={item.icon} size={32} color={greys(theme)[0]} />
+        <View className="bg-primary-800 items-center justify-center rounded-lg p-4">
+          <Icon name={item.icon} size={32} color={getPrimaryColor('0')} />
         </View>
       )}
       <Spacer size={8} />
       <Text
-        className="text-center"
+        className="text-primary-100 text-center"
         overpass
         heavy
         style={{
-          color: greys(theme)[100],
           fontSize: 11,
         }}>
         {item.label}
@@ -73,8 +65,6 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
 
 // Root component (ServicesSection logic merged here)
 const TabTwoScreen = () => {
-  const theme = useSelector(memoizedGetTheme);
-
   const handleNavigation = (item: MenuItemData) => {
     if (item.params) {
       router.push({
@@ -87,11 +77,7 @@ const TabTwoScreen = () => {
   };
 
   return (
-    <VStack
-      flex={1}
-      style={{
-        backgroundColor: greys(theme)[950],
-      }}>
+    <VStack flex={1} className="bg-primary-950">
       <Spacer size={96} />
       <VStack>
         <Text

@@ -1,8 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { Animated } from 'react-native';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys } from 'helper/colors';
 import NumericKeyboard from './NumericKeyboard';
 import { Avatar } from 'components/ui/Avatar';
 import { useNostr } from 'helper/redux/nostr';
@@ -20,7 +17,6 @@ const AVATAR_SIZE = 80;
 const SPACING = 16;
 
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
-  const theme = useSelector(memoizedGetTheme);
   const { currentProfile } = useNostr();
   const [value, setValue] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
@@ -50,8 +46,8 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
 
   // Helper function for dot styling
   const getDotStyle = (isActive: boolean) => ({
-    backgroundColor: isActive ? greys(theme)[0] : 'transparent',
-    borderColor: isActive ? 'transparent' : greys(theme)[0],
+    backgroundColor: isActive ? 'rgb(255 255 255)' : 'transparent',
+    borderColor: isActive ? 'transparent' : 'rgb(255 255 255)',
     ...dotShadow,
   });
 
@@ -97,16 +93,15 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView className="flex-1" style={{ backgroundColor: greys(theme)[950] }}>
+    <BlurView className="bg-primary-950 flex-1">
       <Animated.View
-        className="flex-1"
+        className="bg-primary-950 flex-1"
         style={{
-          backgroundColor: greys(theme)[950],
           opacity,
           transform: [{ translateX: shake }],
         }}>
         <VStack align="center" justify="center" flex={1} spacing={SPACING}>
-          <AnimatedSpriteBackground backgroundColor={greys(theme)[950]} />
+          <AnimatedSpriteBackground backgroundColor="rgb(3 7 18)" />
 
           {currentProfile?.picture && (
             <View style={avatarShadow}>
@@ -118,8 +113,8 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
             <Text
               size={18}
               weight="bold"
+              className="text-primary-0"
               style={{
-                color: greys(theme)[0],
                 ...textShadow,
               }}>
               {`Welcome back, ${currentProfile?.profile?.name}`}
@@ -128,8 +123,8 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
             <Text
               size={20}
               weight="bold"
+              className="text-primary-0"
               style={{
-                color: greys(theme)[0],
                 ...textShadow,
                 textShadowRadius: 10,
               }}>

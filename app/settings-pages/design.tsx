@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { memoizedGetSettings, memoizedGetTheme, setExperimental } from 'helper/redux/settings';
+import { memoizedGetSettings, setExperimental } from 'helper/redux/settings';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { Section as TableSection } from 'components/ui/Section';
@@ -10,7 +10,8 @@ import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Tabs } from 'components/ui/Tabs';
 import Icon, { icons } from 'assets/icons';
-import { greys, hexToRgb, rgbToHsl, shades } from 'helper/colors';
+import { hexToRgb, rgbToHsl } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ScrollView } from 'react-native';
@@ -26,7 +27,7 @@ function chunkArray(array: any[], size: number) {
 }
 
 export default function ModalScreen() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const settings = useSelector(memoizedGetSettings);
   const [isChecked, setIsChecked] = React.useState(settings?.experimental);
 
@@ -404,26 +405,18 @@ export default function ModalScreen() {
           LexendBlack
         </Text>
 
-        {Object.keys(theme.greys).map((grey) => {
+        {Object.keys(greys).map((grey) => {
           return (
-            <View
-              key={grey}
-              style={{
-                backgroundColor: theme.greys[grey],
-                height: 64,
-              }}>
-              <Text>{theme.greys[grey]}</Text>
-              <Text>{JSON.stringify(rgbToHsl(...Object.values(hexToRgb(theme.greys[grey]))))}</Text>
+            <View key={grey} className={`bg-primary-${grey} h-16`}>
+              <Text>{(greys as any)[grey]}</Text>
+              <Text>
+                {JSON.stringify(rgbToHsl(...Object.values(hexToRgb((greys as any)[grey]))))}
+              </Text>
             </View>
           );
         })}
 
-        <View
-          style={{
-            backgroundColor: theme.greys[950],
-            width: 32,
-            height: 32,
-          }}></View>
+        <View className="bg-primary-950 h-8 w-8"></View>
 
         {/* info message */}
         <Card
@@ -457,14 +450,14 @@ export default function ModalScreen() {
           <RowButton
             label={
               <HStack align="center" spacing={8}>
-                <Icon name="mingcute:lightning-fill" size={20} color={greys(theme)[400]} />
-                <Text style={{ color: greys(theme)[50] }} bold>
+                <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
+                <Text className="text-primary-50" bold>
                   npub1example@npubx.cash
                 </Text>
               </HStack>
             }
             onPress={() => {}}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={greys(theme)[400]} />}
+            rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
           />
         </Section>
 
@@ -513,13 +506,9 @@ export default function ModalScreen() {
             <HStack key={rowIndex} className="bg-transparent" style={{ marginBottom: 16 }}>
               {row.map((icon) => (
                 <VStack key={icon} className="flex-1 items-center" style={{ margin: 16 }}>
-                  <Icon name={icon} size={48} color={greys(theme)[0]} />
+                  <Icon name={icon} size={48} color={getPrimaryColor('0')} />
                   <Spacer size={8} />
-                  <Text
-                    style={{ color: greys(theme)[0] }}
-                    className="w-full truncate text-center text-xs">
-                    {icon}
-                  </Text>
+                  <Text className="text-primary-0 w-full truncate text-center text-xs">{icon}</Text>
                 </VStack>
               ))}
               {/* Fill empty columns if row has less than 3 icons */}
@@ -540,7 +529,7 @@ export default function ModalScreen() {
             <Checkbox
               value={isChecked}
               onValueChange={toggleCheckbox}
-              color={isChecked ? shades[300] : undefined}
+              color={isChecked ? getShadeColor('300') : undefined}
             />
             <Spacer size={8} />
             <Text
@@ -549,8 +538,8 @@ export default function ModalScreen() {
                 flex: 1,
                 fontFamily: 'OverpassRegular',
                 fontSize: 14,
-                color: greys(theme)[0],
-              }}>
+              }}
+              className="text-primary-0">
               Toggle experimental features
             </Text>
           </HStack>

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Image } from 'react-native';
-import { greys, Theme } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { calculatePosition, calculateSize, calculateOpacity } from './helper';
 
 interface MintItemProps {
@@ -8,9 +8,12 @@ interface MintItemProps {
   mintIndex: number;
   activeMintId: string;
   mintIndices: string[];
-  renderProgressCircle: (progress: number, size: number, theme: Theme) => React.ReactNode;
+  renderProgressCircle: (
+    progress: number,
+    size: number,
+    getPrimaryColor: (shade: string) => string
+  ) => React.ReactNode;
   getMintProgress: (mintUrl: string) => number;
-  theme: Theme;
 }
 
 // Individual mint component that animates based on active state
@@ -21,8 +24,8 @@ export const MintItem = ({
   mintIndices,
   renderProgressCircle,
   getMintProgress,
-  theme,
 }: MintItemProps) => {
+  const { getPrimaryColor } = useTheme();
   const isMintActive = activeMintId === mint.id;
   const positionIndex = mintIndex - mintIndices.findIndex((m) => m === activeMintId);
 
@@ -61,7 +64,7 @@ export const MintItem = ({
         height: 100,
         marginRight: -100,
         zIndex: zIndexValue,
-        backgroundColor: theme ? greys(theme)[950] : '#222',
+        backgroundColor: getPrimaryColor('950'),
       }}>
       <View
         style={{
@@ -71,7 +74,7 @@ export const MintItem = ({
           marginBottom: 8,
           overflow: 'hidden',
         }}>
-        {renderProgressCircle(mintProgress, 100, theme)}
+        {renderProgressCircle(mintProgress, 100, getPrimaryColor)}
         <View
           style={{
             position: 'absolute',
@@ -93,7 +96,7 @@ export const MintItem = ({
               width: '100%',
               height: '100%',
               borderRadius: 100000,
-              backgroundColor: greys(theme)[950],
+              backgroundColor: getPrimaryColor('950'),
               opacity: calculateOpacity(positionIndex),
             }}
           />

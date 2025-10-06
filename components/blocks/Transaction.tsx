@@ -1,10 +1,9 @@
 import { UntranslatedText } from 'components/ui/Text';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { greens, reds } from 'helper/colors';
 import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import TransactionIcon from 'components/blocks/TransactionIcon';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
@@ -90,7 +89,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
 };
 
 export const Transaction = React.memo(({ historyEntry }: { historyEntry: HistoryEntry }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
 
   const { isSend, isReceive, fiatAmount, handlePress } = useHistoryEntry(historyEntry);
 
@@ -112,11 +111,14 @@ export const Transaction = React.memo(({ historyEntry }: { historyEntry: History
 
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={theme.greys[0]} bold size={14}>
+            <UntranslatedText color={getPrimaryColor('0')} bold size={14}>
               {historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1)}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText color={isSend ? reds[300] : greens[300]} bold size={16}>
+              <UntranslatedText
+                color={isSend ? getRedColor('300') : getGreenColor('300')}
+                bold
+                size={16}>
                 {isSend ? '- ' : isReceive ? '+ ' : ''}
               </UntranslatedText>
               <AmountFormatter
@@ -124,14 +126,14 @@ export const Transaction = React.memo(({ historyEntry }: { historyEntry: History
                 unit={historyEntry.unit}
                 size={16}
                 weight="heavy"
-                color={isSend ? reds[300] : greens[300]}
+                color={isSend ? getRedColor('300') : getGreenColor('300')}
               />
             </HStack>
           </HStack>
 
           <HStack justify="space-between" align="center">
             <HStack align="center" spacing={4}>
-              <UntranslatedText regular size={10} color={theme.greys[100]}>
+              <UntranslatedText regular size={10} color={getPrimaryColor('100')}>
                 {historyEntry?.createdAt
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
@@ -140,7 +142,7 @@ export const Transaction = React.memo(({ historyEntry }: { historyEntry: History
             <UntranslatedText
               bold
               size={10}
-              color={theme.greys[100]}
+              color={getPrimaryColor('100')}
               style={{
                 alignSelf: 'flex-end',
                 textAlign: 'right',

@@ -5,9 +5,9 @@ import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
 import Icon from 'assets/icons';
-import { greys, Theme } from 'helper/colors';
 import { useNostr } from 'helper/redux/nostr';
-import { memoizedGetSettings, memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetSettings } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { showMessage } from 'helper/popup/popups';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
@@ -26,26 +26,30 @@ const SPACING_SM = 16;
 
 const LIGHT_THEMES = ['light', 'beige'];
 
-const isLightTheme = (theme: Theme) => LIGHT_THEMES.includes(theme.id);
-const getBlurTint = (theme: Theme) => (isLightTheme(theme) ? 'light' : 'dark');
-const getBlurIntensity = (theme: Theme) => (isLightTheme(theme) ? 7.5 : 75);
+const isLightTheme = (themeName: string) => LIGHT_THEMES.includes(themeName);
+const getBlurTint = (themeName: string) => (isLightTheme(themeName) ? 'light' : 'dark');
+const getBlurIntensity = (themeName: string) => (isLightTheme(themeName) ? 7.5 : 75);
 
-const TabBarBackground = ({ theme }: { theme: Theme }) => (
-  <BlurView
-    tint={getBlurTint(theme)}
-    intensity={getBlurIntensity(theme)}
-    className="overflow-hidden opacity-100"
-    style={[
-      StyleSheet.absoluteFill,
-      {
-        borderRadius: SPACING_XS,
-        top: -0.5,
-      },
-    ]}
-  />
-);
+const TabBarBackground = () => {
+  const { currentTheme } = useTheme();
+  return (
+    <BlurView
+      tint={getBlurTint(currentTheme)}
+      intensity={getBlurIntensity(currentTheme)}
+      className="overflow-hidden opacity-100"
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          borderRadius: SPACING_XS,
+          top: -0.5,
+        },
+      ]}
+    />
+  );
+};
 
-const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Theme }) => {
+const PaymentsHeaderTitle = ({ navigation }: { navigation: any }) => {
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const screenWidth = Dimensions.get('window').width;
   const searchContainerWidth = screenWidth - PROFILE_AVATAR_SIZE + SPACING_SM;
   const marginOffset = -(PROFILE_AVATAR_SIZE + SPACING_XS);
@@ -58,7 +62,7 @@ const PaymentsHeaderTitle = ({ navigation, theme }: { navigation: any; theme: Th
         marginLeft: marginOffset,
         marginTop: -SPACING_XS,
       }}>
-      <SearchBar navigation={navigation} theme={theme} />
+      <SearchBar navigation={navigation} getPrimaryColor={getPrimaryColor} />
     </View>
   );
 };
@@ -72,7 +76,7 @@ const WalletHeaderTitle = () => {
 };
 
 const TabLayout = () => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
   const navigation = useNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);
@@ -92,8 +96,8 @@ const TabLayout = () => {
   const HeaderRight = () => (
     <Pressable className="opacity-0" onPress={() => showMessage('not_implemented')}>
       <HStack spacing={8}>
-        <View className="rounded-full p-2" style={{ backgroundColor: greys(theme)[800] }}>
-          <Icon name="solar:card-bold" color={greys(theme)[0]} />
+        <View className="bg-primary-800 rounded-full p-2">
+          <Icon name="solar:card-bold" color={getPrimaryColor('0')} />
         </View>
         <Spacer size={8} />
       </HStack>
@@ -107,7 +111,7 @@ const TabLayout = () => {
         return WalletHeaderTitle;
       case 'Payments':
         return function PaymentsHeaderTitleWrapper() {
-          return <PaymentsHeaderTitle navigation={navigation} theme={theme} />;
+          return <PaymentsHeaderTitle navigation={navigation} />;
         };
       default:
         return undefined;
@@ -121,7 +125,7 @@ const TabLayout = () => {
         screenOptions={{
           lazy: true,
           headerBackground: () => <Background />,
-          tabBarBackground: () => <TabBarBackground theme={theme} />,
+          tabBarBackground: () => <TabBarBackground />,
           tabBarStyle: {
             position: 'absolute',
             bottom: 0,
@@ -140,14 +144,14 @@ const TabLayout = () => {
             component={component}
             options={{
               headerTitle: getHeaderTitle(title),
-              tabBarActiveTintColor: theme.shades[300],
-              tabBarInactiveTintColor: greys(theme)[300],
+              tabBarActiveTintColor: getShadeColor('300'),
+              tabBarInactiveTintColor: getPrimaryColor('300'),
               tabBarLabel: '',
-              tabBarIcon: ({ focused }) => <IconComponent focused={focused} theme={theme} />,
+              tabBarIcon: ({ focused }) => <IconComponent focused={focused} />,
               headerLeft: HeaderLeft,
               headerRight: HeaderRight,
               headerStyle: {
-                backgroundColor: greys(theme)[950],
+                backgroundColor: getPrimaryColor('950'),
                 height: 0,
               },
             }}

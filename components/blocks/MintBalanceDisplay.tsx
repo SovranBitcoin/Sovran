@@ -1,11 +1,10 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import { useSelector } from 'react-redux';
 import { SheetManager } from 'react-native-actions-sheet';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
-import { greys } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -41,7 +40,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   showDetailsButton = false,
   style,
 }) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const { getMintInfo } = useMintManagement();
@@ -112,10 +111,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
             padding: 8,
             borderRadius: 16,
             borderWidth: 0.2,
-            borderColor: greys(theme)[600],
+            borderColor: getPrimaryColor('600'),
             marginVertical: 4,
             alignSelf: 'center',
-            backgroundColor: greys(theme)[800],
+            backgroundColor: getPrimaryColor('800'),
           },
           style,
         ]}>
@@ -134,7 +133,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
               <VStack align="flex-start" style={{ marginRight: 10 }}>
                 <Text
                   style={{
-                    color: greys(theme)[50],
+                    color: getPrimaryColor('50'),
                   }}
                   className="ml-[-2px]"
                   size={12}
@@ -149,10 +148,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
             </>
           ) : (
             <HStack align="center" gap={8}>
-              <Icon name="fluent:add-24-filled" size={20} color={greys(theme)[0]} />
+              <Icon name="fluent:add-24-filled" size={20} color={getPrimaryColor('0')} />
               <Text
                 style={{
-                  color: greys(theme)[50],
+                  color: getPrimaryColor('50'),
                 }}
                 className="ml-[-2px]"
                 size={12}
@@ -164,7 +163,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           )}
         </HStack>
         <HStack justify="flex-end" align="center">
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={greys(theme)[0]} />
+          <Icon name="fluent:chevron-down-12-filled" size={12} color={getPrimaryColor('0')} />
           <Spacer size={8} />
         </HStack>
       </HStack>

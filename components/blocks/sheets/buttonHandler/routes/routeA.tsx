@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, GestureResponderEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { HStack, VStack } from 'components/ui/View';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, reds } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 
 const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getRedColor } = useTheme();
   const payload = useSheetPayload('button-handler');
 
   const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
@@ -50,11 +48,11 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: greys(theme)[800],
+        backgroundColor: getPrimaryColor('800'),
       }}>
       <VStack
         style={{
-          backgroundColor: greys(theme)[700],
+          backgroundColor: getPrimaryColor('700'),
           padding: 16,
           borderRadius: 16,
         }}>
@@ -76,13 +74,13 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
               <HStack align="center" spacing={16}>
                 <View
                   style={{
-                    backgroundColor: opacity(greys(theme)[400], 0.25),
+                    backgroundColor: opacity(getPrimaryColor('400'), 0.25),
                     borderRadius: 1000,
                     padding: 4,
                   }}>
                   {button.icon && (
                     <Icon
-                      color={isDangerous ? reds[300] : greys(theme)[0]}
+                      color={isDangerous ? getRedColor('300') : getPrimaryColor('0')}
                       name={button.icon}
                       size={32}
                     />
@@ -90,7 +88,7 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
                 </View>
                 <Text
                   style={{
-                    color: isDangerous ? reds[300] : greys(theme)[0],
+                    color: isDangerous ? getRedColor('300') : getPrimaryColor('0'),
                   }}
                   size={18}
                   weight="bold">

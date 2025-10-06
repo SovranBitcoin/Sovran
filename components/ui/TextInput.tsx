@@ -6,9 +6,7 @@ import {
   TextStyle,
 } from 'react-native';
 import TextInputBase from './TextInputBase';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useTheme } from 'providers/ThemeProvider';
 
 /**
  * Custom TextInput component that wraps TextInputBase with default styling
@@ -20,14 +18,14 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextC
 }
 
 const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }) => {
-  // Use useSelector hook for theme access to make component reactive to theme changes
-  const theme = useSelector(memoizedGetTheme);
+  // Use useTheme hook for theme access to make component reactive to theme changes
+  const { getPrimaryColor } = useTheme();
 
   return (
     <TextInputBase
       Component={RNTextInput}
       style={style}
-      placeholderTextColor={placeholderTextColor || greys(theme)[300]}
+      placeholderTextColor={placeholderTextColor || getPrimaryColor('300')}
       {...props}
     />
   );

@@ -1,9 +1,7 @@
 import React from 'react';
 import { View, VStack, HStack } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';
-import { useSelector } from 'react-redux';
-import { greys } from 'helper/colors';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { PostTop } from './PostTop';
 import { TextContent, extractUrls } from './TextContent';
 import { ActionItems, usePostReactions } from './ActionItems';
@@ -17,7 +15,7 @@ interface PostProps {
 }
 
 export function Post({ post }: PostProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
 
   // Check if this is a repost
   const isRepost = post?.kind === EventKind.Repost;
@@ -101,15 +99,7 @@ export function Post({ post }: PostProps) {
   }
 
   return (
-    <View
-      style={{
-        backgroundColor: greys(theme)[900],
-        padding: 16,
-        marginBottom: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: greys(theme)[800],
-      }}>
+    <View className="bg-primary-900 border-primary-800 mb-2 rounded-xl border p-4">
       <HStack align="flex-start" spacing={12}>
         {/* Avatar Column */}
         <VStack align="center" style={{ marginTop: 2 }}>

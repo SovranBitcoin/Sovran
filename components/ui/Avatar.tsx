@@ -1,10 +1,9 @@
 import React from 'react';
 import { BlurView } from 'expo-blur';
-import { useSelector } from 'react-redux';
 
 import Icon from 'assets/icons';
 import * as AvatarPrimitive from '@rn-primitives/avatar';
-import { memoizedGetTheme } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { rgba } from 'polished';
 import { VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -29,7 +28,7 @@ export const Avatar = ({
   name,
   status,
 }: AvatarProps) => {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const iconSize = size * 0.5; // 50% of parent size
   const statusIconSize = size * 0.33; // 25% of parent size for status icon
 
@@ -85,8 +84,8 @@ export const Avatar = ({
       const initial = name.charAt(0).toUpperCase();
       return (
         <Text
+          className="text-primary-300/75"
           style={{
-            color: rgba(theme.greys[300], 0.75),
             fontSize: iconSize,
             fontWeight: 'bold',
             position: 'absolute',
@@ -103,7 +102,7 @@ export const Avatar = ({
       return (
         <Icon
           name={fallbackIcon}
-          color={rgba(theme.greys[300], 0.75)}
+          color={rgba(getPrimaryColor('300'), 0.75)}
           size={iconSize}
           style={{
             position: 'absolute',

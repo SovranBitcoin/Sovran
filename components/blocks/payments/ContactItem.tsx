@@ -3,16 +3,15 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { formatAmount } from 'helper/currency';
-import { greys, Theme } from 'helper/colors';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from '@/helper/constants';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface ContactItemProps {
   contact: any;
   isVerified: boolean;
-  theme: Theme;
 }
 
 const styles = {
@@ -26,26 +25,24 @@ const styles = {
   textContainer: {
     flex: 1,
   },
-  profileName: (theme: Theme) => ({
-    color: greys(theme)[0],
+  profileName: {
     fontFamily: 'OverpassBold',
     fontSize: 16,
-  }),
-  date: (theme: Theme) => ({
+  },
+  date: {
     marginLeft: 8,
-    color: greys(theme)[200],
     fontFamily: 'OverpassBold',
     fontSize: 16,
-  }),
-  previewText: (theme: Theme) => ({
-    color: greys(theme)[100],
+  },
+  previewText: {
     fontFamily: 'OverpassRegular',
     fontSize: 16,
     marginTop: 2,
-  }),
+  },
 };
 
-export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) => {
+export const ContactItem = ({ contact, isVerified }: ContactItemProps) => {
+  const { getPrimaryColor } = useTheme();
   const mostRecentTransaction = contact?.transactions?.[0];
   const mostRecentMessage = contact?.messages?.[0];
 
@@ -92,17 +89,21 @@ export const ContactItem = ({ contact, isVerified, theme }: ContactItemProps) =>
             />
           </VStack>
           <VStack style={styles.textContainer}>
-            <Text style={styles.profileName(theme)}>
+            <Text style={styles.profileName} className="text-primary-0">
               {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}
             </Text>
-            <Text style={styles.previewText(theme)}>
+            <Text style={styles.previewText} className="text-primary-100">
               {previewText.length > 50
                 ? `${previewText.slice(0, 50)}...`
                 : previewText || 'No activity'}
             </Text>
           </VStack>
         </HStack>
-        {formattedDate && <Text style={styles.date(theme)}>{formattedDate}</Text>}
+        {formattedDate && (
+          <Text style={styles.date} className="text-primary-200">
+            {formattedDate}
+          </Text>
+        )}
       </HStack>
     </TouchableOpacity>
   );

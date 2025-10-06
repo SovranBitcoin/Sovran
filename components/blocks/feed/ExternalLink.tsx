@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
-import { useSelector } from 'react-redux';
-import { greys, Theme } from 'helper/colors';
 import { Text } from 'components/ui/Text';
 import { getLinkPreview as getPreview } from 'link-preview-js';
 import { Cache } from 'react-native-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CachedImage from 'components/ui/Image';
-import { memoizedGetTheme } from 'helper/redux/settings';
 
 type LinkPreviewData =
   | {
@@ -104,48 +101,29 @@ const useLinkPreview = (url: string) => {
   return { loading, linkData, error };
 };
 
-const LinkImage = ({ theme, linkData }: { theme: Theme; linkData: any }) =>
+const LinkImage = ({ linkData }: { linkData: any }) =>
   linkData?.images?.find((image: string) => image.endsWith('.png')) && (
     <CachedImage
-      style={{
-        width: 'auto',
-        height: 100,
-        backgroundColor: greys(theme)[800],
-        borderRadius: 8,
-      }}
+      className="bg-primary-800 h-[100px] w-auto rounded-lg"
       source={{ uri: linkData.images.find((image: string) => image.endsWith('.png')) }}
     />
   );
 
-const LinkDetails = ({ theme, url, linkData }: { theme: Theme; url: string; linkData: any }) => (
+const LinkDetails = ({ url, linkData }: { url: string; linkData: any }) => (
   <View>
-    <Text
-      size={12}
-      style={{
-        color: greys(theme)[300],
-        marginTop: 4,
-      }}>
+    <Text size={12} className="text-primary-300 mt-1">
       {url}
     </Text>
-    <Text
-      weight="heavy"
-      style={{
-        color: greys(theme)[0],
-      }}>
+    <Text weight="heavy" className="text-primary-0">
       {linkData?.title}
     </Text>
-    <Text
-      size={12}
-      style={{
-        color: greys(theme)[200],
-      }}>
+    <Text size={12} className="text-primary-200">
       {linkData?.description}
     </Text>
   </View>
 );
 
 export const ExternalLink = ({ url }: { url: string }) => {
-  const theme = useSelector(memoizedGetTheme);
   const { loading, linkData, error } = useLinkPreview(url);
 
   if (loading) {
@@ -157,15 +135,9 @@ export const ExternalLink = ({ url }: { url: string }) => {
   }
 
   return (
-    <View
-      style={{
-        backgroundColor: greys(theme)[700],
-        borderRadius: 16,
-        padding: 12,
-        marginBottom: 12,
-      }}>
-      <LinkImage theme={theme} linkData={linkData} />
-      <LinkDetails theme={theme} url={url} linkData={linkData} />
+    <View className="bg-primary-700 mb-3 rounded-2xl p-3">
+      <LinkImage linkData={linkData} />
+      <LinkDetails url={url} linkData={linkData} />
     </View>
   );
 };

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 
-import { greys } from 'helper/colors';
 import { View } from 'components/ui/View';
+import Image from 'components/ui/Image';
 import { router } from 'expo-router';
-import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
-import { useSelector } from 'react-redux';
+import { useSettings } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/ui/SearchableList';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { BACKGROUND_IMAGES } from 'helper/backgroundImages';
 
 // An array of available themes
 const themes = [
@@ -21,6 +22,9 @@ const themes = [
   'velvet-emerald',
 ];
 
+// Background image themes
+const backgroundImageThemes = ['royalpurple', 'mysticblue', 'cosmicpurple', 'deepocean'];
+
 // Mapping of theme names to user-friendly names (only for used themes)
 const themeNameMap: Record<string, string> = {
   dark: 'Dark',
@@ -30,32 +34,67 @@ const themeNameMap: Record<string, string> = {
   'crimson-night': 'Crimson Night',
   'twilight-amber': 'Twilight Amber',
   'velvet-emerald': 'Velvet Emerald',
+  // Background image themes
+  royalpurple: 'Royal Purple',
+  mysticblue: 'Mystic Blue',
+  cosmicpurple: 'Cosmic Purple',
+  deepocean: 'Deep Ocean',
 };
 
 function ThemeSettings() {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor } = useTheme();
   const [searchText, setSearchText] = useState('');
   const { setTheme, setBackgroundImage } = useSettings();
 
-  const filteredThemes = themes.filter((theme) =>
+  // Combine regular themes and background image themes
+  const allThemes = [...themes, ...backgroundImageThemes];
+
+  const filteredThemes = allThemes.filter((theme) =>
     theme.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const handleThemePress = (themeName: string) => {
-    setTheme(themeName);
-    setBackgroundImage('');
+    if (backgroundImageThemes.includes(themeName)) {
+      // For background image themes, set both theme and background image
+      setTheme(themeName);
+      setBackgroundImage(themeName);
+    } else {
+      // For regular themes, clear background image
+      setTheme(themeName);
+      setBackgroundImage('');
+    }
     router.back();
   };
 
-  const renderThemeIcon = (themeName: string) => (
-    <View
-      style={{
-        backgroundColor: greys(themeName)[300],
-        borderRadius: 100,
-      }}>
-      <ThemeIcon color={greys(themeName)[800]} />
-    </View>
-  );
+  const renderThemeIcon = (themeName: string) => {
+    // Check if it's a background image theme
+    if (backgroundImageThemes.includes(themeName)) {
+      const backgroundImage = BACKGROUND_IMAGES[themeName];
+      return (
+        <View className="h-12 w-12 overflow-hidden rounded-full">
+          <Image
+            source={backgroundImage?.source}
+            style={{
+              width: '100%',
+              height: '100%',
+              transform: [{ scale: 1.2 }],
+            }}
+          />
+        </View>
+      );
+    }
+
+    // Regular theme icon
+    return (
+      <View
+        style={{
+          backgroundColor: getPrimaryColor('300', themeName),
+          borderRadius: 100,
+        }}>
+        <ThemeIcon color={getPrimaryColor('800', themeName)} />
+      </View>
+    );
+  };
 
   return (
     <Container>
@@ -67,7 +106,6 @@ function ThemeSettings() {
         getLabel={(themeName) => themeNameMap[themeName]}
         onItemPress={handleThemePress}
         searchPlaceholder="Search for theme"
-        theme={theme}
       />
     </Container>
   );

@@ -1,9 +1,6 @@
 import React from 'react';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { greys } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
 import { Avatar } from 'components/ui/Avatar';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
@@ -15,16 +12,12 @@ interface HistoryEntryMintRefreshProps {
 }
 
 export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntryMintRefreshProps) {
-  const theme = useSelector(memoizedGetTheme);
-
   return (
     <HStack
-      blur
       align="center"
       justify="space-between"
-      className="rounded-lg"
+      className="bg-primary-800 rounded-lg"
       style={{
-        backgroundColor: theme.greys[800],
         marginHorizontal: 16,
         marginBottom: 0,
         padding: 16,
@@ -50,7 +43,7 @@ export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntry
                 ? 'Received with'
                 : 'Receiving with'}
           </Text>
-          <Text regular size={16} color={greys(theme)[50]}>
+          <Text regular size={16} className="text-primary-50">
             {mintInfo?.name}
           </Text>
         </VStack>

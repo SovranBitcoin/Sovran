@@ -4,9 +4,8 @@ import { HStack } from './View';
 import { Text } from './Text';
 import { cn } from 'lib/utils';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme } from 'helper/redux/settings';
-import { greys, greens, reds } from 'helper/colors';
+import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 
 const badgeVariants = cva(
   'rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
@@ -35,19 +34,18 @@ export interface BadgeProps
 }
 
 function Badge({ className, variant, icon, size = 12, color, children, ...props }: BadgeProps) {
-  const theme = useSelector(memoizedGetTheme);
-  const g = greys(theme);
+  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
 
   const getVariantStyles = () => {
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: g[100],
+          backgroundColor: getPrimaryColor('100'),
           borderColor: 'transparent',
         };
       case 'secondary':
         return {
-          backgroundColor: g[200],
+          backgroundColor: getPrimaryColor('200'),
           borderColor: 'transparent',
         };
       case 'warning':
@@ -57,17 +55,17 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
         };
       case 'error':
         return {
-          backgroundColor: '#ef4444',
+          backgroundColor: getRedColor('300'),
           borderColor: 'transparent',
         };
       case 'success':
         return {
-          backgroundColor: greens[300],
+          backgroundColor: getGreenColor('500'),
           borderColor: 'transparent',
         };
       default:
         return {
-          backgroundColor: g[100],
+          backgroundColor: getPrimaryColor('100'),
           borderColor: 'transparent',
         };
     }
@@ -78,17 +76,17 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
 
     switch (variant) {
       case 'primary':
-        return g[900];
+        return getPrimaryColor('900');
       case 'secondary':
-        return g[800];
+        return getPrimaryColor('800');
       case 'warning':
-        return reds[500];
+        return getRedColor('500');
       case 'error':
-        return reds[500];
+        return getRedColor('500');
       case 'success':
-        return greens[500];
+        return getGreenColor('300');
       default:
-        return g[900];
+        return getPrimaryColor('900');
     }
   };
 
@@ -98,6 +96,8 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
 
   return (
     <HStack
+      blur
+      colorBlur={opacity(getVariantStyles().backgroundColor, 0.2)}
       align="center"
       gap={isIconOnly ? 0 : 4}
       className={cn(badgeVariants({ variant }), className)}

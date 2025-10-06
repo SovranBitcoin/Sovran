@@ -4,9 +4,8 @@ import { StyledText, Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
-import { greys, greens, shades } from 'helper/colors';
-import { useSelector } from 'react-redux';
-import { memoizedGetTheme, useSettings } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
+import { useSettings } from 'helper/redux/settings';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';
@@ -41,7 +40,7 @@ export function AmountFormatter({
   transactionType = 'send',
   centered = false,
 }: AmountFormatterProps) {
-  const theme = useSelector(memoizedGetTheme);
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { settings } = useSettings();
   const displayBtc = settings.display_btc ?? 1;
 
@@ -51,12 +50,12 @@ export function AmountFormatter({
 
   // Dynamic color logic (only if useTypeColors is true)
   const getTypeColor = (): string => {
-    if (!amount) return greys(theme)[400];
-    return transactionType === 'receive' ? greens[300] : shades[300];
+    if (!amount) return getPrimaryColor('400');
+    return transactionType === 'receive' ? getShadeColor('300') : getShadeColor('300');
   };
 
   // Final color: prioritize passed color, then type colors, then default
-  const currentColor = color || (useTypeColors ? getTypeColor() : greys(theme)[0]);
+  const currentColor = color || (useTypeColors ? getTypeColor() : getPrimaryColor('0'));
 
   // Animation effect (only if animated is true)
   useEffect(() => {

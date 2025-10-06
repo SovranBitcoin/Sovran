@@ -8,8 +8,8 @@ import { Text } from 'components/ui/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/blocks/PrimaryBalance';
 
-import { greys, Theme } from 'helper/colors';
-import { memoizedGetBackgroundImage, memoizedGetTheme } from 'helper/redux/settings';
+import { memoizedGetBackgroundImage } from 'helper/redux/settings';
+import { useTheme } from 'providers/ThemeProvider';
 import { NonGestureView } from './NonGestureView';
 
 // Define proper interfaces for our data types
@@ -24,8 +24,8 @@ interface AccountProps {
 }
 
 export function Account({ accounts, account }: AccountProps): React.ReactElement {
-  const theme = useSelector(memoizedGetTheme);
-  const styles = createStyles(theme);
+  const { getPrimaryColor } = useTheme();
+  const styles = createStyles(getPrimaryColor);
 
   // Animation values
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -94,7 +94,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
           weight={isActive ? 'bold' : 'regular'}
           size={16}
           style={{
-            color: isActive ? greys(theme)[0] : greys(theme)[700],
+            color: isActive ? getPrimaryColor('0') : getPrimaryColor('700'),
             marginTop: 3,
           }}>
           •
@@ -145,7 +145,7 @@ const PLATFORM_BOTTOM_OFFSET = 24;
 
 // Using function to create styles to respect the existing pattern
 // but with proper typing for theme
-const createStyles = (theme: Theme) =>
+const createStyles = (getPrimaryColor: (shade: string) => string) =>
   StyleSheet.create({
     nonGestureView: {
       overflow: 'hidden',
@@ -156,7 +156,7 @@ const createStyles = (theme: Theme) =>
     absoluteRightBottomBorder: {
       position: 'absolute',
       bottom: PLATFORM_BOTTOM_OFFSET,
-      borderBottomColor: greys(theme)[600], // Using a default theme value
+      borderBottomColor: getPrimaryColor('600'),
       borderBottomWidth: 0.2,
       zIndex: -1,
       height: 300,

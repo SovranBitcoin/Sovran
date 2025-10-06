@@ -7,9 +7,6 @@ import {
   FlexStyle,
   DimensionValue,
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import { BACKGROUND_IMAGE_ATTRIBUTES } from 'helper/backgroundImages';
-import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 
 type ViewProps = RNViewProps & {
   blur?: boolean;
@@ -17,18 +14,35 @@ type ViewProps = RNViewProps & {
   blurIntensity?: number;
   blurTint?: BlurTint;
   children?: React.ReactNode;
+  className?: string;
+};
+
+// Function to strip background-related Tailwind classes
+const stripBackgroundClasses = (className?: string): string => {
+  if (!className) return '';
+
+  // Split classes and filter out background-related ones
+  const classes = className.split(' ').filter((cls) => {
+    // Remove background color classes
+    if (cls.startsWith('bg-')) return false;
+    // Remove background image classes
+    if (cls.startsWith('bg-[') || cls.startsWith('bg-gradient-')) return false;
+    return true;
+  });
+
+  return classes.join(' ');
 };
 
 const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
-  const image = useSelector(memoizedGetBackgroundImage);
-
-  const { blur = false, blurIntensity = 70, blurTint, style, children, ...rest } = props;
-
-  const effectiveTint = blurTint
-    ? blurTint
-    : image
-      ? BACKGROUND_IMAGE_ATTRIBUTES[image]?.tint
-      : 'prominent';
+  const {
+    blur = false,
+    blurIntensity = 70,
+    blurTint = 'prominent',
+    style,
+    children,
+    className,
+    ...rest
+  } = props;
 
   const flattenedStyle = StyleSheet.flatten(style);
   const { backgroundColor: _backgroundColor, ...cleanStyle } = flattenedStyle || {};
@@ -36,13 +50,16 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   if (!blur) {
     // 🔁 Normal unwrapped View – no blur requested
     return (
-      <RNView ref={ref} style={style} {...rest}>
+      <RNView ref={ref} style={style} className={className} {...rest}>
         {children}
       </RNView>
     );
   }
 
   // 🧊 Blur-enhanced View - works with or without background image
+  // Strip background classes when blur is enabled
+  const cleanClassName = stripBackgroundClasses(className);
+
   return (
     <RNView
       ref={ref}
@@ -52,6 +69,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
           overflow: 'hidden',
         },
       ]}
+      className={cleanClassName}
       {...rest}>
       {rest.colorBlur && (
         <View
@@ -63,7 +81,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
           ]}
         />
       )}
-      <BlurView intensity={blurIntensity} tint={effectiveTint} style={[StyleSheet.absoluteFill]} />
+      <BlurView intensity={blurIntensity} tint={blurTint} style={[StyleSheet.absoluteFill]} />
 
       {children}
     </RNView>
@@ -108,6 +126,8 @@ const VStack = React.forwardRef<any, StackProps>((props, ref) => {
     wrap = 'nowrap',
     style,
     children,
+    className,
+    blur,
     ...rest
   } = props;
 
@@ -145,8 +165,11 @@ const VStack = React.forwardRef<any, StackProps>((props, ref) => {
     return child;
   });
 
+  // Strip background classes when blur is enabled
+  const cleanClassName = blur ? stripBackgroundClasses(className) : className;
+
   return (
-    <View ref={ref} style={stackStyle} {...rest}>
+    <View ref={ref} style={stackStyle} className={cleanClassName} blur={blur} {...rest}>
       {processedChildren}
     </View>
   );
@@ -165,6 +188,8 @@ const HStack = React.forwardRef<any, StackProps>((props, ref) => {
     wrap = 'nowrap',
     style,
     children,
+    className,
+    blur,
     ...rest
   } = props;
 
@@ -202,8 +227,11 @@ const HStack = React.forwardRef<any, StackProps>((props, ref) => {
     return child;
   });
 
+  // Strip background classes when blur is enabled
+  const cleanClassName = blur ? stripBackgroundClasses(className) : className;
+
   return (
-    <View ref={ref} style={stackStyle} {...rest}>
+    <View ref={ref} style={stackStyle} className={cleanClassName} blur={blur} {...rest}>
       {processedChildren}
     </View>
   );
