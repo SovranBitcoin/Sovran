@@ -217,7 +217,7 @@ export const Button = ({
   const getTextColor = () => {
     switch (variant) {
       case 'primary':
-        return getPrimaryColor('0');
+        return getPrimaryColor('950'); // Use darkest color for contrast against light background
       case 'secondary':
       case 'dangerous':
       default:
