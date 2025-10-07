@@ -1,5 +1,5 @@
 import 'shim';
-import React, { memo, useCallback, useState, useEffect } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -7,8 +7,7 @@ import { View, VStack } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { memoizedGetSettings, termsAccepted } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
-import { getStructure, store } from 'redux/store';
-import { popup } from '@/helper/popup';
+import { store } from 'redux/store';
 import { OnboardingLayout } from 'app/onboard/OnboardLayout';
 import { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
@@ -20,9 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
-import { getLatestVersion } from 'helper/apiClient';
-import semver from 'semver';
-import { version } from 'app/settings-pages';
+import { useVersionCheck } from 'hooks/useVersionCheck';
 import { usePaginatedHistory } from 'coco-cashu-react';
 
 function TabOneScreen() {
@@ -55,36 +52,7 @@ function TabOneScreen() {
   const settings = useSelector(memoizedGetSettings);
 
   useDeeplink();
-
-  useEffect(() => {
-    (async () => {
-      if (!version) return;
-
-      const latestVersionResult = await getLatestVersion({
-        storage: {
-          version: version,
-          store: getStructure(store.getState()),
-        },
-      });
-
-      if (latestVersionResult.isOk()) {
-        if (
-          latestVersionResult.value &&
-          typeof latestVersionResult.value === 'object' &&
-          'version' in latestVersionResult.value
-        ) {
-          if (semver.gt(latestVersionResult.value.version, version)) {
-            popup({
-              message: 'latest_version',
-              params: {
-                version: latestVersionResult.value.version,
-              },
-            });
-          }
-        }
-      }
-    })();
-  }, []);
+  useVersionCheck();
 
   if (!settings?.termsAccepted) {
     return (
