@@ -3,7 +3,7 @@ import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
-import { Message } from 'helper/redux/nostr';
+import { Message } from 'redux/nostr';
 import { useTheme } from 'providers/ThemeProvider';
 
 const MessageComponent = ({ message, isReceived }: { message: Message; isReceived: boolean }) => {

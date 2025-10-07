@@ -13,7 +13,7 @@ import { TransactionHeader } from 'components/blocks/Transaction/TransactionHead
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { useSelector } from 'react-redux';
-import { memoizedGetSelectedMint } from '@/helper/redux/cashu';
+import { memoizedGetSelectedMint } from '@/redux/cashu';
 import { Alert } from 'react-native';
 import { MintQuoteTimeline } from '@/components/blocks/Transaction/TransactionTimeline';
 import { HistoryEntry } from 'coco-cashu-core';

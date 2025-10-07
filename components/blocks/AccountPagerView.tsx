@@ -11,7 +11,7 @@ import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Haptics from 'components/ui/Haptics';
 
-import { memoizedGetSelectedMint } from 'helper/redux/cashu/selectors';
+import { memoizedGetSelectedMint } from 'redux/cashu/selectors';
 import { useMintManagement } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { SheetManager } from 'react-native-actions-sheet';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { memoizedGetSettings, setExperimental } from 'helper/redux/settings';
+import { memoizedGetSettings, setExperimental } from 'redux/settings';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { Section as TableSection } from 'components/ui/Section';

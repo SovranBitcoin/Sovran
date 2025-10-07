@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Animated } from 'react-native';
 import NumericKeyboard from './NumericKeyboard';
 import { Avatar } from 'components/ui/Avatar';
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 import { BlurView } from 'expo-blur';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';

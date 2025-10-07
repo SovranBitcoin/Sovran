@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useSelector } from 'react-redux';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint } from 'redux/cashu';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';

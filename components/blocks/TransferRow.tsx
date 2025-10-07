@@ -3,7 +3,7 @@ import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Image from 'components/ui/Image';
 import Icon from 'assets/icons';
-import { memoizedGetMintInfo } from 'helper/redux/cashu/selectors';
+import { memoizedGetMintInfo } from 'redux/cashu/selectors';
 import { useTheme } from 'providers/ThemeProvider';
 import Svg, { Circle } from 'react-native-svg';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';

@@ -4,8 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/ui/View';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useTheme } from 'providers/ThemeProvider';
-import { setSelectedMint } from 'helper/redux/cashu';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { setSelectedMint } from 'redux/cashu';
+import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 

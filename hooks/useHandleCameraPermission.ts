@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { Linking } from 'react-native';
 
 export function useHandleCameraPermission() {

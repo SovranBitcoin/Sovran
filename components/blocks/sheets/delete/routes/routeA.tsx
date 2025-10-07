@@ -3,7 +3,7 @@ import { Card } from 'components/ui/Card';
 import { Spacer, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { resetApp } from 'helper/redux/store';
+import { resetApp } from 'redux/store';
 import * as Updates from 'expo-updates';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';

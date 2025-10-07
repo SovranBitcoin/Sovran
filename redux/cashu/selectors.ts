@@ -1,5 +1,5 @@
 import { createSelector } from 'reselect';
-import { RootState } from 'helper/redux/store/reducer';
+import { RootState } from 'redux/store/reducer';
 
 // Only keep selectors that are still needed for migration
 export const memoizedGetSelectedMint = createSelector(

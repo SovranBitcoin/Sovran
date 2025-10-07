@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { SafeAreaView, TouchableOpacity, Clipboard, ScrollView, Image } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 

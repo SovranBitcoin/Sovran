@@ -19,7 +19,7 @@ import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { showMessage, showSuccess } from 'helper/popup/popups';
+import { showMessage, showSuccess } from '@/helper/popup';
 import { write } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -29,7 +29,7 @@ import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
 
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';

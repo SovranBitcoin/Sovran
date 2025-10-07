@@ -6,7 +6,7 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
 import * as Clipboard from 'expo-clipboard';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';

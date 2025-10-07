@@ -7,7 +7,7 @@ import { useCashuOperations, useLightningOperations, useMelt, useManager } from 
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { useTheme } from 'providers/ThemeProvider';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
@@ -20,7 +20,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { requestInvoice, utils } from 'lnurl-pay';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { memoizedGetSelectedMint } from 'redux/cashu';
 import { getEncodedToken } from '@cashu/cashu-ts';
 
 interface ScanningData {

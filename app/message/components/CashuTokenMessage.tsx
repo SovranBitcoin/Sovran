@@ -9,7 +9,7 @@ import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useCashuOperations } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 // Removed useCashu - now using usePaginatedHistory directly
 import { router } from 'expo-router';
 

@@ -6,7 +6,7 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { useMintManagement } from 'hooks/coco';
 import { View, VStack, Spacer, HStack } from 'components/ui/View';
 import { MintCurrencySelector } from '../MintCurrencySelector';

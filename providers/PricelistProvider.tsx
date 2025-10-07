@@ -1,5 +1,5 @@
 import React, { useEffect, createContext } from 'react';
-import { usePricelist } from 'helper/redux/pricelist';
+import { usePricelist } from 'redux/pricelist';
 import { PRICELIST_URL } from 'helper/apiClient';
 
 const PricelistContext = createContext<{ btcPrice?: number } | null>(null);

@@ -19,12 +19,12 @@ import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 import { PUBLIC_KEYS } from 'helper/constants';
 // @ts-ignore
 import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 import * as bip39 from '@scure/bip39';
 
 import { entropyToMnemonic } from 'bip39';
 import * as Crypto from 'expo-crypto';
-import { store } from 'helper/redux/store';
+import { store } from 'redux/store';
 import { HDKey } from '@scure/bip32';
 import { relays } from 'components/ndk';
 import { storeMnemonic } from 'helper/secureStorage';

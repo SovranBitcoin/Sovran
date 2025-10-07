@@ -1,7 +1,7 @@
 import { Manager } from 'coco-cashu-core';
-import { store } from 'helper/redux/store';
-import { RootState } from 'helper/redux/store/reducer';
-import { CashuProfile } from 'helper/redux/cashu/types';
+import { store } from 'redux/store';
+import { RootState } from 'redux/store/reducer';
+import { CashuProfile } from 'redux/cashu/types';
 
 /**
  * Data migration utility to move from Redux-based Cashu state to Coco repositories

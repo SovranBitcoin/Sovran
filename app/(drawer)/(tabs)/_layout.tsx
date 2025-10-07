@@ -5,11 +5,11 @@ import { BlurView } from 'expo-blur';
 import { useSelector } from 'react-redux';
 
 import Icon from 'assets/icons';
-import { useNostr } from 'helper/redux/nostr';
-import { memoizedGetSettings } from 'helper/redux/settings';
+import { useNostr } from 'redux/nostr';
+import { memoizedGetSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
-import { showMessage } from 'helper/popup/popups';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { showMessage } from '@/helper/popup';
+import { memoizedGetSelectedMint } from 'redux/cashu';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';

@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
 import { useTheme } from 'providers/ThemeProvider';
-import { TransactionData } from 'helper/redux/cashu';
+import { TransactionData } from 'redux/cashu';
 
 const TransactionComponent = ({
   transaction,

@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { StyleSheet, ScrollView, Dimensions, VirtualizedList } from 'react-native';
 import { View } from 'components/ui/View';
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 // Removed useCashu - now using usePaginatedHistory directly
 import Modal from 'components/blocks/Modal';
 import PagerView from 'react-native-pager-view';

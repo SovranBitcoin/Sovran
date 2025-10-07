@@ -1,7 +1,7 @@
 import { decode } from '@gandlaf21/bolt11-decode';
-import { store } from 'helper/redux/store';
+import { store } from 'redux/store';
 import { auditMint } from 'helper/apiClient';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
+import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { mnemonicToSeedSync } from 'bip39';
 
 import { CashuWallet, CashuMint, decodePaymentRequest, getDecodedToken } from '@cashu/cashu-ts';

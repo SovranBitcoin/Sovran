@@ -8,7 +8,7 @@ import { Text } from 'components/ui/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/blocks/PrimaryBalance';
 
-import { memoizedGetBackgroundImage } from 'helper/redux/settings';
+import { memoizedGetBackgroundImage } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
 import { NonGestureView } from './NonGestureView';
 

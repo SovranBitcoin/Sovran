@@ -3,13 +3,13 @@ import { Text, StyleSheet, ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
 import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
-import { useSettings } from 'helper/redux/settings';
+import { useSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
 import NumericKeyboard from 'components/blocks/passcode/NumericKeyboard';
 import Container from 'components/blocks/Container';
 import { Card } from 'components/ui/Card';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 
 const PASSCODE_LENGTH = 4;
 

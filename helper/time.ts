@@ -1,4 +1,4 @@
-import { store } from './redux/store';
+import { store } from 'redux/store';
 
 /**
  * Converts a Date object to a formatted date-time string

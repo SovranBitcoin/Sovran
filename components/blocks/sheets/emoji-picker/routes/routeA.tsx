@@ -6,7 +6,7 @@ import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';
-import { showSuccess } from 'helper/popup/popups';
+import { showSuccess } from '@/helper/popup';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/ui/Card';
 

@@ -5,7 +5,7 @@ import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { showSuccess } from 'helper/popup/popups';
+import { showSuccess } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';

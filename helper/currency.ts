@@ -1,5 +1,5 @@
-import { store } from 'helper/redux/store';
-import { memoizedPricelist } from 'helper/redux/pricelist';
+import { store } from 'redux/store';
+import { memoizedPricelist } from 'redux/pricelist';
 
 /**
  * Type representing an amount with its unit (aligns with Coco's HistoryEntry)

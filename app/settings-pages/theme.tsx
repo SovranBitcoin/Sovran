@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'components/ui/View';
 import Image from 'components/ui/Image';
 import { router } from 'expo-router';
-import { useSettings } from 'helper/redux/settings';
+import { useSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
 import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/ui/SearchableList';

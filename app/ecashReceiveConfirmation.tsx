@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';

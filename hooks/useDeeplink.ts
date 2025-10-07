@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { useSelector } from 'react-redux';
-import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
-import { showMessage } from 'helper/popup/popups';
+import { memoizedGetSelectedMint } from 'redux/cashu';
+import { memoizedGetCurrentProfile } from 'redux/nostr';
+import { showMessage } from '@/helper/popup';
 import { useProcessPaymentString } from './coco/useProcessPaymentString';
 
 export const useDeeplink = () => {

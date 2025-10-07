@@ -10,8 +10,8 @@ import {
   ADD_CONTACT,
   REMOVE_CONTACT,
 } from './actionTypes';
-import { PUBLIC_KEYS } from '../../constants';
 import { NostrAction } from './actions';
+import { PUBLIC_KEYS } from '@/helper/constants';
 
 type NostrProfile = {
   created_at: number;

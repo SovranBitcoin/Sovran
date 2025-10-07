@@ -24,9 +24,9 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { nip04, nip19 } from 'nostr-tools';
 
 // Import local components and utilities
-import { persistor, store } from 'helper/redux/store';
+import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
-import { memoizedGetCurrentProfile, useNostr } from 'helper/redux/nostr';
+import { memoizedGetCurrentProfile, useNostr } from 'redux/nostr';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';

@@ -6,8 +6,8 @@ import { mnemonicToSeedSync } from 'bip39';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import { nip19 } from 'nostr-tools';
-import { store } from 'helper/redux/store';
-import { memoizedGetCurrentProfile } from 'helper/redux/nostr/selectors';
+import { store } from 'redux/store';
+import { memoizedGetCurrentProfile } from 'redux/nostr/selectors';
 
 /**
  * Coco Manager singleton for managing Cashu operations

@@ -1,5 +1,5 @@
 import { TextMessage, PaymentMessage, CashuTokenMessage } from './components';
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 import { useCashuUtilities } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { TimelineItemType } from '.';

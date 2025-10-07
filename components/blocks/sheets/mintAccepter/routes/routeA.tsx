@@ -5,12 +5,12 @@ import { StyledText, Text } from 'components/ui/Text';
 import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { useDispatch } from 'react-redux';
-import { store } from 'helper/redux/store';
-import { addMintsAction } from 'helper/redux/cashu';
+import { store } from 'redux/store';
+import { addMintsAction } from 'redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import opacity from 'hex-color-opacity';
 import { getMint } from 'helper/cashuClient';
-import { showMessage } from 'helper/popup/popups';
+import { showMessage } from '@/helper/popup';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {

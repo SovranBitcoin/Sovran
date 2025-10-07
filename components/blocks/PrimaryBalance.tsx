@@ -3,11 +3,11 @@ import { TouchableOpacity } from 'react-native';
 import { VStack } from 'components/ui/View';
 import { Badge } from 'components/ui/Badge';
 import { useSelector } from 'react-redux';
-import { useSettings } from 'helper/redux/settings';
+import { useSettings } from 'redux/settings';
 import { useBalanceContext, useMints } from 'hooks/coco';
 import Haptics from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { memoizedPricelist } from 'helper/redux/pricelist';
+import { memoizedPricelist } from 'redux/pricelist';
 // Define proper interfaces
 interface Account {
   unit: CurrencyUnit;

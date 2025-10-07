@@ -5,7 +5,7 @@ import { View, HStack } from 'components/ui/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
-import { useSettings } from 'helper/redux/settings';
+import { useSettings } from 'redux/settings';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';

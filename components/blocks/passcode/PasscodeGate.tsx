@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import PasscodeScreen from './PasscodeScreen';
-import { selectPasscode } from 'helper/redux/settings';
+import { selectPasscode } from 'redux/settings';
 
 const PasscodeGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const storedPasscode = useSelector(selectPasscode);

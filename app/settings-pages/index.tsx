@@ -2,10 +2,10 @@ import React from 'react';
 import { TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
-import { memoizedGetSettings } from 'helper/redux/settings';
+import { memoizedGetSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
 
-import { useNostr } from 'helper/redux/nostr';
+import { useNostr } from 'redux/nostr';
 import {
   ActionSheetProvider,
   connectActionSheet,

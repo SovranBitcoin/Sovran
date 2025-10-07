@@ -22,7 +22,7 @@ import {
   reportUser,
   addContact,
   removeContact,
-} from 'helper/redux/nostr';
+} from 'redux/nostr';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { useTheme } from 'providers/ThemeProvider';
 
@@ -38,8 +38,8 @@ import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import CachedImage from 'components/ui/Image';
-import { showMessage } from 'helper/popup/popups';
-import { RootState } from 'helper/redux/store/reducer';
+import { showMessage } from '@/helper/popup';
+import { RootState } from 'redux/store/reducer';
 import TextInput from 'components/ui/TextInput';
 import { Button } from 'components/ui/Button';
 import { nip19 } from 'nostr-tools';
