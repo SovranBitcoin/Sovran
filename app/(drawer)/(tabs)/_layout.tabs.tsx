@@ -31,7 +31,7 @@ const getBlurIntensity = (themeName: string) => (isLightTheme(themeName) ? 7.5 :
 
 // Icon components that use useTheme hook
 const PaymentsIcon = ({ focused }: { focused: boolean }) => {
-  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   return (
     <Icon
       name="fluent:arrow-swap-16-filled"
@@ -42,7 +42,7 @@ const PaymentsIcon = ({ focused }: { focused: boolean }) => {
 };
 
 const WalletIcon = ({ focused }: { focused: boolean }) => {
-  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
+  const { getPrimaryColor, currentTheme } = useTheme();
   return (
     <View style={{ position: 'relative', width: 64, height: 64 }}>
       <View className="absolute h-4 overflow-hidden" style={{ width: 100, bottom: 51 }}>
@@ -81,7 +81,7 @@ const WalletIcon = ({ focused }: { focused: boolean }) => {
 };
 
 const LifestyleIcon = ({ focused }: { focused: boolean }) => {
-  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   return (
     <Icon
       name="clarity:internet-of-things-solid"

@@ -33,93 +33,6 @@ export function useLightningOperations() {
   );
 
   /**
-   * Redeem a Lightning invoice after payment
-   * This replaces the old checkLightningReceiveStatus function
-   */
-  const redeemLightningInvoice = useCallback(
-    async (mintUrl: string, quoteId: string) => {
-      setIsProcessing(true);
-      setError(null);
-
-      try {
-        await manager.quotes.redeemMintQuote(mintUrl, quoteId);
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to redeem mint quote');
-        setError(error);
-        throw error;
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [manager]
-  );
-
-  /**
-   * Pay a Lightning invoice
-   * This replaces the old sendLightning function
-   */
-  const payLightningInvoice = useCallback(
-    async (mintUrl: string, invoice: string) => {
-      setIsProcessing(true);
-      setError(null);
-
-      try {
-        // Create melt quote
-        const meltQuote = await manager.quotes.createMeltQuote(mintUrl, invoice);
-
-        // Pay the quote
-        await manager.quotes.payMeltQuote(mintUrl, meltQuote.quote);
-
-        return meltQuote;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to pay Lightning invoice');
-        setError(error);
-        throw error;
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    [manager]
-  );
-
-  /**
-   * Wait for a mint quote to be paid (for receiving)
-   * This uses Coco's subscription system instead of polling
-   */
-  const waitForMintQuotePaid = useCallback(
-    async (mintUrl: string, quoteId: string) => {
-      try {
-        // Use the quotes service to wait for payment and auto-redeem
-        const result = await (manager.quotes as any).redeemOnPaid(mintUrl, quoteId);
-        return result.completed;
-      } catch (err) {
-        const error =
-          err instanceof Error ? err : new Error('Failed to wait for mint quote payment');
-        setError(error);
-        throw error;
-      }
-    },
-    [manager]
-  );
-
-  /**
-   * Wait for a melt quote to be paid (for sending)
-   */
-  const waitForMeltQuotePaid = useCallback(
-    async (mintUrl: string, quoteId: string) => {
-      try {
-        return await manager.subscription.awaitMeltQuotePaid(mintUrl, quoteId);
-      } catch (err) {
-        const error =
-          err instanceof Error ? err : new Error('Failed to wait for melt quote payment');
-        setError(error);
-        throw error;
-      }
-    },
-    [manager]
-  );
-
-  /**
    * Reset error state
    */
   const reset = useCallback(() => {
@@ -129,12 +42,6 @@ export function useLightningOperations() {
   return {
     // Core operations
     requestLightningInvoice,
-    redeemLightningInvoice,
-    payLightningInvoice,
-
-    // Subscription operations
-    waitForMintQuotePaid,
-    waitForMeltQuotePaid,
 
     // State
     isProcessing,
