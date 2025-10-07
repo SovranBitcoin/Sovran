@@ -5,7 +5,6 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { mnemonicToSeedSync } from 'bip39';
 
 import {
-  MeltQuoteResponse,
   CashuWallet,
   CashuMint,
   decodePaymentRequest,
@@ -150,45 +149,6 @@ export async function getMint({
   }
 
   return ok(mint);
-}
-
-// Melt quote and payment functions
-export async function getMeltQuote({
-  pr,
-  unit,
-  mintUrl,
-  mppAmount,
-}: {
-  pr: string;
-  unit: string;
-  mintUrl?: string;
-  mppAmount?: number;
-}): Promise<Result<MeltQuoteResponse, Error>> {
-  if (!mintUrl) {
-    return err(new AppError('invalid_mint_url', 'Invalid mint URL'));
-  }
-
-  const walletRes = await getWallet({ unit, mintUrl, profile: null });
-  if (walletRes.isErr()) return err(walletRes.error);
-  const wallet = walletRes.value;
-
-  const activeKeyset = wallet.getActiveKeyset(wallet.keysets.filter((key) => key.unit === unit));
-  const keysetId = activeKeyset.id;
-  wallet.keysetId = keysetId;
-
-  const options = mppAmount ? { options: { mpp: { amount: mppAmount * 1000 } } } : {};
-
-  const meltQuoteRes = await toResult(
-    wallet.mint.createMeltQuote({
-      request: pr,
-      unit,
-      ...options,
-    })
-  );
-
-  if (meltQuoteRes.isErr()) return err(meltQuoteRes.error);
-
-  return ok(meltQuoteRes.value);
 }
 
 export function getUsedProofs(currentProofs, keepProofs) {

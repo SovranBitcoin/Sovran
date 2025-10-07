@@ -3,29 +3,34 @@ import { useSelector } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
 
-import { useMintManagement, useCashuOperations, useLightningOperations } from 'hooks/coco';
+import {
+  useMintManagement,
+  useCashuOperations,
+  useLightningOperations,
+  useMelt,
+  useManager,
+} from 'hooks/coco';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { useTheme } from 'providers/ThemeProvider';
 // Removed Redux Cashu import - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { showMessage } from 'helper/popup/popups';
-import type { MintHistoryEntry, MeltHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { barcodeHandler } from 'helper/payment-handler/handlers';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Image from 'components/ui/Image';
+import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { URDecoder } from '@gandlaf21/bc-ur';
+import { useProcessPaymentString } from '@/hooks/useProcessPaymentString';
 // Removed memoizedGetCurrentProfile - no longer needed
 import { requestInvoice, utils } from 'lnurl-pay';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
+import { getEncodedToken } from '@cashu/cashu-ts';
 interface ScanningData {
   data: string;
   type?: string;
@@ -42,174 +47,82 @@ function ModalScreen() {
     lud16?: string;
     allowedUnits?: string;
     mints?: string;
+    lnUrlOrAddress?: string;
   }>();
 
   // Use Coco hooks instead of Redux
   const { getBalances } = useMintManagement();
   const { sendEcash } = useCashuOperations();
-  const { payLightningInvoice, requestLightningInvoice } = useLightningOperations();
+  const { requestLightningInvoice } = useLightningOperations();
+  const { createMeltQuote } = useMelt();
 
   const [amount, setAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
   const [loading, setLoading] = useState(false);
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const [balance, setBalance] = useState(0);
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
-  // const [isValidMint, setIsValidMint] = useState(false);
 
-  // Load balance and selected mint from Coco
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const balances = await getBalances();
-        // For now, use the first available mint or a default
-        const mintUrl = Object.keys(balances)[0];
-        setBalance(balances[mintUrl] || 0);
-      } catch (error) {
-        console.error('Failed to load balance:', error);
-      }
-    };
-    loadData();
-  }, [getBalances]);
+  const { processPaymentString } = useProcessPaymentString({
+    unit,
+    selectedMint,
+    isFocused: true,
+    onLoading: setLoading,
+  });
 
   // Validate the amount whenever it changes
   useEffect(() => {
     setIsValidAmount(amount > 0);
   }, [amount]);
 
-  const urDecoder = new URDecoder();
+  const manager = useManager();
 
   const handleMintSelected = async (mint: { id: string; unit: string }) => {
-    // Note: setSelectedMintState is not defined in this component
-    // This might need to be implemented based on your state management
     const newUnit = mint.unit.toLowerCase();
     setUnit(newUnit);
-    // Note: navigation.setParams is not available in this context
-    // The unit change will be handled by the parent component
   };
 
   const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
-    try {
-      const quote = await requestLightningInvoice(
-        selectedMint || 'https://mint.minibits.cash/Bitcoin', // Fallback mint URL
-        unit === 'sat' ? amount : amount * 100
-      );
-
-      // Create a mint history entry for Lightning receive
-      const mintHistoryEntry: MintHistoryEntry = {
-        id: `mint-${Date.now()}`,
-        type: 'mint',
-        amount: unit === 'sat' ? amount : amount * 100,
-        unit: unit,
-        mintUrl: selectedMint || 'https://mint.minibits.cash/Bitcoin',
-        createdAt: Date.now(),
-        state: 'UNPAID',
-        paymentRequest: quote.request,
-        quoteId: quote.quote,
-        metadata: {
-          memo: _memo || '',
-        },
-      };
-
-      router.back();
-      router.replace({
-        pathname: `/${params.to}` as any,
-        params: {
-          mintHistoryEntry: JSON.stringify(mintHistoryEntry),
-        },
-      });
-    } catch (error) {
-      console.error('Failed to create Lightning invoice:', error);
-      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
-    }
-  };
-
-  const handleEcashSend = async ({ message: _message }: { message?: string }) => {
-    try {
-      // Use Coco's ecash operations
-      const result = await sendEcash(
-        selectedMint || 'https://mint.minibits.cash',
-        unit === 'sat' ? amount : amount * 100
-      );
-
-      // Create a send history entry for ecash send
-      const sendHistoryEntry: SendHistoryEntry = {
-        id: `send-${Date.now()}`,
-        type: 'send',
-        amount: unit === 'sat' ? amount : amount * 100,
-        unit: unit,
-        mintUrl: selectedMint || 'https://mint.minibits.cash',
-        createdAt: Date.now(),
-        token: result,
-        metadata: {
-          memo: _message || '',
-        },
-      };
-
-      router.replace({
-        pathname: `/${params.to}` as any,
-        params: {
-          sendHistoryEntry: JSON.stringify(sendHistoryEntry),
-        },
-      });
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
-    }
-  };
-
-  const handleDefaultSend = async () => {
-    if (!params.lud16) {
-      showMessage('No Lightning address provided', {}, { emoji: '🚨' });
+    if (!selectedMint) {
+      showMessage('No mint selected', {}, { emoji: '🚨' });
       return;
     }
 
-    const { invoice } = await requestInvoice({
-      lnUrlOrAddress: params.lud16,
-      tokens: utils.toSats(amount),
-    });
+    const mintQuote = await requestLightningInvoice(selectedMint, amount);
 
-    try {
-      // Use Coco's Lightning operations
-      const meltQuote = await payLightningInvoice(
-        selectedMint || 'https://mint.minibits.cash',
-        invoice
+    // todo: is there a better way to do this? I just want to get the recently created historyEntry assosiated with my quote.
+    const mintHistoryEntry = await manager.history
+      .getPaginatedHistory()
+      .then((h) => h.find((h) => h.type === 'mint' && h.quoteId === mintQuote.quote));
+
+    router.replace({
+      pathname: `/${params.to}`,
+      params: {
+        mintHistoryEntry: JSON.stringify(mintHistoryEntry),
+      },
+    });
+  };
+
+  const handleEcashSend = async ({ message: _message }: { message?: string }) => {
+    if (!selectedMint) {
+      showMessage('No mint selected', {}, { emoji: '🚨' });
+      return;
+    }
+
+    const result = await sendEcash(selectedMint, amount);
+
+    // todo: is there a better way to do this? I just want to get the recently created historyEntry assosiated with my token.
+    const sendHistoryEntry = await manager.history
+      .getPaginatedHistory()
+      .then((h) =>
+        h.find((h) => h.type === 'send' && getEncodedToken(h.token) === getEncodedToken(result))
       );
 
-      const totalAmount = Number(amount) + Number(meltQuote.fee_reserve || 0);
-
-      const isBalanceSufficient = unit === 'sat' ? balance >= totalAmount : balance >= totalAmount;
-
-      if (!isBalanceSufficient) {
-        showMessage(
-          'insufficient_balance',
-          { amount, unit, fee: meltQuote.fee_reserve || 0 },
-          { emoji: '🚨' }
-        );
-        return;
-      }
-
-      // Create a melt history entry for Lightning send
-      const meltHistoryEntry: MeltHistoryEntry = {
-        id: `melt-${Date.now()}`,
-        type: 'melt',
-        amount: unit === 'sat' ? amount : amount * 100,
-        unit: unit,
-        mintUrl: selectedMint || 'https://mint.minibits.cash',
-        createdAt: Date.now(),
-        state: 'UNPAID',
-        quoteId: meltQuote.quote,
-        metadata: {},
-      };
-
-      router.push({
-        pathname: `/${params.to}` as any,
-        params: {
-          meltHistoryEntry: JSON.stringify(meltHistoryEntry),
-        },
-      });
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Unknown error', {}, { emoji: '🚨' });
-    }
+    router.replace({
+      pathname: `/${params.to}`,
+      params: {
+        sendHistoryEntry: JSON.stringify(sendHistoryEntry),
+      },
+    });
   };
 
   const handleNext = async () => {
@@ -222,39 +135,56 @@ function ModalScreen() {
       case 'lightningReceiveConfirmation':
         SheetManager.show('transaction-message', {
           onClose: async (data) => {
-            if (data?.action === 'confirm') {
-              await handleLightningReceive({ memo: data.message });
-            } else if (data?.action === 'skip') {
-              await handleLightningReceive({ memo: undefined });
-            }
+            await handleLightningReceive({
+              memo: data?.action === 'confirm' ? data.message : undefined,
+            });
             setLoading(false);
           },
         });
         break;
       case 'ecashSendConfirmation':
-        // check balance
-        if (unit === 'sat' ? balance < amount : balance < amount * 100) {
-          showMessage(
-            'insufficient_balance',
-            { amount: unit === 'sat' ? amount : amount * 100, unit, fee: 0 },
-            { emoji: '🚨' }
-          );
-          setLoading(false);
-          return;
-        }
         SheetManager.show('transaction-message', {
           onClose: async (data) => {
-            if (data?.action === 'confirm') {
-              await handleEcashSend({ message: data.message });
-            } else if (data?.action === 'skip') {
-              await handleEcashSend({ message: undefined });
-            }
+            await handleEcashSend({
+              message: data?.action === 'confirm' ? data.message : undefined,
+            });
             setLoading(false);
           },
         });
         break;
+      case 'lightningSendConfirmation':
+        if (!params.lnUrlOrAddress) {
+          showMessage('No invoice provided', {}, { emoji: '🚨' });
+          return;
+        }
+
+        const { invoice } = await requestInvoice({
+          lnUrlOrAddress: params.lnUrlOrAddress,
+          tokens: utils.toSats(amount),
+        });
+
+        if (!invoice) {
+          showMessage('No invoice provided', {}, { emoji: '🚨' });
+          return;
+        }
+
+        if (!selectedMint) {
+          showMessage('No mint selected', {}, { emoji: '🚨' });
+          return;
+        }
+
+        const meltQuote = await createMeltQuote(selectedMint, invoice);
+
+        router.push({
+          pathname: `/${params.to}` as any,
+          params: {
+            meltQuote: JSON.stringify(meltQuote),
+          },
+        });
+
+        setLoading(false);
+        break;
       default:
-        await handleDefaultSend();
         setLoading(false);
         break;
     }
@@ -263,8 +193,6 @@ function ModalScreen() {
   useEffect(() => {
     if (params?.paymentRequest && params?.amount) {
       setIsValidAmount(true);
-      // setIsValidMint(!!selectedMint);
-      // handleNext();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMint]);
@@ -277,18 +205,7 @@ function ModalScreen() {
     }
 
     const scanning: ScanningData = { data: text };
-    setLoading(true);
-    const res = await barcodeHandler({
-      scanning,
-      urDecoder,
-      unit,
-      selectedMint,
-      setLoading,
-      balance,
-    });
-    if (res.isErr()) {
-      showMessage(res.error.message || 'An error occurred', {}, { emoji: '🚨' });
-    }
+    await processPaymentString(scanning);
   };
 
   const renderButtons = () => {
@@ -414,16 +331,15 @@ function ModalScreen() {
           {(() => {
             const profile = params?.profile ? JSON.parse(params.profile) : null;
             return profile?.picture || profile?.image ? (
-              <Image
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 1000,
-                }}
-                source={{ uri: profile.picture || profile.image }}
+              <Avatar
+                picture={profile.picture || profile.image}
+                size={28}
+                variant="person"
+                alt={profile.name || 'User Avatar'}
+                name={profile.name}
               />
             ) : (
-              <View />
+              <Avatar size={28} variant="person" alt="User Avatar" />
             );
           })()}
         </TouchableOpacity>

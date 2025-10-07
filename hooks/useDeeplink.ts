@@ -1,21 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
-import { barcodeHandler } from 'helper/payment-handler/handlers';
 import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
-import { useNavigation } from 'expo-router';
-import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { showMessage } from 'helper/popup/popups';
+import { useProcessPaymentString } from './useProcessPaymentString';
 
 export const useDeeplink = () => {
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const selectedMint = useSelector(memoizedGetSelectedMint);
-  const navigation = useNavigation();
   const url = Linking.useURL();
 
-  // Hold a single URDecoder instance across renders
-  const urDecoderRef = useRef<URDecoder>(new URDecoder());
+  const { processPaymentString } = useProcessPaymentString({
+    unit: 'sat',
+    selectedMint,
+    isFocused: true,
+  });
 
   useEffect(() => {
     // bail out early if we don’t have a URL or the user isn’t fully loaded
@@ -33,19 +33,16 @@ export const useDeeplink = () => {
 
       if (isOurScheme && isValidHost) {
         // TS knows hostname is string here
-        const res = await barcodeHandler({
-          scanning: { data: hostname },
-          navigation,
-          urDecoder: urDecoderRef.current,
-          unit: 'sat',
-          selectedMint,
-          setLoading: () => { },
-        });
-
-        if (res.isErr()) {
-          showMessage(res.error.message, {}, { emoji: '🚨' });
+        try {
+          await processPaymentString({ data: hostname });
+        } catch (error) {
+          showMessage(
+            error instanceof Error ? error.message : 'Unknown error',
+            {},
+            { emoji: '🚨' }
+          );
         }
       }
     })();
-  }, [url, currentProfile.pubkey, selectedMint, navigation]);
+  }, [url, currentProfile.pubkey, selectedMint, processPaymentString]);
 };

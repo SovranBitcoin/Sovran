@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from 'react';
-import { Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Dimensions, AppState } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
-import { URDecoder } from '@gandlaf21/bc-ur';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
@@ -11,8 +10,8 @@ import { useSelector } from 'react-redux';
 import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import Icon from 'assets/icons';
-import { barcodeHandler } from 'helper/payment-handler/handlers';
 import { View, HStack } from 'components/ui/View';
+import { useProcessPaymentString } from '@/hooks/useProcessPaymentString';
 
 // Screen dimensions
 const { width: screenWidth } = Dimensions.get('window');
@@ -29,47 +28,48 @@ interface ScanningData {
 const Camera: React.FC = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
   const { getPrimaryColor } = useTheme();
-  const [scanned, setScanned] = useState<boolean>(false);
-  const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const [progress, setProgress] = useState<number>(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [hasPermission] = useCameraPermissions();
   const selectedMint = useSelector(memoizedGetSelectedMint);
+  const [isFocused, setIsFocused] = useState<boolean>(true);
+  const appStateRef = useRef<string>(AppState.currentState);
+
+  const { processPaymentString, reset } = useProcessPaymentString({
+    unit,
+    selectedMint,
+    isFocused,
+    onProgress: setProgress,
+    onLoading: setLoading,
+    onScanned: () => {}, // We'll handle this in the hook
+  });
+
+  // Monitor app state changes
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
 
   // Reset state when component comes into focus
   useFocusEffect(
     useCallback(() => {
-      setScanned(false);
-      setLoading(false);
-      setProgress(0);
-      setUrDecoder(new URDecoder());
-    }, [])
+      setIsFocused(true);
+      reset();
+
+      return () => {
+        setIsFocused(false);
+      };
+    }, [reset])
   );
 
   const toggleFlashlight = useCallback((): void => {
     setFlashlightOn((prev) => !prev);
   }, []);
-
-  const handleClipboardPress = useCallback(async (): Promise<void> => {
-    const text = await Clipboard.getStringAsync();
-    if (!text) return;
-
-    const scanning: ScanningData = { data: text };
-    setLoading(true);
-    const res = await barcodeHandler({
-      scanning,
-      urDecoder,
-      unit,
-      selectedMint,
-      setProgress,
-      setLoading,
-      setScanned,
-    });
-    if (res.isErr()) {
-      showMessage(res.error.message, {}, { emoji: '🚨' });
-    }
-  }, [urDecoder, unit, selectedMint]);
 
   const handleCameraReady = useCallback(async (): Promise<void> => {
     try {
@@ -89,28 +89,13 @@ const Camera: React.FC = () => {
     router.back();
   }, []);
 
-  const handleBarcodeScanned = useCallback(
-    async (scanning: ScanningData): Promise<void> => {
-      // Note: Removed navigation.isFocused() check as it's not needed with new router
+  const handleClipboardPress = useCallback(async (): Promise<void> => {
+    const text = await Clipboard.getStringAsync();
+    if (!text) return;
 
-      if (!scanned || scanning.data.startsWith('ur:')) {
-        setLoading(true);
-        const res = await barcodeHandler({
-          scanning,
-          urDecoder,
-          unit,
-          selectedMint,
-          setProgress,
-          setLoading,
-          setScanned,
-        });
-        if (res.isErr()) {
-          showMessage(res.error.message, {}, { emoji: '🚨' });
-        }
-      }
-    },
-    [scanned, urDecoder, unit, selectedMint]
-  );
+    const scanning: ScanningData = { data: text };
+    await processPaymentString(scanning);
+  }, [processPaymentString]);
 
   // Return empty container if no camera permissions
   if (!hasPermission?.granted) {
@@ -134,7 +119,7 @@ const Camera: React.FC = () => {
           barcodeTypes: ['qr'],
         }}
         onCameraReady={handleCameraReady}
-        onBarcodeScanned={handleBarcodeScanned}
+        onBarcodeScanned={processPaymentString}
       />
 
       {/* Close button in top left */}
