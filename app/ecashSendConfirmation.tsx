@@ -17,7 +17,7 @@ import {
 import { nip19 } from 'nostr-tools';
 import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
-import { useSend, usePaginatedHistory } from 'coco-cashu-react';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { showMessage, showSuccess } from 'helper/popup/popups';
 import { write } from 'helper/nfc';
@@ -33,7 +33,7 @@ import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { err, ok, Result } from 'neverthrow';
-import { MintQuoteTimeline } from './lightningReceiveConfirmation';
+import { MintQuoteTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 
 export function EcashSendConfirmation({
@@ -45,7 +45,6 @@ export function EcashSendConfirmation({
 }) {
   const { isTokenSpendable, receiveEcash } = useCashuOperations();
   const { getMintInfo } = useMintManagement();
-  const { send: _send, isSending: _isSending } = useSend();
   const [uri, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [sendingNostr, setSendingNostr] = useState(false);

@@ -1,10 +1,10 @@
-import React, { memo, useEffect, useState, useMemo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/ui/View';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
-import { useWindowDimensions, StyleSheet, ViewStyle } from 'react-native';
+import { useWindowDimensions, StyleSheet } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 /**
  * Circle background for the QR code center logo
  */
-export const Circle = memo(() => {
+const Circle = memo(() => {
   const { getPrimaryColor } = useTheme();
   return (
     <View
@@ -32,84 +32,12 @@ export const Circle = memo(() => {
 
 Circle.displayName = 'Circle';
 
-/**
- * QR code interface properties
- */
-interface QRCodeProps {
-  data: string;
-  padding?: number;
-  animate?: boolean;
-  hasBackground?: boolean;
-  gradient?: {
-    options: {
-      colors: string[];
-      start: [number, number];
-      end: [number, number];
-    };
-  };
-  preserveAspectRatio?: string;
-}
-
-/**
- * Basic QR code component
- */
-export const QRCode = memo(function QRCode({
-  padding = 0,
-  animate = false,
-  hasBackground = false,
-  ...props
-}: QRCodeProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-  const { width: w } = useWindowDimensions();
-  const width = Math.min(w, 600);
-
-  const containerStyle = useMemo(
-    (): ViewStyle => ({
-      ...(hasBackground ? {} : {}),
-    }),
-    [hasBackground]
-  );
-
-  return (
-    <View style={containerStyle}>
-      <LinearGradient
-        colors={
-          !animate
-            ? [getShadeColor('200'), getShadeColor('300')]
-            : [getPrimaryColor('700'), getPrimaryColor('700')]
-        }
-        className={hasBackground ? 'bg-primary-950' : ''}
-        style={{
-          ...(hasBackground
-            ? {
-                padding: 16,
-                borderRadius: 16,
-              }
-            : {}),
-        }}>
-        <EQRCode
-          color={getPrimaryColor('0')}
-          backgroundColor={'transparent'}
-          value={props.data}
-          size={width - 2 * padding}
-          {...props}
-        />
-      </LinearGradient>
-    </View>
-  );
-});
-
-/**
- * AnimatedQRCode props interface
- */
 interface AnimatedQRCodeProps {
   padding?: number;
-  hasLogo?: boolean;
-  variant?: 'primary' | 'secondary';
   unit: string;
   address: string;
   animate?: boolean;
-  hasBackground?: boolean;
+  variant?: 'primary' | 'secondary';
 }
 
 /**
@@ -117,93 +45,84 @@ interface AnimatedQRCodeProps {
  */
 export const AnimatedQRCode = memo(function AnimatedQRCode({
   padding = 10,
-  hasLogo = true,
   unit,
   address,
   animate = false,
-  hasBackground = true,
+  variant = 'primary',
 }: AnimatedQRCodeProps) {
-  const [index, setIndex] = useState<number>(0);
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const [index, setIndex] = useState(0);
   const [parts, setParts] = useState<string[]>([]);
-  const [fragmentLength, setFragmentLength] = useState<number>(0);
 
-  const styles = useMemo(() => createStyles(), []);
-
+  // Encode address for animated QR code
   useEffect(() => {
     if (!animate || !address) return;
 
     try {
       const messageBuffer = Buffer.from(address);
       const ur = UR.fromBuffer(messageBuffer);
-      const maxFragmentLength = 300;
-      const firstSeqNum = 0;
-      const encoder = new UREncoder(ur, maxFragmentLength, firstSeqNum);
+      const encoder = new UREncoder(ur, 300, 0);
       setParts(encoder.encodeWhole());
-      setFragmentLength(encoder.fragmentsLength);
     } catch (error) {
       console.error('Error encoding address:', error);
     }
   }, [address, animate]);
 
+  // Cycle through QR code parts
   useInterval(
-    () => {
-      setIndex((prevIndex) => (prevIndex + 1) % fragmentLength);
-    },
-    animate && fragmentLength > 0 ? 250 : null
+    () => setIndex((prev) => (prev + 1) % parts.length),
+    animate && parts.length > 0 ? 250 : null
   );
 
-  const currentQRData = useMemo((): string | null => {
-    if (animate && parts.length > 0 && fragmentLength > 0) {
-      return parts[index % fragmentLength];
-    } else if (!animate && address) {
-      return address;
-    }
-    return null;
-  }, [animate, parts, fragmentLength, index, address]);
+  const qrData = animate && parts.length > 0 ? parts[index] : address;
+  const width = Math.min(screenWidth, 600);
+  const isLocationUnit = unit.startsWith('location');
+  const gradientColors = animate
+    ? [getPrimaryColor('700'), getPrimaryColor('700')]
+    : [getShadeColor('200'), getShadeColor('300')];
 
-  const renderLogo = () => {
-    if (!hasLogo) return null;
-
-    const isLocationUnit = unit.startsWith('location');
-
-    return (
-      <View style={styles.logoContainer}>
+  return (
+    <View className="flex-row items-center justify-center bg-transparent">
+      {/* Logo */}
+      <View className="z-100 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-75">
         {isLocationUnit ? (
           <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
         ) : (
           <CurrencyIcon width={72} currency={unit} />
         )}
       </View>
-    );
-  };
 
-  return (
-    <View className="flex-row items-center justify-center bg-transparent">
-      {hasLogo && renderLogo()}
-      {hasLogo && <Circle />}
-      {currentQRData && (
-        <QRCode
-          animate={animate}
-          hasBackground={hasBackground}
-          data={currentQRData}
-          padding={padding}
+      <Circle />
+
+      {/* QR Code */}
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
+        <EQRCode
+          color={getPrimaryColor('0')}
+          backgroundColor="transparent"
+          value={qrData}
+          size={width - 2 * padding}
           preserveAspectRatio="none"
         />
-      )}
+      </LinearGradient>
     </View>
   );
 });
 
-const createStyles = () =>
-  StyleSheet.create({
-    logoContainer: {
-      width: 72,
-      height: 72,
-      position: 'absolute',
-      top: '50%' as any,
-      left: '50%' as any,
-      transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
-      zIndex: 100,
-      backgroundColor: 'transparent',
-    },
-  });
+const styles = StyleSheet.create({
+  logoContainer: {
+    width: 72,
+    height: 72,
+    position: 'absolute',
+    top: '50%' as any,
+    left: '50%' as any,
+    transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
+    zIndex: 100,
+    backgroundColor: 'transparent',
+  },
+  gradient: {
+    padding: 16,
+    borderRadius: 16,
+  },
+});
