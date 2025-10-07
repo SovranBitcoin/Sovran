@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { HStack } from './View';
 import { Text } from './Text';
-import { cn } from 'lib/utils';
+import { cn } from 'helper/utils';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';

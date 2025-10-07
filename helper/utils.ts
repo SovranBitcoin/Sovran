@@ -2,15 +2,11 @@ import { MintHistoryEntry } from 'coco-cashu-core';
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
 
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
 /**
  * Formats a number with appropriate suffixes (k, m, b) for large numbers
- * @param num - The number to format
- * @returns Formatted string with appropriate suffix
- *
- * @example
- * formatNumber(1500) // "1.5k"
- * formatNumber(1000000) // "1m"
- * formatNumber(1500000000) // "1.5b"
  */
 export function formatNumber(num: number): string {
   if (num >= 1000000000) {
@@ -26,8 +22,6 @@ export function formatNumber(num: number): string {
 
 /**
  * Checks if a mint history entry has expired based on its payment request
- * @param historyEntry - The mint history entry to check
- * @returns True if the payment request has expired
  */
 export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean {
   try {
@@ -46,4 +40,8 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
     console.error('Error decoding payment request:', error);
     return false;
   }
+}
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
