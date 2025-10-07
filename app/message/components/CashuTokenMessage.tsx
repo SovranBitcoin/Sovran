@@ -44,19 +44,24 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
 
   const handleRedeem = async () => {
     if (!unit) {
-      showMessage('No unit set', {}, { emoji: '🚨' });
+      showMessage({ message: 'No unit set', emoji: '🚨', type: 'error' });
       return;
     }
 
     try {
       await receiveEcash(token);
-      showMessage('funds_received', { amount, unit }, { emoji: '🎉' });
+      showMessage({
+        message: 'funds_received',
+        params: { amount, unit },
+        emoji: '🎉',
+        type: 'success',
+      });
     } catch (error) {
-      showMessage(
-        error instanceof Error ? error.message : 'Failed to receive ecash',
-        {},
-        { emoji: '🚨' }
-      );
+      showMessage({
+        message: error instanceof Error ? error.message : 'Failed to receive ecash',
+        emoji: '🚨',
+        type: 'error',
+      });
     }
   };
 

@@ -171,10 +171,13 @@ const ListRoute = () => {
     }
 
     if (payload?.requireBalance && mint.amount === 0) {
-      showMessage('insufficient_balance', {
-        amount: mint.amount,
-        unit: mint.unit,
-        fee: 0,
+      showMessage({
+        message: 'insufficient_balance',
+        params: {
+          amount: mint.amount,
+          unit: mint.unit,
+          fee: 0,
+        },
       });
       return;
     }
@@ -219,8 +222,12 @@ const ListRoute = () => {
       });
     } catch (e) {
       if (!(e instanceof Error) || e.message !== 'mint_change_failed') {
-        showMessage('general_error', {}, { emoji: '🚨' }, () => {
-          sheetRef.current?.hide();
+        showMessage({
+          message: 'general_error',
+          emoji: '🚨',
+          onClose: () => {
+            sheetRef.current?.hide();
+          },
         });
       }
     } finally {

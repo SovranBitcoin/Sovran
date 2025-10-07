@@ -76,8 +76,11 @@ function TabOneScreen() {
           'version' in latestVersionResult.value
         ) {
           if (semver.gt(latestVersionResult.value.version, version)) {
-            showMessage('latest_version', {
-              version: latestVersionResult.value.version,
+            showMessage({
+              message: 'latest_version',
+              params: {
+                version: latestVersionResult.value.version,
+              },
             });
           }
         }

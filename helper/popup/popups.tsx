@@ -38,7 +38,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   // Authentication & Permissions
   latest_version: {
     title: 'New Version Available',
-    text: ({ version }: { version: string }) =>
+    text: ({ version: _version }: { version: string }) =>
       `A new version of the app is available. Please update to the latest version.`,
     type: MESSAGE_TYPES.INFO,
     variant: 'persistent',
@@ -328,34 +328,54 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
 
-type ShowMessageOptions = {
-  buttons?: MessageButton[];
+interface ShowMessageConfig {
+  // Core message content
+  message: string | MessageCode;
+  params?: Record<string, any>;
+
+  // Visual customization
   emoji?: string;
+  variant?: 'alert' | 'persistent' | 'toast';
+
+  // Behavior
   dismissable?: boolean;
-  variant?: string;
-  [key: string]: any; // Allow additional properties
-};
+  duration?: number; // for auto-dismiss
 
-export const showMessage = (
-  messageCode: MessageCode,
-  params = {},
-  options: ShowMessageOptions = {},
-  onClose: ((data: unknown) => void) | undefined = undefined
-) => {
-  const config =
-    MESSAGE_CONFIGS[messageCode] || { title: messageCode } || MESSAGE_CONFIGS['general_error'];
+  // Actions
+  buttons?: MessageButton[];
+  onClose?: (data: unknown) => void;
 
-  const text = typeof config.text === 'function' ? config.text(params) : config.text;
+  // Type-specific overrides
+  type?: 'success' | 'error' | 'warning' | 'info';
+}
 
-  const variant = options.variant || config.variant || 'alert'; // Use config variant if available
+export const showMessage = (config: ShowMessageConfig | string) => {
+  // Handle both object config and simple string
+  if (typeof config === 'string') {
+    config = { message: config };
+  }
+
+  const { message, params = {}, ...options } = config;
+
+  // Handle both message codes and raw strings
+  const messageConfig =
+    typeof message === 'string' && MESSAGE_CONFIGS[message]
+      ? MESSAGE_CONFIGS[message]
+      : { title: message, text: message, type: MESSAGE_TYPES.INFO };
+
+  const text =
+    typeof messageConfig.text === 'function' ? messageConfig.text(params) : messageConfig.text;
+
+  const variant = options.variant || messageConfig.variant || 'alert';
+  const messageType = options.type || messageConfig.type || MESSAGE_TYPES.INFO;
 
   const payload = {
-    message: config.title,
-    buttons: config.buttons || [],
+    message: messageConfig.title,
+    buttons: options.buttons || messageConfig.buttons || [],
     submessage: text,
-    emoji: options.emoji || MESSAGE_EMOJIS[config.type] || MESSAGE_EMOJIS.ERROR,
+    emoji: options.emoji || MESSAGE_EMOJIS[messageType] || MESSAGE_EMOJIS.INFO,
     dismissable: options.dismissable ?? true,
-    variant, // Add variant to payload
+    variant,
     ...options,
   };
 
@@ -364,17 +384,9 @@ export const showMessage = (
   SheetManager.show('popup-sheet', {
     context: isModal ? undefined : 'global',
     payload,
-    onClose,
+    onClose: options.onClose,
   });
 };
-
-// Optional: Helper functions for common scenarios
-export const showSuccess = (
-  messageCode: MessageCode,
-  params: Record<string, any>,
-  options: Record<string, any> = {},
-  onClose?: (data: unknown) => void
-) => showMessage(messageCode, params, { ...options, type: MESSAGE_TYPES.SUCCESS }, onClose);
 
 // Export constants for use in other files
 export { MESSAGE_TYPES, MESSAGE_EMOJIS, MESSAGE_CONFIGS };

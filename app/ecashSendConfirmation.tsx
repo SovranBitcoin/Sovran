@@ -112,7 +112,7 @@ export function EcashSendConfirmation({
       const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
 
       if (!sendHistoryEntry.token) {
-        showMessage('Invalid token format', {}, {}, () => {});
+        showMessage({ message: 'Invalid token format', onClose: () => {} });
         return;
       }
 
@@ -128,7 +128,7 @@ export function EcashSendConfirmation({
       });
     } catch (error) {
       console.error('Failed to send via Nostr:', error);
-      showMessage('Failed to send via Nostr', {}, {}, () => {});
+      showMessage({ message: 'Failed to send via Nostr', onClose: () => {} });
     } finally {
       setSendingNostr(false);
     }
@@ -139,14 +139,12 @@ export function EcashSendConfirmation({
       // For ecash transactions, "cancelling" means receiving the token back
       // This effectively cancels the send transaction
       await receiveEcash(getEncodedTokenV4(sendHistoryEntry.token));
-      showMessage('Transaction cancelled successfully', {}, {}, () => onClose({}));
+      showMessage({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
     } catch (error) {
-      showMessage(
-        error instanceof Error ? error.message : 'Failed to cancel transaction',
-        {},
-        {},
-        () => onClose({})
-      );
+      showMessage({
+        message: error instanceof Error ? error.message : 'Failed to cancel transaction',
+        onClose: () => onClose({}),
+      });
     }
   };
 
@@ -187,26 +185,33 @@ export function EcashSendConfirmation({
             0
           );
 
-          showMessage(
-            'funds_sent',
-            { amount, unit: sendHistoryEntry.unit },
-            { emoji: '🎉' },
-            () => {
+          showMessage({
+            message: 'funds_sent',
+            params: { amount, unit: sendHistoryEntry.unit },
+            emoji: '🎉',
+            onClose: () => {
               router.dismissAll();
               router.push('/(drawer)/(tabs)');
               onClose({});
-            }
-          );
+            },
+          });
         } catch {
-          showMessage('Invalid token format', {}, { emoji: '⚠️' }, () => onClose({}));
+          showMessage({ message: 'Invalid token format', emoji: '⚠️', onClose: () => onClose({}) });
         }
       } else {
-        showMessage('ecash_transaction_pending', {}, { emoji: '❌' }, () => onClose({}));
+        showMessage({
+          message: 'ecash_transaction_pending',
+          emoji: '❌',
+          onClose: () => onClose({}),
+        });
       }
     } else {
-      showMessage('error_checking_status', { error: result.error.message }, { emoji: '⚠️' }, () =>
-        onClose({})
-      );
+      showMessage({
+        message: 'error_checking_status',
+        params: { error: result.error.message },
+        emoji: '⚠️',
+        onClose: () => onClose({}),
+      });
     }
     setIsCheckingStatus(false);
   };

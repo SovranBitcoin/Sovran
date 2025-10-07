@@ -82,7 +82,7 @@ const Camera: React.FC = () => {
   }, []);
 
   const handleGalleryPress = useCallback(async (): Promise<void> => {
-    showMessage('feature_coming_soon', {}, { emoji: '📸' });
+    showMessage({ message: 'feature_coming_soon', emoji: '📸', type: 'info' });
   }, []);
 
   const handleClosePress = useCallback((): void => {

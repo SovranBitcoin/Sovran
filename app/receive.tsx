@@ -83,12 +83,17 @@ const EcashLightningReceiver = () => {
     }
 
     if (!decodedText) {
-      showMessage('no_clipboard_address', {}, { emoji: '🚨' });
+      showMessage({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
       return;
     }
 
     if (!isValidEcashToken(decodedText)) {
-      showMessage('invalid_address', { address: decodedText }, { emoji: '🚨' });
+      showMessage({
+        message: 'invalid_address',
+        params: { address: decodedText },
+        emoji: '🚨',
+        type: 'error',
+      });
       return;
     }
 
@@ -125,7 +130,7 @@ const EcashLightningReceiver = () => {
 
   const handleCopyLightningAddress = useCallback(async () => {
     await Clipboard.setStringAsync(`${currentProfile.npub}@npubx.cash`);
-    showMessage('lightning_address_copied');
+    showMessage({ message: 'lightning_address_copied', type: 'success' });
   }, [currentProfile.npub]);
 
   const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;

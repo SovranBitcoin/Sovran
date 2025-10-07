@@ -39,18 +39,21 @@ export function EcashReceiveConfirmation({
     setLoading(true);
     try {
       await receiveEcash(token as string);
-      showMessage(
-        'funds_received',
-        { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
-        { emoji: '🎉' },
-        () => {
+      showMessage({
+        message: 'funds_received',
+        params: { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
+        emoji: '🎉',
+        onClose: () => {
           router.dismissAll();
           router.push('/(drawer)/(tabs)');
-        }
-      );
+        },
+      });
     } catch (error) {
       console.error(error);
-      showMessage(error instanceof Error ? error.message : 'Unknown error');
+      showMessage({
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: 'error',
+      });
     }
     setLoading(false);
   };

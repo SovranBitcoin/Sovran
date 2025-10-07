@@ -36,11 +36,11 @@ export const useDeeplink = () => {
         try {
           await processPaymentString({ data: hostname });
         } catch (error) {
-          showMessage(
-            error instanceof Error ? error.message : 'Unknown error',
-            {},
-            { emoji: '🚨' }
-          );
+          showMessage({
+            message: error instanceof Error ? error.message : 'Unknown error',
+            emoji: '🚨',
+            type: 'error',
+          });
         }
       }
     })();

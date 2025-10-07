@@ -107,7 +107,7 @@ export function PaymentInfo({
         ? popupMessage
         : (popupMessage[activeTab]?.name ?? 'Copied to clipboard');
 
-    showMessage(message);
+    showMessage({ message, type: 'success' });
   }, [link, selectedValue, popupMessage, activeTab]);
 
   const renderTabs = (): React.ReactElement | null => {

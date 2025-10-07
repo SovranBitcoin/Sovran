@@ -83,7 +83,7 @@ const PasscodeSettings: React.FC = () => {
                   setPasscode(code);
                   router.back();
                 } else {
-                  showMessage('passcode_not_match', {}, { emoji: '🚨' });
+                  showMessage({ message: 'passcode_not_match', emoji: '🚨', type: 'error' });
                 }
               },
             },

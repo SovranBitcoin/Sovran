@@ -314,10 +314,10 @@ export default function ModalScreen() {
                             onPress: async () => {
                               if (isContact) {
                                 dispatch(removeContact(pubkey));
-                                await showMessage('Contact removed');
+                                await showMessage({ message: 'Contact removed', type: 'success' });
                               } else {
                                 dispatch(addContact({ pubkey, profile }));
-                                await showMessage('Contact added');
+                                await showMessage({ message: 'Contact added', type: 'success' });
                               }
                             },
                           },
@@ -326,7 +326,10 @@ export default function ModalScreen() {
                             icon: 'la:user-slash',
                             text: 'Mute User',
                             onPress: async () => {
-                              await showMessage('User muted successfully');
+                              await showMessage({
+                                message: 'User muted successfully',
+                                type: 'success',
+                              });
                               dispatch(muteUser(pubkey));
                             },
                           },
@@ -335,7 +338,10 @@ export default function ModalScreen() {
                             icon: 'material-symbols:report-rounded',
                             text: 'Report User',
                             onPress: async () => {
-                              await showMessage('User reported successfully');
+                              await showMessage({
+                                message: 'User reported successfully',
+                                type: 'success',
+                              });
                               dispatch(reportUser(pubkey));
                             },
                           },

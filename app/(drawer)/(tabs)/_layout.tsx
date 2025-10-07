@@ -94,7 +94,9 @@ const TabLayout = () => {
   );
 
   const HeaderRight = () => (
-    <Pressable className="opacity-0" onPress={() => showMessage('not_implemented')}>
+    <Pressable
+      className="opacity-0"
+      onPress={() => showMessage({ message: 'not_implemented', type: 'info' })}>
       <HStack spacing={8}>
         <View className="bg-primary-800 rounded-full p-2">
           <Icon name="solar:card-bold" color={getPrimaryColor('0')} />

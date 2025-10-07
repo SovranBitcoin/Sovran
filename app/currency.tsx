@@ -74,7 +74,7 @@ function ModalScreen() {
 
   const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
     if (!selectedMint) {
-      showMessage('No mint selected', {}, { emoji: '🚨' });
+      showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
     }
 
@@ -95,7 +95,7 @@ function ModalScreen() {
 
   const handleEcashSend = async ({ message: _message }: { message?: string }) => {
     if (!selectedMint) {
-      showMessage('No mint selected', {}, { emoji: '🚨' });
+      showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
     }
 
@@ -145,7 +145,7 @@ function ModalScreen() {
         break;
       case 'lightningSendConfirmation':
         if (!params.lnUrlOrAddress) {
-          showMessage('No invoice provided', {}, { emoji: '🚨' });
+          showMessage({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           return;
         }
 
@@ -155,12 +155,12 @@ function ModalScreen() {
         });
 
         if (!invoice) {
-          showMessage('No invoice provided', {}, { emoji: '🚨' });
+          showMessage({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           return;
         }
 
         if (!selectedMint) {
-          showMessage('No mint selected', {}, { emoji: '🚨' });
+          showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
           return;
         }
 
@@ -191,7 +191,7 @@ function ModalScreen() {
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
-      showMessage('no_clipboard_address', {}, { emoji: '🚨' });
+      showMessage({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
       return;
     }
 

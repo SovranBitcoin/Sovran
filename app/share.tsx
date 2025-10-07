@@ -36,7 +36,7 @@ function ShareModal() {
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(data);
-    showMessage(config.popupMessage);
+    showMessage({ message: config.popupMessage, type: 'success' });
   }, [data, config.popupMessage]);
 
   return (

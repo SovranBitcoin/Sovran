@@ -20,7 +20,7 @@ const Profile = () => {
   const handleCopy = (text: string, messageKey: string) => {
     if (text) {
       Clipboard.setString(text);
-      showMessage(messageKey);
+      showMessage({ message: messageKey, type: 'success' });
     }
   };
 

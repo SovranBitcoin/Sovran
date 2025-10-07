@@ -214,24 +214,24 @@ const AddRoute = () => {
 
   const handleSelectCustomMint = () => {
     if (!url.trim()) {
-      showMessage('Please enter a mint URL');
+      showMessage({ message: 'Please enter a mint URL', type: 'warning' });
       return;
     }
 
     if (!looksLikeMintUrl(url)) {
-      showMessage('Please enter a valid mint URL');
+      showMessage({ message: 'Please enter a valid mint URL', type: 'warning' });
       return;
     }
 
     // Just select/check the mint - it will be added when user clicks the main "Add" button
     setSelectedMints((prev) => new Set([...prev, url]));
-    showMessage('Mint selected for addition');
+    showMessage({ message: 'Mint selected for addition', type: 'success' });
     reset();
   };
 
   const handleSave = async () => {
     if (selectedMints.size === 0) {
-      showMessage('Please select at least one mint to add');
+      showMessage({ message: 'Please select at least one mint to add', type: 'warning' });
       return;
     }
 
@@ -240,7 +240,7 @@ const AddRoute = () => {
 
       if (!CocoManager.isInitialized()) {
         console.error('❌ CocoManager not initialized');
-        showMessage('Manager not initialized. Please try again.');
+        showMessage({ message: 'Manager not initialized. Please try again.', type: 'error' });
         return;
       }
 
@@ -268,11 +268,14 @@ const AddRoute = () => {
       }
 
       if (errors.length === 0) {
-        showMessage(`Successfully added ${results.length} mint(s)`);
+        showMessage({ message: `Successfully added ${results.length} mint(s)`, type: 'success' });
       } else if (results.length > 0) {
-        showMessage(`Added ${results.length} mint(s), ${errors.length} failed`);
+        showMessage({
+          message: `Added ${results.length} mint(s), ${errors.length} failed`,
+          type: 'warning',
+        });
       } else {
-        showMessage('Failed to add any mints. Please try again.');
+        showMessage({ message: 'Failed to add any mints. Please try again.', type: 'error' });
         return;
       }
 
@@ -284,7 +287,7 @@ const AddRoute = () => {
       });
     } catch (err) {
       console.error('❌ Failed to add mints:', err);
-      showMessage('Failed to add mints. Please try again.');
+      showMessage({ message: 'Failed to add mints. Please try again.', type: 'error' });
     }
   };
 

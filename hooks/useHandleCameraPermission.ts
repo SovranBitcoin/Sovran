@@ -23,33 +23,14 @@ export function useHandleCameraPermission() {
     if (permission.canAskAgain) {
       const res = await requestPermission();
       if (res.granted) {
-        showMessage('camera_permission_granted');
+        showMessage({ message: 'camera_permission_granted', type: 'success' });
         return true;
       }
 
-      showMessage(
-        'camera_permission_denied',
-        {},
-        {
-          emoji: '🚨',
-          buttons: [
-            {
-              text: 'Open Settings',
-              onPress: () => {
-                Linking.openURL('app-settings:');
-              },
-            },
-          ],
-        }
-      );
-      return false;
-    }
-
-    showMessage(
-      'camera_permission_blocked',
-      {},
-      {
+      showMessage({
+        message: 'camera_permission_denied',
         emoji: '🚨',
+        type: 'error',
         buttons: [
           {
             text: 'Open Settings',
@@ -58,8 +39,23 @@ export function useHandleCameraPermission() {
             },
           },
         ],
-      }
-    );
+      });
+      return false;
+    }
+
+    showMessage({
+      message: 'camera_permission_blocked',
+      emoji: '🚨',
+      type: 'error',
+      buttons: [
+        {
+          text: 'Open Settings',
+          onPress: () => {
+            Linking.openURL('app-settings:');
+          },
+        },
+      ],
+    });
     return false;
   };
 
