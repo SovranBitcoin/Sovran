@@ -48,7 +48,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   unit,
   address,
   animate = false,
-  variant = 'primary',
+  variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
@@ -80,22 +80,11 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const width = Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('location');
   const gradientColors = animate
-    ? [getPrimaryColor('700'), getPrimaryColor('700')]
-    : [getShadeColor('200'), getShadeColor('300')];
+    ? ([getPrimaryColor('700'), getPrimaryColor('700')] as const)
+    : ([getShadeColor('200'), getShadeColor('300')] as const);
 
   return (
     <View className="flex-row items-center justify-center bg-transparent">
-      {/* Logo */}
-      <View className="z-100 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-75">
-        {isLocationUnit ? (
-          <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
-        ) : (
-          <CurrencyIcon width={72} currency={unit} />
-        )}
-      </View>
-
-      <Circle />
-
       {/* QR Code */}
       <LinearGradient colors={gradientColors} style={styles.gradient}>
         <EQRCode
@@ -103,9 +92,20 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
           backgroundColor="transparent"
           value={qrData}
           size={width - 2 * padding}
-          preserveAspectRatio="none"
         />
       </LinearGradient>
+
+      {/* Circle background for the logo */}
+      <Circle />
+
+      {/* Logo */}
+      <View style={styles.logoContainer}>
+        {isLocationUnit ? (
+          <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
+        ) : (
+          <CurrencyIcon width={72} currency={unit} />
+        )}
+      </View>
     </View>
   );
 });

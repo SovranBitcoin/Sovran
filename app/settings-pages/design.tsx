@@ -10,7 +10,7 @@ import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Tabs } from 'components/ui/Tabs';
 import Icon, { icons } from 'assets/icons';
-import { hexToRgb, rgbToHsl } from 'helper/colors';
+import { parseToHsl } from 'polished';
 import { useTheme } from 'providers/ThemeProvider';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -409,9 +409,7 @@ export default function ModalScreen() {
           return (
             <View key={grey} className={`bg-primary-${grey} h-16`}>
               <Text>{(greys as any)[grey]}</Text>
-              <Text>
-                {JSON.stringify(rgbToHsl(...Object.values(hexToRgb((greys as any)[grey]))))}
-              </Text>
+              <Text>{JSON.stringify(parseToHsl((greys as any)[grey]))}</Text>
             </View>
           );
         })}

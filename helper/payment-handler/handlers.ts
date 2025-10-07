@@ -1,12 +1,10 @@
 import {
-  checkIfAlreadyRedeemed,
   getLightningAmount,
   getMeltQuote,
   isValidEcashToken,
   isValidPaymentRequest,
 } from 'helper/cashuClient';
 
-import { getGiveaway } from 'app/ecashReceiveConfirmation';
 import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/ui/Haptics';
@@ -93,16 +91,6 @@ const handleEcash = async ({
   data: string;
   unit: string;
 }): Promise<HandlerResult> => {
-  const giveaway = getGiveaway({ token: data });
-  if (giveaway && 'id' in giveaway) {
-    if (checkIfAlreadyRedeemed(data)) {
-      return err(new Error('already_redeemed'));
-    }
-    const error = 'error' in giveaway ? (giveaway as any).error() : null;
-    if ('condition' in giveaway && !(giveaway as any).condition() && error) {
-      return err(new Error('general_error'));
-    }
-  }
   // Create a receive history entry for ecash receive
   const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
     id: `receive-${Date.now()}`,

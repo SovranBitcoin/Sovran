@@ -1,8 +1,5 @@
 import { decode } from '@gandlaf21/bolt11-decode';
-import { TransactionData } from 'helper/redux/cashu';
 import { store } from 'helper/redux/store';
-import { Platform } from 'react-native';
-import { convertTime } from 'helper/time';
 import { auditMint } from 'helper/apiClient';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { mnemonicToSeedSync } from 'bip39';
@@ -14,7 +11,6 @@ import {
   decodePaymentRequest,
   getDecodedToken,
   ProofState,
-  MintQuoteResponse,
   Proof,
 } from '@cashu/cashu-ts';
 
@@ -23,7 +19,6 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { toResult, toResultSync } from 'helper/toResult';
 import { ok, err, Result } from 'neverthrow';
 import { sha256 } from '@noble/hashes/sha256';
-import { getGiveaway } from 'app/ecashReceiveConfirmation';
 
 // TYPES
 
@@ -32,46 +27,6 @@ interface GetWalletParams {
   mintUrl?: string;
   profile: any;
   forceRefresh?: boolean;
-}
-
-interface BaseTransaction {
-  amount: number;
-  date: string;
-  type: 'ecash' | 'lightning';
-  transactionType: 'send' | 'receive';
-  unit: 'sat' | 'usd' | 'eur' | 'gbp' | string;
-  mintUrl: string;
-  paid: boolean;
-  memo?: string;
-  batchId?: string;
-
-  counter?: number;
-  nostr?: {
-    pubkey: string;
-  };
-}
-
-interface BaseLightningTransaction extends BaseTransaction {
-  type: 'lightning';
-  request: string;
-  lud16?: string;
-}
-
-interface LightningSendTransaction extends BaseLightningTransaction {
-  transactionType: 'send';
-  meltQuote: MeltQuoteResponse;
-  proofs: {
-    keep: Proof[];
-    send: Proof[];
-    change: Proof[];
-  };
-}
-
-interface LightningReceiveTransaction extends BaseLightningTransaction {
-  transactionType: 'receive';
-  mintQuote: MintQuoteResponse;
-  paymentRequest: string;
-  unifiedRequest: string;
 }
 
 interface GetMintParams {
@@ -254,42 +209,6 @@ export function getUsedProofs(currentProofs, keepProofs) {
 
   return usedProofs;
 }
-
-// HELPER FUNCTIONS
-
-export const giveaways = {
-  christmas_2024_ios: {
-    id: 'christmas_2024_ios',
-    start: new Date('2024-12-25T00:00:00Z'),
-    end: new Date('2025-01-05T23:59:59Z'),
-    private_key: process.env.CHRISTMAS_2024_IOS_PRIVATE_KEY,
-    public_key: process.env.CHRISTMAS_2024_IOS_PUBLIC_KEY,
-    note: "Sovran's Christmas Giveaway 🎁",
-    condition: () => Platform.OS === 'ios',
-    error: () =>
-      Platform.OS !== 'ios' && {
-        title: 'Not redeemable on Android',
-        message:
-          'This ecash token is part of our iOS Christmas giveaway and is only redeemable on that platform.',
-      },
-  },
-  christmas_2024_android: {
-    id: 'christmas_2024_android',
-    start: new Date('2024-12-25T00:00:00Z'),
-    end: new Date('2025-01-05T23:59:59Z'),
-    private_key: process.env.CHRISTMAS_2024_ANDROID_PRIVATE_KEY,
-    public_key: process.env.CHRISTMAS_2024_ANDROID_PUBLIC_KEY,
-    note: "Sovran's Christmas Giveaway 🎁",
-    condition: () => Platform.OS === 'android',
-    error: () =>
-      Platform.OS !== 'android' && {
-        title: 'Not redeemable on iOS',
-        message:
-          'This ecash token is part of our Android Christmas giveaway and is only redeemable on that platform.',
-      },
-  },
-};
-
 /**
  * Validates if a string is a valid ecash token
  */
@@ -310,18 +229,6 @@ export function getLightningAmount({ pr }) {
   if (res.isErr()) return null;
   const decodedPR = res.value;
   return decodedPR?.sections?.find((route) => route?.name === 'amount')?.value / 1000;
-}
-
-export function getRawExpiry({ pr }) {
-  if (!pr) return null;
-  const decodedPR = decode(pr as string);
-  const timestamp = decodedPR.sections.find((route) => route.name === 'timestamp')?.value;
-  const expiry = decodedPR.sections.find((route) => route.name === 'expiry')?.value || 3600;
-  return new Date((timestamp + expiry) * 1000);
-}
-
-export function getExpiry({ pr }) {
-  return convertTime(getRawExpiry({ pr }));
 }
 
 export function maybeConvertNpub(key: string) {
@@ -560,19 +467,6 @@ export async function restoreCounter({
 
   return firstEmptyStart;
 }
-
-export const checkIfAlreadyRedeemed = (token: string): boolean => {
-  const profileId = store.getState().nostr?.currentProfile?.id;
-  const transactions = memoizedGetTransactions({ id: profileId })(store.getState());
-
-  const giveaway = getGiveaway({ token });
-  if (!giveaway) return false;
-
-  return transactions.some(
-    (tx: TransactionData) =>
-      tx.privkey === giveaway.private_key && tx.transactionType === 'receive' && !tx.isRefund
-  );
-};
 
 export class AppError extends Error {
   type: string;

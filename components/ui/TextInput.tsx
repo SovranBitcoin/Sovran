@@ -5,12 +5,10 @@ import {
   StyleProp,
   TextStyle,
 } from 'react-native';
-import TextInputBase from './TextInputBase';
 import { useTheme } from 'providers/ThemeProvider';
 
 /**
- * Custom TextInput component that wraps TextInputBase with default styling
- * based on the current theme.
+ * Custom TextInput component with default styling based on the current theme.
  */
 export interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextColor'> {
   style?: StyleProp<TextStyle>;
@@ -18,13 +16,22 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextC
 }
 
 const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }) => {
-  // Use useTheme hook for theme access to make component reactive to theme changes
   const { getPrimaryColor } = useTheme();
 
   return (
-    <TextInputBase
-      Component={RNTextInput}
-      style={style}
+    <RNTextInput
+      className="bg-primary-800 border-primary-600 text-primary-0 mb-0 rounded-[32px] border p-2.5 pl-4 font-bold"
+      style={[
+        {
+          shadowColor: getPrimaryColor('950'),
+          shadowOffset: { width: 1, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 6,
+          fontFamily: 'OverpassBold',
+          borderStyle: 'solid',
+        },
+        style,
+      ]}
       placeholderTextColor={placeholderTextColor || getPrimaryColor('300')}
       {...props}
     />
