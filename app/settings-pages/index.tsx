@@ -48,7 +48,7 @@ export const Section: React.FC<{
 };
 
 const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
 
   return (
     <TouchableOpacity
@@ -155,7 +155,7 @@ export const RowButton: React.FC<{
 };
 
 const ModalScreen = () => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const { currentProfile } = useNostr();
 
   const { showActionSheetWithOptions } = useActionSheet();

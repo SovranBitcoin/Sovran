@@ -73,7 +73,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
             maxWidth: '75%',
             minHeight: 100, // Ensure minimum height for content
           }}>
-          <Text className="text-primary-0 text-xs font-bold opacity-75">{decoded.mint}</Text>
+          <Text className="text-xs font-bold text-primary-0 opacity-75">{decoded.mint}</Text>
 
           <HStack justify="space-between" className="mt-2">
             <VStack>
@@ -87,7 +87,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
                 />
               )}
               {decoded.memo && (
-                <Text className="text-primary-0 bg-primary-0/10 mt-2 rounded-lg p-4 text-xs">
+                <Text className="bg-primary-0/10 mt-2 rounded-lg p-4 text-xs text-primary-0">
                   {decoded.memo}
                 </Text>
               )}

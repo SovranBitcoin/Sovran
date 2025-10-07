@@ -72,7 +72,6 @@ export function TransactionTimeline({ historyEntry }: TransactionTimelineProps) 
 
   const timeline = getTimeline();
   const currentState = timeline.find((item) => item.isCurrent)?.state || timeline[0].state;
-  const isExpired = currentState === EXPIRED_STATE;
 
   // Determine if we should show collapse/expand
   const canCollapse =

@@ -171,7 +171,7 @@ function ModalScreen() {
   );
 
   return (
-    <SafeAreaView className="bg-primary-950 flex-1">
+    <SafeAreaView className="flex-1 bg-primary-950">
       <SkeletonContainer
         backgroundColor={skeletonConfig.backgroundColor}
         highlightColor={skeletonConfig.highlightColor}
@@ -179,7 +179,7 @@ function ModalScreen() {
         animation={skeletonConfig.animation}>
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
-            className="bg-primary-950 flex-1"
+            className="flex-1 bg-primary-950"
             onScrollBeginDrag={handleScroll}
             scrollEventThrottle={16}>
             <View className="bg-primary-950 bg-transparent px-4">

@@ -61,7 +61,7 @@ function ProfileHeader() {
                 alt={currentProfile?.profile?.name || 'Profile'}
               />
               <VStack align="center" spacing={8}>
-                <Text weight="bold" size={20} className="text-primary-0 text-center">
+                <Text weight="bold" size={20} className="text-center text-primary-0">
                   {currentProfile?.profile?.name}
                 </Text>
                 <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />

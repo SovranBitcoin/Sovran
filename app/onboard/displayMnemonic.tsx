@@ -8,7 +8,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const { mnemonic } = useLocalSearchParams<{ mnemonic: string }>();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 

@@ -45,13 +45,13 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
         marginBottom: 16,
       }}>
       {item.icon && (
-        <View className="bg-primary-800 items-center justify-center rounded-lg p-4">
+        <View className="items-center justify-center rounded-lg bg-primary-800 p-4">
           <Icon name={item.icon} size={32} color={getPrimaryColor('0')} />
         </View>
       )}
       <Spacer size={8} />
       <Text
-        className="text-primary-100 text-center"
+        className="text-center text-primary-100"
         overpass
         heavy
         style={{

@@ -166,7 +166,7 @@ interface NameInputProps {
 }
 
 const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   return (
     <VStack spacing={16}>
       <Text weight="medium" size={14} style={styles.inputLabel}>
@@ -198,7 +198,7 @@ const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProp
 
 // Main RecoveryScreen component
 const RecoveryScreen = () => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const styles = createStyles(getPrimaryColor);
   const { setProfiles, setCurrentProfile } = useNostr();
 

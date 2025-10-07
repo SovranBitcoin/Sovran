@@ -75,12 +75,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   );
 
   // Helper function to render the appropriate value content based on the item type
-  function renderValueContent(
-    item: SectionItem,
-    titleText: string,
-    getPrimaryColor: (shade: string) => string,
-    special?: boolean
-  ) {
+  function renderValueContent(item: SectionItem, titleText: string, special?: boolean) {
     if (React.isValidElement(item.value)) {
       return (
         <HStack
@@ -132,17 +127,17 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
     // Handle npub format
     if (typeof item.value === 'string' && item.value?.startsWith?.('npub') && special) {
-      return renderPrefixedValue('npub', item.value.split('npub')[1], titleText, getPrimaryColor);
+      return renderPrefixedValue('npub', item.value.split('npub')[1], titleText);
     }
 
     // Handle creqA format
     if (typeof item.value === 'string' && item.value?.startsWith?.('creqA')) {
-      return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText, getPrimaryColor);
+      return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText);
     }
 
     // Handle lnbc1 format
     if (typeof item.value === 'string' && item.value?.startsWith?.('lnbc1') && special) {
-      return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText, getPrimaryColor);
+      return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText);
     }
 
     // Handle cashu format
@@ -153,7 +148,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     ) {
       const prefix = item.value.startsWith('cashuA') ? 'cashuA' : 'cashuB';
       const value = item.value.split(prefix)[1];
-      return renderPrefixedValue(prefix, value, titleText, getPrimaryColor);
+      return renderPrefixedValue(prefix, value, titleText);
     }
 
     // Handle bitcoin lightning+cashu format
@@ -198,12 +193,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   }
 
   // Helper function to render prefixed values (npub, creqA, etc.)
-  function renderPrefixedValue(
-    prefix: string,
-    value: string,
-    titleText: string,
-    getPrimaryColor: (shade: string) => string
-  ) {
+  function renderPrefixedValue(prefix: string, value: string, titleText: string) {
     return (
       <VStack align="center" className="flex-1" justify="center">
         <Text

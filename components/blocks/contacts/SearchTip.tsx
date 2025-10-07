@@ -12,7 +12,7 @@ export function SearchTip({ icon, text }: SearchTipProps) {
   return (
     <HStack spacing={0} align="center">
       <Icon name={icon} size={20} className="text-primary-300" />
-      <Text className="text-primary-200 flex-1 pl-2" size={14} overpass regular>
+      <Text className="flex-1 pl-2 text-primary-200" size={14} overpass regular>
         {text}
       </Text>
     </HStack>

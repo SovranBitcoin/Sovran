@@ -64,7 +64,7 @@ export default function ModalScreen() {
   const dispatch = useDispatch();
 
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
-  const { profiles, search, addMessage, currentProfile } = useNostr();
+  const { search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
   const { history: transactions } = usePaginatedHistory();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -203,7 +203,7 @@ export default function ModalScreen() {
       new Date(date).getTime()
     ).map((date, index) => (
       <VStack key={index}>
-        <Text className="text-primary-400 my-4 text-center text-sm font-bold">
+        <Text className="my-4 text-center text-sm font-bold text-primary-400">
           {moment(date).format('dddd, MMMM Do YYYY')}
         </Text>
         {timelineItemsGroupedByDate[date].map((item, idx) => (
@@ -280,7 +280,7 @@ export default function ModalScreen() {
                         size={72}
                       />
                       <Animated.View className="w-full pt-1.5">
-                        <Text className="text-primary-0 w-full text-base font-bold">
+                        <Text className="w-full text-base font-bold text-primary-0">
                           {displayName}
                         </Text>
                       </Animated.View>
@@ -452,7 +452,7 @@ export default function ModalScreen() {
           }}
           showsVerticalScrollIndicator={false}>
           {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
-            <Text className="text-primary-400 my-4 text-center text-sm font-bold">
+            <Text className="my-4 text-center text-sm font-bold text-primary-400">
               No activity yet
             </Text>
           ) : (

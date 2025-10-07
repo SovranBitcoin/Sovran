@@ -1,6 +1,5 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View';
 import { HistoryEntry } from 'coco-cashu-core';
@@ -12,7 +11,6 @@ interface HistoryEntryDebugCodeProps {
 export function HistoryEntryDebugCode({ historyEntry }: HistoryEntryDebugCodeProps) {
   return null;
   // eslint-disable-next-line no-unreachable
-  const { getPrimaryColor } = useTheme();
   return (
     <ScrollView horizontal>
       <View

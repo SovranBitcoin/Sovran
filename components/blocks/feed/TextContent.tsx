@@ -28,7 +28,7 @@ export const extractUrls = (text: string) => {
 };
 
 // Component to render text with nostr profile references
-const NostrProfileReference = ({ nostrRef, theme }: { nostrRef: string; theme: any }) => {
+const NostrProfileReference = ({ nostrRef }: { nostrRef: string }) => {
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [relays, setRelays] = useState<string[]>([]);
 
@@ -159,7 +159,7 @@ export function TextContent({
     <View>
       {hasNostrProfiles ? (
         <Text
-          className="text-primary-0 mb-2"
+          className="mb-2 text-primary-0"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
@@ -169,7 +169,7 @@ export function TextContent({
         </Text>
       ) : (
         <HighlightText
-          className="text-primary-0 mb-2"
+          className="mb-2 text-primary-0"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
@@ -186,7 +186,7 @@ export function TextContent({
       {contentWithoutUrls?.length > 200 && (
         <TouchableOpacity onPress={() => setShowFullText(!showFullText)}>
           <Text
-            className="text-primary-300 mb-1 text-right"
+            className="mb-1 text-right text-primary-300"
             style={{
               fontFamily: 'OverpassBold',
               fontSize,

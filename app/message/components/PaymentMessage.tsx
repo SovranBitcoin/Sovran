@@ -54,12 +54,12 @@ const TransactionComponent = ({
           minHeight: 70, // Ensure minimum height for content
         }}>
         <View className="mb-1 rounded-2xl bg-black/25 p-1">
-          <Text className="text-primary-0 text-center text-sm font-bold">
+          <Text className="text-center text-sm font-bold text-primary-0">
             {isReceived ? 'You received' : 'You sent'}
           </Text>
         </View>
-        <Text className="text-primary-0 mb-2 text-base font-black">{formattedAmount}</Text>
-        <Text className="text-primary-0 text-right text-xs font-bold opacity-75">
+        <Text className="mb-2 text-base font-black text-primary-0">{formattedAmount}</Text>
+        <Text className="text-right text-xs font-bold text-primary-0 opacity-75">
           {transaction?.date ? convertTime(new Date(transaction.date)) : null}
         </Text>
       </LinearGradient>

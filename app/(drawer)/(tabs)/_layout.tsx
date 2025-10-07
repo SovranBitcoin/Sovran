@@ -49,7 +49,7 @@ const TabBarBackground = () => {
 };
 
 const PaymentsHeaderTitle = ({ navigation }: { navigation: any }) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const screenWidth = Dimensions.get('window').width;
   const searchContainerWidth = screenWidth - PROFILE_AVATAR_SIZE + SPACING_SM;
   const marginOffset = -(PROFILE_AVATAR_SIZE + SPACING_XS);
@@ -98,7 +98,7 @@ const TabLayout = () => {
       className="opacity-0"
       onPress={() => popup({ message: 'not_implemented', type: 'info' })}>
       <HStack spacing={8}>
-        <View className="bg-primary-800 rounded-full p-2">
+        <View className="rounded-full bg-primary-800 p-2">
           <Icon name="solar:card-bold" color={getPrimaryColor('0')} />
         </View>
         <Spacer size={8} />

@@ -1,7 +1,6 @@
 import React from 'react';
 import { ColorValue } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
 import { VStack } from 'components/ui/View';
 import { ButtonHandler, ButtonHandlerButton } from 'components/ui/ButtonHandler';
@@ -25,7 +24,6 @@ export function OnboardingLayout({
   actions,
   children,
 }: OnboardingLayoutProps) {
-  const { getPrimaryColor } = useTheme();
   const handleNext = () => router.push(nextScreen || '/(drawer)/(tabs)');
   const handleBack = () => router.back();
 
@@ -34,7 +32,7 @@ export function OnboardingLayout({
       align="center"
       justify="space-between"
       flex={1}
-      className={`bg-primary-950 h-full p-4 ${children ? '' : 'pt-64'}`}>
+      className={`h-full bg-primary-950 p-4 ${children ? '' : 'pt-64'}`}>
       {children ? (
         children
       ) : (

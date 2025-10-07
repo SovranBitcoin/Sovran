@@ -226,19 +226,19 @@ export default function RestoreChoiceScreen() {
           style={{ paddingHorizontal: 32 }}>
           <Icon name="fa6-solid:triangle-exclamation" size={48} color="#9ca3af" />
           <Spacer size={16} />
-          <Text className="text-primary-0 text-center text-xl font-bold">
+          <Text className="text-center text-xl font-bold text-primary-0">
             Unable to Load Account
           </Text>
           <Spacer size={12} />
-          <Text className="text-primary-300 text-center text-base leading-6">
+          <Text className="text-center text-base leading-6 text-primary-300">
             {error || "We couldn't find account information."}
           </Text>
           <Spacer size={32} />
           <TouchableOpacity
-            className="bg-primary-0 w-full items-center justify-center rounded-xl"
+            className="w-full items-center justify-center rounded-xl bg-primary-0"
             style={{ paddingVertical: 16 }}
             onPress={handleSkip}>
-            <Text className="text-primary-950 text-base font-semibold">
+            <Text className="text-base font-semibold text-primary-950">
               Continue to Create New Account
             </Text>
           </TouchableOpacity>
@@ -261,7 +261,7 @@ export default function RestoreChoiceScreen() {
             <View className="bg-primary-950" style={{ flex: 1 }}>
               <VStack
                 align="center"
-                className="bg-primary-800 border-primary-700 rounded-2xl"
+                className="rounded-2xl border-primary-700 bg-primary-800"
                 style={{
                   padding: 12,
                   borderWidth: 1,
@@ -276,7 +276,7 @@ export default function RestoreChoiceScreen() {
                   <View style={{ marginRight: 8 }}>
                     {!profileInfo ? (
                       <View
-                        className="bg-primary-700 border-primary-700 h-[48px] w-[48px] items-center justify-center rounded-full"
+                        className="h-[48px] w-[48px] items-center justify-center rounded-full border-primary-700 bg-primary-700"
                         style={{
                           borderWidth: 2,
                         }}>
@@ -295,7 +295,7 @@ export default function RestoreChoiceScreen() {
                       />
                     ) : (
                       <View
-                        className="bg-primary-700 border-primary-700 h-[72px] w-[72px] items-center justify-center rounded-full"
+                        className="h-[72px] w-[72px] items-center justify-center rounded-full border-primary-700 bg-primary-700"
                         style={{
                           borderWidth: 2,
                         }}>

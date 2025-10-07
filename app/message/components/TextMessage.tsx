@@ -33,9 +33,9 @@ const MessageComponent = ({ message, isReceived }: { message: Message; isReceive
           maxWidth: '75%',
           minHeight: 50, // Ensure minimum height for content
         }}>
-        <Text className="text-primary-0 mb-2 text-base font-black">{message.content}</Text>
+        <Text className="mb-2 text-base font-black text-primary-0">{message.content}</Text>
         <HStack className="justify-end">
-          <Text className="text-primary-0 text-xs font-bold opacity-75">
+          <Text className="text-xs font-bold text-primary-0 opacity-75">
             {message.created_at ? convertTime(new Date(message.created_at * 1000)) : 'Unknown time'}
           </Text>
         </HStack>

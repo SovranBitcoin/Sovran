@@ -200,7 +200,7 @@ export const Transactions = React.memo(
                     <Text size={14} heavy color={getPrimaryColor('100')}>
                       {section.title}
                     </Text>
-                    <View className="bg-primary-900 rounded-lg" blur>
+                    <View className="rounded-lg bg-primary-900" blur>
                       {section.data.map((historyEntry) => {
                         const key = (() => {
                           if (historyEntry.id) return historyEntry.id;
@@ -225,7 +225,7 @@ export const Transactions = React.memo(
                           }>
                           <View
                             blur
-                            className="bg-primary-800 border-primary-700 flex items-center rounded-lg border p-3">
+                            className="flex items-center rounded-lg border border-primary-700 bg-primary-800 p-3">
                             <Text size={14} bold>
                               View all ({filteredHistory.length})
                             </Text>

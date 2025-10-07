@@ -34,7 +34,7 @@ export interface BadgeProps
 }
 
 function Badge({ className, variant, icon, size = 12, color, children, ...props }: BadgeProps) {
-  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
   const getVariantStyles = () => {
     switch (variant) {

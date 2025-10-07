@@ -39,7 +39,7 @@ const BottomButtons = ({
   buttonStyle,
   textStyle,
 }: BottomButtonsProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const styles = createStyles(getPrimaryColor);
   const Stack = vertical ? VStack : HStack;
   const spacing = vertical ? 12 : 8;

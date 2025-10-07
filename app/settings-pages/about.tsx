@@ -2,7 +2,6 @@ import React from 'react';
 import { Button } from 'components/ui/Button';
 import { Linking, ScrollView, Text } from 'react-native';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { VStack, Spacer } from 'components/ui/View';
@@ -19,8 +18,6 @@ interface ChangelogSectionProps {
 }
 
 export default function ModalScreen() {
-  const { getPrimaryColor } = useTheme();
-
   const ChangelogSection = ({ title, items, emoji }: ChangelogSectionProps) => (
     <VStack spacing={8} style={{ marginBottom: 16 }}>
       <Text

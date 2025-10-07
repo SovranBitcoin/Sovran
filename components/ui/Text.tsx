@@ -148,7 +148,7 @@ function getFamilyFromProps(props: CustomTextProps): string {
 }
 
 export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const { style, children, ...otherProps } = props;
 
   const weight = getWeightFromProps(props);

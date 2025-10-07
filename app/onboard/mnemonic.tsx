@@ -26,8 +26,8 @@ const GRID_COLS = 3;
 const TOTAL_WORDS = GRID_ROWS * GRID_COLS;
 const VERIFICATION_INDICES = [2, 5, 11]; // Fixed indices for predictability
 
-const RecoveryScreen: React.FC<{}> = () => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+const RecoveryScreen = () => {
+  const { getPrimaryColor } = useTheme();
   const styles = createStyles(getPrimaryColor);
   const { type = 'recover', mnemonic = null } = useLocalSearchParams<{
     type?: string;

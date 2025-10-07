@@ -197,7 +197,7 @@ const StatsGrid = ({
   totalMints?: number;
   totalMelts?: number;
 }) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const stats = [
     {
       label: 'Success Rate',
@@ -235,7 +235,7 @@ const StatsGrid = ({
         <View key={index} className="w-1/2 p-1.5">
           <VStack
             justify="space-between"
-            className="border-primary-700 bg-primary-800 rounded-xl border p-4"
+            className="rounded-xl border border-primary-700 bg-primary-800 p-4"
             style={{
               shadowColor: getPrimaryColor('950'),
               shadowOffset: { width: 0, height: 2 },
@@ -243,18 +243,18 @@ const StatsGrid = ({
               shadowRadius: 8,
               elevation: 3,
             }}>
-            <Text className="text-primary-200 mb-1 text-xs font-semibold uppercase tracking-wide">
+            <Text className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary-200">
               {stat.label}
             </Text>
 
             <Text
-              className={`text-primary-0 mb-0.5 text-2xl font-semibold leading-7 tracking-tight ${
+              className={`mb-0.5 text-2xl font-semibold leading-7 tracking-tight text-primary-0 ${
                 stat.accent ? 'text-2xl leading-8' : ''
               }`}>
               {stat.value}
             </Text>
 
-            <Text className="text-primary-300 text-xs leading-4 tracking-wide opacity-80">
+            <Text className="text-xs leading-4 tracking-wide text-primary-300 opacity-80">
               {stat.description}
             </Text>
           </VStack>
@@ -460,11 +460,11 @@ const InfoRoute = () => {
                 {renderMintIcon()}
               </DonutChart>
             </VStack>
-            <Text className="text-primary-0 mb-1 text-center text-3xl font-bold">
+            <Text className="mb-1 text-center text-3xl font-bold text-primary-0">
               {mintInfo?.name || 'Loading...'}
             </Text>
             {mintInfo?.version && (
-              <Text className="text-primary-100 text-center text-sm">{mintInfo.version}</Text>
+              <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
             )}
           </VStack>
         </ScrollView>
@@ -542,9 +542,9 @@ const InfoRoute = () => {
               {renderMintIcon()}
             </DonutChart>
           </VStack>
-          <Text className="text-primary-0 mb-1 text-center text-3xl font-bold">{displayName}</Text>
+          <Text className="mb-1 text-center text-3xl font-bold text-primary-0">{displayName}</Text>
           {mintInfo?.version && (
-            <Text className="text-primary-100 text-center text-sm">{mintInfo.version}</Text>
+            <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
           )}
 
           {/* Stats Grid */}
