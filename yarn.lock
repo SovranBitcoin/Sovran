@@ -6901,11 +6901,6 @@ is-unicode-supported@^0.1.0:
   resolved "https://registry.npmjs.org/is-unicode-supported/-/is-unicode-supported-0.1.0.tgz"
   integrity sha512-knxG2q4UC3u8stRGyAVJCOdxFmv5DZiRcdlIaAQXAbSfJya+OhopNotLQrstBhququ4ZpuKbDc/8S6mgXgPFPw==
 
-is-url@^1.2.4:
-  version "1.2.4"
-  resolved "https://registry.npmjs.org/is-url/-/is-url-1.2.4.tgz"
-  integrity sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==
-
 is-weakmap@^2.0.2:
   version "2.0.2"
   resolved "https://registry.npmjs.org/is-weakmap/-/is-weakmap-2.0.2.tgz"
@@ -7511,10 +7506,10 @@ link-preview-js@^3.0.5:
     cheerio "1.0.0-rc.11"
     url "0.11.0"
 
-lnurl-pay@^4.0.0:
-  version "4.0.1"
-  resolved "https://registry.npmjs.org/lnurl-pay/-/lnurl-pay-4.0.1.tgz"
-  integrity sha512-t7OL7ugmlsEdTEoQGaUyXHBBrrLJG9lfgzCy6dLMBmnZcWDHYu63TqW+lDJR1Y8RWVJFhZiXd/K1E7FXKDa9uA==
+lnurl-pay@^5.0.2:
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/lnurl-pay/-/lnurl-pay-5.0.2.tgz#ead71e45f40abbdfa0fc5a19fa97035e97f00d33"
+  integrity sha512-IlDpfx/DCXcK2O7q+xWYHIw+QLjyILSPc50ApivVxgPcRQpIRStywkjkg5ddfWyYhTzQzARqbuBNkqcyuzPXxA==
   dependencies:
     "@aws-crypto/sha256-js" "^5.2.0"
     aes-js "^3.1.2"
@@ -7526,7 +7521,6 @@ lnurl-pay@^4.0.0:
     browserify-zlib "^0.2.0"
     buffer "^6.0.3"
     https-browserify "^1.0.0"
-    is-url "^1.2.4"
     stream-browserify "^3.0.0"
     stream-http "^3.2.0"
     tslib "^2.8.1"

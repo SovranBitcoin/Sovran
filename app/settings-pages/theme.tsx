@@ -9,7 +9,6 @@ import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/ui/SearchableList';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { BACKGROUND_IMAGES } from 'helper/backgroundImages';
 
 // An array of available themes
 const themes = [
@@ -23,7 +22,12 @@ const themes = [
 ];
 
 // Background image themes
-const backgroundImageThemes = ['royalpurple', 'mysticblue', 'cosmicpurple', 'deepocean'];
+export const backgroundImageThemes = {
+  royalpurple: require('assets/images/backgrounds/royalpurple.png'),
+  mysticblue: require('assets/images/backgrounds/mysticblue.png'),
+  cosmicpurple: require('assets/images/backgrounds/cosmicpurple.png'),
+  deepocean: require('assets/images/backgrounds/deepocean.png'),
+};
 
 // Mapping of theme names to user-friendly names (only for used themes)
 const themeNameMap: Record<string, string> = {
@@ -47,14 +51,14 @@ function ThemeSettings() {
   const { setTheme, setBackgroundImage } = useSettings();
 
   // Combine regular themes and background image themes
-  const allThemes = [...themes, ...backgroundImageThemes];
+  const allThemes = [...themes, ...Object.keys(backgroundImageThemes)];
 
   const filteredThemes = allThemes.filter((theme) =>
     theme.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const handleThemePress = (themeName: string) => {
-    if (backgroundImageThemes.includes(themeName)) {
+    if (Object.keys(backgroundImageThemes).includes(themeName)) {
       // For background image themes, set both theme and background image
       setTheme(themeName);
       setBackgroundImage(themeName);
@@ -68,12 +72,12 @@ function ThemeSettings() {
 
   const renderThemeIcon = (themeName: string) => {
     // Check if it's a background image theme
-    if (backgroundImageThemes.includes(themeName)) {
-      const backgroundImage = BACKGROUND_IMAGES[themeName];
+    if (Object.keys(backgroundImageThemes).includes(themeName)) {
+      const backgroundImage = backgroundImageThemes[themeName];
       return (
         <View className="h-12 w-12 overflow-hidden rounded-full">
           <Image
-            source={backgroundImage?.source}
+            source={backgroundImage}
             style={{
               width: '100%',
               height: '100%',

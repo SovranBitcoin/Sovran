@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { memoizedGetCurrentProfile } from 'helper/redux/nostr';
 import { showMessage } from 'helper/popup/popups';
-import { useProcessPaymentString } from './useProcessPaymentString';
+import { useProcessPaymentString } from './coco/useProcessPaymentString';
 
 export const useDeeplink = () => {
   const currentProfile = useSelector(memoizedGetCurrentProfile);

@@ -91,7 +91,7 @@
     "intl": "^1.2.5",
     "light-bolt11-decoder": "^3.2.0",
     "link-preview-js": "^3.0.5",
-    "lnurl-pay": "^4.0.0",
+    "lnurl-pay": "^5.0.2",
     "lodash": "^4.17.21",
     "nativewind": "^4.2.1",
     "neverthrow": "^8.2.0",

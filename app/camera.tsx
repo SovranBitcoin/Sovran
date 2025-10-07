@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { showMessage } from 'helper/popup/popups';
 import Icon from 'assets/icons';
 import { View, HStack } from 'components/ui/View';
-import { useProcessPaymentString } from '@/hooks/useProcessPaymentString';
+import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 
 // Screen dimensions
 const { width: screenWidth } = Dimensions.get('window');

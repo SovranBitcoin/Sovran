@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
-import { useSelector } from 'react-redux';
-import { memoizedGetBackgroundImage } from 'helper/redux/settings';
 import { View } from './View';
 import Image from './Image';
-import { BACKGROUND_IMAGES } from '@/helper/backgroundImages';
+import { backgroundImageThemes } from '@/app/settings-pages/theme';
+import { useTheme } from '@/providers/ThemeProvider';
 
 const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -29,9 +28,12 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
     return () => subscription.remove();
   }, [motion]);
 
-  const backgroundImage = useSelector(memoizedGetBackgroundImage);
+  // const backgroundImage = useSelector(memoizedGetBackgroundImage);
+  const theme = useTheme();
 
-  if (!backgroundImage)
+  const backgroundImageSource = backgroundImageThemes[theme.currentTheme];
+
+  if (!backgroundImageSource)
     return <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>;
 
   return (
@@ -43,7 +45,7 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
         },
       ]}>
       <Image
-        source={BACKGROUND_IMAGES[backgroundImage]?.source}
+        source={backgroundImageSource}
         style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
       />
     </Animated.View>

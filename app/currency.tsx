@@ -3,19 +3,11 @@ import { useSelector } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
 
-import {
-  useMintManagement,
-  useCashuOperations,
-  useLightningOperations,
-  useMelt,
-  useManager,
-} from 'hooks/coco';
+import { useCashuOperations, useLightningOperations, useMelt, useManager } from 'hooks/coco';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { useTheme } from 'providers/ThemeProvider';
-// Removed Redux Cashu import - now using Coco
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { showMessage } from 'helper/popup/popups';
-
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
@@ -26,11 +18,11 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useProcessPaymentString } from '@/hooks/useProcessPaymentString';
-// Removed memoizedGetCurrentProfile - no longer needed
+import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { requestInvoice, utils } from 'lnurl-pay';
 import { memoizedGetSelectedMint } from 'helper/redux/cashu';
 import { getEncodedToken } from '@cashu/cashu-ts';
+
 interface ScanningData {
   data: string;
   type?: string;
@@ -51,7 +43,6 @@ function ModalScreen() {
   }>();
 
   // Use Coco hooks instead of Redux
-  const { getBalances } = useMintManagement();
   const { sendEcash } = useCashuOperations();
   const { requestLightningInvoice } = useLightningOperations();
   const { createMeltQuote } = useMelt();
