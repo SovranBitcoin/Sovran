@@ -1,11 +1,8 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { store } from './redux/store';
-
-dayjs.extend(relativeTime);
 
 /**
  * Converts a Date object to a formatted date-time string
+ * Example: 10/07/2025 12:00:00
  */
 export function convertTime(date: Date): string {
   const dateFormat = {
@@ -23,7 +20,8 @@ export function convertTime(date: Date): string {
 }
 
 /**
- * Formats a date for display in a short format (e.g., "Jan 15")
+ * Formats a date for display in a short format
+ * Example: Oct 7
  */
 export function formatCustomDate(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -33,7 +31,8 @@ export function formatCustomDate(date: Date): string {
 }
 
 /**
- * Formats a date for display in a long format (e.g., "January 15, 2024")
+ * Formats a date for display in a long format
+ * Example: October 7, 2025
  */
 export function formatDate(date: string | number): string {
   const language = store.getState().settings?.settings.lang || 'en';
@@ -45,18 +44,29 @@ export function formatDate(date: string | number): string {
 }
 
 /**
- * Converts a Unix timestamp to a relative time string (e.g., "2h", "3d", "Jan 15, 2024")
+ * Converts a Date to a relative time string
+ * Example: "2h", "3d", "01/15/2025"
  */
-export function getTimeAgo(created_at: number): string {
-  const postDate = dayjs.unix(created_at);
-  const now = dayjs();
-  const diffSeconds = now.diff(postDate, 'second');
-  const diffMinutes = now.diff(postDate, 'minute');
-  const diffHours = now.diff(postDate, 'hour');
-  const diffDays = now.diff(postDate, 'day');
+export function getTimeAgo(date: Date | number | string): string {
+  const postDate = new Date(date);
+  const now = new Date();
 
+  // Calculate difference in milliseconds
+  const diffMs = now.getTime() - postDate.getTime();
+
+  // Convert to various units
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  // Return formatted string based on time difference
   if (diffDays >= 7) {
-    return postDate.format('MM/DD/YYYY');
+    // Format as MM/DD/YYYY for dates 7+ days ago
+    const month = String(postDate.getMonth() + 1).padStart(2, '0');
+    const day = String(postDate.getDate()).padStart(2, '0');
+    const year = postDate.getFullYear();
+    return `${month}/${day}/${year}`;
   } else if (diffDays > 0) {
     return `${diffDays}d`;
   } else if (diffHours > 0) {
@@ -66,25 +76,4 @@ export function getTimeAgo(created_at: number): string {
   } else {
     return `${diffSeconds}s`;
   }
-}
-
-/**
- * Converts a Unix timestamp to a Date object
- */
-export function unixToDate(timestamp: number): Date {
-  return new Date(timestamp * 1000);
-}
-
-/**
- * Converts a Date object to a Unix timestamp
- */
-export function dateToUnix(date: Date): number {
-  return Math.floor(date.getTime() / 1000);
-}
-
-/**
- * Gets the current Unix timestamp
- */
-export function getCurrentTimestamp(): number {
-  return Math.floor(Date.now() / 1000);
 }

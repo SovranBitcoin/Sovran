@@ -131,7 +131,6 @@ function TabOneScreen() {
           className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-
           <View
             className="p-4 pt-0"
             style={{ backgroundColor: opacity(getPrimaryColor('950'), 0.99) }}>

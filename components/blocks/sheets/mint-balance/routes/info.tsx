@@ -16,13 +16,7 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
-// migrate to non-skia package
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-
-// Extend dayjs with UTC plugin
-dayjs.extend(utc);
 
 // DonutChart component
 const DonutChart = ({

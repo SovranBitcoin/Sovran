@@ -63,7 +63,6 @@
     "coco-cashu-expo-sqlite": "^0.6.0",
     "coco-cashu-plugin-npc": "^2.0.0",
     "coco-cashu-react": "^1.1.0",
-    "dayjs": "^1.11.13",
     "eas-cli": "^16.0.1",
     "events": "^3.3.0",
     "expo": "^54.0.10",

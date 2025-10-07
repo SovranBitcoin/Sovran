@@ -17,15 +17,11 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Easing } from 'react-native-reanimated';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { SheetProvider } from 'react-native-actions-sheet';
-import { QueryClient } from '@tanstack/react-query';
 // import * as Sentry from '@sentry/react-native';
 import { NostrProvider } from 'nostr-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { bytesToHex } from '@noble/hashes/utils';
 import { nip04, nip19 } from 'nostr-tools';
-// migrate away from dayjs
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 
 // Import local components and utilities
 import { persistor, store } from 'helper/redux/store';
@@ -50,10 +46,6 @@ const RELAY_URLS = relays;
 
 // Initialize global configurations
 LogBox.ignoreAllLogs();
-dayjs.extend(relativeTime);
-
-// Initialize QueryClient
-const queryClient = new QueryClient();
 
 /**
  * Handles DM message fetching and decryption
