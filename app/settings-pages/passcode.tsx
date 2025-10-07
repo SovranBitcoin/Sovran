@@ -9,7 +9,7 @@ import NumericKeyboard from 'components/blocks/passcode/NumericKeyboard';
 import Container from 'components/blocks/Container';
 import { Card } from 'components/ui/Card';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 
 const PASSCODE_LENGTH = 4;
 
@@ -83,7 +83,7 @@ const PasscodeSettings: React.FC = () => {
                   setPasscode(code);
                   router.back();
                 } else {
-                  showMessage({ message: 'passcode_not_match', emoji: '🚨', type: 'error' });
+                  popup({ message: 'passcode_not_match', emoji: '🚨', type: 'error' });
                 }
               },
             },

@@ -38,7 +38,7 @@ import { sendEncryptedDirectMessage } from 'helper/nostrClient';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { BlurView } from 'expo-blur';
 import CachedImage from 'components/ui/Image';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { RootState } from 'redux/store/reducer';
 import TextInput from 'components/ui/TextInput';
 import { Button } from 'components/ui/Button';
@@ -314,10 +314,10 @@ export default function ModalScreen() {
                             onPress: async () => {
                               if (isContact) {
                                 dispatch(removeContact(pubkey));
-                                await showMessage({ message: 'Contact removed', type: 'success' });
+                                await popup({ message: 'Contact removed', type: 'success' });
                               } else {
                                 dispatch(addContact({ pubkey, profile }));
-                                await showMessage({ message: 'Contact added', type: 'success' });
+                                await popup({ message: 'Contact added', type: 'success' });
                               }
                             },
                           },
@@ -326,7 +326,7 @@ export default function ModalScreen() {
                             icon: 'la:user-slash',
                             text: 'Mute User',
                             onPress: async () => {
-                              await showMessage({
+                              await popup({
                                 message: 'User muted successfully',
                                 type: 'success',
                               });
@@ -338,7 +338,7 @@ export default function ModalScreen() {
                             icon: 'material-symbols:report-rounded',
                             text: 'Report User',
                             onPress: async () => {
-                              await showMessage({
+                              await popup({
                                 message: 'User reported successfully',
                                 type: 'success',
                               });

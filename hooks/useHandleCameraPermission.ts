@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { Linking } from 'react-native';
 
 export function useHandleCameraPermission() {
@@ -23,11 +23,11 @@ export function useHandleCameraPermission() {
     if (permission.canAskAgain) {
       const res = await requestPermission();
       if (res.granted) {
-        showMessage({ message: 'camera_permission_granted', type: 'success' });
+        popup({ message: 'camera_permission_granted', type: 'success' });
         return true;
       }
 
-      showMessage({
+      popup({
         message: 'camera_permission_denied',
         emoji: '🚨',
         type: 'error',
@@ -43,7 +43,7 @@ export function useHandleCameraPermission() {
       return false;
     }
 
-    showMessage({
+    popup({
       message: 'camera_permission_blocked',
       emoji: '🚨',
       type: 'error',

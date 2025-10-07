@@ -8,7 +8,7 @@ import { Transactions } from 'components/blocks/Transactions';
 import { memoizedGetSettings, termsAccepted } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
 import { getStructure, store } from 'redux/store';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { OnboardingLayout } from 'app/onboard/OnboardLayout';
 import { SovranTextIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
@@ -76,7 +76,7 @@ function TabOneScreen() {
           'version' in latestVersionResult.value
         ) {
           if (semver.gt(latestVersionResult.value.version, version)) {
-            showMessage({
+            popup({
               message: 'latest_version',
               params: {
                 version: latestVersionResult.value.version,

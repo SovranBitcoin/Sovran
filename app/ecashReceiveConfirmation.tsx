@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -39,7 +39,7 @@ export function EcashReceiveConfirmation({
     setLoading(true);
     try {
       await receiveEcash(token as string);
-      showMessage({
+      popup({
         message: 'funds_received',
         params: { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
         emoji: '🎉',
@@ -50,7 +50,7 @@ export function EcashReceiveConfirmation({
       });
     } catch (error) {
       console.error(error);
-      showMessage({
+      popup({
         message: error instanceof Error ? error.message : 'Unknown error',
         type: 'error',
       });

@@ -328,7 +328,7 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
 
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
 
-interface ShowMessageConfig {
+interface popupConfig {
   // Core message content
   message: string | MessageCode;
   params?: Record<string, any>;
@@ -349,7 +349,7 @@ interface ShowMessageConfig {
   type?: 'success' | 'error' | 'warning' | 'info';
 }
 
-export const showMessage = (config: ShowMessageConfig | string) => {
+export const popup = (config: popupConfig | string) => {
   // Handle both object config and simple string
   if (typeof config === 'string') {
     config = { message: config };

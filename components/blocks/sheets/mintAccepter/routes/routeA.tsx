@@ -10,7 +10,7 @@ import { addMintsAction } from 'redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import opacity from 'hex-color-opacity';
 import { getMint } from 'helper/cashuClient';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
@@ -81,7 +81,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
               if (mintRes.isErr()) {
                 console.log('mintRes.error.message', mintRes.error.message);
                 console.error(mintRes.error.message);
-                showMessage({ message: mintRes.error.message, type: 'error' });
+                popup({ message: mintRes.error.message, type: 'error' });
                 if (mintRes.error.message === 'colliding_keyset_id') {
                   ref.current.hide({
                     mint: [payload.mint],

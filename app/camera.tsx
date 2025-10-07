@@ -8,7 +8,7 @@ import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { useSelector } from 'react-redux';
 import * as Clipboard from 'expo-clipboard';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import Icon from 'assets/icons';
 import { View, HStack } from 'components/ui/View';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
@@ -82,7 +82,7 @@ const Camera: React.FC = () => {
   }, []);
 
   const handleGalleryPress = useCallback(async (): Promise<void> => {
-    showMessage({ message: 'feature_coming_soon', emoji: '📸', type: 'info' });
+    popup({ message: 'feature_coming_soon', emoji: '📸', type: 'info' });
   }, []);
 
   const handleClosePress = useCallback((): void => {

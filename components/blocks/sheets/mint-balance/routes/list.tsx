@@ -10,7 +10,7 @@ import Icon from 'assets/icons';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Avatar } from 'components/ui/Avatar';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { setSelectedMint } from 'redux/cashu';
 import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { router as expoRouter } from 'expo-router';
@@ -171,7 +171,7 @@ const ListRoute = () => {
     }
 
     if (payload?.requireBalance && mint.amount === 0) {
-      showMessage({
+      popup({
         message: 'insufficient_balance',
         params: {
           amount: mint.amount,
@@ -222,7 +222,7 @@ const ListRoute = () => {
       });
     } catch (e) {
       if (!(e instanceof Error) || e.message !== 'mint_change_failed') {
-        showMessage({
+        popup({
           message: 'general_error',
           emoji: '🚨',
           onClose: () => {

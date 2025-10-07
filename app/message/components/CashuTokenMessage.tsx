@@ -9,7 +9,7 @@ import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useCashuOperations } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 // Removed useCashu - now using usePaginatedHistory directly
 import { router } from 'expo-router';
 
@@ -44,20 +44,20 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
 
   const handleRedeem = async () => {
     if (!unit) {
-      showMessage({ message: 'No unit set', emoji: '🚨', type: 'error' });
+      popup({ message: 'No unit set', emoji: '🚨', type: 'error' });
       return;
     }
 
     try {
       await receiveEcash(token);
-      showMessage({
+      popup({
         message: 'funds_received',
         params: { amount, unit },
         emoji: '🎉',
         type: 'success',
       });
     } catch (error) {
-      showMessage({
+      popup({
         message: error instanceof Error ? error.message : 'Failed to receive ecash',
         emoji: '🚨',
         type: 'error',

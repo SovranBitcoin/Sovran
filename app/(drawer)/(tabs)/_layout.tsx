@@ -8,7 +8,7 @@ import Icon from 'assets/icons';
 import { useNostr } from 'redux/nostr';
 import { memoizedGetSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { memoizedGetSelectedMint } from 'redux/cashu';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
@@ -96,7 +96,7 @@ const TabLayout = () => {
   const HeaderRight = () => (
     <Pressable
       className="opacity-0"
-      onPress={() => showMessage({ message: 'not_implemented', type: 'info' })}>
+      onPress={() => popup({ message: 'not_implemented', type: 'info' })}>
       <HStack spacing={8}>
         <View className="bg-primary-800 rounded-full p-2">
           <Icon name="solar:card-bold" color={getPrimaryColor('0')} />

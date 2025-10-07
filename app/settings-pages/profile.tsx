@@ -4,7 +4,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { useNostr } from 'redux/nostr';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
@@ -20,7 +20,7 @@ const Profile = () => {
   const handleCopy = (text: string, messageKey: string) => {
     if (text) {
       Clipboard.setString(text);
-      showMessage({ message: messageKey, type: 'success' });
+      popup({ message: messageKey, type: 'success' });
     }
   };
 

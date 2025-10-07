@@ -7,7 +7,7 @@ import { useCashuOperations, useLightningOperations, useMelt, useManager } from 
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { useTheme } from 'providers/ThemeProvider';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
@@ -74,7 +74,7 @@ function ModalScreen() {
 
   const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
     if (!selectedMint) {
-      showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+      popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
     }
 
@@ -95,7 +95,7 @@ function ModalScreen() {
 
   const handleEcashSend = async ({ message: _message }: { message?: string }) => {
     if (!selectedMint) {
-      showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+      popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
     }
 
@@ -145,7 +145,7 @@ function ModalScreen() {
         break;
       case 'lightningSendConfirmation':
         if (!params.lnUrlOrAddress) {
-          showMessage({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
+          popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           return;
         }
 
@@ -155,12 +155,12 @@ function ModalScreen() {
         });
 
         if (!invoice) {
-          showMessage({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
+          popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           return;
         }
 
         if (!selectedMint) {
-          showMessage({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+          popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
           return;
         }
 
@@ -191,7 +191,7 @@ function ModalScreen() {
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
-      showMessage({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
+      popup({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
       return;
     }
 

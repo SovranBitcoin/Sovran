@@ -6,7 +6,7 @@ import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useNostr } from 'redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
@@ -83,12 +83,12 @@ const EcashLightningReceiver = () => {
     }
 
     if (!decodedText) {
-      showMessage({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
+      popup({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
       return;
     }
 
     if (!isValidEcashToken(decodedText)) {
-      showMessage({
+      popup({
         message: 'invalid_address',
         params: { address: decodedText },
         emoji: '🚨',
@@ -130,7 +130,7 @@ const EcashLightningReceiver = () => {
 
   const handleCopyLightningAddress = useCallback(async () => {
     await Clipboard.setStringAsync(`${currentProfile.npub}@npubx.cash`);
-    showMessage({ message: 'lightning_address_copied', type: 'success' });
+    popup({ message: 'lightning_address_copied', type: 'success' });
   }, [currentProfile.npub]);
 
   const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;

@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from 'redux/cashu';
 import { memoizedGetCurrentProfile } from 'redux/nostr';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { useProcessPaymentString } from './coco/useProcessPaymentString';
 
 export const useDeeplink = () => {
@@ -36,7 +36,7 @@ export const useDeeplink = () => {
         try {
           await processPaymentString({ data: hostname });
         } catch (error) {
-          showMessage({
+          popup({
             message: error instanceof Error ? error.message : 'Unknown error',
             emoji: '🚨',
             type: 'error',

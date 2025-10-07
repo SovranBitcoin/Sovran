@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
   useSharedValue,
 } from 'react-native-reanimated';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { Section } from 'components/ui/Section';
 
 interface TabItem {
@@ -107,7 +107,7 @@ export function PaymentInfo({
         ? popupMessage
         : (popupMessage[activeTab]?.name ?? 'Copied to clipboard');
 
-    showMessage({ message, type: 'success' });
+    popup({ message, type: 'success' });
   }, [link, selectedValue, popupMessage, activeTab]);
 
   const renderTabs = (): React.ReactElement | null => {

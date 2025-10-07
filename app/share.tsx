@@ -6,7 +6,7 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { View, HStack } from 'components/ui/View';
 import * as Clipboard from 'expo-clipboard';
-import { showMessage } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -36,7 +36,7 @@ function ShareModal() {
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(data);
-    showMessage({ message: config.popupMessage, type: 'success' });
+    popup({ message: config.popupMessage, type: 'success' });
   }, [data, config.popupMessage]);
 
   return (

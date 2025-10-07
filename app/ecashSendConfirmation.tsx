@@ -19,7 +19,7 @@ import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
 import { useCashuOperations, useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { showMessage, showSuccess } from '@/helper/popup';
+import { popup, showSuccess } from '@/helper/popup';
 import { write } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -112,7 +112,7 @@ export function EcashSendConfirmation({
       const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
 
       if (!sendHistoryEntry.token) {
-        showMessage({ message: 'Invalid token format', onClose: () => {} });
+        popup({ message: 'Invalid token format', onClose: () => {} });
         return;
       }
 
@@ -128,7 +128,7 @@ export function EcashSendConfirmation({
       });
     } catch (error) {
       console.error('Failed to send via Nostr:', error);
-      showMessage({ message: 'Failed to send via Nostr', onClose: () => {} });
+      popup({ message: 'Failed to send via Nostr', onClose: () => {} });
     } finally {
       setSendingNostr(false);
     }
@@ -139,9 +139,9 @@ export function EcashSendConfirmation({
       // For ecash transactions, "cancelling" means receiving the token back
       // This effectively cancels the send transaction
       await receiveEcash(getEncodedTokenV4(sendHistoryEntry.token));
-      showMessage({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
+      popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
     } catch (error) {
-      showMessage({
+      popup({
         message: error instanceof Error ? error.message : 'Failed to cancel transaction',
         onClose: () => onClose({}),
       });
@@ -185,7 +185,7 @@ export function EcashSendConfirmation({
             0
           );
 
-          showMessage({
+          popup({
             message: 'funds_sent',
             params: { amount, unit: sendHistoryEntry.unit },
             emoji: '🎉',
@@ -196,17 +196,17 @@ export function EcashSendConfirmation({
             },
           });
         } catch {
-          showMessage({ message: 'Invalid token format', emoji: '⚠️', onClose: () => onClose({}) });
+          popup({ message: 'Invalid token format', emoji: '⚠️', onClose: () => onClose({}) });
         }
       } else {
-        showMessage({
+        popup({
           message: 'ecash_transaction_pending',
           emoji: '❌',
           onClose: () => onClose({}),
         });
       }
     } else {
-      showMessage({
+      popup({
         message: 'error_checking_status',
         params: { error: result.error.message },
         emoji: '⚠️',
