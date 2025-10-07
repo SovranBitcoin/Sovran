@@ -30,7 +30,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
   selectedCurrency,
   onCurrencyChange,
 }) => {
-  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
   const { getBalances } = useMintManagement();
   const [multipleBalances, setMultipleBalances] = useState<BalanceItem[]>([]);

@@ -10,9 +10,9 @@ import {
   lnTrim,
   isLightningInvoice,
 } from '@/helper/third-party/lnurl';
-import { getLightningAmount, isValidEcashToken } from '@/helper/cashuClient';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Proof } from '@cashu/cashu-ts';
+import { getLightningAmount, isValidEcashToken } from '@/helper/coco/utils';
 
 interface ScanningData {
   data: string;
@@ -143,7 +143,7 @@ export const useProcessPaymentString = ({
             isLightningInvoice(lnTrim(scanning.data))) &&
           selectedMint
         ) {
-          const amount = getLightningAmount({ pr: lnTrim(scanning.data) });
+          const amount = getLightningAmount(lnTrim(scanning.data));
           if (!amount) {
             router.push({
               pathname: '/currency',

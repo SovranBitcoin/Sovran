@@ -4,12 +4,8 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { StyledText, Text } from 'components/ui/Text';
 import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
-import { useDispatch } from 'react-redux';
-import { store } from 'redux/store';
-import { addMintsAction } from 'redux/cashu';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
-import opacity from 'hex-color-opacity';
-import { getMint } from 'helper/cashuClient';
+import { useMintManagement } from 'hooks/coco/useMintManagement';
 import { popup } from '@/helper/popup';
 
 // eslint-disable-next-line no-empty-pattern
@@ -17,7 +13,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
   const { getPrimaryColor } = useTheme();
   const ref = useSheetRef('mint-accepter');
   const payload = useSheetPayload('mint-accepter');
-  const dispatch = useDispatch();
+  const { addMint } = useMintManagement();
 
   return (
     <View
@@ -55,12 +51,6 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         ?
       </Text>
       <ButtonHandler
-        colors={[
-          opacity(getPrimaryColor('800'), 0),
-          opacity(getPrimaryColor('800'), 0.75),
-          opacity(getPrimaryColor('800'), 0.9),
-          getPrimaryColor('800'),
-        ]}
         buttons={[
           {
             text: "Don't trust",
@@ -76,32 +66,24 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
             text: 'Trust',
             variant: 'primary',
             onPress: async () => {
-              // Check for keyset ID collisions before adding the mint
-              const mintRes = await getMint({ mintUrl: payload.mint, forceRefresh: true });
-              if (mintRes.isErr()) {
-                console.log('mintRes.error.message', mintRes.error.message);
-                console.error(mintRes.error.message);
-                popup({ message: mintRes.error.message, type: 'error' });
-                if (mintRes.error.message === 'colliding_keyset_id') {
-                  ref.current.hide({
-                    mint: [payload.mint],
-                    trusted: false,
-                    error: 'This mint has conflicting keyset IDs with existing mints',
-                  });
-                }
-                return;
-              }
+              try {
+                await addMint(payload.mint);
 
-              dispatch(
-                addMintsAction({
-                  profileId: store.getState().nostr?.currentProfile?.id,
-                  mintUrls: [payload.mint],
-                })
-              );
-              ref.current.hide({
-                mint: [payload.mint],
-                trusted: true,
-              });
+                ref.current.hide({
+                  mint: [payload.mint],
+                  trusted: true,
+                });
+              } catch (err) {
+                popup({
+                  message: err instanceof Error ? err.message : 'Failed to add mint',
+                  type: 'error',
+                });
+                ref.current.hide({
+                  mint: [payload.mint],
+                  trusted: false,
+                  error: err instanceof Error ? err.message : 'Failed to add mint',
+                });
+              }
             },
           },
         ]}

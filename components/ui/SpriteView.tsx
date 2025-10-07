@@ -28,7 +28,6 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
     return () => subscription.remove();
   }, [motion]);
 
-  // const backgroundImage = useSelector(memoizedGetBackgroundImage);
   const theme = useTheme();
 
   const backgroundImageSource = backgroundImageThemes[theme.currentTheme];

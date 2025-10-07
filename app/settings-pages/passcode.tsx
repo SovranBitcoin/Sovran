@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Text, StyleSheet, ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
-import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import { useSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';

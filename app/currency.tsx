@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
 
-import { useCashuOperations, useLightningOperations, useMelt, useManager } from 'hooks/coco';
+import { useLightningOperations, useMelt, useManager, useSend } from 'hooks/coco';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import { useTheme } from 'providers/ThemeProvider';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
@@ -42,8 +42,7 @@ function ModalScreen() {
     lnUrlOrAddress?: string;
   }>();
 
-  // Use Coco hooks instead of Redux
-  const { sendEcash } = useCashuOperations();
+  const { send } = useSend();
   const { requestLightningInvoice } = useLightningOperations();
   const { createMeltQuote } = useMelt();
 
@@ -99,7 +98,7 @@ function ModalScreen() {
       return;
     }
 
-    const result = await sendEcash(selectedMint, amount);
+    const result = await send(selectedMint, amount);
 
     // todo: is there a better way to do this? I just want to get the recently created historyEntry assosiated with my token.
     const sendHistoryEntry = await manager.history

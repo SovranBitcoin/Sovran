@@ -2,13 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { useCashuUtilities } from 'hooks/coco';
 import { EventKind } from 'helper/constants';
 import { formatNumber } from 'helper/utils';
+import { getLightningAmount } from '@/helper/coco/utils';
 
 const reactionCache = new Cache({
   namespace: 'reactions',
@@ -20,7 +19,6 @@ const reactionCache = new Cache({
 });
 
 export const usePostReactions = ({ id }: { id: string }) => {
-  const { getLightningAmount } = useCashuUtilities();
   const [reactionCount, setReactionCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0); // New state for reposts
   const [zapCount, setZapCount] = useState(0); // New state for zaps

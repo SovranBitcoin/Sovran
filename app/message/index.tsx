@@ -43,9 +43,9 @@ import { RootState } from 'redux/store/reducer';
 import TextInput from 'components/ui/TextInput';
 import { Button } from 'components/ui/Button';
 import { nip19 } from 'nostr-tools';
-import { maybeConvertNpub } from '@/helper/cashuClient';
 import { Avatar } from 'components/ui/Avatar';
 import { PUBLIC_KEYS } from 'helper/constants';
+import { maybeConvertNpub } from '@/helper/coco/utils';
 
 export type TimelineItemType = Message | any; // TODO: Replace with proper Coco transaction type
 

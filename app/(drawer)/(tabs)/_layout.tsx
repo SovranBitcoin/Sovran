@@ -76,7 +76,7 @@ const WalletHeaderTitle = () => {
 };
 
 const TabLayout = () => {
-  const { getPrimaryColor, currentTheme, getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const navigation = useNavigation();
   const { currentProfile } = useNostr();
   const settings = useSelector(memoizedGetSettings);

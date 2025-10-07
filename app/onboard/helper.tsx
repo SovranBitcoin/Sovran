@@ -1,4 +1,3 @@
-import { useTheme } from 'providers/ThemeProvider';
 import { StyleSheet, Dimensions } from 'react-native';
 
 const calculatePosition = (index: number) => {

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, VStack, HStack } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';
-import { useTheme } from 'providers/ThemeProvider';
 import { PostTop } from './PostTop';
 import { TextContent, extractUrls } from './TextContent';
 import { ActionItems, usePostReactions } from './ActionItems';
@@ -15,8 +14,6 @@ interface PostProps {
 }
 
 export function Post({ post }: PostProps) {
-  const { getPrimaryColor } = useTheme();
-
   // Check if this is a repost
   const isRepost = post?.kind === EventKind.Repost;
 

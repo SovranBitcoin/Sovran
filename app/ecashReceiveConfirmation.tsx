@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCashuOperations, useMintManagement } from 'hooks/coco';
+import { useMintManagement, useReceive } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { popup } from '@/helper/popup';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -24,7 +24,7 @@ export function EcashReceiveConfirmation({
   receiveHistoryEntry: ReceiveHistoryEntry & { token?: string };
   extraButtons?: ButtonHandlerButton[];
 }) {
-  const { receiveEcash } = useCashuOperations();
+  const { receive } = useReceive();
   const { isKnownMint } = useMintManagement();
 
   const token = receiveHistoryEntry?.token;
@@ -38,7 +38,7 @@ export function EcashReceiveConfirmation({
   const handleRedeem = async () => {
     setLoading(true);
     try {
-      await receiveEcash(token as string);
+      await receive(token as string);
       popup({
         message: 'funds_received',
         params: { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
@@ -104,26 +104,6 @@ export function EcashReceiveConfirmation({
       buttons={
         <ButtonHandler
           buttons={[
-            // {
-            //   text: 'View Send Transaction',
-            //   variant: 'secondary',
-            //   onPress: async () => {
-            //     router.push({
-            //       pathname: '/transaction',
-            //       params: {
-            //         id:
-            //           ('request' in receiveHistoryEntry
-            //             ? receiveHistoryEntry.request
-            //             : undefined) ||
-            //           ('token' in receiveHistoryEntry ? (receiveHistoryEntry as any).token : ''),
-            //         transactionType: 'send',
-            //       },
-            //     });
-            //   },
-            //   condition: !!(
-            //     receiveHistoryEntry.metadata?.isCancel && receiveHistoryEntry.type === 'receive'
-            //   ),
-            // },
             {
               text: 'Cancel',
               variant: 'secondary',
@@ -143,18 +123,6 @@ export function EcashReceiveConfirmation({
       }>
       <VStack gap={12}>
         <TransactionHeader historyEntry={receiveHistoryEntry} />
-
-        {/* {memo && (
-          <>
-            <View
-              style={{
-                marginHorizontal: 16,
-              }}>
-              <Card message={memo} variant="info" />
-            </View>
-            <Spacer size={12} />
-          </>
-        )} */}
 
         <TransactionMintRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
 

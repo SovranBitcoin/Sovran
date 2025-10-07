@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatAmount } from 'helper/currency';
-import { useCashuUtilities, useMintManagement, useMelt, useManager } from 'hooks/coco';
+import { useMintManagement, useMelt, useManager } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { VStack, HStack } from 'components/ui/View';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -17,10 +17,10 @@ import { memoizedGetSelectedMint } from '@/redux/cashu';
 import { Alert } from 'react-native';
 import { MintQuoteTimeline } from '@/components/blocks/Transaction/TransactionTimeline';
 import { HistoryEntry } from 'coco-cashu-core';
+import { getLightningTimestamp } from '@/helper/coco/utils';
 
 export function LightningSendConfirmation({ meltQuote }: { meltQuote: MeltQuoteResponse }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const { getLightningTimestamp } = useCashuUtilities();
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const { payMeltQuote, currentQuote, createMeltQuote, isCreatingQuote } = useMelt();
   const { getMintInfo } = useMintManagement();

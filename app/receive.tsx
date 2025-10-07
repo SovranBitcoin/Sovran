@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { useCashuUtilities, useMintManagement } from 'hooks/coco';
+import { useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
@@ -21,6 +21,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Proof } from '@cashu/cashu-ts';
+import { isValidEcashToken } from '@/helper/coco/utils';
 
 export const pool = new SimplePool();
 
@@ -36,7 +37,6 @@ const EcashLightningReceiver = () => {
   const { currentProfile } = useNostr();
   const { getPrimaryColor } = useTheme();
   const [hasPermission, requestPermission] = useCameraPermissions();
-  const { isValidEcashToken } = useCashuUtilities();
   const { getMintInfo } = useMintManagement();
 
   /**

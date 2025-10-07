@@ -3,17 +3,12 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/ui/QRCode';
-import { Spacer, View, HStack, VStack } from 'components/ui/View';
+import { Spacer, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { GradientSkeleton } from 'components/ui/GradientSkeleton';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  withTiming,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { popup } from '@/helper/popup';
 import { Section } from 'components/ui/Section';
 
@@ -43,59 +38,15 @@ export function PaymentInfo({
   variant = 'primary',
   showSection = true,
 }: PaymentInfoProps): React.ReactElement {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-  const underscoreWidth = useSharedValue(0);
-  const underscorePosition = useSharedValue(0);
+  const { getPrimaryColor } = useTheme();
 
   const [activeTab, setActiveTab] = useState<number>(0);
-  const tabWidths = React.useRef<number[]>([]);
-  const tabOffsets = React.useRef<number[]>([]);
 
   const hasTabs = Array.isArray(data) && data.length > 0;
   const TABS = useMemo(() => (hasTabs ? data.map((item) => item.name) : []), [hasTabs, data]);
 
   const [selectedValue, setSelectedValue] = useState<string>(
     hasTabs ? data[0].value : typeof data === 'string' ? data : ''
-  );
-
-  const animatedUnderscoreStyle = useAnimatedStyle(() => ({
-    width: withTiming(underscoreWidth.value, {
-      duration: 200,
-      easing: Easing.out(Easing.ease),
-    }),
-    transform: [
-      {
-        translateX: withTiming(underscorePosition.value, {
-          duration: 200,
-          easing: Easing.out(Easing.ease),
-        }),
-      },
-    ],
-  }));
-
-  const measureTab = useCallback(
-    (event: any, index: number) => {
-      const { width, x } = event.nativeEvent.layout;
-      tabWidths.current[index] = width;
-      tabOffsets.current[index] = x;
-      if (index === 0 && underscoreWidth.value === 0) {
-        underscoreWidth.value = width;
-        underscorePosition.value = x;
-      }
-    },
-    [underscoreWidth, underscorePosition]
-  );
-
-  const handleTabPress = useCallback(
-    (index: number) => {
-      if (!Array.isArray(data)) return;
-
-      setActiveTab(index);
-      underscoreWidth.value = tabWidths.current[index] ?? 0;
-      underscorePosition.value = tabOffsets.current[index] ?? 0;
-      setSelectedValue(data[index].value);
-    },
-    [data, underscoreWidth, underscorePosition]
   );
 
   const handleCopyPress = useCallback(async () => {
@@ -109,31 +60,6 @@ export function PaymentInfo({
 
     popup({ message, type: 'success' });
   }, [link, selectedValue, popupMessage, activeTab]);
-
-  const renderTabs = (): React.ReactElement | null => {
-    if (TABS.length === 0) return null;
-
-    return (
-      <View style={{ marginHorizontal: 16, paddingHorizontal: 16 }}>
-        <VStack flex={1} justify="center">
-          <HStack flex={1}>
-            {TABS.map((tab, index) => (
-              <TabButton
-                key={tab}
-                label={tab}
-                isActive={index === activeTab}
-                onPress={() => handleTabPress(index)}
-                onLayout={(event) => measureTab(event, index)}
-                getPrimaryColor={getPrimaryColor}
-                isFirst={index === 0}
-                animatedStyle={animatedUnderscoreStyle}
-              />
-            ))}
-          </HStack>
-        </VStack>
-      </View>
-    );
-  };
 
   const renderQRCode = (): React.ReactElement => {
     if (!selectedValue) {
@@ -184,7 +110,6 @@ export function PaymentInfo({
 
   return (
     <>
-      {/* {renderTabs()} */}
       {renderQRCode()}
       {renderSection()}
     </>
@@ -196,7 +121,6 @@ interface TabButtonProps {
   isActive: boolean;
   onPress: () => void;
   onLayout: (event: any) => void;
-  getPrimaryColor: (shade: string) => string;
   isFirst: boolean;
   animatedStyle: any;
 }
@@ -207,10 +131,11 @@ const TabButton = React.memo(
     isActive,
     onPress,
     onLayout,
-    getPrimaryColor,
     isFirst,
     animatedStyle,
   }: TabButtonProps): React.ReactElement => {
+    const { getShadeColor, getPrimaryColor } = useTheme();
+
     return (
       <TouchableOpacity
         onPress={onPress}

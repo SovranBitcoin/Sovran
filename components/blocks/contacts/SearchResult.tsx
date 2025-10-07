@@ -16,7 +16,7 @@ interface SearchResultProps {
 }
 
 export function SearchResult({ result, onPress, loading }: SearchResultProps) {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+  const { getGreenColor, getRedColor } = useTheme();
 
   return (
     <TouchableOpacity

@@ -1,4 +1,4 @@
-import '../../shim';
+import 'shim';
 import React, { useState } from 'react';
 import {
   StyleSheet,

@@ -1,7 +1,6 @@
 import { UntranslatedText } from 'components/ui/Text';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { useSelector } from 'react-redux';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
 import TransactionIcon from 'components/blocks/TransactionIcon';
@@ -89,7 +88,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
 };
 
 export const Transaction = React.memo(({ historyEntry }: { historyEntry: HistoryEntry }) => {
-  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
   const { isSend, isReceive, fiatAmount, handlePress } = useHistoryEntry(historyEntry);
 

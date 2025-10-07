@@ -15,7 +15,7 @@ const TransactionComponent = ({
   transaction: TransactionData;
   isReceived: boolean;
 }) => {
-  const { getPrimaryColor, currentTheme, getShadeColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
     ? [getPrimaryColor('500'), getPrimaryColor('500')]
     : [getShadeColor('200'), getShadeColor('300')];

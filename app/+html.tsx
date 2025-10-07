@@ -1,4 +1,3 @@
-import './global';
 import 'react-native-gesture-handler';
 import React from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';

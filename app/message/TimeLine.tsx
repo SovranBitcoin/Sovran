@@ -1,17 +1,14 @@
 import { TextMessage, PaymentMessage, CashuTokenMessage } from './components';
 import { useNostr } from 'redux/nostr';
-import { useCashuUtilities } from 'hooks/coco';
-import { useTheme } from 'providers/ThemeProvider';
 import { TimelineItemType } from '.';
+import { isValidEcashToken } from '@/helper/coco/utils';
 
 interface TimelineItemProps {
   item: TimelineItemType;
 }
 
 const TimelineItem = ({ item }: TimelineItemProps) => {
-  const { isValidEcashToken } = useCashuUtilities();
   const { currentProfile } = useNostr();
-  const { getPrimaryColor } = useTheme();
 
   // Determine item type
   const isMessage = 'content' in item && !!item.content;

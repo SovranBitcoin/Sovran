@@ -1,4 +1,4 @@
-import 'helper/global';
+import 'shim';
 import React, { memo, useCallback, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
@@ -47,14 +47,12 @@ function TabOneScreen() {
 
   const onRefresh = useCallback(async () => {}, []);
 
-  const { getPrimaryColor, currentTheme } = useTheme();
+  const { getPrimaryColor } = useTheme();
 
   const { history } = usePaginatedHistory();
 
   const currentProfile = useSelector(memoizedGetCurrentProfile);
   const settings = useSelector(memoizedGetSettings);
-
-  // Note: Header options are now handled by the layout file in Expo Router
 
   useDeeplink();
 

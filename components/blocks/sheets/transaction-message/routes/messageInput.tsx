@@ -2,7 +2,6 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import React, { useState } from 'react';
 import { TextInput } from 'react-native';
 import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
-import { useSelector } from 'react-redux';
 import { useTheme } from 'providers/ThemeProvider';
 import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';

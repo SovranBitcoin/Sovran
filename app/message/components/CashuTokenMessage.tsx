@@ -7,11 +7,8 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import { useTheme } from 'providers/ThemeProvider';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { useCashuOperations } from 'hooks/coco';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { useReceive } from 'coco-cashu-react';
 import { popup } from '@/helper/popup';
-// Removed useCashu - now using usePaginatedHistory directly
-import { router } from 'expo-router';
 
 interface Props {
   token: string;
@@ -19,28 +16,12 @@ interface Props {
 }
 
 const CashuTokenComponent = ({ token, isReceived }: Props) => {
-  const { getPrimaryColor, getShadeColor, getRedColor, getGreenColor } = useTheme();
-  const { receiveEcash } = useCashuOperations();
-  const { history: transactions } = usePaginatedHistory();
+  const { getPrimaryColor, getShadeColor, getRedColor } = useTheme();
+  const { receive } = useReceive();
 
   const decoded = getDecodedToken(token);
   const amount = decoded.proofs.reduce((a, p) => a + p.amount, 0);
   const unit = decoded.unit;
-
-  const transaction = transactions.find((t) => t.token === token);
-  const isClaimed = Boolean(transaction);
-
-  const handleViewTransaction = () => {
-    if (transaction) {
-      router.push({
-        pathname: '/transaction',
-        params: {
-          id: transaction.token || transaction.request || '',
-          transactionType: transaction.transactionType,
-        },
-      });
-    }
-  };
 
   const handleRedeem = async () => {
     if (!unit) {
@@ -49,7 +30,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
     }
 
     try {
-      await receiveEcash(token);
+      await receive(token);
       popup({
         message: 'funds_received',
         params: { amount, unit },
@@ -83,7 +64,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
           transform: [{ rotate: '45deg' }],
         }}
       />
-      <Pressable onLongPress={handleViewTransaction}>
+      <Pressable>
         <LinearGradient
           colors={gradientColors}
           style={{
@@ -112,11 +93,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
               )}
             </VStack>
           </HStack>
-          <Button
-            text={isClaimed ? 'View Transaction' : 'Redeem'}
-            variant="primary"
-            onPress={isClaimed ? handleViewTransaction : handleRedeem}
-          />
+          <Button text={'Redeem'} variant="primary" onPress={handleRedeem} />
         </LinearGradient>
       </Pressable>
     </View>

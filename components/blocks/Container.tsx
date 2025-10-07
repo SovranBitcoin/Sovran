@@ -1,7 +1,5 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import { useSelector } from 'react-redux';
-import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View';
 
 const Container: React.FC<{
@@ -10,7 +8,6 @@ const Container: React.FC<{
   contentContainerStyle?: any;
   scroll?: boolean;
 }> = ({ children, style = {}, contentContainerStyle = {} }) => {
-  const { getPrimaryColor } = useTheme();
   const styles = createStyles();
 
   return (

@@ -7,10 +7,11 @@ import Modal from 'components/blocks/Modal';
 import PagerView from 'react-native-pager-view';
 import { useTheme } from 'providers/ThemeProvider';
 import { Tabs } from 'components/ui/Tabs';
-import { useCashuUtilities, useMintManagement } from 'hooks/coco';
+import { useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { nip19 } from 'nostr-tools';
 import { ContactItem } from 'components/blocks/payments';
+import { maybeConvertNpub } from '@/helper/coco/utils';
 
 // This function is now defined inside the Section component to use the hook
 
@@ -27,7 +28,6 @@ const RenderContactItem = ({ item }: { item: any }) => {
 };
 
 const Section = () => {
-  const { maybeConvertNpub } = useCashuUtilities();
   const { getPrimaryColor } = useTheme();
   const styles = createStyles(getPrimaryColor);
   const { profiles, search, currentProfile, messages, contacts } = useNostr();

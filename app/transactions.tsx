@@ -1,5 +1,4 @@
 import { View, HStack } from 'components/ui/View';
-import { useSelector } from 'react-redux';
 import { useTheme } from 'providers/ThemeProvider';
 import { useLocalSearchParams } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';

@@ -8,7 +8,7 @@ import { useBalanceContext, useMints } from 'hooks/coco';
 import Haptics from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { memoizedPricelist } from 'redux/pricelist';
-// Define proper interfaces
+
 interface Account {
   unit: CurrencyUnit;
 }

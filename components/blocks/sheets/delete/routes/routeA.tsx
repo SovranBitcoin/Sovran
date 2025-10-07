@@ -2,7 +2,6 @@ import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Spacer, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import { resetApp } from 'redux/store';
 import * as Updates from 'expo-updates';
 import React from 'react';
@@ -11,7 +10,6 @@ import { useDispatch } from 'react-redux';
 
 // eslint-disable-next-line no-empty-pattern
 const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
-  const { getPrimaryColor } = useTheme();
   const dispatch = useDispatch();
   const handleDeleteProfile = async () => {
     try {

@@ -5,7 +5,7 @@ import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import Modal from 'components/blocks/Modal';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { showSuccess } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';
@@ -53,7 +53,7 @@ export function LightningReceiveConfirmation({
 
   const handleCopy = async (close: (event: any) => void) => {
     await Clipboard.setStringAsync(mintHistoryEntry.paymentRequest);
-    showSuccess('lightning_address_copied', {}, {}, () => close({}));
+    popup({ message: 'lightning_address_copied', type: 'success', onClose: () => close({}) });
   };
 
   const handleShare = async (close: (event: any) => void) => {

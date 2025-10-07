@@ -6,9 +6,9 @@ import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';
-import { showSuccess } from '@/helper/popup';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/ui/Card';
+import { popup } from 'helper/popup';
 
 const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) => {
   const { getPrimaryColor } = useTheme();
@@ -36,8 +36,12 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
     // Return the selected emoji when closing the sheet
     const encodedEmoji = encode(emoji, payload.token);
     Clipboard.setStringAsync(encodedEmoji);
-    showSuccess('ecash_token_copied', {}, {}, () => {
-      router?.goBack();
+    popup({
+      message: 'ecash_token_copied',
+      type: 'success',
+      onClose: () => {
+        router?.goBack();
+      },
     });
   };
 

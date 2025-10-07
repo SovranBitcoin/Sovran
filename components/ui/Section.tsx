@@ -1,8 +1,7 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { ViewStyle } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
-import opacity from 'hex-color-opacity';
 import { BlurView } from 'expo-blur';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -31,12 +30,6 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   const { getPrimaryColor, getShadeColor } = useTheme();
 
   const ContainerView = camera ? BlurView : View;
-
-  // Memoize background color calculation
-  const backgroundColor = useMemo(
-    () => (camera ? opacity(getPrimaryColor('800'), 0.75) : getPrimaryColor('800')),
-    [camera, getPrimaryColor]
-  );
 
   return (
     <ContainerView

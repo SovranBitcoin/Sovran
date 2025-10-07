@@ -1,6 +1,5 @@
 import React from 'react';
 import { Text as DefaultText, TextStyle, ColorValue } from 'react-native';
-import { useSelector } from 'react-redux';
 import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -12,12 +11,9 @@ interface GradientTextProps extends TextProps {
   gradientColors?: readonly [ColorValue, ColorValue, ...ColorValue[]];
 }
 
-const GradientText = ({
-  children,
-  style,
-  gradientColors = [getShadeColor('200'), getShadeColor('300')],
-  ...rest
-}: GradientTextProps) => {
+const GradientText = ({ children, style, gradientColors, ...rest }: GradientTextProps) => {
+  const { getShadeColor } = useTheme();
+
   return (
     <MaskedView
       maskElement={
@@ -25,7 +21,16 @@ const GradientText = ({
           {children}
         </Text>
       }>
-      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+      <LinearGradient
+        colors={
+          (gradientColors || [getShadeColor('200'), getShadeColor('300')]) as readonly [
+            ColorValue,
+            ColorValue,
+            ...ColorValue[],
+          ]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}>
         <Text style={[style, { opacity: 0 }]} {...rest}>
           {children}
         </Text>

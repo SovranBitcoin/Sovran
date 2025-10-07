@@ -6,20 +6,11 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { useSelector } from 'react-redux';
-import {
-  getEncodedTokenV4,
-  decodePaymentRequest,
-  PaymentRequestTransportType,
-  GetInfoResponse,
-  Token,
-} from '@cashu/cashu-ts';
-import { nip19 } from 'nostr-tools';
-import { sendGiftWrappedEncryptedDirectMessage } from 'helper/nostrClient';
-import { useCashuOperations, useMintManagement } from 'hooks/coco';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
+import { useMintManagement } from 'hooks/coco';
+import { usePaginatedHistory, useReceive } from 'coco-cashu-react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { popup, showSuccess } from '@/helper/popup';
+import { popup } from '@/helper/popup';
 import { write } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -28,29 +19,21 @@ import { TransactionHeader } from 'components/blocks/Transaction/TransactionHead
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
 
-import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
-import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { err, ok, Result } from 'neverthrow';
 import { MintQuoteTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 
 export function EcashSendConfirmation({
   sendHistoryEntry,
-  extraButtons = [],
 }: {
   sendHistoryEntry: SendHistoryEntry;
-  extraButtons?: ButtonHandlerButton[];
 }) {
-  const { isTokenSpendable, receiveEcash } = useCashuOperations();
+  const { receive } = useReceive();
   const { getMintInfo } = useMintManagement();
   const [uri, setUri] = useState('');
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-  const [sendingNostr, setSendingNostr] = useState(false);
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
 
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const { history } = usePaginatedHistory();
 
   // Find the current transaction using coco's history system
@@ -77,19 +60,13 @@ export function EcashSendConfirmation({
     loadMintInfo();
   }, [currentTransaction?.mintUrl, getMintInfo]);
 
-  const resolvedPaymentRequest =
-    ('paymentRequest' in sendHistoryEntry ? (sendHistoryEntry as any).paymentRequest : undefined) ||
-    (currentTransaction && 'paymentRequest' in currentTransaction
-      ? currentTransaction.paymentRequest
-      : undefined);
-
   const handleNFCSend = async () => {
     await write(getEncodedTokenV4(sendHistoryEntry.token));
   };
 
   const handleCopy = async (onClose: (event: any) => void) => {
     await Clipboard.setStringAsync(getEncodedTokenV4(sendHistoryEntry.token));
-    showSuccess('ecash_token_copied', {}, {}, () => onClose({}));
+    popup({ message: 'ecash_token_copied', type: 'success', onClose: () => onClose({}) });
   };
 
   const handleShare = async (onClose: (event: any) => void) => {
@@ -100,45 +77,9 @@ export function EcashSendConfirmation({
     onClose({});
   };
 
-  const handleSendNostr = async () => {
-    const request = resolvedPaymentRequest;
-    if (!request) return;
-    try {
-      setSendingNostr(true);
-      const decoded = decodePaymentRequest(request);
-      const receiverTarget = decoded.getTransport(PaymentRequestTransportType.NOSTR)?.target;
-      if (!receiverTarget) return;
-      const { data } = nip19.decode(receiverTarget);
-      const { pubkey } = (data as { pubkey: string }) || { pubkey: '' };
-
-      if (!sendHistoryEntry.token) {
-        popup({ message: 'Invalid token format', onClose: () => {} });
-        return;
-      }
-
-      await sendGiftWrappedEncryptedDirectMessage({
-        message: JSON.stringify({
-          mint: sendHistoryEntry.token.mint,
-          unit: sendHistoryEntry.token.unit,
-          proofs: sendHistoryEntry.token.proofs,
-          id: decoded.id,
-        }),
-        recipient: pubkey,
-        nsec: currentProfile.nsec,
-      });
-    } catch (error) {
-      console.error('Failed to send via Nostr:', error);
-      popup({ message: 'Failed to send via Nostr', onClose: () => {} });
-    } finally {
-      setSendingNostr(false);
-    }
-  };
-
   const handleCancelSend = async (onClose: (event: any) => void) => {
     try {
-      // For ecash transactions, "cancelling" means receiving the token back
-      // This effectively cancels the send transaction
-      await receiveEcash(getEncodedTokenV4(sendHistoryEntry.token));
+      await receive(getEncodedTokenV4(sendHistoryEntry.token));
       popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
     } catch (error) {
       popup({
@@ -160,61 +101,6 @@ export function EcashSendConfirmation({
 
   const formattedToken = getFormattedToken();
   const isLongToken = formattedToken.length >= 500;
-
-  const checkProofsSpent = async (token: Token): Promise<Result<boolean, Error>> => {
-    try {
-      const isSpendable = await isTokenSpendable(getEncodedTokenV4(token));
-      return ok(!isSpendable); // Return true if NOT spendable (i.e., spent)
-    } catch (error) {
-      return err(error instanceof Error ? error : new Error('Failed to check proof states'));
-    }
-  };
-
-  const handleCheckStatus = async (onClose: (event: any) => void) => {
-    if (isCheckingStatus) return;
-
-    setIsCheckingStatus(true);
-    const result = await checkProofsSpent(sendHistoryEntry.token);
-
-    if (result.isOk()) {
-      const proofsSpent = result.value;
-      if (proofsSpent) {
-        try {
-          const amount = sendHistoryEntry.token.proofs.reduce(
-            (sum, proof) => sum + proof.amount,
-            0
-          );
-
-          popup({
-            message: 'funds_sent',
-            params: { amount, unit: sendHistoryEntry.unit },
-            emoji: '🎉',
-            onClose: () => {
-              router.dismissAll();
-              router.push('/(drawer)/(tabs)');
-              onClose({});
-            },
-          });
-        } catch {
-          popup({ message: 'Invalid token format', emoji: '⚠️', onClose: () => onClose({}) });
-        }
-      } else {
-        popup({
-          message: 'ecash_transaction_pending',
-          emoji: '❌',
-          onClose: () => onClose({}),
-        });
-      }
-    } else {
-      popup({
-        message: 'error_checking_status',
-        params: { error: result.error.message },
-        emoji: '⚠️',
-        onClose: () => onClose({}),
-      });
-    }
-    setIsCheckingStatus(false);
-  };
 
   const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
@@ -290,14 +176,6 @@ export function EcashSendConfirmation({
                 condition: !isPaid,
               },
               {
-                text: 'Send via Nostr',
-                icon: 'mdi:send',
-                variant: 'primary',
-                loading: sendingNostr,
-                onPress: handleSendNostr,
-                condition: !!(resolvedPaymentRequest && !isPaid),
-              },
-              {
                 text: 'Copy as Emoji',
                 icon: 'fluent:emoji-24-filled',
                 variant: 'primary',
@@ -311,10 +189,6 @@ export function EcashSendConfirmation({
                 onPress: handleCancelSend,
                 condition: !isPaid,
               },
-              ...extraButtons.map((button) => ({
-                ...button,
-                condition: !isPaid,
-              })),
             ]}
           />
         </HStack>
@@ -336,11 +210,7 @@ export function EcashSendConfirmation({
         {/* Memo display - Coco types don't have memo property directly accessible */}
 
         {mintInfo && (
-          <TransactionMintRefresh
-            historyEntry={currentTransaction}
-            mintInfo={mintInfo}
-            handleCheckStatus={handleCheckStatus}
-          />
+          <TransactionMintRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />
         )}
 
         <MintQuoteTimeline historyEntry={currentTransaction} />
