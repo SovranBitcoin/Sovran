@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { THEMES, THEME_NAMES } from '../themes';
 import { useSelector } from 'react-redux';
-import { colorThemes } from '../utils/colorTheme';
+import { colorThemes } from '../helper/colorTheme';
 
 const ThemeContext = createContext<{
   currentTheme: string;

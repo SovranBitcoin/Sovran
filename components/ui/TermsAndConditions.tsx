@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from 'components/ui/Button';
-import { StyleSheet, Text, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { VStack, HStack, Spacer } from 'components/ui/View';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { Text } from 'components/ui/Text';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -137,33 +138,6 @@ Using ecash involves significant risks including legal, market, liquidity, count
 
 These Terms represent the entire agreement between you and Sovran.`;
 
-const createStyles = (getPrimaryColor: (shade: string) => string) => {
-  return StyleSheet.create({
-    container: {
-      backgroundColor: getPrimaryColor('900'),
-    },
-    titleText: {
-      textAlign: 'center',
-      fontSize: 32,
-      fontFamily: 'OverpassHeavy',
-      color: getPrimaryColor('50'),
-      paddingVertical: 8,
-    },
-    termsText: {
-      fontFamily: 'OverpassRegular',
-      fontSize: 14,
-      color: getPrimaryColor('0'),
-      lineHeight: 22,
-    },
-    checkboxText: {
-      flex: 1,
-      fontFamily: 'OverpassRegular',
-      fontSize: 14,
-      color: getPrimaryColor('0'),
-    },
-  });
-};
-
 interface TermsAndConditionsProps {
   onClose: () => void;
   title?: string;
@@ -179,18 +153,21 @@ export default function TermsAndConditions({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
+  const { getShadeColor } = useTheme();
   const [isChecked, setIsChecked] = useState(false);
 
   const toggleCheckbox = () => setIsChecked(!isChecked);
 
   return (
-    <Container scroll={true} style={styles.container}>
+    <Container scroll={true} className="bg-primary-900">
       <ScrollView>
         <VStack spacing={16}>
-          <Text style={styles.titleText}>{title}</Text>
-          <Text style={styles.termsText}>{terms}</Text>
+          <Text overpass bold size={32} className="text-primary-50 py-2 text-center">
+            {title}
+          </Text>
+          <Text overpass size={14} className="text-primary-0 leading-[22px]">
+            {terms}
+          </Text>
         </VStack>
 
         <Spacer size={64} />
@@ -205,13 +182,13 @@ export default function TermsAndConditions({
 
           {showCheckbox && (
             <TouchableOpacity onPress={toggleCheckbox}>
-              <HStack align="center" spacing={8} style={{ paddingHorizontal: 16 }}>
+              <HStack align="center" spacing={8} className="px-4">
                 <Checkbox
                   value={isChecked}
                   onValueChange={toggleCheckbox}
                   color={isChecked ? getShadeColor('300') : undefined}
                 />
-                <Text id="terms-checkbox" style={styles.checkboxText}>
+                <Text id="terms-checkbox" overpass size={14} className="text-primary-0 flex-1">
                   {checkboxText}
                 </Text>
               </HStack>

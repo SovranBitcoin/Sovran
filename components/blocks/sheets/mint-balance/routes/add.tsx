@@ -11,7 +11,7 @@ import { useMintManagement } from 'hooks/coco';
 import { View, VStack, Spacer, HStack } from 'components/ui/View';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { MintSearchInput } from 'components/ui/MintSearchInput';
-import { useDebouncedMintValidation } from 'hooks/useDebouncedMintValidation';
+import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { filterMints, looksLikeMintUrl } from 'helper/fuzzySearch';
 import { CocoManager } from 'helper/coco/manager';
 import { Avatar } from '@/components/ui/Avatar';

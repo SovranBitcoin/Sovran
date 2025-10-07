@@ -1,6 +1,6 @@
 import { useManager } from 'coco-cashu-react';
 import { useCallback, useState } from 'react';
-import type { MeltQuoteResponse } from 'coco-cashu-core';
+import type { MeltQuoteResponse } from '@cashu/cashu-ts';
 
 /**
  * Custom hook for Cashu melt operations (paying Lightning invoices)

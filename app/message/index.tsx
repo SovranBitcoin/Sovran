@@ -82,7 +82,6 @@ export default function ModalScreen() {
     ...s.profile,
   }));
   const profile = combinedSearchAndProfiles.find((p) => p.pubkey === pubkey);
-  const isVerified = profiles.some((p) => p.pubkey === pubkey);
   const profileImage = profile?.picture || profile?.image;
   const displayName =
     profile?.displayName ||

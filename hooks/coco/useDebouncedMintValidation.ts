@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useMintManagement } from './coco/useMintManagement';
 import { looksLikeMintUrl } from 'helper/fuzzySearch';
 import { fetchMintInfo } from '@/helper/apiClient';
 
@@ -14,7 +13,6 @@ interface ValidationState {
  * Validates mint URLs with a debounce delay to avoid excessive API calls
  */
 export function useDebouncedMintValidation(debounceMs: number = 800) {
-  const { isKnownMint, getMintInfo } = useMintManagement();
   const [validationState, setValidationState] = useState<ValidationState>({
     isValid: null,
     isLoading: false,

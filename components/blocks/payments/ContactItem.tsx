@@ -7,7 +7,6 @@ import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from '@/helper/constants';
-import { useTheme } from 'providers/ThemeProvider';
 
 interface ContactItemProps {
   contact: any;
@@ -41,8 +40,7 @@ const styles = {
   },
 };
 
-export const ContactItem = ({ contact, isVerified }: ContactItemProps) => {
-  const { getPrimaryColor } = useTheme();
+export const ContactItem = ({ contact }: ContactItemProps) => {
   const mostRecentTransaction = contact?.transactions?.[0];
   const mostRecentMessage = contact?.messages?.[0];
 

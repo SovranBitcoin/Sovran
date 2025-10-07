@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dimensions, StyleSheet } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-// todo migrate to legendlist
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from 'components/blocks/feed';

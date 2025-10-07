@@ -6,7 +6,6 @@ import { useNostr } from 'helper/redux/nostr';
 import Modal from 'components/blocks/Modal';
 import PagerView from 'react-native-pager-view';
 import { useTheme } from 'providers/ThemeProvider';
-import { useNavigation } from 'expo-router';
 import { Tabs } from 'components/ui/Tabs';
 import { useCashuUtilities, useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory } from 'coco-cashu-react';
@@ -17,16 +16,12 @@ import { ContactItem } from 'components/blocks/payments';
 
 const RenderContactItem = ({ item }: { item: any }) => {
   const { profiles } = useNostr();
-  const { getPrimaryColor } = useTheme();
-  const navigation = useNavigation();
   const muted = item.profile?.muted;
   if (muted) return null;
   return (
     <ContactItem
       isVerified={profiles.some((profile) => profile.pubkey === item.pubkey)}
       contact={item}
-      getPrimaryColor={getPrimaryColor}
-      navigation={navigation}
     />
   );
 };
