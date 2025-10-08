@@ -66,7 +66,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
               </Text>
               {titleText !== '' && <Spacer size={8} />}
 
-              {renderValueContent(item, titleText, getPrimaryColor, special)}
+              {renderValueContent(item, titleText, special)}
             </HStack>
           );
         })}
