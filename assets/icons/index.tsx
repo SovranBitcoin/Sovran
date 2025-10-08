@@ -82,10 +82,11 @@ export type IconProps = {
     easing?: 'easeOut' | 'linear';
   };
   style?: any;
+  className?: string;
 };
 
-function Icon({ name, color, size = 24, spin, style = {} }: IconProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+function Icon({ name, color, size = 24, spin, style = {}, className }: IconProps) {
+  const { getPrimaryColor } = useTheme();
   const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -116,7 +117,8 @@ function Icon({ name, color, size = 24, spin, style = {} }: IconProps) {
       style={{
         transform: [{ rotate: spinAnimation }],
         ...style,
-      }}>
+      }}
+      className={className}>
       <Monicon name={name} size={size} color={color || getPrimaryColor('0')} />
     </Animated.View>
   );

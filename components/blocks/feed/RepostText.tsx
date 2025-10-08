@@ -14,14 +14,7 @@ export function RepostText({ pubkey, repostCounter }: RepostTextProps) {
     <HStack className="mb-3" align="center">
       <Icon name="garden:arrow-retweet-fill-16" size={16} className="text-primary-400" />
 
-      <UserNameProfiles
-        pubkey={pubkey}
-        className="text-primary-400"
-        style={{
-          fontFamily: 'OverpassBold',
-          fontSize: 14,
-        }}
-      />
+      <UserNameProfiles pubkey={pubkey} />
       {repostCounter > 1 ? (
         <Text
           className="text-primary-400"

@@ -159,13 +159,13 @@ export default function TermsAndConditions({
   const toggleCheckbox = () => setIsChecked(!isChecked);
 
   return (
-    <Container scroll={true} className="bg-primary-900">
+    <Container className="bg-primary-900">
       <ScrollView>
         <VStack spacing={16}>
-          <Text overpass bold size={32} className="py-2 text-center text-primary-50">
+          <Text overpass bold size={32} className="text-primary-50 py-2 text-center">
             {title}
           </Text>
-          <Text overpass size={14} className="leading-[22px] text-primary-0">
+          <Text overpass size={14} className="text-primary-0 leading-[22px]">
             {terms}
           </Text>
         </VStack>
@@ -188,7 +188,7 @@ export default function TermsAndConditions({
                   onValueChange={toggleCheckbox}
                   color={isChecked ? getShadeColor('300') : undefined}
                 />
-                <Text id="terms-checkbox" overpass size={14} className="flex-1 text-primary-0">
+                <Text id="terms-checkbox" overpass size={14} className="text-primary-0 flex-1">
                   {checkboxText}
                 </Text>
               </HStack>

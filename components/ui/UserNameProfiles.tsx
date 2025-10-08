@@ -3,7 +3,7 @@ import { Text } from 'components/ui/Text';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventKind } from 'helper/constants';
 
-export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any }) {
+export function UserNameProfiles({ pubkey }: { pubkey: string }) {
   const filters = useMemo(
     () => [
       {
@@ -31,5 +31,9 @@ export function UserNameProfiles({ pubkey, style }: { pubkey: string; style: any
     return 'Unknown User';
   }, [events]);
 
-  return <Text style={style}>{displayName}</Text>;
+  return (
+    <Text className="text-primary-400" overpass bold size={14}>
+      {displayName}
+    </Text>
+  );
 }

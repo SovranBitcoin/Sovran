@@ -5,7 +5,7 @@ import CachedImage from 'components/ui/Image';
 export function ImageContainer({ url }: { url: string }) {
   return (
     <CachedImage
-      className="mb-2 h-[250px] w-full rounded-lg border border-primary-600 bg-primary-700"
+      className="border-primary-600 bg-primary-700 mb-2 h-[250px] w-full rounded-lg border"
       source={{ uri: url }}
       // resizeMode="contain"
     />

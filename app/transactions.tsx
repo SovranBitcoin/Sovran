@@ -147,8 +147,7 @@ function ModalScreen() {
             <HStack justify="space-between" align="center" className="my-2 w-full">
               <TouchableOpacity
                 onPress={() => toggleAt('at')}
-                className="mr-2 flex-1"
-                className={`rounded-lg border p-2 ${at === 'at' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
+                className={`mr-2 flex-1 rounded-lg border p-2 ${at === 'at' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="mdi:at" // Assuming this is the lightning icon
@@ -165,8 +164,7 @@ function ModalScreen() {
               />
               <TouchableOpacity
                 onPress={() => toggleType('lightning')}
-                className="mr-2 flex-1"
-                className={`rounded-lg border p-2 ${type === 'lightning' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
+                className={`mr-2 flex-1 rounded-lg border p-2 ${type === 'lightning' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="mingcute:lightning-fill" // Assuming this is the lightning icon
@@ -177,8 +175,7 @@ function ModalScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleType('ecash')}
-                className="mr-2 flex-1"
-                className={`rounded-lg border p-2 ${type === 'ecash' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
+                className={`mr-2 flex-1 rounded-lg border p-2 ${type === 'ecash' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
@@ -195,8 +192,7 @@ function ModalScreen() {
               />
               <TouchableOpacity
                 onPress={() => toggleFilter('incoming')}
-                className="mr-2 flex-1"
-                className={`rounded-lg border p-2 ${filter === 'incoming' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
+                className={`mr-2 flex-1 rounded-lg border p-2 ${filter === 'incoming' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="fluent:arrow-download-16-filled"
@@ -207,8 +203,7 @@ function ModalScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => toggleFilter('outgoing')}
-                className="flex-1"
-                className={`rounded-lg border p-2 ${filter === 'outgoing' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
+                className={`flex-1 rounded-lg border p-2 ${filter === 'outgoing' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
                 <HStack align="center" justify="center">
                   <Icon
                     name="fluent:arrow-upload-16-filled"

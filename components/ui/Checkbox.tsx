@@ -5,7 +5,7 @@ import * as CheckboxPrimitive from '@rn-primitives/checkbox';
 
 interface CheckboxProps {
   checked?: boolean;
-  onCheckedChange?: (checked: boolean) => void;
+  onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   size?: number;
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'error';

@@ -8,6 +8,7 @@ interface AppProps {
   style?: StyleProp<ImageStyle>;
   source: ImageSource;
   transitionDuration?: number;
+  className?: string;
 }
 
 /**
@@ -18,9 +19,11 @@ export default function App({
   style,
   source,
   transitionDuration = 1000,
+  className,
 }: AppProps): React.ReactElement {
   return (
     <Image
+      className={className}
       style={style}
       source={source}
       placeholder={{ blurhash: BLUR_HASH }}

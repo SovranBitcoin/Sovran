@@ -313,7 +313,7 @@ export default function ModalScreen() {
             <Text bold size={12}>
               {tx.type} • {tx.transactionType}
             </Text>
-            <Transaction tx={tx} />
+            <Transaction historyEntry={tx} />
           </>
         ))}
 
@@ -414,7 +414,7 @@ export default function ModalScreen() {
           );
         })}
 
-        <View className="h-8 w-8 bg-primary-950"></View>
+        <View className="bg-primary-950 h-8 w-8"></View>
 
         {/* info message */}
         <Card
@@ -506,7 +506,7 @@ export default function ModalScreen() {
                 <VStack key={icon} className="flex-1 items-center" style={{ margin: 16 }}>
                   <Icon name={icon} size={48} color={getPrimaryColor('0')} />
                   <Spacer size={8} />
-                  <Text className="w-full truncate text-center text-xs text-primary-0">{icon}</Text>
+                  <Text className="text-primary-0 w-full truncate text-center text-xs">{icon}</Text>
                 </VStack>
               ))}
               {/* Fill empty columns if row has less than 3 icons */}

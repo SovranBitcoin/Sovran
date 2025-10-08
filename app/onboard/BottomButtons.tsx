@@ -39,7 +39,7 @@ const BottomButtons = ({
   buttonStyle,
   textStyle,
 }: BottomButtonsProps) => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const styles = createStyles(getPrimaryColor);
   const Stack = vertical ? VStack : HStack;
   const spacing = vertical ? 12 : 8;
@@ -54,7 +54,7 @@ const BottomButtons = ({
           key={index}
           style={[
             styles.button,
-            getButtonStyle(button.variant, getPrimaryColor),
+            getButtonStyle(button.variant, getPrimaryColor, getShadeColor),
             !vertical && { flex: 1 },
             button.disabled && styles.disabledButton,
             buttonStyle,
@@ -76,7 +76,11 @@ const BottomButtons = ({
 };
 
 // Helper function to get button style based on variant
-const getButtonStyle = (variant: ButtonVariant, getPrimaryColor: (shade: string) => string) => {
+const getButtonStyle = (
+  variant: ButtonVariant,
+  getPrimaryColor: (shade: string) => string,
+  getShadeColor: (shade: string) => string
+) => {
   const variantStyles: Record<ButtonVariant, ViewStyle> = {
     primary: { backgroundColor: getShadeColor('300') },
     secondary: { backgroundColor: getPrimaryColor('500') },
