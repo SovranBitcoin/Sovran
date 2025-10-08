@@ -252,7 +252,7 @@ const ListRoute = () => {
         <VStack className="items-center p-5">
           <ActivityIndicator size="large" color={getPrimaryColor('0')} />
           <Spacer size={10} />
-          <Text className="text-sm text-primary-200">Loading balances...</Text>
+          <Text className="text-primary-200 text-sm">Loading balances...</Text>
         </VStack>
       </Wrapper>
     );

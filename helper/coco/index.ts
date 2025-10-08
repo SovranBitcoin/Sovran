@@ -1,6 +1,6 @@
 /**
  * Coco Cashu Integration
- * 
+ *
  * This module provides a complete integration with the coco-cashu libraries,
  * replacing the complex Redux-based cashuClient.ts approach with a clean,
  * maintainable architecture.

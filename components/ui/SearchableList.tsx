@@ -41,7 +41,7 @@ export function SearchableList<T>({
     (item: T) => (
       <Pressable
         key={getKey(item)}
-        className="rounded-full border-primary-600 bg-primary-800 p-2"
+        className="border-primary-600 bg-primary-800 rounded-full p-2"
         style={{
           borderWidth: 0.2,
           marginBottom: 8,

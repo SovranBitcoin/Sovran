@@ -9,22 +9,10 @@ import { PUBLIC_KEYS } from 'helper/constants';
 
 interface MenuItemData {
   id: string;
-  icon?: string;
-  label?: string;
-  navigateTo?: string;
-  params?: object;
+  icon: string;
+  label: string;
   empty?: boolean;
 }
-
-const SERVICE_MENU_ITEMS: MenuItemData[] = [
-  {
-    id: 'support',
-    icon: 'mdi:help-circle',
-    label: 'Support',
-    navigateTo: 'userMessages',
-    params: { pubkey: PUBLIC_KEYS.SUPPORT },
-  },
-];
 
 interface MenuItemProps {
   item: MenuItemData;
@@ -63,19 +51,7 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
   );
 };
 
-// Root component (ServicesSection logic merged here)
 const TabTwoScreen = () => {
-  const handleNavigation = (item: MenuItemData) => {
-    if (item.params) {
-      router.push({
-        pathname: `/${item.navigateTo}` as any,
-        params: item.params,
-      });
-    } else {
-      router.push(`/${item.navigateTo}` as any);
-    }
-  };
-
   return (
     <VStack flex={1} className="bg-primary-950">
       <Spacer size={96} />
@@ -94,13 +70,19 @@ const TabTwoScreen = () => {
         <HStack
           className="flex-wrap justify-between"
           style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-          {SERVICE_MENU_ITEMS.map((item) => (
-            <MenuItem
-              key={item.id}
-              item={item}
-              onPress={() => !item.empty && handleNavigation(item)}
-            />
-          ))}
+          <MenuItem
+            item={{
+              id: 'support',
+              icon: 'mdi:help-circle',
+              label: 'Support',
+            }}
+            onPress={() => {
+              router.push({
+                pathname: `userMessages`,
+                params: { pubkey: PUBLIC_KEYS.SUPPORT },
+              });
+            }}
+          />
         </HStack>
       </VStack>
     </VStack>

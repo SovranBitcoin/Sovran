@@ -16,7 +16,7 @@ export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntry
     <HStack
       align="center"
       justify="space-between"
-      className="rounded-lg bg-primary-800"
+      className="bg-primary-800 rounded-lg"
       style={{
         marginHorizontal: 16,
         marginBottom: 0,

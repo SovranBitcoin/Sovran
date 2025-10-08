@@ -93,9 +93,9 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView className="flex-1 bg-primary-950">
+    <BlurView className="bg-primary-950 flex-1">
       <Animated.View
-        className="flex-1 bg-primary-950"
+        className="bg-primary-950 flex-1"
         style={{
           opacity,
           transform: [{ translateX: shake }],

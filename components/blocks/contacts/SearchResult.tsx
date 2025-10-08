@@ -21,7 +21,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="flex-row items-center rounded-lg bg-primary-800 p-2"
+      className="bg-primary-800 flex-row items-center rounded-lg p-2"
       disabled={loading || !result.profile}>
       <HStack spacing={8}>
         <ProfileImage loading={loading} profile={result.profile} />

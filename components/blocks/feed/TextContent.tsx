@@ -159,7 +159,7 @@ export function TextContent({
     <View>
       {hasNostrProfiles ? (
         <Text
-          className="mb-2 text-primary-0"
+          className="text-primary-0 mb-2"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
@@ -169,7 +169,7 @@ export function TextContent({
         </Text>
       ) : (
         <HighlightText
-          className="mb-2 text-primary-0"
+          className="text-primary-0 mb-2"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
@@ -186,7 +186,7 @@ export function TextContent({
       {contentWithoutUrls?.length > 200 && (
         <TouchableOpacity onPress={() => setShowFullText(!showFullText)}>
           <Text
-            className="mb-1 text-right text-primary-300"
+            className="text-primary-300 mb-1 text-right"
             style={{
               fontFamily: 'OverpassBold',
               fontSize,

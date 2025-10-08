@@ -29,7 +29,7 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
   };
 
   return (
-    <View className="overflow-hidden rounded-2xl bg-primary-800 p-4">
+    <View className="bg-primary-800 overflow-hidden rounded-2xl p-4">
       <VStack gap={6}>
         <Text heavy size={20}>
           Add a note
@@ -40,7 +40,7 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
 
         <TextInput
           testID="message-input"
-          className="min-h-[120px] rounded-lg border border-primary-950 bg-primary-900 p-3 text-base text-primary-100"
+          className="border-primary-950 bg-primary-900 text-primary-100 min-h-[120px] rounded-lg border p-3 text-base"
           style={{
             textAlignVertical: 'top',
           }}
