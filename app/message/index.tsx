@@ -23,7 +23,6 @@ import {
   addContact,
   removeContact,
 } from 'redux/nostr';
-import { usePaginatedHistory } from 'coco-cashu-react';
 import { useTheme } from 'providers/ThemeProvider';
 
 // Components
@@ -47,7 +46,7 @@ import { Avatar } from 'components/ui/Avatar';
 import { PUBLIC_KEYS } from 'helper/constants';
 import { maybeConvertNpub } from '@/helper/coco/utils';
 
-export type TimelineItemType = Message | any; // TODO: Replace with proper Coco transaction type
+export type TimelineItemType = Message;
 
 export function convertNpub(pubkey: string) {
   try {
@@ -66,7 +65,6 @@ export default function ModalScreen() {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const { search, addMessage, currentProfile } = useNostr();
   const messages = useSelector(memoizedMessagesByProfile());
-  const { history: transactions } = usePaginatedHistory();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');
@@ -92,31 +90,19 @@ export default function ModalScreen() {
   const contacts = useSelector((state: RootState) => state.nostr.contacts || []);
   const isContact = contacts.some((c) => c.pubkey === pubkey);
 
-  // Auto-scroll to bottom when component mounts or timeline changes
-  // ONE STEP: Get all timeline items for this user
+  // Get messages for this user, grouped by date
   const timelineItemsGroupedByDate = useMemo(() => {
-    const allItems = [
-      // Get user's transactions
-      ...transactions.filter(
-        (t) => t?.nostr?.pubkey && convertNpub(t.nostr.pubkey) === targetPubkey
-      ),
-      // Get user's messages (deduplicated)
-      ..._.uniqBy(
-        messages.filter((msg) => convertNpub(msg.pubkey || msg.sender) === targetPubkey),
-        'id'
-      ),
-    ];
-
-    // Sort and group by date in one step
-    return _.groupBy(
-      allItems.sort((a, b) => {
-        const dateA = (a as any)?.date || a.created_at * 1000;
-        const dateB = (b as any)?.date || b.created_at * 1000;
-        return dateA - dateB;
-      }),
-      (item) => moment((item as any)?.date || item.created_at * 1000).format('YYYY-MM-DD')
+    const userMessages = _.uniqBy(
+      messages.filter((msg) => convertNpub(msg.pubkey || msg.sender) === targetPubkey),
+      'id'
     );
-  }, [transactions, messages, targetPubkey]);
+
+    // Sort and group by date
+    return _.groupBy(
+      userMessages.sort((a, b) => a.created_at - b.created_at),
+      (item) => moment(item.created_at * 1000).format('YYYY-MM-DD')
+    );
+  }, [messages, targetPubkey]);
 
   // Auto-scroll to bottom when component mounts or timeline changes
   useEffect(() => {
@@ -138,33 +124,18 @@ export default function ModalScreen() {
     }
   };
 
-  // Handle long press on timeline items
+  // Handle long press on timeline items (simplified for messages only)
   const handleLongPress = (item: TimelineItemType) => {
-    let options = ['Cancel'];
-    let cancelButtonIndex = 0;
-    let destructiveButtonIndex = -1;
-
-    if ((item as any)?.request) {
-      options = ['View Details', 'Cancel'];
-      destructiveButtonIndex = 0;
-      cancelButtonIndex = 1;
-    }
-
+    // For now, just show a simple action sheet for messages
     showActionSheetWithOptions(
       {
-        options,
-        cancelButtonIndex,
-        destructiveButtonIndex,
+        options: ['Copy Message', 'Cancel'],
+        cancelButtonIndex: 1,
       },
-      (buttonIndex) => {
-        if (buttonIndex === 0 && options.length > 1) {
-          router.push({
-            pathname: '/transaction',
-            params: {
-              id: (item as any).request,
-              transactionType: (item as any).transactionType,
-            },
-          });
+      (buttonIndex?: number) => {
+        if (buttonIndex === 0) {
+          // TODO: Implement copy message functionality
+          console.log('Copy message:', item.content);
         }
       }
     );
@@ -203,7 +174,7 @@ export default function ModalScreen() {
       new Date(date).getTime()
     ).map((date, index) => (
       <VStack key={index}>
-        <Text className="my-4 text-center text-sm font-bold text-primary-400">
+        <Text className="text-primary-400 my-4 text-center text-sm font-bold">
           {moment(date).format('dddd, MMMM Do YYYY')}
         </Text>
         {timelineItemsGroupedByDate[date].map((item, idx) => (
@@ -280,7 +251,7 @@ export default function ModalScreen() {
                         size={72}
                       />
                       <Animated.View className="w-full pt-1.5">
-                        <Text className="w-full text-base font-bold text-primary-0">
+                        <Text className="text-primary-0 w-full text-base font-bold">
                           {displayName}
                         </Text>
                       </Animated.View>
@@ -452,7 +423,7 @@ export default function ModalScreen() {
           }}
           showsVerticalScrollIndicator={false}>
           {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
-            <Text className="my-4 text-center text-sm font-bold text-primary-400">
+            <Text className="text-primary-400 my-4 text-center text-sm font-bold">
               No activity yet
             </Text>
           ) : (

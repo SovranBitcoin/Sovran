@@ -2,15 +2,22 @@ import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { formatAmount } from 'helper/currency';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from '@/helper/constants';
+import { npubToPubkey } from 'components/blocks/Transaction';
 
 interface ContactItemProps {
-  contact: any;
-  isVerified: boolean;
+  // Most recent activity
+  mostRecentMessage?: any;
+
+  // Data sources for profile info
+  mintInfo?: any; // From getMintInfo()
+  nostrInfo?: any; // From nostr profile
+
+  // Fallback for mints
+  mintUrl?: string;
 }
 
 const styles = {
@@ -40,60 +47,132 @@ const styles = {
   },
 };
 
-export const ContactItem = ({ contact }: ContactItemProps) => {
-  const mostRecentTransaction = contact?.transactions?.[0];
-  const mostRecentMessage = contact?.messages?.[0];
+export const ContactItem = ({
+  mostRecentMessage,
+  mintInfo,
+  nostrInfo,
+  mintUrl,
+}: ContactItemProps) => {
+  // Extract profile info from available data sources
+  const getProfileInfo = () => {
+    // Priority: nostrInfo > mintInfo nostr contact > mintInfo > fallback
+    if (nostrInfo) {
+      return {
+        name: nostrInfo.display_name || nostrInfo.name || 'Unknown User',
+        picture: nostrInfo.picture || nostrInfo.image,
+        pubkey: nostrInfo.pubkey,
+      };
+    }
 
-  const mostRecentActivity = mostRecentTransaction || mostRecentMessage;
-  const formattedDate = mostRecentActivity
-    ? formatCustomDate(new Date(mostRecentActivity.date || mostRecentActivity.created_at))
+    if (mintInfo) {
+      // Check if mint has nostr contact info
+      const nostrContact = mintInfo.contact?.find((contact: any) => contact.method === 'nostr');
+      if (nostrContact?.info) {
+        try {
+          // Convert npub to pubkey using existing utility
+          const pubkey = npubToPubkey(nostrContact.info);
+          if (pubkey) {
+            return {
+              name:
+                mintInfo.name || mintUrl?.replace('https://', '').split('/')[0] || 'Unknown Mint',
+              picture: mintInfo.icon_url,
+              pubkey: pubkey,
+            };
+          }
+        } catch (error) {
+          console.warn('Failed to decode nostr contact from mint:', error);
+        }
+      }
+
+      return {
+        name: mintInfo.name || mintUrl?.replace('https://', '').split('/')[0] || 'Unknown Mint',
+        picture: mintInfo.icon_url,
+        pubkey: undefined,
+      };
+    }
+
+    // Fallback for mints
+    if (mintUrl) {
+      return {
+        name: mintUrl.replace('https://', '').split('/')[0],
+        picture: undefined,
+        pubkey: undefined,
+      };
+    }
+
+    return {
+      name: 'Unknown',
+      picture: undefined,
+      pubkey: undefined,
+    };
+  };
+
+  const profile = getProfileInfo();
+
+  // Determine subtitle text
+  const getSubtitle = () => {
+    if (mostRecentMessage) {
+      return mostRecentMessage.content;
+    }
+
+    // Fallback for mints
+    if (mintUrl) {
+      return mintUrl;
+    }
+
+    return 'No activity';
+  };
+
+  // Determine date
+  const formattedDate = mostRecentMessage
+    ? formatCustomDate(
+        new Date(
+          mostRecentMessage.date || mostRecentMessage.created_at || mostRecentMessage.createdAt
+        )
+      )
     : null;
 
-  const previewText = mostRecentTransaction
-    ? `You sent ${formatAmount(
-        { amount: mostRecentTransaction.amount, unit: mostRecentTransaction.unit },
-        {
-          currencyDisplay: mostRecentTransaction.unit === 'sat' ? 'name' : 'symbol',
-        }
-      )}`
-    : mostRecentMessage
-      ? mostRecentMessage.content
-      : '';
+  const subtitle = getSubtitle();
 
   return (
     <TouchableOpacity
       style={styles.contactItem}
       onPress={() => {
-        if (contact.profile) {
+        if (profile.pubkey) {
+          // Navigate to userMessages with the pubkey
           router.push({
             pathname: '/userMessages',
             params: {
-              pubkey: contact.profile?.pubkey,
-              profile: JSON.stringify(contact.profile),
+              pubkey: profile.pubkey,
+              profile: JSON.stringify(profile),
             },
           });
         } else {
+          // TODO: Handle mint-specific navigation (e.g., mint details page)
+          console.log('Mint pressed:', mintUrl);
         }
       }}>
       <HStack align="center" justify="space-between" style={styles.row}>
         <HStack align="center">
           <VStack style={{ marginRight: 8 }}>
             <Avatar
-              picture={contact.profile.picture || contact.profile.image}
+              picture={profile.picture}
+              variant={mintInfo ? 'mint' : 'person'}
               status={
-                Object.values(PUBLIC_KEYS).includes(contact.profile.pubkey) ? 'VERIFIED' : undefined
+                profile.pubkey && Object.values(PUBLIC_KEYS).includes(profile.pubkey)
+                  ? 'VERIFIED'
+                  : undefined
               }
               size={48}
+              name={profile.name}
             />
           </VStack>
           <VStack style={styles.textContainer}>
             <Text style={styles.profileName} className="text-primary-0">
-              {contact.profile?.displayName || contact.profile?.name || 'Unknown User'}
+              {profile.name}
             </Text>
             <Text style={styles.previewText} className="text-primary-100">
-              {previewText.length > 50
-                ? `${previewText.slice(0, 50)}...`
-                : previewText || 'No activity'}
+              {subtitle.length > 50 ? `${subtitle.slice(0, 50)}...` : subtitle}
             </Text>
           </VStack>
         </HStack>
