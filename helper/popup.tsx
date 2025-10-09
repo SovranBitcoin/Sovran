@@ -1,9 +1,48 @@
+/**
+ * @fileoverview Popup and notification system for the Sovran Bitcoin wallet
+ *
+ * This module provides a comprehensive popup and notification system for displaying
+ * various types of messages to users throughout the application. It supports different
+ * message types (error, warning, info, success), customizable variants, and interactive
+ * buttons with navigation capabilities.
+ *
+ * @example
+ * // Import popup function
+ * import { popup } from '@/helper/popup';
+ *
+ * // Simple message
+ * popup('general_error');
+ *
+ * // Custom message with parameters
+ * popup({
+ *   message: 'insufficient_balance',
+ *   params: { amount: 1000, unit: 'sats', fee: 50 }
+ * });
+ *
+ * // Custom popup with buttons
+ * popup({
+ *   message: 'Custom Title',
+ *   text: 'Custom message text',
+ *   type: 'error',
+ *   buttons: [{ text: 'OK', onPress: () => console.log('OK pressed') }]
+ * });
+ */
+
 import { SheetManager } from 'react-native-actions-sheet';
 import { router } from 'expo-router';
 import React from 'react';
 import { Text } from 'components/ui/Text';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 
+/**
+ * Message type constants for different popup categories
+ *
+ * These constants define the available message types that can be used
+ * to categorize and style popups appropriately.
+ *
+ * @readonly
+ * @enum {string}
+ */
 const MESSAGE_TYPES = {
   ERROR: 'error',
   WARNING: 'warning',
@@ -11,6 +50,15 @@ const MESSAGE_TYPES = {
   SUCCESS: 'success',
 };
 
+/**
+ * Emoji mappings for different message types
+ *
+ * These emojis are automatically displayed with their corresponding
+ * message types to provide visual context and improve user experience.
+ *
+ * @readonly
+ * @enum {string}
+ */
 const MESSAGE_EMOJIS = {
   [MESSAGE_TYPES.ERROR]: '🚨',
   [MESSAGE_TYPES.WARNING]: '⚠️',
@@ -18,14 +66,38 @@ const MESSAGE_EMOJIS = {
   [MESSAGE_TYPES.SUCCESS]: '🎉',
 };
 
+/**
+ * Type definition for message text content
+ *
+ * Message text can be a simple string, a React component, or a function
+ * that returns a React component with access to parameters.
+ */
 type MessageText = string | React.ReactNode | ((params: any) => React.ReactNode);
 
+/**
+ * Configuration for popup action buttons
+ *
+ * @interface MessageButton
+ * @property {string} text - The text to display on the button
+ * @property {string} [page] - Optional page to navigate to when button is pressed
+ * @property {() => void} [onPress] - Optional callback function when button is pressed
+ */
 type MessageButton = {
   text: string;
   page?: string;
   onPress?: () => void;
 };
 
+/**
+ * Configuration object for predefined message templates
+ *
+ * @interface MessageConfig
+ * @property {string} title - The title/heading of the popup
+ * @property {MessageText} text - The main message content
+ * @property {string} type - The message type (error, warning, info, success)
+ * @property {MessageButton[]} [buttons] - Optional array of action buttons
+ * @property {string} [variant] - Optional variant for special display behavior
+ */
 type MessageConfig = {
   title: string;
   text: MessageText;
@@ -34,6 +106,16 @@ type MessageConfig = {
   variant?: string; // Add variant as optional property
 };
 
+/**
+ * Predefined message configurations for common application scenarios
+ *
+ * This object contains all the predefined message templates that can be
+ * referenced by their key names. Each configuration includes title, text,
+ * type, and optional buttons or variants.
+ *
+ * @readonly
+ * @constant {Record<string, MessageConfig>}
+ */
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   // Authentication & Permissions
   latest_version: {
@@ -58,41 +140,10 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'Nostr secret key has been copied to your clipboard.',
     type: MESSAGE_TYPES.SUCCESS,
   },
-  unified_address_copied: {
-    title: 'Unified Address Copied',
-    text: 'Unified address has been copied to your clipboard.',
-    type: MESSAGE_TYPES.SUCCESS,
-  },
   lightning_address_copied: {
     title: 'Address Copied',
     text: 'Lightning address has been copied to your clipboard.',
     type: MESSAGE_TYPES.SUCCESS,
-  },
-  payment_request_copied: {
-    title: 'Ecash Payment Request Copied',
-    text: 'Ecash Payment request has been copied to your clipboard.',
-    type: MESSAGE_TYPES.SUCCESS,
-  },
-  invalid_token: {
-    title: 'Invalid Token',
-    text: 'The token format is invalid or corrupted.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  token_expired: {
-    title: 'Token Expired',
-    text: 'This token has expired and cannot be used.',
-    type: MESSAGE_TYPES.WARNING,
-  },
-  payment_info_copy_failed: {
-    title: 'Copy Failed',
-    text: 'Unable to copy payment information. Please try again.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-
-  clipboard_permission_denied: {
-    title: 'Permission Required',
-    text: 'Please enable clipboard access in your device settings to use this feature.',
-    type: MESSAGE_TYPES.ERROR,
   },
   camera_permission_denied: {
     title: 'Camera Permission Denied',
@@ -115,13 +166,6 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     ],
     type: MESSAGE_TYPES.ERROR,
   },
-  sharing_unavailable: {
-    title: 'Sharing Unavailable',
-    text: 'Sharing is not supported on your device.',
-    type: MESSAGE_TYPES.WARNING,
-  },
-
-  // Balance & Transactions
   insufficient_balance: {
     title: 'Insufficient Balance',
     text: ({ amount, unit, fee }: { amount: number; unit: string; fee: number }) => (
@@ -160,41 +204,6 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
       `${amount} ${unit} has been added to your wallet.`,
     type: MESSAGE_TYPES.SUCCESS,
   },
-  funds_sent: {
-    title: 'Transfer Complete',
-    text: ({ amount, unit }: { amount: number; unit: string }) =>
-      `${amount} ${unit} has been sent successfully.`,
-    type: MESSAGE_TYPES.SUCCESS,
-  },
-  ecash_transaction_pending: {
-    title: 'Transaction Pending',
-    text: 'Your transaction is pending. Please wait for the receiver to redeem the ecash token.',
-    type: MESSAGE_TYPES.INFO,
-  },
-  lightning_transaction_pending: {
-    title: 'Transaction Pending',
-    text: 'Your transaction is pending. Please wait for the receiver to send the payment.',
-    type: MESSAGE_TYPES.INFO,
-  },
-  no_initial_balance: {
-    title: 'Deposit Required',
-    text: ({ unit }: { unit: string }) =>
-      `Please add funds to your ${unit.toUpperCase()} account before making transfers.`,
-    type: MESSAGE_TYPES.WARNING,
-  },
-  unsupported_currency: {
-    title: 'Unsupported Currency',
-    text: ({ unit }: { unit: string }) =>
-      `The mint does not support the currency "${unit.toUpperCase()}". Please choose a different currency or different mint.`,
-    type: MESSAGE_TYPES.ERROR,
-  },
-  pending_ecash_transaction: {
-    title: 'Pending reason',
-    text: 'Ecash transactions will remain pending until the receiver has scanned and *redeemed* your ecash token.',
-    type: MESSAGE_TYPES.INFO,
-  },
-
-  // Address & Payment Requests
   invalid_address: {
     title: 'Invalid Address',
     text: ({ address }: { address: string }) =>
@@ -206,35 +215,9 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'No valid address was found in your clipboard.',
     type: MESSAGE_TYPES.WARNING,
   },
-  invalid_payment_request: {
-    title: 'Invalid Payment Request',
-    text: 'The payment request is missing required information.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  missing_amount: {
-    title: 'Amount Required',
-    text: 'The payment request does not specify an amount.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  missing_mint: {
-    title: 'Mint Required',
-    text: 'The payment request does not specify a mint.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  // System & General
   general_error: {
     title: 'Error Occurred',
     text: 'Something went wrong. Please try again.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  mint_update_failed: {
-    title: 'Update Failed',
-    text: 'Unable to update the mint. Please try again.',
-    type: MESSAGE_TYPES.ERROR,
-  },
-  download_failed: {
-    title: 'Download Failed',
-    text: 'Unable to complete the download. Please check your connection and try again.',
     type: MESSAGE_TYPES.ERROR,
   },
   feature_coming_soon: {
@@ -242,23 +225,21 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'This feature is currently under development.',
     type: MESSAGE_TYPES.INFO,
   },
-  already_redeemed: {
-    title: 'Already Redeemed',
-    text: 'This token has already been redeemed. Each token can only be used once per user.',
-    type: MESSAGE_TYPES.WARNING,
-  },
   not_implemented: {
     title: 'Not Implemented',
     text: 'This feature is not yet implemented.',
     type: MESSAGE_TYPES.INFO,
   },
-
+  passcode_not_match: {
+    title: 'Passcode Not Match',
+    text: 'The passcode does not match. Please try again.',
+    type: MESSAGE_TYPES.ERROR,
+  },
   'outputs have already been signed before.': {
     title: 'Outputs have been signed before',
     text: 'Trying again should fix this. If not contact support.',
     type: MESSAGE_TYPES.INFO,
   },
-
   'keyset id inactive.': {
     title: 'Keyset Inactive',
     text: 'You need to update your wallet',
@@ -270,20 +251,16 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     ],
     type: MESSAGE_TYPES.INFO,
   },
-
-  // Cashu related
   'bad response': {
     title: 'Bad Response',
     text: 'This error is typically due to a problem with the mint you are trying to use. Please try a different mint.',
     type: MESSAGE_TYPES.ERROR,
   },
-
   'Error Rate limit exceeded.': {
     title: 'Rate Limit Exceeded',
     text: 'You have exceeded the allowed number of requests. Please try again later.',
     type: MESSAGE_TYPES.ERROR,
   },
-
   'Token already spent.': {
     title: 'Token Already Spent',
     text: 'This token has already been spent. Each token can only be redeemed once',
@@ -304,30 +281,35 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'This invoice has already been paid.',
     type: MESSAGE_TYPES.ERROR,
   },
-  no_funds: {
-    title: 'No New ecash',
-    text: "You don't have any new ecash to redeem.",
-    type: MESSAGE_TYPES.ERROR,
-  },
-  passcode_not_match: {
-    title: 'Passcode Not Match',
-    text: 'The passcode does not match. Please try again.',
-    type: MESSAGE_TYPES.ERROR,
-  },
   'Lightning payment failed: no_route.': {
     title: 'Lightning Payment Failed',
     text: "Your mint isn't well connected to the recipient's lightning network.",
     type: MESSAGE_TYPES.ERROR,
   },
-  colliding_keyset_id: {
-    title: 'Colliding Keyset ID',
-    text: 'This mint has conflicting keyset IDs with existing mints',
-    type: MESSAGE_TYPES.ERROR,
-  },
 };
 
+/**
+ * Type for predefined message configuration keys
+ *
+ * This type represents all the available keys in the MESSAGE_CONFIGS object,
+ * allowing for type-safe access to predefined message templates.
+ */
 type MessageCode = keyof typeof MESSAGE_CONFIGS;
 
+/**
+ * Configuration interface for the popup function
+ *
+ * @interface popupConfig
+ * @property {string | MessageCode} message - The message content or predefined message code
+ * @property {Record<string, any>} [params] - Optional parameters for message template functions
+ * @property {string} [emoji] - Optional custom emoji to override the default
+ * @property {'alert' | 'persistent' | 'toast'} [variant] - Display variant for the popup
+ * @property {boolean} [dismissable] - Whether the popup can be dismissed by the user
+ * @property {number} [duration] - Auto-dismiss duration in milliseconds
+ * @property {MessageButton[]} [buttons] - Custom action buttons for the popup
+ * @property {(data: unknown) => void} [onClose] - Callback function when popup is closed
+ * @property {'success' | 'error' | 'warning' | 'info'} [type] - Override the message type
+ */
 interface popupConfig {
   // Core message content
   message: string | MessageCode;
@@ -349,6 +331,38 @@ interface popupConfig {
   type?: 'success' | 'error' | 'warning' | 'info';
 }
 
+/**
+ * Displays a popup message to the user
+ *
+ * This function is the main entry point for showing popups throughout the application.
+ * It supports both simple string messages and complex configuration objects with
+ * custom styling, buttons, and behavior options.
+ *
+ * @param config - Either a simple string message or a popupConfig object
+ *
+ * @example
+ * // Simple string message
+ * popup('general_error');
+ *
+ * // Predefined message with parameters
+ * popup({
+ *   message: 'insufficient_balance',
+ *   params: { amount: 1000, unit: 'sats', fee: 50 }
+ * });
+ *
+ * // Custom popup with full configuration
+ * popup({
+ *   message: 'Custom Error',
+ *   text: 'Something went wrong',
+ *   type: 'error',
+ *   variant: 'alert',
+ *   buttons: [
+ *     { text: 'Retry', onPress: () => retryAction() },
+ *     { text: 'Cancel', onPress: () => cancelAction() }
+ *   ],
+ *   onClose: (data) => console.log('Popup closed', data)
+ * });
+ */
 export const popup = (config: popupConfig | string) => {
   // Handle both object config and simple string
   if (typeof config === 'string') {
@@ -388,5 +402,14 @@ export const popup = (config: popupConfig | string) => {
   });
 };
 
-// Export constants for use in other files
+/**
+ * Exports the message system constants for use in other files
+ *
+ * These exports allow other parts of the application to access the
+ * message types, emojis, and configurations for consistency.
+ *
+ * @exports MESSAGE_TYPES - Available message type constants
+ * @exports MESSAGE_EMOJIS - Emoji mappings for message types
+ * @exports MESSAGE_CONFIGS - Predefined message configurations
+ */
 export { MESSAGE_TYPES, MESSAGE_EMOJIS, MESSAGE_CONFIGS };

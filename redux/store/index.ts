@@ -3,6 +3,7 @@ import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PUBLIC_KEYS } from 'helper/constants';
+import { hasUrlProtocol } from 'helper/url';
 import _ from 'lodash/fp';
 import { Alert } from 'react-native';
 import bip39 from 'bip39';
@@ -827,7 +828,7 @@ export const getStructure = (obj: any): any => {
   }
   const structure: any = {};
   for (const key in obj) {
-    if (key.includes('https://') || key.includes('http://')) {
+    if (hasUrlProtocol(key)) {
       structure['https://mint.example.com'] = getStructure(obj[key]);
     } else if (getAllKeysFlat().includes(key)) {
       structure[key] = getStructure(obj[key]);

@@ -7,6 +7,7 @@ import { formatCustomDate } from 'helper/time';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { npubToPubkey } from 'components/blocks/Transaction';
+import { getMintDisplayName } from '@/helper/url';
 
 interface ContactItemProps {
   // Most recent activity
@@ -73,8 +74,7 @@ export const ContactItem = ({
           const pubkey = npubToPubkey(nostrContact.info);
           if (pubkey) {
             return {
-              name:
-                mintInfo.name || mintUrl?.replace('https://', '').split('/')[0] || 'Unknown Mint',
+              name: getMintDisplayName(mintUrl || '', mintInfo),
               picture: mintInfo.icon_url,
               pubkey: pubkey,
             };
@@ -85,7 +85,7 @@ export const ContactItem = ({
       }
 
       return {
-        name: mintInfo.name || mintUrl?.replace('https://', '').split('/')[0] || 'Unknown Mint',
+        name: getMintDisplayName(mintUrl || '', mintInfo),
         picture: mintInfo.icon_url,
         pubkey: undefined,
       };
@@ -94,7 +94,7 @@ export const ContactItem = ({
     // Fallback for mints
     if (mintUrl) {
       return {
-        name: mintUrl.replace('https://', '').split('/')[0],
+        name: getMintDisplayName(mintUrl),
         picture: undefined,
         pubkey: undefined,
       };

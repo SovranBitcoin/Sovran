@@ -11,6 +11,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { Avatar } from 'components/ui/Avatar';
+import { extractDomain } from '@/helper/url';
 
 interface MintBalanceDisplayProps {
   unit: string;
@@ -139,9 +140,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
                   size={12}
                   bold
                   overpass>
-                  {mintInfo?.name ||
-                    selectedMint?.replace('https://', '').split('/')[0] ||
-                    'Unknown Mint'}
+                  {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
                 </Text>
                 <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
               </VStack>

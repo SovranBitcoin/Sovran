@@ -1,6 +1,7 @@
 // from enuts
 
 import bolt11 from 'light-bolt11-decoder';
+import { getProtocolForUrl } from '../url';
 const LNURL_REGEX = /^(?:http.*[&?]lightning=|lightning:)?(lnurl[0-9]{1,}[02-9ac-hj-np-z]+)/;
 
 const LN_ADDRESS_REGEX =
@@ -90,7 +91,7 @@ export const parseLnurlp = (url: string): string | null => {
   if (!LNURLP_REGEX.test(parsedUrl)) {
     return null;
   }
-  const protocol = parsedUrl.includes('.onion') ? 'http://' : 'https://';
+  const protocol = getProtocolForUrl(parsedUrl);
   return parsedUrl.replace('lnurlp://', protocol);
 };
 

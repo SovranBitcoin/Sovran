@@ -9,6 +9,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack, Spacer, HStack, View } from 'components/ui/View';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { useMintManagement } from 'hooks/coco';
+import { extractDomain } from '@/helper/url';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Card } from 'components/ui/Card';
 import { RowButton, Section } from 'app/settings-pages';
@@ -414,9 +415,7 @@ const InfoRoute = () => {
         picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
         size={70}
         variant="person"
-        name={
-          mintInfo?.name || auditMintInfo?.name || mintUrl?.replace('https://', '').split('/')[0]
-        }
+        name={mintInfo?.name || auditMintInfo?.name || extractDomain(mintUrl || '')}
         alt={`${mintInfo?.name || auditMintInfo?.name || 'Mint'} icon`}
         status={auditInfo?.auditorData?.state}
       />

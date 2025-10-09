@@ -13,6 +13,7 @@ import { MintCurrencySelector } from '../MintCurrencySelector';
 import { MintSearchInput } from 'components/ui/MintSearchInput';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { filterMints, looksLikeMintUrl } from 'helper/fuzzySearch';
+import { extractDomain } from '@/helper/url';
 import { CocoManager } from 'helper/coco/manager';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -42,7 +43,7 @@ const isPseudoMint = (mint: SearchableMint): mint is PseudoMint => {
 const adaptDiscoveredMint = (mint: DiscoveredMintData): SearchableDiscoveredMint => {
   return {
     ...mint,
-    name: mint.auditInfo.auditorData.name || mint.url.replace('https://', '').split('/')[0],
+    name: mint.auditInfo.auditorData.name || extractDomain(mint.url),
   };
 };
 
@@ -59,8 +60,8 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) =
 
   // Get display values based on mint type
   const displayName = pseudo
-    ? mint.url.replace('https://', '').split('/')[0]
-    : mint.auditInfo.auditorData.name || mint.url.replace('https://', '').split('/')[0];
+    ? extractDomain(mint.url)
+    : mint.auditInfo.auditorData.name || extractDomain(mint.url);
 
   const iconUrl =
     !pseudo && mint.mintInfo
@@ -192,7 +193,7 @@ const AddRoute = () => {
         url,
         isPseudoMint: true,
         mintInfo: customMintInfo,
-        name: url.replace('https://', '').split('/')[0],
+        name: extractDomain(url),
       };
       return [pseudoMint, ...filtered];
     }

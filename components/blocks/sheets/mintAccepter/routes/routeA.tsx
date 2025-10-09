@@ -7,6 +7,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import { popup } from '@/helper/popup';
+import { removeProtocol } from '@/helper/url';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
@@ -45,7 +46,7 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
               fontSize: 20,
               marginBottom: -5.5,
             }}>
-            {payload.mint.replace('https://', '').replace('http://', '')}
+            {removeProtocol(payload.mint)}
           </StyledText>
         </View>
         ?

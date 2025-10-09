@@ -3,6 +3,8 @@
  * Matches against both URL and name fields
  */
 
+import { extractDomain } from './url';
+
 interface SearchableMint {
   url: string;
   name: string;
@@ -69,7 +71,7 @@ export function filterMints<T extends SearchableMint>(mints: T[], query: string)
 export function createPseudoMint(url: string): SearchableMint {
   return {
     url,
-    name: url.replace('https://', '').split('/')[0] || url,
+    name: extractDomain(url) || url,
     mintUrl: url,
     auditorData: undefined, // No auditor data for pseudo mints
   };

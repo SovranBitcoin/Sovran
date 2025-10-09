@@ -7,6 +7,20 @@ import { twMerge } from 'tailwind-merge';
 
 /**
  * Formats a number with appropriate suffixes (k, m, b) for large numbers
+ *
+ * This function converts large numbers into more readable format by adding
+ * appropriate suffixes: 'k' for thousands, 'm' for millions, and 'b' for billions.
+ * Numbers less than 1000 are returned as-is.
+ *
+ * @param num - The number to format (must be a positive number)
+ * @returns A formatted string with appropriate suffix, removing trailing '.0' if present
+ *
+ * @example
+ * formatNumber(1500) // '1.5k'
+ * formatNumber(2500000) // '2.5m'
+ * formatNumber(1000000000) // '1b'
+ * formatNumber(500) // '500'
+ * formatNumber(1000) // '1k' (removes trailing .0)
  */
 export function formatNumber(num: number): string {
   if (num >= 1000000000) {
@@ -22,6 +36,23 @@ export function formatNumber(num: number): string {
 
 /**
  * Checks if a mint history entry has expired based on its payment request
+ *
+ * This function decodes the Lightning Network payment request from the history entry
+ * and checks if the current time exceeds the expiry time. If no payment request
+ * exists or decoding fails, it returns false (not expired).
+ *
+ * @param historyEntry - The mint history entry containing the payment request
+ * @returns True if the entry has expired, false if not expired or if no payment request exists
+ * @throws Will log an error to console if payment request decoding fails, but returns false
+ *
+ * @example
+ * const entry = { paymentRequest: 'lnbc...', ... };
+ * const isExpired = mintHistoryEntryExpired(entry);
+ * if (isExpired) {
+ *   // Handle expired entry - remove from UI or show warning
+ * }
+ *
+ * @since 1.0.0
  */
 export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean {
   try {
@@ -42,6 +73,32 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
   }
 }
 
+/**
+ * Utility function to merge Tailwind CSS classes with proper conflict resolution
+ *
+ * This function combines clsx for conditional class handling and tailwind-merge
+ * for intelligent Tailwind CSS class merging. It resolves conflicts by keeping
+ * the last conflicting class and removes duplicates.
+ *
+ * @param inputs - Variable number of class values to merge (strings, objects, arrays, etc.)
+ * @returns A merged string of CSS classes with conflicts resolved and duplicates removed
+ *
+ * @example
+ * // Basic usage
+ * cn('px-2 py-1', 'px-4') // 'py-1 px-4' (px-2 is overridden by px-4)
+ *
+ * // Conditional classes
+ * cn('text-red-500', { 'text-blue-500': isBlue }) // 'text-blue-500' if isBlue is true
+ *
+ * // Complex conditional logic
+ * cn('base-class', condition && 'conditional-class', isActive && 'active-class')
+ *
+ * // Arrays and mixed types
+ * cn(['class1', 'class2'], { 'class3': true }, 'class4')
+ *
+ * @see {@link https://github.com/dcastil/tailwind-merge} tailwind-merge documentation
+ * @see {@link https://github.com/lukeed/clsx} clsx documentation
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
