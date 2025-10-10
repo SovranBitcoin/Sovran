@@ -30,7 +30,6 @@ interface MintItemProps {
   requireBalance?: boolean;
   selectedCurrency: string;
   showDetailsButton?: boolean;
-  onDetailsPress?: (mintUrl: string) => void;
   onInspectPress?: () => void;
 }
 
@@ -42,7 +41,6 @@ const MintItem: React.FC<MintItemProps> = ({
   globalLoading,
   requireBalance: _requireBalance = true,
   showDetailsButton = false,
-  onDetailsPress,
   onInspectPress,
 }) => {
   const { getPrimaryColor } = useTheme();
@@ -92,9 +90,7 @@ const MintItem: React.FC<MintItemProps> = ({
         {showDetailsButton && (
           <TouchableOpacity
             onPress={() => {
-              if (onDetailsPress) {
-                onDetailsPress(mint.mintUrl);
-              } else if (onInspectPress) {
+              if (onInspectPress) {
                 onInspectPress();
               }
             }}>
@@ -122,7 +118,6 @@ const ListRoute = () => {
   const showAddMintsButton = payload?.showAddMintsButton ?? false;
   const showDetailsButton = payload?.showDetailsButton ?? false;
   const onAddMintsPress = payload?.onAddMintsPress;
-  const onDetailsPress = payload?.onDetailsPress;
 
   const { getBalances, mints } = useMintManagement();
   const [filteredMints, setFilteredMints] = useState<(Mint & { amount: number; unit: string })[]>(
@@ -188,7 +183,7 @@ const ListRoute = () => {
           {
             id: mint.mintUrl,
             name: mint.name,
-            iconUrl: mint.mintInfo.icon_url,
+            iconUrl: mint.mintInfo.icon_url || null,
             unit: mint.unit,
           },
           {
@@ -216,7 +211,7 @@ const ListRoute = () => {
       sheetRef.current?.hide({
         id: mint.mintUrl,
         name: mint.name,
-        iconUrl: mint.mintInfo.icon_url,
+        iconUrl: mint.mintInfo.icon_url || null,
         unit: mint.unit,
       });
     } catch (e) {
@@ -292,7 +287,7 @@ const ListRoute = () => {
         allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
         currencyLabel="Send payment in"
         mintsLabel="Send from"
-        renderItem={(mint: any) => (
+        renderItem={(mint: Mint & { amount: number; unit: string }, selectedCurrency: string) => (
           <MintItem
             key={mint.mintUrl}
             mint={mint}
@@ -301,13 +296,10 @@ const ListRoute = () => {
             globalLoading={loadingId !== null}
             requireBalance={payload?.requireBalance}
             showDetailsButton={showDetailsButton}
-            onDetailsPress={onDetailsPress}
             onInspectPress={() => {
-              // Store mintUrl in a global variable temporarily
-              console.log('Setting global.currentMintUrl to:', mint.mintUrl);
-              (global as any).currentMintUrl = mint.mintUrl;
               router?.navigate('info');
             }}
+            selectedCurrency={selectedCurrency}
             onPress={() => handleMintSelect(mint.mintUrl)}
           />
         )}

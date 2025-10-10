@@ -45,7 +45,6 @@ declare module 'react-native-actions-sheet' {
         showAddMintsButton?: boolean;
         showDetailsButton?: boolean;
         onAddMintsPress?: () => void;
-        onDetailsPress?: (mintUrl: string) => void;
         mintUrl?: string;
         onMintPress?: (
           mint: {
