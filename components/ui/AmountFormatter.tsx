@@ -6,6 +6,7 @@ import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSettings } from 'redux/settings';
+import { cn } from '@/helper/utils';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';
@@ -23,6 +24,7 @@ interface AmountFormatterProps {
   useTypeColors?: boolean;
   transactionType?: TransactionType;
   centered?: boolean;
+  className?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export function AmountFormatter({
   useTypeColors = false,
   transactionType = 'send',
   centered = false,
+  className,
 }: AmountFormatterProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const { settings } = useSettings();
@@ -103,7 +106,7 @@ export function AmountFormatter({
   }
 
   return (
-    <View className={containerClass} style={style}>
+    <View className={cn(containerClass, className)} style={style}>
       {displayBtc === 0 && (
         <AnimatedWrapper>
           <HStack align="center" style={style}>

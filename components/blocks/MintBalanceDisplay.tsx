@@ -11,6 +11,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { Avatar } from 'components/ui/Avatar';
+import { Skeleton } from 'components/ui/Skeleton';
 import { extractDomain } from '@/helper/url';
 
 interface MintBalanceDisplayProps {
@@ -51,6 +52,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 
   // State for mint info only (balance comes from live context)
   const [mintInfo, setMintInfo] = useState<any>(null);
+  const [isLoadingMintInfo, setIsLoadingMintInfo] = useState(false);
 
   // Get the current balance for the selected mint from live context
   const balance = selectedMint ? liveBalances[selectedMint] || 0 : 0;
@@ -59,12 +61,15 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   useEffect(() => {
     const loadMintInfo = async () => {
       if (selectedMint) {
+        setIsLoadingMintInfo(true);
         try {
           const mintInfoData = await getMintInfo(selectedMint);
           setMintInfo(mintInfoData);
         } catch (error) {
           console.error('Failed to load mint info:', error);
           setMintInfo(null);
+        } finally {
+          setIsLoadingMintInfo(false);
         }
       }
     };
@@ -122,27 +127,46 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         <HStack align="center">
           {showMintInfo ? (
             <>
-              <View style={{ marginRight: 8 }}>
-                <Avatar
-                  picture={mintInfo?.icon_url || undefined}
-                  size={32}
-                  variant="mint"
-                  name={mintInfo?.name}
-                  alt={`${mintInfo?.name || 'Mint'} icon`}
-                />
+              <View style={{ marginRight: 4 }}>
+                {isLoadingMintInfo ? (
+                  <Skeleton className="h-[32px] w-[32px] bg-primary-700" />
+                ) : (
+                  <Avatar
+                    picture={mintInfo?.icon_url || undefined}
+                    size={32}
+                    variant="mint"
+                    name={mintInfo?.name}
+                    alt={`${mintInfo?.name || 'Mint'} icon`}
+                  />
+                )}
               </View>
-              <VStack align="flex-start" style={{ marginRight: 10 }}>
-                <Text
-                  style={{
-                    color: getPrimaryColor('50'),
-                  }}
-                  className="ml-[-2px]"
-                  size={12}
-                  bold
-                  overpass>
-                  {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
-                </Text>
-                <AmountFormatter size={12} weight="heavy" amount={balance} unit={unit} />
+              <VStack align="flex-start">
+                {isLoadingMintInfo ? (
+                  <>
+                    <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                    <Spacer size={4} />
+                    <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                  </>
+                ) : (
+                  <>
+                    <Text
+                      style={{
+                        color: getPrimaryColor('50'),
+                      }}
+                      size={12}
+                      bold
+                      overpass>
+                      {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
+                    </Text>
+                    <AmountFormatter
+                      className="ml-[4px]"
+                      size={12}
+                      weight="heavy"
+                      amount={balance}
+                      unit={unit}
+                    />
+                  </>
+                )}
               </VStack>
             </>
           ) : (
