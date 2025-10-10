@@ -2,7 +2,7 @@
 
 [https://sovran.money](https://sovran.money)
 
-<img width=830.9 src="./sovran.png" />
+<img width="100%" src="./sovran.png" />
 
 ## Features
 
