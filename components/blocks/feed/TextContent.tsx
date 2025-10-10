@@ -117,13 +117,13 @@ const NostrProfileReference = ({ nostrRef }: { nostrRef: string }) => {
 };
 
 // Function to split text and render nostr references
-const renderTextWithNostrProfiles = (text: string, theme: any) => {
+const renderTextWithNostrProfiles = (text: string) => {
   const nostrProfileRegex = /(nostr:(nprofile1[^\s]+|npub1[^\s]+))/g;
   const parts = text.split(nostrProfileRegex);
 
   return parts.map((part, index) => {
     if (part.match(nostrProfileRegex)) {
-      return <NostrProfileReference key={index} nostrRef={part} theme={theme} />;
+      return <NostrProfileReference key={index} nostrRef={part} />;
     }
     return part;
   });
@@ -159,17 +159,17 @@ export function TextContent({
     <View>
       {hasNostrProfiles ? (
         <Text
-          className="text-primary-0 mb-2"
+          className="mb-2 text-primary-0"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
             lineHeight: fontSize * 1.4,
           }}>
-          {renderTextWithNostrProfiles(displayText || '', theme)}
+          {renderTextWithNostrProfiles(displayText || '')}
         </Text>
       ) : (
         <HighlightText
-          className="text-primary-0 mb-2"
+          className="mb-2 text-primary-0"
           style={{
             fontFamily: 'OverpassRegular',
             fontSize,
@@ -186,7 +186,7 @@ export function TextContent({
       {contentWithoutUrls?.length > 200 && (
         <TouchableOpacity onPress={() => setShowFullText(!showFullText)}>
           <Text
-            className="text-primary-300 mb-1 text-right"
+            className="mb-1 text-right text-primary-300"
             style={{
               fontFamily: 'OverpassBold',
               fontSize,
