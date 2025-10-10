@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
 import { Text } from 'components/ui/Text';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from 'helper/constants';
+import { Metadata } from 'nostr-tools/kinds';
 
 export function UserNameProfiles({ pubkey }: { pubkey: string }) {
   const filters = useMemo(
     () => [
       {
         authors: [pubkey], // Filter profiles based on the provided pubkey
-        kinds: [EventKind.Metadata], // Fetch metadata (profile details)
+        kinds: [Metadata], // Fetch metadata (profile details)
         limit: 1,
       },
     ],

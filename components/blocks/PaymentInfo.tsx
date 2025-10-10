@@ -1,33 +1,59 @@
-import React, { useState, useCallback, useMemo } from 'react';
+/**
+ * @fileoverview PaymentInfo component for displaying QR codes with copy functionality
+ *
+ * This module contains the PaymentInfo component that displays payment information
+ * as QR codes with integrated copy-to-clipboard functionality. The component supports
+ * both simple string data and complex array-based data structures, with optional
+ * animation and visual variants.
+ */
+
+import React, { useCallback, useMemo } from 'react';
 import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/ui/QRCode';
-import { Spacer, HStack } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
-import { GradientSkeleton } from 'components/ui/GradientSkeleton';
-import { useTheme } from 'providers/ThemeProvider';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Animated from 'react-native-reanimated';
+import { HStack } from 'components/ui/View';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { popup } from '@/helper/popup';
-import { Section } from 'components/ui/Section';
-
-interface TabItem {
-  name: string;
-  value: string;
-}
 
 interface PaymentInfoProps {
   unit: string;
-  data: string | TabItem[];
+  data: string | { name: string; value: string }[];
   link?: string;
   popupMessage: string | { [key: number]: { name: string } };
   setUri?: (uri: string) => void;
   animated?: boolean;
   variant?: 'primary' | 'secondary';
-  showSection?: boolean;
 }
 
+/**
+ * PaymentInfo component displays a QR code for payment information with copy functionality.
+ *
+ * The component can handle both simple string data and array of objects with name/value pairs.
+ * When the QR code is pressed, it copies the payment information to the clipboard and shows
+ * a success message. If no data is available, it displays a skeleton loading state.
+ *
+ * @param props - The component props
+ * @returns A React element containing either a QR code or skeleton loader
+ *
+ * @example
+ * ```tsx
+ * // Simple string data
+ * <PaymentInfo
+ *   unit="sat"
+ *   data="bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+ *   popupMessage="Bitcoin address copied!"
+ * />
+ *
+ * // Array data (uses first item)
+ * <PaymentInfo
+ *   unit="usd"
+ *   data={[{ name: 'Lightning', value: 'lnbc1000n1...' }]}
+ *   popupMessage="Lightning invoice copied!"
+ *   animated={true}
+ * />
+ * ```
+ */
 export function PaymentInfo({
   unit,
   data,
@@ -36,19 +62,21 @@ export function PaymentInfo({
   setUri,
   animated = false,
   variant = 'primary',
-  showSection = true,
 }: PaymentInfoProps): React.ReactElement {
-  const { getPrimaryColor } = useTheme();
+  /**
+   * Extracts the value to display from the data prop.
+   * Handles both string data and array of objects (uses first item's value).
+   */
+  const selectedValue = useMemo(() => {
+    if (typeof data === 'string') return data;
+    if (Array.isArray(data) && data.length > 0) return data[0].value;
+    return '';
+  }, [data]);
 
-  const [activeTab, setActiveTab] = useState<number>(0);
-
-  const hasTabs = Array.isArray(data) && data.length > 0;
-  const TABS = useMemo(() => (hasTabs ? data.map((item) => item.name) : []), [hasTabs, data]);
-
-  const [selectedValue, setSelectedValue] = useState<string>(
-    hasTabs ? data[0].value : typeof data === 'string' ? data : ''
-  );
-
+  /**
+   * Handles copying payment information to clipboard when QR code is pressed.
+   * Copies either the link prop or the selectedValue, then shows a success popup.
+   */
   const handleCopyPress = useCallback(async () => {
     const textToCopy = link || selectedValue;
     await Clipboard.setStringAsync(textToCopy);
@@ -56,117 +84,30 @@ export function PaymentInfo({
     const message =
       typeof popupMessage === 'string'
         ? popupMessage
-        : (popupMessage[activeTab]?.name ?? 'Copied to clipboard');
+        : (popupMessage[0]?.name ?? 'Copied to clipboard');
 
     popup({ message, type: 'success' });
-  }, [link, selectedValue, popupMessage, activeTab]);
+  }, [link, selectedValue, popupMessage]);
 
-  const renderQRCode = (): React.ReactElement => {
-    if (!selectedValue) {
-      return (
-        <HStack align="center" justify="center">
-          <GradientSkeleton startColor={getPrimaryColor('800')} endColor={getPrimaryColor('950')} />
-        </HStack>
-      );
-    }
-
+  if (!selectedValue) {
     return (
-      <Pressable onPress={handleCopyPress}>
-        <ViewShot captureMode="mount" onCapture={setUri}>
-          <AnimatedQRCode
-            padding={32}
-            unit={unit}
-            address={selectedValue}
-            animate={animated}
-            variant={variant}
-          />
-        </ViewShot>
-      </Pressable>
-    );
-  };
-
-  const renderSection = (): React.ReactElement | null => {
-    if (!selectedValue || !showSection) return null;
-
-    return (
-      <>
-        <Spacer size={12} />
-        <Section
-          special={true}
-          style={{
-            marginHorizontal: 16,
-            marginBottom: 0,
-          }}
-          items={[
-            {
-              title: '',
-              value: link || selectedValue,
-            },
-          ]}
-        />
-      </>
-    );
-  };
-
-  return (
-    <>
-      {renderQRCode()}
-      {renderSection()}
-    </>
-  );
-}
-
-interface TabButtonProps {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-  onLayout: (event: any) => void;
-  isFirst: boolean;
-  animatedStyle: any;
-}
-
-const TabButton = React.memo(
-  ({
-    label,
-    isActive,
-    onPress,
-    onLayout,
-    isFirst,
-    animatedStyle,
-  }: TabButtonProps): React.ReactElement => {
-    const { getShadeColor, getPrimaryColor } = useTheme();
-
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        className="relative flex-1 items-center pb-2"
-        onLayout={onLayout}>
-        <Text
-          style={{
-            fontFamily: 'OverpassBold',
-            fontSize: 14,
-            color: isActive ? getPrimaryColor('0') : getPrimaryColor('400'),
-          }}>
-          {label}
-        </Text>
-        {isFirst && (
-          <Animated.View
-            style={[
-              {
-                height: 2,
-                width: '100%',
-                backgroundColor: getShadeColor('300'),
-                position: 'absolute',
-                bottom: 0,
-                top: 8,
-              },
-              animatedStyle,
-            ]}
-          />
-        )}
-      </TouchableOpacity>
+      <HStack align="center" justify="center">
+        <Skeleton className="bg-primary-800 h-64 w-64" />
+      </HStack>
     );
   }
-);
 
-TabButton.displayName = 'TabButton';
+  return (
+    <Pressable onPress={handleCopyPress}>
+      <ViewShot captureMode="mount" onCapture={setUri}>
+        <AnimatedQRCode
+          padding={32}
+          unit={unit}
+          address={selectedValue}
+          animate={animated}
+          variant={variant}
+        />
+      </ViewShot>
+    </Pressable>
+  );
+}

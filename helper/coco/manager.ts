@@ -5,9 +5,10 @@ import { retrieveMnemonic } from 'helper/secureStorage';
 import { mnemonicToSeedSync } from 'bip39';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
 import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
-import { nip19 } from 'nostr-tools';
-import { store } from 'redux/store';
-import { memoizedGetCurrentProfile } from 'redux/nostr/selectors';
+import * as nip06 from 'nostr-tools/nip06';
+import { HDKey } from '@scure/bip32';
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 /**
  * Coco Manager singleton for managing Cashu operations
@@ -62,14 +63,22 @@ export class CocoManager {
         if (!mnemonic) {
           throw new Error('No mnemonic found in secure storage');
         }
-        return mnemonicToSeedSync(mnemonic);
+
+        // Derive cashu mnemonic using the same logic as useCashuMnemonic hook
+        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+        const DERIVATION_PATH = `m/44'/129372'`;
+        const path = `${DERIVATION_PATH}/0'/0'/0/0`; // Account index 0
+        const seed = root.derive(path);
+        const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
+
+        return mnemonicToSeedSync(derivedCashuMnemonic);
       };
 
       // Prepare plugins array
       const plugins: any[] = [];
 
       // Add NPC plugin if current profile is available
-      const nsecSigner = this.getCurrentProfileSigner();
+      const nsecSigner = await this.getCurrentProfileSigner();
       if (nsecSigner) {
         console.log('NsecSigner created:', typeof nsecSigner, nsecSigner);
 
@@ -238,18 +247,20 @@ export class CocoManager {
    * Get the current profile's signer for NPC plugin
    * This creates a signer from the current profile's nsec
    */
-  private static getCurrentProfileSigner(): NsecSigner | null {
+  private static async getCurrentProfileSigner(): Promise<NsecSigner | null> {
     try {
-      const state = store.getState();
-      const currentProfile = memoizedGetCurrentProfile(state);
+      // Get mnemonic from secure storage
+      const mnemonic = await retrieveMnemonic();
 
-      if (!currentProfile?.nsec) {
-        console.warn('No current profile or nsec found for NPC plugin');
+      if (!mnemonic) {
+        console.warn('No mnemonic found for NPC plugin');
         return null;
       }
 
-      const { data: secretKey } = nip19.decode(currentProfile.nsec);
-      return new NsecSigner(secretKey as Uint8Array);
+      // Derive Nostr keys using NIP-06 (account index 0)
+      const { privateKey: sk } = nip06.accountFromSeedWords(mnemonic, undefined, 0);
+
+      return new NsecSigner(sk);
     } catch (error) {
       console.error('Failed to create signer for NPC plugin:', error);
       return null;

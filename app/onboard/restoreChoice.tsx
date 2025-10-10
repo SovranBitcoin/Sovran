@@ -17,7 +17,7 @@ import Icon from 'assets/icons';
 import Image from 'components/ui/Image';
 import { Button } from 'components/ui/Button';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from 'helper/constants';
+import { Metadata } from 'nostr-tools/kinds';
 import * as nip06 from 'nostr-tools/nip06';
 import { Card } from 'components/ui/Card';
 import { useTheme } from 'providers/ThemeProvider';
@@ -50,7 +50,7 @@ function useRestoreCandidate() {
     return [
       {
         authors: [state.pubkey],
-        kinds: [EventKind.Metadata],
+        kinds: [Metadata],
         limit: 1,
       },
     ];
@@ -226,19 +226,19 @@ export default function RestoreChoiceScreen() {
           style={{ paddingHorizontal: 32 }}>
           <Icon name="fa6-solid:triangle-exclamation" size={48} color="#9ca3af" />
           <Spacer size={16} />
-          <Text className="text-center text-xl font-bold text-primary-0">
+          <Text className="text-primary-0 text-center text-xl font-bold">
             Unable to Load Account
           </Text>
           <Spacer size={12} />
-          <Text className="text-center text-base leading-6 text-primary-300">
+          <Text className="text-primary-300 text-center text-base leading-6">
             {error || "We couldn't find account information."}
           </Text>
           <Spacer size={32} />
           <TouchableOpacity
-            className="w-full items-center justify-center rounded-xl bg-primary-0"
+            className="bg-primary-0 w-full items-center justify-center rounded-xl"
             style={{ paddingVertical: 16 }}
             onPress={handleSkip}>
-            <Text className="text-base font-semibold text-primary-950">
+            <Text className="text-primary-950 text-base font-semibold">
               Continue to Create New Account
             </Text>
           </TouchableOpacity>
@@ -261,7 +261,7 @@ export default function RestoreChoiceScreen() {
             <View className="bg-primary-950" style={{ flex: 1 }}>
               <VStack
                 align="center"
-                className="rounded-2xl border-primary-700 bg-primary-800"
+                className="border-primary-700 bg-primary-800 rounded-2xl"
                 style={{
                   padding: 12,
                   borderWidth: 1,
@@ -276,7 +276,7 @@ export default function RestoreChoiceScreen() {
                   <View style={{ marginRight: 8 }}>
                     {!profileInfo ? (
                       <View
-                        className="h-[48px] w-[48px] items-center justify-center rounded-full border-primary-700 bg-primary-700"
+                        className="border-primary-700 bg-primary-700 h-[48px] w-[48px] items-center justify-center rounded-full"
                         style={{
                           borderWidth: 2,
                         }}>
@@ -295,7 +295,7 @@ export default function RestoreChoiceScreen() {
                       />
                     ) : (
                       <View
-                        className="h-[72px] w-[72px] items-center justify-center rounded-full border-primary-700 bg-primary-700"
+                        className="border-primary-700 bg-primary-700 h-[72px] w-[72px] items-center justify-center rounded-full"
                         style={{
                           borderWidth: 2,
                         }}>

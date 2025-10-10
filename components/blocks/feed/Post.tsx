@@ -7,7 +7,7 @@ import { ActionItems, usePostReactions } from './ActionItems';
 import { RepostText } from './RepostText';
 import { UrlProcessor } from './UrlProcessor';
 import { useNostrProfile } from './useNostrProfile';
-import { EventKind } from 'helper/constants';
+import { Repost } from 'nostr-tools/kinds';
 
 interface PostProps {
   post: any;
@@ -15,7 +15,7 @@ interface PostProps {
 
 export function Post({ post }: PostProps) {
   // Check if this is a repost
-  const isRepost = post?.kind === EventKind.Repost;
+  const isRepost = post?.kind === Repost;
 
   // For reposts, use the original post ID for reactions, otherwise use the post ID
   const postIdForReactions = isRepost

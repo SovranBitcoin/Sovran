@@ -67,9 +67,15 @@ const PaymentsHeaderTitle = () => {
 };
 
 const WalletHeaderTitle = () => {
+  const { currentProfile } = useNostr();
   const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
   const accounts = supportedUnits.map((unit) => ({ unit }));
   const [account, setAccount] = React.useState(accounts[0]);
+
+  // Always render the component but conditionally show content
+  if (!currentProfile?.pubkey) {
+    return null;
+  }
 
   return <WalletHeader unit={account.unit} accounts={accounts} setAccount={setAccount} />;
 };
@@ -83,21 +89,25 @@ const TabLayout = () => {
 
   const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
 
-  const HeaderLeft = () => (
-    <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-      <HStack spacing={12} align="flex-start">
-        <Spacer size={8} />
-        <Avatar picture={currentProfile?.picture} />
-      </HStack>
-    </Pressable>
-  );
+  const HeaderLeft = () => {
+    if (!currentProfile?.pubkey) return null;
+
+    return (
+      <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+        <HStack spacing={12} align="flex-start">
+          <Spacer size={8} />
+          <Avatar picture={currentProfile?.picture} />
+        </HStack>
+      </Pressable>
+    );
+  };
 
   const HeaderRight = () => (
     <Pressable
       className="opacity-0"
       onPress={() => popup({ message: 'not_implemented', type: 'info' })}>
       <HStack spacing={8}>
-        <View className="bg-primary-800 rounded-full p-2">
+        <View className="rounded-full bg-primary-800 p-2">
           <Icon name="solar:card-bold" color={getPrimaryColor('0')} />
         </View>
         <Spacer size={8} />

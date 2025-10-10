@@ -23,6 +23,7 @@ import {
   addContact,
   removeContact,
 } from 'redux/nostr';
+import { useNostrKeys } from 'hooks/useSecureStore';
 import { useTheme } from 'providers/ThemeProvider';
 
 // Components
@@ -63,7 +64,8 @@ export default function ModalScreen() {
   const dispatch = useDispatch();
 
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
-  const { search, addMessage, currentProfile } = useNostr();
+  const { search, addMessage } = useNostr();
+  const { value: nostrKeys } = useNostrKeys();
   const messages = useSelector(memoizedMessagesByProfile());
   const { showActionSheetWithOptions } = useActionSheet();
 
@@ -147,7 +149,7 @@ export default function ModalScreen() {
       const recipientPubKey = convertNpub(pubkey);
 
       const sentEvent = await sendEncryptedDirectMessage({
-        nsec: currentProfile.nsec,
+        nsec: nostrKeys?.nsec || '',
         recipientPublicKey: recipientPubKey,
         message,
       });
@@ -174,7 +176,7 @@ export default function ModalScreen() {
       new Date(date).getTime()
     ).map((date, index) => (
       <VStack key={index}>
-        <Text className="text-primary-400 my-4 text-center text-sm font-bold">
+        <Text className="my-4 text-center text-sm font-bold text-primary-400">
           {moment(date).format('dddd, MMMM Do YYYY')}
         </Text>
         {timelineItemsGroupedByDate[date].map((item, idx) => (
@@ -251,7 +253,7 @@ export default function ModalScreen() {
                         size={72}
                       />
                       <Animated.View className="w-full pt-1.5">
-                        <Text className="text-primary-0 w-full text-base font-bold">
+                        <Text className="w-full text-base font-bold text-primary-0">
                           {displayName}
                         </Text>
                       </Animated.View>
@@ -387,7 +389,7 @@ export default function ModalScreen() {
                 },
               ]}
             />
-            {currentProfile?.nsec && (
+            {nostrKeys?.nsec && (
               <HStack align="center" spacing={2} className="relative">
                 <TextInput
                   placeholder="Type your message..."
@@ -423,7 +425,7 @@ export default function ModalScreen() {
           }}
           showsVerticalScrollIndicator={false}>
           {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
-            <Text className="text-primary-400 my-4 text-center text-sm font-bold">
+            <Text className="my-4 text-center text-sm font-bold text-primary-400">
               No activity yet
             </Text>
           ) : (

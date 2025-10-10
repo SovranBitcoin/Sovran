@@ -150,15 +150,11 @@ export default function DrawerLayout() {
         swipeEdgeWidth: screenWidth * 0.15,
         swipeMinDistance: 25,
         drawerStyle: {
-          width:
-            currentProfile?.pubkey && selectedMint
-              ? Math.max(screenWidth - 50, screenWidth * 0.9)
-              : 0,
+          width: currentProfile?.pubkey ? Math.max(screenWidth - 50, screenWidth * 0.9) : 0,
         },
         keyboardDismissMode: 'none',
       }}
       drawerContent={() => {
-        if (!(currentProfile?.pubkey && selectedMint)) return null;
         return <WrappedSovranDrawer />;
       }}>
       <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />

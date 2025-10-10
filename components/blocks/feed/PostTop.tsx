@@ -1,7 +1,7 @@
 import React from 'react';
 import { HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { GradientSkeleton } from 'components/ui/GradientSkeleton';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useNostrProfile } from './useNostrProfile';
 import { getTimeAgo } from 'helper/time';
 import { useTheme } from 'providers/ThemeProvider';
@@ -11,7 +11,7 @@ interface PostTopProps {
 }
 
 export function PostTop({ post }: PostTopProps) {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor: _getPrimaryColor } = useTheme();
   const profile = useNostrProfile({ id: post?.pubkey });
   let timeAgo = getTimeAgo(post.created_at);
 
@@ -26,16 +26,7 @@ export function PostTop({ post }: PostTopProps) {
   return (
     <HStack align="center">
       {!displayName ? (
-        <GradientSkeleton
-          startColor={getPrimaryColor('700')}
-          endColor={getPrimaryColor('600')}
-          width={100}
-          height={16}
-          style={{
-            borderRadius: 8,
-            marginRight: 8,
-          }}
-        />
+        <Skeleton className="bg-primary-700 mr-2 h-4 w-24 rounded-lg" />
       ) : (
         <Text
           className="text-primary-0"

@@ -9,7 +9,7 @@ import { View } from 'components/ui/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
-import { EventKind } from 'helper/constants';
+import { ShortTextNote, Repost } from 'nostr-tools/kinds';
 
 const Feed = ({ filters }: { filters: any }) => {
   const { events } = useSubscribe({ filters });
@@ -42,7 +42,7 @@ const TabTwoScreen = () => {
     () => ({
       Feed: [
         {
-          kinds: [EventKind.TextNote, EventKind.Repost, 30023],
+          kinds: [ShortTextNote, Repost, 30023],
           authors: [pubkey],
         },
       ],

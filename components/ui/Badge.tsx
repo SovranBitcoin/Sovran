@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { ViewStyle } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { HStack } from './View';
 import { Text } from './Text';
@@ -25,18 +26,18 @@ const badgeVariants = cva(
   }
 );
 
-export interface BadgeProps
-  extends React.ComponentPropsWithoutRef<'div'>,
-    VariantProps<typeof badgeVariants> {
+export interface BadgeProps extends VariantProps<typeof badgeVariants> {
   icon?: string;
   size?: number;
   color?: string;
+  className?: string;
+  children?: React.ReactNode;
 }
 
-function Badge({ className, variant, icon, size = 12, color, children, ...props }: BadgeProps) {
+function Badge({ className, variant, icon, size = 12, color, children }: BadgeProps) {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
-  const getVariantStyles = () => {
+  const getVariantStyles = (): ViewStyle => {
     switch (variant) {
       case 'primary':
         return {
@@ -97,20 +98,18 @@ function Badge({ className, variant, icon, size = 12, color, children, ...props 
   return (
     <HStack
       blur
-      colorBlur={opacity(getVariantStyles().backgroundColor, 0.2)}
-      align="center"
+      colorBlur={opacity(String(getVariantStyles().backgroundColor || '#000000'), 0.2)}
       gap={isIconOnly ? 0 : 4}
       className={cn(badgeVariants({ variant }), className)}
+      justify="center"
+      align="center"
       style={{
         ...variantStyles,
         paddingHorizontal: isIconOnly ? 0 : 10, // px-2.5 equivalent
         paddingVertical: isIconOnly ? 0 : 2, // py-0.5 equivalent
-        width: isIconOnly ? size + 4 : undefined, // Make it square for icon-only
-        height: isIconOnly ? size + 4 : undefined,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-      {...props}>
+        width: isIconOnly ? ((size + 4) as number) : undefined, // Make it square for icon-only
+        height: isIconOnly ? ((size + 4) as number) : undefined,
+      }}>
       {icon && <Icon name={icon} size={size} color={textColor} />}
       {children && (
         <Text size={size} bold overpass color={textColor}>

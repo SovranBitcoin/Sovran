@@ -5,7 +5,7 @@ import Icon from 'assets/icons';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache
 import { Cache } from 'react-native-cache';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from 'helper/constants';
+import { Reaction, Repost, Zap } from 'nostr-tools/kinds';
 import { formatNumber } from 'helper/utils';
 import { getLightningAmount } from '@/helper/coco/utils';
 
@@ -58,7 +58,7 @@ export const usePostReactions = ({ id }: { id: string }) => {
     () => [
       {
         '#e': [id], // Use the post ID to filter reactions, reposts, and zaps
-        kinds: [EventKind.Reaction, EventKind.Repost, EventKind.ZapReceipt], // Include all event types
+        kinds: [Reaction, Repost, Zap], // Include all event types
       },
     ],
     [id]
@@ -74,15 +74,11 @@ export const usePostReactions = ({ id }: { id: string }) => {
     if (toggle && reactionEvents.length > 0) {
       async function updateReactionCache() {
         // Count reactions, reposts, and zaps
-        const newReactionCount = reactionEvents.filter(
-          (event) => event.kind === EventKind.Reaction
-        ).length;
-        const newRepostCount = reactionEvents.filter(
-          (event) => event.kind === EventKind.Repost
-        ).length;
+        const newReactionCount = reactionEvents.filter((event) => event.kind === Reaction).length;
+        const newRepostCount = reactionEvents.filter((event) => event.kind === Repost).length;
         let newZapCount = 0;
         reactionEvents
-          .filter((event) => event.kind === EventKind.ZapReceipt)
+          .filter((event) => event.kind === Zap)
           .forEach((event) => {
             const ln = event.tags.find((t) => t[0] === 'bolt11')?.[1];
             if (ln) {

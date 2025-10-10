@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Utility functions for the Sovran application
+ *
+ * This module contains various utility functions used throughout the application,
+ * including number formatting, Lightning Network payment request handling,
+ * and Tailwind CSS class merging utilities.
+ */
+
 import { MintHistoryEntry } from 'coco-cashu-core';
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
@@ -51,8 +59,6 @@ export function formatNumber(num: number): string {
  * if (isExpired) {
  *   // Handle expired entry - remove from UI or show warning
  * }
- *
- * @since 1.0.0
  */
 export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean {
   try {

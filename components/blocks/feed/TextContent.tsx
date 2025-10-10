@@ -6,7 +6,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { nip19 } from 'nostr-tools';
 import { useNostrProfile } from './useNostrProfile';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { EventKind } from 'helper/constants';
+import { Metadata } from 'nostr-tools/kinds';
 import { useTheme } from 'providers/ThemeProvider';
 
 export const extractUrls = (text: string) => {
@@ -57,7 +57,7 @@ const NostrProfileReference = ({ nostrRef }: { nostrRef: string }) => {
     () => [
       {
         authors: pubkey ? [pubkey] : [],
-        kinds: [EventKind.Metadata],
+        kinds: [Metadata],
         limit: 1,
       },
     ],

@@ -9353,6 +9353,11 @@ react-native-skeleton-component@^1.0.0:
   resolved "https://registry.npmjs.org/react-native-skeleton-component/-/react-native-skeleton-component-1.0.0.tgz"
   integrity sha512-sMZoZegq6ZwbxrsrxYdZWVUT5OJb1dCX/hLOlwVBkzItwR5cWBqsYaXeNhPOdasXYDhkVMtDQlgZjgyw9dfMJw==
 
+react-native-skeleton-placeholder@^5.2.4:
+  version "5.2.4"
+  resolved "https://registry.yarnpkg.com/react-native-skeleton-placeholder/-/react-native-skeleton-placeholder-5.2.4.tgz#a654fa083ff274a39c763e086f8a850c556d4c95"
+  integrity sha512-OZntVq1hU1UX33FltxK2ezT2v9vHIhV8YnEbnMWUCvxT0N9OsgD1qxiHm6qb9YRJVgq2o5z3S7dNPsPnDF/jNg==
+
 react-native-snow-bg@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/react-native-snow-bg/-/react-native-snow-bg-1.0.0.tgz"

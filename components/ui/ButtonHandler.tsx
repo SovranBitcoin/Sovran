@@ -23,9 +23,17 @@ interface ButtonHandlerProps {
   context?: 'tab' | 'sheet';
   buttons: ButtonHandlerButton[];
   style?: StyleProp<ViewStyle>;
+  gradientColor?: string;
+  className?: string;
 }
 
-export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
+export function ButtonHandler({
+  context,
+  buttons,
+  style,
+  gradientColor,
+  className,
+}: ButtonHandlerProps) {
   const [loading, setLoading] = useState(false);
   const { getPrimaryColor } = useTheme();
 
@@ -58,10 +66,13 @@ export function ButtonHandler({ context, buttons, style }: ButtonHandlerProps) {
       align="center"
       justify="space-between"
       spacing={0}
-      className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''}`}
+      className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''} ${className || ''}`}
       style={[style]}>
       <LinearGradient
-        colors={[opacity(getPrimaryColor('950'), 0.75), opacity(getPrimaryColor('950'), 0)]}
+        colors={[
+          opacity(gradientColor || getPrimaryColor('950'), 0.75),
+          opacity(gradientColor || getPrimaryColor('950'), 0),
+        ]}
         start={{ x: 0, y: 1 }}
         end={{ x: 0, y: 0 }}
         style={{

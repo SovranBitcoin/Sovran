@@ -3,7 +3,7 @@ import { Button } from 'components/ui/Button';
 import { ScrollView } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
-import { VStack, HStack, Spacer } from 'components/ui/View';
+import { VStack, HStack } from 'components/ui/View';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Text } from 'components/ui/Text';
@@ -161,18 +161,14 @@ export default function TermsAndConditions({
   return (
     <Container className="bg-primary-900">
       <ScrollView>
-        <VStack spacing={16}>
+        <VStack spacing={16} className="p-4">
           <Text overpass bold size={32} className="text-primary-50 py-2 text-center">
             {title}
           </Text>
           <Text overpass size={14} className="text-primary-0 leading-[22px]">
             {terms}
           </Text>
-        </VStack>
 
-        <Spacer size={64} />
-
-        <VStack spacing={16}>
           <Button
             variant="primary"
             text={buttonText}

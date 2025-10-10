@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -6,10 +6,11 @@ import { useTheme } from 'providers/ThemeProvider';
 import { convertTime } from 'helper/time';
 import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
 import { mintHistoryEntryExpired } from 'helper/utils';
-import { MintQuoteState, MeltQuoteState } from '@cashu/cashu-ts';
+import { MintQuoteState, MeltQuoteState, MeltQuoteResponse } from '@cashu/cashu-ts';
 
 interface TransactionTimelineProps {
   historyEntry: HistoryEntry;
+  meltQuote?: MeltQuoteResponse;
 }
 
 // Define the state progressions
@@ -24,9 +25,49 @@ interface TimelineItem {
   timestamp?: number;
 }
 
-export function TransactionTimeline({ historyEntry }: TransactionTimelineProps) {
+// Helper function to check if melt quote is expired
+const isMeltQuoteExpired = (meltQuote: MeltQuoteResponse, currentTime: number): boolean => {
+  if (!meltQuote.expiry) return false;
+  const now = Math.floor(currentTime / 1000);
+  return now > meltQuote.expiry;
+};
+
+// Helper function to get time until expiry
+const getTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): string => {
+  if (!meltQuote.expiry) return '';
+  const now = Math.floor(currentTime / 1000);
+  const timeLeft = meltQuote.expiry - now;
+
+  if (timeLeft <= 0) return 'EXPIRED';
+
+  const hours = Math.floor(timeLeft / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
+  const seconds = timeLeft % 60;
+
+  if (hours > 0) {
+    return `expires in ${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `expires in ${minutes}m ${seconds}s`;
+  } else {
+    return `expires in ${seconds}s`;
+  }
+};
+
+export function TransactionTimeline({ historyEntry, meltQuote }: TransactionTimelineProps) {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Update time every second for real-time countdown
+  useEffect(() => {
+    if (meltQuote && historyEntry.type === 'melt' && meltQuote.expiry) {
+      const interval = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [meltQuote, historyEntry.type]);
 
   const isMintTransaction = historyEntry.type === 'mint';
 
@@ -59,8 +100,22 @@ export function TransactionTimeline({ historyEntry }: TransactionTimelineProps) 
     } else {
       // Melt transaction
       const meltTx = historyEntry as MeltHistoryEntry;
-      const currentIndex = MELT_STATES.indexOf(meltTx.state);
+      const isExpired = meltQuote && isMeltQuoteExpired(meltQuote, currentTime);
 
+      if (isExpired) {
+        // Show expired timeline for melt
+        return [
+          {
+            state: MeltQuoteState.UNPAID,
+            complete: true,
+            isCurrent: false,
+            timestamp: meltTx.createdAt,
+          },
+          { state: EXPIRED_STATE, complete: true, isCurrent: true },
+        ];
+      }
+
+      const currentIndex = MELT_STATES.indexOf(meltTx.state);
       return MELT_STATES.map((state, index) => ({
         state,
         complete: index <= currentIndex,
@@ -72,6 +127,17 @@ export function TransactionTimeline({ historyEntry }: TransactionTimelineProps) 
 
   const timeline = getTimeline();
   const currentState = timeline.find((item) => item.isCurrent)?.state || timeline[0].state;
+
+  // Get expiry info for melt quotes
+  const getStateWithExpiry = () => {
+    if (meltQuote && historyEntry.type === 'melt') {
+      const expiryInfo = getTimeUntilExpiry(meltQuote, currentTime);
+      if (expiryInfo) {
+        return `${currentState} • ${expiryInfo}`;
+      }
+    }
+    return currentState;
+  };
 
   // Determine if we should show collapse/expand
   const canCollapse =
@@ -107,7 +173,7 @@ export function TransactionTimeline({ historyEntry }: TransactionTimelineProps) 
           marginBottom: 8,
           textTransform: 'uppercase',
         }}>
-        {currentState}
+        {getStateWithExpiry()}
       </Text>
 
       <View>

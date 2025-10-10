@@ -1,12 +1,20 @@
+/**
+ * @fileoverview New User Onboarding Screen for Sovran Application
+ *
+ * This module contains the React component for creating a new Sovran profile during
+ * the onboarding process. It handles profile picture selection, name input, and
+ * Nostr profile creation with secure mnemonic generation and storage.
+ *
+ * The component integrates with Nostr protocol for decentralized identity management
+ * and uses BIP39 mnemonic generation for secure key derivation following NIP-06.
+ */
+
 import 'shim';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -17,11 +25,9 @@ import { Text } from 'components/ui/Text';
 import { router } from 'expo-router';
 import { EventTemplate, finalizeEvent, nip19, SimplePool } from 'nostr-tools';
 import { PUBLIC_KEYS } from 'helper/constants';
-// @ts-ignore
-import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import * as nip06 from 'nostr-tools/nip06';
 import { useNostr } from 'redux/nostr';
 import * as bip39 from '@scure/bip39';
-
 import { entropyToMnemonic } from 'bip39';
 import * as Crypto from 'expo-crypto';
 import { store } from 'redux/store';
@@ -30,149 +36,211 @@ import { relays } from 'components/ndk';
 import { storeMnemonic } from 'helper/secureStorage';
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
+import { Avatar } from 'components/ui/Avatar';
 import { Spacer, VStack, HStack } from 'components/ui/View';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 global.Buffer = require('buffer').Buffer;
 
+// Constants
+/** Account index for HD key derivation (currently fixed to 0) */
+const ACCOUNT_INDEX = 0;
+
+/** Number of entropy bytes for BIP39 mnemonic generation (128 bits) */
+const ENTROPY_BYTES = 16;
+
+/** Size in pixels for the large selected profile picture display */
+const AVATAR_SIZE_LARGE = 128;
+
+/** Size in pixels for the small profile picture options in the selector */
+const AVATAR_SIZE_SMALL = 60;
+
+/** Nostr relay URLs for profile publishing */
+const RELAY_URLS = relays;
+
 /**
- * Executes an async function within a requestAnimationFrame to improve UI responsiveness
+ * Array of profile picture URLs available for selection
+ *
+ * These are pre-generated avatar images that users can choose from
+ * during profile creation. Each URL points to a hosted image that will be used
+ * as the user's public profile picture on the Nostr network.
  */
-export const runWithAnimationFrame = <T extends any[]>(
-  callback: Function,
-  setIsSubmitting?: React.Dispatch<React.SetStateAction<boolean>>
-) => {
-  return async (...args: T) => {
-    if (setIsSubmitting) {
-      setIsSubmitting(true);
-    }
+const PROFILE_PICTURES: string[] = [
+  'https://i.ibb.co/hFLfs20/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-96aab0a7-3406-4a14-a262-893d4a07fd7d.webp',
+  'https://i.ibb.co/NWRGTD1/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-b86bf261-8011-4b6d-9760-ac3e13792c8e.png',
+  'https://i.ibb.co/s6P30Bs/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-583aad52-cf85-41a1-a4d7-594bfa816efb.webp',
+  'https://i.ibb.co/Snm98B9/kelbiee-A-photorealistic-White-woman-facing-forward-a-digital-i-23363858-885f-434d-befa-8d112acc90e7.png',
+  'https://i.ibb.co/xYPtXtJ/kelbiee-A-photorealistic-german-man-facing-forward-a-digital-il-7acde628-0725-4900-adb3-3640bef4eff1.webp',
+  'https://i.ibb.co/G7yjvGf/kelbiee-A-photorealistic-latina-woman-facing-forward-a-digital-2340219e-5afd-4701-95d6-934f2c1e480f.webp',
+  'https://i.ibb.co/CshqCky/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-f1d772bc-e3ff-4cfe-bee8-4b0f067b2fde.webp',
+  'https://i.ibb.co/86mmHXG/kelbiee-A-photorealistic-man-facing-forward-a-digital-illustrat-8151d836-41be-48c0-8b4c-c1664de23150.webp',
+  'https://i.ibb.co/2Zj79j7/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-0e565a6b-b105-41b3-8fc6-eabb72e50591.png',
+];
 
-    requestAnimationFrame(async () => {
-      try {
-        await callback(...args);
-      } catch {
-      } finally {
-        if (setIsSubmitting) {
-          setIsSubmitting(false);
-        }
-      }
-    });
-  };
-};
+// Utility Functions
+/**
+ * Generates a BIP39 mnemonic phrase for secure key derivation
+ *
+ * This function creates a cryptographically secure mnemonic phrase using 128 bits
+ * of entropy (16 bytes) following BIP39 standards. If a mnemonic already exists
+ * in the store, it returns that instead of generating a new one.
+ *
+ * The generated mnemonic is used to derive Nostr private keys following NIP-06
+ * specification, ensuring deterministic key generation across devices.
+ *
+ * @returns A 12-word BIP39 mnemonic phrase as a space-separated string
+ *
+ * @example
+ * const mnemonic = generateMnemonic();
+ * // Returns: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+ *
+ * @see {@link https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki} BIP39 specification
+ * @see {@link https://github.com/nostr-protocol/nips/blob/master/06.md} NIP-06 specification
+ */
+function generateMnemonic(): string {
+  const existingMnemonic = store.getState()?.nostr?.profiles?.[0]?.mnemonic;
+  if (existingMnemonic) return existingMnemonic;
 
-export function generateMnemonic(): string {
-  const mnemonic = store.getState()?.nostr?.profiles?.[0]?.mnemonic;
-  if (mnemonic) return mnemonic;
-
-  const entropy = Buffer.from(Crypto.getRandomBytes(16));
+  const entropy = Buffer.from(Crypto.getRandomBytes(ENTROPY_BYTES));
   return entropyToMnemonic(entropy);
 }
 
-const profilePictures = [
-  {
-    uri: 'https://i.ibb.co/hFLfs20/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-96aab0a7-3406-4a14-a262-893d4a07fd7d.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/NWRGTD1/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-b86bf261-8011-4b6d-9760-ac3e13792c8e.png',
-  },
-  {
-    uri: 'https://i.ibb.co/s6P30Bs/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-583aad52-cf85-41a1-a4d7-594bfa816efb.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/Snm98B9/kelbiee-A-photorealistic-White-woman-facing-forward-a-digital-i-23363858-885f-434d-befa-8d112acc90e7.png',
-  },
-  {
-    uri: 'https://i.ibb.co/xYPtXtJ/kelbiee-A-photorealistic-german-man-facing-forward-a-digital-il-7acde628-0725-4900-adb3-3640bef4eff1.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/G7yjvGf/kelbiee-A-photorealistic-latina-woman-facing-forward-a-digital-2340219e-5afd-4701-95d6-934f2c1e480f.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/CshqCky/kelbiee-A-photorealistic-caucasian-man-facing-forward-a-digital-f1d772bc-e3ff-4cfe-bee8-4b0f067b2fde.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/86mmHXG/kelbiee-A-photorealistic-man-facing-forward-a-digital-illustrat-8151d836-41be-48c0-8b4c-c1664de23150.webp',
-  },
-  {
-    uri: 'https://i.ibb.co/2Zj79j7/kelbiee-A-photorealistic-lebanese-woman-facing-forward-a-digita-0e565a6b-b105-41b3-8fc6-eabb72e50591.png',
-  },
-];
-
-// Relay URLs used for Nostr connections
-const RELAY_URLS = relays;
-
+// Component Interfaces
+/**
+ * Props interface for the ProfilePictureSelector component
+ *
+ * @interface ProfilePictureSelectorProps
+ */
 interface ProfilePictureSelectorProps {
-  selectedProfilePicture: any;
-  setSelectedProfilePicture: (profile: any) => void;
+  /** Currently selected profile picture URL */
+  selectedProfilePicture: string;
+  /** Callback function to update the selected profile picture */
+  setSelectedProfilePicture: (profile: string) => void;
+  /** Whether the form is currently being submitted (disables interactions) */
   isSubmitting: boolean;
-  styles: any;
 }
 
+/**
+ * ProfilePictureSelector component for selecting a profile picture during onboarding
+ *
+ * This component displays a large preview of the currently selected profile picture
+ * and a horizontal scrollable list of available profile picture options. Users can
+ * tap on any option to select it as their profile picture.
+ *
+ * The component uses Avatar components for consistent styling and includes visual
+ * feedback for the selected state and disabled state during form submission.
+ *
+ * @param props - The component props
+ * @returns JSX element representing the profile picture selector
+ *
+ * @example
+ * <ProfilePictureSelector
+ *   selectedProfilePicture={selectedPicture}
+ *   setSelectedProfilePicture={setSelectedPicture}
+ *   isSubmitting={false}
+ * />
+ */
 const ProfilePictureSelector = ({
   selectedProfilePicture,
   setSelectedProfilePicture,
   isSubmitting,
-  styles,
-}: ProfilePictureSelectorProps) => (
-  <VStack align="center">
-    <View style={styles.selectedProfileContainer}>
-      {selectedProfilePicture && (
-        <Image source={{ uri: selectedProfilePicture.uri }} style={styles.selectedProfileImage} />
-      )}
-    </View>
+}: ProfilePictureSelectorProps) => {
+  /**
+   * Handles profile picture selection
+   *
+   * @param profile - The profile picture URL to select
+   */
+  const handleSelect = (profile: string) => {
+    if (!isSubmitting) {
+      setSelectedProfilePicture(profile);
+    }
+  };
 
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      className="max-h-20"
-      contentContainerStyle={styles.profileOptionsContent}>
-      <HStack justify="center">
-        {profilePictures.map((profile, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={() =>
-              handleProfilePictureSelect(profile, setSelectedProfilePicture, isSubmitting)
-            }
-            className="mx-1"
-            style={[
-              styles.profileOption,
-              selectedProfilePicture === profile && styles.selectedProfileOption,
-              isSubmitting && styles.disabledControl,
-            ]}
-            disabled={isSubmitting}>
-            <Image source={{ uri: profile.uri }} style={styles.profileOptionImage} />
-          </TouchableOpacity>
-        ))}
-      </HStack>
-    </ScrollView>
-  </VStack>
-);
+  return (
+    <VStack align="center" spacing={16}>
+      <Avatar
+        picture={selectedProfilePicture}
+        size={AVATAR_SIZE_LARGE}
+        variant="person"
+        alt="Selected Profile Picture"
+      />
 
-const handleProfilePictureSelect = (
-  profile: any,
-  setSelectedProfilePicture: (profile: any) => void,
-  isSubmitting: boolean
-) => {
-  if (isSubmitting) return;
-  setSelectedProfilePicture(profile);
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="max-h-20"
+        contentContainerStyle={{ paddingHorizontal: 4 }}>
+        <HStack justify="center">
+          {PROFILE_PICTURES.map((profile, index) => {
+            const isSelected = selectedProfilePicture === profile;
+            const opacity = isSubmitting ? 'opacity-30' : isSelected ? 'opacity-100' : 'opacity-60';
+
+            return (
+              <TouchableOpacity
+                key={profile}
+                onPress={() => handleSelect(profile)}
+                className={`mx-1 ${opacity}`}
+                disabled={isSubmitting}>
+                <Avatar
+                  picture={profile}
+                  size={AVATAR_SIZE_SMALL}
+                  variant="person"
+                  alt={`Profile Option ${index + 1}`}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </HStack>
+      </ScrollView>
+    </VStack>
+  );
 };
 
+/**
+ * Props interface for the NameInput component
+ *
+ * @interface NameInputProps
+ */
 interface NameInputProps {
+  /** Current value of the name input field */
   name: string;
+  /** Callback function to update the name value */
   setName: (name: string) => void;
+  /** Whether the form is currently being submitted (disables input) */
   isSubmitting: boolean;
-  styles: any;
-  error: boolean;
+  /** Whether to show the validation error message */
+  showError: boolean;
 }
 
-const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProps) => {
+/**
+ * NameInput component for entering the user's profile name during onboarding
+ *
+ * This component provides a text input field for the user to enter their public
+ * profile name, along with validation error handling and helpful text about
+ * profile visibility. The input is disabled during form submission.
+ *
+ * The component includes a warning card that appears when validation fails,
+ * informing the user that a profile name is required.
+ *
+ * @param props - The component props
+ * @returns JSX element representing the name input form
+ *
+ * @example
+ * <NameInput
+ *   name={profileName}
+ *   setName={setProfileName}
+ *   isSubmitting={false}
+ *   showError={hasError}
+ * />
+ */
+const NameInput = ({ name, setName, isSubmitting, showError }: NameInputProps) => {
   const { getPrimaryColor } = useTheme();
+
   return (
     <VStack spacing={16}>
-      <Text weight="medium" size={14} style={styles.inputLabel}>
+      <Text weight="medium" size={14} className="text-primary-100">
         Enter your name
       </Text>
-      {error && (
+      {showError && (
         <>
           <Card message="You must enter something for your profile name" variant="warning" />
           <Spacer size={8} />
@@ -181,13 +249,15 @@ const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProp
       <VStack spacing={16}>
         <TextInput
           placeholder="Your public profile name"
-          onChangeText={(newText) => setName(newText)}
-          style={[styles.textInput, isSubmitting && styles.disabledControl]}
+          onChangeText={setName}
+          className={`rounded-lg border bg-primary-800 p-4 text-base text-white ${
+            isSubmitting ? 'opacity-60' : ''
+          }`}
           editable={!isSubmitting}
           placeholderTextColor={getPrimaryColor('300')}
           value={name}
         />
-        <Text weight="regular" size={12} style={styles.privacyNote}>
+        <Text weight="regular" size={12} className="leading-5 text-primary-200">
           Note that your profile will be public, so anyone can search for you and send funds. While
           your profile is public, your transactions remain private.
         </Text>
@@ -196,58 +266,92 @@ const NameInput = ({ name, setName, isSubmitting, styles, error }: NameInputProp
   );
 };
 
-// Main RecoveryScreen component
+// Main Component
+/**
+ * RecoveryScreen component for new user onboarding and profile creation
+ *
+ * This is the main component for creating a new Sovran profile during the onboarding
+ * process. It handles profile picture selection, name input validation, and the complete
+ * Nostr profile creation workflow including secure mnemonic generation and storage.
+ *
+ * The component follows NIP-06 specification for deterministic key derivation and
+ * publishes the profile to Nostr relays for decentralized identity management.
+ *
+ * @returns JSX element representing the new user onboarding screen
+ *
+ * @example
+ * <RecoveryScreen />
+ */
 const RecoveryScreen = () => {
-  const { getPrimaryColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
   const { setProfiles, setCurrentProfile } = useNostr();
 
-  // State
-  const [selectedProfilePicture, setSelectedProfilePicture] = useState(profilePictures[0]);
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState<string>(PROFILE_PICTURES[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mnemonic] = useState(generateMnemonic());
   const [name, setName] = useState('');
-  const [error, setError] = useState(false);
+  const [showError, setShowError] = useState(false);
 
-  // Note: prevScreen logic removed as it's not needed with new router
+  /**
+   * Handles the complete profile creation process
+   *
+   * This function orchestrates the entire profile creation workflow:
+   * 1. Validates the name input
+   * 2. Generates Nostr keys from the mnemonic using NIP-06
+   * 3. Creates and publishes a Nostr profile event
+   * 4. Securely stores the mnemonic
+   * 5. Updates the local profile state
+   * 6. Navigates to the animation screen
+   *
+   * The function includes comprehensive error handling and user feedback
+   * for each step of the process.
+   *
+   * @async
+   * @throws Will show an alert if profile creation fails
+   * @throws Will show an alert if mnemonic storage fails
+   *
+   * @see {@link https://github.com/nostr-protocol/nips/blob/master/06.md} NIP-06 specification
+   */
+  const handleCreateProfile = async () => {
+    if (!name.trim()) {
+      setShowError(true);
+      return;
+    }
 
-  const handleCreateProfile = runWithAnimationFrame(async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setShowError(false);
+
     try {
-      if (!name.trim() || isSubmitting) {
-        setError(true);
-        return;
-      }
-
-      const accountIndex = 0; // for now we force it to create account at index 0 only
-
       // Generate keys from mnemonic
       const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
         mnemonic,
         undefined,
-        accountIndex
+        ACCOUNT_INDEX
       );
 
       const nsec = nip19.nsecEncode(sk);
       const npub = nip19.npubEncode(pk);
 
-      // Build profile event
+      // Build and publish profile event
       const event: EventTemplate = {
         kind: 0,
         created_at: Math.floor(Date.now() / 1000),
         tags: [['client', 'sovran.money', `31990:${PUBLIC_KEYS.SUPPORT}:sovran-app`]],
         content: JSON.stringify({
           name,
-          picture: selectedProfilePicture.uri,
+          picture: selectedProfilePicture,
         }),
       };
 
       const signedEvent = finalizeEvent(event, sk);
       const pool = new SimplePool();
+
       await Promise.any(pool.publish(RELAY_URLS, signedEvent)).finally(() =>
         pool.close(RELAY_URLS)
       );
 
-      // Store mnemonic securely before proceeding
+      // Store mnemonic securely
       const mnemonicStored = await storeMnemonic(mnemonic);
       if (!mnemonicStored) {
         console.error('Failed to store mnemonic securely');
@@ -259,11 +363,11 @@ const RecoveryScreen = () => {
         return;
       }
 
-      // Update local profile storage
+      // Create and store new profile
       const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
       const newProfile = {
         name,
-        picture: selectedProfilePicture.uri,
+        picture: selectedProfilePicture,
         pubkey: pk,
         npub,
         nsec,
@@ -272,24 +376,38 @@ const RecoveryScreen = () => {
           xpriv: root.privateExtendedKey,
           xpub: root.publicExtendedKey,
         },
-        id: accountIndex,
+        id: ACCOUNT_INDEX,
       };
 
-      // setProfiles([...(profiles || []), newProfile]);
-      setProfiles([newProfile]); // for now we force it to create account at index 0 only
+      setProfiles([newProfile]);
       setCurrentProfile(newProfile);
-      // Skip seed phrase display and verification - go directly to animation
+
+      // Navigate to animation screen
       router.push({
         pathname: '/onboard/animate',
         params: { mnemonic, type: 'new' },
       });
     } catch (err) {
-      console.error(err);
+      console.error('Failed to create profile:', err);
+      Alert.alert('Error', 'Failed to create profile. Please try again.', [{ text: 'OK' }]);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, setIsSubmitting);
+  };
 
+  /**
+   * Handles navigation to the existing account recovery flow
+   *
+   * This function navigates the user to the mnemonic input screen where they
+   * can enter their existing recovery phrase to restore their account.
+   *
+   * @example
+   * // User clicks "I already have a Sovran account" button
+   * handleExistingAccount();
+   */
   const handleExistingAccount = () => {
     if (isSubmitting) return;
+
     router.push({
       pathname: '/onboard/mnemonic',
       params: {
@@ -302,18 +420,16 @@ const RecoveryScreen = () => {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}>
-      <Container style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled">
-          <View style={styles.container}>
+      className="flex-1">
+      <Container className="flex-1">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          <VStack className="flex-1 bg-primary-950 p-4">
             <VStack spacing={8}>
               <Spacer size={16} />
-              <Text weight="bold" size={24} style={styles.headerTitle}>
+              <Text weight="bold" size={24} className="font-overpass-bold text-white">
                 Create Sovran Profile
               </Text>
-              <Text weight="regular" size={14} style={styles.headerSubtitle}>
+              <Text weight="regular" size={14} className="text-primary-0">
                 Your profile lets others find you and send you bitcoin easily.
               </Text>
               <Spacer size={24} />
@@ -323,116 +439,36 @@ const RecoveryScreen = () => {
               selectedProfilePicture={selectedProfilePicture}
               setSelectedProfilePicture={setSelectedProfilePicture}
               isSubmitting={isSubmitting}
-              styles={styles}
             />
 
             <NameInput
               name={name}
               setName={setName}
               isSubmitting={isSubmitting}
-              styles={styles}
-              error={error}
+              showError={showError}
             />
-          </View>
+          </VStack>
         </ScrollView>
       </Container>
 
-      <View style={styles.bottomButtons}>
+      <VStack className="bg-primary-950 px-4 pb-4">
         <Button
           variant="primary"
-          text={prevScreen === 'onboard/nostr' ? 'Create Sovran Account' : 'Next'}
+          text="Create Sovran Account"
           onPress={handleCreateProfile}
           disabled={isSubmitting}
           loading={isSubmitting}
         />
 
-        {prevScreen === 'onboard/nostr' && (
-          <Button
-            variant="secondary"
-            text="I already have a Sovran account"
-            onPress={handleExistingAccount}
-            disabled={isSubmitting}
-          />
-        )}
-      </View>
+        <Button
+          variant="secondary"
+          text="I already have a Sovran account"
+          onPress={handleExistingAccount}
+          disabled={isSubmitting}
+        />
+      </VStack>
     </KeyboardAvoidingView>
   );
 };
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    scrollContainer: {
-      flexGrow: 1,
-    },
-    container: {
-      flex: 1,
-      padding: 16,
-      backgroundColor: getPrimaryColor('950'),
-    },
-    headerTitle: {
-      fontFamily: 'OverpassBold',
-      color: getPrimaryColor('0'),
-    },
-    headerSubtitle: {
-      color: getPrimaryColor('200'),
-    },
-    selectedProfileContainer: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: getPrimaryColor('800'),
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-    },
-    selectedProfileImage: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-    },
-    profileOptionsContent: {
-      paddingHorizontal: 4,
-    },
-    profileOption: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    selectedProfileOption: {
-      borderColor: getShadeColor('300'),
-    },
-    profileOptionImage: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-    },
-    inputLabel: {
-      color: getPrimaryColor('100'),
-    },
-    textInput: {
-      backgroundColor: getPrimaryColor('800'),
-      color: getPrimaryColor('0'),
-      borderRadius: 8,
-      padding: 16,
-      fontSize: 16,
-      borderWidth: 1,
-      borderColor: getPrimaryColor('700'),
-    },
-    privacyNote: {
-      color: getPrimaryColor('200'),
-      lineHeight: 18,
-    },
-    bottomButtons: {
-      paddingHorizontal: 16,
-      paddingBottom: 16,
-      backgroundColor: getPrimaryColor('950'),
-    },
-    disabledControl: {
-      opacity: 0.6,
-    },
-  });
 
 export default RecoveryScreen;

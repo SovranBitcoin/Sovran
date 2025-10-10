@@ -196,7 +196,7 @@ const ModalScreen = () => {
 
   return (
     <Container>
-      <ScrollView>
+      <ScrollView className="px-4">
         <Section title="Account">
           <ProfileButton currentProfile={currentProfile} />
         </Section>

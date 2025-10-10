@@ -41,12 +41,7 @@ function ShareModal() {
 
   return (
     <Modal showClose title={config.title} buttons={<></>}>
-      <PaymentInfo
-        popupMessage={config.popupMessage}
-        data={data}
-        showSection={false}
-        unit={config.unit}
-      />
+      <PaymentInfo popupMessage={config.popupMessage} data={data} unit={config.unit} />
       <View style={{ marginHorizontal: 16 }}>
         <Section title={config.sectionTitle}>
           <RowButton

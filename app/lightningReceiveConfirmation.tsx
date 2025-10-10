@@ -110,7 +110,6 @@ export function LightningReceiveConfirmation({
         <TransactionHeader historyEntry={currentTransaction} />
         {!isPaid && (
           <PaymentInfo
-            showSection={false}
             setUri={setUri}
             data={[{ name: 'Lightning', value: mintHistoryEntry.paymentRequest }]}
             unit={mintHistoryEntry.unit}

@@ -12,7 +12,7 @@ import 'intl';
 import 'intl/locale-data/jsonp/en';
 import 'react-native-gesture-handler';
 import { PersistGate } from 'redux-persist/integration/react';
-import { Provider, useSelector } from 'react-redux';
+import { Provider } from 'react-redux';
 import * as SplashScreen from 'expo-splash-screen';
 import { Easing } from 'react-native-reanimated';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
@@ -26,7 +26,8 @@ import { nip04, nip19 } from 'nostr-tools';
 // Import local components and utilities
 import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
-import { memoizedGetCurrentProfile, useNostr } from 'redux/nostr';
+import { useNostr } from 'redux/nostr';
+import { useNostrKeys } from 'hooks/useSecureStore';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';
@@ -50,13 +51,15 @@ LogBox.ignoreAllLogs();
 /**
  * Handles DM message fetching and decryption
  */
-function useNostrDMs(currentProfile, addMessage, messages) {
-  useEffect(() => {
-    if (!currentProfile?.nsec) return;
+function useNostrDMs(addMessage: any, messages: any) {
+  const { value: nostrKeys } = useNostrKeys();
 
-    const { data: privKeyBytes } = nip19.decode(currentProfile.nsec);
-    const privKey = bytesToHex(privKeyBytes);
-    const pubKey = currentProfile.pubkey;
+  useEffect(() => {
+    if (!nostrKeys?.nsec) return;
+
+    const { data: privKeyBytes } = nip19.decode(nostrKeys.nsec);
+    const privKey = bytesToHex(privKeyBytes as Uint8Array);
+    const pubKey = nostrKeys.pubkey;
 
     // Set up subscription for direct messages
     const fetchDMs = async () => {
@@ -66,13 +69,13 @@ function useNostrDMs(currentProfile, addMessage, messages) {
       subscription.on('event', async (event) => {
         try {
           // Skip if message already exists
-          if (messages.some((msg) => msg.id === event.id)) return;
+          if (messages.some((msg: any) => msg.id === event.id)) return;
 
           const decryptedMessage = await nip04.decrypt(privKey, event.pubkey, event.content);
 
-          addMessage(currentProfile.pubkey, {
+          addMessage(nostrKeys.pubkey, {
             sender: event.pubkey,
-            receiver: currentProfile.pubkey,
+            receiver: nostrKeys.pubkey,
             content: decryptedMessage,
             created_at: event.created_at,
             id: event.id,
@@ -83,7 +86,7 @@ function useNostrDMs(currentProfile, addMessage, messages) {
     };
 
     fetchDMs();
-  }, [currentProfile.pubkey, currentProfile.nsec, addMessage, messages]);
+  }, [nostrKeys?.pubkey, nostrKeys?.nsec, addMessage, messages]);
 }
 
 function MySplashScreen() {
@@ -99,12 +102,12 @@ function MySplashScreen() {
 }
 
 function MainStack() {
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
   const { addMessage, messages } = useNostr();
   const { getPrimaryColor, currentTheme } = useTheme();
+  const { value: nostrKeys } = useNostrKeys();
 
   // Set up DM subscriptions
-  useNostrDMs(currentProfile, addMessage, messages);
+  useNostrDMs(addMessage, messages);
 
   // Screen options builder
   const getScreenOptions = (screen: ModalConfig) => {
@@ -129,10 +132,10 @@ function MainStack() {
           fontSize: 16,
         },
         headerStyle: {
-          backgroundColor: currentProfile.pubkey ? getPrimaryColor('950') : 'transparent',
+          backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
         },
         headerLargeStyle: {
-          backgroundColor: currentProfile.pubkey ? getPrimaryColor('950') : 'transparent',
+          backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
         },
       };
     }

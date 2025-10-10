@@ -203,7 +203,6 @@ const EcashLightningReceiver = () => {
             data={`${currentProfile.npub}@npubx.cash`}
             popupMessage="lightning_address_copied"
             unit="sat"
-            showSection={false}
           />
         )}
         {showLightningAddress && (

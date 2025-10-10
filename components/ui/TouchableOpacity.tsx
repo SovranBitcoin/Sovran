@@ -1,4 +1,3 @@
-import { runWithAnimationFrame } from 'app/onboard/new';
 import React, { useRef, FC } from 'react';
 import {
   TouchableOpacity as RNTouchableOpacity,
@@ -50,7 +49,7 @@ export const TouchableOpacity: FC<TouchableOpacityProps> = ({
     const isDragged = absX > DRAG_THRESHOLD || absY > DRAG_THRESHOLD;
 
     if (!isDragged) {
-      runWithAnimationFrame(onPress, () => {})(e);
+      onPress(e);
     }
   };
 

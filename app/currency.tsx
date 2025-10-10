@@ -125,9 +125,11 @@ function ModalScreen() {
       case 'lightningReceiveConfirmation':
         SheetManager.show('transaction-message', {
           onClose: async (data) => {
-            await handleLightningReceive({
-              memo: data?.action === 'confirm' ? data.message : undefined,
-            });
+            if (data?.action && ['confirm', 'skip'].includes(data.action)) {
+              await handleLightningReceive({
+                memo: data?.action === 'confirm' ? data.message : undefined,
+              });
+            }
             setLoading(false);
           },
         });

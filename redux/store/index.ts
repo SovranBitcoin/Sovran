@@ -480,7 +480,7 @@ const migrations = {
 };
 
 const persistConfig = {
-  key: 'SOVRAN',
+  key: 'SOVRANNNN12387162736',
   storage: AsyncStorage,
   timeout: null,
   version: 150,

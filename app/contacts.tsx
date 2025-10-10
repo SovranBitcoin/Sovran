@@ -60,6 +60,7 @@ function ModalScreen() {
       const result = await apiSearchUsers({ query, limit: 10 });
 
       if (result.isOk()) {
+        console.log(result.value);
         const data = result.value;
 
         if (data.results && Array.isArray(data.results)) {
@@ -171,7 +172,7 @@ function ModalScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-primary-950">
+    <SafeAreaView className="bg-primary-950 flex-1">
       <SkeletonContainer
         backgroundColor={skeletonConfig.backgroundColor}
         highlightColor={skeletonConfig.highlightColor}
@@ -179,7 +180,7 @@ function ModalScreen() {
         animation={skeletonConfig.animation}>
         <Container contentContainerStyle={{ paddingHorizontal: 0, flex: 1 }}>
           <ScrollView
-            className="flex-1 bg-primary-950"
+            className="bg-primary-950 flex-1"
             onScrollBeginDrag={handleScroll}
             scrollEventThrottle={16}>
             <View className="bg-primary-950 bg-transparent px-4">

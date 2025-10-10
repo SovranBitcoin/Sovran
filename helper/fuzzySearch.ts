@@ -3,7 +3,7 @@
  * Matches against both URL and name fields
  */
 
-import { extractDomain } from './url';
+import { extractDomain } from 'helper/url';
 
 interface SearchableMint {
   url: string;

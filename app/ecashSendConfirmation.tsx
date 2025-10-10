@@ -203,7 +203,6 @@ export function EcashSendConfirmation({
             unit={sendHistoryEntry.unit}
             data={formattedToken}
             animated={isLongToken}
-            showSection={false}
           />
         )}
 

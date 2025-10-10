@@ -70,6 +70,28 @@ export function useMelt() {
   );
 
   /**
+   * Get a melt quote by ID
+   * Note: This is a workaround since getMeltQuote is not exposed in QuotesApi
+   * We'll need to access the repository directly through the manager
+   */
+  const getMeltQuote = useCallback(
+    async (mintUrl: string, quoteId: string): Promise<MeltQuoteResponse | null> => {
+      setError(null);
+      try {
+        // Access the melt quote repository directly through the manager
+        // This is a workaround since the API doesn't expose getMeltQuote
+        const quote = await manager.meltQuoteService.meltQuoteRepo.getMeltQuote(mintUrl, quoteId);
+        return quote;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Failed to get melt quote');
+        setError(error);
+        throw error;
+      }
+    },
+    [manager]
+  );
+
+  /**
    * Reset all states
    */
   const reset = useCallback(() => {
@@ -83,6 +105,7 @@ export function useMelt() {
     // Core operations
     createMeltQuote,
     payMeltQuote,
+    getMeltQuote,
     melt, // Combined operation
 
     // Current state
