@@ -9,7 +9,7 @@ import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch } from 'react-redux';
 
 // eslint-disable-next-line no-empty-pattern
-const RouteA = ({}: RouteScreenProps<'example-sheet-with-router', 'route-a'>) => {
+const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
   const dispatch = useDispatch();
   const handleDeleteProfile = async () => {
     try {
