@@ -39,9 +39,6 @@ import { Card } from 'components/ui/Card';
 import { Avatar } from 'components/ui/Avatar';
 import { Spacer, VStack, HStack } from 'components/ui/View';
 
-global.Buffer = require('buffer').Buffer;
-
-// Constants
 /** Account index for HD key derivation (currently fixed to 0) */
 const ACCOUNT_INDEX = 0;
 

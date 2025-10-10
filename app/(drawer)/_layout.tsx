@@ -3,7 +3,6 @@ import { Dimensions, View, Pressable, ScrollView } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { nip19 } from 'nostr-tools';
 import Icon from 'assets/icons';
-import { useSelector } from 'react-redux';
 import { useNostr } from 'redux/nostr';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -11,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Avatar } from 'components/ui/Avatar';
-import { memoizedGetSelectedMint } from 'redux/cashu/selectors';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
 import { router } from 'expo-router';
@@ -142,7 +140,6 @@ const WrappedSovranDrawer = withSheetProvider(SovranDrawer);
 
 export default function DrawerLayout() {
   const { currentProfile } = useNostr();
-  const selectedMint = useSelector(memoizedGetSelectedMint);
 
   return (
     <Drawer

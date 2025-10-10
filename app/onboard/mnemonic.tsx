@@ -120,7 +120,7 @@ const RecoveryScreen = () => {
       setWords(masked);
       setActiveWordIndex(VERIFICATION_INDICES[0]);
     }
-  }, [type, mnemonic]);
+  }, [type, mnemonic, isVerifyMode]);
 
   // Focus input when activeWordIndex changes
   useEffect(() => {
@@ -326,7 +326,7 @@ const RecoveryScreen = () => {
     return (
       <TouchableOpacity
         key={`${type}-${index}`}
-        className={wordCellVariants({ state: cellState, isActive })}
+        className={wordCellVariants({ state: cellState })}
         onPress={() => {
           setActiveWordIndex(index);
           setCurrentInput(words[index] || '');
@@ -355,7 +355,7 @@ const RecoveryScreen = () => {
 
     try {
       return nip06.validateWords(mnemonicStr);
-    } catch (error) {
+    } catch {
       return false;
     }
   };
