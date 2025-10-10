@@ -2,7 +2,7 @@
 
 [https://sovran.money](https://sovran.money)
 
-<img width=300 src="https://github.com/user-attachments/assets/cb952f82-c08d-4c55-a0c1-1f513c41a619" />
+<img width=300 src="./sovran.png" />
 
 ## Features
 
