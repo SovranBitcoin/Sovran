@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  TextInput,
-  Keyboard,
-} from 'react-native';
+import { View, TouchableOpacity, Alert, ScrollView, TextInput, Keyboard } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
 import { HStack, VStack } from 'components/ui/View';
 import { useLocalSearchParams, router } from 'expo-router';
-import * as nip06 from 'node_modules/nostr-tools/lib/cjs/nip06';
+import * as nip06 from 'nostr-tools/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { cva } from 'class-variance-authority';
 import BottomButtons from './BottomButtons';
 
 // BIP39 wordlist for validation
@@ -26,9 +19,77 @@ const GRID_COLS = 3;
 const TOTAL_WORDS = GRID_ROWS * GRID_COLS;
 const VERIFICATION_INDICES = [2, 5, 11]; // Fixed indices for predictability
 
+// CVA variants for word cell styling
+const wordCellVariants = cva('flex-1 rounded-lg p-3 mx-1 min-h-[60px] border-b-2', {
+  variants: {
+    state: {
+      default: 'bg-primary-800 border-b-transparent',
+      active: 'bg-primary-700 border-b-primary-400',
+      invalid: 'bg-red-900/40 border-b-red-300',
+      valid: 'bg-green-900/40 border-b-green-300',
+      filledInvalid: 'bg-red-900/40 border-b-red-300',
+    },
+  },
+  compoundVariants: [
+    {
+      state: 'valid',
+      class: 'bg-green-900/40 border-b-green-300',
+    },
+    {
+      state: 'filledInvalid',
+      class: 'bg-red-900/40 border-b-red-300',
+    },
+    {
+      state: 'active',
+      class: 'bg-primary-700 border-b-primary-400',
+    },
+  ],
+  defaultVariants: {
+    state: 'default',
+  },
+});
+
+const wordNumberVariants = cva('text-primary-300 text-xs mb-1 text-left', {
+  variants: {
+    active: {
+      true: 'text-primary-0',
+      false: '',
+    },
+  },
+  defaultVariants: {
+    active: false,
+  },
+});
+
+const wordTextVariants = cva('text-primary-300 text-center text-sm', {
+  variants: {
+    filled: {
+      true: 'text-primary-100',
+      false: '',
+    },
+    valid: {
+      true: 'text-green-300',
+      false: '',
+    },
+    invalid: {
+      true: 'text-red-300',
+      false: '',
+    },
+    active: {
+      true: 'text-primary-0',
+      false: '',
+    },
+  },
+  defaultVariants: {
+    filled: false,
+    valid: false,
+    invalid: false,
+    active: false,
+  },
+});
+
 const RecoveryScreen = () => {
   const { getPrimaryColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
   const { type = 'recover', mnemonic = null } = useLocalSearchParams<{
     type?: string;
     mnemonic?: string;
@@ -229,41 +290,56 @@ const RecoveryScreen = () => {
     // Check if the word is correct in verify mode
     const isCorrectWord = words[index]?.toLowerCase() === originalWord?.toLowerCase();
 
-    const isValidWord = isVerifyCell ? isCorrectWord : isFilled && isCompleteWord(words[index]);
+    // Determine if the word is valid based on the mode
+    let isValidWord: boolean;
+    if (isVerifyCell) {
+      // In verify mode: check if it matches the original word
+      isValidWord = isCorrectWord;
+    } else {
+      // In recovery mode: check if it's a complete BIP39 word
+      isValidWord = isFilled && isCompleteWord(words[index]);
+    }
+
+    // Determine cell state for CVA
+    let cellState: 'default' | 'active' | 'invalid' | 'valid' | 'filledInvalid' = 'default';
+
+    if (isFilled) {
+      // If the cell has content, determine if it's valid or invalid
+      if (isValidWord) {
+        cellState = 'valid';
+      } else {
+        cellState = 'filledInvalid';
+      }
+    } else if (isActive) {
+      // If the cell is empty but active, show active state
+      cellState = 'active';
+    }
+    // If empty and not active, it stays 'default'
+
+    // Debug logging
+    if (words[index]) {
+      console.log(
+        `Cell ${index}: word="${words[index]}", isFilled=${isFilled}, isValidWord=${isValidWord}, isActive=${isActive}, cellState=${cellState}`
+      );
+    }
 
     return (
       <TouchableOpacity
         key={`${type}-${index}`}
-        style={[
-          styles.wordCell,
-          isInvalid
-            ? styles.invalidWordCell
-            : isFilled && isValidWord
-              ? styles.validWordCell
-              : isFilled
-                ? styles.invalidWordCell
-                : null,
-          isActive && styles.activeWordCell,
-        ]}
+        className={wordCellVariants({ state: cellState, isActive })}
         onPress={() => {
           setActiveWordIndex(index);
           setCurrentInput(words[index] || '');
         }}>
         <VStack justify="center" flex={1}>
-          <Text style={[styles.wordNumber, isActive && styles.activeWordText]}>
-            {`${index + 1}.`}
-          </Text>
+          <Text className={wordNumberVariants({ active: isActive })}>{`${index + 1}.`}</Text>
           <Text
-            style={[
-              styles.wordText,
-              isFilled && styles.filledWordText,
-              (isVerifyCell ? isCorrectWord : isFilled && isValidWord)
-                ? styles.validWordText
-                : isInvalid
-                  ? styles.invalidWordText
-                  : null,
-              isActive && styles.activeWordText,
-            ]}
+            className={wordTextVariants({
+              filled: isFilled,
+              valid: isVerifyCell ? isCorrectWord : isFilled && isValidWord,
+              invalid: isInvalid,
+              active: isActive,
+            })}
             numberOfLines={1}
             ellipsizeMode="tail">
             {words[index] || ''}
@@ -298,26 +374,20 @@ const RecoveryScreen = () => {
   return (
     <>
       <Container>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled">
-          <View style={styles.container}>
-            <Text style={styles.title}>
-              {isVerifyMode ? 'Verify your Recovery Phrase' : 'Enter your Recovery Phrase'}
-            </Text>
-
+        <ScrollView className="flex-grow px-4" keyboardShouldPersistTaps="handled">
+          <View className="flex-1 bg-primary-950">
             {isVerifyMode && (
-              <Text style={styles.subtitle}>
+              <Text className="mb-4 text-base font-normal text-primary-100">
                 {
                   "Please enter the missing words from your recovery phrase to verify you've saved it correctly"
                 }
               </Text>
             )}
 
-            <View style={styles.inputContainer}>
+            <View className="mb-2">
               <TextInput
                 ref={inputRef}
-                style={styles.textInput}
+                className="rounded-lg border border-primary-700 bg-primary-800 p-4 text-base text-primary-0"
                 value={currentInput}
                 onChangeText={handleTextChange}
                 onSubmitEditing={handleSubmitEditing}
@@ -337,11 +407,11 @@ const RecoveryScreen = () => {
                 }
               />
             </View>
-            <VStack style={styles.gridContainer}>
+            <VStack className="mb-6 mt-4">
               {!isVerifyMode ? (
                 // For recovery mode, show the full grid
                 Array.from({ length: GRID_ROWS }).map((_, rowIndex) => (
-                  <HStack key={rowIndex} style={styles.gridRow} justify="space-between">
+                  <HStack key={rowIndex} className="mb-2" justify="space-between">
                     {Array.from({ length: GRID_COLS }).map((_, colIndex) =>
                       renderWordCell(rowIndex * GRID_COLS + colIndex)
                     )}
@@ -349,7 +419,7 @@ const RecoveryScreen = () => {
                 ))
               ) : (
                 // For verify mode, show only the cells that need verification in a single horizontal row
-                <HStack style={styles.verifyRow} justify="space-between">
+                <HStack className="mb-4" justify="space-between">
                   {verifyIndices.map((index) => renderWordCell(index))}
                 </HStack>
               )}
@@ -376,134 +446,10 @@ const RecoveryScreen = () => {
             disabled: !isSubmitEnabled(),
           },
         ]}
-        theme={theme}
         vertical
       />
     </>
   );
 };
-
-// Utility function to blend colors
-const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075) => {
-  // Parse hex colors to RGB
-  const parseHex = (hex: string) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return { r, g, b };
-  };
-
-  // Convert RGB back to hex
-  const rgbToHex = (r: number, g: number, b: number) => {
-    return (
-      '#' +
-      Math.round(r).toString(16).padStart(2, '0') +
-      Math.round(g).toString(16).padStart(2, '0') +
-      Math.round(b).toString(16).padStart(2, '0')
-    );
-  };
-
-  // Parse colors
-  const base = parseHex(baseColor);
-  const accent = parseHex(accentColor);
-
-  // Blend the colors
-  const r = base.r * (1 - intensity) + accent.r * intensity;
-  const g = base.g * (1 - intensity) + accent.g * intensity;
-  const b = base.b * (1 - intensity) + accent.b * intensity;
-
-  // Return the blended color
-  return rgbToHex(r, g, b);
-};
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    scrollContainer: {
-      flexGrow: 1,
-    },
-    container: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('950'),
-    },
-    title: {
-      fontFamily: 'OverpassBold',
-      fontSize: 20,
-      color: getPrimaryColor('0'),
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontFamily: 'OverpassRegular',
-      fontSize: 16,
-      color: getPrimaryColor('100'),
-      marginBottom: 16,
-    },
-    gridContainer: {
-      marginTop: 16,
-      marginBottom: 24,
-    },
-    gridRow: {
-      marginBottom: 8,
-    },
-    verifyRow: {
-      marginBottom: 16,
-    },
-    wordCell: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('800'),
-      borderRadius: 8,
-      padding: 12,
-      marginHorizontal: 4,
-      minHeight: 60,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent',
-    },
-    activeWordCell: {
-      backgroundColor: getPrimaryColor('700'),
-      borderBottomColor: getPrimaryColor('400'),
-    },
-    activeWordText: {
-      color: getPrimaryColor('0'),
-    },
-    invalidWordCell: {
-      backgroundColor: infuseColors(getPrimaryColor('950'), getRedColor('300')),
-      borderBottomColor: getRedColor('300'),
-    },
-    validWordCell: {
-      backgroundColor: infuseColors(getPrimaryColor('950'), getGreenColor('300')),
-      borderBottomColor: getGreenColor('300'),
-    },
-    wordNumber: {
-      color: getPrimaryColor('300'),
-      fontSize: 12,
-      marginBottom: 4,
-      textAlign: 'left',
-    },
-    wordText: {
-      color: getPrimaryColor('300'),
-      textAlign: 'center',
-      fontSize: 14,
-    },
-    filledWordText: {
-      color: getPrimaryColor('100'),
-    },
-    invalidWordText: {
-      color: getRedColor('300'),
-    },
-    validWordText: {
-      color: getGreenColor('300'),
-    },
-    inputContainer: {
-      marginBottom: 8,
-    },
-    textInput: {
-      backgroundColor: getPrimaryColor('800'),
-      color: getPrimaryColor('0'),
-      borderRadius: 8,
-      padding: 16,
-      fontSize: 16,
-      borderWidth: 1,
-      borderColor: getPrimaryColor('700'),
-    },
-  });
 
 export default RecoveryScreen;
