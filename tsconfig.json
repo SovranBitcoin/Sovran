@@ -11,6 +11,7 @@
       "@/*": ["./*"]
     }
   },
+  "exclude": ["coco/**/*"],
   "expo": {
     "experiments": {
       "typedRoutes": true
