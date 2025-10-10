@@ -96,7 +96,7 @@ export function Post({ post }: PostProps) {
   }
 
   return (
-    <View className="border-primary-800 bg-primary-900 mb-2 rounded-xl border p-4">
+    <View className="mb-2 rounded-xl border border-primary-800 bg-primary-900 p-4">
       <HStack align="flex-start" spacing={12}>
         {/* Avatar Column */}
         <VStack align="center" style={{ marginTop: 2 }}>

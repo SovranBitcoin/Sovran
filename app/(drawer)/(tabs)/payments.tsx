@@ -227,7 +227,7 @@ const TabOneScreen = () => {
   const getItemCount = (data: any) => data.length;
 
   return (
-    <View className="bg-primary-950 flex-1">
+    <View className="flex-1 bg-primary-950">
       <Spacer size={96} />
       <Modal scrollEnabled={false} showBack={false} showHeader={false} buttons={null}>
         <View

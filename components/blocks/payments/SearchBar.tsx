@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 
 export const SearchBar = () => {
   return (
-    <View className="bg-primary-800 ml-7 mr-1 mt-16 h-12 overflow-hidden rounded-2xl">
+    <View className="ml-7 mr-1 mt-16 h-12 overflow-hidden rounded-2xl bg-primary-800">
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -15,7 +15,7 @@ export const SearchBar = () => {
           })
         }>
         <Text
-          className="text-primary-500 absolute left-4 top-3.5 text-base"
+          className="absolute left-4 top-3.5 text-base text-primary-500"
           style={{ fontFamily: 'OverpassRegular' }}>
           Search for contacts
         </Text>

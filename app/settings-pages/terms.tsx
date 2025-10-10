@@ -162,10 +162,10 @@ export default function TermsAndConditions({
     <Container className="bg-primary-900">
       <ScrollView>
         <VStack spacing={16} className="p-4">
-          <Text overpass bold size={32} className="text-primary-50 py-2 text-center">
+          <Text overpass bold size={32} className="py-2 text-center text-primary-50">
             {title}
           </Text>
-          <Text overpass size={14} className="text-primary-0 leading-[22px]">
+          <Text overpass size={14} className="leading-[22px] text-primary-0">
             {terms}
           </Text>
 
@@ -184,7 +184,7 @@ export default function TermsAndConditions({
                   onValueChange={toggleCheckbox}
                   color={isChecked ? getShadeColor('300') : undefined}
                 />
-                <Text id="terms-checkbox" overpass size={14} className="text-primary-0 flex-1">
+                <Text id="terms-checkbox" overpass size={14} className="flex-1 text-primary-0">
                   {checkboxText}
                 </Text>
               </HStack>

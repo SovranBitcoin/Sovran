@@ -20,7 +20,7 @@ const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }
 
   return (
     <RNTextInput
-      className="border-primary-600 bg-primary-800 text-primary-0 mb-0 rounded-[32px] border p-2.5 pl-4 font-bold"
+      className="mb-0 rounded-[32px] border border-primary-600 bg-primary-800 p-2.5 pl-4 font-bold text-primary-0"
       style={[
         {
           shadowColor: getPrimaryColor('950'),

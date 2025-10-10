@@ -27,7 +27,7 @@ interface SectionProps {
 }
 
 export function Section({ items, style, camera = false, special }: SectionProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getShadeColor } = useTheme();
 
   const ContainerView = camera ? BlurView : View;
 

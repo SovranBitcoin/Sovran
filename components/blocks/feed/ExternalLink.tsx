@@ -104,14 +104,14 @@ const useLinkPreview = (url: string) => {
 const LinkImage = ({ linkData }: { linkData: any }) =>
   linkData?.images?.find((image: string) => image.endsWith('.png')) && (
     <CachedImage
-      className="bg-primary-800 h-[100px] w-auto rounded-lg"
+      className="h-[100px] w-auto rounded-lg bg-primary-800"
       source={{ uri: linkData.images.find((image: string) => image.endsWith('.png')) }}
     />
   );
 
 const LinkDetails = ({ url, linkData }: { url: string; linkData: any }) => (
   <View>
-    <Text size={12} className="text-primary-300 mt-1">
+    <Text size={12} className="mt-1 text-primary-300">
       {url}
     </Text>
     <Text weight="heavy" className="text-primary-0">
@@ -135,7 +135,7 @@ export const ExternalLink = ({ url }: { url: string }) => {
   }
 
   return (
-    <View className="bg-primary-700 mb-3 rounded-2xl p-3">
+    <View className="mb-3 rounded-2xl bg-primary-700 p-3">
       <LinkImage linkData={linkData} />
       <LinkDetails url={url} linkData={linkData} />
     </View>

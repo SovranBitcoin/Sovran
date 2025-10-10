@@ -4,14 +4,12 @@ import { Text } from 'components/ui/Text';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useNostrProfile } from './useNostrProfile';
 import { getTimeAgo } from 'helper/time';
-import { useTheme } from 'providers/ThemeProvider';
 
 interface PostTopProps {
   post: any;
 }
 
 export function PostTop({ post }: PostTopProps) {
-  const { getPrimaryColor: _getPrimaryColor } = useTheme();
   const profile = useNostrProfile({ id: post?.pubkey });
   let timeAgo = getTimeAgo(post.created_at);
 
@@ -26,7 +24,7 @@ export function PostTop({ post }: PostTopProps) {
   return (
     <HStack align="center">
       {!displayName ? (
-        <Skeleton className="bg-primary-700 mr-2 h-4 w-24 rounded-lg" />
+        <Skeleton className="mr-2 h-4 w-24 rounded-lg bg-primary-700" />
       ) : (
         <Text
           className="text-primary-0"

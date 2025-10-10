@@ -7,21 +7,21 @@ import { SearchTip } from './SearchTip';
 export function NoResultsFound() {
   return (
     <VStack spacing={24} align="center" className="mt-6 px-6">
-      <VStack className="bg-primary-800 h-20 w-20 items-center justify-center rounded-full">
+      <VStack className="h-20 w-20 items-center justify-center rounded-full bg-primary-800">
         <Icon name="nonicons:error-16" size={40} color="#9ca3af" />
       </VStack>
 
       <VStack spacing={12}>
-        <Text className="text-primary-50 text-center" overpass bold size={20}>
+        <Text className="text-center text-primary-50" overpass bold size={20}>
           No Results Found
         </Text>
 
-        <Text className="text-primary-400 text-center" overpass regular size={16}>
+        <Text className="text-center text-primary-400" overpass regular size={16}>
           {"We couldn't find any users matching your search"}
         </Text>
       </VStack>
 
-      <VStack className="bg-primary-800 w-full rounded-xl p-4">
+      <VStack className="w-full rounded-xl bg-primary-800 p-4">
         <Text overpass bold size={16} className="text-primary-100">
           Try adjusting your search:
         </Text>

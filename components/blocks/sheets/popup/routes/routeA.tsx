@@ -32,17 +32,17 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   return (
     <VStack
       justify={isModal || isPersistent ? 'center' : 'flex-end'}
-      className="bg-primary-800 mx-4 mb-0 overflow-hidden rounded-2xl p-4">
+      className="mx-4 mb-0 overflow-hidden rounded-2xl bg-primary-800 p-4">
       <VStack align="center" justify="center" gap={8}>
         <Text size={30} className="text-primary-0">
           {payload?.emoji || '🎉'}
         </Text>
-        <Text overpass size={20} bold className="text-primary-0 text-center">
+        <Text overpass size={20} bold className="text-center text-primary-0">
           {payload?.message || 'Error'}
         </Text>
         {payload?.submessage &&
           (typeof payload.submessage === 'string' ? (
-            <Text overpass size={14} className="text-primary-0 text-center">
+            <Text overpass size={14} className="text-center text-primary-0">
               {payload.submessage}
             </Text>
           ) : (
@@ -64,9 +64,9 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
           );
         })}
         {!isModal && !isPersistent && (
-          <View className="bg-primary-950 mt-2.5 h-1 w-[30px] self-center rounded-full">
+          <View className="mt-2.5 h-1 w-[30px] self-center rounded-full bg-primary-950">
             <Animated.View
-              className="bg-primary-0 h-full rounded-full"
+              className="h-full rounded-full bg-primary-0"
               style={{
                 width: progress.interpolate({
                   inputRange: [0, 100],
