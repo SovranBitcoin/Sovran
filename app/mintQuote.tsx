@@ -20,7 +20,7 @@ import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionD
 import { TransactionTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 import type { MintHistoryEntry, HistoryEntry } from 'coco-cashu-core';
 
-export function LightningReceiveConfirmation({
+export function MintQuote({
   mintHistoryEntry,
   extraButtons = [],
 }: {
@@ -174,7 +174,7 @@ function ModalScreen() {
 
   const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
 
-  return <LightningReceiveConfirmation mintHistoryEntry={mintHistoryEntry} />;
+  return <MintQuote mintHistoryEntry={mintHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

@@ -37,7 +37,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       case 'mint': {
         // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)
         router.push({
-          pathname: '/lightningReceiveConfirmation',
+          pathname: '/mintQuote',
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -47,7 +47,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       case 'melt': {
         // Coco uses 'melt' for ecash-to-Lightning (Lightning send)
         router.push({
-          pathname: '/lightningSendConfirmation',
+          pathname: '/meltQuote',
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -57,7 +57,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       case 'send': {
         // Coco uses 'send' for ecash sends
         router.push({
-          pathname: '/ecashSendConfirmation',
+          pathname: '/sendToken',
           params: {
             sendHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -69,7 +69,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
         // Extended ReceiveHistoryEntry with token property
         const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
         router.push({
-          pathname: '/ecashReceiveConfirmation',
+          pathname: '/receiveToken',
           params: {
             receiveHistoryEntry: JSON.stringify(receiveEntry),
           },

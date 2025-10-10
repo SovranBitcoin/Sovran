@@ -122,7 +122,7 @@ function ModalScreen() {
     setLoading(true);
 
     switch (params.to) {
-      case 'lightningReceiveConfirmation':
+      case 'mintQuote':
         SheetManager.show('transaction-message', {
           onClose: async (data) => {
             if (data?.action && ['confirm', 'skip'].includes(data.action)) {
@@ -134,7 +134,7 @@ function ModalScreen() {
           },
         });
         break;
-      case 'ecashSendConfirmation':
+      case 'sendToken':
         SheetManager.show('transaction-message', {
           onClose: async (data) => {
             await handleEcashSend({
@@ -144,7 +144,7 @@ function ModalScreen() {
           },
         });
         break;
-      case 'lightningSendConfirmation':
+      case 'meltQuote':
         if (!params.lnUrlOrAddress) {
           popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           return;
@@ -201,8 +201,8 @@ function ModalScreen() {
   };
 
   const renderButtons = () => {
-    const isP2PK = params?.profile && params.to === 'ecashSendConfirmation';
-    const isEcashSend = params.to === 'ecashSendConfirmation';
+    const isP2PK = params?.profile && params.to === 'sendToken';
+    const isEcashSend = params.to === 'sendToken';
     const hasPaymentRequest = params?.paymentRequest;
 
     return (
@@ -282,9 +282,7 @@ function ModalScreen() {
         animated
         useTypeColors
         transactionType={
-          params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
-            ? 'send'
-            : 'receive'
+          params?.to === 'sendToken' || params?.to === 'meltQuote' ? 'send' : 'receive'
         }
         centered
       />
@@ -293,12 +291,10 @@ function ModalScreen() {
         unit={unit}
         allowedMints={params?.mints as unknown as string[]}
         allowedUnits={params?.allowedUnits as unknown as string[]}
-        requireBalance={
-          params?.to === 'ecashSendConfirmation' || params?.to === 'lightningSendConfirmation'
-        }
+        requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
         requireValidMint={!!params?.allowedUnits}
       />
-      {params.to === 'ecashSendConfirmation' && params?.profile && (
+      {params.to === 'sendToken' && params?.profile && (
         <TouchableOpacity
           style={[
             {

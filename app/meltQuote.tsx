@@ -23,7 +23,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from '@/helper/time';
 
-export function LightningSendConfirmation({
+export function MeltQuote({
   meltQuote,
   meltHistoryEntry,
 }: {
@@ -295,7 +295,7 @@ function ModalScreen() {
     ? (JSON.parse(meltHistoryEntryString) as MeltHistoryEntry)
     : undefined;
 
-  return <LightningSendConfirmation meltQuote={meltQuote} meltHistoryEntry={meltHistoryEntry} />;
+  return <MeltQuote meltQuote={meltQuote} meltHistoryEntry={meltHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

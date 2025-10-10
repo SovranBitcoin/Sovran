@@ -205,7 +205,7 @@ const ListRoute = () => {
         expoRouter.push({
           pathname: '/currency',
           params: {
-            to: 'ecashSendConfirmation',
+            to: 'sendToken',
             unit: mint.unit.toLowerCase(),
             type: payload?.accountType,
             accountIndex: payload?.accountIndex?.toString(),
@@ -252,7 +252,7 @@ const ListRoute = () => {
         <VStack className="items-center p-5">
           <ActivityIndicator size="large" color={getPrimaryColor('0')} />
           <Spacer size={10} />
-          <Text className="text-primary-200 text-sm">Loading balances...</Text>
+          <Text className="text-sm text-primary-200">Loading balances...</Text>
         </VStack>
       </Wrapper>
     );

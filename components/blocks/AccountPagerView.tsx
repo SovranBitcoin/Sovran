@@ -108,7 +108,7 @@ export function AccountPagerView({
     router.push({
       pathname: `/${page}`,
       params: {
-        to: 'ecashSendConfirmation',
+        to: 'sendToken',
         unit: accountUnit,
       },
     });

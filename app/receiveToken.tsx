@@ -9,15 +9,13 @@ import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
-
-// Main component
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { VStack } from 'components/ui/View';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 
-export function EcashReceiveConfirmation({
+export function ReceiveToken({
   receiveHistoryEntry,
   extraButtons = [],
 }: {
@@ -149,7 +147,7 @@ function ModalScreen() {
     token?: string;
   };
 
-  return <EcashReceiveConfirmation receiveHistoryEntry={receiveHistoryEntry} />;
+  return <ReceiveToken receiveHistoryEntry={receiveHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

@@ -78,19 +78,19 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'lightningSendConfirmation',
+    name: 'meltQuote',
     options: {
       presentation: 'modal',
     },
   },
   {
-    name: 'ecashReceiveConfirmation',
+    name: 'receiveToken',
     options: {
       presentation: 'modal',
     },
   },
   {
-    name: 'lightningReceiveConfirmation',
+    name: 'mintQuote',
     options: {
       presentation: 'modal',
     },
@@ -205,7 +205,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'ecashSendConfirmation',
+    name: 'sendToken',
     title: 'Send Ecash',
     options: {
       presentation: 'modal',

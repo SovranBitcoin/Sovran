@@ -62,7 +62,7 @@ const EcashLightningReceiver = () => {
     };
 
     router.push({
-      pathname: '/ecashReceiveConfirmation',
+      pathname: '/receiveToken',
       params: {
         receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
       },
@@ -122,7 +122,7 @@ const EcashLightningReceiver = () => {
     router.push({
       pathname: '/currency',
       params: {
-        to: 'lightningReceiveConfirmation',
+        to: 'mintQuote',
         unit,
       },
     });

@@ -102,7 +102,7 @@ export const useProcessPaymentString = ({
             };
 
             router.push({
-              pathname: '/ecashReceiveConfirmation',
+              pathname: '/receiveToken',
               params: {
                 receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
               },
@@ -132,7 +132,7 @@ export const useProcessPaymentString = ({
           };
 
           router.push({
-            pathname: '/ecashReceiveConfirmation',
+            pathname: '/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
@@ -148,7 +148,7 @@ export const useProcessPaymentString = ({
             router.push({
               pathname: '/currency',
               params: {
-                to: 'lightningSendConfirmation',
+                to: 'meltQuote',
                 lnUrlOrAddress: lnTrim(scanning.data),
                 unit,
               },
@@ -158,7 +158,7 @@ export const useProcessPaymentString = ({
 
           const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
           router.push({
-            pathname: '/lightningSendConfirmation',
+            pathname: '/meltQuote',
             params: {
               meltQuote: JSON.stringify(quote),
             },

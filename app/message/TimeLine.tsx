@@ -1,7 +1,7 @@
 import { TextMessage, PaymentMessage, CashuTokenMessage } from './components';
 import { useNostr } from 'redux/nostr';
-import { TimelineItemType } from '.';
 import { isValidEcashToken } from '@/helper/coco/utils';
+import { TimelineItemType } from 'app/userMessages';
 
 interface TimelineItemProps {
   item: TimelineItemType;
