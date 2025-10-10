@@ -7,7 +7,7 @@ import { GetInfoResponse } from '@cashu/cashu-ts';
 
 interface HistoryEntryMintRefreshProps {
   mintInfo: GetInfoResponse;
-  historyEntry: HistoryEntry;
+  historyEntry: Partial<HistoryEntry> & { type: HistoryEntry['type'] };
   handleCheckStatus?: (onClose: () => void) => Promise<void>;
 }
 
@@ -16,7 +16,7 @@ export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntry
     <HStack
       align="center"
       justify="space-between"
-      className="bg-primary-800 rounded-lg"
+      className="rounded-lg bg-primary-800"
       style={{
         marginHorizontal: 16,
         marginBottom: 0,
