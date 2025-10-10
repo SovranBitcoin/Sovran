@@ -334,7 +334,9 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
           items={[
             {
               title: 'Date',
-              value: convertTime(getLightningTimestamp(displayQuote?.request || '') * 1000),
+              value: convertTime(
+                new Date(getLightningTimestamp(displayQuote?.request || '') * 1000)
+              ),
             },
             { title: 'Type', value: 'Send • Lightning' },
             {
