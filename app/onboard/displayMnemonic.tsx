@@ -8,12 +8,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const { mnemonic } = useLocalSearchParams<{ mnemonic: string }>();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 
   const words = mnemonic.split(' ');
-  const styles = createStyles(getPrimaryColor);
+  const styles = createStyles(getPrimaryColor, getShadeColor);
 
   const handleContinue = () => {
     if (!hasConfirmedBackup) {
@@ -127,7 +127,6 @@ const MnemonicDisplayScreen = () => {
             onPress: handleContinue,
           },
         ]}
-        theme={theme}
         vertical
       />
     </>
@@ -165,7 +164,10 @@ const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075)
   return rgbToHex(r, g, b);
 };
 
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
+const createStyles = (
+  getPrimaryColor: (shade: string) => string,
+  getShadeColor: (shade: string) => string
+) =>
   StyleSheet.create({
     scrollContainer: {
       flexGrow: 1,
