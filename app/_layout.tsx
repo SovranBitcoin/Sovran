@@ -194,6 +194,7 @@ export default function RootLayout() {
       }, 0);
     }
 
+    // @ts-ignore
     initializeNDK({
       explicitRelayUrls: RELAY_URLS,
     });
