@@ -2,91 +2,122 @@
 
 [https://sovran.money](https://sovran.money)
 
-Sovran is an open-source Bitcoin wallet powered by ecash with Nostr capabilities. We are focused on trying to give utility to Bitcoin through our marketplace where users can buy freedom enhancing technologies such as VPNs, eSIMs and Giftcards.
-
 <img width=300 src="https://github.com/user-attachments/assets/cb952f82-c08d-4c55-a0c1-1f513c41a619" />
 
 ## Features
 
-- [x] Deeplinks, can receive ecash via airdrop, can send via airdrop.
-- [x] (optional) pin code to unlock app
-- [ ] Payment requests (needs more testing)
+### Core Wallet Functionality ✅
 
-- [x] Lightning Receiving
-  - [x] Attach note
-  - [x] Websockets
-  - [x] Check Status Button
+- **Cashu ecash support** - Send and receive Bitcoin via ecash tokens
+- **Lightning Network integration** - Lightning payments and invoices
+- **Multi-currency support** - USD, EUR, GBP, and Satoshi units
+- **QR code scanning** - Camera-based payment processing
+- **NFC support** - Contactless payment capabilities
 
-- [x] Lightning Sending
-  - [ ] Attach note
-  - [x] Calculate Lightning fees + Mint fees
-  - [x] via Pasting, Scanning, DM
-  - [ ] When sending via lightning check if invoice has nostr enabled and enrich the transaction with nostr information
+### Security & Privacy ✅
 
-- [x] Ecash Receiving
-  - [x] via Pasting, Scanning
-  - [x] Attach note
-  - [x] Unlocks tokens locked to '02' + pk
+- **BIP39 mnemonic recovery** - 12-word seed phrase backup
+- **NIP-06 key derivation** - Deterministic key generation for nostr profiles
+- **Passcode protection** - Device-level security
+- **Secure storage** - Encrypted local data storage
+- **No data collection** - Privacy-first approach
+- **Open source** - Fully auditable codebase
 
-- [x] Ecash Sending
-  - [x] via Copy, DM, NFC, Share QR Image, Emoji
-  - [x] Lock to NPUB
-  - [x] Cancel (which automatically redeems ecash)
-  - [x] Attach note
-  - [x] Websockets
-  - [x] Check Status Button
+### Nostr Integration ✅
 
-- [ ] Offline Receive
-  - [ ] via locked ecash
-  - [ ] Store now and redeem later
+- **Decentralized identity** - Nostr profile management
+- **Direct messaging** - Encrypted peer-to-peer communication
+- **Contact management** - Nostr-based contact system
+- **Profile sharing** - QR code profile sharing
 
-- [x] QR Codes
-  - [x] QR Code Scanner
-  - [x] Animated or Static depending on context
+### User Experience ✅
 
-- [x] NIP06 Mnemonic Seed for Nostr identities
-- [x] NUT13 Mnemonic Seed for Ecash
+- **Modern UI/UX** - Clean, intuitive interface
+- **Theme support** - Multiple visual themes
+- **Transaction history** - Comprehensive transaction tracking
+- **Mint management** - Add and manage multiple mints
+- **Real-time updates** - Live balance and transaction updates
 
-- [x] Nostr DMs
-  - [x] Ecash formatted nicely so you can click "Redeem"
+## Current Status
 
-- [x] NPCV2 Lightning URL
-  - [ ] Scroll down to fetch ecash
-  - [ ] Change NPC mint
-  - [ ] Custom Lightning URL e.g. satoshi@npubx.cash
+**Version:** 0.0.24 (Build 1)
 
-- [ ] Multipath Payment: Implement MPP and design an intuitive UI to pay from multiple mints
-- [ ] Mint Management: Implement better ways to help the user distribute ecash between mints
-- [ ] Unified payment addresses: Write a formal NUT for this to get community input & implement it in Sovran
+### Recent Updates
 
-- [x] Basic NFC functionality
-  - [x] Automatic Keyset Rotation on receive/send.
+- **Mint Audit Page** - Added comprehensive mint auditing capabilities
+- **Mint Messaging** - Direct communication with mints
+- **Enhanced Error Handling** - Improved Lightning payment error messages
+- **Payment State Tracking** - Real-time transaction status updates
+- **Auto-updating Mint Auditor** - Daily mint health checks
 
-- [x] Marketplace features include:
-  - [ ] Bitrefill gift cards (behind dev flag)
-  - [ ] VPN using LNVPN (WireGuard)
-  - [ ] Donation centre to donate to those in need
+## Roadmap
 
-- [x] Nostr features:
-  - [ ] Multiple profiles via a single mnemonic (removed for now)
-  - [x] Send direct messages to contacts
-  - [x] Transactions enriched with Nostr information (profile pictures, names, etc.)
+### Phase 1: Foundation Stabilization
 
-## Recovery
+- [ ] **Coco Multi-Unit Support** - Full support for multiple currency units
+- [ ] **Code Quality** - Zero TypeScript errors and linting issues
+- [ ] **Expired Transaction Polish** - Improved handling of expired transactions
+- [ ] **Performance Optimization** - Enhanced app responsiveness
 
-Our recovery process is a bit non-standard. We use a NIP05 to generate all users nostr profiles, but I didn't like the idea of every nsec having all the money attached to it. So we derive a NUT13 mnemonic from our NIP06 mnemonic which is a bit messy but it works. The reason we do this is because in all cashu wallets it expects a seed in the form of a mnemonic.
+### Phase 2: Core Features Restoration
 
-The rational was that if I chose to import my nsec into a different application my personal assumption is that it shouldn't have access to all my ecash. I understand this runs counter to NIP60, so I'm open to hearing criticism on this.
+- [ ] **Swap Functionality** - Re-implement token swapping between mints
+- [ ] **Advanced Mint Management** - Enhanced mint discovery and management
+- [ ] **Transaction Filtering** - Advanced transaction search and filtering
+- [ ] **Export Capabilities** - Transaction history export
+- [ ] **Restore backup** - Restore cashu tokens for mints that support it
 
-Go to `Settings > Profile` to see all your mnemonics.
+### Phase 3: Enhanced User Experience
 
-Also it didn't feel right for the NIP06 and NUT13 to share the same mnemonic.
+- [ ] **Push Notifications** - Real-time payment notifications
+- [ ] **Biometric Authentication** - Fingerprint/Face ID support (optional)
+- [ ] **Advanced Security** - Hardware wallet integration
+- [ ] **Offline Mode** - Limited functionality without internet
 
-We are the only ones to my knowledge who are trying to create a single mnemonic phrase to recover _multiple_ nostr profiles which all have ecash in _multiple_ mints.
+### Phase 4: Advanced Features
 
-## TODO:
+- [ ] **Lightning Address Support** - Full LNURL-pay integration
+- [ ] **Plugin System** - Extensible architecture
 
-- When opening the wallet lets fetch all the mint infos and keysets just to be up-to-date.
-- When I make a transaction and new proofs are created, and if they produce keysetId's I've never seen before I should automatically fetch the keyset from the mint and it to redux. I think this will ensure I always have all the keysets.
-- Create better Container component that handles: Buttons, Scrolling, Keyboard Avoiding, Safe Area, works in Modals or regular screens, handles titles, handles back buttons, handles navigation.
-- Unify Text and StyledText components to have a similar API - currently Text has props like `lexend`, `bold`, `size` while StyledText uses different props like `custom`, `colors`, `size`. Should standardize the interface for better developer experience.
+## Technical Architecture
+
+### Built With
+
+- **React Native** - Cross-platform mobile development
+- **Expo** - Development platform and tools
+- **TypeScript** - Type-safe development
+- **Redux** - State management
+- **Coco-Cashu** - Modular Cashu implementation
+- **Nostr** - Decentralized communication protocol
+
+### Protocol Support
+
+- **Cashu NUTs** - [add list of supported nuts]
+- **Lightning Network** - BOLT11 invoices and LNURL
+- **Nostr** - [add list of supports nips]
+- **BIP39/BIP32** - Hierarchical deterministic wallets
+
+## Development Status
+
+Due to migrating to the Coco architecture, several features were temporarily removed to ensure a more reliable foundation. This "one step back, two steps forward" approach ensures long-term stability and maintainability.
+
+### Known Issues
+
+- Some experimental features require manual activation
+- Limited multi-unit support in current Coco implementation
+- Transaction expiration handling needs refinement
+
+## Contributing
+
+We welcome contributions! Please see our [GitHub repository](https://github.com/SovranBitcoin/Sovran) for:
+
+- Issue reporting
+- Feature requests
+- Code contributions
+- Documentation improvements
+
+## Support
+
+- **GitHub Issues** - Bug reports and feature requests
+- **Nostr** - Direct messaging via Nostr protocol
+- **Twitter** - [@KevinKelbie](https://x.com/KevinKelbie)
