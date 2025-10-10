@@ -118,7 +118,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   {
     name: 'onboard/mnemonic',
-    title: '',
+    title: 'Verify Recovery Phrase',
   },
   {
     name: 'onboard/new',
