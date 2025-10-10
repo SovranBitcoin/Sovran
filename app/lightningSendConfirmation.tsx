@@ -21,6 +21,7 @@ import { getLightningTimestamp } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
+import { convertTime } from '@/helper/time';
 
 export function LightningSendConfirmation({
   meltQuote,
@@ -253,12 +254,12 @@ export function LightningSendConfirmation({
           items={[
             {
               title: 'Date',
-              value: getLightningTimestamp(meltQuote?.request || ''),
+              value: convertTime(getLightningTimestamp(displayQuote?.request || '') * 1000),
             },
             { title: 'Type', value: 'Send • Lightning' },
             {
               title: 'Request',
-              value: truncateMiddle(meltQuote?.request || '', 5),
+              value: truncateMiddle(displayQuote?.request || '', 5),
             },
             { title: 'Quote', value: truncateMiddle(quoteId, 7) },
             {
