@@ -1,3 +1,27 @@
+/**
+ * @fileoverview Lightning payment mint quote interface for the Sovran wallet
+ *
+ * This module provides the user interface for receiving Lightning payments by creating
+ * mint quotes. It handles Lightning invoice display, payment status tracking, and
+ * displays comprehensive transaction details with mint management capabilities.
+ *
+ * @example
+ * // Navigation usage
+ * router.push({
+ *   pathname: '/mintQuote',
+ *   params: { mintHistoryEntry: JSON.stringify(historyEntry) }
+ * });
+ *
+ * // Component usage with a mint history entry
+ * <MintQuote mintHistoryEntry={historyEntry} />
+ *
+ * // With additional custom buttons
+ * <MintQuote
+ *   mintHistoryEntry={historyEntry}
+ *   extraButtons={[{ text: 'Custom Action', onPress: handleCustom }]}
+ * />
+ */
+
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
@@ -20,14 +44,47 @@ import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionD
 import { TransactionTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 import type { MintHistoryEntry, HistoryEntry } from 'coco-cashu-core';
 
-export function MintQuote({
-  mintHistoryEntry,
-  extraButtons = [],
-}: {
+/**
+ * Props for the MintQuote component
+ */
+interface MintQuoteProps {
+  /** The mint history entry containing Lightning invoice and transaction details */
   mintHistoryEntry: MintHistoryEntry;
+  /** Whether to automatically go back when payment is completed (deprecated) */
   autoGoBackOnPaid?: boolean;
+  /** Additional custom buttons to display in the action bar */
   extraButtons?: ButtonHandlerButton[];
-}) {
+}
+
+/**
+ * Main component for receiving Lightning payments via mint quotes
+ *
+ * This component provides a complete interface for receiving Lightning payments, including:
+ * - Lightning invoice display and sharing
+ * - Payment status tracking and updates
+ * - Mint information and refresh capabilities
+ * - Transaction timeline and debug information
+ * - Support for custom action buttons
+ *
+ * The component automatically finds the current transaction in the Coco history
+ * and displays appropriate UI states based on the payment status (pending vs completed).
+ *
+ * @param props - The component props
+ * @returns JSX element representing the mint quote interface
+ *
+ * @example
+ * // Basic usage
+ * <MintQuote mintHistoryEntry={historyEntry} />
+ *
+ * // With custom buttons
+ * <MintQuote
+ *   mintHistoryEntry={historyEntry}
+ *   extraButtons={[
+ *     { text: 'View Details', onPress: () => console.log('Details') }
+ *   ]}
+ * />
+ */
+export function MintQuote({ mintHistoryEntry, extraButtons = [] }: MintQuoteProps) {
   const manager = useManager();
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
@@ -51,11 +108,29 @@ export function MintQuote({
     }
   }, [currentTransaction?.mintUrl, manager]);
 
+  /**
+   * Handles copying the Lightning invoice to clipboard
+   *
+   * Copies the Lightning payment request to the device clipboard and shows a success popup.
+   * This allows users to paste the invoice in other applications or share it manually.
+   *
+   * @param close - Callback function to close any open modals
+   * @async
+   */
   const handleCopy = async (close: (event: any) => void) => {
     await Clipboard.setStringAsync(mintHistoryEntry.paymentRequest);
     popup({ message: 'lightning_address_copied', type: 'success', onClose: () => close({}) });
   };
 
+  /**
+   * Handles sharing the Lightning invoice via the native share sheet
+   *
+   * Opens the device's native share sheet with the Lightning payment request.
+   * This allows users to share the invoice through various apps like messaging, email, etc.
+   *
+   * @param close - Callback function to close any open modals
+   * @async
+   */
   const handleShare = async (close: (event: any) => void) => {
     if (uri) {
       await Share.share({ url: uri, message: mintHistoryEntry.paymentRequest });
@@ -167,6 +242,15 @@ export function MintQuote({
   );
 }
 
+/**
+ * Modal screen wrapper for the MintQuote component
+ *
+ * This component handles the modal presentation of the mint quote interface.
+ * It parses the mint history entry from the URL parameters and passes it
+ * to the main MintQuote component.
+ *
+ * @returns JSX element representing the modal screen
+ */
 function ModalScreen() {
   const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
     mintHistoryEntry: string;
@@ -177,4 +261,10 @@ function ModalScreen() {
   return <MintQuote mintHistoryEntry={mintHistoryEntry} />;
 }
 
+/**
+ * Default export wrapped with sheet provider for modal functionality
+ *
+ * This export provides the modal screen with the necessary sheet provider
+ * context for displaying action sheets and other modal components.
+ */
 export default withSheetProvider(ModalScreen);

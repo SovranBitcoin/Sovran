@@ -1,3 +1,30 @@
+/**
+ * @fileoverview Lightning payment melt quote interface for the Sovran wallet
+ *
+ * This module provides the user interface for melting ecash tokens to send Lightning payments.
+ * It handles melt quote creation, payment processing, and displays comprehensive transaction
+ * details with real-time status updates and mint management.
+ *
+ * @example
+ * // Navigation usage with melt quote
+ * router.push({
+ *   pathname: '/meltQuote',
+ *   params: { meltQuote: JSON.stringify(quote) }
+ * });
+ *
+ * // Navigation usage with melt history entry
+ * router.push({
+ *   pathname: '/meltQuote',
+ *   params: { meltHistoryEntry: JSON.stringify(historyEntry) }
+ * });
+ *
+ * // Component usage with a melt quote
+ * <MeltQuote meltQuote={quote} />
+ *
+ * // With melt history entry for fetching quote
+ * <MeltQuote meltHistoryEntry={historyEntry} />
+ */
+
 import React, { useState, useEffect } from 'react';
 import { formatAmount } from 'helper/currency';
 import { useMintManagement, useMelt, useManager } from 'hooks/coco';
@@ -23,13 +50,41 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from '@/helper/time';
 
-export function MeltQuote({
-  meltQuote,
-  meltHistoryEntry,
-}: {
+/**
+ * Props for the MeltQuote component
+ */
+interface MeltQuoteProps {
+  /** Optional melt quote response for immediate display */
   meltQuote?: MeltQuoteResponse;
+  /** Optional melt history entry for fetching quote data */
   meltHistoryEntry?: MeltHistoryEntry;
-}) {
+}
+
+/**
+ * Main component for melting ecash tokens to Lightning payments
+ *
+ * This component provides a complete interface for melting ecash tokens to send Lightning payments, including:
+ * - Melt quote creation and management
+ * - Lightning payment processing
+ * - Real-time transaction status tracking
+ * - Mint selection and balance management
+ * - Comprehensive transaction details display
+ * - Error handling and loading states
+ *
+ * The component can work with either a pre-existing melt quote or a melt history entry
+ * that it will use to fetch the quote data from the mint.
+ *
+ * @param props - The component props
+ * @returns JSX element representing the melt quote interface
+ *
+ * @example
+ * // With existing melt quote
+ * <MeltQuote meltQuote={quote} />
+ *
+ * // With history entry to fetch quote
+ * <MeltQuote meltHistoryEntry={historyEntry} />
+ */
+export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const selectedMint = useSelector(memoizedGetSelectedMint);
   const { payMeltQuote, currentQuote, createMeltQuote, isCreatingQuote, getMeltQuote } = useMelt();
@@ -107,6 +162,16 @@ export function MeltQuote({
     loadMintInfo();
   }, [selectedMint, getMintInfo]);
 
+  /**
+   * Handles mint selection for creating a new melt quote
+   *
+   * When a user selects a different mint, this function creates a new melt quote
+   * with the selected mint and updates the unit display accordingly.
+   *
+   * @param mint - The selected mint object containing id and unit information
+   * @async
+   * @throws {Error} When melt quote creation fails
+   */
   const handleMintSelected = async (mint: any) => {
     try {
       await createMeltQuote(mint.id, meltQuote?.request || '');
@@ -117,6 +182,15 @@ export function MeltQuote({
     }
   };
 
+  /**
+   * Handles the melt payment process
+   *
+   * Processes the Lightning payment by paying the melt quote through the selected mint.
+   * This function requires a selected mint and a valid quote ID to proceed.
+   *
+   * @async
+   * @throws {Error} When no mint is selected or payment fails
+   */
   const handleMelt = async () => {
     if (!selectedMint) {
       throw new Error('No mint selected');
@@ -125,6 +199,12 @@ export function MeltQuote({
     await payMeltQuote(selectedMint, displayQuote?.quote || '');
   };
 
+  /**
+   * Handles the cancel action
+   *
+   * Dismisses all modals and navigates back to the main tabs screen.
+   * This is used when the user wants to cancel the melt process.
+   */
   const handleCancel = () => {
     router.dismissAll();
     router.push('/(drawer)/(tabs)');
@@ -281,6 +361,15 @@ export function MeltQuote({
   );
 }
 
+/**
+ * Modal screen wrapper for the MeltQuote component
+ *
+ * This component handles the modal presentation of the melt quote interface.
+ * It parses the melt quote and/or melt history entry from the URL parameters
+ * and passes them to the main MeltQuote component.
+ *
+ * @returns JSX element representing the modal screen
+ */
 function ModalScreen() {
   const { meltQuote: meltQuoteString, meltHistoryEntry: meltHistoryEntryString } =
     useLocalSearchParams<{
@@ -298,4 +387,10 @@ function ModalScreen() {
   return <MeltQuote meltQuote={meltQuote} meltHistoryEntry={meltHistoryEntry} />;
 }
 
+/**
+ * Default export wrapped with sheet provider for modal functionality
+ *
+ * This export provides the modal screen with the necessary sheet provider
+ * context for displaying action sheets and other modal components.
+ */
 export default withSheetProvider(ModalScreen);

@@ -1,3 +1,21 @@
+/**
+ * @fileoverview Ecash token sending interface for the Sovran wallet
+ *
+ * This module provides the user interface for sending ecash tokens to other users.
+ * It handles token sharing, transaction cancellation, and displays comprehensive
+ * transaction details with various sharing options including NFC, clipboard, and messaging.
+ *
+ * @example
+ * // Navigation usage
+ * router.push({
+ *   pathname: '/sendToken',
+ *   params: { sendHistoryEntry: JSON.stringify(sendEntry) }
+ * });
+ *
+ * // Component usage with a send history entry
+ * <SendToken sendHistoryEntry={sendEntry} />
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -23,7 +41,35 @@ import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionD
 import { MintQuoteTimeline } from 'components/blocks/Transaction/TransactionTimeline';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 
-export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryEntry }) {
+/**
+ * Props for the SendToken component
+ */
+interface SendTokenProps {
+  /** The send history entry containing token and transaction details */
+  sendHistoryEntry: SendHistoryEntry;
+}
+
+/**
+ * Main component for sending ecash tokens
+ *
+ * This component provides a complete interface for sending ecash tokens, including:
+ * - Token sharing via multiple methods (NFC, clipboard, share sheet, emoji)
+ * - Transaction cancellation and redemption
+ * - Real-time transaction status tracking
+ * - Mint information and refresh capabilities
+ * - Comprehensive transaction details display
+ *
+ * The component automatically finds the current transaction in the Coco history
+ * and displays appropriate UI states based on the transaction status (pending vs completed).
+ *
+ * @param props - The component props
+ * @returns JSX element representing the send token interface
+ *
+ * @example
+ * // Basic usage
+ * <SendToken sendHistoryEntry={sendEntry} />
+ */
+export function SendToken({ sendHistoryEntry }: SendTokenProps) {
   const { receive } = useReceive();
   const { getMintInfo } = useMintManagement();
   const [uri, setUri] = useState('');
@@ -55,15 +101,42 @@ export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryE
     loadMintInfo();
   }, [currentTransaction?.mintUrl, getMintInfo]);
 
+  /**
+   * Handles NFC token sharing
+   *
+   * Writes the encoded ecash token to NFC for contactless sharing.
+   * This allows users to share tokens by bringing their device close to another NFC-enabled device.
+   *
+   * @async
+   * @throws {Error} When NFC writing fails
+   */
   const handleNFCSend = async () => {
     await write(getEncodedTokenV4(sendHistoryEntry.token));
   };
 
+  /**
+   * Handles copying the token to clipboard
+   *
+   * Copies the encoded ecash token to the device clipboard and shows a success popup.
+   * This allows users to paste the token in other applications or share it manually.
+   *
+   * @param onClose - Callback function to close any open modals
+   * @async
+   */
   const handleCopy = async (onClose: (event: any) => void) => {
     await Clipboard.setStringAsync(getEncodedTokenV4(sendHistoryEntry.token));
     popup({ message: 'ecash_token_copied', type: 'success', onClose: () => onClose({}) });
   };
 
+  /**
+   * Handles sharing the token via the native share sheet
+   *
+   * Opens the device's native share sheet with the ecash token and a cashu:// URL.
+   * This allows users to share tokens through various apps like messaging, email, etc.
+   *
+   * @param onClose - Callback function to close any open modals
+   * @async
+   */
   const handleShare = async (onClose: (event: any) => void) => {
     await Share.share({
       url: uri,
@@ -72,6 +145,16 @@ export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryE
     onClose({});
   };
 
+  /**
+   * Handles cancelling the send transaction
+   *
+   * Attempts to redeem the token back to the user's wallet, effectively cancelling
+   * the send transaction. This is useful when the recipient hasn't claimed the token yet.
+   *
+   * @param onClose - Callback function to close any open modals
+   * @async
+   * @throws {Error} When token redemption fails
+   */
   const handleCancelSend = async (onClose: (event: any) => void) => {
     try {
       await receive(getEncodedTokenV4(sendHistoryEntry.token));
@@ -84,7 +167,15 @@ export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryE
     }
   };
 
-  // Safely format the token
+  /**
+   * Safely formats the token for display and sharing
+   *
+   * Attempts to encode the token using the Cashu V4 format. If encoding fails,
+   * falls back to JSON stringification of the original token object.
+   *
+   * @returns The formatted token string
+   * @private
+   */
   const getFormattedToken = (): string => {
     try {
       return getEncodedTokenV4(sendHistoryEntry.token);
@@ -97,6 +188,16 @@ export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryE
   const formattedToken = getFormattedToken();
   const isLongToken = formattedToken.length >= 500;
 
+  /**
+   * Handles copying the token as emoji representation
+   *
+   * Opens the emoji picker sheet to allow users to share the token as emoji.
+   * This provides an alternative sharing method that can be more user-friendly
+   * for certain communication channels.
+   *
+   * @param onClose - Callback function to close any open modals
+   * @async
+   */
   const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
       payload: {
@@ -251,6 +352,15 @@ export function SendToken({ sendHistoryEntry }: { sendHistoryEntry: SendHistoryE
   );
 }
 
+/**
+ * Modal screen wrapper for the SendToken component
+ *
+ * This component handles the modal presentation of the send token interface.
+ * It parses the send history entry from the URL parameters and passes it
+ * to the main SendToken component.
+ *
+ * @returns JSX element representing the modal screen
+ */
 function ModalScreen() {
   const { sendHistoryEntry: sendHistoryEntryString } = useLocalSearchParams<{
     sendHistoryEntry: string;
@@ -261,4 +371,10 @@ function ModalScreen() {
   return <SendToken sendHistoryEntry={sendHistoryEntry} />;
 }
 
+/**
+ * Default export wrapped with sheet provider for modal functionality
+ *
+ * This export provides the modal screen with the necessary sheet provider
+ * context for displaying action sheets and other modal components.
+ */
 export default withSheetProvider(ModalScreen);
