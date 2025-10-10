@@ -17,7 +17,7 @@ export default function ModalScreen() {
         {
           variant: 'primary',
           text: 'Recover Wallet',
-          onPress: () =>
+          onPress: async () =>
             router.push({
               pathname: '/onboard/mnemonic',
               params: {
@@ -28,7 +28,7 @@ export default function ModalScreen() {
         },
         {
           text: 'New Wallet',
-          onPress: () => router.push('/onboard/displayMnemonic'),
+          onPress: async () => router.push('/onboard/displayMnemonic'),
           variant: 'primary',
         },
       ]}
