@@ -8,10 +8,11 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["src/*"],
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "coco-cashu-core": ["./coco/packages/core"]
     }
   },
-  "exclude": ["coco/**/*"],
+  "exclude": ["node_modules", "dist", "build", "coco/**/*"],
   "expo": {
     "experiments": {
       "typedRoutes": true
