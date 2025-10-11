@@ -66,7 +66,7 @@ export function ButtonHandler({
       align="center"
       justify="space-between"
       spacing={0}
-      className={`flex-row p-2 pb-4 ${context === 'tab' ? 'mb-12' : ''} ${className || ''}`}
+      className={`flex-row pb-4 ${context === 'tab' ? 'mb-12' : ''} ${className || ''}`}
       style={[style]}>
       <LinearGradient
         colors={[

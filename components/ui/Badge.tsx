@@ -51,7 +51,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
         };
       case 'warning':
         return {
-          backgroundColor: '#f59e0b',
+          backgroundColor: getRedColor('300'),
           borderColor: 'transparent',
         };
       case 'error':

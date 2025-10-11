@@ -17,23 +17,13 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
   const { addMint } = useMintManagement();
 
   return (
-    <View
-      style={{
-        marginHorizontal: 8,
-        marginBottom: 0,
-        borderRadius: 16,
-        overflow: 'hidden',
-        backgroundColor: getPrimaryColor('800'),
-        padding: 8,
-        paddingTop: 24,
-      }}>
+    <View className="mx-4 mb-0 overflow-hidden rounded-2xl bg-primary-800 p-4">
       <Text
         size={24}
         overpass
         heavy
         className="text-primary-0"
         style={{
-          marginLeft: 16,
           textAlign: 'center',
           marginBottom: 16,
         }}>
@@ -47,12 +37,12 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
             style={{
               marginBottom: -5.5,
             }}>
-            {removeProtocol(payload.mint)}
+            {removeProtocol(payload.mint)}?
           </StyledText>
         </View>
-        ?
       </Text>
       <ButtonHandler
+        gradientColor={getPrimaryColor('800')}
         buttons={[
           {
             text: "Don't trust",

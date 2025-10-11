@@ -129,7 +129,7 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) =
                   </Badge>
                 )}
                 {typeof score === 'number' && (
-                  <Badge variant="warning" icon="ic:round-star" size={12}>
+                  <Badge variant="success" icon="ic:round-star" size={12}>
                     {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
                     {recommendations.length})
                   </Badge>
