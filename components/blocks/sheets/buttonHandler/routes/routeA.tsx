@@ -23,13 +23,14 @@
  */
 
 import React, { useState } from 'react';
-import { View, TouchableOpacity, GestureResponderEvent } from 'react-native';
+import { View, GestureResponderEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { HStack, VStack } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 /**
  * RouteA Component

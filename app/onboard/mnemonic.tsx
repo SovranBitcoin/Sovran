@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, Alert, ScrollView, TextInput, Keyboard } from 'react-native';
+import { View, Alert, ScrollView, TextInput, Keyboard } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
@@ -9,6 +9,7 @@ import * as nip06 from 'nostr-tools/nip06';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { cva } from 'class-variance-authority';
 import BottomButtons from './BottomButtons';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 // BIP39 wordlist for validation
 const BIP39_WORDLIST = wordlist;

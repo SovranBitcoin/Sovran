@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SafeAreaView, TouchableOpacity, Clipboard, ScrollView, Image } from 'react-native';
+import { SafeAreaView, Clipboard, ScrollView } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostr } from 'redux/nostr';
 import { useMnemonic, useCashuMnemonic, useNostrKeys } from 'hooks/useSecureStore';
@@ -9,6 +9,8 @@ import { popup } from '@/helper/popup';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Skeleton } from 'components/ui/Skeleton';
+import { Avatar } from 'components/ui/Avatar';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 const Profile = () => {
   const { getPrimaryColor } = useTheme();
@@ -156,12 +158,11 @@ const Profile = () => {
 
           <VStack align="center" style={{ marginBottom: 16, marginTop: 16 }}>
             {currentProfile?.picture ? (
-              <Image
-                source={{
-                  uri: currentProfile.picture,
-                }}
-                className="h-[100px] w-[100px] rounded-full"
-                resizeMode="cover"
+              <Avatar
+                picture={currentProfile.picture}
+                variant="person"
+                size={100}
+                alt={currentProfile.profile?.name || 'User'}
               />
             ) : (
               <Skeleton

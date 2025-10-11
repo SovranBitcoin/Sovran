@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, ImageSource, ImageStyle } from 'expo-image';
-import { StyleProp, View, StyleSheet, Dimensions } from 'react-native';
+import { StyleProp, View, Dimensions } from 'react-native';
 
 const BLUR_HASH = '000000';
 
@@ -62,36 +62,22 @@ export function SpriteView({ source, width }: SpriteProps) {
 
   return (
     <View
-      style={[
-        styles.frame,
-        { width: renderWidth, height: renderHeight, transform: [{ scale: 1.1 }] },
-      ]}>
+      className="relative overflow-hidden"
+      style={{
+        width: renderWidth,
+        height: renderHeight,
+        transform: [{ scale: 1.1 }],
+      }}>
       <Image
         source={source}
-        style={[
-          styles.sprite,
-          {
-            width: SPRITE_WIDTH * scale,
-            height: SPRITE_HEIGHT * scale,
-            transform: [{ translateX: -index * FRAME_WIDTH * scale }],
-          },
-        ]}
+        className="absolute bottom-0 left-0 right-0 top-0"
+        style={{
+          width: SPRITE_WIDTH * scale,
+          height: SPRITE_HEIGHT * scale,
+          transform: [{ translateX: -index * FRAME_WIDTH * scale }],
+        }}
         contentFit="cover"
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  frame: {
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  sprite: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    right: 0,
-  },
-});

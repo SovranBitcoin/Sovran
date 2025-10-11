@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Image } from 'react-native';
+import { View, Animated } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import { calculatePosition, calculateSize, calculateOpacity } from './helper';
+import { Avatar } from 'components/ui/Avatar';
 
 interface MintItemProps {
   mint: any;
@@ -88,18 +89,9 @@ export const MintItem = ({
             bottom: 0,
             zIndex: isMintActive ? 1000 : 0,
           }}>
-          <Image
-            source={{
-              uri: mint.iconUrl,
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: 100000,
-              backgroundColor: getPrimaryColor('950'),
-              opacity: calculateOpacity(positionIndex),
-            }}
-          />
+          <View style={{ opacity: calculateOpacity(positionIndex) }}>
+            <Avatar picture={mint.iconUrl} variant="mint" size={100} />
+          </View>
         </View>
       </View>
     </Animated.View>

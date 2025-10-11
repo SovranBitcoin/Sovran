@@ -3,24 +3,36 @@ import { VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { SearchTip } from './SearchTip';
+import { useTheme } from 'providers/ThemeProvider';
 
 export function EmptyStateView() {
+  const { getPrimaryColor } = useTheme();
   return (
-    <VStack spacing={24} align="center" className="mt-6">
-      <VStack className="h-20 w-20 items-center justify-center rounded-full bg-primary-800">
-        <Icon name="majesticons:search-line" size={40} color="#9ca3af" />
+    <VStack spacing={8} align="center" className="mt-6">
+      <VStack justify="center" align="center" className="h-20 w-20 rounded-full bg-primary-800">
+        <Icon name="majesticons:search-line" size={40} color={getPrimaryColor('500')} />
       </VStack>
 
-      <Text className="text-center text-primary-50" overpass bold size={20}>
+      <Text
+        className="text-primary-50"
+        overpass
+        bold
+        size={20}
+        style={{ color: getPrimaryColor('500') }}>
         Search for Users
       </Text>
 
-      <Text className="text-center text-primary-400" size={16} overpass regular>
+      <Text
+        className="text-center text-primary-400"
+        size={16}
+        overpass
+        regular
+        style={{ color: getPrimaryColor('500') }}>
         Type a name, public key, or NIP-05 identifier to find users on the network
       </Text>
 
       <VStack className="w-full rounded-xl bg-primary-800 p-4">
-        <Text overpass bold size={16} className="text-primary-100">
+        <Text overpass bold size={16} style={{ color: getPrimaryColor('300') }}>
           Search Tips:
         </Text>
         <VStack spacing={12} className="mt-2">

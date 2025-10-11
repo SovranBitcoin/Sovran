@@ -1,9 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, Image, ScrollView, Linking } from 'react-native';
+import { ScrollView, Linking } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useSelector } from 'react-redux';
 import { memoizedGetSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
+import { Avatar } from 'components/ui/Avatar';
 
 import { useNostr } from 'redux/nostr';
 import {
@@ -19,6 +20,7 @@ import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import Icon from 'assets/icons';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -62,12 +64,11 @@ const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
           backgroundColor: getPrimaryColor('800'),
         }}>
         <HStack spacing={12} flex={1}>
-          <Image
-            alt=""
-            source={{
-              uri: currentProfile?.picture,
-            }}
-            className="h-[60px] w-[60px] rounded-full"
+          <Avatar
+            picture={currentProfile?.picture}
+            variant="person"
+            size={60}
+            alt={currentProfile?.name || 'User'}
           />
           <VStack spacing={2} flex={1}>
             <Text

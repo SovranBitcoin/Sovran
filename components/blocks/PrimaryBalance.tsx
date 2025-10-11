@@ -1,5 +1,4 @@
 import React, { useCallback } from 'react';
-import { TouchableOpacity } from 'react-native';
 import { VStack } from 'components/ui/View';
 import { Badge } from 'components/ui/Badge';
 import { useSelector } from 'react-redux';
@@ -8,6 +7,7 @@ import { useBalanceContext, useMints } from 'hooks/coco';
 import Haptics from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { memoizedPricelist } from 'redux/pricelist';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 interface Account {
   unit: CurrencyUnit;

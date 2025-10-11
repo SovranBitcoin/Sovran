@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { router } from 'expo-router';
 import { useSettings } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
@@ -19,7 +20,6 @@ const PasscodeSettings: React.FC = () => {
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
-  const styles = createStyles(getPrimaryColor);
 
   const handlePress = (val: string) => {
     if (step === 'create') {
@@ -41,18 +41,23 @@ const PasscodeSettings: React.FC = () => {
 
   return (
     <Container>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <ScrollView className={'px-4'}>
         <Card
           message="Forgetting your passcode will prevent you from accessing your wallet."
           variant="warning"></Card>
-        <VStack justify="space-between" align="center" style={styles.container}>
-          <VStack align="center" justify="center" style={styles.content}>
-            <Text style={styles.title} className="text-primary-0">
+        <VStack justify="space-between" align="center" className="flex-1 py-8">
+          <VStack align="center" justify="center" className="flex-1">
+            <Text size={20} weight="bold" className="mb-5 text-center text-primary-0">
               {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
             </Text>
-            <HStack style={styles.dotsContainer}>
+            <HStack className="mb-5">
               {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
-                <View key={i} style={currentValue.length > i ? styles.dotActive : styles.dot} />
+                <View
+                  key={i}
+                  className={`mx-1.5 h-3 w-3 rounded-full ${
+                    currentValue.length > i ? 'bg-primary-0' : 'border border-primary-0'
+                  }`}
+                />
               ))}
             </HStack>
           </VStack>
@@ -92,40 +97,5 @@ const PasscodeSettings: React.FC = () => {
     </Container>
   );
 };
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      paddingVertical: 32,
-    },
-    content: {
-      flex: 1,
-    },
-    title: {
-      fontSize: 20,
-      marginBottom: 20,
-      fontFamily: 'OverpassBold',
-      textAlign: 'center',
-    },
-    dotsContainer: {
-      marginBottom: 20,
-    },
-    dot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: getPrimaryColor('0'),
-      marginHorizontal: 6,
-    },
-    dotActive: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: getPrimaryColor('0'),
-      marginHorizontal: 6,
-    },
-  });
 
 export default PasscodeSettings;

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
-import { Animated, Platform, StyleSheet } from 'react-native';
+import { Animated, Platform } from 'react-native';
 
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -25,7 +25,6 @@ interface AccountProps {
 
 export function Account({ accounts, account }: AccountProps): React.ReactElement {
   const { getPrimaryColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
 
   // Animation values
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -106,25 +105,29 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   const image = useSelector(memoizedGetBackgroundImage);
 
   return (
-    <NonGestureView key={account.unit} index={0} style={styles.nonGestureView}>
+    <NonGestureView
+      key={account.unit}
+      index={0}
+      style={{
+        overflow: 'hidden',
+        zIndex: 10,
+        height: 335,
+        width: '100%',
+      }}>
       <View>
         <View
+          className="z-[9] p-4"
           style={{
-            padding: 16,
             marginTop: Platform.OS === 'web' ? 64 : 16,
             paddingBottom: 0,
             paddingTop: 16,
-            zIndex: 9,
           }}
         />
-        <View
-          style={{
-            height: 110,
-          }}></View>
+        <View className="h-[110px]" />
         <PrimaryBalance account={account} />
       </View>
 
-      <VStack align="center" justify="space-around" style={{ width: '100%', alignSelf: 'center' }}>
+      <VStack align="center" justify="space-around" className="w-full self-center">
         <HStack />
 
         <HStack spacing={2}>
@@ -133,40 +136,16 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         </HStack>
       </VStack>
 
-      <View style={styles.absoluteRightBottomBorder}>
-        <View style={styles.bottomNegative}>{!image && renderCurrencyIcon()}</View>
+      <View
+        className="absolute bottom-6 -z-10 h-[300px] w-full overflow-hidden"
+        style={{
+          borderBottomColor: getPrimaryColor('600'),
+          borderBottomWidth: 0.2,
+        }}>
+        <View className="absolute bottom-0 right-0 rounded-full">
+          {!image && renderCurrencyIcon()}
+        </View>
       </View>
     </NonGestureView>
   );
 }
-
-// Use a constant for platform-specific values
-const PLATFORM_BOTTOM_OFFSET = 24;
-
-// Using function to create styles to respect the existing pattern
-// but with proper typing for theme
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    nonGestureView: {
-      overflow: 'hidden',
-      zIndex: 1,
-      height: 335,
-      width: '100%',
-    },
-    absoluteRightBottomBorder: {
-      position: 'absolute',
-      bottom: PLATFORM_BOTTOM_OFFSET,
-      borderBottomColor: getPrimaryColor('600'),
-      borderBottomWidth: 0.2,
-      zIndex: -1,
-      height: 300,
-      overflow: 'hidden',
-      width: '100%',
-    },
-    bottomNegative: {
-      position: 'absolute',
-      bottom: 0,
-      borderRadius: 10000,
-      right: 0,
-    },
-  });

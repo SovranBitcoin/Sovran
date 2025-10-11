@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface Props {
   passcode: string;
@@ -22,6 +23,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
   const shake = useRef(new Animated.Value(0)).current;
+  const { getPrimaryColor } = useTheme();
 
   // Shadow styles - cannot be fully replicated with Tailwind in React Native
   const textShadow = {
@@ -101,7 +103,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           transform: [{ translateX: shake }],
         }}>
         <VStack align="center" justify="center" flex={1} spacing={SPACING}>
-          <AnimatedSpriteBackground backgroundColor="rgb(3 7 18)" />
+          <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
 
           {currentProfile?.picture && (
             <View style={avatarShadow}>

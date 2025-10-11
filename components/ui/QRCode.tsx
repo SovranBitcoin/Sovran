@@ -4,7 +4,7 @@ import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/ui/View';
 import { CurrencyIcon, FlagIcon } from 'assets/icons';
-import { useWindowDimensions, StyleSheet } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -86,7 +86,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   return (
     <View className="flex-row items-center justify-center bg-transparent">
       {/* QR Code */}
-      <LinearGradient colors={gradientColors} style={styles.gradient}>
+      <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
         <EQRCode
           color={getPrimaryColor('0')}
           backgroundColor="transparent"
@@ -99,7 +99,11 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       <Circle />
 
       {/* Logo */}
-      <View style={styles.logoContainer}>
+      <View
+        className="absolute left-1/2 top-1/2 z-[100] -translate-x-9 -translate-y-9 scale-75 bg-transparent"
+        style={{
+          transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
+        }}>
         {isLocationUnit ? (
           <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
         ) : (
@@ -108,21 +112,4 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       </View>
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  logoContainer: {
-    width: 72,
-    height: 72,
-    position: 'absolute',
-    top: '50%' as any,
-    left: '50%' as any,
-    transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
-    zIndex: 100,
-    backgroundColor: 'transparent',
-  },
-  gradient: {
-    padding: 16,
-    borderRadius: 16,
-  },
 });

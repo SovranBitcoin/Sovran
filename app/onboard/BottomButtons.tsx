@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  StyleSheet,
   TouchableOpacity,
   TextStyle,
   StyleProp,
@@ -40,23 +39,34 @@ const BottomButtons = ({
   textStyle,
 }: BottomButtonsProps) => {
   const { getPrimaryColor, getShadeColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
   const Stack = vertical ? VStack : HStack;
   const spacing = vertical ? 12 : 8;
+
+  const getButtonVariantClass = (variant: ButtonVariant) => {
+    const variantClasses: Record<ButtonVariant, string> = {
+      primary: 'bg-shade-300',
+      secondary: 'bg-primary-500',
+      tertiary: 'bg-primary-800',
+      info: 'bg-shade-300',
+      default: 'bg-primary-800',
+    };
+    return variantClasses[variant] || variantClasses.default;
+  };
 
   return (
     <Stack
       spacing={spacing}
       justify={vertical ? 'flex-start' : 'space-between'}
-      style={[styles.bottomButtons, containerStyle]}>
+      className="w-full bg-primary-950 p-4"
+      style={containerStyle}>
       {buttons.map((button, index) => (
         <TouchableOpacity
           key={index}
+          className={`rounded-2xl p-4 ${getButtonVariantClass(button.variant)} ${
+            !vertical ? 'flex-1' : ''
+          } ${button.disabled ? 'opacity-50' : ''}`}
           style={[
-            styles.button,
             getButtonStyle(button.variant, getPrimaryColor, getShadeColor),
-            !vertical && { flex: 1 },
-            button.disabled && styles.disabledButton,
             buttonStyle,
             button.buttonStyle,
           ]}
@@ -64,7 +74,11 @@ const BottomButtons = ({
           disabled={button.disabled}>
           <HStack align="center" spacing={8}>
             {button.leftIcon}
-            <Text weight="bold" size={16} style={[styles.buttonText, textStyle, button.textStyle]}>
+            <Text
+              weight="bold"
+              size={16}
+              className="text-center"
+              style={[textStyle, button.textStyle]}>
               {button.text}
             </Text>
             {button.rightIcon}
@@ -91,24 +105,5 @@ const getButtonStyle = (
 
   return variantStyles[variant as ButtonVariant] ?? variantStyles.default;
 };
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    bottomButtons: {
-      width: '100%',
-      padding: 16,
-      backgroundColor: getPrimaryColor('950'),
-    },
-    button: {
-      padding: 16,
-      borderRadius: 16,
-    },
-    buttonText: {
-      textAlign: 'center',
-    },
-    disabledButton: {
-      opacity: 0.5,
-    },
-  });
 
 export default BottomButtons;

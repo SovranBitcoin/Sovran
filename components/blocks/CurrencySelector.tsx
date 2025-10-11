@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { TouchableOpacity, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { FlagIcon, CurrencyIcon } from 'assets/icons';
 import { useMintManagement } from 'hooks/coco';
@@ -7,6 +7,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { View, HStack } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 // Define interface for balance items
 interface BalanceItem {

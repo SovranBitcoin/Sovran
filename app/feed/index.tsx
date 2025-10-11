@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from 'components/blocks/feed';
-import { View } from 'components/ui/View';
+import { View, VStack } from 'components/ui/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
@@ -33,7 +33,6 @@ const Feed = ({ filters }: { filters: any }) => {
 const TabTwoScreen = () => {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const { getPrimaryColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
   const pagerRef = useRef(null);
   const [selectedTab, setSelectedTab] = useState('Feed');
   const tabs = useMemo(() => ['Feed'], []);
@@ -68,44 +67,24 @@ const TabTwoScreen = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <VStack className="flex-1 bg-primary-950 p-4">
       <View>
         <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
       </View>
       <PagerView
         ref={pagerRef}
         onPageSelected={onPageSelected}
-        style={styles.pagerView}
+        className="-mx-4 mt-2 h-screen"
+        style={{ height: Dimensions.get('window').height }}
         initialPage={0}>
         {tabs.map((tab, index) => (
-          <View key={index.toString()} style={styles.pageContainer}>
+          <View key={index.toString()} className="h-full flex-1 overflow-hidden bg-primary-950">
             <Feed filters={filters[tab as keyof typeof filters]} />
           </View>
         ))}
       </PagerView>
-    </View>
+    </VStack>
   );
 };
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    container: {
-      backgroundColor: getPrimaryColor('950'),
-      flex: 1,
-      padding: 16,
-    },
-    pagerView: {
-      height: Dimensions.get('window').height,
-      marginLeft: -16,
-      marginRight: -16,
-      marginTop: 8,
-    },
-    pageContainer: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('950'),
-      height: '100%',
-      overflow: 'hidden',
-    },
-  });
 
 export default withSheetProvider(TabTwoScreen);

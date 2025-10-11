@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Dimensions, TouchableOpacity } from 'react-native';
+import { Dimensions } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -11,6 +11,7 @@ import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
 import _ from 'lodash';
 import { mintHistoryEntryExpired } from 'helper/utils';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 interface Account {
   unit: string;
@@ -174,11 +175,12 @@ export const Transactions = React.memo(
             style={{
               minHeight: Dimensions.get('screen').height / 2,
             }}>
-            <Icon name="fluent:clock-12-filled" color={getPrimaryColor('500')} />
-            <Text heavy size={16} className="text-primary-500">
+            <Spacer size={24} />
+            <Icon name="fluent:clock-12-filled" size={32} color={getPrimaryColor('500')} />
+            <Text heavy size={16} style={{ color: getPrimaryColor('500') }}>
               No History
             </Text>
-            <Text color={getPrimaryColor('500')} heavy size={16}>
+            <Text color={getPrimaryColor('500')} size={16}>
               Your history will show up here
             </Text>
           </View>

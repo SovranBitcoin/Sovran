@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Alert, ScrollView } from 'react-native';
+import { View, Alert, ScrollView } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { Text } from 'components/ui/Text';
@@ -8,12 +8,11 @@ import { useLocalSearchParams, router } from 'expo-router';
 import BottomButtons from './BottomButtons';
 
 const MnemonicDisplayScreen = () => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getShadeColor } = useTheme();
   const { mnemonic } = useLocalSearchParams<{ mnemonic: string }>();
   const [hasConfirmedBackup, setHasConfirmedBackup] = useState(false);
 
   const words = mnemonic.split(' ');
-  const styles = createStyles(getPrimaryColor, getShadeColor);
 
   const handleContinue = () => {
     if (!hasConfirmedBackup) {
@@ -55,11 +54,15 @@ const MnemonicDisplayScreen = () => {
   };
 
   const renderWordCell = (index: number) => (
-    <View key={index} style={styles.wordCell}>
-      <Text style={styles.wordNumber}>{`${index + 1}.`}</Text>
+    <View
+      key={index}
+      className="border-l-3 mx-1 min-h-[60px] flex-1 justify-center rounded-lg border-shade-300 bg-primary-800 p-3">
+      <Text size={12} className="text-left text-primary-300">{`${index + 1}.`}</Text>
       <Text
         testID={`mnemonic-word-${index}`}
-        style={styles.wordText}
+        size={14}
+        semibold
+        className="text-center text-primary-100"
         numberOfLines={1}
         ellipsizeMode="tail">
         {words[index] || ''}
@@ -70,20 +73,22 @@ const MnemonicDisplayScreen = () => {
   return (
     <>
       <Container>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled">
-          <View style={styles.container}>
+        <ScrollView className="flex-grow" keyboardShouldPersistTaps="handled">
+          <View className="flex-1 bg-primary-950 pb-4">
             <VStack spacing={16}>
-              <Text style={styles.title}>Your Recovery Phrase</Text>
+              <Text size={20} weight="bold" className="text-primary-0">
+                Your Recovery Phrase
+              </Text>
 
-              <Text style={styles.instructions}>
+              <Text size={16} className="leading-6 text-primary-100">
                 These 12 words are the only way to recover your wallet. Write them down in order and
                 keep them in a safe place.
               </Text>
 
-              <View style={styles.warningContainer}>
-                <Text style={styles.warningText}>
+              <View
+                className="rounded-lg border-l-4 border-shade-300 p-3"
+                style={{ backgroundColor: getShadeColor('300') + '0F' }}>
+                <Text size={16} weight="semibold" className="text-shade-300">
                   Warning: Never share your recovery phrase with anyone!
                 </Text>
               </View>
@@ -98,15 +103,23 @@ const MnemonicDisplayScreen = () => {
                 ))}
               </VStack>
 
-              <View style={styles.securityTipsContainer}>
+              <View className="rounded-lg bg-primary-800 p-4">
                 <VStack spacing={8}>
-                  <Text style={styles.securityTipsTitle}>Security Tips:</Text>
-                  <Text style={styles.securityTipText}>
+                  <Text size={16} weight="semibold" className="text-primary-100">
+                    Security Tips:
+                  </Text>
+                  <Text size={14} className="my-1 text-primary-200">
                     • Write these words down on paper (not digitally)
                   </Text>
-                  <Text style={styles.securityTipText}>• Store in a secure location</Text>
-                  <Text style={styles.securityTipText}>• Never share with anyone</Text>
-                  <Text style={styles.securityTipText}>• This phrase controls ALL your funds</Text>
+                  <Text size={14} className="my-1 text-primary-200">
+                    • Store in a secure location
+                  </Text>
+                  <Text size={14} className="my-1 text-primary-200">
+                    • Never share with anyone
+                  </Text>
+                  <Text size={14} className="my-1 text-primary-200">
+                    • This phrase controls ALL your funds
+                  </Text>
                 </VStack>
               </View>
             </VStack>
@@ -132,109 +145,5 @@ const MnemonicDisplayScreen = () => {
     </>
   );
 };
-
-// Helper function for color blending
-const infuseColors = (baseColor: string, accentColor: string, intensity = 0.075) => {
-  // Parse hex colors to RGB
-  const parseHex = (hex: string) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return { r, g, b };
-  };
-
-  // Convert RGB back to hex
-  const rgbToHex = (r: number, g: number, b: number) => {
-    return (
-      '#' +
-      Math.round(r).toString(16).padStart(2, '0') +
-      Math.round(g).toString(16).padStart(2, '0') +
-      Math.round(b).toString(16).padStart(2, '0')
-    );
-  };
-
-  const base = parseHex(baseColor);
-  const accent = parseHex(accentColor);
-
-  // Blend the colors
-  const r = base.r * (1 - intensity) + accent.r * intensity;
-  const g = base.g * (1 - intensity) + accent.g * intensity;
-  const b = base.b * (1 - intensity) + accent.b * intensity;
-
-  return rgbToHex(r, g, b);
-};
-
-const createStyles = (
-  getPrimaryColor: (shade: string) => string,
-  getShadeColor: (shade: string) => string
-) =>
-  StyleSheet.create({
-    scrollContainer: {
-      flexGrow: 1,
-    },
-    container: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('950'),
-      paddingBottom: 16,
-    },
-    title: {
-      fontFamily: 'OverpassBold',
-      fontSize: 20,
-      color: getPrimaryColor('0'),
-    },
-    instructions: {
-      fontSize: 16,
-      color: getPrimaryColor('100'),
-      lineHeight: 22,
-    },
-    warningContainer: {
-      backgroundColor: infuseColors(getPrimaryColor('950'), getShadeColor('300')),
-      borderRadius: 8,
-      padding: 12,
-      borderLeftWidth: 4,
-      borderLeftColor: getShadeColor('300'),
-    },
-    warningText: {
-      color: getShadeColor('300'),
-      fontWeight: '600',
-    },
-    wordCell: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('800'),
-      borderRadius: 8,
-      padding: 12,
-      marginHorizontal: 4,
-      minHeight: 60,
-      justifyContent: 'center',
-      borderLeftWidth: 3,
-      borderLeftColor: getShadeColor('300'),
-    },
-    wordNumber: {
-      color: getPrimaryColor('300'),
-      fontSize: 12,
-      textAlign: 'left',
-    },
-    wordText: {
-      color: getPrimaryColor('100'),
-      textAlign: 'center',
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    securityTipsContainer: {
-      backgroundColor: getPrimaryColor('800'),
-      borderRadius: 8,
-      padding: 16,
-    },
-    securityTipsTitle: {
-      color: getPrimaryColor('100'),
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    securityTipText: {
-      color: getPrimaryColor('200'),
-      fontSize: 14,
-      marginVertical: 4,
-    },
-  });
 
 export default MnemonicDisplayScreen;
