@@ -39,10 +39,18 @@ export function MintSearchInput({
       return <ActivityIndicator size="small" color={getPrimaryColor('400')} />;
     }
     if (validationState.isValid === true) {
-      return <Text style={{ color: '#10B981', fontSize: 16 }}>✓</Text>;
+      return (
+        <Text size={16} className="text-green-300">
+          ✓
+        </Text>
+      );
     }
     if (validationState.isValid === false) {
-      return <Text style={{ color: '#EF4444', fontSize: 16 }}>✗</Text>;
+      return (
+        <Text size={16} className="text-red-300">
+          ✗
+        </Text>
+      );
     }
     return null;
   };
@@ -81,13 +89,10 @@ export function MintSearchInput({
           {canAddMint && onAddMint && (
             <Text
               onPress={onAddMint}
-              className="rounded px-2 py-1"
-              style={{
-                backgroundColor: '#10B981',
-                color: 'white',
-                fontSize: 12,
-                fontWeight: '600',
-              }}>
+              className="rounded bg-green-300 px-2 py-1 text-white"
+              size={12}
+              bold
+              overpass>
               Add
             </Text>
           )}
@@ -95,11 +100,15 @@ export function MintSearchInput({
       </HStack>
 
       {validationState.error && (
-        <Text style={{ color: '#EF4444', fontSize: 12 }}>{validationState.error}</Text>
+        <Text size={12} className="text-red-300">
+          {validationState.error}
+        </Text>
       )}
 
       {validationState.isValid === true && (
-        <Text style={{ color: '#10B981', fontSize: 12 }}>Valid mint URL</Text>
+        <Text size={12} className="text-green-300">
+          Valid mint URL
+        </Text>
       )}
     </VStack>
   );

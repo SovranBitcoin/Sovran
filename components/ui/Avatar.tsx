@@ -85,9 +85,10 @@ export const Avatar = ({
       return (
         <Text
           className="text-primary-300/75"
+          size={iconSize}
+          bold
+          overpass
           style={{
-            fontSize: iconSize,
-            fontWeight: 'bold',
             position: 'absolute',
           }}>
           {initial}

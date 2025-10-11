@@ -254,10 +254,10 @@ export default function ModalScreen() {
             <Spacer size={8} />
             <Text
               id="terms-checkbox"
+              size={14}
+              regular
               style={{
                 flex: 1,
-                fontFamily: 'OverpassRegular',
-                fontSize: 14,
               }}
               className="text-primary-0">
               Toggle experimental features

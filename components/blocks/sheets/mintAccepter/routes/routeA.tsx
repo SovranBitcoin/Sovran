@@ -29,10 +29,10 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
       }}>
       <Text
         size={24}
+        overpass
+        heavy
+        className="text-primary-0"
         style={{
-          fontSize: 20,
-          fontFamily: 'OverpassHeavy',
-          color: getPrimaryColor('0'),
           marginLeft: 16,
           textAlign: 'center',
           marginBottom: 16,
@@ -41,9 +41,10 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
         <View>
           <StyledText
             primary
+            size={20}
+            heavy
+            overpass
             style={{
-              fontFamily: 'OverpassHeavy',
-              fontSize: 20,
               marginBottom: -5.5,
             }}>
             {removeProtocol(payload.mint)}

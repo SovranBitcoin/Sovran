@@ -143,12 +143,7 @@ export default function Modal({
             alignItems: 'center',
             pointerEvents: 'none',
           }}>
-          <Text
-            className="text-primary-0"
-            style={{
-              fontFamily: 'OverpassHeavy',
-              fontSize: 18,
-            }}>
+          <Text className="text-primary-0" size={18} heavy overpass>
             {title}
           </Text>
         </View>

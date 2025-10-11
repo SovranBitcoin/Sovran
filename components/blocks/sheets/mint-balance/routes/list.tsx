@@ -103,10 +103,10 @@ const MintItem: React.FC<MintItemProps> = ({
         </View>
 
         <VStack flex={1}>
-          <Text className="text-primary-0" style={{ fontSize: 16, fontWeight: '500' }}>
+          <Text className="text-primary-0" size={16} bold overpass>
             {mint.name}
           </Text>
-          <Text className="text-primary-200" style={{ fontSize: 14 }}>
+          <Text className="text-primary-200" size={14}>
             {formattedBalance}
           </Text>
         </VStack>

@@ -38,13 +38,7 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
         </View>
       )}
       <Spacer size={8} />
-      <Text
-        className="text-center text-primary-100"
-        overpass
-        heavy
-        style={{
-          fontSize: 11,
-        }}>
+      <Text className="text-center text-primary-100" overpass heavy size={11}>
         {item.label}
       </Text>
     </TouchableOpacity>

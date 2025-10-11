@@ -322,12 +322,7 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
               title: 'Status',
               value: (
                 <HStack align="center">
-                  <Text
-                    className="text-primary-0"
-                    style={{
-                      fontFamily: 'OverpassBold',
-                      fontSize: 16,
-                    }}>
+                  <Text className="text-primary-0" size={16} overpass bold>
                     {isPaid ? 'Completed' : 'Pending'}
                   </Text>
                 </HStack>

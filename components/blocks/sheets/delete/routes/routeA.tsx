@@ -59,7 +59,7 @@ const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
 
   return (
     <View className="bg-primary-950" style={{ padding: 20 }}>
-      <Text style={{ fontSize: 18, marginBottom: 20 }}>
+      <Text size={18} style={{ marginBottom: 20 }}>
         Are you sure you want to delete your profile?
       </Text>
       <Text style={{ marginBottom: 20 }}>

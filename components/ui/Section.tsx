@@ -107,10 +107,11 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <TouchableOpacity className="flex-row items-center">
             <StyledText
               primary
+              size={24}
+              heavy
+              overpass
+              className="text-shade-200"
               style={{
-                color: getShadeColor('200'),
-                fontFamily: 'OverpassHeavy',
-                fontSize: 24,
                 textAlign: 'center',
                 textShadowColor: 'rgba(0, 0, 0, 0.75)',
                 textShadowOffset: { width: 0, height: 0 },

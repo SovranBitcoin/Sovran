@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { Text } from 'react-native';
 import Haptics from 'components/ui/Haptics';
 import { Button } from 'components/ui/Button';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 
 interface Props {
   onKeyPress: (value: string) => void;
@@ -40,9 +40,11 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
         <VStack align="center" justify="center" flex={1}>
           {value === '<' ? (
             <Text
+              size={32}
+              bold
+              overpass
+              className="text-white-0"
               style={{
-                color: 'white',
-                fontSize: 32,
                 textShadowColor: 'rgba(0,0,0,0.5)',
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 8,
@@ -51,13 +53,13 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
             </Text>
           ) : (
             <Text
+              size={32}
+              bold
+              overpass
+              className="text-white-0"
               style={{
                 padding: 16,
                 paddingHorizontal: 24,
-                fontSize: 32,
-                color: 'white',
-                fontWeight: 'bold',
-                fontFamily: 'OverpassBold',
                 textShadowColor: 'rgba(0,0,0,0.5)',
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 8,

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, memo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import Haptics from 'components/ui/Haptics';
 import { useTheme } from 'providers/ThemeProvider';
+import { Text } from 'components/ui/Text';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -80,13 +81,13 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
           <Icon name="lucide:delete" size={24} color="white" />
         ) : (
           <Text
+            size={24}
+            bold
+            overpass
             style={{
               padding: 16,
               paddingHorizontal: 24,
-              fontSize: 24,
               color: 'white',
-              fontWeight: 'bold',
-              fontFamily: 'OverpassBold',
             }}>
             {value}
           </Text>

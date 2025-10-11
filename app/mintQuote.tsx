@@ -221,9 +221,7 @@ export function MintQuote({ mintHistoryEntry, extraButtons = [] }: MintQuoteProp
               title: 'Status',
               value: (
                 <HStack align="center">
-                  <Text
-                    className="text-primary-0"
-                    style={{ fontSize: 16, fontFamily: 'OverpassBold' }}>
+                  <Text className="text-primary-0" size={16} overpass bold>
                     {isPaid ? 'Completed' : 'Pending'}
                   </Text>
                 </HStack>

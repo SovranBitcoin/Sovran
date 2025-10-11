@@ -190,15 +190,15 @@ const Camera: React.FC = () => {
         {/* Progress text */}
         <View className="absolute bottom-0 self-center rounded-lg bg-black/50 p-2">
           {progress > 0 ? (
-            <Text className="text-primary-0" style={{ fontSize: 16 }}>
+            <Text className="text-primary-0" size={16}>
               Progress: {Math.round(progress * 100)}%
             </Text>
           ) : loading ? (
-            <Text className="text-primary-0" style={{ fontSize: 16 }}>
+            <Text className="text-primary-0" size={16}>
               Loading...
             </Text>
           ) : (
-            <Text className="text-primary-0" style={{ fontSize: 16 }}>
+            <Text className="text-primary-0" size={16}>
               Scanning...
             </Text>
           )}

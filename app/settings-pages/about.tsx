@@ -1,10 +1,11 @@
 import React from 'react';
 import { Button } from 'components/ui/Button';
-import { Linking, ScrollView, Text } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 import Icon from 'assets/icons';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { VStack, Spacer } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 
 type ChangelogItem = {
   title: string;
@@ -20,12 +21,7 @@ interface ChangelogSectionProps {
 export default function ModalScreen() {
   const ChangelogSection = ({ title, items, emoji }: ChangelogSectionProps) => (
     <VStack spacing={8} style={{ marginBottom: 16 }}>
-      <Text
-        className="text-primary-0"
-        style={{
-          fontSize: 16,
-          fontWeight: 'bold',
-        }}>
+      <Text className="text-primary-0" size={16} bold>
         {emoji} {title}
       </Text>
       <VStack spacing={6}>
@@ -33,8 +29,8 @@ export default function ModalScreen() {
           <VStack key={index} style={{ paddingLeft: 12 }}>
             <Text
               className="text-primary-200"
+              size={14}
               style={{
-                fontSize: 14,
                 lineHeight: 20,
               }}>
               •{' '}
@@ -103,9 +99,9 @@ export default function ModalScreen() {
         <VStack spacing={8} style={{ marginBottom: 20 }}>
           <Text
             className="text-primary-0"
+            size={18}
+            bold
             style={{
-              fontSize: 18,
-              fontWeight: 'bold',
               textAlign: 'center',
             }}>
             {"What's New in Version 0.0.22 (1)"}

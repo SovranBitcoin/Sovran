@@ -143,10 +143,11 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                       <CurrencyIcon currency={currency.toLowerCase()} />
                     )}
                     <Text
+                      size={14}
+                      bold
+                      overpass
                       style={{
                         color: getPrimaryColor('0'),
-                        fontSize: 14,
-                        fontFamily: 'OverpassBold',
                       }}>
                       {currency}
                     </Text>

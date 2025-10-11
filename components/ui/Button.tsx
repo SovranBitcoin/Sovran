@@ -248,10 +248,11 @@ export const Button = ({
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         {typeof text === 'string' ? (
           <Text
+            size={16}
+            bold
+            overpass
             style={{
               color: getTextColor(),
-              fontFamily: 'OverpassBold',
-              fontSize: 16,
             }}>
             {text}
           </Text>

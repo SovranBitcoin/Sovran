@@ -118,7 +118,9 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) =
             />
 
             <VStack spacing={2}>
-              <Text style={[{ color: getPrimaryColor('0'), fontSize: 16 }]}>{displayName}</Text>
+              <Text size={16} bold overpass className="text-primary-0">
+                {displayName}
+              </Text>
 
               <HStack align="center" gap={4}>
                 {pseudo && (

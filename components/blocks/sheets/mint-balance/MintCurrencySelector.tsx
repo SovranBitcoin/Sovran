@@ -98,10 +98,11 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       {/* Currency Selector */}
       <VStack>
         <Text
+          size={18}
+          bold
+          overpass
+          className="text-primary-0"
           style={{
-            color: getPrimaryColor('0'),
-            fontSize: 18,
-            fontWeight: '600',
             marginBottom: 4,
           }}>
           {currencyLabel}
@@ -136,7 +137,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                   ) : (
                     <CurrencyIcon width={32} currency={currency.toLowerCase()} />
                   )}
-                  <Text style={{ color: getPrimaryColor('0'), fontSize: 14, fontWeight: 'bold' }}>
+                  <Text size={14} bold overpass className="text-primary-0">
                     {currency === 'SAT' ? 'BTC' : currency === 'ALL' ? 'ALL' : currency}
                   </Text>
                 </HStack>
@@ -151,10 +152,11 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       {/* Mints List */}
       <VStack>
         <Text
+          size={18}
+          bold
+          overpass
+          className="text-primary-0"
           style={{
-            color: getPrimaryColor('0'),
-            fontSize: 18,
-            fontWeight: '600',
             marginBottom: 4,
           }}>
           {mintsLabel}

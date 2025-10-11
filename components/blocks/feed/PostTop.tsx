@@ -26,21 +26,11 @@ export function PostTop({ post }: PostTopProps) {
       {!displayName ? (
         <Skeleton className="mr-2 h-4 w-24 rounded-lg bg-primary-700" />
       ) : (
-        <Text
-          className="text-primary-0"
-          style={{
-            fontFamily: 'OverpassBold',
-            fontSize: 14,
-          }}>
+        <Text className="text-primary-0" size={14} bold overpass>
           {displayName}
         </Text>
       )}
-      <Text
-        className="text-primary-200"
-        style={{
-          fontFamily: 'OverpassRegular',
-          fontSize: 14,
-        }}>
+      <Text className="text-primary-200" size={14}>
         {' '}
         • {timeAgo}
       </Text>

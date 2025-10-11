@@ -16,23 +16,13 @@ export function RepostText({ pubkey, repostCounter }: RepostTextProps) {
 
       <UserNameProfiles pubkey={pubkey} />
       {repostCounter > 1 ? (
-        <Text
-          className="text-primary-400"
-          style={{
-            fontFamily: 'OverpassBold',
-            fontSize: 14,
-          }}>
+        <Text className="text-primary-400" size={14} bold overpass>
           {` and ${repostCounter - 1} other ${
             repostCounter - 1 > 1 ? 'people' : 'person'
           } reposted`}
         </Text>
       ) : (
-        <Text
-          className="text-primary-400"
-          style={{
-            fontFamily: 'OverpassBold',
-            fontSize: 14,
-          }}>
+        <Text className="text-primary-400" size={14} bold overpass>
           {' reposted'}
         </Text>
       )}

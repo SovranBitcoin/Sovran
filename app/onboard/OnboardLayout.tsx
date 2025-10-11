@@ -51,14 +51,14 @@ export function OnboardingLayout({
           )}
           {highlight && highlightColors && (
             <StyledText
+              lexend
+              black
               style={{
-                fontSize: 48,
-                fontFamily: 'LexendBlack',
                 lineHeight: 48,
               }}
               custom
               colors={highlightColors}
-              size={32}>
+              size={48}>
               {highlight}
             </StyledText>
           )}
