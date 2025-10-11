@@ -13,7 +13,7 @@
  * ```typescript
  * // Open message input
  * const result = await SheetManager.show('transaction-message');
- * 
+ *
  * // Handle result
  * if (result?.action === 'confirm') {
  *   console.log('Message:', result.message);
