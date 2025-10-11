@@ -67,13 +67,13 @@ function ModalScreen() {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const { search, addMessage } = useNostr();
   const { value: nostrKeys } = useNostrKeys();
-  const messages = useSelector(memoizedMessagesByProfile());
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
 
   const targetPubkey = convertNpub(pubkey);
+  const messages = useSelector(memoizedMessagesByProfile({ pubkey: targetPubkey }));
 
   // Header data
   const maxWidth = Math.min(Dimensions.get('window').width, 600);

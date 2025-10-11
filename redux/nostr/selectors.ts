@@ -25,6 +25,6 @@ export const memoizedMessagesByProfile = ({ pubkey }: { pubkey?: string } = {}) 
       (state: RootState) => memoizedGetCurrentProfile(state),
     ],
     (messages, profile) => {
-      return messages[pubkey || profile.pubkey];
+      return messages[pubkey || profile.pubkey] || [];
     }
   );
