@@ -22,8 +22,7 @@
  * @see {@link ./info}
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -31,8 +30,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { popup } from '@/helper/popup';
-import { useMintManagement } from 'hooks/coco';
-import { View, VStack, Spacer, HStack } from 'components/ui/View';
+import { View, VStack, HStack } from 'components/ui/View';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { MintSearchInput } from 'components/ui/MintSearchInput';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
@@ -42,7 +40,9 @@ import { CocoManager } from 'helper/coco/manager';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useDiscoveredMints } from '@/hooks/coco/useDiscoveredMints';
+import { useMintManagement } from 'hooks/coco';
 import type { DiscoveredMintData } from '@/hooks/coco/useDiscoveredMints';
 
 interface PseudoMint {
@@ -173,7 +173,6 @@ const AddRoute = () => {
   const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
-  const { getBalances } = useMintManagement();
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
 
@@ -186,34 +185,64 @@ const AddRoute = () => {
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  // Get owned mint URLs to exclude from discovery
-  const [ownedMintUrls, setOwnedMintUrls] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const loadOwnedMints = async () => {
-      const balances = await getBalances();
-      setOwnedMintUrls(new Set(Object.keys(balances)));
-    };
-    loadOwnedMints();
-  }, [getBalances]);
-
   // Use the discovered mints hook
-  const {
-    mints: discoveredMints,
-    loading,
-    error,
-    retry,
-  } = useDiscoveredMints({
-    excludeUrls: ownedMintUrls,
-  });
+  const { mints: discoveredMints, loading, error, retry } = useDiscoveredMints();
+
+  // Get known mints for filtering
+  const { mints: knownMints } = useMintManagement();
 
   // Get allowed currencies from payload or use defaults
   const allowedCurrencies = payload?.allowedUnits ?? ['SAT', 'USD', 'EUR', 'GBP'];
 
-  // Filter mints based on search query
+  // Helper function to normalize URLs for comparison
+  const normalizeUrl = (url: string): string => {
+    // Remove trailing slash and normalize
+    return url.replace(/\/$/, '');
+  };
+
+  // Filter mints based on search query and exclude known mints
   const filteredMints = useMemo((): SearchableMint[] => {
-    // Convert discovered mints to searchable format
-    const searchableDiscoveredMints = discoveredMints.map(adaptDiscoveredMint);
+    // Get known mint URLs for exclusion (normalized)
+    const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
+
+    console.log('🔍 ADD PAGE FILTERING DEBUG:');
+    console.log('📋 Known mints from useMintManagement:', knownMints.length);
+    console.log('📋 Known mint URLs (normalized):', Array.from(knownMintUrls));
+    console.log('🔍 Discovered mints from useDiscoveredMints:', discoveredMints.length);
+    console.log(
+      '🔍 Discovered mint URLs:',
+      discoveredMints.map((m) => m.url)
+    );
+
+    // Convert discovered mints to searchable format and exclude known mints
+    const searchableDiscoveredMints = discoveredMints
+      .filter((mint) => {
+        const normalizedDiscoveredUrl = normalizeUrl(mint.url);
+        const isKnown = knownMintUrls.has(normalizedDiscoveredUrl);
+        if (isKnown) {
+          console.log(
+            `❌ EXCLUDING known mint: ${mint.url} (normalized: ${normalizedDiscoveredUrl})`
+          );
+        } else {
+          console.log(
+            `✅ INCLUDING unknown mint: ${mint.url} (normalized: ${normalizedDiscoveredUrl})`
+          );
+        }
+        return !isKnown;
+      })
+      .map(adaptDiscoveredMint);
+
+    console.log(
+      '🔍 Filtered out',
+      knownMintUrls.size,
+      'known mints, showing',
+      searchableDiscoveredMints.length,
+      'discovered mints'
+    );
+    console.log(
+      '🔍 Final filtered mint URLs:',
+      searchableDiscoveredMints.map((m) => m.url)
+    );
 
     if (!url.trim()) return searchableDiscoveredMints;
 
@@ -232,7 +261,7 @@ const AddRoute = () => {
     }
 
     return filtered;
-  }, [discoveredMints, url, customMintInfo]);
+  }, [discoveredMints, knownMints, url, customMintInfo]);
 
   const handleToggleMint = (url: string) => {
     setSelectedMints((prev) => {
@@ -326,14 +355,50 @@ const AddRoute = () => {
     }
   };
 
+  // Skeleton component that matches AddMintItem layout
+  const MintItemSkeleton = () => {
+    // Generate random widths for more realistic skeleton
+    const nameWidth = 100 + Math.random() * 60; // 100-160px
+    const badge1Width = 60 + Math.random() * 40; // 60-100px
+    const badge2Width = 50 + Math.random() * 30; // 50-80px
+
+    return (
+      <View
+        className="overflow-hidden rounded-lg"
+        blur
+        style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
+        <HStack align="center" justify="space-between" className="p-3">
+          <HStack align="center" gap={8}>
+            <Skeleton
+              className="h-[42px] w-[42px] bg-primary-700"
+              style={{ borderRadius: 42 * 0.25 }} // Square rounded for mints
+            />
+            <VStack spacing={2}>
+              <Skeleton className="h-[16px] bg-primary-700" style={{ width: nameWidth }} />
+              <HStack align="center" gap={4}>
+                <Skeleton
+                  className="h-[20px] rounded-full bg-primary-700"
+                  style={{ width: badge1Width }}
+                />
+                <Skeleton
+                  className="h-[20px] rounded-full bg-primary-700"
+                  style={{ width: badge2Width }}
+                />
+              </HStack>
+            </VStack>
+          </HStack>
+          <Skeleton className="h-[24px] w-[24px] rounded bg-primary-700" />
+        </HStack>
+      </View>
+    );
+  };
+
   // Loading state component for the mints section
   const LoadingMintsList = () => (
-    <VStack className="items-center p-8">
-      <ActivityIndicator size="large" color={getPrimaryColor('0')} />
-      <Spacer size={12} />
-      <Text className="text-center text-sm" style={{ color: getPrimaryColor('200') }}>
-        Discovering mints...
-      </Text>
+    <VStack spacing={0}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <MintItemSkeleton key={index} />
+      ))}
     </VStack>
   );
 

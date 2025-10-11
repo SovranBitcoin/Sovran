@@ -14,10 +14,6 @@ export interface DiscoveredMintData {
   mintInfo: MintInfo | null;
 }
 
-interface UseDiscoveredMintsOptions {
-  excludeUrls?: Set<string>;
-}
-
 interface UseDiscoveredMintsResult {
   mints: DiscoveredMintData[];
   loading: boolean;
@@ -25,10 +21,7 @@ interface UseDiscoveredMintsResult {
   retry: () => void;
 }
 
-export const useDiscoveredMints = (
-  options: UseDiscoveredMintsOptions = {}
-): UseDiscoveredMintsResult => {
-  const { excludeUrls = new Set() } = options;
+export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
   const [mints, setMints] = useState<DiscoveredMintData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,11 +88,7 @@ export const useDiscoveredMints = (
         for (let i = 0; i < result.results.length; i++) {
           const mint = result.results[i];
 
-          // Skip excluded URLs
-          if (excludeUrls.has(mint.url)) {
-            console.log(`⏭️ Skipping excluded mint: ${mint.url}`);
-            continue;
-          }
+          // Process all discovered mints - filtering will be done in the component
 
           try {
             console.log(`🔍 Processing mint ${i + 1}/${result.results.length}: ${mint.url}`);
@@ -139,6 +128,10 @@ export const useDiscoveredMints = (
         }
 
         console.log('✅ Successfully processed', processedMints.length, 'mints');
+        console.log(
+          '🔍 Discovered mint URLs:',
+          processedMints.map((m) => m.url)
+        );
         setMints(processedMints);
       } catch (err) {
         console.error('❌ Failed to load mints:', err);
@@ -154,7 +147,7 @@ export const useDiscoveredMints = (
     };
 
     loadMints();
-  }, [excludeUrls, retryCount]);
+  }, [retryCount]);
 
   const retry = () => {
     setRetryCount((prev) => prev + 1);

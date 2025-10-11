@@ -10,9 +10,8 @@ import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
-import { Card } from 'components/ui/Card';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { Spacer, View } from 'components/ui/View';
+import { View } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
@@ -182,22 +181,6 @@ const EcashLightningReceiver = () => {
         </View>
       }>
       <View>
-        {showLightningAddress && (
-          <View
-            style={{
-              marginHorizontal: 16,
-              marginTop: 0,
-            }}>
-            {new Date() > new Date('2025-07-22') && (
-              <Card
-                message="The receive address from NPUBX below is an experimental feature, ensure you keep your app up-to-date for possible breaking changes."
-                variant="warning"
-              />
-            )}
-            <Spacer size={12} />
-          </View>
-        )}
-
         {showLightningAddress && (
           <PaymentInfo
             data={`${currentProfile.npub}@npubx.cash`}

@@ -21,6 +21,11 @@ export function useMintManagement() {
 
     try {
       const mints = await manager.mint.getAllMints();
+      console.log('🏦 useMintManagement: Loaded mints from manager:', mints.length);
+      console.log(
+        '🏦 useMintManagement: Mint URLs:',
+        mints.map((m) => m.mintUrl)
+      );
       setMints(mints);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to load mints');

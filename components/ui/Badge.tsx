@@ -41,32 +41,32 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: getPrimaryColor('100'),
+          backgroundColor: opacity(getPrimaryColor('100'), 0.2),
           borderColor: 'transparent',
         };
       case 'secondary':
         return {
-          backgroundColor: getPrimaryColor('200'),
+          backgroundColor: opacity(getPrimaryColor('200'), 0.2),
           borderColor: 'transparent',
         };
       case 'warning':
         return {
-          backgroundColor: getRedColor('300'),
+          backgroundColor: opacity(getRedColor('300'), 0.2),
           borderColor: 'transparent',
         };
       case 'error':
         return {
-          backgroundColor: getRedColor('300'),
+          backgroundColor: opacity(getRedColor('300'), 0.2),
           borderColor: 'transparent',
         };
       case 'success':
         return {
-          backgroundColor: getGreenColor('500'),
+          backgroundColor: opacity(getGreenColor('500'), 0.2),
           borderColor: 'transparent',
         };
       default:
         return {
-          backgroundColor: getPrimaryColor('100'),
+          backgroundColor: opacity(getPrimaryColor('100'), 0.2),
           borderColor: 'transparent',
         };
     }
@@ -97,8 +97,6 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
 
   return (
     <HStack
-      blur
-      colorBlur={opacity(String(getVariantStyles().backgroundColor || '#000000'), 0.2)}
       gap={isIconOnly ? 0 : 4}
       className={cn(badgeVariants({ variant }), className)}
       justify="center"

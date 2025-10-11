@@ -23,11 +23,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useDispatch, useSelector } from 'react-redux';
 import { useMintManagement } from 'hooks/coco';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
@@ -39,9 +37,11 @@ import { setSelectedMint } from 'redux/cashu';
 import { memoizedGetCurrentProfile } from 'redux/nostr';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { View, HStack, VStack } from 'components/ui/View';
 import { formatAmount } from 'helper/currency';
 import { MintCurrencySelector } from '../MintCurrencySelector';
+import { getMintDisplayName } from 'helper/url';
+import { Skeleton } from '@/components/ui/Skeleton';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
 
@@ -67,7 +67,6 @@ const MintItem: React.FC<MintItemProps> = ({
   showDetailsButton = false,
   onInspectPress,
 }) => {
-  const { getPrimaryColor } = useTheme();
   const formattedBalance = balance.amount
     ? formatAmount(
         { amount: balance.amount, unit: balance.unit },
@@ -94,17 +93,17 @@ const MintItem: React.FC<MintItemProps> = ({
             picture={mint.mintInfo.icon_url || undefined}
             size={36}
             variant="mint"
-            name={mint.name}
-            alt={`${mint.name} mint`}
+            name={getMintDisplayName(mint.mintUrl, mint.mintInfo)}
+            alt={`${getMintDisplayName(mint.mintUrl, mint.mintInfo)} mint`}
           />
           <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
-            {isLoading && <ActivityIndicator animating size="small" color={getPrimaryColor('0')} />}
+            {isLoading && <View className="h-3 w-3 animate-pulse rounded-full bg-primary-600" />}
           </View>
         </View>
 
         <VStack flex={1}>
           <Text className="text-primary-0" size={16} bold overpass>
-            {mint.name}
+            {getMintDisplayName(mint.mintUrl, mint.mintInfo)}
           </Text>
           <Text className="text-primary-200" size={14}>
             {formattedBalance}
@@ -141,7 +140,6 @@ const MintItem: React.FC<MintItemProps> = ({
  * @returns {JSX.Element}
  */
 const ListRoute = () => {
-  const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const router = useSheetRouter('mint-balance');
@@ -160,6 +158,36 @@ const ListRoute = () => {
   const profileId = useSelector(memoizedGetCurrentProfile).id;
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
+  // Skeleton component that matches MintItem layout
+  const MintItemSkeleton = () => {
+    // Generate random widths for more realistic skeleton
+    const nameWidth = 100 + Math.random() * 60; // 100-160px
+    const balanceWidth = 60 + Math.random() * 40; // 60-100px
+
+    return (
+      <View
+        className="bg-primary-900"
+        style={{
+          padding: 16,
+          marginBottom: 4,
+          borderRadius: 16,
+        }}>
+        <HStack align="center" gap={12}>
+          <View style={{ position: 'relative' }}>
+            <Skeleton
+              className="h-[36px] w-[36px] bg-primary-700"
+              style={{ borderRadius: 36 * 0.25 }} // Square rounded for mints
+            />
+          </View>
+          <VStack flex={1}>
+            <Skeleton className="mb-2 h-[16px] bg-primary-700" style={{ width: nameWidth }} />
+            <Skeleton className="h-[14px] bg-primary-700" style={{ width: balanceWidth }} />
+          </VStack>
+        </HStack>
+      </View>
+    );
+  };
+
   // Load mints with balances
   useEffect(() => {
     const loadMints = async () => {
@@ -168,6 +196,15 @@ const ListRoute = () => {
 
         const balances = await getBalances();
 
+        console.log('📋 LIST PAGE LOADING DEBUG:');
+        console.log('📋 Mints from useMintManagement:', mints.length);
+        console.log(
+          '📋 Mint URLs from useMintManagement:',
+          mints.map((m) => m.mintUrl)
+        );
+        console.log('💰 Balances from getBalances:', Object.keys(balances).length);
+        console.log('💰 Balance URLs:', Object.keys(balances));
+
         const mintsWithBalances = mints.map((mint) => ({
           unit: 'SAT',
           amount: balances[mint.mintUrl] || 0,
@@ -175,6 +212,12 @@ const ListRoute = () => {
         }));
 
         const sortedMints = _.orderBy(mintsWithBalances, ['amount'], ['desc']);
+
+        console.log('📋 Final sorted mints for list:', sortedMints.length);
+        console.log(
+          '📋 Final sorted mint URLs:',
+          sortedMints.map((m) => m.mintUrl)
+        );
 
         setFilteredMints(sortedMints);
       } catch (error) {
@@ -286,10 +329,10 @@ const ListRoute = () => {
             ]}
           />
         }>
-        <VStack className="items-center p-5">
-          <ActivityIndicator size="large" color={getPrimaryColor('0')} />
-          <Spacer size={10} />
-          <Text className="text-sm text-primary-200">Loading balances...</Text>
+        <VStack spacing={0}>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <MintItemSkeleton key={index} />
+          ))}
         </VStack>
       </Wrapper>
     );
