@@ -1,10 +1,25 @@
+/**
+ * @fileoverview Route config and types for EmojiPicker
+ *
+ * @module components/blocks/sheets/emoji-picker/routes
+ *
+ * @description
+ * **Routes:**
+ * - 'emoji-grid': Bitcoin emoji selection interface
+ *
+ * **Data:**
+ * - Payload: `{token: string}` - Sheet-wide, via `useSheetPayload()`
+ * - Route Params: None (single route)
+ * - Return: None (closes after selection)
+ *
+ * **Flow:** emoji-grid → user selects emoji → encode → clipboard → close
+ */
+
 import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
 import EmojiGrid from './routeA';
 
-// Define a unique name for this sheet
 export const sheetName = 'emoji-picker';
 
-// Define all available routes for this sheet
 export const routes: Route[] = [
   {
     name: 'emoji-grid',

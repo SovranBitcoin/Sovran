@@ -1,7 +1,27 @@
+/**
+ * @fileoverview EmojiGrid - Bitcoin emoji selection
+ *
+ * @module components/blocks/sheets/emoji-picker/routes/emoji-grid
+ *
+ * @description
+ * Grid of 11 Bitcoin-themed emojis. On selection: encodes token, copies to
+ * clipboard, shows success popup, closes sheet via router.goBack().
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: Closes after selection (only route)
+ *
+ * **Data:**
+ * - Payload: `{token: string}` - The ecash token to encode
+ *
+ * **Flow:** Display grid → user taps emoji → encode → clipboard → popup → close
+ *
+ * @see {@link ./index}
+ */
+
 import React from 'react';
-import { TouchableOpacity, StyleSheet } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
-import { useTheme } from 'providers/ThemeProvider';
 import { Spacer, View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import chunk from 'lodash/chunk';
@@ -10,99 +30,88 @@ import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/ui/Card';
 import { popup } from 'helper/popup';
 
+/**
+ * EmojiGrid Component
+ *
+ * @component
+ * @param {RouteScreenProps<'emoji-picker', 'emoji-grid'>} props
+ * @returns {JSX.Element}
+ */
 const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) => {
-  const { getPrimaryColor } = useTheme();
-  const styles = createStyles(getPrimaryColor);
-
   const payload = useSheetPayload('emoji-picker');
 
+  /**
+   * Emojis for token encoding
+   *
+   * @constant
+   * @type {Array<{id: string, emoji: string}>}
+   */
   const emojis = [
     { id: 'laugh', emoji: '😂' },
-    { id: 'nut', emoji: '🥜' }, // peanut (inside joke in some bitcoin circles)
-    { id: 'lightning', emoji: '⚡' }, // lightning (for Lightning Network)
-    { id: 'heart', emoji: '🧡' }, // orange heart (bitcoin community love)
-    { id: 'trophy', emoji: '🏆' }, // trophy (winning)
-    { id: 'volcano', emoji: '🌋' }, // volcano (El Salvador volcano bonds)
-    { id: 'rocket', emoji: '🚀' }, // rocket (to the moon)
-    { id: 'money', emoji: '💰' }, // money bag
-    { id: 'key', emoji: '🔑' }, // key (private keys)
-    { id: 'badger', emoji: '🦡' }, // badger (bitcoin badger/mascot)
-    { id: 'ape', emoji: '🦍' }, // ape ("apeing in")
+    { id: 'nut', emoji: '🥜' },
+    { id: 'lightning', emoji: '⚡' },
+    { id: 'heart', emoji: '🧡' },
+    { id: 'trophy', emoji: '🏆' },
+    { id: 'volcano', emoji: '🌋' },
+    { id: 'rocket', emoji: '🚀' },
+    { id: 'money', emoji: '💰' },
+    { id: 'key', emoji: '🔑' },
+    { id: 'badger', emoji: '🦡' },
+    { id: 'ape', emoji: '🦍' },
   ];
 
-  const emojiRows = chunk(emojis, 4); // 3 columns per row
+  const emojiRows = chunk(emojis, 4);
 
+  /**
+   * Handles emoji selection
+   *
+   * @async
+   * @description Encodes token, copies to clipboard, shows popup, closes sheet
+   *
+   * **Process:** encode → clipboard → popup → router.goBack()
+   * **Effects:** Clipboard write, shows notification, closes sheet
+   *
+   * @param {string} emoji - Selected emoji character
+   */
   const handleEmojiSelect = async (emoji: string) => {
-    // Return the selected emoji when closing the sheet
     const encodedEmoji = encode(emoji, payload.token);
-    Clipboard.setStringAsync(encodedEmoji);
+    await Clipboard.setStringAsync(encodedEmoji);
     popup({
       message: 'ecash_token_copied',
       type: 'success',
-      onClose: () => {
-        router?.goBack();
-      },
+      onClose: () => router?.goBack(),
     });
   };
 
   return (
-    <View style={styles.container}>
-      <Text weight="bold" style={[styles.title, { marginTop: 24 }]}>
-        Encode as Emoji
-      </Text>
-      <Spacer size={12} />
-      <Card message={"These encoded emoji's don't work on every platform."} variant="info" />
-      <Spacer size={12} />
-      <ScrollView>
-        {emojiRows.map((row, rowIndex) => (
-          <HStack key={rowIndex} justify="space-between" style={styles.row}>
-            {row.map((emoji, colIndex) => (
-              <TouchableOpacity
-                testID={emoji.id}
-                key={colIndex}
-                style={[
-                  styles.emojiButton,
-                  colIndex > 0 && { marginLeft: 8 }, // Only add marginLeft if not the first in the row
-                ]}
-                onPress={() => handleEmojiSelect(emoji.emoji)}>
-                <VStack align="center" justify="center" flex={1}>
-                  <Text style={styles.emoji}>{emoji.emoji}</Text>
-                </VStack>
-              </TouchableOpacity>
-            ))}
-          </HStack>
-        ))}
-      </ScrollView>
+    <View className="mx-4 mb-0 overflow-hidden rounded-2xl bg-primary-950">
+      <VStack className="p-6">
+        <Text weight="bold" className="text-lg font-semibold text-primary-0">
+          Encode as Emoji
+        </Text>
+        <Spacer size={12} />
+        <Card message={"These encoded emoji's don't work on every platform."} variant="info" />
+        <Spacer size={12} />
+        <ScrollView>
+          {emojiRows.map((row, rowIndex) => (
+            <HStack key={rowIndex} justify="space-between" className="mb-3">
+              {row.map((emoji, colIndex) => (
+                <TouchableOpacity
+                  testID={emoji.id}
+                  key={colIndex}
+                  className={`flex-1 rounded-lg bg-primary-800 p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
+                  onPress={() => handleEmojiSelect(emoji.emoji)}>
+                  <VStack align="center" justify="center" flex={1}>
+                    <Text className="text-2xl">{emoji.emoji}</Text>
+                  </VStack>
+                </TouchableOpacity>
+              ))}
+            </HStack>
+          ))}
+        </ScrollView>
+      </VStack>
     </View>
   );
 };
-
-const createStyles = (getPrimaryColor: (shade: string) => string) =>
-  StyleSheet.create({
-    container: {
-      marginHorizontal: 16,
-      marginBottom: 0,
-      borderRadius: 16,
-      overflow: 'hidden',
-      backgroundColor: getPrimaryColor('950'),
-    },
-    title: {
-      color: getPrimaryColor('0'),
-      fontSize: 18,
-      fontWeight: '600',
-    },
-    row: {
-      marginBottom: 12,
-    },
-    emojiButton: {
-      flex: 1,
-      backgroundColor: getPrimaryColor('800'),
-      borderRadius: 8,
-      padding: 12,
-    },
-    emoji: {
-      fontSize: 24,
-    },
-  });
 
 export default EmojiGrid;

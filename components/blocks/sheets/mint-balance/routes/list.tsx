@@ -1,3 +1,27 @@
+/**
+ * @fileoverview ListRoute - Mint selection with balances
+ *
+ * @module components/blocks/sheets/mint-balance/routes/list
+ *
+ * @description
+ * Displays owned mints with balances, currency filtering, and selection options.
+ * Users can select mints for transactions, add new mints, or inspect details.
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: `router.navigate('add')` or `router.navigate('info', {mintUrl})`
+ * - Close: `sheetRef.current?.hide({payload: selectedMint})`
+ *
+ * **Data:**
+ * - Payload: `useSheetPayload('mint-balance')` - Configuration and callbacks
+ * - Params: None (initial route)
+ *
+ * **Flow:** Load mints → display with balances → user selects → callback/navigate → close
+ *
+ * @see {@link ./add}
+ * @see {@link ./info}
+ */
+
 import React, { useState, useEffect } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
@@ -109,6 +133,13 @@ const MintItem: React.FC<MintItemProps> = ({
   );
 };
 
+/**
+ * ListRoute Component
+ *
+ * @component
+ * @param {RouteScreenProps<'mint-balance', 'list'>} props
+ * @returns {JSX.Element}
+ */
 const ListRoute = () => {
   const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
@@ -157,6 +188,17 @@ const ListRoute = () => {
     loadMints();
   }, [mints, getBalances]);
 
+  /**
+   * Handles mint selection
+   *
+   * @async
+   * @description Validates balance, executes callback, updates state, navigates, closes sheet
+   *
+   * **Process:** validate → callback/state → navigate → sheetRef.hide()
+   * **Effects:** Redux dispatch, navigation, popup notifications, sheet close
+   *
+   * @param {string} mintUrl - Selected mint URL
+   */
   const handleMintSelect = async (mintUrl: string) => {
     const mint = filteredMints.find((m) => m.mintUrl === mintUrl);
     if (!mint) {
@@ -297,7 +339,7 @@ const ListRoute = () => {
             requireBalance={payload?.requireBalance}
             showDetailsButton={showDetailsButton}
             onInspectPress={() => {
-              router?.navigate('info');
+              router?.navigate('info', { mintUrl: mint.mintUrl });
             }}
             selectedCurrency={selectedCurrency}
             onPress={() => handleMintSelect(mint.mintUrl)}

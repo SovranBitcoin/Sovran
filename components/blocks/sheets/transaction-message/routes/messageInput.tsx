@@ -1,3 +1,26 @@
+/**
+ * @fileoverview MessageInput - Transaction message input form
+ *
+ * @module components/blocks/sheets/transaction-message/routes/message-input
+ *
+ * @description
+ * Text input form for adding optional messages to transactions. Users can
+ * type a message and confirm or skip entirely. Returns action and message text.
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: Closes with result after confirm/skip
+ * - Close: `sheetRef.current?.hide({action, message})`
+ *
+ * **Data:**
+ * - Payload: None (no payload needed)
+ * - Params: None (single route)
+ *
+ * **Flow:** Display form → user types → confirm/skip → close with result
+ *
+ * @see {@link ./index}
+ */
+
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import React, { useState } from 'react';
 import { TextInput } from 'react-native';
@@ -6,13 +29,27 @@ import { useTheme } from 'providers/ThemeProvider';
 import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 
-// eslint-disable-next-line no-empty-pattern
+/**
+ * MessageInput Component
+ *
+ * @component
+ * @param {RouteScreenProps<'transaction-message', 'message-input'>} props
+ * @returns {JSX.Element}
+ */
 const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input'>) => {
   const [message, setMessage] = useState('');
   const sheetRef = useSheetRef('transaction-message');
   const { getPrimaryColor } = useTheme();
 
-  // Handler for confirming with message
+  /**
+   * Handles message confirmation
+   *
+   * @async
+   * @description Closes sheet with confirm action and trimmed message
+   *
+   * **Process:** trim message → sheetRef.hide()
+   * **Effects:** Sheet close with result
+   */
   const handleConfirm = async () => {
     sheetRef.current?.hide({
       action: 'confirm',
@@ -20,7 +57,15 @@ const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input
     });
   };
 
-  // Handler for skipping the message
+  /**
+   * Handles message skip
+   *
+   * @async
+   * @description Closes sheet with skip action and empty message
+   *
+   * **Process:** sheetRef.hide()
+   * **Effects:** Sheet close with result
+   */
   const handleSkip = async () => {
     sheetRef.current?.hide({
       action: 'skip',

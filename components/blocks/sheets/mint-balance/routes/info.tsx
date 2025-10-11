@@ -1,3 +1,27 @@
+/**
+ * @fileoverview InfoRoute - Detailed mint information and audit data
+ *
+ * @module components/blocks/sheets/mint-balance/routes/info
+ *
+ * @description
+ * Displays comprehensive mint details including audit scores, contact info, stats,
+ * and performance metrics. Users can view mint reliability, contact operators, and inspect details.
+ *
+ * **Navigation:**
+ * - From: `router.navigate('info', {mintUrl})` from list route
+ * - To: `router.goBack()` or external links (email, social, nostr)
+ * - Close: `sheetRef.current?.hide()`
+ *
+ * **Data:**
+ * - Payload: `useSheetPayload('mint-balance')` - Optional mintUrl override
+ * - Params: `{mintUrl: string}` - Passed via `router.navigate('info', {mintUrl})`
+ *
+ * **Flow:** Load mint info → display stats → show contact options → user interacts → close
+ *
+ * @see {@link ./list}
+ * @see {@link ./add}
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, Animated, Alert, Linking } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
@@ -265,6 +289,13 @@ const StatsGrid = ({
   );
 };
 
+/**
+ * InfoRoute Component
+ *
+ * @component
+ * @param {RouteScreenProps<'mint-balance', 'info'>} props
+ * @returns {JSX.Element}
+ */
 const InfoRoute = () => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
@@ -297,7 +328,17 @@ const InfoRoute = () => {
   console.log('InfoRoute - auditInfo:', auditInfo);
   console.log('InfoRoute - auditMintInfo:', auditMintInfo);
 
-  // Helper functions
+  /**
+   * Handles text copying to clipboard
+   *
+   * @async
+   * @description Copies text to clipboard with error handling
+   *
+   * **Process:** Clipboard.setStringAsync() → show alert on error
+   * **Effects:** Clipboard write, error alerts
+   *
+   * @param {string} text - Text to copy
+   */
   const handleCopy = async (text: string) => {
     try {
       await Clipboard.setStringAsync(text);
@@ -306,6 +347,18 @@ const InfoRoute = () => {
     }
   };
 
+  /**
+   * Handles contact method interactions
+   *
+   * @async
+   * @description Opens appropriate app/link based on contact method, falls back to clipboard
+   *
+   * **Process:** switch method → openURL/navigate → fallback to clipboard
+   * **Effects:** External app opens, navigation, clipboard write, sheet close
+   *
+   * @param {string} method - Contact method (email, twitter, nostr, etc.)
+   * @param {string} info - Contact information
+   */
   const handleContactPress = async (method: string, info: string) => {
     try {
       switch (method.toLowerCase()) {

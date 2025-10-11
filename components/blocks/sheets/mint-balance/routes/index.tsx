@@ -1,3 +1,22 @@
+/**
+ * @fileoverview Route config and types for MintBalance
+ *
+ * @module components/blocks/sheets/mint-balance/routes
+ *
+ * @description
+ * **Routes:**
+ * - 'list': Mint selection with balances and currency filtering
+ * - 'add': Discover and add new mints to wallet
+ * - 'info': Detailed mint information and audit data
+ *
+ * **Data:**
+ * - Payload: `{requireBalance?: boolean, showAddMintsButton?: boolean, onMintPress?: function}` - Sheet-wide, via `useSheetPayload()`
+ * - Route Params: `{mintUrl: string}` - Passed via `router.navigate('info', {mintUrl})`
+ * - Return: `{id: string, name: string, iconUrl: string|null, unit: string}` - Via `await SheetManager.show()`
+ *
+ * **Flow:** list → user selects mint → close OR list → add → discover mints → add → close OR list → info → inspect details → close
+ */
+
 import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
 import ListRoute from './list';
 import AddRoute from './add';
@@ -26,7 +45,7 @@ declare module 'react-native-actions-sheet' {
       routes: {
         list: RouteDefinition;
         add: RouteDefinition;
-        info: RouteDefinition;
+        info: RouteDefinition<{ mintUrl: string }>;
       };
       returnValue: {
         id: string;

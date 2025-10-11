@@ -1,3 +1,27 @@
+/**
+ * @fileoverview AddRoute - Discover and add new mints
+ *
+ * @module components/blocks/sheets/mint-balance/routes/add
+ *
+ * @description
+ * Discovers available mints, allows custom URL entry, and adds selected mints to wallet.
+ * Users can search discovered mints, add custom URLs, and select multiple mints for addition.
+ *
+ * **Navigation:**
+ * - From: `router.navigate('add')` from list route
+ * - To: `router.goBack()` after successful addition
+ * - Close: `sheetRef.current?.hide({payload: result})`
+ *
+ * **Data:**
+ * - Payload: `useSheetPayload('mint-balance')` - Allowed currencies and configuration
+ * - Params: None (direct navigation)
+ *
+ * **Flow:** Load discovered mints → search/filter → select mints → add to wallet → close
+ *
+ * @see {@link ./list}
+ * @see {@link ./info}
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { ActivityIndicator } from 'react-native';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
@@ -136,6 +160,13 @@ const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) =
   );
 };
 
+/**
+ * AddRoute Component
+ *
+ * @component
+ * @param {RouteScreenProps<'mint-balance', 'add'>} props
+ * @returns {JSX.Element}
+ */
 const AddRoute = () => {
   const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
@@ -230,6 +261,15 @@ const AddRoute = () => {
     reset();
   };
 
+  /**
+   * Handles mint addition
+   *
+   * @async
+   * @description Adds selected mints to wallet via CocoManager, shows progress, closes sheet
+   *
+   * **Process:** validate → addMint() for each → show results → sheetRef.hide()
+   * **Effects:** Wallet updates, popup notifications, sheet close
+   */
   const handleSave = async () => {
     if (selectedMints.size === 0) {
       popup({ message: 'Please select at least one mint to add', type: 'warning' });

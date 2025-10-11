@@ -1,3 +1,26 @@
+/**
+ * @fileoverview RouteA - Toast notifications and modal dialogs
+ *
+ * @module components/blocks/sheets/popup/routes/route-a
+ *
+ * @description
+ * Displays toast notifications with auto-dismiss, modal dialogs with buttons,
+ * and persistent alerts. Supports custom emojis, messages, and navigation actions.
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: `router.goBack()` after auto-dismiss or button press
+ * - Close: Auto-dismiss (3s) or manual via buttons
+ *
+ * **Data:**
+ * - Payload: `useSheetPayload('popup-sheet')` - Message content and behavior
+ * - Params: None (single route)
+ *
+ * **Flow:** Display message → auto-dismiss OR button press → close
+ *
+ * @see {@link ./index}
+ */
+
 import React, { useEffect, useState } from 'react';
 import { Animated } from 'react-native';
 import { View, VStack } from 'components/ui/View';
@@ -6,6 +29,13 @@ import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { router as expoRouter } from 'expo-router';
 
+/**
+ * RouteA Component
+ *
+ * @component
+ * @param {RouteScreenProps<'popup-sheet', 'route-a'>} props
+ * @returns {JSX.Element}
+ */
 const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   const [progress] = useState(new Animated.Value(0));
 
@@ -13,6 +43,14 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
   const isModal = payload?.variant === 'modal';
   const isPersistent = payload?.variant === 'persistent';
 
+  /**
+   * Handles auto-dismiss timer
+   *
+   * @description Sets up 3-second auto-dismiss timer and progress animation for toast notifications
+   *
+   * **Process:** setTimeout → Animated.timing → router.goBack()
+   * **Effects:** Auto-dismiss, progress animation
+   */
   useEffect(() => {
     if (!isModal && !isPersistent) {
       const timer = setTimeout(() => {

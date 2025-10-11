@@ -1,3 +1,27 @@
+/**
+ * @fileoverview RouteA - Dynamic button action interface
+ *
+ * @module components/blocks/sheets/buttonHandler/routes/route-a
+ *
+ * @description
+ * Displays dynamic button actions with processing states and custom styling.
+ * Supports async operations, button reordering (Next buttons last), and
+ * disabled states during processing. Handles both sync and async button actions.
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: Closes after button action execution
+ * - Close: `router?.goBack()` or `router?.close()`
+ *
+ * **Data:**
+ * - Payload: `useSheetPayload('button-handler')` - Button configuration array
+ * - Params: None (single route)
+ *
+ * **Flow:** Display buttons → user selects → execute action → close
+ *
+ * @see {@link ./index}
+ */
+
 import React, { useState } from 'react';
 import { View, TouchableOpacity, GestureResponderEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
@@ -7,12 +31,30 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 
+/**
+ * RouteA Component
+ *
+ * @component
+ * @param {RouteScreenProps<'button-handler', 'route-a'>} props
+ * @returns {JSX.Element}
+ */
 const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
   const { getPrimaryColor, getRedColor } = useTheme();
   const payload = useSheetPayload('button-handler');
 
   const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
 
+  /**
+   * Handles button press execution
+   *
+   * @description Executes button action with processing state management and close handling
+   *
+   * **Process:** set processing → execute action → handle promise/sync → reset state
+   * **Effects:** Button state changes, sheet close, async operation handling
+   *
+   * @param {Function} onPress - Button action function
+   * @param {number} index - Button index for processing state
+   */
   const handleButtonPress = (
     onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>,
     index: number

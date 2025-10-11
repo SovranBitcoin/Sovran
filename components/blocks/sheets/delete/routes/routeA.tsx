@@ -1,3 +1,26 @@
+/**
+ * @fileoverview RouteA - Profile deletion confirmation
+ *
+ * @module components/blocks/sheets/delete/routes/route-a
+ *
+ * @description
+ * Displays deletion warnings and confirmation button. Shows mnemonic recovery
+ * limitations and performs complete app reset with reload on confirmation.
+ *
+ * **Navigation:**
+ * - From: Initial route (sheet opens here)
+ * - To: Closes after destructive action (app reset)
+ * - Close: App reset and reload (no return)
+ *
+ * **Data:**
+ * - Payload: None (no payload needed)
+ * - Params: None (single route)
+ *
+ * **Flow:** Display warnings → user confirms → reset app → reload
+ *
+ * @see {@link ./index}
+ */
+
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Spacer, View } from 'components/ui/View';
@@ -8,9 +31,25 @@ import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch } from 'react-redux';
 
-// eslint-disable-next-line no-empty-pattern
+/**
+ * RouteA Component
+ *
+ * @component
+ * @param {RouteScreenProps<'delete-router', 'route-a'>} props
+ * @returns {JSX.Element}
+ */
 const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
   const dispatch = useDispatch();
+
+  /**
+   * Handles profile deletion
+   *
+   * @async
+   * @description Resets app state and reloads application
+   *
+   * **Process:** dispatch(resetApp()) → Updates.reloadAsync()
+   * **Effects:** Complete app reset, data loss, app reload
+   */
   const handleDeleteProfile = async () => {
     try {
       await dispatch(resetApp());
