@@ -9,6 +9,7 @@
 import { MintHistoryEntry } from 'coco-cashu-core';
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
+import { MeltQuoteResponse } from '@cashu/cashu-ts';
 
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -77,6 +78,30 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
     console.error('Error decoding payment request:', error);
     return false;
   }
+}
+
+/**
+ * Checks if a melt quote has expired based on its expiry timestamp
+ *
+ * This function checks if the current time exceeds the melt quote's expiry time.
+ * If no expiry timestamp exists, it returns false (not expired).
+ *
+ * @param meltQuote - The melt quote response containing the expiry timestamp
+ * @returns True if the melt quote has expired, false if not expired or if no expiry exists
+ *
+ * @example
+ * const quote = { expiry: 1234567890, ... };
+ * const isExpired = meltQuoteExpired(quote);
+ * if (isExpired) {
+ *   // Handle expired melt quote - show refresh component
+ * }
+ */
+export function meltQuoteExpired(meltQuote: MeltQuoteResponse): boolean {
+  if (!meltQuote.expiry) {
+    return false;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  return now > meltQuote.expiry;
 }
 
 /**

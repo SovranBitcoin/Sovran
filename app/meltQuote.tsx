@@ -49,6 +49,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from 'helper/time';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
+import { meltQuoteExpired } from 'helper/utils';
 
 /**
  * Props for the MeltQuote component
@@ -301,14 +302,21 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => handleCancel(),
-                condition: displayQuote.state === 'UNPAID',
+                condition: displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
+              },
+              {
+                text: 'Close',
+                icon: 'ri:close-circle-line',
+                variant: 'secondary',
+                onPress: async () => handleCancel(),
+                condition: meltQuoteExpired(displayQuote),
               },
               {
                 text: isCreatingQuote ? 'Sending...' : 'Send',
                 icon: isCreatingQuote ? 'ri:loader-line' : 'ri:send-plane-2-fill',
                 variant: 'primary',
                 onPress: async () => handleMelt(),
-                condition: displayQuote.state === 'UNPAID',
+                condition: displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
                 disabled: isCreatingQuote,
               },
             ]}
@@ -318,7 +326,8 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
 
-        {displayQuote.state === 'UNPAID' ? (
+        {/* Show mint balance display for unpaid quotes that haven't expired, otherwise show refresh component */}
+        {displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
           <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} updateSelectedMint />
         ) : (
           <HistoryEntryRefresh
