@@ -20,7 +20,6 @@ import { default as registerMintBalance } from 'components/blocks/sheets/mint-ba
  * @param {Object} params - Registration parameters
  * @param {'global'} [params.context] - Optional context for global registration
  * @returns {void}
- * @since 1.0.0
  *
  * @example
  * // Call during app initialization (typically in App.tsx or _layout.tsx)

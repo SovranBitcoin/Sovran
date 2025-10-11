@@ -128,7 +128,7 @@ function ModalScreen() {
   };
 
   // Handle long press on timeline items (simplified for messages only)
-  const handleLongPress = (item: TimelineItemType) => {
+  const handleLongPress = () => {
     // For now, just show a simple action sheet for messages
     showActionSheetWithOptions(
       {
@@ -181,7 +181,7 @@ function ModalScreen() {
         {timelineItemsGroupedByDate[date].map((item, idx) => (
           <Pressable
             key={idx}
-            onLongPress={() => handleLongPress(item)}
+            onLongPress={() => handleLongPress()}
             style={{ minHeight: 60 }} // Ensure minimum height for each item
           >
             <TimelineItem item={item} />

@@ -137,6 +137,7 @@ export class CocoManager {
         await this.instance.enableMintQuoteWatcher({
           watchExistingPendingOnStart: true,
         });
+
         console.log('Mint quote watcher enabled');
         await new Promise((resolve) => setTimeout(resolve, 500)); // Longer delay
       } catch (error) {

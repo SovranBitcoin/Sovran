@@ -174,7 +174,5 @@ class DeviceChecker {
  * if (device.platform('ios').gte(12)) {
  *   // iOS 12+ specific code
  * }
- *
- * @since 1.0.0
  */
 export const device = new DeviceChecker();
