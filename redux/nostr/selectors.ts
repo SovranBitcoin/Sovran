@@ -17,7 +17,6 @@ export const memoizedGetNostrProfile = ({ nostrPubkey }: { nostrPubkey: string }
       return _.find(allProfiles, { pubkey: nostrPubkey });
     }
   );
-
 export const memoizedMessagesByProfile = ({ pubkey }: { pubkey?: string } = {}) =>
   createSelector(
     [

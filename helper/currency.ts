@@ -1,6 +1,3 @@
-import { store } from 'redux/store';
-import { memoizedPricelist } from 'redux/pricelist';
-
 /**
  * @fileoverview Currency formatting utilities for the Sovran application
  *
@@ -9,6 +6,9 @@ import { memoizedPricelist } from 'redux/pricelist';
  * cryptocurrency and fiat currencies. It integrates with the Redux store for
  * real-time price data and user preferences.
  */
+
+import { store } from 'redux/store';
+import { memoizedPricelist } from 'redux/pricelist';
 
 /**
  * Represents an amount with its associated currency unit
