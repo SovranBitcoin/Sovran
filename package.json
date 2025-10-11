@@ -18,12 +18,7 @@
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
-    "maestro": "maestro test ./.maestro",
-    "screenshots": "./process-screenshots.sh",
-    "tree": "node ./scripts/tree.js",
-    "tree-lines": "NO_COLOR=1 ./scripts/tree-lines.sh",
-    "find-unused": "./scripts/find-unused.sh",
-    "find-unused-styles": "NO_COLOR=1 ./scripts/find-unused-styles.sh"
+    "maestro": "maestro test ./.maestro"
   },
   "dependencies": {
     "@cashu/cashu-ts": "2.6.0",
