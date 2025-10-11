@@ -27,8 +27,6 @@ const ThemeContext = createContext<{
 });
 
 const getPrimaryColor = (themeName: string, shade: string): string => {
-  console.log('themeName', themeName);
-
   const colors = THEMES[themeName as keyof typeof THEMES];
   if (!colors) {
     console.warn(`Theme "${themeName}" not found, falling back to dark theme`);

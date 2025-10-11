@@ -279,8 +279,6 @@ const AddRoute = () => {
     }
 
     try {
-      console.log('🚀 Starting to add selected mints:', Array.from(selectedMints));
-
       if (!CocoManager.isInitialized()) {
         console.error('❌ CocoManager not initialized');
         popup({ message: 'Manager not initialized. Please try again.', type: 'error' });
@@ -293,19 +291,13 @@ const AddRoute = () => {
 
       for (const mintUrl of selectedMints) {
         try {
-          console.log(`🔍 Adding mint: ${mintUrl}`);
-          const result = await manager.mint.addMint(mintUrl);
-          console.log(`✅ Added mint ${mintUrl}:`, result);
+          await manager.mint.addMint(mintUrl);
           results.push(mintUrl);
 
           try {
-            const mintInfo = await manager.mint.getMintInfo(mintUrl);
-            console.log(`✅ Mint info loaded for ${mintUrl}:`, mintInfo);
-          } catch (infoError) {
-            console.warn(`⚠️ Failed to load mint info for ${mintUrl}:`, infoError);
-          }
+            await manager.mint.getMintInfo(mintUrl);
+          } catch {}
         } catch (err) {
-          console.error(`❌ Failed to add mint ${mintUrl}:`, err);
           errors.push({ mintUrl, error: err });
         }
       }

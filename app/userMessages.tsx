@@ -137,8 +137,6 @@ function ModalScreen() {
       },
       (buttonIndex?: number) => {
         if (buttonIndex === 0) {
-          // TODO: Implement copy message functionality
-          console.log('Copy message:', item.content);
         }
       }
     );

@@ -321,13 +321,6 @@ const InfoRoute = () => {
     error: auditError,
   } = useAuditedMint(mintUrl);
 
-  // Debug logging
-  console.log('InfoRoute - mintUrl:', mintUrl);
-  console.log('InfoRoute - global.currentMintUrl:', (global as any).currentMintUrl);
-  console.log('InfoRoute - payload:', payload);
-  console.log('InfoRoute - auditInfo:', auditInfo);
-  console.log('InfoRoute - auditMintInfo:', auditMintInfo);
-
   /**
    * Handles text copying to clipboard
    *

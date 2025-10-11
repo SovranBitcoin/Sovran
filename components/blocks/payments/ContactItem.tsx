@@ -149,7 +149,6 @@ export const ContactItem = ({
           });
         } else {
           // TODO: Handle mint-specific navigation (e.g., mint details page)
-          console.log('Mint pressed:', mintUrl);
         }
       }}>
       <HStack align="center" justify="space-between" style={styles.row}>

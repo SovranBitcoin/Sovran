@@ -78,7 +78,6 @@ export const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSe
         await SecureStore.setItemAsync(STORAGE_KEYS[key], newValue, options);
 
         setValueState(newValue);
-        console.log(`${key} stored securely`);
         return true;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to store value';
@@ -98,7 +97,6 @@ export const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSe
       await SecureStore.deleteItemAsync(STORAGE_KEYS[key], options);
 
       setValueState(null);
-      console.log(`${key} removed from secure storage`);
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to remove value';

@@ -47,9 +47,7 @@ const NostrProfileReference = ({ nostrRef }: { nostrRef: string }) => {
         setPubkey(decodedPubkey);
         setRelays([]); // Will use default relays from NDK
       }
-    } catch (e) {
-      console.log('Failed to decode nostr reference:', nostrRef, e);
-    }
+    } catch {}
   }, [nostrRef]);
 
   // Use useSubscribe to fetch profile from specific relays
@@ -97,9 +95,7 @@ const NostrProfileReference = ({ nostrRef }: { nostrRef: string }) => {
       try {
         const metadata = JSON.parse(latestEvent.content);
         return metadata.display_name || metadata.displayName || metadata.name || 'Unknown User';
-      } catch (e) {
-        console.log('Failed to parse profile metadata:', e);
-      }
+      } catch {}
     }
 
     return 'Loading...';

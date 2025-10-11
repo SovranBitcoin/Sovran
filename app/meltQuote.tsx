@@ -137,7 +137,6 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
   }, [meltHistoryEntry, meltQuote, getMeltQuote, getMintInfo]);
 
   const displayQuote = currentQuote || meltQuote || fetchedMeltQuote;
-  console.log('displayQuote', displayQuote);
   const manager = useManager();
   useEffect(() => {
     manager.history.getPaginatedHistory().then(setHistory);

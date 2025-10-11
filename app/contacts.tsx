@@ -60,7 +60,6 @@ function ModalScreen() {
       const result = await apiSearchUsers({ query, limit: 10 });
 
       if (result.isOk()) {
-        console.log(result.value);
         const data = result.value;
 
         if (data.results && Array.isArray(data.results)) {

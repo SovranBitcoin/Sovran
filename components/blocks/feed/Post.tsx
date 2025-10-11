@@ -24,10 +24,6 @@ export function Post({ post }: PostProps) {
 
   const { reactionCount, repostCount, zapCount } = usePostReactions({ id: postIdForReactions });
 
-  // Debug logging for post IDs
-  console.log('Post ID for reactions:', postIdForReactions);
-  console.log('Is repost:', isRepost);
-
   // Get profiles for avatar display
   const originalAuthorProfile = useNostrProfile({
     id: post?.tags?.find((tag: any) => tag[0] === 'p')?.[1] || post?.pubkey,
@@ -50,11 +46,6 @@ export function Post({ post }: PostProps) {
     const authorTag = post?.tags?.find((tag: any) => tag[0] === 'p');
 
     if (eventTag) {
-      // Debug logging to see what the repost content looks like
-      console.log('Repost content:', post?.content);
-      console.log('Repost content type:', typeof post?.content);
-      console.log('Original author pubkey:', authorTag?.[1]);
-
       // For reposts, the content might be JSON string that needs parsing
       let repostContent = post?.content || '';
 
@@ -72,9 +63,8 @@ export function Post({ post }: PostProps) {
               parsedContent.body ||
               repostContent;
           }
-        } catch (e) {
+        } catch {
           // If parsing fails, use the original content
-          console.log('Failed to parse repost content:', e);
         }
       } else if (typeof repostContent === 'object' && repostContent !== null) {
         // If it's already an object, extract the content field

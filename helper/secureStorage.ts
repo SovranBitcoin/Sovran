@@ -35,7 +35,6 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
 
     await SecureStore.setItemAsync(STORAGE_KEYS.USER_MNEMONIC, mnemonic, options);
 
-    console.log('Mnemonic stored securely');
     return true;
   } catch (error) {
     console.error('Failed to store mnemonic:', error);

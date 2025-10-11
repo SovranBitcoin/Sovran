@@ -35,7 +35,6 @@ export const CocoTransactionsProvider = ({ children }: CocoTransactionsProviderP
 
     // Listen for mint quote state changes (Lightning transactions)
     const unsubscribeMintQuotes = manager.on('mint-quote:state-changed', (payload) => {
-      console.log('🔄 Mint quote state changed:', payload);
       // Coco automatically updates its internal state
       // Just refresh the history to get the latest data
       refresh();
@@ -43,25 +42,21 @@ export const CocoTransactionsProvider = ({ children }: CocoTransactionsProviderP
 
     // Listen for mint quote redemption (when proofs are minted)
     const unsubscribeMintQuoteRedeemed = manager.on('mint-quote:redeemed', (payload) => {
-      console.log('🎉 Mint quote redeemed, proofs minted:', payload);
       refresh();
     });
 
     // Listen for proof state changes (Ecash transactions)
     const unsubscribeProofs = manager.on('proofs:state-changed', (payload) => {
-      console.log('Proof state changed:', payload);
       refresh();
     });
 
     // Listen for melt quote payments (Lightning sends)
     const unsubscribeMeltQuotes = manager.on('melt-quote:paid', (payload) => {
-      console.log('Melt quote paid:', payload);
       refresh();
     });
 
     // Listen for general history updates
     const unsubscribeHistory = manager.on('history:updated', () => {
-      console.log('History updated');
       refresh();
     });
 

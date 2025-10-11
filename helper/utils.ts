@@ -72,7 +72,6 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
     const timestamp = _.find(paymentRequest.sections, { name: 'timestamp' })?.value ?? 0;
     const expiryTime = (timestamp + expiry) * 1000;
 
-    console.log(Date.now(), expiryTime);
     return Date.now() > expiryTime;
   } catch (error) {
     console.error('Error decoding payment request:', error);
