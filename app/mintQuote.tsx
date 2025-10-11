@@ -34,15 +34,15 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager, usePaginatedHistory } from 'coco-cashu-react';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
 import { useLocalSearchParams } from 'expo-router';
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
-import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { TransactionTimeline } from 'components/blocks/Transaction/TransactionTimeline';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import type { MintHistoryEntry, HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 
 /**
  * Props for the MintQuote component
@@ -182,7 +182,7 @@ export function MintQuote({ mintHistoryEntry, extraButtons = [] }: MintQuoteProp
         </HStack>
       }>
       <VStack gap={12}>
-        <TransactionHeader historyEntry={currentTransaction} />
+        <HistoryEntryHeader historyEntry={currentTransaction} />
         {!isPaid && (
           <PaymentInfo
             setUri={setUri}
@@ -198,13 +198,13 @@ export function MintQuote({ mintHistoryEntry, extraButtons = [] }: MintQuoteProp
           </>
         )}
 
-        <TransactionMintRefresh
+        <HistoryEntryRefresh
           mintInfo={mintInfo}
           historyEntry={currentTransaction}
           handleCheckStatus={async () => {}}
         />
 
-        <TransactionTimeline historyEntry={currentTransaction} />
+        <HistoryEntryTimeline historyEntry={currentTransaction} />
 
         <Section
           special={false}

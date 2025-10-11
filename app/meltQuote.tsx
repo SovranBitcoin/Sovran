@@ -36,19 +36,19 @@ import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
-import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { useSelector } from 'react-redux';
 import { memoizedGetSelectedMint } from '@/redux/cashu';
 import { Alert } from 'react-native';
-import { MintQuoteTimeline } from '@/components/blocks/Transaction/TransactionTimeline';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import { HistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
 import { getLightningTimestamp } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
-import { convertTime } from '@/helper/time';
+import { convertTime } from 'helper/time';
+import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 
 /**
  * Props for the MeltQuote component
@@ -316,19 +316,19 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
         </HStack>
       }>
       <VStack gap={12}>
-        <TransactionHeader historyEntry={displayMeltHistoryEntry} />
+        <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
 
         {displayQuote.state === 'UNPAID' ? (
           <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} updateSelectedMint />
         ) : (
-          <TransactionMintRefresh
+          <HistoryEntryRefresh
             mintInfo={mintInfo}
             historyEntry={displayMeltHistoryEntry}
             handleCheckStatus={async () => {}}
           />
         )}
 
-        <MintQuoteTimeline historyEntry={displayMeltHistoryEntry} meltQuote={displayQuote} />
+        <HistoryEntryTimeline historyEntry={displayMeltHistoryEntry} meltQuote={displayQuote} />
 
         <Section
           items={[

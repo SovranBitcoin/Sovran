@@ -55,6 +55,3 @@ export function HistoryEntryHeader({ historyEntry }: HistoryEntryHeaderProps) {
     </HStack>
   );
 }
-
-// Keep the old export for backward compatibility
-export const TransactionHeader = HistoryEntryHeader;

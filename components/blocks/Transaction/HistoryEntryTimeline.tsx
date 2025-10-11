@@ -8,7 +8,7 @@ import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cash
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { MintQuoteState, MeltQuoteState, MeltQuoteResponse } from '@cashu/cashu-ts';
 
-interface TransactionTimelineProps {
+interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteResponse;
 }
@@ -53,7 +53,7 @@ const getTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): 
   }
 };
 
-export function TransactionTimeline({ historyEntry, meltQuote }: TransactionTimelineProps) {
+export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTimelineProps) {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -249,6 +249,3 @@ export function TransactionTimeline({ historyEntry, meltQuote }: TransactionTime
     </View>
   );
 }
-
-// Keep the old export for backward compatibility
-export const MintQuoteTimeline = TransactionTimeline;

@@ -33,13 +33,13 @@ import { write } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
-import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { MintQuoteTimeline } from 'components/blocks/Transaction/TransactionTimeline';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import type { SendHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 
 /**
  * Props for the SendToken component
@@ -290,7 +290,7 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
         </HStack>
       }>
       <VStack gap={12}>
-        <TransactionHeader historyEntry={currentTransaction} />
+        <HistoryEntryHeader historyEntry={currentTransaction} />
 
         {!isPaid && (
           <PaymentInfo
@@ -304,11 +304,9 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
 
         {/* Memo display - Coco types don't have memo property directly accessible */}
 
-        {mintInfo && (
-          <TransactionMintRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />
-        )}
+        {mintInfo && <HistoryEntryRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />}
 
-        <MintQuoteTimeline historyEntry={currentTransaction} />
+        <HistoryEntryTimeline historyEntry={currentTransaction} />
 
         <Section
           items={[

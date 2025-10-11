@@ -11,7 +11,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useLocalSearchParams, router } from 'expo-router';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { Card } from 'components/ui/Card';
-import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { Spacer, View } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
@@ -229,7 +229,7 @@ const EcashLightningReceiver = () => {
         )}
 
         {showLightningAddress && (
-          <TransactionMintRefresh
+          <HistoryEntryRefresh
             mintInfo={mintInfo}
             historyEntry={{
               type: 'receive',

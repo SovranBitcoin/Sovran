@@ -5,13 +5,13 @@ import { Avatar } from 'components/ui/Avatar';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 
-interface HistoryEntryMintRefreshProps {
+interface HistoryEntryRefreshProps {
   mintInfo: GetInfoResponse;
   historyEntry: Partial<HistoryEntry> & { type: HistoryEntry['type'] };
   handleCheckStatus?: (onClose: () => void) => Promise<void>;
 }
 
-export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntryMintRefreshProps) {
+export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefreshProps) {
   return (
     <HStack
       align="center"
@@ -51,6 +51,3 @@ export function HistoryEntryMintRefresh({ mintInfo, historyEntry }: HistoryEntry
     </HStack>
   );
 }
-
-// Keep the old export for backward compatibility
-export const TransactionMintRefresh = HistoryEntryMintRefresh;

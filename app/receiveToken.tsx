@@ -24,12 +24,12 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionHeader } from 'components/blocks/Transaction/TransactionHeader';
 import { truncateMiddle } from 'helper/strings';
-import { TransactionMintRefresh } from 'components/blocks/Transaction/TransactionMintRefresh';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { VStack } from 'components/ui/View';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 
 /**
  * Props for the ReceiveToken component
@@ -179,9 +179,9 @@ export function ReceiveToken({ receiveHistoryEntry }: ReceiveTokenProps) {
         />
       }>
       <VStack gap={12}>
-        <TransactionHeader historyEntry={receiveHistoryEntry} />
+        <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
 
-        <TransactionMintRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
+        <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
 
         <Section
           items={[
