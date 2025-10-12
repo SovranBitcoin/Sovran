@@ -10,6 +10,7 @@ import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
 import { ShortTextNote, Repost } from 'nostr-tools/kinds';
+import Container from '@/components/blocks/Container';
 
 const Feed = ({ filters }: { filters: any }) => {
   const { events } = useSubscribe({ filters });
@@ -67,23 +68,25 @@ const TabTwoScreen = () => {
   }, []);
 
   return (
-    <VStack className="flex-1 bg-primary-950 p-4">
-      <View>
-        <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
-      </View>
-      <PagerView
-        ref={pagerRef}
-        onPageSelected={onPageSelected}
-        className="-mx-4 mt-2 h-screen"
-        style={{ height: Dimensions.get('window').height }}
-        initialPage={0}>
-        {tabs.map((tab, index) => (
-          <View key={index.toString()} className="h-full flex-1 overflow-hidden bg-primary-950">
-            <Feed filters={filters[tab as keyof typeof filters]} />
-          </View>
-        ))}
-      </PagerView>
-    </VStack>
+    <Container>
+      <VStack className="flex-1 bg-primary-950 p-4">
+        <View>
+          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+        </View>
+        <PagerView
+          ref={pagerRef}
+          onPageSelected={onPageSelected}
+          className="-mx-4 mt-2 h-screen"
+          style={{ height: Dimensions.get('window').height }}
+          initialPage={0}>
+          {tabs.map((tab, index) => (
+            <View key={index.toString()} className="h-full flex-1 overflow-hidden bg-primary-950">
+              <Feed filters={filters[tab as keyof typeof filters]} />
+            </View>
+          ))}
+        </PagerView>
+      </VStack>
+    </Container>
   );
 };
 

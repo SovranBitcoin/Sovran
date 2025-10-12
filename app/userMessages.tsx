@@ -270,13 +270,14 @@ function ModalScreen() {
                             variant: 'secondary',
                             icon: 'majesticons:text',
                             text: 'Feed',
-                            onPress: async () => {
+                            onPress: async (close) => {
                               router.push({
                                 pathname: '/feed',
                                 params: {
                                   pubkey,
                                 },
                               });
+                              close();
                             },
                           },
                           {
