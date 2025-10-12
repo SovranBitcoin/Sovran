@@ -36,6 +36,7 @@ import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { useFonts } from 'hooks/useFonts';
 import { CocoProvider } from 'helper/coco';
 import { PortalHost } from '@rn-primitives/portal';
+import { compose } from 'helper/utils';
 /**
  * Splash screen component
  */
@@ -168,6 +169,19 @@ function MainStack() {
   );
 }
 
+// Provider components for composition
+const AppProviders = compose([
+  [NostrProvider, { relayUrls: RELAY_URLS }],
+  [PersistGate, { loading: null, persistor }],
+  [Provider, { store }],
+  ThemeProvider,
+  CocoProvider,
+  ActionSheetProvider,
+  [SheetProvider, { context: 'global' }],
+  PricelistProvider,
+  PasscodeGate,
+]);
+
 /**
  * Main application component
  */
@@ -217,28 +231,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider style={containerStyle}>
-      <NostrProvider relayUrls={RELAY_URLS}>
-        <PersistGate loading={null} persistor={persistor}>
-          <Provider store={store}>
-            <ThemeProvider>
-              <CocoProvider>
-                <ActionSheetProvider>
-                  <SheetProvider context="global">
-                    <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                      <PricelistProvider>
-                        <PasscodeGate>
-                          <MainStack />
-                          <PortalHost />
-                        </PasscodeGate>
-                      </PricelistProvider>
-                    </View>
-                  </SheetProvider>
-                </ActionSheetProvider>
-              </CocoProvider>
-            </ThemeProvider>
-          </Provider>
-        </PersistGate>
-      </NostrProvider>
+      <AppProviders>
+        <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+          <MainStack />
+          <PortalHost />
+        </View>
+      </AppProviders>
     </SafeAreaProvider>
   );
 }

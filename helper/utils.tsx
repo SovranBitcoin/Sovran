@@ -3,7 +3,8 @@
  *
  * This module contains various utility functions used throughout the application,
  * including number formatting, Lightning Network payment request handling,
- * and Tailwind CSS class merging utilities.
+ * Tailwind CSS class merging utilities,
+ * and React provider composition.
  */
 
 import { MintHistoryEntry } from 'coco-cashu-core';
@@ -13,6 +14,7 @@ import { MeltQuoteResponse } from '@cashu/cashu-ts';
 
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import React from 'react';
 
 /**
  * Formats a number with appropriate suffixes (k, m, b) for large numbers
@@ -132,3 +134,75 @@ export function meltQuoteExpired(meltQuote: MeltQuoteResponse): boolean {
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+/**
+ * Composes multiple React providers into a single provider component.
+ *
+ * Given an array of providers, this utility nests them so that children are rendered
+ * within all providers, in the order provided. Supports both direct component references
+ * and component-props tuples for providers that need configuration.
+ *
+ * @example
+ * // Direct component references (clean API)
+ * const AppProviders = compose([ProviderA, ProviderB, ProviderC]);
+ *
+ * // Mixed approach (tuples + direct)
+ * const AppProviders = compose([
+ *   [NostrProvider, { relayUrls: RELAY_URLS }],
+ *   [PersistGate, { loading: null, persistor }],
+ *   [Provider, { store }],
+ *   ThemeProvider,  // Direct component (no props needed)
+ *   ActionSheetProvider, // Automatically wrapped in Fragment for single-child requirement
+ * ]);
+ *
+ * <AppProviders>
+ *   <App />
+ * </AppProviders>
+ */
+export const compose = (
+  providers: (
+    | React.FC<{ children: React.ReactNode }>
+    | React.ComponentType<any>
+    | [React.ComponentType<any>, Record<string, any>]
+  )[]
+): React.FC<{ children: React.ReactNode }> => {
+  const ComposedProvider = providers.reduce((Prev, Curr) => {
+    const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
+      let CurrentProvider: React.FC<{ children: React.ReactNode }>;
+
+      // Handle tuple syntax [Component, props]
+      if (Array.isArray(Curr) && Curr.length === 2) {
+        const [Component, props] = Curr;
+        const ConfiguredProvider = ({ children }: { children: React.ReactNode }) => {
+          const wrappedChildren = React.Children.count(children) > 1 ? <>{children}</> : children;
+          return <Component {...props}>{wrappedChildren}</Component>;
+        };
+        ConfiguredProvider.displayName = `ConfiguredProvider(${Component.displayName || Component.name || 'Unknown'})`;
+        CurrentProvider = ConfiguredProvider;
+      }
+      // Handle direct component reference
+      else if (typeof Curr === 'function' && Curr.length === 1) {
+        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
+      }
+      // Handle configured component (arrow function)
+      else {
+        CurrentProvider = Curr as React.FC<{ children: React.ReactNode }>;
+      }
+
+      if (!Prev) return <CurrentProvider>{children}</CurrentProvider>;
+      return (
+        <Prev>
+          <CurrentProvider>{children}</CurrentProvider>
+        </Prev>
+      );
+    };
+    const componentName = Array.isArray(Curr)
+      ? Curr[0].displayName || Curr[0].name
+      : Curr.displayName || Curr.name;
+    ProviderComponent.displayName = `ProviderWrapper(${componentName || 'Unknown'})`;
+    return ProviderComponent;
+  }, undefined as any);
+
+  ComposedProvider.displayName = 'ComposedProvider';
+  return ComposedProvider;
+};
