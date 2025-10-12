@@ -251,30 +251,6 @@ const ModalScreen = () => {
             isDanger
           />
         </Section>
-        {settings?.experimental && (
-          <>
-            <Section title="Advanced Debugging">
-              <RowButton
-                label="Restore Counter"
-                onPress={() => {
-                  router.push('/settings-pages/restoreCounter');
-                }}
-              />
-              <RowButton
-                label="Websocket Connections"
-                onPress={() => {
-                  router.push('/settings-pages/websocketConnections');
-                }}
-              />
-              <RowButton
-                label="Check Proofs"
-                onPress={() => {
-                  router.push('/settings-pages/proofs');
-                }}
-              />
-            </Section>
-          </>
-        )}
 
         <TouchableOpacity
           onPress={() => {

@@ -26,7 +26,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'feed',
     options: {
-      presentation: 'modal',
+      presentation: 'card',
     },
   },
   {
@@ -171,6 +171,10 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'settings-pages/store',
     title: 'Store',
+  },
+  {
+    name: 'settings-pages/restoreCounter',
+    title: 'Restore Counter',
   },
   {
     name: 'settings-pages/terms',
