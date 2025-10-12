@@ -4,7 +4,8 @@ import { Manager } from 'coco-cashu-core';
 import { CocoManager } from './manager';
 import { DataMigration } from './migration';
 import { View } from 'components/ui/View';
-
+import { VideoScreen } from 'components/ui/VideoPlayer';
+import Image from 'components/ui/Image';
 interface CocoContextValue {
   manager: Manager | null;
   isReady: boolean;
@@ -115,7 +116,32 @@ export function CocoProvider({ children }: CocoProviderProps) {
             flexDirection: 'column',
             gap: 16,
           }}>
-          <View>Initializing Coco...</View>
+          <View style={{ position: 'relative', width: 300, height: 300 }}>
+            <Image
+              style={{
+                width: 150,
+                height: 150,
+                position: 'absolute',
+                bottom: 10,
+                left: 150,
+                transform: [{ translateX: -75 }, { rotate: '10deg' }],
+                zIndex: 1,
+              }}
+              source={require('../../assets/images/initializing.png')}
+            />
+            <VideoScreen
+              style={{
+                width: 300,
+                height: 300,
+                backgroundColor: 'black',
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+              }}
+              videoSource={require('../../assets/videos/coco.mp4')}
+              muted={true}
+            />
+          </View>
           {isMigrating && <div>Migrating data...</div>}
           {migrationError && <div style={{ color: 'red' }}>Error: {migrationError.message}</div>}
         </View>

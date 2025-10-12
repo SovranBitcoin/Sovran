@@ -30,6 +30,7 @@ interface Props {
   account: Account;
   showMore: boolean;
   history: HistoryEntry[];
+  isFetching?: boolean; // Loading state for fetching transactions
   // Filtering options
   filter?: 'all' | 'incoming' | 'outgoing';
   type?: 'all' | 'lightning' | 'ecash';
@@ -46,6 +47,7 @@ export const Transactions = React.memo(
     account,
     showMore,
     history,
+    isFetching = false,
     filter = 'all',
     type = 'all',
     tab = 'All',
@@ -168,6 +170,35 @@ export const Transactions = React.memo(
     }, [sections.all, sections.pending, sections.confirmed, sections.expired, tab]);
 
     if (showMore) {
+      if (isFetching) {
+        return (
+          <View
+            className="flex items-center"
+            style={{
+              minHeight: Dimensions.get('screen').height / 2,
+            }}>
+            <Spacer size={24} />
+            <Icon
+              name="ant-design:loading-outlined"
+              size={32}
+              color={getPrimaryColor('500')}
+              spin={{
+                duration: 1000,
+                outputRange: ['0deg', '360deg'],
+                delay: 0,
+                easing: 'linear',
+              }}
+            />
+            <Text heavy size={16} style={{ color: getPrimaryColor('500') }}>
+              Loading Transactions...
+            </Text>
+            <Text color={getPrimaryColor('500')} size={16}>
+              Please wait while we fetch your history
+            </Text>
+          </View>
+        );
+      }
+
       if (filteredHistory.length === 0) {
         return (
           <View

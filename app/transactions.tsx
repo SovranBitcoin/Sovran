@@ -182,7 +182,7 @@ function ModalScreen() {
     return [];
   }, [paymentType, direction]);
 
-  const { history } = usePaginatedHistory();
+  const { history, isFetching } = usePaginatedHistory();
 
   /**
    * Generates a unique key for the transaction list based on current filters
@@ -325,6 +325,7 @@ function ModalScreen() {
           account={{ ...parsedAccount, unit: selectedCurrency }}
           showMore={false}
           history={history}
+          isFetching={isFetching}
           filter={direction}
           type={paymentType}
           at="all"
