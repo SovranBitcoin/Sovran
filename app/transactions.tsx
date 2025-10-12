@@ -1,103 +1,267 @@
+/**
+ * @fileoverview Transactions Modal Screen - Transaction history with filtering
+ *
+ * @module app/transactions
+ *
+ * @description
+ * Modal screen for viewing and filtering transaction history. Users can filter by
+ * payment type (Lightning/eCash), direction (incoming/outgoing), and status tabs.
+ * Features smart mapping from UI selections to coco transaction types.
+ *
+ * **Features:**
+ * - Payment type filtering (Lightning: mint/melt, eCash: send/receive)
+ * - Direction filtering (incoming/outgoing)
+ * - Status tabs (All, Confirmed, Pending, Expired)
+ * - Currency selection
+ * - Smart coco type mapping
+ *
+ * **Usage:**
+ * ```typescript
+ * router.push({
+ *    pathname: '/transactions',
+ *    params: {
+ *      account: { unit: 'sat' },
+ *      tab: 'Confirmed',
+ *    },
+ *  })
+ * ```
+ *
+ * @see {@link components/blocks/Transactions}
+ * @see {@link coco-cashu-core}
+ */
+
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, HStack } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { useLocalSearchParams } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import React, { useState } from 'react';
 import { Transactions } from 'components/blocks/Transactions';
 import Container from 'components/blocks/Container';
 import CurrencySelector from 'components/blocks/CurrencySelector';
 import Icon from 'assets/icons';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { MintHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { usePaginatedHistory } from 'coco-cashu-react';
 
+/**
+ * Transaction status tab type
+ *
+ * @typedef {'All' | 'Confirmed' | 'Pending' | 'Expired'} StatusTab
+ */
+type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
+
+/**
+ * Payment type filter options
+ *
+ * @typedef {'all' | 'lightning' | 'ecash'} PaymentType
+ */
+type PaymentType = 'all' | 'lightning' | 'ecash';
+
+/**
+ * Direction filter options
+ *
+ * @typedef {'all' | 'incoming' | 'outgoing'} Direction
+ */
+type Direction = 'all' | 'incoming' | 'outgoing';
+
+/**
+ * Transactions Modal Screen - Transaction history with filtering
+ *
+ * @component
+ * @param {Object} props - Component props (none required)
+ * @returns {JSX.Element} The transactions modal screen
+ *
+ * @example
+ * <ModalScreen />
+ */
 function ModalScreen() {
   const { getPrimaryColor } = useTheme();
   const { account, tab: tab_ } = useLocalSearchParams<{
     account: string;
     tab: 'All' | 'Incoming' | 'Outgoing';
   }>();
+
+  // State management
   const [selectedCurrency, setSelectedCurrency] = useState(
     account ? JSON.parse(account).unit : 'sat'
   );
-  const [filter, setFilter] = useState<'all' | 'incoming' | 'outgoing'>('all');
-  const [type, setType] = useState<'all' | 'lightning' | 'ecash'>('all');
-  const [at, setAt] = useState<'all' | 'at'>('all');
-  const [tab, setTab] = useState<'All' | 'Confirmed' | 'Pending' | 'Expired'>(
-    (tab_ as 'All' | 'Confirmed' | 'Pending' | 'Expired') || 'All'
-  );
+  const [paymentType, setPaymentType] = useState<PaymentType>('all');
+  const [direction, setDirection] = useState<Direction>('all');
+  const [tab, setTab] = useState<StatusTab>((tab_ as StatusTab) || 'All');
 
-  const handleCurrencyChange = (currency: string) => {
+  /**
+   * Handles currency selection change
+   *
+   * @description Updates the selected currency and normalizes to lowercase
+   *
+   * @param {string} currency - The new currency selection
+   * @returns {void}
+   */
+  const handleCurrencyChange = useCallback((currency: string) => {
     setSelectedCurrency(currency.toLowerCase());
-  };
+  }, []);
 
-  const toggleFilter = (newFilter: 'incoming' | 'outgoing') => {
-    setFilter((prevFilter) => (prevFilter === newFilter ? 'all' : newFilter));
-  };
+  /**
+   * Toggles payment type filter (Lightning/eCash)
+   *
+   * @description Toggles between the selected payment type and 'all'. If the same
+   * type is selected again, it resets to 'all'.
+   *
+   * @param {'lightning' | 'ecash'} type - The payment type to toggle
+   * @returns {void}
+   */
+  const togglePaymentType = useCallback((type: 'lightning' | 'ecash') => {
+    setPaymentType((prevType) => (prevType === type ? 'all' : type));
+  }, []);
 
-  const toggleType = (newType: 'lightning' | 'ecash') => {
-    setType((prevType) => (prevType === newType ? 'all' : newType));
-    setAt('all');
-  };
+  /**
+   * Toggles direction filter (incoming/outgoing)
+   *
+   * @description Toggles between the selected direction and 'all'. If the same
+   * direction is selected again, it resets to 'all'.
+   *
+   * @param {'incoming' | 'outgoing'} dir - The direction to toggle
+   * @returns {void}
+   */
+  const toggleDirection = useCallback((dir: 'incoming' | 'outgoing') => {
+    setDirection((prevDir) => (prevDir === dir ? 'all' : dir));
+  }, []);
 
-  const toggleAt = (newAt: 'at' | 'all') => {
-    setAt((prevAt) => (prevAt === newAt ? 'all' : newAt));
-    setType('all');
-  };
+  /**
+   * Maps UI filter selections to coco transaction types
+   *
+   * @description Intelligently maps payment type and direction selections to the
+   * corresponding coco transaction types. Lightning maps to mint/melt, eCash maps
+   * to send/receive, and direction filters further narrow the selection.
+   *
+   * **Mapping Logic:**
+   * - Lightning + All → ['mint', 'melt']
+   * - Lightning + Incoming → ['mint']
+   * - Lightning + Outgoing → ['melt']
+   * - eCash + All → ['send', 'receive']
+   * - eCash + Incoming → ['receive']
+   * - eCash + Outgoing → ['send']
+   * - All + Incoming → ['mint', 'receive']
+   * - All + Outgoing → ['melt', 'send']
+   * - All + All → ['mint', 'melt', 'send', 'receive']
+   *
+   * @returns {CocoTransactionType[]} Array of coco transaction types to filter by
+   *
+   * @example
+   * // Lightning + Incoming selection
+   * const types = getCocoTransactionTypes(); // ['mint']
+   */
+  const getCocoTransactionTypes = useCallback((): HistoryEntry['type'][] => {
+    // All combinations
+    if (paymentType === 'all' && direction === 'all') {
+      return ['mint', 'melt', 'send', 'receive'];
+    }
+
+    // Lightning payments
+    if (paymentType === 'lightning') {
+      if (direction === 'all') return ['mint', 'melt'];
+      if (direction === 'incoming') return ['mint'];
+      if (direction === 'outgoing') return ['melt'];
+    }
+
+    // eCash payments
+    if (paymentType === 'ecash') {
+      if (direction === 'all') return ['send', 'receive'];
+      if (direction === 'incoming') return ['receive'];
+      if (direction === 'outgoing') return ['send'];
+    }
+
+    // Direction-only filtering
+    if (paymentType === 'all') {
+      if (direction === 'incoming') return ['mint', 'receive'];
+      if (direction === 'outgoing') return ['melt', 'send'];
+    }
+
+    return [];
+  }, [paymentType, direction]);
 
   const { history } = usePaginatedHistory();
 
-  const listKey = `${filter}-${type}-${at}-${tab}-${selectedCurrency}`;
+  /**
+   * Generates a unique key for the transaction list based on current filters
+   *
+   * @description Creates a cache key that changes when any filter changes,
+   * ensuring proper re-rendering of the transaction list.
+   *
+   * @returns {string} Unique key combining all filter states
+   */
+  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}`;
 
-  // Calculate counts for tabs
-  const filteredHistory = React.useMemo(() => {
+  /**
+   * Filters transaction history based on current selections
+   *
+   * @description Applies currency and transaction type filtering to the history.
+   * Uses the smart mapping function to determine which transaction types to include.
+   *
+   * **Process:** currency filter → type filter → return filtered array
+   * **Effects:** Updates when currency, payment type, or direction changes
+   *
+   * @returns {HistoryEntry[]} Filtered array of transaction history entries
+   */
+  const filteredHistory = useMemo(() => {
+    const allowedTypes = getCocoTransactionTypes();
+
     return history.filter((historyEntry) => {
+      // Filter by currency
       if (historyEntry.unit !== selectedCurrency) return false;
-      if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
-      if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
-      if (type === 'lightning' && historyEntry.type !== 'mint') return false;
-      if (type === 'ecash' && historyEntry.type !== 'send') return false;
+
+      // Filter by transaction type if types are specified
+      if (allowedTypes.length > 0 && !allowedTypes.includes(historyEntry.type)) return false;
+
       return true;
     });
-  }, [history, selectedCurrency, filter, type]);
+  }, [history, selectedCurrency, getCocoTransactionTypes]);
 
-  const { pendingCount, confirmedCount, expiredCount } = React.useMemo(() => {
-    const expired = filteredHistory.filter((historyEntry) => {
-      // Check if it's an unpaid mint transaction that has expired
+  /**
+   * Calculates transaction counts by status (pending, confirmed, expired)
+   *
+   * @description Analyzes filtered transaction history to count entries by their
+   * current status. Handles complex logic for mint/melt transactions with unpaid
+   * states and expiration checking.
+   *
+   * **Status Logic:**
+   * - **Expired:** Unpaid mint transactions that have passed their expiry time
+   * - **Pending:** Unpaid mint/melt transactions that haven't expired
+   * - **Confirmed:** All other transactions (paid or expired unpaid)
+   *
+   * **Process:** filter expired → filter pending → filter confirmed → return counts
+   * **Effects:** Updates when filtered history changes
+   *
+   * @returns {Object} Object containing counts for each status
+   * @returns {number} returns.pendingCount - Number of pending transactions
+   * @returns {number} returns.confirmedCount - Number of confirmed transactions
+   * @returns {number} returns.expiredCount - Number of expired transactions
+   */
+  const { pendingCount, confirmedCount, expiredCount } = useMemo(() => {
+    // Helper function to check if a mint transaction is expired
+    const isMintExpired = (entry: HistoryEntry): boolean => {
       return (
-        historyEntry.type === 'mint' &&
-        historyEntry.state === 'UNPAID' &&
-        mintHistoryEntryExpired(historyEntry as MintHistoryEntry)
+        entry.type === 'mint' &&
+        entry.state === 'UNPAID' &&
+        mintHistoryEntryExpired(entry as MintHistoryEntry)
       );
-    });
+    };
 
-    const pending = filteredHistory.filter((historyEntry) => {
-      const isExpired =
-        historyEntry.type === 'mint' &&
-        historyEntry.state === 'UNPAID' &&
-        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+    // Helper function to check if a transaction is pending (unpaid but not expired)
+    const isPending = (entry: HistoryEntry): boolean => {
+      const isUnpaid =
+        (entry.type === 'mint' && entry.state === 'UNPAID') ||
+        (entry.type === 'melt' && entry.state === 'UNPAID');
 
-      return (
-        ((historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-          (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID')) &&
-        !isExpired
-      );
-    });
+      return isUnpaid && !isMintExpired(entry);
+    };
 
-    const confirmed = filteredHistory.filter((historyEntry) => {
-      const isPending =
-        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID');
-
-      const isExpired =
-        historyEntry.type === 'mint' &&
-        historyEntry.state === 'UNPAID' &&
-        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
-
-      return !isPending || isExpired;
-    });
+    // Count transactions by status
+    const expired = filteredHistory.filter(isMintExpired);
+    const pending = filteredHistory.filter(isPending);
+    const confirmed = filteredHistory.filter((entry) => !isPending(entry) && !isMintExpired(entry));
 
     return {
       pendingCount: pending.length,
@@ -106,9 +270,52 @@ function ModalScreen() {
     };
   }, [filteredHistory]);
 
+  // Derived values
   const allCount = filteredHistory.length;
-
   const parsedAccount = account ? JSON.parse(account) : { unit: selectedCurrency };
+
+  /**
+   * Renders a filter button with consistent styling
+   *
+   * @description Creates a toggleable filter button with active/inactive states
+   * and appropriate icons and colors.
+   *
+   * @param {Object} props - Button configuration
+   * @param {string} props.type - The filter type ('lightning' | 'ecash' | 'incoming' | 'outgoing')
+   * @param {string} props.icon - The icon name to display
+   * @param {Function} props.onPress - Press handler function
+   * @param {boolean} props.isActive - Whether the button is currently active
+   * @param {string} props.className - Additional CSS classes
+   * @returns {JSX.Element} The filter button component
+   */
+  const renderFilterButton = useCallback(
+    ({
+      icon,
+      onPress,
+      isActive,
+      className = '',
+    }: {
+      icon: string;
+      onPress: () => void;
+      isActive: boolean;
+      className?: string;
+    }) => (
+      <TouchableOpacity
+        onPress={onPress}
+        className={`${className} flex-1 rounded-lg border p-2 ${
+          isActive ? 'bg-primary-700' : 'bg-primary-950'
+        } border-primary-700`}>
+        <HStack align="center" justify="center">
+          <Icon
+            name={icon}
+            size={24}
+            color={isActive ? getPrimaryColor('0') : getPrimaryColor('500')}
+          />
+        </HStack>
+      </TouchableOpacity>
+    ),
+    [getPrimaryColor]
+  );
 
   return (
     <Container>
@@ -118,16 +325,17 @@ function ModalScreen() {
           account={{ ...parsedAccount, unit: selectedCurrency }}
           showMore={false}
           history={history}
-          filter={filter}
-          type={type}
-          at={at}
+          filter={direction}
+          type={paymentType}
+          at="all"
           tab={tab}
           header={
             <>
+              {/* Status tabs */}
               <Tabs
                 tabs={['All', 'Confirmed', 'Pending', 'Expired']}
                 selectedTab={tab}
-                handleTabPress={(tab) => setTab(tab as 'All' | 'Confirmed' | 'Pending' | 'Expired')}
+                handleTabPress={(tab) => setTab(tab as StatusTab)}
                 amounts={[
                   String(allCount),
                   String(confirmedCount),
@@ -136,83 +344,51 @@ function ModalScreen() {
                 ]}
               />
 
-              <View
-                style={{
-                  height: 4,
-                }}></View>
+              {/* Spacer */}
+              <View style={{ height: 4 }} />
 
+              {/* Currency selector */}
               <CurrencySelector
                 selectedCurrency={selectedCurrency.toUpperCase()}
                 onCurrencyChange={handleCurrencyChange}
               />
+
+              {/* Filter buttons */}
               <HStack justify="space-between" align="center" className="my-2 w-full">
-                <TouchableOpacity
-                  onPress={() => toggleAt('at')}
-                  className={`mr-2 flex-1 rounded-lg border p-2 ${at === 'at' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
-                  <HStack align="center" justify="center">
-                    <Icon
-                      name="mdi:at" // Assuming this is the lightning icon
-                      size={24}
-                      color={at === 'at' ? getPrimaryColor('0') : getPrimaryColor('500')}
-                    />
-                  </HStack>
-                </TouchableOpacity>
+                {/* Payment type filters */}
+                {renderFilterButton({
+                  icon: 'mingcute:lightning-fill',
+                  onPress: () => togglePaymentType('lightning'),
+                  isActive: paymentType === 'lightning',
+                  className: 'mr-2',
+                })}
+
+                {renderFilterButton({
+                  icon: 'majesticons:coins',
+                  onPress: () => togglePaymentType('ecash'),
+                  isActive: paymentType === 'ecash',
+                  className: 'mr-2',
+                })}
+
+                {/* Separator */}
                 <View
                   className="mr-2 h-4 w-px"
-                  style={{
-                    backgroundColor: getPrimaryColor('700'),
-                  }}
+                  style={{ backgroundColor: getPrimaryColor('700') }}
                 />
-                <TouchableOpacity
-                  onPress={() => toggleType('lightning')}
-                  className={`mr-2 flex-1 rounded-lg border p-2 ${type === 'lightning' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
-                  <HStack align="center" justify="center">
-                    <Icon
-                      name="mingcute:lightning-fill" // Assuming this is the lightning icon
-                      size={24}
-                      color={type === 'lightning' ? getPrimaryColor('0') : getPrimaryColor('500')}
-                    />
-                  </HStack>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => toggleType('ecash')}
-                  className={`mr-2 flex-1 rounded-lg border p-2 ${type === 'ecash' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
-                  <HStack align="center" justify="center">
-                    <Icon
-                      name="majesticons:coins" // Assuming this is the ecash icon or a coins icon
-                      size={24}
-                      color={type === 'ecash' ? getPrimaryColor('0') : getPrimaryColor('500')}
-                    />
-                  </HStack>
-                </TouchableOpacity>
-                <View
-                  className="mr-2 h-4 w-px"
-                  style={{
-                    backgroundColor: getPrimaryColor('700'),
-                  }}
-                />
-                <TouchableOpacity
-                  onPress={() => toggleFilter('incoming')}
-                  className={`mr-2 flex-1 rounded-lg border p-2 ${filter === 'incoming' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
-                  <HStack align="center" justify="center">
-                    <Icon
-                      name="fluent:arrow-download-16-filled"
-                      size={24}
-                      color={filter === 'incoming' ? getPrimaryColor('0') : getPrimaryColor('500')}
-                    />
-                  </HStack>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => toggleFilter('outgoing')}
-                  className={`flex-1 rounded-lg border p-2 ${filter === 'outgoing' ? 'bg-primary-700' : 'bg-primary-950'} border-primary-700`}>
-                  <HStack align="center" justify="center">
-                    <Icon
-                      name="fluent:arrow-upload-16-filled"
-                      size={24}
-                      color={filter === 'outgoing' ? getPrimaryColor('0') : getPrimaryColor('500')}
-                    />
-                  </HStack>
-                </TouchableOpacity>
+
+                {/* Direction filters */}
+                {renderFilterButton({
+                  icon: 'fluent:arrow-download-16-filled',
+                  onPress: () => toggleDirection('incoming'),
+                  isActive: direction === 'incoming',
+                  className: 'mr-2',
+                })}
+
+                {renderFilterButton({
+                  icon: 'fluent:arrow-upload-16-filled',
+                  onPress: () => toggleDirection('outgoing'),
+                  isActive: direction === 'outgoing',
+                })}
               </HStack>
             </>
           }
@@ -222,4 +398,12 @@ function ModalScreen() {
   );
 }
 
+/**
+ * Transactions Modal Screen with Sheet Provider
+ *
+ * @description Exports the ModalScreen component wrapped with the sheet provider
+ * for modal functionality and state management.
+ *
+ * @see {@link withSheetProvider}
+ */
 export default withSheetProvider(ModalScreen);
