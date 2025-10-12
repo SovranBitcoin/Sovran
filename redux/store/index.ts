@@ -9,6 +9,7 @@ import { Alert } from 'react-native';
 import bip39 from 'bip39';
 import { HDKey } from '@scure/bip32';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { storeMnemonic } from 'helper/secureStorage';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
@@ -477,13 +478,64 @@ const migrations = {
 
     return _.update('cashu.allocation', () => allocation, state);
   },
+  151: (state: RootState) => {
+    console.log('=== MIGRATION 151: Moving mnemonic to secure storage ===');
+
+    try {
+      // Get profile 0 from nostr profiles
+      const profiles = state.nostr?.profiles || [];
+      const profile0 = profiles[0];
+
+      if (!profile0) {
+        console.log('No profile 0 found, skipping migration');
+        return state;
+      }
+
+      if (!profile0.mnemonic) {
+        console.log('No mnemonic found in profile 0, skipping migration');
+        return state;
+      }
+
+      console.log('Found mnemonic in profile 0, storing in secure storage...');
+
+      // Store the mnemonic in secure storage (async operation)
+      storeMnemonic(profile0.mnemonic)
+        .then((success) => {
+          if (success) {
+            console.log('✅ Successfully stored mnemonic in secure storage');
+          } else {
+            console.log('❌ Failed to store mnemonic in secure storage');
+            Alert.alert(
+              'Migration Warning',
+              'Failed to store mnemonic in secure storage. Please contact support if this persists.'
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('Migration 151 error:', error);
+          Alert.alert(
+            'Migration Error',
+            'An error occurred during migration. Please contact support if this persists.'
+          );
+        });
+    } catch (error) {
+      console.error('Migration 151 error:', error);
+      Alert.alert(
+        'Migration Error',
+        'An error occurred during migration. Please contact support if this persists.'
+      );
+    }
+
+    console.log('=== MIGRATION 151 COMPLETE ===');
+    return state;
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 150,
+  version: 151,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
