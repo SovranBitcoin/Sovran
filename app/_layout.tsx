@@ -221,20 +221,20 @@ export default function RootLayout() {
         <PersistGate loading={null} persistor={persistor}>
           <Provider store={store}>
             <ThemeProvider>
-              <ActionSheetProvider>
-                <SheetProvider context="global">
-                  <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-                    <PricelistProvider>
-                      <CocoProvider>
+              <CocoProvider>
+                <ActionSheetProvider>
+                  <SheetProvider context="global">
+                    <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+                      <PricelistProvider>
                         <PasscodeGate>
                           <MainStack />
                           <PortalHost />
                         </PasscodeGate>
-                      </CocoProvider>
-                    </PricelistProvider>
-                  </View>
-                </SheetProvider>
-              </ActionSheetProvider>
+                      </PricelistProvider>
+                    </View>
+                  </SheetProvider>
+                </ActionSheetProvider>
+              </CocoProvider>
             </ThemeProvider>
           </Provider>
         </PersistGate>
