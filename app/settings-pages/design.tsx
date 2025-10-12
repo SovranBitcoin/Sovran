@@ -1,6 +1,6 @@
 import React from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { memoizedGetSettings, setExperimental } from 'redux/settings';
+import { useSelector } from 'react-redux';
+import { memoizedGetSettings } from 'redux/settings';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { Section as TableSection } from 'components/ui/Section';
@@ -29,11 +29,9 @@ export default function ModalScreen() {
   const settings = useSelector(memoizedGetSettings);
   const [isChecked, setIsChecked] = React.useState(settings?.experimental);
 
-  const dispatch = useDispatch();
   const toggleCheckbox = () => {
     const newValue = !isChecked;
     setIsChecked(newValue);
-    dispatch(setExperimental(newValue));
   };
 
   return (

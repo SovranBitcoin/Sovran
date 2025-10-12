@@ -1,27 +1,17 @@
 import {
   SET_DISPLAY_BITCOIN,
-  SET_LANGUAGE,
   SET_THEME,
-  SET_EXPERIMENTAL,
   SET_PASSCODE,
   SET_BACKGROUND_IMAGE,
   TERMS_ACCEPTED,
 } from './actionTypes';
 
 export type SettingsAction =
-  | ReturnType<typeof setLanguage>
   | ReturnType<typeof setTheme>
   | ReturnType<typeof setDisplayBitcoin>
-  | ReturnType<typeof setExperimental>
   | ReturnType<typeof setPasscode>
   | ReturnType<typeof setBackgroundImage>
   | ReturnType<typeof termsAccepted>;
-
-export const setLanguage = (lang: string) =>
-  ({
-    type: SET_LANGUAGE,
-    payload: lang,
-  }) as const;
 
 export const setTheme = (theme: string) =>
   ({
@@ -33,12 +23,6 @@ export const setDisplayBitcoin = (display: number) =>
   ({
     type: SET_DISPLAY_BITCOIN,
     payload: display,
-  }) as const;
-
-export const setExperimental = (experimental: boolean) =>
-  ({
-    type: SET_EXPERIMENTAL,
-    payload: experimental,
   }) as const;
 
 export const setPasscode = (passcode: string) =>

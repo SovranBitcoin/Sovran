@@ -3,7 +3,6 @@ import {
   SET_CURRENT_PROFILE,
   SET_SEARCH,
   SET_PROFILES,
-  SET_FOLLOWS,
   ADD_MESSAGE,
   MUTE_USER,
   REPORT_USER,
@@ -11,7 +10,6 @@ import {
   REMOVE_CONTACT,
 } from './actionTypes';
 import { NostrContactProfile, Profile } from './reducer';
-import { NDKUserProfile } from '@nostr-dev-kit/ndk';
 
 export type NostrAction =
   | ReturnType<typeof muteUser>
@@ -21,8 +19,7 @@ export type NostrAction =
   | ReturnType<typeof addMessage>
   | ReturnType<typeof addContact>
   | ReturnType<typeof removeContact>
-  | ReturnType<typeof setProfiles>
-  | ReturnType<typeof setFollows>;
+  | ReturnType<typeof setProfiles>;
 
 export const muteUser = (pubkey: string) =>
   ({
@@ -52,12 +49,6 @@ export const setProfiles = (profiles: Profile[]) =>
   ({
     type: SET_PROFILES,
     payload: profiles,
-  }) as const;
-
-export const setFollows = (follows: { pubkey: string; profile: NDKUserProfile }) =>
-  ({
-    type: SET_FOLLOWS,
-    payload: follows,
   }) as const;
 
 export const addMessage = (pubkey: string, message: string) =>

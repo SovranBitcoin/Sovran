@@ -1,11 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  setLanguage,
-  setTheme,
-  setDisplayBitcoin,
-  setPasscode,
-  setBackgroundImage,
-} from './actions';
+import { setTheme, setDisplayBitcoin, setPasscode, setBackgroundImage } from './actions';
 import {
   selectLanguage,
   selectDisplayBitcoin,
@@ -32,7 +26,6 @@ export const useSettings = () => {
     passcode,
     backgroundImage,
     setTheme: (theme: string) => dispatch(setTheme(theme)),
-    setLanguage: (lang: string) => dispatch(setLanguage(lang)),
     setDisplayBitcoin: (display: number) => dispatch(setDisplayBitcoin(display)),
     setPasscode: (code: string) => dispatch(setPasscode(code)),
     setBackgroundImage: (image: string) => dispatch(setBackgroundImage(image)),

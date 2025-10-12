@@ -11,10 +11,3 @@ export const memoizedGetSelectedMint = createSelector(
     return profiles[profileId].selectedMint;
   }
 );
-
-// Removed memoizedGetMintInfo - now using Coco's getMintInfo
-
-export const memoizedGetAllocation = createSelector(
-  [(state: RootState) => state.cashu.allocation],
-  (allocation) => allocation || {}
-);

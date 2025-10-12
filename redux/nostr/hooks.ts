@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
-import { setCurrentProfile, setProfiles, addMessage, setSearch, setFollows } from './actions';
+import { setCurrentProfile, setProfiles, addMessage, setSearch } from './actions';
 
 import { memoizedGetCurrentProfile } from './selectors';
 import { RootState } from '../store/reducer';
@@ -21,7 +21,6 @@ export const useNostr = () => {
     setCurrentProfile: (profile) => dispatch(setCurrentProfile(profile)),
     setProfiles: (profiles) => dispatch(setProfiles(profiles)),
     addMessage: (pubkey, message) => dispatch(addMessage(pubkey, message)),
-    setFollows: (follows) => dispatch(setFollows(follows)),
     follows: [...(follows[currentProfile?.pubkey] || [])],
     contacts: contacts || [],
     setSearch: (search) => dispatch(setSearch(search)),
