@@ -1710,9 +1710,9 @@
   integrity sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==
 
 "@iconify/json@^2.2.391":
-  version "2.2.394"
-  resolved "https://registry.yarnpkg.com/@iconify/json/-/json-2.2.394.tgz#565c202f15bff08f9bcb655b5297ec548bb857d2"
-  integrity sha512-XuI/rTjVO4rOAbRpb2DZSBzRJcWSTO8lhR0jGEzF28ROM8+vwWMpVaZVvZAeCo3Hc4BItxP+c1hOJMS1cRB5RA==
+  version "2.2.395"
+  resolved "https://registry.yarnpkg.com/@iconify/json/-/json-2.2.395.tgz#e07eb237c885f423b89424cdeec6afbee8c1bb3d"
+  integrity sha512-XSYOnlGqiZhJkFFBUiVK4C5VIiv4rxyKtCmkQ9nS4zfMpS4xT0BF9+qWUKOHYgeCzCLghyWfrm6Eti3Sv5kfqQ==
   dependencies:
     "@iconify/types" "*"
     pathe "^2.0.0"
@@ -2091,9 +2091,9 @@
     websocket-polyfill "^0.0.3"
 
 "@nostr-dev-kit/ndk@^2.10.7", "@nostr-dev-kit/ndk@^2.15.0", "@nostr-dev-kit/ndk@^2.17.0", "@nostr-dev-kit/ndk@^2.17.3":
-  version "2.17.4"
-  resolved "https://registry.yarnpkg.com/@nostr-dev-kit/ndk/-/ndk-2.17.4.tgz#deeacad411ebf5d328488bb6a4d9939c67bca09a"
-  integrity sha512-oFwAaze76OPx9ZUAJzGLMxSpXbmb7TCaXubaEnOx7VFro9zntvtA5Gb9Zrv7hUgoXvvYaQBDU2NivAlNlcuUfQ==
+  version "2.17.5"
+  resolved "https://registry.yarnpkg.com/@nostr-dev-kit/ndk/-/ndk-2.17.5.tgz#8cbd1d45c1796b4c9a43462ab07d7c8cb146bf90"
+  integrity sha512-C1ZihH9wTPCPQrt4C9iDoV5SNayk6xlmvKnciY+kifWhnxm1hW3o0+Qta2mh44FMV0KIjjgFXjJx8yaHMenqGg==
   dependencies:
     "@codesandbox/sandpack-client" "^2.19.8"
     "@noble/curves" "^1.6.0"

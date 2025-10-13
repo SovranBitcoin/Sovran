@@ -29,7 +29,7 @@ import { useMintManagement } from 'hooks/coco';
 import { usePaginatedHistory, useReceive } from 'coco-cashu-react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { popup } from '@/helper/popup';
-import { write } from 'helper/nfc';
+import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -108,10 +108,23 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
    * This allows users to share tokens by bringing their device close to another NFC-enabled device.
    *
    * @async
-   * @throws {Error} When NFC writing fails
+   * @description Encodes the current send history entry token and writes it to NFC for sharing
+   *
+   * **Process:** Encode token → Write to NFC → Handle result
+   * **Effects:** NFC tag written, user feedback shown
+   *
+   * @returns {Promise<void>} Resolves when NFC write operation is complete
+   * @throws {Error} When NFC writing fails or token encoding fails
+   *
+   * @example
+   * await handleNFCSend();
+   * // Token is now available for NFC sharing
    */
-  const handleNFCSend = async () => {
-    await write(getEncodedTokenV4(sendHistoryEntry.token));
+  const handleNFCSend = async (close: (event: any) => void): Promise<void> => {
+    const success = await writeTokenToNFC(getEncodedTokenV4(sendHistoryEntry.token));
+    if (success) {
+      popup({ message: 'ecash_token_shared_via_nfc', type: 'success', onClose: () => close({}) });
+    }
   };
 
   /**
