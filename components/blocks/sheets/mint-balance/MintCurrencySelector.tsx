@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Icon, { CurrencyIcon, FlagIcon } from 'assets/icons';
+import Icon, { CurrencyIcon } from 'assets/icons';
 import { HStack, VStack, Spacer } from 'components/ui/View';
 import { useTheme } from '@/providers/ThemeProvider';
 
@@ -123,10 +123,9 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                 onPress={() => handleCurrencyChange(currency)}>
                 <HStack align="center" justify="flex-start" gap={8}>
                   {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
-                    <FlagIcon
-                      country={currency === 'USD' ? 'US' : currency === 'EUR' ? 'EU' : 'GB'}
-                      height={32}
-                      width={32}
+                    <Icon
+                      name={`circle-flags:${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : 'gb'}`}
+                      size={32}
                     />
                   ) : currency === 'ALL' ? (
                     <Icon

@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { FlagIcon, CurrencyIcon } from 'assets/icons';
+import Icon, { CurrencyIcon } from 'assets/icons';
 import { useMintManagement } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { View, HStack } from 'components/ui/View';
@@ -139,7 +139,7 @@ const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                   }}>
                   <HStack align="center" gap={8} style={{ width: 36 }}>
                     {currencyItem.country ? (
-                      <FlagIcon country={currencyItem.country} height={32} width={32} />
+                      <Icon name={`circle-flags:${currencyItem.country.toLowerCase()}`} size={32} />
                     ) : (
                       <CurrencyIcon currency={currency.toLowerCase()} />
                     )}

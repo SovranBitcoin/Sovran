@@ -4463,6 +4463,11 @@ cipher-base@^1.0.1:
     safe-buffer "^5.2.1"
     to-buffer "^1.2.2"
 
+circle-flags@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/circle-flags/-/circle-flags-1.0.1.tgz#deceaf2504d1a3592e942266b8070d96187eabdd"
+  integrity sha512-tqo1S1pmTZjAD0wgvxBLnbUmplGkIElbJTbz2o5VqpkDm1Eu9VgJjX+6U4RSVJYPLP+95mL7VOv5jiK2xuYFJA==
+
 class-variance-authority@^0.7.1:
   version "0.7.1"
   resolved "https://registry.yarnpkg.com/class-variance-authority/-/class-variance-authority-0.7.1.tgz#4008a798a0e4553a781a57ac5177c9fb5d043787"

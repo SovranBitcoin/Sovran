@@ -3,12 +3,11 @@ import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/ui/View';
-import { CurrencyIcon, FlagIcon } from 'assets/icons';
+import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
-
 /**
  * Circle background for the QR code center logo
  */
@@ -78,7 +77,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const qrData = animate && parts.length > 0 ? parts[index] : address;
   const width = Math.min(screenWidth, 600);
-  const isLocationUnit = unit.startsWith('location');
+  const isLocationUnit = unit.startsWith('circle-flags');
   const gradientColors = animate
     ? ([getPrimaryColor('700'), getPrimaryColor('700')] as const)
     : ([getShadeColor('200'), getShadeColor('300')] as const);
@@ -105,7 +104,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
           transform: [{ translateX: -36 }, { translateY: -36 }, { scale: 0.75 }],
         }}>
         {isLocationUnit ? (
-          <FlagIcon country={unit.split('_')[1]} height={72} width={72} />
+          <Icon name={unit} size={72} />
         ) : (
           <CurrencyIcon width={72} currency={unit} />
         )}

@@ -4,72 +4,9 @@ import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-nativ
 import { useTheme } from 'providers/ThemeProvider';
 import { Monicon } from '@monicon/native';
 
-// todo: remove all these icons and use <Icon name={name} size={size} color={color || getPrimaryColor('0')} /> instead.
-
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 import { View } from 'components/ui/View';
-export { FlagIcon } from './flag';
-
-export const icons = [
-  'majesticons:text',
-  'la:user-plus',
-  'la:user-minus',
-  'hugeicons:new-twitter',
-  'material-symbols:info-rounded',
-  'la:user-slash',
-  'material-symbols:report-rounded',
-  'material-symbols:verified-rounded',
-  'fluent:emoji-24-filled',
-  'mdi:lightbulb-on-outline',
-  'mdi:lightbulb-on',
-  'material-symbols:close-rounded',
-  'proicons:photo',
-  'solar:card-bold',
-  'nonicons:error-16',
-  'lucide:pencil-line',
-  'majesticons:search-line',
-  'solar:key-bold',
-  'simple-line-icons:close',
-  'ph:user-bold',
-  'iconamoon:send-fill',
-  'mdi:contact',
-  'mingcute:lightning-fill',
-  'majesticons:coins',
-  'lucide:delete',
-  'ant-design:loading-outlined',
-  'mdi:decimal',
-  'humbleicons:refresh',
-  'ri:share-fill',
-  'lets-icons:copy',
-  'tabler:dots',
-  'ph:contactless-payment-fill',
-  'material-symbols:currency-bitcoin',
-  'material-symbols-light:currency-bitcoin',
-  'fluent:wallet-20-filled',
-  'material-symbols:settings-rounded',
-  'fluent:chevron-down-12-filled',
-  'simple-line-icons:check',
-  'lucide:arrow-up-right',
-  'mdi:help-circle',
-  'bx:dots-vertical-rounded',
-  'mdi:at',
-  'lucide:arrow-right',
-  'lucide:arrow-up-right',
-  'fluent:arrow-upload-16-filled',
-  'fluent:arrow-download-16-filled',
-  'fluent:arrow-swap-16-filled',
-  'fluent:clock-12-filled',
-  'mdi:cancel',
-  'clarity:internet-of-things-solid',
-  'stash:qr-code',
-  'majesticons:eye-off',
-  'majesticons:eye',
-  'fa6-solid:chevron-left',
-  'fa6-solid:chevron-right',
-  'fluent:add-24-filled',
-  'ic:round-refresh',
-];
 
 export type IconProps = {
   name: string;
@@ -623,35 +560,6 @@ export function CurrencyIcon({
   }
 
   return null;
-}
-
-export function VerifiedIcon({ style }: { style?: StyleProp<ViewStyle> }) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-
-  return (
-    <Svg viewBox="0 0 24 24" style={style}>
-      <Defs>
-        <LinearGradient id="gradient" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor="#FF5841" />
-          <Stop offset="0.25" stopColor="#FF353C" />
-          <Stop offset="0.5" stopColor="#ED0C46" />
-          <Stop offset="0.745" stopColor="#CF014E" />
-          <Stop offset="1" stopColor="#BF004E" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        stroke={getPrimaryColor('800')}
-        strokeWidth={2.5}
-        strokeOpacity={0.5}
-        fill="url(#gradient)"
-        d="m23 12l-2.44-2.79l.34-3.69l-3.61-.82l-1.89-3.2L12 2.96L8.6 1.5L6.71 4.69L3.1 5.5l.34 3.7L1 12l2.44 2.79l-.34 3.7l3.61.82L8.6 22.5l3.4-1.47l3.4 1.46l1.89-3.19l3.61-.82l-.34-3.69zm-12.91 4.72l-3.8-3.81l1.48-1.48l2.32 2.33l5.85-5.87l1.48 1.48z"
-      />
-      <Path
-        fill="url(#gradient)"
-        d="m23 12l-2.44-2.79l.34-3.69l-3.61-.82l-1.89-3.2L12 2.96L8.6 1.5L6.71 4.69L3.1 5.5l.34 3.7L1 12l2.44 2.79l-.34 3.7l3.61.82L8.6 22.5l3.4-1.47l3.4 1.46l1.89-3.19l3.61-.82l-.34-3.69zm-12.91 4.72l-3.8-3.81l1.48-1.48l2.32 2.33l5.85-5.87l1.48 1.48z"
-      />
-    </Svg>
-  );
 }
 
 export function BtcIcon({

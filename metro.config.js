@@ -13,6 +13,7 @@ config.resolver.alias = {
 
 // First, apply Monicon
 const configWithMonicon = withMonicon(config, {
+  collections: ['circle-flags'],
   icons: [
     // Your existing icons array...
     'fa6-solid:chevron-left',
