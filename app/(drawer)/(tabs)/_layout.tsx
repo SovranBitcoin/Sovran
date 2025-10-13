@@ -17,6 +17,7 @@ import { SearchBar } from 'components/blocks/payments';
 import { TAB_SCREENS } from '@/app/(drawer)/(tabs)/_layout.tabs';
 import { useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 
 const Tab = createBottomTabNavigator();
 
@@ -29,6 +30,28 @@ const LIGHT_THEMES = ['light', 'beige'];
 const isLightTheme = (themeName: string) => LIGHT_THEMES.includes(themeName);
 const getBlurTint = (themeName: string) => (isLightTheme(themeName) ? 'light' : 'dark');
 const getBlurIntensity = (themeName: string) => (isLightTheme(themeName) ? 7.5 : 75);
+
+// Wrapper component for tab icons with haptic feedback
+const TabIconWithHaptics = ({
+  IconComponent,
+  focused,
+  onPress,
+}: {
+  IconComponent: React.ComponentType<{ focused: boolean }>;
+  focused: boolean;
+  onPress: () => void;
+}) => {
+  const handlePress = async () => {
+    await EnhancedHaptics.navigateHaptic();
+    onPress();
+  };
+
+  return (
+    <Pressable onPress={handlePress}>
+      <IconComponent focused={focused} />
+    </Pressable>
+  );
+};
 
 const TabBarBackground = () => {
   const { currentTheme } = useTheme();
@@ -151,19 +174,25 @@ const TabLayout = () => {
             key={name}
             name={name}
             component={component}
-            options={{
+            options={({ navigation }) => ({
               headerTitle: getHeaderTitle(title),
               tabBarActiveTintColor: getShadeColor('300'),
               tabBarInactiveTintColor: getPrimaryColor('300'),
               tabBarLabel: '',
-              tabBarIcon: ({ focused }) => <IconComponent focused={focused} />,
+              tabBarIcon: ({ focused }) => (
+                <TabIconWithHaptics
+                  IconComponent={IconComponent}
+                  focused={focused}
+                  onPress={() => navigation.navigate(name as any)}
+                />
+              ),
               headerLeft: HeaderLeft,
               headerRight: HeaderRight,
               headerStyle: {
                 backgroundColor: getPrimaryColor('950'),
                 height: 0,
               },
-            }}
+            })}
           />
         ))}
       </Tab.Navigator>

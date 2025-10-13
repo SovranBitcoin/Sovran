@@ -40,6 +40,16 @@
  *   onPress={handleCustom}
  *   ripple={{ color: 'blue', duration: 600 }}
  * />
+ *
+ * // Button with haptic feedback
+ * <Button text="Haptic" onPress={handleHaptic} haptics />
+ *
+ * // Custom haptic configuration
+ * <Button
+ *   text="Impact"
+ *   onPress={handleImpact}
+ *   haptics={{ type: 'impact', impactStyle: 'heavy' }}
+ * />
  * ```
  *
  * @see {@link ./TouchableOpacity}
@@ -60,6 +70,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
 import { View, HStack } from 'components/ui/View';
+import { EnhancedHaptics } from './Haptics';
 
 /**
  * Configuration for ripple effect animations
@@ -221,6 +232,26 @@ interface BlurConfig {
 }
 
 /**
+ * Configuration for haptic feedback
+ *
+ * @interface HapticConfig
+ * @description
+ * Controls the type and behavior of haptic feedback when the button is pressed.
+ */
+interface HapticConfig {
+  /** Type of haptic feedback to trigger */
+  type?: 'selection' | 'impact' | 'notification';
+  /** Impact style for impact haptic (only applies when type is 'impact') */
+  impactStyle?: 'light' | 'medium' | 'heavy';
+  /** Notification type for notification haptic (only applies when type is 'notification') */
+  notificationType?: 'success' | 'warning' | 'error';
+  /** Whether to trigger haptic feedback on press start (default: true) */
+  onPressStart?: boolean;
+  /** Whether to trigger haptic feedback on press end (default: false) */
+  onPressEnd?: boolean;
+}
+
+/**
  * Props for the Button component
  *
  * @interface ButtonProps
@@ -249,6 +280,8 @@ export interface ButtonProps {
   ripple?: boolean | RippleConfig;
   /** Blur effect configuration (boolean or config object) */
   blur?: boolean | BlurConfig;
+  /** Haptic feedback configuration (boolean or config object) */
+  haptics?: boolean | HapticConfig;
 }
 
 /**
@@ -293,6 +326,7 @@ export const Button = ({
   testID,
   ripple = false,
   blur = false,
+  haptics = false,
 }: ButtonProps) => {
   const { getPrimaryColor, getShadeColor } = useTheme();
 
@@ -313,6 +347,79 @@ export const Button = ({
   const { intensity = 75, tint = 'dark' } = blurConfig;
 
   const shouldUseBlur = blur !== false;
+
+  // Haptic config
+  const hapticConfig = typeof haptics === 'object' ? haptics : {};
+  const {
+    type = 'selection',
+    impactStyle = 'medium',
+    notificationType = 'success',
+    onPressStart = true,
+    onPressEnd = false,
+  } = hapticConfig;
+
+  const shouldUseHaptics = haptics !== false;
+
+  /**
+   * Triggers haptic feedback based on configuration
+   *
+   * @description
+   * Executes the appropriate haptic feedback based on the configured type and parameters.
+   * Supports selection, impact, and notification haptic types with customizable options.
+   *
+   * @param {string} trigger - When the haptic should trigger ('start' or 'end')
+   */
+  const triggerHaptic = useCallback(
+    async (trigger: 'start' | 'end') => {
+      if (!shouldUseHaptics) return;
+      if (trigger === 'start' && !onPressStart) return;
+      if (trigger === 'end' && !onPressEnd) return;
+
+      try {
+        switch (type) {
+          case 'selection':
+            await EnhancedHaptics.buttonHaptic();
+            break;
+          case 'impact':
+            switch (impactStyle) {
+              case 'light':
+                await EnhancedHaptics.buttonHaptic();
+                break;
+              case 'medium':
+                await EnhancedHaptics.actionHaptic();
+                break;
+              case 'heavy':
+                await EnhancedHaptics.destructiveHaptic();
+                break;
+              default:
+                await EnhancedHaptics.buttonHaptic();
+            }
+            break;
+          case 'notification':
+            switch (notificationType) {
+              case 'success':
+                await EnhancedHaptics.successHaptic();
+                break;
+              case 'warning':
+                await EnhancedHaptics.warningHaptic();
+                break;
+              case 'error':
+                await EnhancedHaptics.errorHaptic();
+                break;
+              default:
+                await EnhancedHaptics.successHaptic();
+            }
+            break;
+          default:
+            await EnhancedHaptics.buttonHaptic();
+        }
+      } catch (error) {
+        // Silently fail if haptics are not supported
+        console.warn('Haptic feedback not supported on this device:', error);
+      }
+    },
+    [shouldUseHaptics, type, impactStyle, notificationType, onPressStart, onPressEnd]
+  );
 
   /**
    * Gets button styles based on variant and effect configuration
@@ -415,11 +522,13 @@ export const Button = ({
 
   const handlePress = async (e: any) => {
     if (disabled || loading) return;
+    await triggerHaptic('end');
     await onPress(e);
   };
 
-  const handlePressIn = (event: any) => {
+  const handlePressIn = async (event: any) => {
     if (disabled || loading) return;
+    await triggerHaptic('start');
     handleRipplePressIn(event);
   };
 

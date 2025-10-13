@@ -4,7 +4,7 @@ import { Badge } from 'components/ui/Badge';
 import { useSelector } from 'react-redux';
 import { useSettings } from 'redux/settings';
 import { useBalanceContext, useMints } from 'hooks/coco';
-import Haptics from 'components/ui/Haptics';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { memoizedPricelist } from 'redux/pricelist';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -44,8 +44,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     return totalBalance;
   }, [liveBalances, mints]);
 
-  const toggleUnit = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const toggleUnit = useCallback(async () => {
+    await EnhancedHaptics.successHaptic();
     setDisplayBitcoin(((settings.display_btc + 1) % 4) as DisplayBtcMode);
   }, [settings.display_btc, setDisplayBitcoin]);
 

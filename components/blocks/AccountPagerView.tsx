@@ -9,7 +9,7 @@ import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Haptics from 'components/ui/Haptics';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 
 import { memoizedGetSelectedMint } from 'redux/cashu/selectors';
 import { useMintManagement } from 'hooks/coco';
@@ -54,9 +54,9 @@ export function AccountPagerView({
   const swiperRef = useRef<any>(null);
 
   const onPageSelected = useCallback(
-    (index: number): void => {
+    async (index: number): Promise<void> => {
       setAccount(accounts[index]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await EnhancedHaptics.successHaptic();
     },
     [accounts, setAccount]
   );

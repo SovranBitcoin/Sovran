@@ -15,6 +15,7 @@ import { AnimatedQRCode } from 'components/ui/QRCode';
 import { HStack } from 'components/ui/View';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { popup } from '@/helper/popup';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 
 interface PaymentInfoProps {
   unit: string;
@@ -76,8 +77,12 @@ export function PaymentInfo({
   /**
    * Handles copying payment information to clipboard when QR code is pressed.
    * Copies either the link prop or the selectedValue, then shows a success popup.
+   * Includes haptic feedback for better user experience.
    */
   const handleCopyPress = useCallback(async () => {
+    // Trigger haptic feedback for copy action
+    await EnhancedHaptics.copyHaptic();
+
     const textToCopy = link || selectedValue;
     await Clipboard.setStringAsync(textToCopy);
 

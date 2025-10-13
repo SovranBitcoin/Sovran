@@ -28,4 +28,108 @@ interface HapticsInterface {
  */
 const Haptics: HapticsInterface = ExpoHaptics;
 
+/**
+ * Enhanced Haptics class with semantic methods for common actions
+ * Provides consistent haptic feedback patterns across the app
+ */
+class EnhancedHaptics {
+  /**
+   * Haptic feedback for copy actions (addresses, text, etc.)
+   * Uses success notification for positive copy confirmation
+   */
+  static async copyHaptic(): Promise<void> {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.warn('Copy haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for navigation actions (tab switches, page transitions)
+   * Uses selection feedback for navigation confirmation
+   */
+  static async navigateHaptic(): Promise<void> {
+    try {
+      await Haptics.selectionAsync();
+    } catch (error) {
+      console.warn('Navigation haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for button presses and selections
+   * Uses light impact for general button interactions
+   */
+  static async buttonHaptic(): Promise<void> {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.warn('Button haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for important actions (send, delete, confirm)
+   * Uses medium impact for significant actions
+   */
+  static async actionHaptic(): Promise<void> {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      console.warn('Action haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for errors and warnings
+   * Uses error notification for negative feedback
+   */
+  static async errorHaptic(): Promise<void> {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch (error) {
+      console.warn('Error haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for warnings and caution
+   * Uses warning notification for cautionary feedback
+   */
+  static async warningHaptic(): Promise<void> {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch (error) {
+      console.warn('Warning haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for success actions
+   * Uses success notification for positive feedback
+   */
+  static async successHaptic(): Promise<void> {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.warn('Success haptic not supported:', error);
+    }
+  }
+
+  /**
+   * Haptic feedback for heavy/destructive actions
+   * Uses heavy impact for significant destructive actions
+   */
+  static async destructiveHaptic(): Promise<void> {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch (error) {
+      console.warn('Destructive haptic not supported:', error);
+    }
+  }
+}
+
+// Export both the original Haptics and the enhanced version
 export default Haptics;
+export { EnhancedHaptics };

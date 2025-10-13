@@ -9,7 +9,7 @@ interface VideoScreenProps {
   muted?: boolean;
 }
 
-export function VideoScreen({ videoSource, style, muted }: VideoScreenProps) {
+export function VideoScreen({ videoSource, style, muted = false }: VideoScreenProps) {
   const { getPrimaryColor } = useTheme();
   const ref = useRef(null);
   const [, setIsPlaying] = useState(true);

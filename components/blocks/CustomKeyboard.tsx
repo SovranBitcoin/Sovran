@@ -1,7 +1,7 @@
 import React, { useState, useCallback, memo } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
-import Haptics from 'components/ui/Haptics';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 
@@ -24,10 +24,10 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         let newValue: string;
 
         if (stringValue === '<') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          EnhancedHaptics.actionHaptic();
           newValue = prevInputValue.slice(0, -1);
         } else {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          EnhancedHaptics.buttonHaptic();
           newValue = prevInputValue + stringValue;
         }
 

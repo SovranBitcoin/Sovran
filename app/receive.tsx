@@ -21,6 +21,7 @@ import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Proof } from '@cashu/cashu-ts';
 import { isValidEcashToken } from '@/helper/coco/utils';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 
 export const pool = new SimplePool();
 
@@ -128,6 +129,9 @@ const EcashLightningReceiver = () => {
   };
 
   const handleCopyLightningAddress = useCallback(async () => {
+    // Trigger copy haptic feedback
+    await EnhancedHaptics.copyHaptic();
+
     await Clipboard.setStringAsync(`${currentProfile.npub}@npubx.cash`);
     popup({ message: 'lightning_address_copied', type: 'success' });
   }, [currentProfile.npub]);

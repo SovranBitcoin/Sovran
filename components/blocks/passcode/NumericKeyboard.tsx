@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import Haptics from 'components/ui/Haptics';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Button } from 'components/ui/Button';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -81,10 +81,10 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
       setInputValue((prev) => {
         let newValue = prev;
         if (String(value) === '<') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          EnhancedHaptics.actionHaptic();
           newValue = prev.slice(0, -1);
         } else {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          EnhancedHaptics.buttonHaptic();
           newValue = prev + String(value);
         }
         onKeyPress(newValue);
