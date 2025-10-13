@@ -4,15 +4,15 @@ import { router } from 'expo-router';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import Haptics from 'components/ui/Haptics';
 import { useMelt } from '@/hooks/coco';
-import {
-  isLightningAddress,
-  isLnurlp,
-  lnTrim,
-  isLightningInvoice,
-} from '@/helper/third-party/lnurl';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Proof } from '@cashu/cashu-ts';
-import { getLightningAmount, isValidEcashToken } from '@/helper/coco/utils';
+import {
+  getLightningAmount,
+  isLightningInvoice,
+  isValidEcashToken,
+  lnTrim,
+} from '@/helper/coco/utils';
+import { utils as lnurlPayUtils } from 'lnurl-pay';
 
 interface ScanningData {
   data: string;
@@ -138,8 +138,8 @@ export const useProcessPaymentString = ({
             },
           });
         } else if (
-          (isLightningAddress(lnTrim(scanning.data)) ||
-            isLnurlp(lnTrim(scanning.data)) ||
+          (lnurlPayUtils.isLightningAddress(lnTrim(scanning.data)) ||
+            lnurlPayUtils.isLnurlp(lnTrim(scanning.data)) ||
             isLightningInvoice(lnTrim(scanning.data))) &&
           selectedMint
         ) {

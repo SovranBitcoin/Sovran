@@ -2,6 +2,7 @@ import { Manager } from 'coco-cashu-core';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { decode } from '@gandlaf21/bolt11-decode';
 import { nip19 } from 'nostr-tools';
+import _ from 'lodash';
 
 /**
  * Get mint information using the Coco Manager
@@ -96,4 +97,38 @@ export function maybeConvertNpub(key: string) {
     }
   }
   return key;
+}
+
+export const isLightningInvoice = (invoice: string): boolean => {
+  try {
+    decode(invoice);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export function lnTrim(str: string) {
+  if (!str || !_.isString(str)) {
+    return '';
+  }
+  str = str.trim().toLowerCase();
+  const uriPrefixes = [
+    'lightning:',
+    'lightning=',
+    'lightning://',
+    'lnurlp://',
+    'lnurlp=',
+    'lnurlp:',
+    'lnurl:',
+    'lnurl=',
+    'lnurl://',
+  ];
+  uriPrefixes.forEach((prefix) => {
+    if (!str.startsWith(prefix)) {
+      return;
+    }
+    str = str.slice(prefix.length).trim();
+  });
+  return str.trim();
 }
