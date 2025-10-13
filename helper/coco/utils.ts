@@ -1,3 +1,34 @@
+/**
+ * @fileoverview Coco Cashu utility functions for Lightning Network and ecash operations
+ *
+ * @module helper/coco/utils
+ *
+ * @description
+ * **Comprehensive utility functions for Coco Cashu operations**
+ * - Mint information retrieval and validation
+ * - Ecash token validation and spendability checks
+ * - Lightning Network invoice parsing and validation
+ * - Nostr key conversion utilities
+ * - Lightning address and URL trimming utilities
+ *
+ * **Usage:**
+ * ```typescript
+ * import { getMintInfo, isValidEcashToken, getLightningAmount } from '@/helper/coco/utils';
+ *
+ * // Validate ecash token
+ * const isValid = isValidEcashToken(tokenString);
+ *
+ * // Get Lightning invoice amount
+ * const amount = getLightningAmount(invoiceString);
+ *
+ * // Get mint information
+ * const mintInfo = await getMintInfo(manager, mintUrl);
+ * ```
+ *
+ * @see {@link https://github.com/bitcoinvault/coco-cashu-core} Coco Cashu Core
+ * @see {@link https://github.com/gandlaf21/bolt11-decode} BOLT11 Decode
+ */
+
 import { Manager } from 'coco-cashu-core';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { decode } from '@gandlaf21/bolt11-decode';
@@ -5,7 +36,23 @@ import { nip19 } from 'nostr-tools';
 import _ from 'lodash';
 
 /**
- * Get mint information using the Coco Manager
+ * Retrieves mint information using the Coco Manager
+ *
+ * @async
+ * @description Fetches comprehensive mint information including supported currencies, fees, and capabilities
+ *
+ * **Process:** manager.mint.getMintInfo() → return mint data
+ * **Effects:** Network request to mint server
+ *
+ * @param {Manager} manager - The Coco Manager instance
+ * @param {string} mintUrl - The URL of the mint to query
+ * @returns {Promise<any>} Mint information object containing supported currencies, fees, and capabilities
+ * @throws {Error} When mint URL is invalid or mint server is unreachable
+ *
+ * @example
+ * const manager = new Manager();
+ * const mintInfo = await getMintInfo(manager, 'https://mint.example.com');
+ * console.log(mintInfo.currencies); // ['USD', 'EUR', 'BTC']
  */
 export async function getMintInfo(manager: Manager, mintUrl: string) {
   try {
@@ -16,7 +63,25 @@ export async function getMintInfo(manager: Manager, mintUrl: string) {
 }
 
 /**
- * Check if a token is spendable
+ * Checks if an ecash token is spendable by validating mint availability and token structure
+ *
+ * @async
+ * @description Validates token structure, checks if mint is known, and determines spendability
+ *
+ * **Process:** decode token → extract mint URL → check if mint is known → return spendability
+ * **Effects:** Network request to check mint availability
+ *
+ * @param {Manager} manager - The Coco Manager instance
+ * @param {string} token - The ecash token string to validate
+ * @returns {Promise<boolean>} True if token is spendable, false otherwise
+ * @throws {Error} When token decoding fails or manager is not initialized
+ *
+ * @example
+ * const manager = new Manager();
+ * const isSpendable = await isTokenSpendable(manager, 'cashuAeyJ0b2tlbiI6...');
+ * if (isSpendable) {
+ *   // Token can be spent
+ * }
  */
 export async function isTokenSpendable(manager: Manager, token: string): Promise<boolean> {
   try {
@@ -38,7 +103,22 @@ export async function isTokenSpendable(manager: Manager, token: string): Promise
 }
 
 /**
- * Validate if a string is a valid ecash token
+ * Validates if a string is a valid ecash token by attempting to decode it
+ *
+ * @description Checks if the provided string can be successfully decoded as an ecash token
+ *
+ * **Process:** getDecodedToken() → return success/failure
+ * **Effects:** None (pure validation function)
+ *
+ * @param {string} token - The token string to validate
+ * @returns {boolean} True if token is valid, false otherwise
+ *
+ * @example
+ * const token = 'cashuAeyJ0b2tlbiI6...';
+ * const isValid = isValidEcashToken(token);
+ * if (isValid) {
+ *   // Process valid token
+ * }
  */
 export function isValidEcashToken(token: string): boolean {
   try {
@@ -50,7 +130,20 @@ export function isValidEcashToken(token: string): boolean {
 }
 
 /**
- * Get Lightning invoice amount
+ * Extracts the amount in satoshis from a Lightning Network invoice
+ *
+ * @description Decodes a BOLT11 invoice and extracts the payment amount, converting from millisatoshis to satoshis
+ *
+ * **Process:** decode invoice → find amount section → convert millisats to sats
+ * **Effects:** None (pure parsing function)
+ *
+ * @param {string} invoice - The Lightning Network invoice string
+ * @returns {number} Amount in satoshis, or 0 if parsing fails or no amount specified
+ *
+ * @example
+ * const invoice = 'lnbc100n1p...';
+ * const amount = getLightningAmount(invoice);
+ * console.log(`Amount: ${amount} sats`); // Amount: 100 sats
  */
 export function getLightningAmount(invoice: string): number {
   try {
@@ -63,7 +156,20 @@ export function getLightningAmount(invoice: string): number {
 }
 
 /**
- * Get Lightning invoice description
+ * Extracts the description from a Lightning Network invoice
+ *
+ * @description Decodes a BOLT11 invoice and extracts the payment description
+ *
+ * **Process:** decode invoice → find description section → return description
+ * **Effects:** None (pure parsing function)
+ *
+ * @param {string} invoice - The Lightning Network invoice string
+ * @returns {string} Payment description, or empty string if parsing fails or no description
+ *
+ * @example
+ * const invoice = 'lnbc100n1p...';
+ * const description = getLightningDescription(invoice);
+ * console.log(`Description: ${description}`); // Description: Coffee payment
  */
 export function getLightningDescription(invoice: string): string {
   try {
@@ -76,7 +182,21 @@ export function getLightningDescription(invoice: string): string {
 }
 
 /**
- * Get Lightning invoice timestamp
+ * Extracts the timestamp from a Lightning Network invoice
+ *
+ * @description Decodes a BOLT11 invoice and extracts the creation timestamp
+ *
+ * **Process:** decode invoice → find timestamp section → return timestamp
+ * **Effects:** None (pure parsing function)
+ *
+ * @param {string} invoice - The Lightning Network invoice string
+ * @returns {number} Unix timestamp in seconds, or 0 if parsing fails or no timestamp
+ *
+ * @example
+ * const invoice = 'lnbc100n1p...';
+ * const timestamp = getLightningTimestamp(invoice);
+ * const date = new Date(timestamp * 1000);
+ * console.log(`Created: ${date.toISOString()}`);
  */
 export function getLightningTimestamp(invoice: string): number {
   try {
@@ -88,6 +208,22 @@ export function getLightningTimestamp(invoice: string): number {
   }
 }
 
+/**
+ * Converts a Nostr npub key to P2PK format if it's in npub format
+ *
+ * @description Checks if the key starts with 'npub1' and converts it to the P2PK format used by Lightning Network
+ *
+ * **Process:** check npub prefix → decode with nip19 → convert to P2PK format
+ * **Effects:** None (pure conversion function)
+ *
+ * @param {string} key - The key string to potentially convert
+ * @returns {string} The converted key in P2PK format, or original key if not npub format
+ *
+ * @example
+ * const npubKey = 'npub1abc123...';
+ * const p2pkKey = maybeConvertNpub(npubKey);
+ * console.log(p2pkKey); // '02abc123...'
+ */
 export function maybeConvertNpub(key: string) {
   // Check and convert npub to P2PK
   if (key && key.startsWith('npub1')) {
@@ -99,6 +235,24 @@ export function maybeConvertNpub(key: string) {
   return key;
 }
 
+/**
+ * Validates if a string is a valid Lightning Network invoice
+ *
+ * @description Attempts to decode a BOLT11 invoice to determine if it's valid
+ *
+ * **Process:** decode invoice → return success/failure
+ * **Effects:** None (pure validation function)
+ *
+ * @param {string} invoice - The invoice string to validate
+ * @returns {boolean} True if invoice is valid, false otherwise
+ *
+ * @example
+ * const invoice = 'lnbc100n1p...';
+ * const isValid = isLightningInvoice(invoice);
+ * if (isValid) {
+ *   // Process valid Lightning invoice
+ * }
+ */
 export const isLightningInvoice = (invoice: string): boolean => {
   try {
     decode(invoice);
@@ -108,6 +262,24 @@ export const isLightningInvoice = (invoice: string): boolean => {
   }
 };
 
+/**
+ * Trims and normalizes Lightning Network addresses and URLs by removing common prefixes
+ *
+ * @description Removes various Lightning Network URI prefixes and normalizes the string for consistent processing
+ *
+ * **Process:** validate input → trim and lowercase → remove URI prefixes → return cleaned string
+ * **Effects:** None (pure string processing function)
+ *
+ * @param {string} str - The string to trim and normalize
+ * @returns {string} The cleaned string with prefixes removed, or empty string if input is invalid
+ *
+ * @example
+ * // Various input formats
+ * lnTrim('lightning:user@domain.com') // 'user@domain.com'
+ * lnTrim('lnurlp://domain.com/pay') // 'domain.com/pay'
+ * lnTrim('lnurl:user@domain.com') // 'user@domain.com'
+ * lnTrim('  LNBC100N1P...  ') // 'lnbc100n1p...'
+ */
 export function lnTrim(str: string) {
   if (!str || !_.isString(str)) {
     return '';

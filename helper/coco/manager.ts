@@ -4,11 +4,30 @@ import * as SQLite from 'expo-sqlite';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import { mnemonicToSeedSync } from 'bip39';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
-import { NsecSigner } from 'helper/third-party/cashu-address-sdk-rn/signer';
 import * as nip06 from 'nostr-tools/nip06';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+
+import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
+
+export interface Signer {
+  signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
+}
+
+export class NsecSigner implements Signer {
+  secretKey: Uint8Array;
+
+  constructor(secretKey: Uint8Array) {
+    if (secretKey.length !== 32) {
+      throw new Error('Expected secret key of 32 bytes');
+    }
+    this.secretKey = secretKey;
+  }
+  async signEvent(e: EventTemplate) {
+    return finalizeEvent(e, this.secretKey);
+  }
+}
 
 /**
  * Coco Manager singleton for managing Cashu operations
