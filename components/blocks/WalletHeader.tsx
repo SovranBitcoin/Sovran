@@ -1,11 +1,10 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'components/ui/View';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useTheme } from 'providers/ThemeProvider';
-import { setSelectedMint } from 'redux/cashu';
-import { memoizedGetCurrentProfile } from 'redux/nostr';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
@@ -37,17 +36,42 @@ export function Background() {
 }
 
 export default function WalletHeader({ unit, accounts, setAccount }: WalletHeaderProps) {
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
-  const dispatch = useDispatch();
+  const { keys } = useNostrKeysContext();
+  const pubkey = keys?.pubkey;
+
+  console.log('WalletHeader: keys from NostrKeysContext:', keys);
+  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
+
+  console.log('WalletHeader: props and state:', { unit, accounts, pubkey });
 
   const handleMintSelected = async (
     mint: { id: string; unit: string },
     _balance?: { amount: number; unit: string }
   ) => {
-    dispatch(setSelectedMint({ profileId, mintUrl: mint.id }));
+    console.log('WalletHeader: handleMintSelected called with:', {
+      mint,
+      pubkey,
+      hasPubkey: !!pubkey,
+    });
+
+    if (!pubkey) {
+      console.warn('WalletHeader: No pubkey available, cannot set selected mint');
+      return;
+    }
+
+    console.log('WalletHeader: Setting selected mint in store:', {
+      pubkey,
+      mintId: mint.id,
+    });
+    setSelectedMint(pubkey, mint.id);
+
     const index = accounts.findIndex((a) => a.unit === mint.unit);
+    console.log('WalletHeader: Looking for account with unit:', mint.unit, 'found index:', index);
     if (index !== -1) {
+      console.log('WalletHeader: Setting account to:', accounts[index]);
       setAccount(accounts[index]);
+    } else {
+      console.warn('WalletHeader: No account found for unit:', mint.unit);
     }
   };
 

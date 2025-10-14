@@ -24,7 +24,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
-import { useDispatch, useSelector } from 'react-redux';
 import { useMintManagement } from 'hooks/coco';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -33,8 +32,8 @@ import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Avatar } from 'components/ui/Avatar';
 import { popup } from '@/helper/popup';
-import { setSelectedMint } from 'redux/cashu';
-import { memoizedGetCurrentProfile } from 'redux/nostr';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack } from 'components/ui/View';
@@ -154,8 +153,11 @@ const ListRoute = () => {
   );
   const [loading, setLoading] = useState(true);
 
-  const dispatch = useDispatch();
-  const profileId = useSelector(memoizedGetCurrentProfile).id;
+  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const pubkey = keys?.pubkey;
+
+  console.log('MintBalance: keys from NostrKeysContext:', keys, 'using pubkey:', pubkey);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   // Skeleton component that matches MintItem layout
@@ -263,7 +265,9 @@ const ListRoute = () => {
 
     setLoadingId(mint.mintUrl);
     try {
+      // Always call the callback if provided
       if (payload?.onMintPress) {
+        console.log('MintBalance: Calling onMintPress callback');
         payload.onMintPress(
           {
             id: mint.mintUrl,
@@ -276,8 +280,21 @@ const ListRoute = () => {
             unit: mint.unit,
           }
         );
-      } else if (payload?.updateSelectedMint !== false) {
-        dispatch(setSelectedMint({ profileId, mintUrl: mint.mintUrl }));
+      }
+
+      // Also update the store if updateSelectedMint is true
+      if (payload?.updateSelectedMint !== false) {
+        if (!pubkey) {
+          console.warn('MintBalance: No pubkey available, cannot set selected mint');
+          return;
+        }
+        console.log('MintBalance: Setting selected mint in store:', {
+          pubkey,
+          mintUrl: mint.mintUrl,
+          mintName: mint.name,
+        });
+        setSelectedMint(pubkey, mint.mintUrl);
+        console.log('MintBalance: Selected mint set successfully in store');
       }
       if (payload?.navigate) {
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -293,6 +310,12 @@ const ListRoute = () => {
         });
       }
 
+      console.log('MintBalance: hiding sheet with mint data:', {
+        id: mint.mintUrl,
+        name: mint.name,
+        iconUrl: mint.mintInfo.icon_url || null,
+        unit: mint.unit,
+      });
       sheetRef.current?.hide({
         id: mint.mintUrl,
         name: mint.name,

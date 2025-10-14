@@ -23,7 +23,7 @@ import {
   addContact,
   removeContact,
 } from 'redux/nostr';
-import { useNostrKeys } from 'hooks/useSecureStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 
 // Components
@@ -66,7 +66,7 @@ function ModalScreen() {
 
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
   const { search, addMessage } = useNostr();
-  const { value: nostrKeys } = useNostrKeys();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [message, setMessage] = useState('');
@@ -277,7 +277,7 @@ function ModalScreen() {
                                   pubkey,
                                 },
                               });
-                              close();
+                              close({} as any);
                             },
                           },
                           {

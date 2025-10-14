@@ -2,12 +2,13 @@ import React, { useState, useRef } from 'react';
 import { Animated } from 'react-native';
 import NumericKeyboard from './NumericKeyboard';
 import { Avatar } from 'components/ui/Avatar';
-import { useNostr } from 'redux/nostr';
 import { BlurView } from 'expo-blur';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { useTheme } from 'providers/ThemeProvider';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
 
 interface Props {
   passcode: string;
@@ -18,7 +19,7 @@ const AVATAR_SIZE = 80;
 const SPACING = 16;
 
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
-  const { currentProfile } = useNostr();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const [value, setValue] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
@@ -105,34 +106,23 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
         <VStack align="center" justify="center" flex={1} spacing={SPACING}>
           <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
 
-          {currentProfile?.picture && (
-            <View style={avatarShadow}>
-              <Avatar picture={currentProfile.picture} size={AVATAR_SIZE} />
-            </View>
-          )}
+          <View style={avatarShadow}>
+            <Avatar seed={nostrKeys?.pubkey} size={AVATAR_SIZE} />
+          </View>
 
-          {currentProfile?.profile?.name ? (
-            <Text
-              size={18}
-              weight="bold"
-              className="text-primary-0"
-              style={{
-                ...textShadow,
-              }}>
-              {`Welcome back, ${currentProfile?.profile?.name}`}
-            </Text>
-          ) : (
-            <Text
-              size={20}
-              weight="bold"
-              className="text-primary-0"
-              style={{
-                ...textShadow,
-                textShadowRadius: 10,
-              }}>
-              Enter Passcode
-            </Text>
-          )}
+          <Text
+            size={18}
+            weight="bold"
+            className="text-primary-0"
+            style={{
+              ...textShadow,
+            }}>
+            {`Welcome back, ${uniqueUsernameGenerator({
+              seed: nostrKeys?.pubkey,
+              separator: '-',
+              dictionaries: [adjectives, nouns],
+            })}`}
+          </Text>
 
           <HStack>
             {Array.from({ length: passcode.length }).map((_, i) => (

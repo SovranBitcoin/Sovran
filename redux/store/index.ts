@@ -1,9 +1,8 @@
-import { applyMiddleware, createStore } from 'redux';
+import { applyMiddleware, createStore, Dispatch } from 'redux';
 import { createMigrate, persistStore, persistReducer } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PUBLIC_KEYS } from 'helper/constants';
-import { hasUrlProtocol } from 'helper/url';
 import _ from 'lodash/fp';
 import { Alert } from 'react-native';
 import bip39 from 'bip39';
@@ -327,7 +326,6 @@ const migrations = {
 
     // Generate allocation config based on highest balance mints
     // Use EXACT same logic as memoizedGetAllBalancesMultipleCurrencies
-    console.log(123123, state.nostr);
     const currentProfileId = state.nostr?.currentProfile?.id;
     console.log('Current Profile ID:', currentProfileId);
 
@@ -529,13 +527,38 @@ const migrations = {
     console.log('=== MIGRATION 151 COMPLETE ===');
     return state;
   },
+  152: (state: RootState) => {
+    console.log('=== MIGRATION 152: Migrating settings from Redux to Zustand ===');
+
+    try {
+      // Import the migration function dynamically to avoid circular dependencies
+      import('stores/migrateSettings')
+        .then(({ migrateSettingsFromRedux }) => {
+          migrateSettingsFromRedux(state)
+            .then(() => {
+              console.log('✅ Settings migration to Zustand completed');
+            })
+            .catch((error) => {
+              console.error('❌ Settings migration failed:', error);
+            });
+        })
+        .catch((error) => {
+          console.error('❌ Failed to import migration function:', error);
+        });
+    } catch (error) {
+      console.error('Migration 152 error:', error);
+    }
+
+    console.log('=== MIGRATION 152 COMPLETE ===');
+    return state;
+  },
 };
 
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 151,
+  version: 152,
   migrate: createMigrate(migrations, { debug: true }),
 };
 
@@ -543,370 +566,76 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = createStore(persistedReducer, applyMiddleware(thunkMiddleware));
 
-// The point of this object is to extract the structure of the state object
-// This is so we don't send the state object with all its private data
-// The reason I'm doing this is so I can help ensure the users state is not corrupted or invalid
-// It's not a fullproof solution, but it will allow me to purge parts of the state if unused
-// or restructure the state object if needed without being concerned about bugs.
-// If any private data is leaked from this that would be considered a bug.
-const organizedKeys = {
-  // Root level sections
-  rootSections: ['settings', 'cashu', 'pricelist', 'nostr', '_persist'],
-
-  // Settings section
-  settings: [
-    'lang',
-    'theme',
-    'display_btc',
-    'passcode',
-    'termsAccepted',
-    'experimental',
-    'backgroundImage',
-    'allocation',
-  ],
-
-  // Settings sub-objects
-  termsAccepted: ['termsAccepted', 'date'],
-
-  // Allocation structure (currency -> mint URL -> ratio)
-  allocation: ['sat', 'usd', 'eur', 'gbp'],
-
-  // Color shade values (powers of 100)
-  colorShades: ['100', '200', '300', '400', '500'],
-
-  // Grey shade values
-  greyShades: ['0', '50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'],
-
-  // Cashu section
-  cashu: ['profiles', 'info', 'keysets', 'keys', 'audits'],
-
-  // Cashu profile fields
-  cashuProfile: ['selectedMint', 'mints', 'proofs', 'counters', 'keysets', 'transactions'],
-
-  // Cashu proof fields
-  cashuProof: ['amount', 'C', 'id', 'secret', 'dleqValid', 'dleq'],
-
-  // DLEQ fields
-  dleq: ['s', 'e', 'r'],
-
-  // Cashu transaction fields
-  cashuTransaction: [
-    'request',
-    'amount',
-    'mintQuote',
-    'date',
-    'type',
-    'paid',
-    'transactionType',
-    'unit',
-    'mintUrl',
-    'paymentRequest',
-    'unifiedRequest',
-    'status',
-    'completedAt',
-    'mintQuotes',
-    'proofStates',
-    'token',
-    'nostr',
-    'counter',
-    'isCancel',
-    'refund',
-    'meltQuote',
-    'fees',
-    'proofs',
-    'lud16',
-    'p2pk',
-    'fromNIP05',
-    'memo',
-    'meltQuotes',
-  ],
-
-  // Mint quote fields
-  mintQuote: ['quote', 'request', 'amount', 'unit', 'state', 'expiry', 'pubkey', 'paid', 'addedAt'],
-
-  // Cashu mint info fields
-  cashuMintInfo: [
-    'name',
-    'pubkey',
-    'version',
-    'description',
-    'description_long',
-    'contact',
-    'motd',
-    'icon_url',
-    'time',
-    'nuts',
-  ],
-
-  // NUT (Notation, Usage, and Terminology) specification numbers
-  nutNumbers: ['4', '5', '7', '8', '9', '10', '11', '12', '14', '15', '17', '20'],
-
-  // NUT method fields
-  nutMethod: ['method', 'unit', 'description', 'commands'],
-
-  // Cashu keyset fields
-  cashuKeyset: ['id', 'unit', 'active', 'input_fee_ppk'],
-
-  // Cryptographic key amounts (powers of 2)
-  cryptoKeyAmounts: [
-    '1',
-    '2',
-    '4',
-    '8',
-    '16',
-    '32',
-    '64',
-    '128',
-    '256',
-    '512',
-    '1024',
-    '2048',
-    '4096',
-    '8192',
-    '16384',
-    '32768',
-    '65536',
-    '131072',
-    '262144',
-    '524288',
-    '1048576',
-    '2097152',
-    '4194304',
-    '8388608',
-    '16777216',
-    '33554432',
-    '67108864',
-    '134217728',
-    '268435456',
-    '536870912',
-    '1073741824',
-    '2147483648',
-    '4294967296',
-    '8589934592',
-    '17179869184',
-    '34359738368',
-    '68719476736',
-    '137438953472',
-    '274877906944',
-    '549755813888',
-    '1099511627776',
-    '2199023255552',
-    '4398046511104',
-    '8796093022208',
-    '17592186044416',
-    '35184372088832',
-    '70368744177664',
-    '140737488355328',
-    '281474976710656',
-    '562949953421312',
-    '1125899906842624',
-    '2251799813685248',
-    '4503599627370496',
-    '9007199254740992',
-    '18014398509481984',
-    '36028797018963968',
-    '72057594037927936',
-    '144115188075855872',
-    '288230376151711744',
-    '576460752303423488',
-    '1152921504606846976',
-    '2305843009213693952',
-    '4611686018427387904',
-    '9223372036854775808',
-  ],
-
-  // Cashu audit fields
-  cashuAudit: [
-    'id',
-    'url',
-    'info',
-    'name',
-    'balance',
-    'sum_donations',
-    'updated_at',
-    'next_update',
-    'state',
-    'n_errors',
-    'n_mints',
-    'n_melts',
-    'swaps',
-    'fromCache',
-    'lastFetched',
-  ],
-
-  // Cashu swap fields
-  cashuSwap: [
-    'id',
-    'from_id',
-    'to_id',
-    'from_url',
-    'to_url',
-    'amount',
-    'fee',
-    'created_at',
-    'time_taken',
-    'state',
-    'error',
-  ],
-
-  // Bitrefill section
-  bitrefill: ['events'],
-
-  // Bitrefill event fields
-  bitrefillEvent: ['type', 'source', 'data', 'date'],
-
-  // Bitrefill data fields
-  bitrefillData: ['categories', 'currentCategory'],
-
-  // Price list section
-  pricelist: ['usd', 'btc'],
-
-  // Nostr section
-  nostr: ['currentProfile', 'search', 'profiles', 'messages', 'follows', 'contacts'],
-
-  // Nostr profile fields
-  nostrProfile: [
-    'id',
-    'pubkey',
-    'profile',
-    'npub',
-    'nsec',
-    'mints',
-    'mnemonic',
-    'picture',
-    'root',
-    'nut13',
-  ],
-
-  // Nostr profile metadata
-  nostrProfileMetadata: [
-    'created_at',
-    'profileEvent',
-    'name',
-    'picture',
-    'image',
-    'lud16',
-    'banner',
-    'nip05',
-    'website',
-    'lud06',
-    'displayName',
-    'display_name',
-    'about',
-    'nip05Valid',
-    'hasNip05Conflict',
-  ],
-
-  // Nostr root keys
-  nostrRoot: ['xpub', 'xpriv'],
-
-  // Nostr messages
-  nostrMessages: ['loaded_messages'],
-
-  // Nostr message fields
-  nostrMessage: ['sender', 'receiver', 'pubkey', 'content', 'created_at', 'id', 'sig'],
-
-  // Persistence section
-  persist: ['version', 'rehydrated'],
-
-  // Special identifiers and hashes
-  specialIdentifiers: [
-    'https://mint.example.com', // example mint URL
-  ],
-
-  // Common field patterns
-  commonFields: [
-    'id',
-    'name',
-    'type',
-    'amount',
-    'request',
-    'pubkey',
-    'created_at',
-    'url',
-    'state',
-    'date',
-    'unit',
-    'description',
-    'picture',
-    'version',
-  ],
-};
-
-// Function to get a flat array of all keys
-function getAllKeysFlat() {
-  const allKeys = new Set();
-
-  for (const keys of Object.values(organizedKeys)) {
-    keys.forEach((key) => allKeys.add(key));
-  }
-
-  return Array.from(allKeys).sort();
-}
-
-export const getStructure = (obj: any): any => {
-  if (typeof obj !== 'object' || obj === null) {
-    return typeof obj;
-  }
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) {
-      return [];
-    }
-
-    const firstItem = obj[0];
-
-    // If array contains primitives (strings, numbers, etc.)
-    if (typeof firstItem !== 'object' || firstItem === null) {
-      return [typeof firstItem];
-    }
-
-    // If array contains objects, use your existing logic
-    const allKeys = obj.reduce((keys, item) => {
-      if (typeof item === 'object' && item !== null) {
-        Object.keys(item).forEach((key) => keys.add(key));
-      }
-      return keys;
-    }, new Set<string>());
-
-    const exampleItem = obj.find((item) => typeof item === 'object' && item !== null);
-
-    const structure: any = {};
-    allKeys.forEach((key: any) => {
-      structure[key] =
-        exampleItem && key in exampleItem ? getStructure(exampleItem[key]) : 'undefined';
-    });
-
-    return [structure];
-  }
-  const structure: any = {};
-  for (const key in obj) {
-    if (hasUrlProtocol(key)) {
-      structure['https://mint.example.com'] = getStructure(obj[key]);
-    } else if (getAllKeysFlat().includes(key)) {
-      structure[key] = getStructure(obj[key]);
-    } else {
-      structure['unknown'] = getStructure(obj[key]);
-    }
-  }
-  return structure;
-};
-
 store.subscribe(() => { });
 
 export const persistor = persistStore(store);
 
 // Typed reset app action creator moved here to avoid a require cycle
 export const resetApp = (): AppThunk => {
-  return async (dispatch): Promise<void> => {
+  return async (dispatch: Dispatch): Promise<void> => {
     try {
-      // Clear persisted redux data
-      await persistor.purge();
+      console.log('Starting complete app reset...');
 
-      // Dispatch the reset action to clear the in-memory state
+      // 1. Clear Coco SQLite database and reset manager
+      try {
+        const { CocoManager } = await import('helper/coco/manager');
+        await CocoManager.completeReset();
+        console.log('✅ Coco database and manager reset successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to reset Coco database:', error);
+        // Continue with other cleanup even if this fails
+      }
+
+      // 2. Clear secure storage
+      try {
+        const { clearAllSecureData } = await import('helper/secureStorage');
+        const cleared = await clearAllSecureData();
+        if (cleared) {
+          console.log('✅ Secure storage cleared successfully');
+        } else {
+          console.warn('⚠️ Secure storage clear returned false');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to clear secure storage:', error);
+        // Continue with other cleanup even if this fails
+      }
+
+      // 3. Clear Zustand stores
+      try {
+        const { useMintStore } = await import('stores/mintStore');
+        const { useSettingsStore } = await import('stores/settingsStore');
+        const { usePricelistStore } = await import('stores/pricelistStore');
+
+        // Clear mint store (both state and storage)
+        const mintStore = useMintStore.getState();
+        await mintStore.clearAllData();
+        console.log('✅ Mint store cleared successfully');
+
+        // Clear settings store (both state and storage)
+        const settingsStore = useSettingsStore.getState();
+        await settingsStore.clearAllData();
+        console.log('✅ Settings store cleared successfully');
+
+        // Clear pricelist store (both state and storage)
+        const pricelistStore = usePricelistStore.getState();
+        await pricelistStore.clearAllData();
+        console.log('✅ Pricelist store cleared successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to clear Zustand stores:', error);
+        // Continue with other cleanup even if this fails
+      }
+
+      // 4. Clear persisted redux data
+      await persistor.purge();
+      console.log('✅ Redux data cleared successfully');
+
+      // 5. Dispatch the reset action to clear the in-memory state
       dispatch({ type: RESET_APP });
 
-      // Restart persistence after reset
+      // 6. Restart persistence after reset
       persistor.persist();
+
+      console.log('Complete app reset finished successfully');
 
       return Promise.resolve();
     } catch (error) {

@@ -3,10 +3,10 @@ import { Dimensions, AppState } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
-import { memoizedGetSelectedMint } from 'redux/cashu';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
-import { useSelector } from 'react-redux';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
 import Icon from 'assets/icons';
@@ -32,7 +32,9 @@ const Camera: React.FC = () => {
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [hasPermission] = useCameraPermissions();
-  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [isFocused, setIsFocused] = useState<boolean>(true);
   const appStateRef = useRef<string>(AppState.currentState);
 

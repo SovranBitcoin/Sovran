@@ -1,16 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
-import * as nip06 from 'nostr-tools/nip06';
-import { nip19 } from 'nostr-tools';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
   USER_MNEMONIC: 'user_mnemonic',
-  USER_PROFILE_DATA: 'user_profile_data',
 } as const;
 
 // iOS-specific options for enhanced security
@@ -137,30 +131,29 @@ export const useMnemonic = (autoLoad: boolean = true) => {
 };
 
 /**
- * Convenience hook specifically for profile data access
- * @param autoLoad Whether to automatically load the profile data on mount (default: true)
- * @returns Object containing profile data value, loading state, error, and methods to manage the profile data
- */
-export const useProfileData = (autoLoad: boolean = true) => {
-  return useSecureStore('USER_PROFILE_DATA', autoLoad);
-};
-
-/**
  * Hook for deriving cashu mnemonic from the main mnemonic
  * @param accountIndex The account index to derive the cashu mnemonic for (default: 0)
  * @param autoLoad Whether to automatically derive the cashu mnemonic on mount (default: true)
  * @returns Object containing derived cashu mnemonic, loading state, error, and refresh method
  */
 export const useCashuMnemonic = (accountIndex: number = 0, autoLoad: boolean = true) => {
-  const { value: mnemonic, loading: mnemonicLoading, error: mnemonicError } = useMnemonic(autoLoad);
-  const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);
+  // Import the context hook dynamically to avoid circular dependencies
+  const { useNostrKeysContext } = require('providers/NostrKeysProvider');
+  const {
+    cashuMnemonic,
+    isReady,
+    isLoading,
+    error: providerError,
+    refresh: refreshProvider,
+    getCashuMnemonicForAccount,
+  } = useNostrKeysContext();
+  const [localCashuMnemonic, setLocalCashuMnemonic] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(autoLoad);
   const [error, setError] = useState<string | null>(null);
 
-  const deriveCashuMnemonic = useCallback(async () => {
-    if (!mnemonic) {
-      setCashuMnemonic(null);
-      setLoading(false);
+  const loadCashuMnemonicForAccount = useCallback(async () => {
+    if (!isReady) {
+      setLoading(true);
       return;
     }
 
@@ -168,146 +161,59 @@ export const useCashuMnemonic = (accountIndex: number = 0, autoLoad: boolean = t
       setLoading(true);
       setError(null);
 
-      // Generate HD root key from mnemonic
-      const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
-
-      // Derive the specific path for this account index
-      const DERIVATION_PATH = `m/44'/129372'`;
-      const path = `${DERIVATION_PATH}/0'/${accountIndex}'/0/0`;
-      const seed = root.derive(path);
-
-      // Generate the cashu mnemonic from the derived private key
-      const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
-
-      setCashuMnemonic(derivedCashuMnemonic);
+      // If requesting default account (0), use cached mnemonic from provider
+      if (accountIndex === 0) {
+        setLocalCashuMnemonic(cashuMnemonic);
+      } else {
+        // For other accounts, get mnemonic from provider
+        const accountMnemonic = await getCashuMnemonicForAccount(accountIndex);
+        setLocalCashuMnemonic(accountMnemonic);
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to derive cashu mnemonic';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load cashu mnemonic';
       setError(errorMessage);
-      console.error('Failed to derive cashu mnemonic:', err);
-      setCashuMnemonic(null);
+      console.error('Failed to load cashu mnemonic:', err);
+      setLocalCashuMnemonic(null);
     } finally {
       setLoading(false);
     }
-  }, [mnemonic, accountIndex]);
+  }, [isReady, accountIndex, cashuMnemonic, getCashuMnemonicForAccount]);
 
-  // Auto-derive when mnemonic changes or on mount
+  // Auto-load when provider is ready or account index changes
   useEffect(() => {
-    if (autoLoad && mnemonic) {
-      deriveCashuMnemonic();
+    if (autoLoad && isReady) {
+      loadCashuMnemonicForAccount();
     }
-  }, [autoLoad, mnemonic, deriveCashuMnemonic]);
+  }, [autoLoad, isReady, loadCashuMnemonicForAccount]);
 
-  // Update loading state based on mnemonic loading
+  // Update loading state based on provider loading
   useEffect(() => {
-    if (mnemonicLoading) {
+    if (isLoading) {
       setLoading(true);
     }
-  }, [mnemonicLoading]);
+  }, [isLoading]);
 
-  // Update error state based on mnemonic error
+  // Update error state based on provider error
   useEffect(() => {
-    if (mnemonicError) {
-      setError(mnemonicError);
+    if (providerError) {
+      setError(providerError);
     }
-  }, [mnemonicError]);
+  }, [providerError]);
 
   const refresh = useCallback(async () => {
-    await deriveCashuMnemonic();
-  }, [deriveCashuMnemonic]);
+    if (accountIndex === 0) {
+      // Refresh the provider for default account
+      await refreshProvider();
+    } else {
+      // Load mnemonic for specific account
+      await loadCashuMnemonicForAccount();
+    }
+  }, [accountIndex, refreshProvider, loadCashuMnemonicForAccount]);
 
   return {
-    value: cashuMnemonic,
-    loading: loading || mnemonicLoading,
-    error: error || mnemonicError,
-    refresh,
-    accountIndex,
-  };
-};
-
-/**
- * Hook for deriving Nostr keys (npub/nsec) from the main mnemonic
- * @param accountIndex The account index to derive the Nostr keys for (default: 0)
- * @param autoLoad Whether to automatically derive the keys on mount (default: true)
- * @returns Object containing derived npub/nsec keys, loading state, error, and refresh method
- */
-export const useNostrKeys = (accountIndex: number = 0, autoLoad: boolean = true) => {
-  const { value: mnemonic, loading: mnemonicLoading, error: mnemonicError } = useMnemonic(autoLoad);
-  const [nostrKeys, setNostrKeys] = useState<{
-    npub: string;
-    nsec: string;
-    pubkey: string;
-    privateKey: Uint8Array;
-  } | null>(null);
-  const [loading, setLoading] = useState<boolean>(autoLoad);
-  const [error, setError] = useState<string | null>(null);
-
-  const deriveNostrKeys = useCallback(async () => {
-    if (!mnemonic) {
-      setNostrKeys(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Generate keys from mnemonic using NIP-06
-      const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
-        mnemonic,
-        undefined,
-        accountIndex
-      );
-
-      // Encode the keys
-      const nsec = nip19.nsecEncode(sk);
-      const npub = nip19.npubEncode(pk);
-
-      setNostrKeys({
-        npub,
-        nsec,
-        pubkey: pk,
-        privateKey: sk,
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to derive Nostr keys';
-      setError(errorMessage);
-      console.error('Failed to derive Nostr keys:', err);
-      setNostrKeys(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [mnemonic, accountIndex]);
-
-  // Auto-derive when mnemonic changes or on mount
-  useEffect(() => {
-    if (autoLoad && mnemonic) {
-      deriveNostrKeys();
-    }
-  }, [autoLoad, mnemonic, deriveNostrKeys]);
-
-  // Update loading state based on mnemonic loading
-  useEffect(() => {
-    if (mnemonicLoading) {
-      setLoading(true);
-    }
-  }, [mnemonicLoading]);
-
-  // Update error state based on mnemonic error
-  useEffect(() => {
-    if (mnemonicError) {
-      setError(mnemonicError);
-    }
-  }, [mnemonicError]);
-
-  const refresh = useCallback(async () => {
-    await deriveNostrKeys();
-  }, [deriveNostrKeys]);
-
-  return {
-    value: nostrKeys,
-    loading: loading || mnemonicLoading,
-    error: error || mnemonicError,
+    value: localCashuMnemonic,
+    loading: loading || isLoading,
+    error: error,
     refresh,
     accountIndex,
   };

@@ -134,7 +134,6 @@ export const getLatestVersion = ({
 }: {
   storage: {
     version: string;
-    store: object;
   };
 }) => safePost<{ version: string }>(`${BASE_URL}/app/latest-version`, storage);
 

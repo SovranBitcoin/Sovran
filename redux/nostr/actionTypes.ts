@@ -1,7 +1,6 @@
 export const SET_CURRENT_PROFILE = 'SET_CURRENT_PROFILE';
 export const SET_SEARCH = 'SET_SEARCH';
 export const SET_PROFILES = 'SET_PROFILES';
-export const SET_FOLLOWS = 'SET_FOLLOWS';
 export const ADD_MESSAGE = 'ADD_MESSAGE';
 export const MUTE_USER = 'MUTE_USER';
 export const REPORT_USER = 'REPORT_USER';

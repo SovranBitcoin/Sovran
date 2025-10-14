@@ -8,7 +8,7 @@ import * as nip06 from 'nostr-tools/nip06';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-
+import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 
 export interface Signer {
@@ -36,6 +36,15 @@ export class NsecSigner implements Signer {
 export class CocoManager {
   private static instance: Manager | null = null;
   private static isInitializing = false;
+  private static cashuMnemonic: string | null = null;
+
+  /**
+   * Set the cashu mnemonic from NostrKeysProvider
+   * This should be called before initialize()
+   */
+  static setCashuMnemonic(mnemonic: string): void {
+    this.cashuMnemonic = mnemonic;
+  }
 
   /**
    * Initialize the Coco Manager with database and seed management
@@ -76,8 +85,14 @@ export class CocoManager {
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
 
-      // Seed management - reuse existing secure storage
+      // Seed management - use precomputed cashu mnemonic if available
       const seedGetter = async (): Promise<Uint8Array> => {
+        if (this.cashuMnemonic) {
+          // Use precomputed cashu mnemonic from NostrKeysProvider
+          return mnemonicToSeedSync(this.cashuMnemonic);
+        }
+
+        // Fallback to computing from main mnemonic (for backward compatibility)
         const mnemonic = await retrieveMnemonic();
         if (!mnemonic) {
           throw new Error('No mnemonic found in secure storage');
@@ -333,11 +348,89 @@ export class CocoManager {
   }
 
   /**
+   * Clear all data from the SQLite database
+   * This will delete the entire database file and all associated files
+   */
+  static async clearAllData(): Promise<void> {
+    try {
+      // First, close any existing database connections
+      if (this.instance) {
+        await this.disableWatchers();
+        this.instance = null;
+        this.isInitializing = false;
+      }
+
+      const dbName = 'coco.db';
+      console.log('Deleting database:', dbName);
+
+      try {
+        // Use SQLite.deleteDatabaseAsync as the primary method
+        await SQLite.deleteDatabaseAsync(dbName);
+        console.log('✅ Coco database deleted successfully using SQLite.deleteDatabaseAsync');
+      } catch (error) {
+        console.warn('⚠️ SQLite.deleteDatabaseAsync failed:', error);
+
+        // Fallback: try to delete using FileSystem with legacy API
+        try {
+          const dbDirectory = FileSystem.documentDirectory;
+          const dbPath = `${dbDirectory}SQLite/${dbName}`;
+          const journalPath = `${dbPath}-journal`;
+          const walPath = `${dbPath}-wal`;
+          const shmPath = `${dbPath}-shm`;
+
+          console.log('Trying FileSystem fallback for:', { dbPath, journalPath, walPath, shmPath });
+
+          // Delete all SQLite-related files using legacy FileSystem API
+          const filesToDelete = [dbPath, journalPath, walPath, shmPath];
+
+          for (const filePath of filesToDelete) {
+            try {
+              await FileSystem.deleteAsync(filePath, { idempotent: true });
+              console.log(`Deleted: ${filePath}`);
+            } catch {
+              console.log(`File not found or already deleted: ${filePath}`);
+            }
+          }
+
+          console.log('✅ Coco database deleted successfully using FileSystem fallback');
+        } catch (fsError) {
+          console.warn('⚠️ FileSystem fallback also failed:', fsError);
+          // Continue even if both methods fail
+        }
+      }
+
+      console.log('All Coco SQLite data cleared successfully');
+    } catch (error) {
+      console.error('Failed to clear Coco data:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Reset the manager (useful for testing or logout)
    */
   static async reset(): Promise<void> {
     await this.disableWatchers();
     this.instance = null;
     this.isInitializing = false;
+  }
+
+  /**
+   * Complete reset: clear all data and reset the manager
+   * This is used for the "Delete everything" functionality
+   */
+  static async completeReset(): Promise<void> {
+    try {
+      // Clear all data first
+      await this.clearAllData();
+
+      // Then reset the manager
+      await this.reset();
+
+      console.log('CocoManager complete reset finished');
+    } catch (error) {
+      console.error('Failed to complete reset CocoManager:', error);
+      throw error;
+    }
   }
 }

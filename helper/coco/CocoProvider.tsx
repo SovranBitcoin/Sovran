@@ -33,6 +33,41 @@ interface CocoProviderProps {
 }
 
 /**
+ * Initialize default mints for new users
+ * This adds the Sovran mint and Minibits mint so users have mints available immediately
+ */
+async function initializeDefaultMints(manager: Manager): Promise<void> {
+  try {
+    console.log('Initializing default mints...');
+
+    const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
+
+    // Add each default mint (only if not already exists)
+    for (const mintUrl of defaultMints) {
+      try {
+        // Check if mint already exists
+        const isKnown = await manager.mint.isKnownMint(mintUrl);
+        if (isKnown) {
+          console.log(`ℹ️ Default mint already exists: ${mintUrl}`);
+          continue;
+        }
+
+        await manager.mint.addMint(mintUrl);
+        console.log(`✅ Added default mint: ${mintUrl}`);
+      } catch (error) {
+        console.warn(`⚠️ Failed to add default mint ${mintUrl}:`, error);
+        // Continue with other mints even if one fails
+      }
+    }
+
+    console.log('Default mints initialization completed');
+  } catch (error) {
+    console.error('Failed to initialize default mints:', error);
+    // Don't throw - this shouldn't prevent the app from starting
+  }
+}
+
+/**
  * CocoProvider handles the initialization of the Coco Manager and data migration
  * This should wrap your entire app and be placed above other providers
  */
@@ -74,7 +109,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
             setIsMigrating(false);
           }
         } else {
+          console.log('No migration needed');
         }
+
+        // Initialize default mints for new users
+        await initializeDefaultMints(mgr);
 
         setIsReady(true);
       } catch (error) {
@@ -130,14 +169,16 @@ export function CocoProvider({ children }: CocoProviderProps) {
               source={require('../../assets/images/initializing.png')}
             />
             <VideoScreen
-              style={{
-                width: 300,
-                height: 300,
-                backgroundColor: 'black',
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-              }}
+              style={
+                {
+                  width: 300,
+                  height: 300,
+                  backgroundColor: 'black',
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                } as any
+              }
               videoSource={require('../../assets/videos/coco.mp4')}
               muted={true}
             />

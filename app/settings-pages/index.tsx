@@ -1,12 +1,10 @@
 import React from 'react';
 import { ScrollView, Linking } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useSelector } from 'react-redux';
-import { memoizedGetSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { Avatar } from 'components/ui/Avatar';
 
-import { useNostr } from 'redux/nostr';
 import {
   ActionSheetProvider,
   connectActionSheet,
@@ -21,6 +19,8 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -49,7 +49,8 @@ export const Section: React.FC<{
   );
 };
 
-const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
+const ProfileButton = () => {
+  const { keys: nostrKeys } = useNostrKeysContext();
   const { getPrimaryColor } = useTheme();
 
   return (
@@ -64,12 +65,7 @@ const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
           backgroundColor: getPrimaryColor('800'),
         }}>
         <HStack spacing={12} flex={1}>
-          <Avatar
-            picture={currentProfile?.picture}
-            variant="person"
-            size={60}
-            alt={currentProfile?.name || 'User'}
-          />
+          <Avatar seed={nostrKeys?.pubkey} variant="person" size={60} />
           <VStack spacing={2} flex={1}>
             <Text
               size={18}
@@ -78,14 +74,18 @@ const ProfileButton = ({ currentProfile }: { currentProfile: any }) => {
               style={{
                 color: getPrimaryColor('0'),
               }}>
-              {currentProfile?.profile?.name}
+              {uniqueUsernameGenerator({
+                seed: nostrKeys?.pubkey,
+                separator: '-',
+                dictionaries: [adjectives, nouns],
+              })}
             </Text>
             <Text
               size={16}
               style={{
                 color: getPrimaryColor('400'),
               }}>
-              {truncateMiddle(currentProfile?.npub, 8)}
+              {truncateMiddle(nostrKeys?.npub || '', 8)}
             </Text>
           </VStack>
         </HStack>
@@ -157,7 +157,6 @@ export const RowButton: React.FC<{
 
 const ModalScreen = () => {
   const { getPrimaryColor } = useTheme();
-  const { currentProfile } = useNostr();
 
   const { showActionSheetWithOptions } = useActionSheet();
 
@@ -193,13 +192,13 @@ const ModalScreen = () => {
     );
   };
 
-  const settings = useSelector(memoizedGetSettings);
+  const _settings = useSettingsStore((state) => state.getAllSettings());
 
   return (
     <Container>
       <ScrollView className="px-4">
         <Section title="Account">
-          <ProfileButton currentProfile={currentProfile} />
+          <ProfileButton />
         </Section>
         <Section title="Preferences">
           <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />

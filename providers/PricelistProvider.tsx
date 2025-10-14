@@ -1,34 +1,130 @@
-import React, { useEffect, createContext } from 'react';
-import { usePricelist } from 'redux/pricelist';
+import React, { useEffect, createContext, useContext } from 'react';
+import { usePricelistStore } from 'stores/pricelistStore';
 import { PRICELIST_URL } from 'helper/apiClient';
 
-const PricelistContext = createContext<{ btcPrice?: number } | null>(null);
+interface PricelistContextType {
+  btcPrice?: number;
+  isLoading: boolean;
+  error: string | null;
+  isStale: boolean;
+}
+
+const PricelistContext = createContext<PricelistContextType | null>(null);
+
+export const usePricelistContext = () => {
+  const context = useContext(PricelistContext);
+  if (!context) {
+    throw new Error('usePricelistContext must be used within a PricelistProvider');
+  }
+  return context;
+};
 
 export const PricelistProvider = ({ children }: { children: React.ReactNode }) => {
-  const { pricelist, setPricelist } = usePricelist();
+  const {
+    pricelist,
+    isLoading,
+    error,
+    setBtcPrice,
+    setLoading,
+    setError,
+    isStale: isDataStale,
+  } = usePricelistStore();
 
   useEffect(() => {
-    const ws = new WebSocket(PRICELIST_URL);
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 1000; // Start with 1 second
 
-    ws.onmessage = (event) => {
+    const connect = () => {
+      if (ws?.readyState === WebSocket.OPEN) return;
+
+      console.log('PricelistProvider: Connecting to WebSocket...');
+      setLoading(true);
+      setError(null);
+
       try {
-        const data = JSON.parse(event.data);
-        if (typeof data?.btcPrice === 'number') {
-          setPricelist(data.btcPrice);
-        }
-      } catch (err) {}
+        ws = new WebSocket(PRICELIST_URL);
+
+        ws.onopen = () => {
+          console.log('PricelistProvider: WebSocket connected');
+          setLoading(false);
+          setError(null);
+          reconnectAttempts = 0; // Reset on successful connection
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('PricelistProvider: Received data:', data);
+
+            if (typeof data?.btcPrice === 'number') {
+              setBtcPrice(data.btcPrice);
+            } else if (data?.usd?.btc) {
+              // Handle different data formats
+              setBtcPrice(data.usd.btc);
+            }
+          } catch (err) {
+            console.error('PricelistProvider: Error parsing WebSocket data:', err);
+            setError('Failed to parse price data');
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.error('PricelistProvider: WebSocket error:', err);
+          setError('Connection error');
+          setLoading(false);
+        };
+
+        ws.onclose = () => {
+          console.log('PricelistProvider: WebSocket closed');
+          setLoading(false);
+
+          // Attempt to reconnect if we haven't exceeded max attempts
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(
+              `PricelistProvider: Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
+            );
+
+            reconnectTimeout = setTimeout(
+              () => {
+                connect();
+              },
+              reconnectDelay * Math.pow(2, reconnectAttempts - 1)
+            ); // Exponential backoff
+          } else {
+            console.error('PricelistProvider: Max reconnection attempts reached');
+            setError('Connection lost. Please check your internet connection.');
+          }
+        };
+      } catch (err) {
+        console.error('PricelistProvider: Error creating WebSocket:', err);
+        setError('Failed to connect to price feed');
+        setLoading(false);
+      }
     };
 
-    ws.onerror = (err) => {};
+    // Start connection
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
     };
-  }, [setPricelist]);
+  }, [setBtcPrice, setLoading, setError]);
 
-  return (
-    <PricelistContext.Provider value={{ btcPrice: pricelist?.usd?.btc }}>
-      {children}
-    </PricelistContext.Provider>
-  );
+  const contextValue: PricelistContextType = {
+    btcPrice: pricelist?.usd?.btc,
+    isLoading,
+    error,
+    isStale: isDataStale(5), // Consider data stale after 5 minutes
+  };
+
+  return <PricelistContext.Provider value={contextValue}>{children}</PricelistContext.Provider>;
 };

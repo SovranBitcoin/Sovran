@@ -4,7 +4,6 @@ import { useMintManagement } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
 import { SimplePool } from 'nostr-tools';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { useNostr } from 'redux/nostr';
 import { useCameraPermissions } from 'expo-camera';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -22,6 +21,7 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Proof } from '@cashu/cashu-ts';
 import { isValidEcashToken } from '@/helper/coco/utils';
 import { EnhancedHaptics } from 'components/ui/Haptics';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 export const pool = new SimplePool();
 
@@ -34,10 +34,10 @@ interface TokenHandlerParams {
  */
 const EcashLightningReceiver = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
-  const { currentProfile } = useNostr();
   const { getPrimaryColor } = useTheme();
   const [hasPermission, requestPermission] = useCameraPermissions();
   const { getMintInfo } = useMintManagement();
+  const { keys: nostrKeys } = useNostrKeysContext();
 
   /**
    * Handles ecash token processing and navigation
@@ -132,12 +132,12 @@ const EcashLightningReceiver = () => {
     // Trigger copy haptic feedback
     await EnhancedHaptics.copyHaptic();
 
-    await Clipboard.setStringAsync(`${currentProfile.npub}@npubx.cash`);
+    await Clipboard.setStringAsync(`${nostrKeys?.npub}@npubx.cash`);
     popup({ message: 'lightning_address_copied', type: 'success' });
-  }, [currentProfile.npub]);
+  }, [nostrKeys?.npub]);
 
   const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : unit.toUpperCase()}`;
-  const showLightningAddress = Boolean(currentProfile?.npub && unit === 'sat');
+  const showLightningAddress = Boolean(nostrKeys?.npub && unit === 'sat');
 
   // Get mint info using Coco
   const [mintInfo, setMintInfo] = useState<any>(null);
@@ -187,7 +187,7 @@ const EcashLightningReceiver = () => {
       <View>
         {showLightningAddress && (
           <PaymentInfo
-            data={`${currentProfile.npub}@npubx.cash`}
+            data={`${nostrKeys?.npub}@npubx.cash`}
             popupMessage="lightning_address_copied"
             unit="sat"
           />
@@ -203,7 +203,7 @@ const EcashLightningReceiver = () => {
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
                     <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
-                      {truncateMiddle(currentProfile.npub, 7)}@npubx.cash
+                      {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
                     </Text>
                   </View>
                 }

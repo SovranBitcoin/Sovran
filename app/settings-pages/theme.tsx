@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'components/ui/View';
 import Image from 'components/ui/Image';
 import { router } from 'expo-router';
-import { useSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/ui/SearchableList';
@@ -48,7 +48,7 @@ const themeNameMap: Record<string, string> = {
 function ThemeSettings() {
   const { getPrimaryColor } = useTheme();
   const [searchText, setSearchText] = useState('');
-  const { setTheme, setBackgroundImage } = useSettings();
+  const setTheme = useSettingsStore((state) => state.setTheme);
 
   // Combine regular themes and background image themes
   const allThemes = [...themes, ...Object.keys(backgroundImageThemes)];
@@ -58,15 +58,8 @@ function ThemeSettings() {
   );
 
   const handleThemePress = (themeName: string) => {
-    if (Object.keys(backgroundImageThemes).includes(themeName)) {
-      // For background image themes, set both theme and background image
-      setTheme(themeName);
-      setBackgroundImage(themeName);
-    } else {
-      // For regular themes, clear background image
-      setTheme(themeName);
-      setBackgroundImage('');
-    }
+    // Unified theme handling - the store will handle background image themes
+    setTheme(themeName);
     router.back();
   };
 

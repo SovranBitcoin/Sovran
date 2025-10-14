@@ -1,12 +1,11 @@
 import React, { useCallback } from 'react';
 import { VStack } from 'components/ui/View';
 import { Badge } from 'components/ui/Badge';
-import { useSelector } from 'react-redux';
-import { useSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useBalanceContext, useMints } from 'hooks/coco';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { memoizedPricelist } from 'redux/pricelist';
+import { useBtcPrice } from 'stores/pricelistStore';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 interface Account {
@@ -24,10 +23,11 @@ interface PrimaryBalanceProps {
  * Component that displays the primary balance with unit toggling capability
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
-  const { settings, setDisplayBitcoin } = useSettings();
+  const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
+  const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const { balance: liveBalances } = useBalanceContext();
   const { mints } = useMints();
-  const btcPrice = useSelector(memoizedPricelist);
+  const btcPrice = useBtcPrice('usd');
 
   // Calculate total balance for this unit across all mints
   const balance = React.useMemo(() => {
@@ -46,14 +46,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const toggleUnit = useCallback(async () => {
     await EnhancedHaptics.successHaptic();
-    setDisplayBitcoin(((settings.display_btc + 1) % 4) as DisplayBtcMode);
-  }, [settings.display_btc, setDisplayBitcoin]);
+    setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
+  }, [displayBtc, setDisplayBtc]);
 
   return (
     <VStack align="center" className="z-9">
-      {btcPrice?.usd?.btc && (
+      {btcPrice && (
         <Badge variant="success" size={12} className="mt-[-16px]">
-          ≈ ${((btcPrice?.usd?.btc / 100_000_000) * balance).toFixed(2)}
+          ≈ ${((btcPrice / 100_000_000) * balance).toFixed(2)}
         </Badge>
       )}
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">

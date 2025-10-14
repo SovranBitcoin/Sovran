@@ -7,14 +7,14 @@
  * **Comprehensive avatar component with multiple variants and status indicators**
  * - Supports both person and mint avatar types
  * - Dynamic status badges with different variants
- * - Fallback content with icons or initials
+ * - Fallback content with icons, initials, or generated avatars
  * - Blur effects and theme integration
  * - Responsive sizing and positioning
  *
  * **Features:**
  * - Person avatars (circular) and mint avatars (rounded square)
  * - Status indicators (OK, ERROR, OFFLINE, VERIFIED)
- * - Fallback content with icons or name initials
+ * - Fallback content with icons, name initials, or seed-based generated avatars
  * - Theme-aware colors and styling
  * - Blur effects for enhanced visual appeal
  *
@@ -22,6 +22,9 @@
  * ```typescript
  * // Basic person avatar
  * <Avatar picture="https://example.com/photo.jpg" name="John Doe" />
+ *
+ * // Generated avatar from seed
+ * <Avatar seed="user123pubkey" name="John Doe" />
  *
  * // Mint avatar with status
  * <Avatar variant="mint" name="Bitcoin Mint" status="OK" />
@@ -40,12 +43,13 @@
 
 import React from 'react';
 import { BlurView } from 'expo-blur';
+import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 
 import Icon from 'assets/icons';
 import * as AvatarPrimitive from '@rn-primitives/avatar';
 import { useTheme } from 'providers/ThemeProvider';
 import { rgba } from 'polished';
-import { VStack } from 'components/ui/View';
+import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Badge } from './Badge';
 
@@ -80,7 +84,163 @@ interface AvatarProps {
   name?: string;
   /** Status indicator (OK, ERROR, OFFLINE, VERIFIED) */
   status?: string;
+  /** Seed for generating deterministic avatar (e.g., pubkey) */
+  seed?: string;
 }
+
+// ==================== PRNG Implementation ====================
+
+/**
+ * Alea PRNG implementation for deterministic random generation
+ */
+function Alea(seed: string) {
+  let me: any = this;
+  let mash = Mash();
+
+  me.next = function () {
+    let t = 2091639 * me.s0 + me.c * 2.3283064365386963e-10;
+    me.s0 = me.s1;
+    me.s1 = me.s2;
+    return (me.s2 = t - (me.c = t | 0));
+  };
+
+  me.c = 1;
+  me.s0 = mash(' ');
+  me.s1 = mash(' ');
+  me.s2 = mash(' ');
+  me.s0 -= mash(seed);
+  if (me.s0 < 0) {
+    me.s0 += 1;
+  }
+  me.s1 -= mash(seed);
+  if (me.s1 < 0) {
+    me.s1 += 1;
+  }
+  me.s2 -= mash(seed);
+  if (me.s2 < 0) {
+    me.s2 += 1;
+  }
+  mash = null;
+}
+
+function Mash() {
+  let n = 0xefc8249d;
+  let mash = function (data: string) {
+    data = data.toString();
+    for (let i = 0; i < data.length; i++) {
+      n += data.charCodeAt(i);
+      let h = 0.02519603282416938 * n;
+      n = h >>> 0;
+      h -= n;
+      h *= n;
+      n = h >>> 0;
+      h -= n;
+      n += h * 0x100000000;
+    }
+    return (n >>> 0) * 2.3283064365386963e-10;
+  };
+  return mash;
+}
+
+function rand(seed: string) {
+  let xg = new Alea(seed);
+  let prng = xg.next.bind(xg);
+  prng.double = function () {
+    return prng() + ((prng() * 0x200000) | 0) * 1.1102230246251565e-16;
+  };
+  return prng;
+}
+
+/**
+ * Generate HSL color from random function
+ */
+function generateHSLColor(random: () => number, alpha: number = 1): string {
+  const h = Math.floor(random() * 360);
+  const s = 50 + Math.floor(random() * 30);
+  const l = 45 + Math.floor(random() * 20);
+  return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+}
+
+/**
+ * Generates a deterministic wave-pattern avatar from a seed
+ *
+ * @param {string} seed - Seed string (e.g., pubkey)
+ * @param {number} size - Size of the avatar in pixels
+ * @returns {JSX.Element} SVG avatar component
+ */
+function generateWavesAvatar(seed: string, size: number): JSX.Element {
+  const random = rand(seed || 'default').double;
+
+  // Generate gradient colors
+  const color1 = generateHSLColor(random);
+  const color2 = generateHSLColor(random);
+
+  // Generate waves
+  const waveCount = 4 + Math.floor(random() * 3);
+  const baseHue = random() * 360;
+  const waves = [];
+
+  for (let i = 0; i < waveCount; i++) {
+    const amplitude = size * 0.15 + random() * (size * 0.25); // 15-40% of size
+    const frequency = 2 + random() * 3;
+    const yOffset = (size / (waveCount + 1)) * (i + 1);
+    const phase = random() * Math.PI * 2;
+
+    let pathData = `M 0 ${yOffset} `;
+    const step = size / 20; // Dynamic step based on size
+    for (let x = 0; x <= size; x += step) {
+      const y = yOffset + Math.sin((x / size) * Math.PI * frequency + phase) * amplitude;
+      pathData += `L ${x} ${y} `;
+    }
+    pathData += `L ${size} ${size} L 0 ${size} Z`;
+
+    const hue = (baseHue + (i / waveCount) * 80) % 360;
+    const alpha = 0.3 + random() * 0.4;
+    const fill = `hsla(${hue}, 65%, 55%, ${alpha})`;
+
+    waves.push({ pathData, fill, key: `wave-${i}` });
+  }
+
+  // Generate circular accents
+  const circles = [];
+  for (let i = 0; i < 5; i++) {
+    circles.push({
+      cx: random() * size,
+      cy: random() * size,
+      r: size * 0.1 + random() * (size * 0.15), // 10-25% of size
+      fill: `hsla(${baseHue + 180}, 70%, 60%, 0.5)`,
+      key: `circle-${i}`,
+    });
+  }
+
+  return (
+    <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Defs>
+          <LinearGradient id={`bg-gradient-${seed}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={color1} />
+            <Stop offset="100%" stopColor={color2} />
+          </LinearGradient>
+        </Defs>
+
+        {/* Background */}
+        <Rect width={size} height={size} fill={`url(#bg-gradient-${seed})`} />
+
+        {/* Waves */}
+        {waves.map((wave) => (
+          <Path key={wave.key} d={wave.pathData} fill={wave.fill} />
+        ))}
+
+        {/* Circular accents */}
+        {circles.map((circle) => (
+          <Circle key={circle.key} cx={circle.cx} cy={circle.cy} r={circle.r} fill={circle.fill} />
+        ))}
+      </Svg>
+    </View>
+  );
+}
+
+// ==================== Avatar Component ====================
 
 /**
  * Avatar component with multiple variants and status indicators
@@ -96,6 +256,9 @@ interface AvatarProps {
  * @example
  * // Basic person avatar
  * <Avatar picture="https://example.com/photo.jpg" name="John Doe" />
+ *
+ * // Generated avatar from seed
+ * <Avatar seed="npub1abc..." name="Alice" />
  *
  * // Mint avatar with status
  * <Avatar variant="mint" name="Bitcoin Mint" status="OK" size={64} />
@@ -113,6 +276,7 @@ export const Avatar = ({
   alt,
   name,
   status,
+  seed,
 }: AvatarProps) => {
   const { getPrimaryColor } = useTheme();
   const iconSize = size * 0.5; // 50% of parent size
@@ -184,15 +348,21 @@ export const Avatar = ({
    *
    * @description
    * Creates appropriate fallback content based on avatar variant and available props.
+   * Priority: seed (generates avatar) > name (shows initial) > icon (default fallback)
+   *
    * For mint avatars with names, shows the first letter. For people or mints without
    * names, shows appropriate icons (user icon for people, coins icon for mints).
+   * If seed is provided, generates a unique deterministic avatar.
    *
-   * **Process:** Check variant and name → generate initial or icon → return styled element
+   * **Process:** Check seed → check variant and name → generate initial or icon → return styled element
    * **Effects:** Provides visual fallback when avatar image fails to load
    *
-   * @returns {JSX.Element} Fallback content element (Text with initial or Icon)
+   * @returns {JSX.Element} Fallback content element (Generated avatar, Text with initial, or Icon)
    *
    * @example
+   * // With seed: Shows generated avatar
+   * getFallbackContent() // Returns <Svg>...</Svg>
+   *
    * // Mint with name: Shows "B" for "Bitcoin Mint"
    * getFallbackContent() // Returns <Text>B</Text>
    *
@@ -203,6 +373,12 @@ export const Avatar = ({
    * getFallbackContent() // Returns <Icon name="majesticons:coins" />
    */
   const getFallbackContent = () => {
+    // Priority 1: If seed is provided, generate avatar
+    if (seed) {
+      return generateWavesAvatar(seed, size);
+    }
+
+    // Priority 2: If name is provided and variant is mint, show initial
     if (variant === 'mint' && name) {
       // For mints, show the first letter of the name
       const initial = name.charAt(0).toUpperCase();
@@ -219,6 +395,7 @@ export const Avatar = ({
         </Text>
       );
     } else {
+      // Priority 3: Default to icons
       // For people or mints without name, show icon
       const fallbackIcon =
         variant === 'person'
@@ -253,14 +430,16 @@ export const Avatar = ({
         {/* Fallback content when image fails to load */}
         <AvatarPrimitive.Fallback style={avatarStyles}>
           <VStack align="center" justify="center" flex={1}>
-            {/* Blur background for visual appeal */}
-            <BlurView
-              tint="default"
-              style={avatarStyles}
-              intensity={75}
-              className="overflow-hidden opacity-100"
-            />
-            {/* Fallback content (initial or icon) */}
+            {/* Only show blur background if not using generated avatar */}
+            {!seed && (
+              <BlurView
+                tint="default"
+                style={avatarStyles}
+                intensity={75}
+                className="overflow-hidden opacity-100"
+              />
+            )}
+            {/* Fallback content (generated avatar, initial, or icon) */}
             {getFallbackContent()}
           </VStack>
         </AvatarPrimitive.Fallback>

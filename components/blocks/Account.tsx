@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { Animated, Platform } from 'react-native';
 
@@ -8,7 +7,7 @@ import { Text } from 'components/ui/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/blocks/PrimaryBalance';
 
-import { memoizedGetBackgroundImage } from 'redux/settings';
+import { useSettingsStore, isBackgroundImageTheme } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { NonGestureView } from './NonGestureView';
 
@@ -102,7 +101,8 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
     });
   };
 
-  const image = useSelector(memoizedGetBackgroundImage);
+  const theme = useSettingsStore((state) => state.getTheme());
+  const image = isBackgroundImageTheme(theme) ? theme : null;
 
   return (
     <NonGestureView

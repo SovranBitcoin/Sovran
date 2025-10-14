@@ -1,6 +1,5 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { memoizedGetSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { Section as TableSection } from 'components/ui/Section';
@@ -26,12 +25,14 @@ function chunkArray(array: any[], size: number) {
 
 export default function ModalScreen() {
   const { getPrimaryColor, getShadeColor } = useTheme();
-  const settings = useSelector(memoizedGetSettings);
-  const [isChecked, setIsChecked] = React.useState(settings?.experimental);
+  const experimental = useSettingsStore((state) => state.getExperimental());
+  const setExperimental = useSettingsStore((state) => state.setExperimental);
+  const [isChecked, setIsChecked] = React.useState(experimental);
 
   const toggleCheckbox = () => {
     const newValue = !isChecked;
     setIsChecked(newValue);
+    setExperimental(newValue);
   };
 
   return (

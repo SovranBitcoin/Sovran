@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import Modal from 'components/blocks/Modal';
 import { AmountFormatter } from '../components/ui/AmountFormatter';
 
@@ -20,7 +19,8 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { requestInvoice, utils } from 'lnurl-pay';
-import { memoizedGetSelectedMint } from 'redux/cashu';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getEncodedToken } from '@cashu/cashu-ts';
 
 interface ScanningData {
@@ -48,7 +48,9 @@ function ModalScreen() {
 
   const [amount, setAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
   const [loading, setLoading] = useState(false);
-  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
 

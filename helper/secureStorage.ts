@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
   USER_MNEMONIC: 'user_mnemonic',
-  USER_PROFILE_DATA: 'user_profile_data',
 } as const;
 
 // iOS-specific options for enhanced security
@@ -69,6 +70,86 @@ export async function hasMnemonic(): Promise<boolean> {
     return mnemonic !== null && mnemonic.trim().length > 0;
   } catch (error) {
     console.error('Failed to check for mnemonic:', error);
+    return false;
+  }
+}
+
+/**
+ * Generates a new 12-word mnemonic phrase
+ * @returns Promise<string> The generated mnemonic phrase
+ */
+export async function generateMnemonic(): Promise<string> {
+  try {
+    // Generate 128 bits of entropy (16 bytes) for a 12-word mnemonic
+    const entropy = new Uint8Array(16);
+    crypto.getRandomValues(entropy);
+
+    // Generate mnemonic from entropy
+    const mnemonic = bip39.entropyToMnemonic(entropy, wordlist);
+
+    console.log('Generated new mnemonic');
+    return mnemonic;
+  } catch (error) {
+    console.error('Failed to generate mnemonic:', error);
+    throw new Error('Failed to generate mnemonic');
+  }
+}
+
+/**
+ * Generates and stores a new mnemonic if none exists
+ * @returns Promise<string | null> The mnemonic (existing or newly generated), or null if failed
+ */
+export async function ensureMnemonicExists(): Promise<string | null> {
+  try {
+    // Check if mnemonic already exists
+    const existingMnemonic = await retrieveMnemonic();
+    if (existingMnemonic) {
+      console.log('Mnemonic already exists');
+      return existingMnemonic;
+    }
+
+    // Generate new mnemonic
+    console.log('No mnemonic found, generating new one...');
+    const newMnemonic = await generateMnemonic();
+
+    // Store the new mnemonic
+    const stored = await storeMnemonic(newMnemonic);
+    if (!stored) {
+      console.error('Failed to store newly generated mnemonic');
+      return null;
+    }
+
+    console.log('New mnemonic generated and stored successfully');
+    return newMnemonic;
+  } catch (error) {
+    console.error('Failed to ensure mnemonic exists:', error);
+    return null;
+  }
+}
+
+/**
+ * Clears all data from secure storage
+ * @returns Promise<boolean> True if cleared successfully, false otherwise
+ */
+export async function clearAllSecureData(): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+
+    // Clear all known storage keys
+    const keys = Object.values(STORAGE_KEYS);
+    const clearPromises = keys.map((key) =>
+      SecureStore.deleteItemAsync(key, options).catch((error) => {
+        console.warn(`Failed to clear ${key}:`, error);
+        return false;
+      })
+    );
+
+    await Promise.all(clearPromises);
+
+    console.log('All secure storage data cleared successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to clear secure storage:', error);
     return false;
   }
 }

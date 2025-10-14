@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { THEMES, THEME_NAMES } from '../themes';
-import { useSelector } from 'react-redux';
+import { useSettingsStore } from 'stores/settingsStore';
 import { colorThemes } from '../helper/colorTheme';
 
 const ThemeContext = createContext<{
@@ -93,20 +93,22 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
-  // Get current theme from Redux store
-  const reduxTheme = useSelector((state: any) => state.settings.settings.theme);
-  const [currentTheme, setCurrentTheme] = useState(initialTheme || reduxTheme || 'dark');
+  // Get current theme from Zustand store
+  const theme = useSettingsStore((state) => state.getTheme());
+  const setThemeStore = useSettingsStore((state) => state.setTheme);
+  const [currentTheme, setCurrentTheme] = useState(initialTheme || theme || 'dark');
 
-  // Update local state when Redux theme changes
+  // Update local state when Zustand theme changes
   useEffect(() => {
-    if (reduxTheme) {
-      setCurrentTheme(reduxTheme);
+    if (theme) {
+      setCurrentTheme(theme);
     }
-  }, [reduxTheme]);
+  }, [theme]);
 
   const setTheme = (themeName: string) => {
     if (THEMES[themeName as keyof typeof THEMES]) {
       setCurrentTheme(themeName);
+      setThemeStore(themeName);
     } else {
       console.warn(`Theme "${themeName}" not found in available themes`);
     }

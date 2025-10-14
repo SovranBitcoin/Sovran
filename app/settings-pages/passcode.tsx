@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { router } from 'expo-router';
-import { useSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import NumericKeyboard from 'components/blocks/passcode/NumericKeyboard';
 import Container from 'components/blocks/Container';
 import { Card } from 'components/ui/Card';
@@ -13,7 +13,7 @@ import { popup } from '@/helper/popup';
 const PASSCODE_LENGTH = 4;
 
 const PasscodeSettings: React.FC = () => {
-  const { setPasscode } = useSettings();
+  const setPasscode = useSettingsStore((state) => state.setPasscode);
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState('');

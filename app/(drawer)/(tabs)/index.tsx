@@ -1,19 +1,10 @@
 import 'shim';
 import React, { memo, useCallback, useState } from 'react';
-import { useSelector } from 'react-redux';
 import 'react-native-get-random-values';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
-import { View, VStack } from 'components/ui/View';
+import { View } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
-import { memoizedGetSettings, termsAccepted } from 'redux/settings';
 import { useTheme } from 'providers/ThemeProvider';
-import { store } from 'redux/store';
-import { OnboardingLayout } from 'app/onboard/OnboardLayout';
-import { SovranTextIcon } from 'assets/icons';
-import { Text } from 'components/ui/Text';
-import TermsConditionsScreen from 'app/settings-pages/terms';
-import { router } from 'expo-router';
-import { memoizedGetCurrentProfile } from 'redux/nostr';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -48,43 +39,8 @@ function TabOneScreen() {
 
   const { history } = usePaginatedHistory();
 
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
-  const settings = useSelector(memoizedGetSettings);
-
   useDeeplink();
   useVersionCheck();
-
-  if (!settings?.termsAccepted) {
-    return (
-      <TermsConditionsScreen
-        onClose={() => {
-          store.dispatch(termsAccepted(new Date().toISOString()));
-        }}
-      />
-    );
-  }
-
-  if (!currentProfile?.pubkey) {
-    return (
-      <OnboardingLayout
-        nextScreen="onboard/ecash"
-        actions={[
-          {
-            text: 'Next',
-            icon: 'fa6-solid:chevron-right',
-            variant: 'primary',
-            onPress: async () => router.push('/onboard/ecash'),
-          },
-        ]}>
-        <VStack align="center" justify="center" flex={1} spacing={4}>
-          <Text size={32} weight="heavy">
-            Welcome to
-          </Text>
-          <SovranTextIcon size={200} />
-        </VStack>
-      </OnboardingLayout>
-    );
-  }
 
   return (
     <View

@@ -2,14 +2,10 @@ import React from 'react';
 import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
-import { useSelector } from 'react-redux';
-
 import Icon from 'assets/icons';
-import { useNostr } from 'redux/nostr';
-import { memoizedGetSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { popup } from '@/helper/popup';
-import { memoizedGetSelectedMint } from 'redux/cashu';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';
@@ -18,6 +14,7 @@ import { TAB_SCREENS } from '@/app/(drawer)/(tabs)/_layout.tabs';
 import { useNavigation } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { EnhancedHaptics } from 'components/ui/Haptics';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 const Tab = createBottomTabNavigator();
 
@@ -90,13 +87,13 @@ const PaymentsHeaderTitle = () => {
 };
 
 const WalletHeaderTitle = () => {
-  const { currentProfile } = useNostr();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
   const accounts = supportedUnits.map((unit) => ({ unit }));
   const [account, setAccount] = React.useState(accounts[0]);
 
   // Always render the component but conditionally show content
-  if (!currentProfile?.pubkey) {
+  if (!nostrKeys?.pubkey) {
     return null;
   }
 
@@ -106,20 +103,19 @@ const WalletHeaderTitle = () => {
 const TabLayout = () => {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const navigation = useNavigation();
-  const { currentProfile } = useNostr();
-  const settings = useSelector(memoizedGetSettings);
-  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
 
-  const isNavigationVisible = selectedMint && currentProfile?.pubkey && settings?.termsAccepted;
+  const isNavigationVisible = nostrKeys?.pubkey && isTermsAccepted;
 
   const HeaderLeft = () => {
-    if (!currentProfile?.pubkey) return null;
+    if (!nostrKeys?.pubkey) return null;
 
     return (
       <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
         <HStack spacing={12} align="flex-start">
           <Spacer size={8} />
-          <Avatar picture={currentProfile?.picture} />
+          <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
         </HStack>
       </Pressable>
     );

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { SafeAreaView, Clipboard, ScrollView } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
-import { useNostr } from 'redux/nostr';
-import { useMnemonic, useCashuMnemonic, useNostrKeys } from 'hooks/useSecureStore';
+import { useMnemonic, useCashuMnemonic } from 'hooks/useSecureStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
 import { popup } from '@/helper/popup';
@@ -14,10 +14,9 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 
 const Profile = () => {
   const { getPrimaryColor } = useTheme();
-  const { currentProfile } = useNostr();
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
   const { value: cashuMnemonic, loading: cashuMnemonicLoading } = useCashuMnemonic();
-  const { value: nostrKeys, loading: nostrKeysLoading } = useNostrKeys();
+  const { keys: nostrKeys, isLoading: nostrKeysLoading } = useNostrKeysContext();
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
     nsec: false,
@@ -157,23 +156,7 @@ const Profile = () => {
           </Text>
 
           <VStack align="center" style={{ marginBottom: 16, marginTop: 16 }}>
-            {currentProfile?.picture ? (
-              <Avatar
-                picture={currentProfile.picture}
-                variant="person"
-                size={100}
-                alt={currentProfile.profile?.name || 'User'}
-              />
-            ) : (
-              <Skeleton
-                style={{
-                  height: 100,
-                  width: 100,
-                  borderRadius: 50, // Makes it perfectly circular
-                  backgroundColor: getPrimaryColor('700'),
-                }}
-              />
-            )}
+            <Avatar seed={nostrKeys?.pubkey} variant="person" size={100} />
           </VStack>
 
           {renderCopyableDetail(

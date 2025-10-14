@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
-import { useSelector } from 'react-redux';
-import { memoizedGetSelectedMint } from 'redux/cashu';
-import { memoizedGetCurrentProfile } from 'redux/nostr';
+import { useMintStore } from '../stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { popup } from '@/helper/popup';
 import { useProcessPaymentString } from './coco/useProcessPaymentString';
 
 export const useDeeplink = () => {
-  const currentProfile = useSelector(memoizedGetCurrentProfile);
-  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const url = Linking.useURL();
 
   const { processPaymentString } = useProcessPaymentString({
@@ -19,7 +19,7 @@ export const useDeeplink = () => {
 
   useEffect(() => {
     // bail out early if we don’t have a URL or the user isn’t fully loaded
-    if (!url || !currentProfile.pubkey) {
+    if (!url || !keys?.pubkey) {
       return;
     }
 
@@ -44,5 +44,5 @@ export const useDeeplink = () => {
         }
       }
     })();
-  }, [url, currentProfile.pubkey, selectedMint, processPaymentString]);
+  }, [url, keys?.pubkey, selectedMint, processPaymentString]);
 };

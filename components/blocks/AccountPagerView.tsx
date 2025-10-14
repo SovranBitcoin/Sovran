@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
 import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
@@ -11,9 +10,10 @@ import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 
-import { memoizedGetSelectedMint } from 'redux/cashu/selectors';
+import { useMintStore } from 'stores/mintStore';
 import { useMintManagement } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { router } from 'expo-router';
@@ -45,7 +45,9 @@ export function AccountPagerView({
   const { handlePermission } = useHandleCameraPermission();
   const { getBalances } = useMintManagement();
 
-  const selectedMintUrl = useSelector(memoizedGetSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMintUrl = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
   // Use all accounts - don't filter based on balance data
   // The balance will be displayed as 0 if no data is available

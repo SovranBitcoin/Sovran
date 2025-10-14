@@ -2,12 +2,10 @@
 import { ThunkAction, combineReducers } from 'redux';
 import { settingsReducer } from '../settings/reducer';
 import { cashuReducer } from '../cashu/reducer';
-import { pricelistReducer } from '../pricelist/reducer';
 import { nostrReducer } from '../nostr/reducer';
 import { SettingsAction } from '../settings';
 import { CashuAction } from '../cashu';
 import { NostrAction } from '../nostr';
-import { PricelistAction } from '../pricelist';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
@@ -16,14 +14,13 @@ export const RESET_APP = 'RESET_APP' as const;
 const appReducer = combineReducers({
   settings: settingsReducer,
   cashu: cashuReducer,
-  pricelist: pricelistReducer,
   nostr: nostrReducer,
 });
 
 // Define RootState from the appReducer
 export type RootState = ReturnType<typeof appReducer>;
 
-type Action = SettingsAction | CashuAction | NostrAction | PricelistAction | typeof RESET_APP;
+type Action = SettingsAction | CashuAction | NostrAction | typeof RESET_APP;
 
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<

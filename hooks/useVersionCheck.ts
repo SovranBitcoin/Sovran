@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { getLatestVersion } from 'helper/apiClient';
-import { getStructure, store } from 'redux/store';
 import { popup } from 'helper/popup';
 import semver from 'semver';
 import { version } from 'app/settings-pages';
@@ -17,7 +16,6 @@ export const useVersionCheck = () => {
       const latestVersionResult = await getLatestVersion({
         storage: {
           version: version,
-          store: getStructure(store.getState()),
         },
       });
 

@@ -3,21 +3,25 @@ import { Dimensions, View, Pressable, ScrollView } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { nip19 } from 'nostr-tools';
 import Icon from 'assets/icons';
-import { useNostr } from 'redux/nostr';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { Avatar } from 'components/ui/Avatar';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
 import { router } from 'expo-router';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
+
+import { Avatar } from '@/components/ui/Avatar';
+
+// Main compnent function
 
 const screenWidth = Dimensions.get('screen').width;
 
 function ProfileHeader() {
-  const { currentProfile } = useNostr();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const { getPrimaryColor } = useTheme();
 
   return (
@@ -38,29 +42,26 @@ function ProfileHeader() {
         <TouchableOpacity
           className="items-center"
           onPress={() => {
-            if (currentProfile?.pubkey) {
+            if (nostrKeys?.pubkey) {
               router.push({
                 pathname: 'share',
                 params: {
                   type: 'profile',
-                  data: currentProfile?.npub || nip19.npubEncode(currentProfile?.pubkey),
+                  data: nostrKeys?.npub || nip19.npubEncode(nostrKeys?.pubkey),
                 },
               });
-            } else {
-              router.push('/onboard');
             }
           }}>
-          {currentProfile?.pubkey && (
+          {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
-              <Avatar
-                picture={currentProfile.picture}
-                size={64}
-                variant="person"
-                alt={currentProfile?.profile?.name || 'Profile'}
-              />
+              <Avatar seed={nostrKeys?.pubkey} size={64} variant="person" />
               <VStack align="center" spacing={8}>
                 <Text weight="bold" size={20} className="text-center text-primary-0">
-                  {currentProfile?.profile?.name}
+                  {uniqueUsernameGenerator({
+                    seed: nostrKeys?.pubkey,
+                    separator: '-',
+                    dictionaries: [adjectives, nouns],
+                  })}
                 </Text>
                 <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
               </VStack>
@@ -139,7 +140,7 @@ function SovranDrawer() {
 const WrappedSovranDrawer = withSheetProvider(SovranDrawer);
 
 export default function DrawerLayout() {
-  const { currentProfile } = useNostr();
+  const { keys: nostrKeys } = useNostrKeysContext();
 
   return (
     <Drawer
@@ -147,7 +148,7 @@ export default function DrawerLayout() {
         swipeEdgeWidth: screenWidth * 0.15,
         swipeMinDistance: 25,
         drawerStyle: {
-          width: currentProfile?.pubkey ? Math.max(screenWidth - 50, screenWidth * 0.9) : 0,
+          width: nostrKeys?.pubkey ? Math.max(screenWidth - 50, screenWidth * 0.9) : 0,
         },
         keyboardDismissMode: 'none',
       }}

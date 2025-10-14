@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
 import PasscodeScreen from './PasscodeScreen';
-import { selectPasscode } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 
 const PasscodeGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const storedPasscode = useSelector(selectPasscode);
-  const [unlocked, setUnlocked] = useState(!storedPasscode);
+  const passcode = useSettingsStore((state) => state.passcode);
+  const [unlocked, setUnlocked] = useState(!passcode);
 
   useEffect(() => {
-    if (!storedPasscode) setUnlocked(true);
-  }, [storedPasscode]);
+    if (!passcode) setUnlocked(true);
+  }, [passcode]);
 
-  if (storedPasscode && !unlocked) {
-    return <PasscodeScreen passcode={storedPasscode} onSuccess={() => setUnlocked(true)} />;
+  if (passcode && !unlocked) {
+    return <PasscodeScreen passcode={passcode} onSuccess={() => setUnlocked(true)} />;
   }
 
   return <>{children}</>;

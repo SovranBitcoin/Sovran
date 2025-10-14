@@ -25,11 +25,11 @@ import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
 import { Spacer, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { resetApp } from 'redux/store';
-import * as Updates from 'expo-updates';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch } from 'react-redux';
+import { resetApp } from '@/redux/store';
+import * as Updates from 'expo-updates';
 
 /**
  * RouteA Component
@@ -51,10 +51,8 @@ const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
    * **Effects:** Complete app reset, data loss, app reload
    */
   const handleDeleteProfile = async () => {
-    try {
-      await dispatch(resetApp());
-      await Updates.reloadAsync();
-    } catch {}
+    await dispatch(resetApp());
+    await Updates.reloadAsync();
   };
 
   return (

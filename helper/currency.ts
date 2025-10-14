@@ -7,8 +7,8 @@
  * real-time price data and user preferences.
  */
 
-import { store } from 'redux/store';
-import { memoizedPricelist } from 'redux/pricelist';
+import { usePricelistStore } from 'stores/pricelistStore';
+import { useSettingsStore } from 'stores/settingsStore';
 
 /**
  * Represents an amount with its associated currency unit
@@ -95,13 +95,13 @@ const FIAT_UNITS = ['usd', 'eur', 'gbp'];
  * @private
  */
 function getRate(unit: string): number {
-  const pricelist = memoizedPricelist(store.getState());
+  const pricelist = usePricelistStore.getState().pricelist;
   const rates: Record<string, number> = {
     btc: 1,
     sats: 100_000_000,
     usd: pricelist?.usd?.btc ?? 63_900,
-    eur: 53_500,
-    gbp: 47_800,
+    eur: pricelist?.eur?.btc ?? 53_500,
+    gbp: pricelist?.gbp?.btc ?? 47_800,
   };
   return rates[unit] ?? 1;
 }
@@ -142,7 +142,7 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
 
   // Handle user preference for sats display (BTC vs sats)
   if (options.useUserPreference && inputUnit === 'sats') {
-    const displayBtc = store.getState().settings.settings.display_btc ?? 1;
+    const displayBtc = useSettingsStore.getState().getDisplayBtc();
     const precision = displayBtc === 0 ? 8 : 0;
     const value = displayBtc === 0 ? input.amount / 100_000_000 : input.amount;
     const formatted = value.toLocaleString('en-US', {

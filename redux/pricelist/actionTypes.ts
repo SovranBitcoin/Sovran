@@ -1,1 +1,0 @@
-export const SET_PRICELIST = 'SET_PRICELIST' as const;

@@ -12,24 +12,6 @@ export interface ModalConfig {
 
 export const MODAL_SCREENS: ModalConfig[] = [
   {
-    name: 'TabLayout',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'notifications',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'feed',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
     name: 'contacts',
   },
   {
@@ -52,24 +34,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   {
     name: 'camera',
-  },
-  {
-    name: 'passcode',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'backup',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'profile',
-    options: {
-      presentation: 'modal',
-    },
   },
   {
     name: 'share',
@@ -96,81 +60,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
-    name: 'onboard',
-    options: {
-      presentation: 'modal',
-    },
-  },
-  {
-    name: 'post',
-    options: {
-      presentation: 'card',
-      fullScreenGestureEnabled: true,
-    },
-  },
-  {
-    name: 'onboard/welcome',
-    title: '',
-  },
-  {
-    name: 'onboard/displayMnemonic',
-    title: '',
-  },
-  {
-    name: 'onboard/mnemonic',
-    title: 'Verify Recovery Phrase',
-  },
-  {
-    name: 'onboard/new',
-    title: '',
-  },
-  {
-    name: 'onboard/animate',
-    title: 'Loading...',
-  },
-  {
-    name: 'onboard/restore',
-    title: '',
-  },
-  {
-    name: 'onboard/nsec',
-    title: '',
-  },
-  {
-    name: 'onboard/ecash',
-    title: '',
-  },
-  {
-    name: 'onboard/go',
-    title: '',
-  },
-  {
-    name: 'onboard/recover',
-    title: '',
-  },
-  {
-    name: 'onboard/nostr',
-    title: '',
-  },
-  {
-    name: 'onboard/restoreChoice',
-    title: '',
-  },
-  {
-    name: 'settings-pages',
-    title: 'Settings',
-  },
-  {
     name: 'settings-pages/about',
     title: 'About',
   },
   {
     name: 'settings-pages/design',
     title: 'Design',
-  },
-  {
-    name: 'settings-pages/store',
-    title: 'Store',
   },
   {
     name: 'settings-pages/terms',

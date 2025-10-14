@@ -5,7 +5,7 @@ import { View, HStack } from 'components/ui/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
-import { useSettings } from 'redux/settings';
+import { useSettingsStore } from 'stores/settingsStore';
 import { cn } from '@/helper/utils';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
@@ -44,8 +44,7 @@ export function AmountFormatter({
   className,
 }: AmountFormatterProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
-  const { settings } = useSettings();
-  const displayBtc = settings.display_btc ?? 1;
+  const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
   // Animation setup (only if animated is true)
   const scaleAnim = useRef(new Animated.Value(1)).current;

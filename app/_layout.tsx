@@ -27,16 +27,17 @@ import { nip04, nip19 } from 'nostr-tools';
 import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
 import { useNostr } from 'redux/nostr';
-import { useNostrKeys } from 'hooks/useSecureStore';
+import { useNostrKeysContext, NostrKeysProvider } from 'providers/NostrKeysProvider';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
+import AppGate from 'components/blocks/AppGate';
 import { useFonts } from 'hooks/useFonts';
-import { CocoProvider } from 'helper/coco';
 import { PortalHost } from '@rn-primitives/portal';
 import { compose } from 'helper/utils';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 /**
  * Splash screen component
  */
@@ -53,7 +54,7 @@ LogBox.ignoreAllLogs();
  * Handles DM message fetching and decryption
  */
 function useNostrDMs(addMessage: any, messages: any) {
-  const { value: nostrKeys } = useNostrKeys();
+  const { keys: nostrKeys } = useNostrKeysContext();
 
   useEffect(() => {
     if (!nostrKeys?.nsec) return;
@@ -105,7 +106,7 @@ function MySplashScreen() {
 function MainStack() {
   const { addMessage, messages } = useNostr();
   const { getPrimaryColor, currentTheme } = useTheme();
-  const { value: nostrKeys } = useNostrKeys();
+  const { keys: nostrKeys } = useNostrKeysContext();
 
   // Set up DM subscriptions
   useNostrDMs(addMessage, messages);
@@ -169,17 +170,27 @@ function MainStack() {
   );
 }
 
+const containerStyle = {
+  width:
+    Platform.OS === 'web'
+      ? Math.min(Dimensions.get('window').width, 600)
+      : Dimensions.get('window').width,
+};
+
 // Provider components for composition
 const AppProviders = compose([
+  [SafeAreaProvider, { style: containerStyle }],
+  KeyboardProvider,
   [NostrProvider, { relayUrls: RELAY_URLS }],
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
-  CocoProvider,
+  [NostrKeysProvider, { defaultAccountIndex: 0 }],
   ActionSheetProvider,
   [SheetProvider, { context: 'global' }],
   PricelistProvider,
   PasscodeGate,
+  AppGate,
 ]);
 
 /**
@@ -222,21 +233,12 @@ export default function RootLayout() {
     return <MySplashScreen />;
   }
 
-  const containerStyle = {
-    width:
-      Platform.OS === 'web'
-        ? Math.min(Dimensions.get('window').width, 600)
-        : Dimensions.get('window').width,
-  };
-
   return (
-    <SafeAreaProvider style={containerStyle}>
-      <AppProviders>
-        <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
-          <MainStack />
-          <PortalHost />
-        </View>
-      </AppProviders>
-    </SafeAreaProvider>
+    <AppProviders>
+      <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+        <MainStack />
+        <PortalHost />
+      </View>
+    </AppProviders>
   );
 }

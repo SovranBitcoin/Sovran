@@ -3,7 +3,6 @@ import {
   SET_CURRENT_PROFILE,
   SET_SEARCH,
   SET_PROFILES,
-  SET_FOLLOWS,
   ADD_MESSAGE,
   MUTE_USER,
   REPORT_USER,
@@ -197,11 +196,6 @@ export const nostrReducer: Reducer<NostrState, NostrAction> = (
 
     case SET_PROFILES: {
       return { ...state, profiles: action.payload };
-    }
-
-    case SET_FOLLOWS: {
-      const pubkey = state.profiles?.[state.currentProfile.id]?.pubkey;
-      return { ...state, follows: { [pubkey]: action.payload } };
     }
 
     case ADD_MESSAGE: {

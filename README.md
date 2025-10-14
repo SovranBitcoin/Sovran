@@ -81,14 +81,26 @@
 
 ## Technical Architecture
 
+### Code Structure
+
+This is a **React Native** project built with **Expo** that provides a modern Bitcoin wallet experience. The app uses a clean, modular architecture with clear separation of concerns:
+
+- **Frontend**: React Native with Expo for cross-platform mobile development
+- **Styling**: Tailwind CSS via NativeWind for consistent, utility-first styling
+- **State Management**: Zustand for lightweight, performant state management
+- **Bitcoin Operations**: Coco-Cashu for modular ecash processing and mint operations
+- **Nostr Integration**: nostr-development-kit (NDK) for decentralized communication and identity
+
 ### Built With
 
-- **React Native** - Cross-platform mobile development
-- **Expo** - Development platform and tools
-- **TypeScript** - Type-safe development
-- **Redux** - State management
-- **Coco-Cashu** - Modular Cashu implementation
-- **Nostr** - Decentralized communication protocol
+- **React Native** - Cross-platform mobile development framework
+- **Expo** - Development platform and build tools
+- **TypeScript** - Type-safe development with full type coverage
+- **Tailwind CSS** - Utility-first CSS framework via NativeWind
+- **Zustand** - Lightweight state management (replacing Redux)
+- **Coco-Cashu** - Modular Cashu implementation for ecash operations
+- **nostr-development-kit (NDK)** - Nostr protocol integration and utilities
+- **Redux** - Legacy state management (being migrated to Zustand)
 
 ### Protocol Support
 

@@ -1,9 +1,9 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
-import { useSelector } from 'react-redux';
-import { memoizedGetSelectedMint } from 'redux/cashu';
+import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
@@ -44,7 +44,18 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 }) => {
   const { getPrimaryColor } = useTheme();
 
-  const selectedMint = useSelector(memoizedGetSelectedMint);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+
+  // Debug logging
+  console.log('MintBalanceDisplay: Debug info:', {
+    hasKeys: !!keys,
+    pubkey: keys?.pubkey,
+    selectedMint,
+    selectedMints,
+    selectedMintFromStore: keys?.pubkey ? selectedMints[keys.pubkey] : 'no pubkey',
+  });
   const { getMintInfo } = useMintManagement();
 
   // Use coco's live balance context for real-time updates
@@ -60,10 +71,12 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   // Load mint info from Coco (balance updates automatically via context)
   useEffect(() => {
     const loadMintInfo = async () => {
+      console.log('MintBalanceDisplay: loadMintInfo called with selectedMint:', selectedMint);
       if (selectedMint) {
         setIsLoadingMintInfo(true);
         try {
           const mintInfoData = await getMintInfo(selectedMint);
+          console.log('MintBalanceDisplay: loaded mint info:', mintInfoData);
           setMintInfo(mintInfoData);
         } catch (error) {
           console.error('Failed to load mint info:', error);
@@ -71,6 +84,9 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         } finally {
           setIsLoadingMintInfo(false);
         }
+      } else {
+        console.log('MintBalanceDisplay: no selectedMint, setting mintInfo to null');
+        setMintInfo(null);
       }
     };
 
@@ -94,12 +110,24 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         allowedUnits,
         showAddMintsButton,
         showDetailsButton,
-        onMintPress: updateSelectedMint ? undefined : onMintSelected,
+        // Always pass the callback, even when updateSelectedMint is true
+        onMintPress: onMintSelected,
       },
       onClose: async (mint) => {
-        if (mint?.id && onMintSelected && updateSelectedMint) {
+        console.log('MintBalanceDisplay: onClose called with mint:', mint);
+        console.log('MintBalanceDisplay: onClose conditions:', {
+          hasMintId: !!mint?.id,
+          hasOnMintSelected: !!onMintSelected,
+          updateSelectedMint,
+        });
+        if (mint?.id && onMintSelected) {
           // Use live balance from context instead of calling getBalances()
           const amt = liveBalances[mint.id] || 0;
+          console.log('MintBalanceDisplay: calling onMintSelected with:', {
+            mint,
+            amount: amt,
+            unit,
+          });
           onMintSelected(mint, { amount: amt, unit });
         }
       },
