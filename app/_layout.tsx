@@ -38,6 +38,7 @@ import { useFonts } from 'hooks/useFonts';
 import { PortalHost } from '@rn-primitives/portal';
 import { compose } from 'helper/utils';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { CocoProvider } from '@/helper/coco';
 /**
  * Splash screen component
  */
@@ -186,6 +187,7 @@ const AppProviders = compose([
   [Provider, { store }],
   ThemeProvider,
   [NostrKeysProvider, { defaultAccountIndex: 0 }],
+  CocoProvider,
   ActionSheetProvider,
   [SheetProvider, { context: 'global' }],
   PricelistProvider,

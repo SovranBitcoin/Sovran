@@ -63,7 +63,7 @@ export class DataMigration {
     }
 
     // Add each mint to Coco
-    for (const mintUrl of uniqueMints) {
+    for (const mintUrl of Array.from(uniqueMints)) {
       try {
         console.log(`Adding mint: ${mintUrl}`);
         await this.manager.mint.addMint(mintUrl);
@@ -94,26 +94,23 @@ export class DataMigration {
   private async migrateProofs(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
     for (const profile of profiles) {
       for (const [mintUrl, proofs] of Object.entries(profile.proofs)) {
-        if (proofs.length === 0) continue;
+        if (!Array.isArray(proofs) || proofs.length === 0) continue;
 
         try {
           // Convert Redux proof format to Coco format
           const coreProofs = proofs.map((proof) => ({
-            id: proof.id,
-            amount: proof.amount,
-            secret: proof.secret,
-            C: proof.C,
-            keysetId: proof.id, // This might need adjustment based on your data structure
+            ...proof, // Spread all Proof fields (id, amount, secret, C, dleq, witness)
+            mintUrl, // Add mintUrl
+            state: 'ready' as const, // Set state to 'ready' for existing proofs
           }));
 
-          // Note: Coco doesn't expose a direct saveProofs method in the public API
-          // For now, we'll skip proof migration and let users restore from seed
-          // This is actually better as it ensures proof integrity
-          console.log(
-            `Skipping ${proofs.length} proofs for ${mintUrl} - will be restored from seed`
-          );
+          // Use the ProofService to save proofs
+          await this.manager.getProofService().saveProofs(mintUrl, coreProofs);
+
           result.proofsMigrated += proofs.length;
+          console.log(`Migrated ${proofs.length} proofs for ${mintUrl}`);
         } catch (error) {
+          console.error(`Failed to migrate proofs for ${mintUrl}:`, error);
           result.errors.push({
             type: 'proofs_migration_failed',
             message: `Failed to migrate proofs for ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,

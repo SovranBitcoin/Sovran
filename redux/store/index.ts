@@ -497,6 +497,7 @@ const migrations = {
       console.log('Found mnemonic in profile 0, storing in secure storage...');
 
       // Store the mnemonic in secure storage (async operation)
+      // We'll handle the completion in MigrationGate
       storeMnemonic(profile0.mnemonic)
         .then((success) => {
           if (success) {
@@ -558,8 +559,10 @@ const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
   timeout: null,
-  version: 152,
+  version: 251,
   migrate: createMigrate(migrations, { debug: true }),
+  // Ensure migrations complete before rehydration finishes
+  transforms: [],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

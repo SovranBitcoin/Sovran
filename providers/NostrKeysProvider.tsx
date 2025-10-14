@@ -17,7 +17,6 @@ import { VideoScreen } from 'components/ui/VideoPlayer';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { CocoProvider } from 'helper/coco';
 import { CocoManager } from 'helper/coco/manager';
 
 interface NostrKeys {
@@ -350,9 +349,5 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     );
   }
 
-  return (
-    <NostrKeysContext.Provider value={contextValue}>
-      <CocoProvider>{children}</CocoProvider>
-    </NostrKeysContext.Provider>
-  );
+  return <NostrKeysContext.Provider value={contextValue}>{children}</NostrKeysContext.Provider>;
 }

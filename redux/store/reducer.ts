@@ -20,7 +20,12 @@ const appReducer = combineReducers({
 // Define RootState from the appReducer
 export type RootState = ReturnType<typeof appReducer>;
 
-type Action = SettingsAction | CashuAction | NostrAction | typeof RESET_APP;
+type Action =
+  | SettingsAction
+  | CashuAction
+  | NostrAction
+  | typeof RESET_APP
+  | typeof MIGRATION_250_COMPLETE;
 
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<

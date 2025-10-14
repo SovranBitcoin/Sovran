@@ -49,11 +49,11 @@
     tslib "^2.6.2"
 
 "@aws-sdk/types@^3.222.0":
-  version "3.901.0"
-  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.901.0.tgz#b5a2e26c7b3fb3bbfe4c7fc24873646992a1c56c"
-  integrity sha512-FfEM25hLEs4LoXsLXQ/q6X6L4JmKkKkbVFpKD4mwfVHtRVQG6QxJiCPcrkcPISquiy6esbwK2eh64TWbiD60cg==
+  version "3.910.0"
+  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.910.0.tgz#1707a9f5d36d828789173fcd5622a5684cf67b2f"
+  integrity sha512-o67gL3vjf4nhfmuSUNNkit0d62QJEwwHLxucwVJkR/rw9mfUtAWsgBs8Tp16cdUbMgsyQtCQilL8RAJDoGtadQ==
   dependencies:
-    "@smithy/types" "^4.6.0"
+    "@smithy/types" "^4.7.1"
     tslib "^2.6.2"
 
 "@babel/code-frame@7.10.4", "@babel/code-frame@~7.10.4":
@@ -2907,7 +2907,7 @@
   dependencies:
     tslib "^2.6.2"
 
-"@smithy/types@^4.6.0":
+"@smithy/types@^4.7.1":
   version "4.7.1"
   resolved "https://registry.yarnpkg.com/@smithy/types/-/types-4.7.1.tgz#9171d1bcfbbc4579d73d96cb9a7e1895b291e8e9"
   integrity sha512-WwP7vzoDyzvIFLzF5UhLQ6AsEx/PvSObzlNtJNW3lLy+BaSvTqCU628QKVvcJI/dydlAS1mSHQP7anKcxDcOxA==
