@@ -19,14 +19,12 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { SheetProvider } from 'react-native-actions-sheet';
 // import * as Sentry from '@sentry/react-native';
 import { NostrProvider } from 'nostr-react';
-import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { NDKPrivateKeySigner, useNDK, NDKCacheAdapterSqlite } from '@nostr-dev-kit/ndk-mobile';
 import { bytesToHex } from '@noble/hashes/utils';
 import { nip04, nip19 } from 'nostr-tools';
-
 // Import local components and utilities
 import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
-import { useNostr } from 'redux/nostr';
 import { useNostrKeysContext, NostrKeysProvider } from 'providers/NostrKeysProvider';
 import ndk, { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
@@ -39,6 +37,9 @@ import { PortalHost } from '@rn-primitives/portal';
 import { compose } from 'helper/utils';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { CocoProvider } from '@/helper/coco';
+
+const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
+
 /**
  * Splash screen component
  */
@@ -105,12 +106,26 @@ function MySplashScreen() {
 }
 
 function MainStack() {
-  const { addMessage, messages } = useNostr();
+  // const { addMessage, messages } = useNostr();
   const { getPrimaryColor, currentTheme } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const { init: initializeNDK } = useNDK();
+
+  // Initialize NDK with signer when keys are available
+  useEffect(() => {
+    if (nostrKeys?.privateKey) {
+      // @ts-ignore
+      initializeNDK({
+        // todo: Cache adapter
+        cacheAdapter,
+        explicitRelayUrls: RELAY_URLS,
+        signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
+      });
+    }
+  }, [initializeNDK, nostrKeys?.privateKey]);
 
   // Set up DM subscriptions
-  useNostrDMs(addMessage, messages);
+  // useNostrDMs(addMessage, messages);
 
   // Screen options builder
   const getScreenOptions = (screen: ModalConfig) => {
@@ -199,10 +214,9 @@ const AppProviders = compose([
  * Main application component
  */
 export default function RootLayout() {
-  const { init: initializeNDK } = useNDK();
   const [appIsReady, setAppIsReady] = useState(false);
   const scaleRef = useRef(new Animated.Value(1));
-
+  const { getPrimaryColor } = useTheme();
   const [fontsLoaded, fontsError] = useFonts();
 
   useEffect(() => {
@@ -220,12 +234,7 @@ export default function RootLayout() {
         }).start(() => setAppIsReady(true));
       }, 0);
     }
-
-    // @ts-ignore
-    initializeNDK({
-      explicitRelayUrls: RELAY_URLS,
-    });
-  }, [fontsLoaded, initializeNDK]);
+  }, [fontsLoaded]);
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) await SplashScreen.hideAsync();
@@ -237,7 +246,13 @@ export default function RootLayout() {
 
   return (
     <AppProviders>
-      <View onLayout={onLayoutRootView} style={{ flex: 1 }}>
+      <View
+        onLayout={onLayoutRootView}
+        style={{
+          flex: 1,
+          backgroundColor: getPrimaryColor('950'),
+        }}
+        className="bg-background-950">
         <MainStack />
         <PortalHost />
       </View>

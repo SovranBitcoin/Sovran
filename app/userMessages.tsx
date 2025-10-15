@@ -1,52 +1,33 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
-  Alert,
+  ScrollView,
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
   Animated,
   Dimensions,
-  ScrollView,
+  Text as RNText,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import { useActionSheet } from '@expo/react-native-action-sheet';
-import moment from 'moment';
-import _ from 'lodash';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
 
 // Custom hooks
-import {
-  memoizedMessagesByProfile,
-  Message,
-  useNostr,
-  muteUser,
-  reportUser,
-  addContact,
-  removeContact,
-} from 'redux/nostr';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { Message } from 'redux/nostr';
 import { useTheme } from 'providers/ThemeProvider';
 
 // Components
-import Modal from 'components/blocks/Modal';
-import { VStack, HStack } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
-import TimelineItem from 'app/message/TimeLine';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { SheetManager } from 'react-native-actions-sheet';
-import { useLocalSearchParams, router } from 'expo-router';
-import { sendEncryptedDirectMessage } from 'helper/nostrClient';
-import Icon, { ArrowIcon } from 'assets/icons';
-import { BlurView } from 'expo-blur';
-import CachedImage from 'components/ui/Image';
-import { popup } from '@/helper/popup';
-import { RootState } from 'redux/store/reducer';
-import TextInput from 'components/ui/TextInput';
-import { Button } from 'components/ui/Button';
+import { View, VStack, HStack } from 'components/ui/View';
 import { nip19 } from 'nostr-tools';
-import { Avatar } from 'components/ui/Avatar';
-import { PUBLIC_KEYS } from 'helper/constants';
 import { maybeConvertNpub } from '@/helper/coco/utils';
 import { withSheetProvider } from '@/hocs/withSheetProvider';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { Text } from 'components/ui/Text';
+import { Avatar } from 'components/ui/Avatar';
+import TextInput from 'components/ui/TextInput';
+import Icon from 'assets/icons';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 export type TimelineItemType = Message;
 
@@ -60,379 +41,439 @@ export function convertNpub(pubkey: string) {
   return maybeConvertNpub(pubkey)?.slice(2);
 }
 
-function ModalScreen() {
-  const { getPrimaryColor } = useTheme();
-  const dispatch = useDispatch();
+// Helper function to format timestamp
+function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-  const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
-  const { search, addMessage } = useNostr();
-  const { keys: nostrKeys } = useNostrKeysContext();
-  const { showActionSheetWithOptions } = useActionSheet();
+  if (diffInHours < 24) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffInHours < 48) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString();
+  }
+}
 
-  const [message, setMessage] = useState('');
-  const scrollViewRef = useRef<ScrollView>(null);
+// Animated scrolling text component for overflow handling
+function AnimatedScrollingText({
+  text,
+  style,
+  maxWidth,
+}: {
+  text: string;
+  style: any;
+  maxWidth: number;
+}) {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const [textWidth, setTextWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(maxWidth);
 
-  const targetPubkey = convertNpub(pubkey);
-  const messages = useSelector(memoizedMessagesByProfile({ pubkey: targetPubkey }));
+  const shouldAnimate = textWidth > containerWidth;
 
-  // Header data
-  const maxWidth = Math.min(Dimensions.get('window').width, 600);
-  const bannerHeight = (maxWidth * 214) / 600 + 32;
-  const combinedSearchAndProfiles = search.map((s) => ({
-    pubkey: convertNpub(s.pubkey),
-    ...s.profile,
-  }));
-  const profile = combinedSearchAndProfiles.find((p) => p.pubkey === pubkey);
-  const profileImage = profile?.picture || profile?.image;
-  const displayName =
-    profile?.displayName ||
-    profile?.display_name ||
-    profile?.username ||
-    profile?.name ||
-    'Unknown User';
-  const contacts = useSelector((state: RootState) => state.nostr.contacts || []);
-  const isContact = contacts.some((c) => c.pubkey === pubkey);
-
-  // Get messages for this user, grouped by date
-  const timelineItemsGroupedByDate = useMemo(() => {
-    const userMessages = _.uniqBy(
-      messages.filter((msg) => convertNpub(msg.pubkey || msg.sender) === targetPubkey),
-      'id'
-    );
-
-    // Sort and group by date
-    return _.groupBy(
-      userMessages.sort((a, b) => a.created_at - b.created_at),
-      (item) => moment(item.created_at * 1000).format('YYYY-MM-DD')
-    );
-  }, [messages, targetPubkey]);
-
-  // Auto-scroll to bottom when component mounts or timeline changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [timelineItemsGroupedByDate]);
+    if (shouldAnimate) {
+      const scrollDistance = textWidth - containerWidth;
+      const duration = Math.max(3000, scrollDistance * 30);
 
-  // Get profile only when needed
-  const currentUserProfile = search.find((s) => convertNpub(s.pubkey) === targetPubkey)?.profile;
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.delay(1000),
+          Animated.timing(scrollX, {
+            toValue: -scrollDistance,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1000),
+          Animated.timing(scrollX, {
+            toValue: 0,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+        ])
+      );
 
-  // Header handlers
-  const handleGoBack = () => {
-    if (router.canGoBack()) {
-      router.back();
+      animation.start();
+
+      return () => {
+        animation.stop();
+        scrollX.setValue(0);
+      };
     } else {
-      console.warn('No previous screen to go back to.');
+      scrollX.setValue(0);
     }
+  }, [shouldAnimate, textWidth, containerWidth, scrollX]);
+
+  const onTextLayout = (event: any) => {
+    const width = event.nativeEvent.layout.width;
+    setTextWidth(width);
   };
 
-  // Handle long press on timeline items (simplified for messages only)
-  const handleLongPress = () => {
-    // For now, just show a simple action sheet for messages
-    showActionSheetWithOptions(
-      {
-        options: ['Copy Message', 'Cancel'],
-        cancelButtonIndex: 1,
-      },
-      (buttonIndex?: number) => {
-        if (buttonIndex === 0) {
-        }
-      }
-    );
+  const onContainerLayout = (event: any) => {
+    const width = event.nativeEvent.layout.width;
+    setContainerWidth(width);
   };
 
-  // Send DM handler
-  const handleSendDM = async () => {
-    try {
-      const recipientPubKey = convertNpub(pubkey);
+  return (
+    <View style={{ width: maxWidth, overflow: 'hidden' }} onLayout={onContainerLayout}>
+      <Animated.View
+        style={{
+          transform: [{ translateX: scrollX }],
+        }}>
+        <RNText style={style} onLayout={onTextLayout} numberOfLines={1}>
+          {text}
+        </RNText>
+      </Animated.View>
+    </View>
+  );
+}
 
-      const sentEvent = await sendEncryptedDirectMessage({
-        nsec: nostrKeys?.nsec || '',
-        recipientPublicKey: recipientPubKey,
-        message,
-      });
+function MessageBubble({
+  message,
+  isMe,
+  userPicture,
+}: {
+  message: any;
+  isMe: boolean;
+  userPicture?: string;
+}) {
+  const { getPrimaryColor, getShadeColor } = useTheme();
 
-      addMessage(sentEvent.pubkey, {
-        sender: sentEvent.pubkey,
-        receiver: recipientPubKey,
-        pubkey: recipientPubKey,
-        content: message,
-        created_at: sentEvent.created_at,
-        id: sentEvent.id,
-      });
+  return (
+    <HStack
+      align="flex-start"
+      justify={isMe ? 'flex-end' : 'flex-start'}
+      spacing={8}
+      style={{ marginBottom: 16 }}>
+      {!isMe && (
+        <Avatar
+          size={32}
+          picture={userPicture}
+          seed={message.sender === 'other' ? 'other-user' : 'me-user'}
+          name={message.sender === 'other' ? 'Other User' : 'Me'}
+        />
+      )}
 
-      Alert.alert('Success', 'Message sent successfully!');
-      setMessage('');
-    } catch {
-      Alert.alert('Error', 'Failed to send message');
-    }
-  };
+      <VStack align={isMe ? 'flex-end' : 'flex-start'} spacing={4}>
+        <View
+          style={{
+            backgroundColor: isMe ? getPrimaryColor('600') : getPrimaryColor('700'),
+            // paddingHorizontal: 16,
+            // paddingVertical: 12,
+            borderRadius: 18,
+            borderTopLeftRadius: isMe ? 18 : 4,
+            borderTopRightRadius: isMe ? 4 : 18,
+            maxWidth: '85%',
+            // minWidth: 60,
+            alignSelf: isMe ? 'flex-end' : 'flex-start',
+          }}>
+          <Text
+            size={16}
+            style={{
+              color: getPrimaryColor('0'),
+              lineHeight: 20,
+              marginHorizontal: 16,
+              marginVertical: 12,
+              flexShrink: 1,
+              flexWrap: 'wrap', // ensures wrapping inside the parent View
+            }}>
+            {message.content}
+          </Text>
+        </View>
 
-  // Render grouped timeline items
-  const renderGroupedItems = () => {
-    return _.sortBy(Object.keys(timelineItemsGroupedByDate), (date) =>
-      new Date(date).getTime()
-    ).map((date, index) => (
-      <VStack key={index}>
-        <Text className="my-4 text-center text-sm font-bold text-primary-400">
-          {moment(date).format('dddd, MMMM Do YYYY')}
-        </Text>
-        {timelineItemsGroupedByDate[date].map((item, idx) => (
-          <Pressable
-            key={idx}
-            onLongPress={() => handleLongPress()}
-            style={{ minHeight: 60 }} // Ensure minimum height for each item
-          >
-            <TimelineItem item={item} />
-          </Pressable>
-        ))}
+        <HStack align="center" spacing={4}>
+          <Text
+            size={12}
+            style={{
+              color: getShadeColor('400'),
+              marginLeft: isMe ? 0 : 8,
+            }}>
+            {message.timestamp}
+          </Text>
+          {isMe && (
+            <Icon
+              name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
+              size={14}
+              color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
+            />
+          )}
+        </HStack>
       </VStack>
-    ));
+
+      {isMe && <Avatar size={32} seed="me-user" name="Me" />}
+    </HStack>
+  );
+}
+
+function ModalScreen() {
+  const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messageText, setMessageText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const insets = useSafeAreaInsets();
+  const screenWidth = Dimensions.get('window').width;
+
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { keys: nostrKeys } = useNostrKeysContext();
+
+  // Get user metadata
+  const metadataFilters = useMemo(
+    () => [
+      {
+        authors: [pubkey],
+        kinds: [Metadata],
+        limit: 1,
+      },
+    ],
+    [pubkey]
+  );
+
+  const { events: metadataEvents } = useSubscribe({ filters: metadataFilters });
+
+  // Get DMs between current user and the other user
+  const dmFilters = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+
+    return [
+      {
+        kinds: [EncryptedDirectMessage],
+        authors: [nostrKeys.pubkey],
+        '#p': [pubkey],
+      },
+      {
+        kinds: [EncryptedDirectMessage],
+        '#p': [nostrKeys.pubkey],
+        authors: [pubkey],
+      },
+    ];
+  }, [pubkey, nostrKeys?.pubkey]);
+
+  const { events: dmEvents } = useSubscribe({ filters: dmFilters });
+
+  // Get user info from metadata events
+  const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
+  const displayName = userInfo?.display_name || userInfo?.name || 'Unknown User';
+  const userPicture = userInfo?.picture;
+
+  // Process and decrypt DM events
+  useEffect(() => {
+    const processDMs = async () => {
+      if (!dmEvents || !nostrKeys?.pubkey) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const processedMessages = await Promise.all(
+          dmEvents.map(async (event) => {
+            try {
+              // Decrypt the message content
+              await event.decrypt();
+
+              const isMe = event.pubkey === nostrKeys.pubkey;
+              const senderPubkey = isMe ? nostrKeys.pubkey : event.pubkey;
+
+              return {
+                id: event.id,
+                content: event.content,
+                sender: isMe ? 'me' : 'other',
+                timestamp: formatTimestamp(event.created_at || 0),
+                isRead: true, // For now, assume all messages are read
+                created_at: event.created_at || 0,
+                pubkey: senderPubkey,
+              };
+            } catch (error) {
+              console.error('Failed to decrypt message:', error);
+              return null;
+            }
+          })
+        );
+
+        // Filter out failed decryptions and sort by timestamp
+        const validMessages = processedMessages
+          .filter((msg): msg is NonNullable<typeof msg> => msg !== null)
+          .sort((a, b) => a.created_at - b.created_at);
+
+        setMessages(validMessages);
+      } catch (error) {
+        console.error('Error processing DMs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    processDMs();
+  }, [dmEvents, nostrKeys?.pubkey]);
+
+  const handleSendMessage = () => {
+    if (messageText.trim()) {
+      // Here you would typically send the message via Nostr
+      console.log('Sending message:', messageText);
+      setMessageText('');
+    }
   };
 
   return (
     <KeyboardAvoidingView
+      style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1">
-      <Modal
-        inverted
-        title={
-          <>
-            <HStack align="center" justify="center">
-              {/* Banner Image */}
-              <CachedImage
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  opacity: 0.66,
-                  width: maxWidth,
-                  height: bannerHeight,
-                }}
-                source={{ uri: profile?.banner }}
-              />
-
-              {/* Blur Effect */}
-              <BlurView
-                tint="default"
-                intensity={33}
-                experimentalBlurMethod="dimezisBlurView"
-                className="absolute bottom-0 left-0 right-0 top-0 pt-8"
-                style={{ width: maxWidth, height: bannerHeight }}
-              />
-
-              {/* Header Content */}
-              <HStack
-                className="mt-8"
-                style={{ width: maxWidth }}
-                align="center"
-                justify="space-around">
-                {/* Back Button */}
-                <Button
-                  onPress={handleGoBack}
-                  icon={<ArrowIcon size={24} rotate={-135} color={getPrimaryColor('0')} />}
-                  blur
-                />
-
-                {/* Profile Information */}
-                <VStack align="center" justify="center" className="flex-1">
-                  {profileImage && (
-                    <VStack align="center" className="h-18 relative mr-2">
-                      <Avatar
-                        picture={profileImage}
-                        variant="person"
-                        status={
-                          Object.values(PUBLIC_KEYS).includes(profile?.pubkey)
-                            ? 'VERIFIED'
-                            : undefined
-                        }
-                        size={72}
-                      />
-                      <Animated.View className="w-full pt-1.5">
-                        <Text className="w-full text-base font-bold text-primary-0">
-                          {displayName}
-                        </Text>
-                      </Animated.View>
-                    </VStack>
-                  )}
-                </VStack>
-
-                {/* Info Button */}
-                <Button
-                  onPress={() => {
-                    SheetManager.show('button-handler', {
-                      payload: {
-                        buttons: [
-                          {
-                            variant: 'secondary',
-                            icon: 'majesticons:text',
-                            text: 'Feed',
-                            onPress: async (close) => {
-                              router.push({
-                                pathname: '/feed',
-                                params: {
-                                  pubkey,
-                                },
-                              });
-                              close({} as any);
-                            },
-                          },
-                          {
-                            variant: 'secondary',
-                            icon: isContact ? 'la:user-minus' : 'la:user-plus',
-                            text: isContact ? 'Remove Contact' : 'Add Contact',
-                            onPress: async () => {
-                              if (isContact) {
-                                dispatch(removeContact(pubkey));
-                                await popup({ message: 'Contact removed', type: 'success' });
-                              } else {
-                                dispatch(addContact({ pubkey, profile }));
-                                await popup({ message: 'Contact added', type: 'success' });
-                              }
-                            },
-                          },
-                          {
-                            variant: 'secondary',
-                            icon: 'la:user-slash',
-                            text: 'Mute User',
-                            onPress: async () => {
-                              await popup({
-                                message: 'User muted successfully',
-                                type: 'success',
-                              });
-                              dispatch(muteUser(pubkey));
-                            },
-                          },
-                          {
-                            variant: 'secondary',
-                            icon: 'material-symbols:report-rounded',
-                            text: 'Report User',
-                            onPress: async () => {
-                              await popup({
-                                message: 'User reported successfully',
-                                type: 'success',
-                              });
-                              dispatch(reportUser(pubkey));
-                            },
-                          },
-                        ],
-                      },
-                    });
-                  }}
-                  icon={
-                    <Icon
-                      name="material-symbols:info-rounded"
-                      size={24}
-                      color={getPrimaryColor('0')}
-                    />
-                  }
-                  blur
-                />
-              </HStack>
-            </HStack>
-          </>
-        }
-        padding={24}
-        buttons={
-          <>
-            <ButtonHandler
-              style={{
-                paddingBottom: 0,
-              }}
-              buttons={[
-                {
-                  text: 'Send Money',
-                  variant: 'primary',
-                  onPress: async () => {
-                    SheetManager.show('button-handler', {
-                      payload: {
-                        buttons: [
-                          {
-                            text: 'Lightning',
-                            icon: 'mingcute:lightning-fill',
-                            variant: 'primary',
-                            onPress: async () => {
-                              router.push({
-                                pathname: '/currency',
-                                params: {
-                                  to: 'meltQuote',
-                                  unit: 'sat',
-                                  lud16: currentUserProfile?.lud16,
-                                  pubkey: currentUserProfile?.pubkey,
-                                  profile: JSON.stringify(currentUserProfile),
-                                },
-                              });
-                            },
-                          },
-                          {
-                            text: 'Lock Ecash',
-                            icon: 'solar:key-bold',
-                            variant: 'primary',
-                            onPress: async () => {
-                              router.push({
-                                pathname: '/currency',
-                                params: {
-                                  to: 'sendToken',
-                                  unit: 'sat',
-                                  profile: JSON.stringify(currentUserProfile),
-                                },
-                              });
-                            },
-                          },
-                        ],
-                      },
-                    });
-                  },
-                },
-              ]}
-            />
-            {nostrKeys?.nsec && (
-              <HStack align="center" spacing={2} className="relative">
-                <TextInput
-                  placeholder="Type your message..."
-                  value={message}
-                  onChangeText={setMessage}
-                  className="ml-3 flex-1 p-3 text-base"
-                />
-
-                <Button
-                  variant="secondary"
-                  icon={<Icon name="iconamoon:send-fill" />}
-                  onPress={handleSendDM}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    marginRight: 8,
-                    paddingVertical: 0,
-                  }}
-                />
-              </HStack>
-            )}
-          </>
-        }
-        className="flex-1">
-        <ScrollView
-          ref={scrollViewRef}
-          className="flex-1"
-          contentContainerStyle={{
-            paddingTop: 128, // Account for header
-            paddingBottom: 160, // Account for input area
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+      <StatusBar barStyle="light-content" backgroundColor={getPrimaryColor('800')} />
+      <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
+        {/* Header */}
+        <View
+          style={{
+            backgroundColor: getPrimaryColor('800'),
             paddingHorizontal: 16,
-            minHeight: 200,
+            paddingTop: insets.top + 12,
+            paddingBottom: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: getPrimaryColor('700'),
+          }}>
+          <HStack align="center" justify="space-between" style={{ height: 48 }}>
+            <HStack align="center" spacing={12} style={{ flex: 1, minWidth: 0 }}>
+              <Pressable onPress={() => router.back()}>
+                <Icon
+                  name="material-symbols:arrow-back-rounded"
+                  size={24}
+                  color={getPrimaryColor('0')}
+                />
+              </Pressable>
+
+              <Avatar size={40} picture={userPicture} seed={pubkey} name={displayName} />
+
+              <VStack spacing={2} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                <AnimatedScrollingText
+                  text={displayName}
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    color: getPrimaryColor('0'),
+                  }}
+                  maxWidth={screenWidth - 240}
+                />
+                <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                  {nip19.npubEncode(pubkey)}
+                </Text>
+              </VStack>
+            </HStack>
+
+            <HStack align="center" spacing={12} style={{ flexShrink: 0 }}>
+              {/* <Pressable>
+                <Icon name="mdi:contact" size={20} color={getPrimaryColor('0')} />
+              </Pressable> */}
+              <Pressable
+                className="ml-2"
+                onPress={() =>
+                  router.push({
+                    pathname: 'share',
+                    params: {
+                      type: 'profile',
+                      data: nip19.npubEncode(pubkey),
+                    },
+                  })
+                }>
+                <Icon name="stash:qr-code" size={20} color={getPrimaryColor('0')} />
+              </Pressable>
+              {/* <Pressable>
+                <Icon name="bx:dots-vertical-rounded" size={20} color={getPrimaryColor('0')} />
+              </Pressable> */}
+            </HStack>
+          </HStack>
+        </View>
+
+        {/* Messages */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: 16,
+            flexGrow: 1,
           }}
-          showsVerticalScrollIndicator={false}>
-          {Object.keys(timelineItemsGroupedByDate).length === 0 ? (
-            <Text className="my-4 text-center text-sm font-bold text-primary-400">
-              No activity yet
-            </Text>
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {isLoading ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: 50,
+              }}>
+              <Text size={16} style={{ color: getShadeColor('400') }}>
+                Loading messages...
+              </Text>
+            </View>
+          ) : messages.length === 0 ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: 50,
+              }}>
+              <Text size={16} style={{ color: getShadeColor('400') }}>
+                No messages yet. Start the conversation!
+              </Text>
+            </View>
           ) : (
-            renderGroupedItems()
+            messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isMe={message.sender === 'me'}
+                userPicture={message.sender === 'other' ? userPicture : undefined}
+              />
+            ))
           )}
         </ScrollView>
-      </Modal>
+
+        {/* Input Area */}
+        <View
+          style={{
+            backgroundColor: getPrimaryColor('800'),
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: insets.bottom + 12,
+            borderTopWidth: 1,
+            borderTopColor: getPrimaryColor('700'),
+          }}>
+          <HStack align="center" spacing={12}>
+            {/* <Pressable>
+              <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+            </Pressable> */}
+            <Avatar size={40} seed={nostrKeys?.pubkey} />
+
+            <TextInput
+              value={messageText}
+              onChangeText={setMessageText}
+              placeholder="Type a message..."
+              style={{
+                flex: 1,
+                backgroundColor: getPrimaryColor('700'),
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderWidth: 0,
+                margin: 0,
+                shadowOpacity: 0,
+              }}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              onSubmitEditing={handleSendMessage}
+            />
+
+            <Pressable onPress={handleSendMessage} disabled={!messageText.trim()}>
+              <Icon
+                name="iconamoon:send-fill"
+                size={24}
+                color={messageText.trim() ? getPrimaryColor('0') : getShadeColor('500')}
+              />
+            </Pressable>
+          </HStack>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }

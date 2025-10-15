@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { ScrollView, Dimensions, VirtualizedList } from 'react-native';
+import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
+import { Dimensions } from 'react-native';
 import Modal from 'components/blocks/Modal';
 import PagerView from 'react-native-pager-view';
 import { useTheme } from 'providers/ThemeProvider';
@@ -9,147 +9,152 @@ import { Spacer, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useMintManagement } from 'hooks/coco';
 import { Mint } from 'coco-cashu-core';
-import { useNostr } from 'redux/nostr';
-import { usePaginatedHistory } from 'coco-cashu-react';
 import { npubToPubkey } from 'components/blocks/Transaction';
-import _ from 'lodash';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { LegendList } from '@legendapp/list';
 
-const RenderItem = ({
-  item,
-  allMessages = [],
-  allTransactions: _allTransactions = [],
-}: {
-  item: any;
-  allMessages?: any[];
-  allTransactions?: any[];
-}) => {
-  // Handle contact items (from search/contacts)
-  if (item.pubkey && item.profile) {
-    // Filter messages for this specific contact
-    const contactMessages = _.filter(allMessages, (message) => {
-      return (
-        message.pubkey === item.pubkey ||
-        message.sender === item.pubkey ||
-        message.receiver === item.pubkey
-      );
-    });
+// Memoized ContactItem to prevent unnecessary re-renders
+const RenderItem = React.memo(({ item }: { item: any }) => {
+  console.log(`[PERF] Rendering ContactItem for ${item.type}:${item.pubkey || item.mint?.mintUrl}`);
+  return <ContactItem item={item} />;
+});
 
-    // Sort by created_at to get the most recent
-    const mostRecentMessage = _.maxBy(contactMessages, 'created_at');
-
-    const muted = item.profile?.muted;
-    if (muted) return null;
-
-    return <ContactItem mostRecentMessage={mostRecentMessage} nostrInfo={item.profile} />;
-  }
-
-  // Handle mint items (from mints)
-  if (item.mint && item.mintInfo) {
-    // Find the most recent message for this mint
-    // First, try to get the nostr pubkey from the mint's nostr contact
-    let mintPubkey = null;
-    const nostrContact = item.mintInfo.contact?.find((contact: any) => contact.method === 'nostr');
-    if (nostrContact?.info) {
-      try {
-        // Convert npub to pubkey using existing utility
-        mintPubkey = npubToPubkey(nostrContact.info);
-      } catch (error) {
-        console.warn('Failed to decode nostr contact from mint:', error);
-      }
-    }
-
-    // Find messages for this mint's pubkey
-    const mintMessages = mintPubkey
-      ? allMessages.filter((message) => {
-          return (
-            message.pubkey === mintPubkey ||
-            message.sender === mintPubkey ||
-            message.receiver === mintPubkey
-          );
-        })
-      : [];
-
-    const mostRecentMessage = _.maxBy(mintMessages, 'created_at');
-
-    return (
-      <ContactItem
-        mostRecentMessage={mostRecentMessage}
-        mintInfo={item.mintInfo}
-        mintUrl={item.mint.mintUrl}
-      />
-    );
-  }
-
-  // Fallback for unknown item types
-  return null;
-};
+RenderItem.displayName = 'RenderItem';
 
 const TabOneScreen = () => {
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
   const { mints, loadMints, getMintInfo } = useMintManagement();
-  const { search, contacts, messages: allMessages } = useNostr();
-  const { history: allTransactions } = usePaginatedHistory();
+  const { keys: nostrKeys } = useNostrKeysContext();
 
   // State for mint info data
   const [mintsWithInfo, setMintsWithInfo] = useState<{ mint: Mint; mintInfo: any }[]>([]);
   const [mintsLoadingInfo, setMintsLoadingInfo] = useState(false);
 
-  // Use only added contacts for Contacts tab
-  const allContacts = contacts;
+  // Get all DM events for the current user (single subscription)
+  const dmFilters = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
 
-  // Filter contacts with messages for Recent Activity
-  const enrichedContacts = search.filter((contact) => {
-    const contactMessages = allMessages.filter((message) => {
-      return (
-        message.pubkey === contact.pubkey ||
-        message.sender === contact.pubkey ||
-        message.receiver === contact.pubkey
-      );
-    });
-    return !_.isEmpty(contactMessages);
-  });
-
-  // Remove duplicates based on pubkey
-  const uniqueEnrichedContacts = _.uniqBy(enrichedContacts, 'pubkey');
-
-  // Sort by most recent message (newest first)
-  const sortedEnrichedContacts = _.orderBy(
-    uniqueEnrichedContacts,
-    [
-      (contact) => {
-        const contactMessages = allMessages.filter((message) => {
-          return (
-            message.pubkey === contact.pubkey ||
-            message.sender === contact.pubkey ||
-            message.receiver === contact.pubkey
-          );
-        });
-        return _.maxBy(contactMessages, 'created_at')?.created_at || 0;
+    return [
+      {
+        kinds: [EncryptedDirectMessage],
+        authors: [nostrKeys.pubkey],
       },
-    ],
-    ['desc']
-  );
+      {
+        kinds: [EncryptedDirectMessage],
+        '#p': [nostrKeys.pubkey],
+      },
+    ];
+  }, [nostrKeys?.pubkey]);
 
-  // Debug logging
-  console.log('Payments Debug:', {
-    searchLength: search.length,
-    contactsLength: contacts.length,
-    enrichedContactsLength: enrichedContacts.length,
-    uniqueEnrichedContactsLength: uniqueEnrichedContacts.length,
-    sortedEnrichedContactsLength: sortedEnrichedContacts.length,
-    allMessagesLength: allMessages.length,
-    searchContacts: search.map((s) => ({
-      pubkey: s.pubkey,
-      name: s.profile?.display_name || s.profile?.name,
-    })),
-    sampleMessages: allMessages.slice(0, 3).map((m) => ({
-      pubkey: m.pubkey,
-      sender: m.sender,
-      receiver: m.receiver,
-      content: m.content?.substring(0, 30),
-    })),
-  });
+  const { events: dmEvents } = useSubscribe({ filters: dmFilters });
+
+  // State for decrypted contacts
+  const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
+  const [isDecrypting, setIsDecrypting] = useState(false);
+
+  // Extract unique pubkeys from DM events and create contact list
+  const recentActivityContacts = useMemo(() => {
+    console.log('[PERF] Computing recentActivityContacts...');
+    const startTime = performance.now();
+
+    if (!dmEvents || !nostrKeys?.pubkey) {
+      console.log('[PERF] No dmEvents or nostrKeys, returning empty array');
+      return [];
+    }
+
+    // Group events by pubkey
+    const contactMap = new Map();
+
+    dmEvents.forEach((event) => {
+      // Determine the other person's pubkey
+      const otherPubkey =
+        event.pubkey === nostrKeys.pubkey
+          ? event.tags.find((tag) => tag[0] === 'p')?.[1]
+          : event.pubkey;
+
+      if (!otherPubkey) return;
+
+      // Keep the most recent event for each contact
+      const existing = contactMap.get(otherPubkey);
+      if (!existing || (event.created_at && event.created_at > existing.created_at)) {
+        contactMap.set(otherPubkey, event);
+      }
+    });
+
+    // Convert map to array and sort by most recent
+    const result = Array.from(contactMap.entries())
+      .map(([pubkey, event]) => ({
+        type: 'contact',
+        pubkey,
+        dmEvent: event,
+        timestamp: event.created_at || 0,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    const endTime = performance.now();
+    console.log(
+      `[PERF] recentActivityContacts computed in ${endTime - startTime}ms, found ${result.length} contacts`
+    );
+    return result;
+  }, [dmEvents, nostrKeys?.pubkey]);
+
+  // Decrypt DM events for contacts
+  useEffect(() => {
+    const decryptContacts = async () => {
+      if (!recentActivityContacts.length || !nostrKeys?.pubkey) {
+        setDecryptedContacts([]);
+        return;
+      }
+
+      try {
+        setIsDecrypting(true);
+        console.log('[PERF] Starting contact decryption...');
+        const startTime = performance.now();
+
+        const decryptedResults = await Promise.all(
+          recentActivityContacts.map(async (contact) => {
+            try {
+              if (contact.dmEvent) {
+                // Decrypt the message content
+                await contact.dmEvent.decrypt();
+                return {
+                  ...contact,
+                  dmEvent: {
+                    ...contact.dmEvent,
+                    content: contact.dmEvent.content, // Now decrypted
+                  },
+                };
+              }
+              return contact;
+            } catch (error) {
+              console.warn(`Failed to decrypt message for contact ${contact.pubkey}:`, error);
+              return {
+                ...contact,
+                dmEvent: {
+                  ...contact.dmEvent,
+                  content: '[Encrypted message]', // Fallback for failed decryption
+                },
+              };
+            }
+          })
+        );
+
+        const endTime = performance.now();
+        console.log(`[PERF] Contact decryption completed in ${endTime - startTime}ms`);
+        setDecryptedContacts(decryptedResults);
+      } catch (error) {
+        console.error('Error decrypting contacts:', error);
+        setDecryptedContacts(recentActivityContacts);
+      } finally {
+        setIsDecrypting(false);
+      }
+    };
+
+    decryptContacts();
+  }, [recentActivityContacts, nostrKeys?.pubkey]);
 
   // Load mints and their info on component mount
   useEffect(() => {
@@ -207,11 +212,125 @@ const TabOneScreen = () => {
     }
   }, [mints, getMintInfo]);
 
+  // State for decrypted mints
+  const [decryptedMints, setDecryptedMints] = useState<any[]>([]);
+  const [isDecryptingMints, setIsDecryptingMints] = useState(false);
+
+  // Build mints with most recent DM
+  const mintsWithMetadata = useMemo(() => {
+    console.log('[PERF] Computing mintsWithMetadata...');
+    const startTime = performance.now();
+
+    if (!dmEvents) {
+      console.log('[PERF] No dmEvents, returning empty array');
+      return [];
+    }
+
+    // Create a map of most recent DMs by pubkey
+    const dmMap = new Map();
+    dmEvents?.forEach((event) => {
+      const otherPubkey =
+        event.pubkey === nostrKeys?.pubkey
+          ? event.tags.find((tag) => tag[0] === 'p')?.[1]
+          : event.pubkey;
+
+      if (!otherPubkey) return;
+
+      const existing = dmMap.get(otherPubkey);
+      if (!existing || (event.created_at && event.created_at > existing.created_at)) {
+        dmMap.set(otherPubkey, event);
+      }
+    });
+
+    const result = mintsWithInfo.map(({ mint, mintInfo }) => {
+      // Get pubkey from mint's nostr contact
+      let mintPubkey = null;
+      const nostrContact = mintInfo.contact?.find((contact: any) => contact.method === 'nostr');
+      if (nostrContact?.info) {
+        try {
+          mintPubkey = npubToPubkey(nostrContact.info);
+        } catch (error) {
+          console.warn('Failed to decode nostr contact from mint:', error);
+        }
+      }
+
+      return {
+        type: 'mint',
+        pubkey: mintPubkey,
+        mint,
+        mintInfo,
+        dmEvent: mintPubkey ? dmMap.get(mintPubkey) : undefined,
+        timestamp: mintPubkey ? dmMap.get(mintPubkey)?.created_at || 0 : 0,
+      };
+    });
+
+    const endTime = performance.now();
+    console.log(
+      `[PERF] mintsWithMetadata computed in ${endTime - startTime}ms, found ${result.length} mints`
+    );
+    return result;
+  }, [mintsWithInfo, dmEvents, nostrKeys?.pubkey]);
+
+  // Decrypt DM events for mints
+  useEffect(() => {
+    const decryptMints = async () => {
+      if (!mintsWithMetadata.length || !nostrKeys?.pubkey) {
+        setDecryptedMints([]);
+        return;
+      }
+
+      try {
+        setIsDecryptingMints(true);
+        console.log('[PERF] Starting mint decryption...');
+        const startTime = performance.now();
+
+        const decryptedResults = await Promise.all(
+          mintsWithMetadata.map(async (mint) => {
+            try {
+              if (mint.dmEvent) {
+                // Decrypt the message content
+                await mint.dmEvent.decrypt();
+                return {
+                  ...mint,
+                  dmEvent: {
+                    ...mint.dmEvent,
+                    content: mint.dmEvent.content, // Now decrypted
+                  },
+                };
+              }
+              return mint;
+            } catch (error) {
+              console.warn(`Failed to decrypt message for mint ${mint.mint?.mintUrl}:`, error);
+              return {
+                ...mint,
+                dmEvent: {
+                  ...mint.dmEvent,
+                  content: '[Encrypted message]', // Fallback for failed decryption
+                },
+              };
+            }
+          })
+        );
+
+        const endTime = performance.now();
+        console.log(`[PERF] Mint decryption completed in ${endTime - startTime}ms`);
+        setDecryptedMints(decryptedResults);
+      } catch (error) {
+        console.error('Error decrypting mints:', error);
+        setDecryptedMints(mintsWithMetadata);
+      } finally {
+        setIsDecryptingMints(false);
+      }
+    };
+
+    decryptMints();
+  }, [mintsWithMetadata, nostrKeys?.pubkey]);
+
   const pagerRef = useRef<PagerView>(null);
 
   const onPageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
-    const tabNames = ['Recent activity', 'Contacts', 'Mints'];
+    const tabNames = ['Recent activity', 'Mints'];
     setSelectedTab(tabNames[pageIndex]);
   }, []);
 
@@ -220,11 +339,10 @@ const TabOneScreen = () => {
     pagerRef.current?.setPage(index);
   };
 
-  const tabs = ['Recent activity', 'Contacts', 'Mints'].filter(Boolean);
+  const tabs = ['Recent activity', 'Mints'];
 
-  const getItem = (data: any, index: number) => data[index];
-
-  const getItemCount = (data: any) => data.length;
+  // Constants for LegendList
+  const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
   return (
     <View className="flex-1 bg-primary-950">
@@ -238,11 +356,7 @@ const TabOneScreen = () => {
             tabs={tabs}
             selectedTab={selectedTab}
             handleTabPress={handleTabPress}
-            amounts={[
-              String(sortedEnrichedContacts.length),
-              String(allContacts.length),
-              String(mintsWithInfo.length),
-            ]}
+            amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
           />
         </View>
         <View
@@ -259,79 +373,61 @@ const TabOneScreen = () => {
               backgroundColor: getPrimaryColor('950'),
             }}
             initialPage={0}
-            scrollEnabled={contacts.length > 0}>
-            <ScrollView key="1">
-              <VirtualizedList
-                data={sortedEnrichedContacts}
-                initialNumToRender={10}
-                renderItem={(item) => (
-                  <RenderItem
-                    {...item}
-                    allMessages={allMessages}
-                    allTransactions={allTransactions}
-                  />
-                )}
-                keyExtractor={(item) => item.pubkey}
-                getItemCount={getItemCount}
-                getItem={getItem}
-                style={{
-                  backgroundColor: getPrimaryColor('950'),
-                  paddingBottom: 256,
-                }}
-              />
-            </ScrollView>
-            <ScrollView key="2">
-              <VirtualizedList
-                data={allContacts}
-                initialNumToRender={1}
-                renderItem={(item) => (
-                  <RenderItem
-                    {...item}
-                    allMessages={allMessages}
-                    allTransactions={allTransactions}
-                  />
-                )}
-                keyExtractor={(item) => item.pubkey}
-                getItemCount={getItemCount}
-                getItem={getItem}
-                style={{
-                  backgroundColor: getPrimaryColor('950'),
-                  paddingBottom: 256,
-                }}
-              />
-            </ScrollView>
-            <ScrollView key="3">
-              {mintsLoadingInfo ? (
+            scrollEnabled={true}>
+            <View key="1" style={{ flex: 1 }}>
+              {isDecrypting ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: getPrimaryColor('400') }}>Loading mints...</Text>
+                  <Text style={{ color: getPrimaryColor('400') }}>Decrypting messages...</Text>
                 </View>
-              ) : mintsWithInfo.length === 0 ? (
+              ) : decryptedContacts.length === 0 ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: getPrimaryColor('400') }}>
+                    No recent conversations found
+                  </Text>
+                </View>
+              ) : (
+                <LegendList
+                  data={decryptedContacts}
+                  estimatedItemSize={ITEM_HEIGHT}
+                  renderItem={({ item }) => <RenderItem item={item} />}
+                  keyExtractor={(item) => item.pubkey}
+                  style={{
+                    backgroundColor: getPrimaryColor('950'),
+                    flex: 1,
+                  }}
+                  contentContainerStyle={{ paddingBottom: 256 }}
+                  maintainVisibleContentPosition
+                />
+              )}
+            </View>
+            <View key="2" style={{ flex: 1 }}>
+              {mintsLoadingInfo || isDecryptingMints ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: getPrimaryColor('400') }}>
+                    {mintsLoadingInfo ? 'Loading mints...' : 'Decrypting messages...'}
+                  </Text>
+                </View>
+              ) : decryptedMints.length === 0 ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
                   <Text style={{ color: getPrimaryColor('400') }}>
                     No mints with nostr contacts found
                   </Text>
                 </View>
               ) : (
-                <VirtualizedList
-                  data={mintsWithInfo}
-                  initialNumToRender={5}
-                  renderItem={(item) => (
-                    <RenderItem
-                      {...item}
-                      allMessages={allMessages}
-                      allTransactions={allTransactions}
-                    />
-                  )}
+                <LegendList
+                  data={decryptedMints}
+                  estimatedItemSize={ITEM_HEIGHT}
+                  renderItem={({ item }) => <RenderItem item={item} />}
                   keyExtractor={(item) => item.mint.mintUrl}
-                  getItemCount={getItemCount}
-                  getItem={getItem}
                   style={{
                     backgroundColor: getPrimaryColor('950'),
-                    paddingBottom: 256,
+                    flex: 1,
                   }}
+                  contentContainerStyle={{ paddingBottom: 256 }}
+                  maintainVisibleContentPosition
                 />
               )}
-            </ScrollView>
+            </View>
           </PagerView>
         </View>
       </Modal>
