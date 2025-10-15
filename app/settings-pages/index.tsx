@@ -20,7 +20,7 @@ import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
+import { getUsername } from '@/helper/username';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -74,11 +74,7 @@ const ProfileButton = () => {
               style={{
                 color: getPrimaryColor('0'),
               }}>
-              {uniqueUsernameGenerator({
-                seed: nostrKeys?.pubkey,
-                separator: '-',
-                dictionaries: [adjectives, nouns],
-              })}
+              {getUsername(nostrKeys?.pubkey || '')}
             </Text>
             <Text
               size={16}

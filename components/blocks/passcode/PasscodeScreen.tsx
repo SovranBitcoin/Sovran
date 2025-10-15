@@ -8,7 +8,7 @@ import { Text } from 'components/ui/Text';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
+import { getUsername } from '@/helper/username';
 
 interface Props {
   passcode: string;
@@ -117,11 +117,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
             style={{
               ...textShadow,
             }}>
-            {`Welcome back, ${uniqueUsernameGenerator({
-              seed: nostrKeys?.pubkey,
-              separator: '-',
-              dictionaries: [adjectives, nouns],
-            })}`}
+            {`Welcome back, ${getUsername(nostrKeys?.pubkey || '')}`}
           </Text>
 
           <HStack>

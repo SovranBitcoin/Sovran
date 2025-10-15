@@ -343,12 +343,7 @@ const AddRoute = () => {
         return;
       }
 
-      sheetRef.current?.hide({
-        id: 'add-mints',
-        name: 'Add Mints',
-        iconUrl: null,
-        unit: 'sat',
-      });
+      sheetRef.current?.hide();
     } catch (err) {
       console.error('❌ Failed to add mints:', err);
       popup({ message: 'Failed to add mints. Please try again.', type: 'error' });

@@ -19,6 +19,7 @@ export class DataMigration {
     const cashuState = state.cashu;
 
     console.log('Starting Redux to Coco migration...');
+    console.log('Redux cashu state:', JSON.stringify(cashuState, null, 2));
 
     const result: MigrationResult = {
       mintsMigrated: 0,
@@ -55,15 +56,24 @@ export class DataMigration {
   private async migrateMints(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
     const uniqueMints = new Set<string>();
 
-    // Collect all unique mint URLs
+    // Collect all unique mint URLs from both mints array and proofs keys
     for (const profile of profiles) {
+      // Add mints from the mints array
       for (const mintUrl of profile.mints) {
+        uniqueMints.add(mintUrl);
+      }
+
+      // Add mints from proofs keys (mint URLs that have proofs)
+      for (const mintUrl of Object.keys(profile.proofs)) {
         uniqueMints.add(mintUrl);
       }
     }
 
     // Add each mint to Coco
-    for (const mintUrl of Array.from(uniqueMints)) {
+    const mintUrls = Array.from(uniqueMints);
+    console.log(`Found ${mintUrls.length} unique mints to migrate:`, mintUrls);
+
+    for (const mintUrl of mintUrls) {
       try {
         console.log(`Adding mint: ${mintUrl}`);
         await this.manager.mint.addMint(mintUrl);
@@ -105,7 +115,7 @@ export class DataMigration {
           }));
 
           // Use the ProofService to save proofs
-          await this.manager.getProofService().saveProofs(mintUrl, coreProofs);
+          await (this.manager as any).proofService.saveProofs(mintUrl, coreProofs);
 
           result.proofsMigrated += proofs.length;
           console.log(`Migrated ${proofs.length} proofs for ${mintUrl}`);
@@ -124,17 +134,30 @@ export class DataMigration {
    * Migrate counter values to Coco
    */
   private async migrateCounters(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
+    let totalCounters = 0;
+
+    // Count total counters first for logging
+    for (const profile of profiles) {
+      console.log('Profile counters:', profile.counters);
+      for (const [, counters] of Object.entries(profile.counters)) {
+        totalCounters += Object.keys(counters).length;
+      }
+    }
+
+    if (totalCounters === 0) {
+      console.log('No counters found to migrate');
+      return;
+    }
+
+    console.log(`Found ${totalCounters} counters to migrate`);
+
     for (const profile of profiles) {
       for (const [mintUrl, counters] of Object.entries(profile.counters)) {
         for (const [keysetId, counter] of Object.entries(counters)) {
           try {
-            // Note: Coco doesn't expose a direct setCounter method in the public API
-            // Counters are managed internally by the wallet service
-            // For now, we'll skip counter migration and let Coco manage them
-            console.log(
-              `Skipping counter for ${mintUrl}:${keysetId} = ${counter} - will be managed by Coco`
-            );
+            await (this.manager as any).counterService.overwriteCounter(mintUrl, keysetId, counter);
             result.countersMigrated++;
+            console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
           } catch (error) {
             result.errors.push({
               type: 'counter_migration_failed',

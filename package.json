@@ -17,11 +17,12 @@
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
-    "maestro": "maestro test ./.maestro"
+    "maestro": "maestro test ./.maestro",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
-    "@cashu/cashu-ts": "2.6.0",
+    "@cashu/cashu-ts": "2.7.2",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/react-native-action-sheet": "^4.1.0",
     "@gandlaf21/bc-ur": "^1.1.12",
@@ -56,10 +57,10 @@
     "circle-flags": "^1.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "coco-cashu-core": "file:./coco/packages/core",
-    "coco-cashu-expo-sqlite": "file:./coco/packages/expo-sqlite",
+    "coco-cashu-core": "^1.0.0-rc10",
+    "coco-cashu-expo-sqlite": "^0.6.0",
     "coco-cashu-plugin-npc": "^2.0.0",
-    "coco-cashu-react": "file:./coco/packages/react",
+    "coco-cashu-react": "^1.1.0",
     "events": "^3.3.0",
     "expo": "^54.0.13",
     "expo-application": "~7.0.7",
@@ -149,6 +150,7 @@
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-unused-imports": "^4.1.4",
+    "patch-package": "^8.0.1",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
@@ -197,5 +199,9 @@
     "tty": "tty-browserify",
     "vm": "vm-browserify",
     "tls": false
+  },
+  "resolutions": {
+    "@antfu/install-pkg": "0.5.0",
+    "package-manager-detector": "0.2.11"
   }
 }

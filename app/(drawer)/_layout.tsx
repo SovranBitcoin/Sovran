@@ -12,9 +12,9 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Spacer, VStack, HStack } from 'components/ui/View';
 import { router } from 'expo-router';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { adjectives, nouns, uniqueUsernameGenerator } from 'unique-username-generator';
 
 import { Avatar } from '@/components/ui/Avatar';
+import { getUsername } from '@/helper/username';
 
 // Main compnent function
 
@@ -57,11 +57,7 @@ function ProfileHeader() {
               <Avatar seed={nostrKeys?.pubkey} size={64} variant="person" />
               <VStack align="center" spacing={8}>
                 <Text weight="bold" size={20} className="text-center text-primary-0">
-                  {uniqueUsernameGenerator({
-                    seed: nostrKeys?.pubkey,
-                    separator: '-',
-                    dictionaries: [adjectives, nouns],
-                  })}
+                  {getUsername(nostrKeys?.pubkey)}
                 </Text>
                 <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
               </VStack>

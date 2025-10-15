@@ -9,11 +9,13 @@
       "ios": {
         "simulator": true
       },
-      "channel": "e2e-simulator"
+      "channel": "e2e-simulator",
+      "node": "22.4.0"
     },
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "22.4.0"
     },
     "preview": {
       "ios": {
@@ -21,9 +23,12 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "node": "22.4.0"
     },
-    "production": {}
+    "production": {
+      "node": "22.4.0"
+    }
   },
   "submit": {
     "production": {}

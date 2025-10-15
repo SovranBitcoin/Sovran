@@ -183,8 +183,8 @@ export function CocoProvider({ children }: CocoProviderProps) {
               muted={true}
             />
           </View>
-          {isMigrating && <div>Migrating data...</div>}
-          {migrationError && <div style={{ color: 'red' }}>Error: {migrationError.message}</div>}
+          {isMigrating && <View>Migrating data...</View>}
+          {migrationError && <View style={{ color: 'red' }}>Error: {migrationError.message}</View>}
         </View>
       </CocoContext.Provider>
     );
