@@ -88,7 +88,7 @@ This is a **React Native** project built with **Expo** that provides a modern Bi
 - **Frontend**: React Native with Expo for cross-platform mobile development
 - **Styling**: Tailwind CSS via NativeWind for consistent, utility-first styling
 - **State Management**: Zustand for lightweight, performant state management
-- **Bitcoin Operations**: Coco-Cashu for modular ecash processing and mint operations
+- **Bitcoin, Lightning and Cashu Operations**: Coco-Cashu for modular ecash processing and mint operations
 - **Nostr Integration**: nostr-development-kit (NDK) for decentralized communication and identity
 
 ### Built With

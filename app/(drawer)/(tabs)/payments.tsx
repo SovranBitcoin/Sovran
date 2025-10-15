@@ -345,9 +345,14 @@ const TabOneScreen = () => {
   const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
   return (
-    <View className="flex-1 bg-primary-950">
+    <View className="flex-1 bg-primary-900">
       <Spacer size={96} />
-      <Modal scrollEnabled={false} showBack={false} showHeader={false} buttons={null}>
+      <Modal
+        scrollEnabled={false}
+        showBack={false}
+        showHeader={false}
+        buttons={null}
+        backgroundColor={getPrimaryColor('900')}>
         <View
           style={{
             paddingHorizontal: 12,
@@ -370,7 +375,6 @@ const TabOneScreen = () => {
             onPageSelected={onPageSelected}
             style={{
               height: Dimensions.get('window').height,
-              backgroundColor: getPrimaryColor('950'),
             }}
             initialPage={0}
             scrollEnabled={true}>
@@ -392,7 +396,6 @@ const TabOneScreen = () => {
                   renderItem={({ item }) => <RenderItem item={item} />}
                   keyExtractor={(item) => item.pubkey}
                   style={{
-                    backgroundColor: getPrimaryColor('950'),
                     flex: 1,
                   }}
                   contentContainerStyle={{ paddingBottom: 256 }}
@@ -420,7 +423,7 @@ const TabOneScreen = () => {
                   renderItem={({ item }) => <RenderItem item={item} />}
                   keyExtractor={(item) => item.mint.mintUrl}
                   style={{
-                    backgroundColor: getPrimaryColor('950'),
+                    backgroundColor: getPrimaryColor('900'),
                     flex: 1,
                   }}
                   contentContainerStyle={{ paddingBottom: 256 }}
