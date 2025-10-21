@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack } from 'components/ui/View';
+import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { ProfileImage } from './ProfileImage';
@@ -21,11 +21,11 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="flex-row items-center rounded-lg bg-primary-800 p-2"
+      className="flex-row items-center rounded-lg py-2"
       disabled={loading || !result.profile}>
       <HStack spacing={8}>
         <ProfileImage loading={loading} profile={result.profile} />
-        <HStack className="flex-1">
+        <VStack spacing={4} className="flex-1">
           <Text loading={loading} overpass bold size={16} className="text-primary-50">
             {result.profile?.displayName || result.profile?.name || 'Loading...'}
           </Text>
@@ -42,7 +42,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
               {result.profile.nip05}
             </Text>
           )}
-        </HStack>
+        </VStack>
       </HStack>
     </TouchableOpacity>
   );

@@ -3,7 +3,8 @@ import PagerView from 'react-native-pager-view';
 import { useTheme } from 'providers/ThemeProvider';
 import { Tabs } from 'components/ui/Tabs';
 import { ContactItem } from 'components/blocks/payments';
-import { View } from 'components/ui/View';
+import { View, VStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { useMintManagement } from 'hooks/coco';
 import { Mint } from 'coco-cashu-core';
 import { npubToPubkey } from 'components/blocks/Transaction';
@@ -18,9 +19,16 @@ import { SearchResultsOverlay } from 'components/blocks/payments/SearchResultsOv
 import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
 import { CancelButton } from 'components/blocks/payments/CancelButton';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
-import { Dimensions } from 'react-native';
+import { Dimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
+import { SkeletonContainer } from 'react-native-skeleton-component';
+import { store } from 'redux/store';
+import { setSearch } from 'redux/nostr';
+import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
+import { SearchResult } from 'components/blocks/contacts';
+import { router } from 'expo-router';
+
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
   console.log(`[PERF] Rendering ContactItem for ${item.type}:${item.pubkey || item.mint?.mintUrl}`);
@@ -28,6 +36,19 @@ const RenderItem = React.memo(({ item }: { item: any }) => {
 });
 
 RenderItem.displayName = 'RenderItem';
+
+// Define proper types
+interface SearchResultData {
+  pubkey: string;
+  profile: UserProfile;
+}
+
+interface PlaceholderResult {
+  pubkey: string;
+  profile?: undefined;
+}
+
+type DisplayResult = SearchResultData | PlaceholderResult;
 
 const PaymentsContent = () => {
   const { getPrimaryColor } = useTheme();
@@ -38,6 +59,12 @@ const PaymentsContent = () => {
   // State for mint info data
   const [mintsWithInfo, setMintsWithInfo] = useState<{ mint: Mint; mintInfo: any }[]>([]);
   const [mintsLoadingInfo, setMintsLoadingInfo] = useState(false);
+
+  // Search-related state
+  const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get all DM events for the current user (single subscription)
   const dmFilters = useMemo(() => {
@@ -335,6 +362,129 @@ const PaymentsContent = () => {
   const pagerRef = useRef<PagerView>(null);
   const { searchQuery } = usePaymentsAnimation();
 
+  // Search functionality
+  const searchUsers = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+
+    setSearchLoading(true);
+    setHasSearched(true);
+
+    try {
+      const result = await apiSearchUsers({ query, limit: 10 });
+
+      if (result.isOk()) {
+        const data = result.value;
+
+        if (data.results && Array.isArray(data.results)) {
+          const formattedResults: SearchResultData[] = data.results.map((res) => {
+            const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
+
+            return {
+              pubkey: res.pubkey,
+              profile: {
+                ...res,
+                pubkey: profileEventPubkey,
+              },
+            };
+          });
+
+          // Store all results in Redux
+          if (formattedResults.length > 0) {
+            formattedResults.forEach((result) => {
+              store.dispatch(setSearch({ pubkey: result.pubkey, profile: result.profile }));
+            });
+          }
+
+          setSearchResults(formattedResults);
+        } else {
+          setSearchResults([]);
+        }
+      } else {
+        console.error('Error searching users:', result.error);
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Unexpected error during search:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Debounced search handler
+  useEffect(() => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Reset state if search is cleared
+    if (!searchQuery.trim()) {
+      setHasSearched(false);
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    // Debounce the search
+    debounceTimeoutRef.current = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 500);
+
+    // Cleanup function
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, searchUsers]);
+
+  // Generate placeholder results for the loading state
+  const placeholderResults = useMemo<PlaceholderResult[]>(
+    () =>
+      Array(20)
+        .fill(null)
+        .map((_, index) => ({
+          pubkey: `placeholder-${index}`,
+        })),
+    []
+  );
+
+  // Memoized computed values
+  const displayResults: DisplayResult[] = useMemo(
+    () => (searchLoading ? placeholderResults : searchResults),
+    [searchLoading, placeholderResults, searchResults]
+  );
+
+  const showSearchResults =
+    searchQuery.trim().length > 0 && (searchLoading || searchResults.length > 0);
+  const showNoResults =
+    searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
+
+  // Skeleton configuration
+  const skeletonConfig = useMemo(
+    () => ({
+      backgroundColor: getPrimaryColor('800'),
+      highlightColor: getPrimaryColor('600'),
+      speed: 800,
+      animation: searchLoading ? ('pulse' as const) : ('none' as const),
+    }),
+    [getPrimaryColor, searchLoading]
+  );
+
+  const navigateToUserMessages = useCallback(
+    ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
+      router.push({
+        pathname: '/userMessages',
+        params: {
+          pubkey: pubkey,
+          profile: JSON.stringify(profile),
+        },
+      });
+    },
+    []
+  );
+
   // Debug logging
   console.log('PaymentsContent render:', {
     decryptedContactsLength: decryptedContacts?.length || 0,
@@ -343,6 +493,9 @@ const PaymentsContent = () => {
     mintsLoadingInfo,
     isDecryptingMints,
     selectedTab,
+    searchQuery,
+    searchLoading,
+    searchResultsLength: searchResults.length,
   });
 
   const onPageSelected = useCallback((event: any) => {
@@ -363,84 +516,142 @@ const PaymentsContent = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-primary-900 px-4">
-      <View className="flex-1 bg-primary-900" style={{}}>
-        {/* Search Bar and Cancel Button */}
-        <View
-          style={{
-            flexDirection: 'row',
-            height: 48,
-          }}>
-          <AnimatedSearchBar />
-          <CancelButton />
-        </View>
-
-        <View
-          style={{
-            paddingHorizontal: 12,
-          }}>
-          <Tabs
-            tabs={tabs}
-            selectedTab={selectedTab}
-            handleTabPress={handleTabPress}
-            amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
-          />
-        </View>
-        <View
-          style={{
-            flex: 1,
-            paddingLeft: 16,
-            paddingRight: 16,
-          }}>
-          <PagerView
-            ref={pagerRef}
-            onPageSelected={onPageSelected}
+      <SkeletonContainer
+        backgroundColor={skeletonConfig.backgroundColor}
+        highlightColor={skeletonConfig.highlightColor}
+        speed={skeletonConfig.speed}
+        animation={skeletonConfig.animation}>
+        <View className="flex-1 bg-primary-900" style={{}}>
+          {/* Search Bar and Cancel Button */}
+          <View
             style={{
-              height: Dimensions.get('window').height,
-            }}
-            initialPage={0}
-            scrollEnabled={true}>
-            <View key="1" style={{ flex: 1 }}>
-              <DraggableContactsList
-                data={decryptedContacts}
-                isDecrypting={isDecrypting}
-                emptyMessage="No recent conversations found"
-                itemHeight={ITEM_HEIGHT}
-              />
-            </View>
-            <View key="2" style={{ flex: 1 }}>
-              <DraggableContactsList
-                data={decryptedMints}
-                isDecrypting={mintsLoadingInfo || isDecryptingMints}
-                emptyMessage="No mints with nostr contacts found"
-                itemHeight={ITEM_HEIGHT}
-              />
-            </View>
-          </PagerView>
+              flexDirection: 'row',
+              height: 48,
+            }}>
+            <AnimatedSearchBar />
+            <CancelButton />
+          </View>
 
-          {/* Search Results Overlay */}
-          <SearchResultsOverlay
-            allContacts={decryptedContacts}
-            allMints={decryptedMints}
-            searchQuery={searchQuery}
-          />
-        </View>
+          <View
+            style={{
+              paddingHorizontal: 12,
+            }}>
+            <Tabs
+              tabs={tabs}
+              selectedTab={selectedTab}
+              handleTabPress={handleTabPress}
+              amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
+            />
+          </View>
+          <View
+            style={{
+              flex: 1,
+              paddingLeft: 16,
+              paddingRight: 16,
+            }}>
+            <PagerView
+              ref={pagerRef}
+              onPageSelected={onPageSelected}
+              style={{
+                height: Dimensions.get('window').height,
+              }}
+              initialPage={0}
+              scrollEnabled={true}>
+              <View key="1" style={{ flex: 1 }}>
+                <DraggableContactsList
+                  data={decryptedContacts}
+                  isDecrypting={isDecrypting}
+                  emptyMessage="No recent conversations found"
+                  itemHeight={ITEM_HEIGHT}
+                />
+              </View>
+              <View key="2" style={{ flex: 1 }}>
+                <DraggableContactsList
+                  data={decryptedMints}
+                  isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                  emptyMessage="No mints with nostr contacts found"
+                  itemHeight={ITEM_HEIGHT}
+                />
+              </View>
+            </PagerView>
 
-        {/* Animated blur overlay for search mode */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 48,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1000,
-            padding: 8,
-          }}>
-          {/* my search results */}
+            {/* Search Results Overlay */}
+            <SearchResultsOverlay
+              allContacts={decryptedContacts}
+              allMints={decryptedMints}
+              searchQuery={searchQuery}
+            />
+          </View>
+
+          {/* Search results overlay */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 48,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000,
+              paddingVertical: 8,
+              pointerEvents: showSearchResults ? 'auto' : 'none',
+            }}>
+            <ScrollView>
+              {showSearchResults && (
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                  }}
+                  onStartShouldSetResponder={() => true}
+                  onTouchEnd={(e) => e.stopPropagation()}>
+                  <VStack spacing={12}>
+                    {/* <Text
+                    loading={searchLoading}
+                    overpass
+                    regular
+                    bold
+                    size={14}
+                    color={getPrimaryColor('100')}>
+                    Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
+                  </Text> */}
+                    {displayResults.map((result) => (
+                      <SearchResult
+                        key={result.pubkey}
+                        loading={searchLoading}
+                        result={result}
+                        onPress={() => {
+                          if (!searchLoading && result.profile) {
+                            navigateToUserMessages({
+                              pubkey: result.pubkey,
+                              profile: result.profile,
+                            });
+                          }
+                        }}
+                      />
+                    ))}
+                  </VStack>
+                </View>
+              )}
+              {showNoResults && (
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: getPrimaryColor('950'),
+                    borderRadius: 12,
+                    padding: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                  <Text overpass size={16} className="text-primary-400">
+                    No results found for "{searchQuery}"
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+          <AnimatedBlur />
         </View>
-        <AnimatedBlur />
-        {/* </Modal> */}
-      </View>
+      </SkeletonContainer>
     </SafeAreaView>
   );
 };
