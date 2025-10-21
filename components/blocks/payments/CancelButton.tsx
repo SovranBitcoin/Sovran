@@ -9,7 +9,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const CancelButton: FC = () => {
   const { getPrimaryColor } = useTheme();
-  const { screenView, onGoToContacts } = usePaymentsAnimation();
+  const { screenView, searchQuery, onGoToContacts, onSearchQueryChange } = usePaymentsAnimation();
 
   // Animate button appearance
   const rContainerStyle = useAnimatedStyle(() => {
@@ -20,13 +20,25 @@ export const CancelButton: FC = () => {
     };
   });
 
+  const handlePress = () => {
+    if (searchQuery.trim() !== '') {
+      // If there's text, clear it
+      onSearchQueryChange('');
+    } else {
+      // If no text, go back to contacts
+      onGoToContacts();
+    }
+  };
+
+  const buttonText = searchQuery.trim() !== '' ? 'Clear' : 'Cancel';
+
   return (
     <AnimatedPressable
-      onPress={onGoToContacts}
+      onPress={handlePress}
       className="z-[999] items-center justify-center"
       style={rContainerStyle}>
       <Text className="font-medium" style={{ color: getPrimaryColor('400') }}>
-        Cancel
+        {buttonText}
       </Text>
     </AnimatedPressable>
   );

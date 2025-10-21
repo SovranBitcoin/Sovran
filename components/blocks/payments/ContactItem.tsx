@@ -21,8 +21,7 @@ interface ContactItemProps {
 
 const styles = {
   contactItem: {
-    marginBottom: 16,
-    marginTop: 16,
+    marginBottom: 24,
   },
   row: {
     flex: 1,

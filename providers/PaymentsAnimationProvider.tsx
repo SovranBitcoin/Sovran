@@ -13,11 +13,11 @@ import { SharedValue, useSharedValue, withTiming } from 'react-native-reanimated
 
 // Core sizing constants for search bar and transitions
 export const SEARCHBAR_HEIGHT = 48;
-export const CANCEL_CONTAINER_WIDTH = 75;
+export const CANCEL_CONTAINER_WIDTH = 64;
 const LEFT_PADDING = 16;
 
 // Search field width differs between views
-export const SEARCHBAR_DEFAULT_WIDTH = Dimensions.get('window').width - LEFT_PADDING * 2;
+export const SEARCHBAR_DEFAULT_WIDTH = Dimensions.get('window').width - LEFT_PADDING;
 export const SEARCHBAR_SEARCH_WIDTH =
   Dimensions.get('window').width - CANCEL_CONTAINER_WIDTH - LEFT_PADDING;
 

@@ -80,7 +80,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   }
 
   return (
-    <Animated.View className="flex-1" style={rContainerStyle}>
+    <Animated.View className="mt-3 flex-1" style={rContainerStyle}>
       <LegendList
         data={data}
         estimatedItemSize={itemHeight}
@@ -89,10 +89,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
         style={{
           flex: 1,
         }}
-        contentContainerStyle={{
-          paddingBottom: 100,
-          paddingTop: 16,
-        }}
+        contentContainerStyle={{}}
         maintainVisibleContentPosition
       />
       {/* Top gradient for visual feedback */}

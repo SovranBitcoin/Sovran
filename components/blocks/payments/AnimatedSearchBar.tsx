@@ -1,5 +1,5 @@
 import React, { FC } from 'react';
-import { TextInput, Pressable } from 'react-native';
+import { TextInput, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -17,13 +17,19 @@ import {
 } from 'providers/PaymentsAnimationProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Avatar } from 'components/ui/Avatar';
-import { HStack } from '@/components/ui/View';
 
 export const AnimatedSearchBar: FC = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const { getPrimaryColor } = useTheme();
-  const { screenView, offsetY, isListDragging, searchQuery, onGoToSearch, onSearchQueryChange } =
-    usePaymentsAnimation();
+  const {
+    screenView,
+    offsetY,
+    isListDragging,
+    searchQuery,
+    onGoToSearch,
+    onSearchQueryChange,
+    inputRef,
+  } = usePaymentsAnimation();
 
   // Get colors OUTSIDE the worklet
   const color800 = getPrimaryColor('800');
@@ -73,9 +79,52 @@ export const AnimatedSearchBar: FC = () => {
     };
   });
 
+  // Animate avatar visibility with translateX
+  const rAvatarStyle = useAnimatedStyle(() => {
+    const isSearching = screenView.value === 'search';
+
+    return {
+      opacity: withTiming(isSearching ? 0 : 1, {
+        duration: 200,
+      }),
+      transform: [
+        {
+          translateX: withSpring(isSearching ? -56 : 0, {
+            damping: 100,
+            stiffness: 1400,
+          }),
+        },
+        {
+          scale: withSpring(isSearching ? 0.8 : 1, {
+            damping: 100,
+            stiffness: 1400,
+          }),
+        },
+      ],
+    };
+  });
+
+  // Animate input container to account for avatar space
+  const rInputContainerStyle = useAnimatedStyle(() => {
+    const isSearching = screenView.value === 'search';
+
+    return {
+      paddingLeft: withSpring(isSearching ? 0 : 56, {
+        damping: 100,
+        stiffness: 1400,
+      }),
+    };
+  });
+
   const handlePress = () => {
     console.log('Search bar pressed!');
     onGoToSearch();
+    // Focus the input after transitioning to search mode
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
   };
 
   const handleTextChange = (text: string) => {
@@ -83,32 +132,38 @@ export const AnimatedSearchBar: FC = () => {
   };
 
   return (
-    <Animated.View className="z-[999] h-[48px] overflow-hidden" style={rContainerStyle}>
-      <HStack spacing={8} align="flex-start" className="h-[48px] overflow-hidden">
-        <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
-        <Pressable onPress={handlePress} className="h-[48px] flex-1 overflow-hidden">
-          <Animated.View style={rInputStyle} className="h-[48px] overflow-hidden rounded-2xl">
+    <Animated.View className="z-[999] h-[48px] overflow-hidden " style={rContainerStyle}>
+      <View className="relative h-[48px]">
+        {/* Avatar - absolutely positioned */}
+        <Animated.View
+          style={[rAvatarStyle, { position: 'absolute', left: 14, top: 0, zIndex: 1 }]}>
+          <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
+        </Animated.View>
+
+        {/* Search Input */}
+        <Animated.View style={rInputContainerStyle} className="ml-4 h-[48px]">
+          <Animated.View style={rInputStyle} className="h-[48px] rounded-2xl">
             <TextInput
-              ref={usePaymentsAnimation().inputRef}
+              ref={inputRef}
               placeholder="Search for contacts"
               placeholderTextColor={color500}
               value={searchQuery}
               onChangeText={handleTextChange}
-              editable={false}
-              pointerEvents="none"
-              className="h-full overflow-hidden px-4"
+              onFocus={handlePress}
+              editable={true}
+              pointerEvents="auto"
+              className="h-full px-4"
               style={{
                 backgroundColor: 'transparent',
                 color: color200,
                 fontSize: 16,
                 fontFamily: 'OverpassRegular',
-                // borderCurve: '',
               }}
               selectionColor={color300}
             />
           </Animated.View>
-        </Pressable>
-      </HStack>
+        </Animated.View>
+      </View>
     </Animated.View>
   );
 };

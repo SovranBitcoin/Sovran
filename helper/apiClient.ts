@@ -91,6 +91,34 @@ export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: numb
   return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
+export interface RecommendedUsersResponse {
+  source: string;
+  limit: number;
+  sort: string;
+  results: UserProfile[];
+  fromCache: boolean;
+}
+
+export const getRecommendedUsers = ({
+  source,
+  limit = 5,
+  sort = 'globalPagerank',
+}: {
+  source?: string;
+  limit?: number;
+  sort?: string;
+}) => {
+  console.log('source', source);
+  console.log('limit', limit);
+  console.log('sort', sort);
+  const params = new URLSearchParams();
+  if (source) params.append('source', source);
+  params.append('limit', String(limit));
+  params.append('sort', sort);
+
+  return safeFetch<RecommendedUsersResponse>(`${BASE_URL}/nostr/recommended?${params}`);
+};
+
 export interface AuditMintResponse {
   id: number;
   url: string;

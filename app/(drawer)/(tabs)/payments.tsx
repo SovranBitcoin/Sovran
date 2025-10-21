@@ -4,7 +4,6 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Tabs } from 'components/ui/Tabs';
 import { ContactItem } from 'components/blocks/payments';
 import { View, VStack } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
 import { useMintManagement } from 'hooks/coco';
 import { Mint } from 'coco-cashu-core';
 import { npubToPubkey } from 'components/blocks/Transaction';
@@ -15,19 +14,21 @@ import {
   PaymentsAnimationProvider,
   usePaymentsAnimation,
 } from 'providers/PaymentsAnimationProvider';
-import { SearchResultsOverlay } from 'components/blocks/payments/SearchResultsOverlay';
 import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
 import { CancelButton } from 'components/blocks/payments/CancelButton';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
-import { Dimensions, ScrollView } from 'react-native';
+import { Alert, Dimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 import { SkeletonContainer } from 'react-native-skeleton-component';
 import { store } from 'redux/store';
 import { setSearch } from 'redux/nostr';
-import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
+import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
 import { SearchResult } from 'components/blocks/contacts';
+import { NoResultsFound } from 'components/blocks/contacts/NoResultsFound';
+import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { router } from 'expo-router';
+import { Text } from 'components/ui/Text';
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
@@ -51,6 +52,7 @@ interface PlaceholderResult {
 type DisplayResult = SearchResultData | PlaceholderResult;
 
 const PaymentsContent = () => {
+  usePaymentsAnimation();
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
   const { mints, loadMints, getMintInfo } = useMintManagement();
@@ -65,6 +67,10 @@ const PaymentsContent = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Recommended users state
+  const [recommendedUsers, setRecommendedUsers] = useState<UserProfile[]>([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
 
   // Get all DM events for the current user (single subscription)
   const dmFilters = useMemo(() => {
@@ -361,6 +367,32 @@ const PaymentsContent = () => {
 
   const pagerRef = useRef<PagerView>(null);
   const { searchQuery } = usePaymentsAnimation();
+  // Fetch recommended users
+  const fetchRecommendedUsers = useCallback(async () => {
+    try {
+      setRecommendedLoading(true);
+      const result = await getRecommendedUsers({
+        // source: nostrKeys?.pubkey,
+        limit: 10,
+        sort: 'globalPagerank',
+      });
+
+      if (result.isOk()) {
+        Alert.alert('result', JSON.stringify(result.value));
+
+        console.log('result123123', result.value.results);
+        setRecommendedUsers(result.value.results);
+      } else {
+        console.error('Error fetching recommended users:', result.error);
+        setRecommendedUsers([]);
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching recommended users:', error);
+      setRecommendedUsers([]);
+    } finally {
+      setRecommendedLoading(false);
+    }
+  }, []);
 
   // Search functionality
   const searchUsers = useCallback(async (query: string) => {
@@ -439,6 +471,11 @@ const PaymentsContent = () => {
     };
   }, [searchQuery, searchUsers]);
 
+  // Fetch recommended users on mount
+  useEffect(() => {
+    fetchRecommendedUsers();
+  }, [fetchRecommendedUsers]);
+
   // Generate placeholder results for the loading state
   const placeholderResults = useMemo<PlaceholderResult[]>(
     () =>
@@ -485,6 +522,16 @@ const PaymentsContent = () => {
     []
   );
 
+  const handleRecommendedUserPress = useCallback(
+    (user: UserProfile) => {
+      navigateToUserMessages({
+        pubkey: user.pubkey,
+        profile: user,
+      });
+    },
+    [navigateToUserMessages]
+  );
+
   // Debug logging
   console.log('PaymentsContent render:', {
     decryptedContactsLength: decryptedContacts?.length || 0,
@@ -515,13 +562,13 @@ const PaymentsContent = () => {
   const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
   return (
-    <SafeAreaView className="flex-1 bg-primary-900 px-4">
+    <SafeAreaView className="flex-1 bg-primary-900">
       <SkeletonContainer
         backgroundColor={skeletonConfig.backgroundColor}
         highlightColor={skeletonConfig.highlightColor}
         speed={skeletonConfig.speed}
         animation={skeletonConfig.animation}>
-        <View className="flex-1 bg-primary-900" style={{}}>
+        <View className="relative flex-1 bg-primary-900">
           {/* Search Bar and Cancel Button */}
           <View
             style={{
@@ -574,13 +621,6 @@ const PaymentsContent = () => {
                 />
               </View>
             </PagerView>
-
-            {/* Search Results Overlay */}
-            <SearchResultsOverlay
-              allContacts={decryptedContacts}
-              allMints={decryptedMints}
-              searchQuery={searchQuery}
-            />
           </View>
 
           {/* Search results overlay */}
@@ -593,27 +633,33 @@ const PaymentsContent = () => {
               bottom: 0,
               zIndex: 1000,
               paddingVertical: 8,
-              pointerEvents: showSearchResults ? 'auto' : 'none',
+              // pointerEvents: screenView.value === 'search' ? 'auto' : 'none',
             }}>
             <ScrollView>
+              {/* Recommended Users - Always show, but in different layouts */}
+              <RecommendedUsers
+                users={recommendedUsers}
+                onUserPress={handleRecommendedUserPress}
+                loading={recommendedLoading}
+                isSearching={searchLoading}
+              />
+
+              {/* Search Results */}
               {showSearchResults && (
                 <View
                   style={{
                     flex: 1,
                     borderRadius: 12,
+                    marginTop: 16,
                   }}
                   onStartShouldSetResponder={() => true}
                   onTouchEnd={(e) => e.stopPropagation()}>
+                  <View className="mx-4 mb-4">
+                    <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
+                      Search results
+                    </Text>
+                  </View>
                   <VStack spacing={12}>
-                    {/* <Text
-                    loading={searchLoading}
-                    overpass
-                    regular
-                    bold
-                    size={14}
-                    color={getPrimaryColor('100')}>
-                    Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
-                  </Text> */}
                     {displayResults.map((result) => (
                       <SearchResult
                         key={result.pubkey}
@@ -632,21 +678,9 @@ const PaymentsContent = () => {
                   </VStack>
                 </View>
               )}
-              {showNoResults && (
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: getPrimaryColor('950'),
-                    borderRadius: 12,
-                    padding: 16,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <Text overpass size={16} className="text-primary-400">
-                    No results found for "{searchQuery}"
-                  </Text>
-                </View>
-              )}
+
+              {/* No Results Found */}
+              {showNoResults && <NoResultsFound />}
             </ScrollView>
           </View>
           <AnimatedBlur />

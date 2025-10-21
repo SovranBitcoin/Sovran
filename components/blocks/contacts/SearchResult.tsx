@@ -1,11 +1,10 @@
 import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, VStack } from 'components/ui/View';
+import { HStack, VStack, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { ProfileImage } from './ProfileImage';
 import { UserProfile } from 'helper/apiClient';
-
 interface SearchResultProps {
   result: {
     pubkey: string;
@@ -19,31 +18,30 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   const { getGreenColor, getRedColor } = useTheme();
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex-row items-center rounded-lg py-2"
-      disabled={loading || !result.profile}>
-      <HStack spacing={8}>
-        <ProfileImage loading={loading} profile={result.profile} />
-        <VStack spacing={4} className="flex-1">
-          <Text loading={loading} overpass bold size={16} className="text-primary-50">
-            {result.profile?.displayName || result.profile?.name || 'Loading...'}
-          </Text>
-          {result.profile?.nip05 && (
-            <Text
-              loading={loading}
-              overpass
-              regular
-              size={12}
-              style={{
-                color: result.profile.nip05Valid ? getGreenColor('300') : getRedColor('300'),
-              }}>
-              {result.profile.nip05Valid ? '✓ ' : '✗ '}
-              {result.profile.nip05}
+    <View blur className="mx-4 flex-row items-center rounded-lg p-4">
+      <TouchableOpacity onPress={onPress} disabled={loading || !result.profile}>
+        <HStack spacing={8}>
+          <ProfileImage loading={loading} profile={result.profile} />
+          <VStack spacing={4} className="flex-1">
+            <Text loading={loading} overpass bold size={16} className="text-primary-50">
+              {result.profile?.displayName || result.profile?.name || 'Loading...'}
             </Text>
-          )}
-        </VStack>
-      </HStack>
-    </TouchableOpacity>
+            {result.profile?.nip05 && (
+              <Text
+                loading={loading}
+                overpass
+                regular
+                size={12}
+                style={{
+                  color: result.profile.nip05Valid ? getGreenColor('300') : getRedColor('300'),
+                }}>
+                {result.profile.nip05Valid ? '✓ ' : '✗ '}
+                {result.profile.nip05}
+              </Text>
+            )}
+          </VStack>
+        </HStack>
+      </TouchableOpacity>
+    </View>
   );
 }
