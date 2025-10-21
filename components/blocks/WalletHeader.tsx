@@ -86,7 +86,7 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
         updateSelectedMint={true}
         showAddMintsButton={true}
         showDetailsButton={true}
-        style={{ width: Dimensions.get('window').width - 128 }}
+        style={{ width: Dimensions.get('window').width - 124 - 16 }}
       />
     </View>
   );

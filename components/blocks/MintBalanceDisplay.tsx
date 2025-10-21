@@ -140,10 +140,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         blur
         align="center"
         justify="space-between"
+        className="rounded-2xl"
         style={[
           {
             padding: 8,
-            borderRadius: 16,
             borderWidth: 0.2,
             borderColor: getPrimaryColor('600'),
             marginVertical: 4,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View, StyleSheet, Dimensions } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import Icon from 'assets/icons';
@@ -9,18 +9,15 @@ import { popup } from '@/helper/popup';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
 import { HStack, Spacer } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';
-import { SearchBar } from 'components/blocks/payments';
 import { TAB_SCREENS } from '@/app/(drawer)/(tabs)/_layout.tabs';
-import { useNavigation } from 'expo-router';
+import { useNavigation, usePathname } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 const Tab = createBottomTabNavigator();
 
-const PROFILE_AVATAR_SIZE = 48;
 const SPACING_XS = 8;
-const SPACING_SM = 16;
 
 const LIGHT_THEMES = ['light', 'beige'];
 
@@ -68,24 +65,6 @@ const TabBarBackground = () => {
   );
 };
 
-const PaymentsHeaderTitle = () => {
-  const screenWidth = Dimensions.get('window').width;
-  const searchContainerWidth = screenWidth - PROFILE_AVATAR_SIZE + SPACING_SM;
-  const marginOffset = -(PROFILE_AVATAR_SIZE + SPACING_XS);
-
-  return (
-    <View
-      className="justify-center pr-4"
-      style={{
-        width: searchContainerWidth,
-        marginLeft: marginOffset,
-        marginTop: -SPACING_XS,
-      }}>
-      <SearchBar />
-    </View>
-  );
-};
-
 const WalletHeaderTitle = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
@@ -103,18 +82,19 @@ const WalletHeaderTitle = () => {
 const TabLayout = () => {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const navigation = useNavigation();
+  const pathname = usePathname();
   const { keys: nostrKeys } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
 
   const isNavigationVisible = nostrKeys?.pubkey && isTermsAccepted;
+  const isPaymentsTab = pathname?.includes('/payments');
 
   const HeaderLeft = () => {
-    if (!nostrKeys?.pubkey) return null;
+    if (!nostrKeys?.pubkey || isPaymentsTab) return null;
 
     return (
       <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-        <HStack spacing={12} align="flex-start">
-          <Spacer size={8} />
+        <HStack spacing={12} align="flex-start" className="ml-4">
           <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
         </HStack>
       </Pressable>
@@ -139,8 +119,6 @@ const TabLayout = () => {
     switch (title) {
       case 'Wallet':
         return WalletHeaderTitle;
-      case 'Payments':
-        return PaymentsHeaderTitle;
       default:
         return undefined;
     }

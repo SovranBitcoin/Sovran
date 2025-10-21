@@ -1,20 +1,26 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
-import { Dimensions } from 'react-native';
-import Modal from 'components/blocks/Modal';
 import PagerView from 'react-native-pager-view';
 import { useTheme } from 'providers/ThemeProvider';
 import { Tabs } from 'components/ui/Tabs';
 import { ContactItem } from 'components/blocks/payments';
-import { Spacer, View } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
+import { View } from 'components/ui/View';
 import { useMintManagement } from 'hooks/coco';
 import { Mint } from 'coco-cashu-core';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { LegendList } from '@legendapp/list';
-
+import {
+  PaymentsAnimationProvider,
+  usePaymentsAnimation,
+} from 'providers/PaymentsAnimationProvider';
+import { SearchResultsOverlay } from 'components/blocks/payments/SearchResultsOverlay';
+import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
+import { CancelButton } from 'components/blocks/payments/CancelButton';
+import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
+import { Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
   console.log(`[PERF] Rendering ContactItem for ${item.type}:${item.pubkey || item.mint?.mintUrl}`);
@@ -23,7 +29,7 @@ const RenderItem = React.memo(({ item }: { item: any }) => {
 
 RenderItem.displayName = 'RenderItem';
 
-const TabOneScreen = () => {
+const PaymentsContent = () => {
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
   const { mints, loadMints, getMintInfo } = useMintManagement();
@@ -327,6 +333,17 @@ const TabOneScreen = () => {
   }, [mintsWithMetadata, nostrKeys?.pubkey]);
 
   const pagerRef = useRef<PagerView>(null);
+  const { searchQuery } = usePaymentsAnimation();
+
+  // Debug logging
+  console.log('PaymentsContent render:', {
+    decryptedContactsLength: decryptedContacts?.length || 0,
+    decryptedMintsLength: decryptedMints?.length || 0,
+    isDecrypting,
+    mintsLoadingInfo,
+    isDecryptingMints,
+    selectedTab,
+  });
 
   const onPageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
@@ -345,14 +362,18 @@ const TabOneScreen = () => {
   const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
   return (
-    <View className="flex-1 bg-primary-900">
-      <Spacer size={96} />
-      <Modal
-        scrollEnabled={false}
-        showBack={false}
-        showHeader={false}
-        buttons={null}
-        backgroundColor={getPrimaryColor('900')}>
+    <SafeAreaView className="flex-1 bg-primary-900 px-4">
+      <View className="flex-1 bg-primary-900" style={{}}>
+        {/* Search Bar and Cancel Button */}
+        <View
+          style={{
+            flexDirection: 'row',
+            height: 48,
+          }}>
+          <AnimatedSearchBar />
+          <CancelButton />
+        </View>
+
         <View
           style={{
             paddingHorizontal: 12,
@@ -379,62 +400,56 @@ const TabOneScreen = () => {
             initialPage={0}
             scrollEnabled={true}>
             <View key="1" style={{ flex: 1 }}>
-              {isDecrypting ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: getPrimaryColor('400') }}>Decrypting messages...</Text>
-                </View>
-              ) : decryptedContacts.length === 0 ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: getPrimaryColor('400') }}>
-                    No recent conversations found
-                  </Text>
-                </View>
-              ) : (
-                <LegendList
-                  data={decryptedContacts}
-                  estimatedItemSize={ITEM_HEIGHT}
-                  renderItem={({ item }) => <RenderItem item={item} />}
-                  keyExtractor={(item) => item.pubkey}
-                  style={{
-                    flex: 1,
-                  }}
-                  contentContainerStyle={{ paddingBottom: 256 }}
-                  maintainVisibleContentPosition
-                />
-              )}
+              <DraggableContactsList
+                data={decryptedContacts}
+                isDecrypting={isDecrypting}
+                emptyMessage="No recent conversations found"
+                itemHeight={ITEM_HEIGHT}
+              />
             </View>
             <View key="2" style={{ flex: 1 }}>
-              {mintsLoadingInfo || isDecryptingMints ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: getPrimaryColor('400') }}>
-                    {mintsLoadingInfo ? 'Loading mints...' : 'Decrypting messages...'}
-                  </Text>
-                </View>
-              ) : decryptedMints.length === 0 ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: getPrimaryColor('400') }}>
-                    No mints with nostr contacts found
-                  </Text>
-                </View>
-              ) : (
-                <LegendList
-                  data={decryptedMints}
-                  estimatedItemSize={ITEM_HEIGHT}
-                  renderItem={({ item }) => <RenderItem item={item} />}
-                  keyExtractor={(item) => item.mint.mintUrl}
-                  style={{
-                    backgroundColor: getPrimaryColor('900'),
-                    flex: 1,
-                  }}
-                  contentContainerStyle={{ paddingBottom: 256 }}
-                  maintainVisibleContentPosition
-                />
-              )}
+              <DraggableContactsList
+                data={decryptedMints}
+                isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                emptyMessage="No mints with nostr contacts found"
+                itemHeight={ITEM_HEIGHT}
+              />
             </View>
           </PagerView>
+
+          {/* Search Results Overlay */}
+          <SearchResultsOverlay
+            allContacts={decryptedContacts}
+            allMints={decryptedMints}
+            searchQuery={searchQuery}
+          />
         </View>
-      </Modal>
-    </View>
+
+        {/* Animated blur overlay for search mode */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 48,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            padding: 8,
+          }}>
+          {/* my search results */}
+        </View>
+        <AnimatedBlur />
+        {/* </Modal> */}
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const TabOneScreen = () => {
+  return (
+    <PaymentsAnimationProvider>
+      <PaymentsContent />
+    </PaymentsAnimationProvider>
   );
 };
 

@@ -203,7 +203,7 @@ function generateWavesAvatar(seed: string, size: number): JSX.Element {
 
   // Generate circular accents
   const circles = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 0; i++) {
     circles.push({
       cx: random() * size,
       cy: random() * size,

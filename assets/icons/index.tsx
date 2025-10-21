@@ -397,6 +397,7 @@ export function CurrencyIcon({
       <View
         style={{
           width: width,
+          height: width,
         }}>
         <Svg
           viewBox="0 0 33 33"
