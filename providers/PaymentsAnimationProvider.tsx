@@ -30,6 +30,7 @@ type ScreenView = 'contacts' | 'search';
 type ContextValue = {
   inputRef: RefObject<TextInput | null>;
   screenView: SharedValue<ScreenView>;
+  currentView: ScreenView;
   isListDragging: SharedValue<boolean>;
   offsetY: SharedValue<number>;
   blurIntensity: SharedValue<number>;
@@ -50,29 +51,32 @@ export const PaymentsAnimationProvider: FC<PropsWithChildren> = ({ children }) =
   const isListDragging = useSharedValue(false);
   const blurIntensity = useSharedValue(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentView, setCurrentView] = useState<ScreenView>('contacts');
 
   // Transition to search mode
   const onGoToSearch = useCallback(() => {
+    console.log('[DEBUG PaymentsAnimationProvider] onGoToSearch called');
     screenView.value = 'search';
+    setCurrentView('search');
     blurIntensity.value = withTiming(100);
-    // Make TextInput editable and focus it
+    // Focus the input (it's always editable now)
     if (inputRef.current) {
-      inputRef.current.setNativeProps({ editable: true, pointerEvents: 'auto' });
       inputRef.current.focus();
     }
-  }, []);
+  }, [screenView, blurIntensity]);
 
   // Return to contacts mode
   const onGoToContacts = useCallback(() => {
+    console.log('[DEBUG PaymentsAnimationProvider] onGoToContacts called');
     screenView.value = 'contacts';
+    setCurrentView('contacts');
     blurIntensity.value = withTiming(0);
     setSearchQuery('');
-    // Make TextInput non-editable again
+    // Blur the input
     if (inputRef.current) {
-      inputRef.current.setNativeProps({ editable: false, pointerEvents: 'none' });
       inputRef.current.blur();
     }
-  }, []);
+  }, [screenView, blurIntensity]);
 
   // Update search query
   const onSearchQueryChange = useCallback((query: string) => {
@@ -82,6 +86,7 @@ export const PaymentsAnimationProvider: FC<PropsWithChildren> = ({ children }) =
   const value = {
     inputRef,
     screenView,
+    currentView,
     isListDragging,
     offsetY,
     blurIntensity,

@@ -17,7 +17,7 @@ import {
 import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
 import { CancelButton } from 'components/blocks/payments/CancelButton';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
-import { Alert, Dimensions, ScrollView } from 'react-native';
+import { Dimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 import { SkeletonContainer } from 'react-native-skeleton-component';
@@ -366,7 +366,7 @@ const PaymentsContent = () => {
   }, [mintsWithMetadata, nostrKeys?.pubkey]);
 
   const pagerRef = useRef<PagerView>(null);
-  const { searchQuery } = usePaymentsAnimation();
+  const { searchQuery, currentView } = usePaymentsAnimation();
   // Fetch recommended users
   const fetchRecommendedUsers = useCallback(async () => {
     try {
@@ -378,9 +378,6 @@ const PaymentsContent = () => {
       });
 
       if (result.isOk()) {
-        Alert.alert('result', JSON.stringify(result.value));
-
-        console.log('result123123', result.value.results);
         setRecommendedUsers(result.value.results);
       } else {
         console.error('Error fetching recommended users:', result.error);
@@ -497,6 +494,7 @@ const PaymentsContent = () => {
     searchQuery.trim().length > 0 && (searchLoading || searchResults.length > 0);
   const showNoResults =
     searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
+  const isSearchMode = currentView === 'search';
 
   // Skeleton configuration
   const skeletonConfig = useMemo(
@@ -543,6 +541,8 @@ const PaymentsContent = () => {
     searchQuery,
     searchLoading,
     searchResultsLength: searchResults.length,
+    currentView,
+    isSearchMode,
   });
 
   const onPageSelected = useCallback((event: any) => {
@@ -561,6 +561,66 @@ const PaymentsContent = () => {
   // Constants for LegendList
   const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
+  // Fetch kind 0 (profile) events for all contacts
+  const profileFilters = useMemo(() => {
+    const allPubkeys = [...decryptedContacts, ...decryptedMints]
+      .map((item: any) => item.pubkey)
+      .filter((pubkey): pubkey is string => !!pubkey);
+
+    console.log('[DEBUG payments.tsx] Requesting profiles for pubkeys:', allPubkeys.length);
+    console.log(
+      '[DEBUG payments.tsx] First 5 pubkeys:',
+      allPubkeys.slice(0, 5).map((p) => p.slice(0, 8))
+    );
+
+    if (allPubkeys.length === 0) return null;
+
+    return [
+      {
+        kinds: [0],
+        authors: allPubkeys,
+      },
+    ];
+  }, [decryptedContacts, decryptedMints]);
+
+  const { events: profileEvents } = useSubscribe({
+    filters: profileFilters,
+  });
+
+  // DEBUG: Log raw profile events
+  console.log('[DEBUG payments.tsx] profileEvents count:', profileEvents?.length || 0);
+  console.log(
+    '[DEBUG payments.tsx] First 3 profile events:',
+    profileEvents?.slice(0, 3).map((e) => ({
+      pubkey: e.pubkey,
+      content: e.content,
+      kind: e.kind,
+    }))
+  );
+
+  // Parse and map profile events to a more usable format
+  const profilesMap = useMemo(() => {
+    const map = new Map();
+    profileEvents?.forEach((event) => {
+      try {
+        const profile = JSON.parse(event.content);
+        map.set(event.pubkey, profile);
+        console.log(
+          `[DEBUG payments.tsx] Parsed profile for ${event.pubkey.slice(0, 8)}:`,
+          profile
+        );
+      } catch (error) {
+        console.warn(`Failed to parse profile for ${event.pubkey}:`, error);
+      }
+    });
+    console.log('[DEBUG payments.tsx] profilesMap size:', map.size);
+    console.log(
+      '[DEBUG payments.tsx] profilesMap keys:',
+      Array.from(map.keys()).map((k) => k.slice(0, 8))
+    );
+    return map;
+  }, [profileEvents]);
+
   return (
     <SafeAreaView className="flex-1 bg-primary-900">
       <SkeletonContainer
@@ -574,6 +634,7 @@ const PaymentsContent = () => {
             style={{
               flexDirection: 'row',
               height: 48,
+              zIndex: 1001,
             }}>
             <AnimatedSearchBar />
             <CancelButton />
@@ -607,6 +668,7 @@ const PaymentsContent = () => {
               <View key="1" style={{ flex: 1 }}>
                 <DraggableContactsList
                   data={decryptedContacts}
+                  profilesMap={profilesMap}
                   isDecrypting={isDecrypting}
                   emptyMessage="No recent conversations found"
                   itemHeight={ITEM_HEIGHT}
@@ -615,6 +677,7 @@ const PaymentsContent = () => {
               <View key="2" style={{ flex: 1 }}>
                 <DraggableContactsList
                   data={decryptedMints}
+                  profilesMap={profilesMap}
                   isDecrypting={mintsLoadingInfo || isDecryptingMints}
                   emptyMessage="No mints with nostr contacts found"
                   itemHeight={ITEM_HEIGHT}
@@ -633,9 +696,13 @@ const PaymentsContent = () => {
               bottom: 0,
               zIndex: 1000,
               paddingVertical: 8,
-              // pointerEvents: screenView.value === 'search' ? 'auto' : 'none',
+              pointerEvents: isSearchMode ? 'auto' : 'none',
+            }}
+            onStartShouldSetResponder={() => {
+              console.log('[DEBUG overlay] onStartShouldSetResponder, isSearchMode:', isSearchMode);
+              return true;
             }}>
-            <ScrollView>
+            <ScrollView pointerEvents={isSearchMode ? 'auto' : 'none'}>
               {/* Recommended Users - Always show, but in different layouts */}
               <RecommendedUsers
                 users={recommendedUsers}

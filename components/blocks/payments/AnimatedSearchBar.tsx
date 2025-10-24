@@ -117,7 +117,8 @@ export const AnimatedSearchBar: FC = () => {
   });
 
   const handlePress = () => {
-    console.log('Search bar pressed!');
+    console.log('[DEBUG AnimatedSearchBar] Search bar pressed!');
+    console.log('[DEBUG AnimatedSearchBar] Current screenView:', screenView.value);
     onGoToSearch();
     // Focus the input after transitioning to search mode
     setTimeout(() => {
@@ -150,8 +151,6 @@ export const AnimatedSearchBar: FC = () => {
               value={searchQuery}
               onChangeText={handleTextChange}
               onFocus={handlePress}
-              editable={true}
-              pointerEvents="auto"
               className="h-full px-4"
               style={{
                 backgroundColor: 'transparent',

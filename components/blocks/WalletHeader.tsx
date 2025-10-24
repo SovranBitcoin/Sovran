@@ -7,6 +7,7 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
+import { useRoute } from '@react-navigation/native';
 
 interface AccountType {
   unit: string;
@@ -20,6 +21,11 @@ interface WalletHeaderProps {
 
 export function Background() {
   const { getPrimaryColor } = useTheme();
+  const route = useRoute();
+
+  if (route.name === 'payments') {
+    return null;
+  }
 
   return (
     <LinearGradient

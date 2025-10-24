@@ -1,20 +1,26 @@
 import React, { FC, useCallback } from 'react';
 import { View } from 'react-native';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { LegendList } from '@legendapp/list';
 import { ContactItem } from './ContactItem';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
-import { usePaymentsAnimation } from 'providers/PaymentsAnimationProvider';
 
-// Memoized ContactItem to prevent unnecessary re-renders
-const RenderItem = React.memo(({ item }: { item: any }) => {
-  return <ContactItem item={item} />;
-});
+// Wrapper component that looks up profile and passes it to ContactItem
+const RenderItem = ({ item, profilesMap }: { item: any; profilesMap: Map<string, any> }) => {
+  const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
 
-RenderItem.displayName = 'RenderItem';
+  console.log('[DEBUG RenderItem] Rendering:', {
+    pubkey: item.pubkey?.slice(0, 8),
+    hasProfile: !!profile,
+    profileName: profile?.name || profile?.display_name,
+  });
+
+  return <ContactItem item={item} profile={profile} />;
+};
 
 interface DraggableContactsListProps {
+  profilesMap: Map<string, any>;
   data: any[];
   isDecrypting: boolean;
   emptyMessage: string;
@@ -22,21 +28,30 @@ interface DraggableContactsListProps {
 }
 
 export const DraggableContactsList: FC<DraggableContactsListProps> = ({
+  profilesMap,
   data,
   isDecrypting,
   emptyMessage,
   itemHeight = 80,
 }) => {
   const { getPrimaryColor } = useTheme();
-  const { screenView, offsetY } = usePaymentsAnimation();
 
   // Debug logging
-  console.log('DraggableContactsList render:', {
+  console.log('[DEBUG DraggableContactsList] Render:', {
     dataLength: data?.length || 0,
+    profilesMapSize: profilesMap.size,
     isDecrypting,
     emptyMessage,
-    data: data?.slice(0, 2), // Log first 2 items for debugging
   });
+  console.log(
+    '[DEBUG DraggableContactsList] First 2 items:',
+    data?.slice(0, 2).map((item) => ({
+      type: item.type,
+      pubkey: item.pubkey?.slice(0, 8),
+      hasProfile: profilesMap.has(item.pubkey),
+      profile: profilesMap.get(item.pubkey),
+    }))
+  );
 
   // Note: LegendList doesn't support onScroll prop the same way as FlatList
   // We'll handle drag gestures differently if needed
@@ -46,13 +61,6 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
     return {
       // Always allow pointer events for now - we'll handle this differently
       pointerEvents: 'auto',
-    };
-  });
-
-  // Top gradient style for visual feedback during drag
-  const rTopGradientStyle = useAnimatedStyle(() => {
-    return {
-      opacity: offsetY.value < 0 ? 0 : screenView.value === 'contacts' ? withTiming(1) : 0,
     };
   });
 
@@ -82,9 +90,10 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   return (
     <Animated.View className="mt-3 flex-1" style={rContainerStyle}>
       <LegendList
+        key={`list-${profilesMap.size}`}
         data={data}
         estimatedItemSize={itemHeight}
-        renderItem={({ item }) => <RenderItem item={item} />}
+        renderItem={({ item }) => <RenderItem item={item} profilesMap={profilesMap} />}
         keyExtractor={keyExtractor}
         style={{
           flex: 1,

@@ -17,6 +17,13 @@ interface ContactItemProps {
     mintInfo?: any;
     timestamp?: number;
   };
+  profile?: {
+    name?: string;
+    display_name?: string;
+    picture?: string;
+    about?: string;
+    nip05?: string;
+  };
 }
 
 const styles = {
@@ -45,28 +52,43 @@ const styles = {
   },
 };
 
-export const ContactItem = React.memo(({ item }: ContactItemProps) => {
-  console.log(`[PERF] ContactItem render for ${item.type}:${item.pubkey || item.mint?.mintUrl}`);
+export const ContactItem = ({ item, profile }: ContactItemProps) => {
+  console.log(
+    `[DEBUG ContactItem] Render for ${item.type}:${item.pubkey?.slice(0, 8) || item.mint?.mintUrl}`
+  );
+  console.log('[DEBUG ContactItem] Received profile:', JSON.stringify(profile));
+  console.log('[DEBUG ContactItem] Item pubkey:', item.pubkey?.slice(0, 16));
+  console.log(
+    '[DEBUG ContactItem] Profile name:',
+    profile?.name || profile?.display_name || 'NO PROFILE'
+  );
 
   // Get display info
   const displayInfo = useMemo(() => {
     if (item.type === 'mint') {
-      return {
+      const mintInfo = {
         name: getMintDisplayName(item.mint?.mintUrl || '', item.mintInfo),
         picture: item.mintInfo?.icon_url,
         subtitle: item.dmEvent?.content || item.mint?.mintUrl || 'No messages',
         isMint: true,
       };
+      console.log('[DEBUG ContactItem] Mint displayInfo:', JSON.stringify(mintInfo));
+      return mintInfo;
     }
 
-    // Regular contact - use pubkey as name
-    return {
-      name: item.pubkey.slice(0, 16) + '...',
-      picture: undefined,
-      subtitle: item.dmEvent?.content || 'No messages',
+    // Regular contact - use profile data from kind 0 event
+    const displayName = profile?.display_name || profile?.name || item.pubkey.slice(0, 16) + '...';
+    const lastMessage = item.dmEvent?.content || 'No messages';
+
+    const contactInfo = {
+      name: displayName,
+      picture: profile?.picture,
+      subtitle: lastMessage,
       isMint: false,
     };
-  }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent?.content]);
+    console.log('[DEBUG ContactItem] Contact displayInfo:', JSON.stringify(contactInfo));
+    return contactInfo;
+  }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent?.content, profile]);
 
   // Format date
   const formattedDate = useMemo(() => {
@@ -122,6 +144,4 @@ export const ContactItem = React.memo(({ item }: ContactItemProps) => {
       </HStack>
     </TouchableOpacity>
   );
-});
-
-ContactItem.displayName = 'ContactItem';
+};

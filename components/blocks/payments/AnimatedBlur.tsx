@@ -17,7 +17,9 @@ export const AnimatedBlur: FC = () => {
   });
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFillObject, rBlurStyle]} pointerEvents="none">
+    <Animated.View
+      style={[StyleSheet.absoluteFillObject, rBlurStyle, { zIndex: 999 }]}
+      pointerEvents="none">
       <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFillObject} />
       {/* Additional overlay for better visual depth */}
       <View
