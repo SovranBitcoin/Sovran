@@ -41,7 +41,7 @@
  * @see {@link components/ui/Text}
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 
@@ -52,6 +52,7 @@ import { rgba } from 'polished';
 import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Badge } from './Badge';
+import { Skeleton } from './Skeleton';
 
 /**
  * Avatar variant types
@@ -86,6 +87,8 @@ interface AvatarProps {
   status?: string;
   /** Seed for generating deterministic avatar (e.g., pubkey) */
   seed?: string;
+  /** External loading state (e.g., from useSubscribe) */
+  loading?: boolean;
 }
 
 // ==================== PRNG Implementation ====================
@@ -277,8 +280,26 @@ export const Avatar = ({
   name,
   status,
   seed,
+  loading: externalLoading = false,
 }: AvatarProps) => {
   const { getPrimaryColor } = useTheme();
+  const [imageLoading, setImageLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Reset loading and error state when picture changes
+  useEffect(() => {
+    if (picture) {
+      setImageLoading(true);
+      setHasError(false);
+    } else {
+      setImageLoading(false);
+      setHasError(false);
+    }
+  }, [picture]);
+
+  // Combined loading state: external loading (data fetching) OR image loading
+  const isLoading = externalLoading || imageLoading;
+
   const iconSize = size * 0.5; // 50% of parent size
   const statusIconSize = size * 0.33; // 25% of parent size for status icon
 
@@ -420,29 +441,63 @@ export const Avatar = ({
   // Get status badge configuration
   const statusBadge = getStatusBadge();
 
+  // If no picture is provided, just show the seed/fallback version
+  const shouldShowImage = picture && !hasError;
+
+  // Show skeleton if loading (either external or image loading)
+  const showSkeleton = isLoading;
+
+  // Show fallback (seed/icon) only if not loading or if image failed
+  const showFallback = !showSkeleton || hasError;
+
   return (
     <VStack style={{ position: 'relative' }}>
       {/* Main avatar container using AvatarPrimitive for accessibility */}
       <AvatarPrimitive.Root alt={alt || defaultAlt} style={avatarStyles}>
-        {/* Avatar image if available */}
-        {picture && <AvatarPrimitive.Image source={{ uri: picture }} style={avatarStyles} />}
+        {/* Avatar image if available and not errored */}
+        {shouldShowImage && (
+          <AvatarPrimitive.Image
+            source={{ uri: picture }}
+            style={avatarStyles}
+            onLoad={() => {
+              setImageLoading(false);
+            }}
+            onError={() => {
+              setImageLoading(false);
+              setHasError(true);
+            }}
+          />
+        )}
 
-        {/* Fallback content when image fails to load */}
-        <AvatarPrimitive.Fallback style={avatarStyles}>
-          <VStack align="center" justify="center" flex={1}>
-            {/* Only show blur background if not using generated avatar */}
-            {!seed && (
-              <BlurView
-                tint="default"
-                style={avatarStyles}
-                intensity={75}
-                className="overflow-hidden opacity-100"
-              />
-            )}
-            {/* Fallback content (generated avatar, initial, or icon) */}
-            {getFallbackContent()}
-          </VStack>
-        </AvatarPrimitive.Fallback>
+        {/* Loading state - show skeleton */}
+        {showSkeleton && (
+          <Skeleton
+            style={{
+              ...avatarStyles,
+              position: 'absolute',
+              zIndex: 10,
+            }}
+          />
+        )}
+
+        {/* Fallback content - show if not loading or if error occurred */}
+        {showFallback && (
+          <AvatarPrimitive.Fallback style={avatarStyles}>
+            <VStack align="center" justify="center" flex={1}>
+              {/* Only show blur background if not using generated avatar */}
+              {!seed && (
+                <BlurView
+                  tint="default"
+                  style={avatarStyles}
+                  intensity={75}
+                  className="overflow-hidden opacity-100"
+                />
+              )}
+              {/* Fallback content (generated avatar, initial, or icon) */}
+              {getFallbackContent()}
+            </VStack>
+          </AvatarPrimitive.Fallback>
+        )}
       </AvatarPrimitive.Root>
 
       {/* Status badge positioned in bottom right corner */}

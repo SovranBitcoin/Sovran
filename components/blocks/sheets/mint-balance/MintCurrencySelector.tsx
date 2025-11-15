@@ -39,6 +39,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
   mintsLabel = 'Send from',
   onCurrencyChange,
   customEmptyState,
+  isLoading = false,
 }: MintCurrencySelectorProps<T>) {
   const { getPrimaryColor } = useTheme();
 
@@ -161,19 +162,21 @@ export function MintCurrencySelector<T extends MintData = MintData>({
           {mintsLabel}
         </Text>
         <VStack>
-          {filteredMints.length === 0
-            ? customEmptyState || (
-                <Text style={{ color: getPrimaryColor('0'), textAlign: 'center', marginTop: 20 }}>
-                  {selectedCurrency === 'ALL'
-                    ? 'No mints available'
-                    : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
-                </Text>
-              )
-            : filteredMints.map((mint) => (
-                <React.Fragment key={mint.mintUrl || mint.url || Math.random()}>
-                  {renderItem(mint, selectedCurrency)}
-                </React.Fragment>
-              ))}
+          {isLoading && mints.length === 0 ? (
+            customEmptyState || null
+          ) : filteredMints.length === 0 ? (
+            <Text style={{ color: getPrimaryColor('0'), textAlign: 'center', marginTop: 20 }}>
+              {selectedCurrency === 'ALL'
+                ? 'No mints available'
+                : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+            </Text>
+          ) : (
+            filteredMints.map((mint) => (
+              <React.Fragment key={mint.mintUrl || mint.url || Math.random()}>
+                {renderItem(mint, selectedCurrency)}
+              </React.Fragment>
+            ))
+          )}
         </VStack>
       </VStack>
     </VStack>

@@ -46,7 +46,7 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
     for (const mintUrl of defaultMints) {
       try {
         // Check if mint already exists
-        const isKnown = await manager.mint.isKnownMint(mintUrl);
+        const isKnown = await manager.mint.isTrustedMint(mintUrl);
         if (isKnown) {
           console.log(`ℹ️ Default mint already exists: ${mintUrl}`);
           continue;

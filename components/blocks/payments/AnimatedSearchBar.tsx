@@ -1,5 +1,5 @@
 import React, { FC } from 'react';
-import { TextInput, View } from 'react-native';
+import { TextInput, View, Pressable } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -17,10 +17,14 @@ import {
 } from 'providers/PaymentsAnimationProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Avatar } from 'components/ui/Avatar';
+import { useNavigation } from 'expo-router';
+import { DrawerActions } from '@react-navigation/native';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 
 export const AnimatedSearchBar: FC = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const { getPrimaryColor } = useTheme();
+  const navigation = useNavigation();
   const {
     screenView,
     offsetY,
@@ -132,13 +136,20 @@ export const AnimatedSearchBar: FC = () => {
     onSearchQueryChange(text);
   };
 
+  const handleAvatarPress = async () => {
+    await EnhancedHaptics.navigateHaptic();
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
+
   return (
     <Animated.View className="z-[999] h-[48px] overflow-hidden " style={rContainerStyle}>
       <View className="relative h-[48px]">
         {/* Avatar - absolutely positioned */}
         <Animated.View
           style={[rAvatarStyle, { position: 'absolute', left: 14, top: 0, zIndex: 1 }]}>
-          <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
+          <Pressable onPress={handleAvatarPress}>
+            <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
+          </Pressable>
         </Animated.View>
 
         {/* Search Input */}

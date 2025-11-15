@@ -163,15 +163,27 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
       {...rest}>
       {rest.colorBlur && (
         <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: rest.colorBlur,
-            },
-          ]}
+          style={{
+            position: 'absolute',
+            top: -1,
+            left: -1,
+            right: -1,
+            bottom: -1,
+            backgroundColor: rest.colorBlur,
+          }}
         />
       )}
-      <BlurView intensity={blurIntensity} tint={blurTint} style={[StyleSheet.absoluteFill]} />
+      <BlurView
+        intensity={blurIntensity}
+        tint={blurTint}
+        style={{
+          position: 'absolute',
+          top: -1,
+          left: -1,
+          right: -1,
+          bottom: -1,
+        }}
+      />
 
       {children}
     </RNView>

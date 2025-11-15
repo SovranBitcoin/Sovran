@@ -99,7 +99,7 @@ type NostrState = {
 const initialState: NostrState = {
   currentProfile: {
     id: 0,
-    mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
+    // mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
   },
   search: [
     {
@@ -167,10 +167,10 @@ const initialState: NostrState = {
     },
   ],
   profiles: [
-    {
-      id: 0,
-      mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
-    },
+    // {
+    //   id: 0,
+    //   mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
+    // },
   ],
   messages: {
     loaded_messages: [],

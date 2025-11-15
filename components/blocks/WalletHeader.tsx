@@ -29,7 +29,7 @@ export function Background() {
 
   return (
     <LinearGradient
-      colors={[getPrimaryColor('950'), opacity(getPrimaryColor('950'), 0)]}
+      colors={[getPrimaryColor('900'), opacity(getPrimaryColor('900'), 0)]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={{

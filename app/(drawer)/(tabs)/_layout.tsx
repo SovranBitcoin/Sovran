@@ -92,8 +92,13 @@ const TabLayout = () => {
   const HeaderLeft = () => {
     if (!nostrKeys?.pubkey || isPaymentsTab) return null;
 
+    const handleAvatarPress = async () => {
+      await EnhancedHaptics.navigateHaptic();
+      navigation.dispatch(DrawerActions.openDrawer());
+    };
+
     return (
-      <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+      <Pressable onPress={handleAvatarPress}>
         <HStack spacing={12} align="flex-start" className="ml-4">
           <Avatar seed={nostrKeys?.pubkey} size={48} variant="person" />
         </HStack>

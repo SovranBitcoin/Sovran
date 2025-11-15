@@ -106,7 +106,6 @@ function MySplashScreen() {
 }
 
 function MainStack() {
-  // const { addMessage, messages } = useNostr();
   const { getPrimaryColor, currentTheme } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
   const { init: initializeNDK } = useNDK();

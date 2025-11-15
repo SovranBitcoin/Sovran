@@ -7,22 +7,35 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 
 // Wrapper component that looks up profile and passes it to ContactItem
-const RenderItem = ({ item, profilesMap }: { item: any; profilesMap: Map<string, any> }) => {
+const RenderItem = ({
+  item,
+  profilesMap,
+  isLoadingProfiles,
+}: {
+  item: any;
+  profilesMap: Map<string, any>;
+  isLoadingProfiles?: boolean;
+}) => {
   const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+
+  // Only show loading if we're still fetching profiles AND this specific contact doesn't have profile data yet
+  const shouldShowLoading = isLoadingProfiles && !profile;
 
   console.log('[DEBUG RenderItem] Rendering:', {
     pubkey: item.pubkey?.slice(0, 8),
     hasProfile: !!profile,
     profileName: profile?.name || profile?.display_name,
+    shouldShowLoading,
   });
 
-  return <ContactItem item={item} profile={profile} />;
+  return <ContactItem item={item} profile={profile} isLoadingProfile={shouldShowLoading} />;
 };
 
 interface DraggableContactsListProps {
   profilesMap: Map<string, any>;
   data: any[];
   isDecrypting: boolean;
+  isLoadingProfiles?: boolean;
   emptyMessage: string;
   itemHeight?: number;
 }
@@ -31,6 +44,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   profilesMap,
   data,
   isDecrypting,
+  isLoadingProfiles = false,
   emptyMessage,
   itemHeight = 80,
 }) => {
@@ -93,7 +107,9 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
         key={`list-${profilesMap.size}`}
         data={data}
         estimatedItemSize={itemHeight}
-        renderItem={({ item }) => <RenderItem item={item} profilesMap={profilesMap} />}
+        renderItem={({ item }) => (
+          <RenderItem item={item} profilesMap={profilesMap} isLoadingProfiles={isLoadingProfiles} />
+        )}
         keyExtractor={keyExtractor}
         style={{
           flex: 1,

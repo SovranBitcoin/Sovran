@@ -24,7 +24,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, Animated, Alert, Linking } from 'react-native';
-import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
+import { useSheetRef, useSheetPayload, RouteScreenProps } from 'react-native-actions-sheet';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -35,6 +35,7 @@ import { npubToPubkey } from 'components/blocks/Transaction';
 import { useMintManagement } from 'hooks/coco';
 import { extractDomain } from '@/helper/url';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
+import { useKYMMint } from 'hooks/coco/useKYMMint';
 import { Card } from 'components/ui/Card';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -42,6 +43,7 @@ import { Avatar } from 'components/ui/Avatar';
 import { truncateMiddle } from 'helper/strings';
 import * as Clipboard from 'expo-clipboard';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
+import { getUsername } from '@/helper/username';
 
 // DonutChart component
 const DonutChart = ({
@@ -268,24 +270,282 @@ const StatsGrid = ({
               shadowRadius: 8,
               elevation: 3,
             }}>
-            <Text className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary-200">
+            <Text bold overpass size={12} className="mb-1 uppercase tracking-wide text-primary-200">
               {stat.label}
             </Text>
 
             <Text
-              className={`mb-0.5 text-2xl font-semibold leading-7 tracking-tight text-primary-0 ${
+              bold
+              overpass
+              size={20}
+              className={`mb-0.5 leading-7 tracking-tight text-primary-0 ${
                 stat.accent ? 'text-2xl leading-8' : ''
               }`}>
               {stat.value}
             </Text>
 
-            <Text className="text-xs leading-4 tracking-wide text-primary-300 opacity-80">
+            <Text
+              bold
+              overpass
+              size={12}
+              className="leading-4 tracking-wide text-primary-300 opacity-80">
               {stat.description}
             </Text>
           </VStack>
         </View>
       ))}
     </HStack>
+  );
+};
+
+// RatingDisplay component
+const RatingDisplay = ({ score, recommendations }: { score?: number; recommendations?: any[] }) => {
+  const { getPrimaryColor } = useTheme();
+
+  if (score === undefined) {
+    return null;
+  }
+
+  // Determine which row should show gold stars
+  // Use ceiling so that scores like 1.1 go to the 2-star row, 2.3 goes to 3-star row, etc.
+  const targetRow = Math.max(1, Math.min(5, Math.ceil(score)));
+
+  // Calculate the percentage of gold for the target row (score / rowStars)
+  // This gives us the fraction of that row that should be gold
+  const goldPercentage = Math.min(1, score / targetRow);
+
+  // Calculate review distribution (5 stars down to 1 star)
+  const distribution = [5, 4, 3, 2, 1].map((starRating) => {
+    if (!recommendations || recommendations.length === 0) {
+      return { stars: starRating, percentage: 0 };
+    }
+    const count = recommendations.filter((rec) => Math.round(rec.score) === starRating).length;
+    const percentage = recommendations.length > 0 ? count / recommendations.length : 0;
+    return { stars: starRating, percentage };
+  });
+
+  const displayScore = score % 1 === 0 ? score.toString() : score.toFixed(1);
+
+  return (
+    <HStack align="flex-start" gap={16} className="w-full px-4">
+      {/* Large score display on the left */}
+      <VStack align="center" spacing={0}>
+        <Text size={32} heavy className="text-primary-0">
+          {Number(displayScore).toFixed(1)}
+        </Text>
+        <Text size={12} className="text-primary-300">
+          out of 5
+        </Text>
+      </VStack>
+
+      {/* Star distribution bars on the right */}
+      <VStack spacing={4} className="flex-1" style={{ flex: 1, minWidth: 0 }}>
+        {distribution.map(({ stars, percentage }) => {
+          const isTargetRow = stars === targetRow;
+          // Calculate how many full stars should be gold (e.g., 1.1 in 2-star row = 1 full star)
+          const fullGoldStars = isTargetRow ? Math.floor(goldPercentage * stars) : 0;
+          // Calculate if there's a partial star (e.g., 1.1 in 2-star row has 0.1 of second star)
+          const hasPartialStar = isTargetRow && goldPercentage * stars > fullGoldStars;
+
+          return (
+            <HStack
+              key={stars}
+              align="center"
+              gap={4}
+              className="w-full"
+              style={{ flex: 1, minWidth: 0 }}>
+              {/* Star rating label */}
+              <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+                {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => {
+                  const isFullGold = isTargetRow && idx < fullGoldStars;
+                  const isPartialGold = isTargetRow && idx === fullGoldStars && hasPartialStar;
+
+                  return (
+                    <Icon
+                      key={idx}
+                      name="ic:round-star"
+                      size={12}
+                      color={
+                        isFullGold ? '#FFD700' : isPartialGold ? '#FFD700' : getPrimaryColor('400')
+                      }
+                      style={
+                        isPartialGold
+                          ? { opacity: goldPercentage * stars - fullGoldStars }
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </HStack>
+
+              {/* Distribution bar directly after stars */}
+              <View
+                className="h-2 flex-1 overflow-hidden rounded-full"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  backgroundColor: isTargetRow
+                    ? 'rgba(255, 215, 0, 0.2)' // Off-gold background for gold bar
+                    : getPrimaryColor('700'),
+                }}>
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    width: isTargetRow ? `${goldPercentage * 100}%` : `${percentage * 100}%`,
+                    backgroundColor: isTargetRow
+                      ? '#FFD700'
+                      : percentage > 0
+                        ? getPrimaryColor('400')
+                        : 'transparent',
+                  }}
+                />
+              </View>
+            </HStack>
+          );
+        })}
+      </VStack>
+    </HStack>
+  );
+};
+
+// ReviewsList component
+const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
+  const { getPrimaryColor } = useTheme();
+  const [currentPage, setCurrentPage] = useState(0);
+  const reviewsPerPage = 3;
+
+  if (!recommendations || recommendations.length === 0) {
+    return null;
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(recommendations.length / reviewsPerPage);
+  const startIndex = currentPage * reviewsPerPage;
+  const endIndex = Math.min(startIndex + reviewsPerPage, recommendations.length);
+  const currentReviews = recommendations.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
+  };
+
+  return (
+    <VStack spacing={12} className="w-full px-4">
+      {/* Reviews */}
+      <VStack spacing={0} className="w-full">
+        {currentReviews.map((review, index) => {
+          // Extract review data - adjust property names based on actual KYM structure
+          const reviewText = review.comment;
+          const reviewScore = review.score;
+
+          // Determine display name - prefer name, fallback to truncated npub
+          const displayName = getUsername(review.pubkey);
+
+          return (
+            <View key={index} style={{ width: '100%' }}>
+              {index > 0 && (
+                <View
+                  className="h-px w-full"
+                  style={{ backgroundColor: getPrimaryColor('700'), marginVertical: 16 }}
+                />
+              )}
+              <HStack align="flex-start" gap={12} style={{ width: '100%', flex: 1 }}>
+                {/* Avatar */}
+                <View style={{ flexShrink: 0 }}>
+                  <Avatar seed={review.pubkey} size={40} variant="person" />
+                </View>
+
+                {/* Review content */}
+                <VStack spacing={4} className="flex-1" style={{ flex: 1, minWidth: 0 }}>
+                  {/* User identifier and date */}
+                  <HStack
+                    align="center"
+                    justify="space-between"
+                    className="w-full"
+                    style={{ flex: 1, minWidth: 0 }}>
+                    <HStack align="center" gap={6} style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        size={14}
+                        bold
+                        className="text-primary-0"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {displayName}
+                      </Text>
+                    </HStack>
+                  </HStack>
+
+                  {/* Star rating */}
+                  <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Icon
+                        key={star}
+                        name="ic:round-star"
+                        size={14}
+                        color={star <= Math.round(reviewScore) ? '#FFD700' : getPrimaryColor('600')}
+                      />
+                    ))}
+                  </HStack>
+
+                  {/* Review text */}
+                  {reviewText && (
+                    <Text
+                      size={14}
+                      className="text-primary-200"
+                      numberOfLines={10}
+                      ellipsizeMode="tail"
+                      style={{ flex: 1, minWidth: 0 }}>
+                      {reviewText}
+                    </Text>
+                  )}
+                </VStack>
+              </HStack>
+            </View>
+          );
+        })}
+      </VStack>
+
+      {/* Pagination Controls */}
+      <View
+        className="w-full rounded-full border border-primary-600 bg-primary-900 px-4"
+        style={{ position: 'relative' }}>
+        <HStack align="center" className="w-full">
+          {/* Previous Button - 50% width */}
+          <View
+            className="flex-1 p-3"
+            style={{
+              width: '50%',
+              opacity: currentPage === 0 ? 0.5 : 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onTouchEnd={() => currentPage > 0 && handlePrevPage()}>
+            <Icon name="fa6-solid:chevron-left" size={12} color={getPrimaryColor('200')} />
+          </View>
+
+          <Text size={12} bold className="text-primary-200">
+            {currentPage + 1} / {totalPages}
+          </Text>
+
+          {/* Next Button - 50% width */}
+          <View
+            className="flex-1 p-3"
+            style={{
+              width: '50%',
+              opacity: currentPage === totalPages - 1 ? 0.5 : 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onTouchEnd={() => currentPage < totalPages - 1 && handleNextPage()}>
+            <Icon name="fa6-solid:chevron-right" size={12} color={getPrimaryColor('200')} />
+          </View>
+        </HStack>
+      </View>
+    </VStack>
   );
 };
 
@@ -296,7 +556,7 @@ const StatsGrid = ({
  * @param {RouteScreenProps<'mint-balance', 'info'>} props
  * @returns {JSX.Element}
  */
-const InfoRoute = () => {
+const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
@@ -305,13 +565,20 @@ const InfoRoute = () => {
   const [mintInfo, setMintInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReviews, setShowReviews] = useState(false);
 
   // Animation values for the subtle pulsating effect
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(0.8)).current;
 
-  // Get mintUrl from global variable or payload
-  const mintUrl = (global as any).currentMintUrl || payload?.mintUrl;
+  // Get mintUrl from route params, global variable, or payload
+  const mintUrl = params?.mintUrl || (global as any).currentMintUrl || payload?.mintUrl;
+
+  console.log('🔍 INFO PAGE DEBUG:');
+  console.log('📋 Params:', params);
+  console.log('📋 Params mintUrl:', params?.mintUrl);
+  console.log('📋 Payload mintUrl:', payload?.mintUrl);
+  console.log('📋 Final mintUrl:', mintUrl);
 
   // Use audited mint hook to get audit data for this specific mint
   const {
@@ -321,6 +588,8 @@ const InfoRoute = () => {
     error: auditError,
   } = useAuditedMint(mintUrl);
 
+  // Fetch KYM rating data
+  const { score: kymScore, recommendations: kymRecommendations } = useKYMMint(mintUrl);
   /**
    * Handles text copying to clipboard
    *
@@ -505,12 +774,12 @@ const InfoRoute = () => {
                 {renderMintIcon()}
               </DonutChart>
             </VStack>
-            <Text className="mb-1 text-center text-3xl font-bold text-primary-0">
+            <Text size={24} bold className="mb-1 text-center font-bold text-primary-0">
               {mintInfo?.name || 'Loading...'}
             </Text>
-            {mintInfo?.version && (
+            {/* {mintInfo?.version && (
               <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
-            )}
+            )} */}
           </VStack>
         </ScrollView>
       </Wrapper>
@@ -587,9 +856,45 @@ const InfoRoute = () => {
               {renderMintIcon()}
             </DonutChart>
           </VStack>
-          <Text className="mb-1 text-center text-3xl font-bold text-primary-0">{displayName}</Text>
-          {mintInfo?.version && (
+          <Text size={24} bold className="mb-1 text-center font-bold text-primary-0">
+            {displayName}
+          </Text>
+          {/* {mintInfo?.version && (
             <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
+          )} */}
+
+          {/* Rating Display */}
+          {kymScore !== undefined && (
+            <>
+              <Spacer size={16} />
+              <RatingDisplay score={kymScore} recommendations={kymRecommendations} />
+            </>
+          )}
+
+          {/* Reviews List */}
+          {kymRecommendations && kymRecommendations.length > 0 && (
+            <>
+              <Spacer size={8} />
+              {!showReviews ? (
+                <View className="w-full px-4">
+                  <HStack justify="flex-end" className="w-full">
+                    <Text
+                      size={14}
+                      bold
+                      style={{
+                        color: '#FFD700',
+                        textDecorationLine: 'underline',
+                      }}
+                      onPress={() => setShowReviews(true)}>
+                      Show {kymRecommendations.length} review
+                      {kymRecommendations.length !== 1 ? 's' : ''}
+                    </Text>
+                  </HStack>
+                </View>
+              ) : (
+                <ReviewsList recommendations={kymRecommendations} />
+              )}
+            </>
           )}
 
           {/* Stats Grid */}

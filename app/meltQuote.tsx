@@ -140,9 +140,11 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
 
   const displayQuote = currentQuote || meltQuote || fetchedMeltQuote;
   const manager = useManager();
+
   useEffect(() => {
     manager.history.getPaginatedHistory().then(setHistory);
   }, [manager, displayQuote]);
+
   const [unit, setUnit] = useState(meltQuote?.unit || meltHistoryEntry?.unit || 'sat');
   const amount = displayQuote?.amount || 0;
   const feeReserve = displayQuote?.fee_reserve || 0;

@@ -8,6 +8,7 @@ import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-act
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import { popup } from '@/helper/popup';
 import { removeProtocol } from '@/helper/url';
+import { Alert } from 'react-native';
 
 // eslint-disable-next-line no-empty-pattern
 function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
@@ -60,12 +61,12 @@ function RouteA({}: RouteScreenProps<'mint-accepter', 'route-a'>) {
             onPress: async () => {
               try {
                 await addMint(payload.mint);
-
                 ref.current.hide({
                   mint: [payload.mint],
                   trusted: true,
                 });
               } catch (err) {
+                Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add mint');
                 popup({
                   message: err instanceof Error ? err.message : 'Failed to add mint',
                   type: 'error',

@@ -133,10 +133,12 @@ function MessageBubble({
   message,
   isMe,
   userPicture,
+  isLoadingMetadata,
 }: {
   message: any;
   isMe: boolean;
   userPicture?: string;
+  isLoadingMetadata?: boolean;
 }) {
   const { getPrimaryColor, getShadeColor } = useTheme();
 
@@ -150,8 +152,9 @@ function MessageBubble({
         <Avatar
           size={32}
           picture={userPicture}
-          seed={message.sender === 'other' ? 'other-user' : 'me-user'}
+          seed={message.pubkey}
           name={message.sender === 'other' ? 'Other User' : 'Me'}
+          loading={isLoadingMetadata}
         />
       )}
 
@@ -201,7 +204,7 @@ function MessageBubble({
         </HStack>
       </VStack>
 
-      {isMe && <Avatar size={32} seed="me-user" name="Me" />}
+      {isMe && <Avatar size={32} seed={message.pubkey} name="Me" loading={false} />}
     </HStack>
   );
 }
@@ -229,7 +232,12 @@ function ModalScreen() {
     [pubkey]
   );
 
-  const { events: metadataEvents } = useSubscribe({ filters: metadataFilters });
+  const { events: metadataEvents, eose: metadataEose } = useSubscribe({
+    filters: metadataFilters,
+  });
+
+  // Loading state: true until we receive EOSE (end of stored events)
+  const isMetadataLoading = !metadataEose;
 
   // Get DMs between current user and the other user
   const dmFilters = useMemo(() => {
@@ -255,6 +263,9 @@ function ModalScreen() {
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = userInfo?.display_name || userInfo?.name || 'Unknown User';
   const userPicture = userInfo?.picture;
+
+  // Only show loading if we're still fetching metadata AND we don't have user info yet
+  const shouldShowAvatarLoading = isMetadataLoading && !userInfo;
 
   // Process and decrypt DM events
   useEffect(() => {
@@ -341,7 +352,13 @@ function ModalScreen() {
                 />
               </Pressable>
 
-              <Avatar size={40} picture={userPicture} seed={pubkey} name={displayName} />
+              <Avatar
+                size={40}
+                picture={userPicture}
+                seed={pubkey}
+                name={displayName}
+                loading={shouldShowAvatarLoading}
+              />
 
               <VStack spacing={2} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
                 <AnimatedScrollingText
@@ -423,6 +440,7 @@ function ModalScreen() {
                 message={message}
                 isMe={message.sender === 'me'}
                 userPicture={message.sender === 'other' ? userPicture : undefined}
+                isLoadingMetadata={shouldShowAvatarLoading}
               />
             ))
           )}
@@ -442,7 +460,7 @@ function ModalScreen() {
             {/* <Pressable>
               <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
             </Pressable> */}
-            <Avatar size={40} seed={nostrKeys?.pubkey} />
+            <Avatar size={40} seed={nostrKeys?.pubkey} loading={false} />
 
             <TextInput
               value={messageText}

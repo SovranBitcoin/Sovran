@@ -246,13 +246,13 @@ function ModalScreen() {
                 }),
               condition: isEcashSend && !isP2PK && !hasPaymentRequest,
             },
-            {
-              text: 'Contacts',
-              icon: 'mdi:contact',
-              variant: 'secondary',
-              onPress: async () => router.push('/contacts'),
-              condition: isEcashSend && !isP2PK && !hasPaymentRequest,
-            },
+            // {
+            //   text: 'Contacts',
+            //   icon: 'mdi:contact',
+            //   variant: 'secondary',
+            //   onPress: async () => router.push('/contacts'),
+            //   condition: isEcashSend && !isP2PK && !hasPaymentRequest,
+            // },
           ]}
         />
       </HStack>

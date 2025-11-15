@@ -47,7 +47,7 @@ const MenuItem = ({ item, onPress }: MenuItemProps) => {
 
 const TabTwoScreen = () => {
   return (
-    <VStack flex={1} className="bg-primary-950">
+    <VStack flex={1} className="bg-primary-900">
       <Spacer size={96} />
       <VStack>
         <Text

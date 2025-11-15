@@ -20,7 +20,7 @@ export function useMintManagement() {
     setError(null);
 
     try {
-      const mints = await manager.mint.getAllMints();
+      const mints = await manager.mint.getAllTrustedMints();
       console.log('🏦 useMintManagement: Loaded mints from manager:', mints.length);
       console.log(
         '🏦 useMintManagement: Mint URLs:',
@@ -45,7 +45,7 @@ export function useMintManagement() {
       setError(null);
 
       try {
-        const result = await manager.mint.addMint(mintUrl);
+        const result = await manager.mint.trustMint(mintUrl);
 
         // Reload mints to get the updated list
         await loadMints();
@@ -69,7 +69,7 @@ export function useMintManagement() {
   const isKnownMint = useCallback(
     async (mintUrl: string): Promise<boolean> => {
       try {
-        return await manager.mint.isKnownMint(mintUrl);
+        return await manager.mint.isTrustedMint(mintUrl);
       } catch {
         return false;
       }

@@ -24,6 +24,7 @@ interface ContactItemProps {
     about?: string;
     nip05?: string;
   };
+  isLoadingProfile?: boolean;
 }
 
 const styles = {
@@ -52,7 +53,7 @@ const styles = {
   },
 };
 
-export const ContactItem = ({ item, profile }: ContactItemProps) => {
+export const ContactItem = ({ item, profile, isLoadingProfile = false }: ContactItemProps) => {
   console.log(
     `[DEBUG ContactItem] Render for ${item.type}:${item.pubkey?.slice(0, 8) || item.mint?.mintUrl}`
   );
@@ -123,6 +124,7 @@ export const ContactItem = ({ item, profile }: ContactItemProps) => {
               }
               size={48}
               name={displayInfo.name}
+              loading={isLoadingProfile}
             />
           </VStack>
           <VStack style={styles.textContainer}>

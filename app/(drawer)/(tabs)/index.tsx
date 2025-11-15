@@ -49,7 +49,7 @@ function TabOneScreen() {
         width: '100%',
         height: '100%',
       }}>
-      <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
+      <AnimatedSpriteBackground backgroundColor={getPrimaryColor('900')} />
 
       <View className="flex-1">
         <ScrollView
@@ -58,12 +58,12 @@ function TabOneScreen() {
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
           <View
             className="p-4 pt-0"
-            style={{ backgroundColor: opacity(getPrimaryColor('950'), 0.99) }}>
+            style={{ backgroundColor: opacity(getPrimaryColor('900'), 0.99) }}>
             <LinearGradient
               colors={[
-                opacity(getPrimaryColor('950'), 0.99),
-                opacity(getPrimaryColor('950'), 0.5),
-                opacity(getPrimaryColor('950'), 0),
+                opacity(getPrimaryColor('900'), 0.99),
+                opacity(getPrimaryColor('900'), 0.5),
+                opacity(getPrimaryColor('900'), 0),
               ]}
               start={{ x: 0.5, y: 1 }}
               end={{ x: 0.5, y: 0 }}

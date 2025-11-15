@@ -17,6 +17,7 @@ export interface DiscoveredMintData {
 interface UseDiscoveredMintsResult {
   mints: DiscoveredMintData[];
   loading: boolean;
+  loadingMore: boolean; // True when progressively loading mints
   error: string | null;
   retry: () => void;
 }
@@ -24,6 +25,7 @@ interface UseDiscoveredMintsResult {
 export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
   const [mints, setMints] = useState<DiscoveredMintData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -32,6 +34,7 @@ export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
       try {
         setLoading(true);
         setError(null);
+        setMints([]); // Clear previous mints when starting new discovery
 
         console.log('🔍 Starting mint discovery...');
 
@@ -83,7 +86,9 @@ export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
 
         console.log('🔍 Processing discovered mints sequentially...');
 
-        const processedMints: DiscoveredMintData[] = [];
+        // Start with loading=false and loadingMore=true to show progressive results
+        setLoading(false);
+        setLoadingMore(true);
 
         for (let i = 0; i < result.results.length; i++) {
           const mint = result.results[i];
@@ -115,24 +120,24 @@ export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
               );
             }
 
-            processedMints.push(discoveredMint);
+            // Update state immediately after processing each mint
+            setMints((prev) => [...prev, discoveredMint]);
           } catch (err) {
             console.warn(`⚠️ Error processing mint ${mint.url}:`, err);
             // Still add the mint without mintInfo if it fails
-            processedMints.push({
-              url: mint.url,
-              auditInfo: mint,
-              mintInfo: null,
-            });
+            setMints((prev) => [
+              ...prev,
+              {
+                url: mint.url,
+                auditInfo: mint,
+                mintInfo: null,
+              },
+            ]);
           }
         }
 
-        console.log('✅ Successfully processed', processedMints.length, 'mints');
-        console.log(
-          '🔍 Discovered mint URLs:',
-          processedMints.map((m) => m.url)
-        );
-        setMints(processedMints);
+        console.log('✅ Successfully processed', result.results.length, 'mints');
+        setLoadingMore(false);
       } catch (err) {
         console.error('❌ Failed to load mints:', err);
         console.error('❌ Error details:', {
@@ -143,6 +148,7 @@ export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
         setError('Failed to load mint recommendations. Please try again.');
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
@@ -153,5 +159,5 @@ export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
     setRetryCount((prev) => prev + 1);
   };
 
-  return { mints, loading, error, retry };
+  return { mints, loading, loadingMore, error, retry };
 };

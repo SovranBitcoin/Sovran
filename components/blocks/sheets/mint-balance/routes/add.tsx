@@ -175,6 +175,7 @@ const AddRoute = () => {
   const payload = useSheetPayload('mint-balance');
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
+  const [isAdding, setIsAdding] = useState(false);
 
   // Search functionality
   const {
@@ -186,7 +187,7 @@ const AddRoute = () => {
   } = useDebouncedMintValidation(800);
 
   // Use the discovered mints hook
-  const { mints: discoveredMints, loading, error, retry } = useDiscoveredMints();
+  const { mints: discoveredMints, loading, loadingMore, error, retry } = useDiscoveredMints();
 
   // Get known mints for filtering
   const { mints: knownMints } = useMintManagement();
@@ -307,46 +308,92 @@ const AddRoute = () => {
       return;
     }
 
+    if (isAdding) {
+      console.warn('⚠️ Already adding mints, ignoring duplicate request');
+      return;
+    }
+
+    setIsAdding(true);
+
     try {
       if (!CocoManager.isInitialized()) {
         console.error('❌ CocoManager not initialized');
         popup({ message: 'Manager not initialized. Please try again.', type: 'error' });
+        setIsAdding(false);
         return;
       }
 
       const manager = CocoManager.getInstance();
       const results = [];
       const errors = [];
+      const mintUrls = Array.from(selectedMints);
 
-      for (const mintUrl of selectedMints) {
+      console.log(`🔄 Starting to add ${mintUrls.length} mint(s):`, mintUrls);
+
+      // Process mints sequentially with a small delay to avoid race conditions
+      for (let i = 0; i < mintUrls.length; i++) {
+        const mintUrl = mintUrls[i];
+        console.log(`📌 Processing mint ${i + 1}/${mintUrls.length}: ${mintUrl}`);
+
         try {
-          await manager.mint.addMint(mintUrl);
+          // Trust the mint
+          await manager.mint.trustMint(mintUrl);
+          console.log(`✅ Successfully trusted mint: ${mintUrl}`);
           results.push(mintUrl);
 
+          // Try to fetch mint info (non-critical, so we don't fail if this errors)
           try {
             await manager.mint.getMintInfo(mintUrl);
-          } catch {}
+            console.log(`✅ Successfully fetched mint info: ${mintUrl}`);
+          } catch (infoErr) {
+            console.warn(`⚠️ Failed to fetch mint info for ${mintUrl}:`, infoErr);
+            // Don't add to errors since trustMint succeeded
+          }
+
+          // Add a small delay between operations to avoid potential race conditions
+          if (i < mintUrls.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
         } catch (err) {
-          errors.push({ mintUrl, error: err });
+          console.error(`❌ Failed to add mint ${mintUrl}:`, err);
+          errors.push({
+            mintUrl,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
+      console.log(`📊 Results: ${results.length} succeeded, ${errors.length} failed`);
+
       if (errors.length === 0) {
         popup({ message: `Successfully added ${results.length} mint(s)`, type: 'success' });
+        sheetRef.current?.hide();
       } else if (results.length > 0) {
         popup({
           message: `Added ${results.length} mint(s), ${errors.length} failed`,
           type: 'warning',
         });
+        // Still close the sheet if some succeeded
+        sheetRef.current?.hide();
       } else {
-        popup({ message: 'Failed to add any mints. Please try again.', type: 'error' });
-        return;
+        const errorMessages = errors
+          .map((e) => `${extractDomain(e.mintUrl)}: ${e.error}`)
+          .join(', ');
+        console.error('❌ All mints failed:', errors);
+        popup({
+          message: `Failed to add any mints: ${errorMessages}`,
+          type: 'error',
+        });
+        // Don't close the sheet if all failed, so user can retry
       }
-
-      sheetRef.current?.hide();
     } catch (err) {
       console.error('❌ Failed to add mints:', err);
-      popup({ message: 'Failed to add mints. Please try again.', type: 'error' });
+      popup({
+        message: `Failed to add mints: ${err instanceof Error ? err.message : String(err)}`,
+        type: 'error',
+      });
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -389,13 +436,27 @@ const AddRoute = () => {
   };
 
   // Loading state component for the mints section
-  const LoadingMintsList = () => (
+  const LoadingMintsList = ({ count = 5 }: { count?: number }) => (
     <VStack spacing={0}>
-      {Array.from({ length: 5 }).map((_, index) => (
+      {Array.from({ length: count }).map((_, index) => (
         <MintItemSkeleton key={index} />
       ))}
     </VStack>
   );
+
+  // Loading more indicator component - shows remaining skeletons to reach 5 total
+  // Always shows at least 1 skeleton while loading to indicate progress
+  const LoadingMoreIndicator = ({ currentMintCount }: { currentMintCount: number }) => {
+    // Show enough skeletons to reach 5 total items, with minimum of 1 skeleton
+    const skeletonCount = Math.max(1, 5 - currentMintCount);
+    return (
+      <VStack spacing={0}>
+        {Array.from({ length: skeletonCount }).map((_, index) => (
+          <MintItemSkeleton key={`loading-more-${index}`} />
+        ))}
+      </VStack>
+    );
+  };
 
   if (loading) {
     return (
@@ -471,10 +532,10 @@ const AddRoute = () => {
           context="sheet"
           buttons={[
             {
-              text: `Add (${selectedMints.size})`,
+              text: isAdding ? 'Adding...' : `Add (${selectedMints.size})`,
               variant: 'primary',
               onPress: handleSave,
-              disabled: selectedMints.size === 0,
+              disabled: selectedMints.size === 0 || isAdding,
             },
             {
               text: 'Close',
@@ -493,19 +554,26 @@ const AddRoute = () => {
           canAddMint={url.trim().length > 0}
         />
 
-        <MintCurrencySelector
-          mints={filteredMints as any[]}
-          allowedCurrencies={allowedCurrencies}
-          currencyLabel="Currency options"
-          mintsLabel={url.trim() ? 'Search results' : 'Discovered mints'}
-          renderItem={(mint: any) => (
-            <AddMintItem
-              mint={mint}
-              onToggle={handleToggleMint}
-              selected={selectedMints.has(mint.url)}
-            />
+        <VStack spacing={0}>
+          <MintCurrencySelector
+            mints={filteredMints as any[]}
+            allowedCurrencies={allowedCurrencies}
+            currencyLabel="Currency options"
+            mintsLabel={url.trim() ? 'Search results' : 'Discovered mints'}
+            renderItem={(mint: any) => (
+              <AddMintItem
+                mint={mint}
+                onToggle={handleToggleMint}
+                selected={selectedMints.has(mint.url)}
+              />
+            )}
+            customEmptyState={loading || loadingMore ? <LoadingMintsList /> : undefined}
+            isLoading={loading || loadingMore}
+          />
+          {loadingMore && filteredMints.length > 0 && (
+            <LoadingMoreIndicator currentMintCount={filteredMints.length} />
           )}
-        />
+        </VStack>
       </VStack>
     </Wrapper>
   );

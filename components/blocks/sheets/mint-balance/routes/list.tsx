@@ -405,6 +405,7 @@ const ListRoute = () => {
             requireBalance={payload?.requireBalance}
             showDetailsButton={showDetailsButton}
             onInspectPress={() => {
+              console.log('🔍 LIST PAGE: Navigating to info with mintUrl:', mint.mintUrl);
               router?.navigate('info', { mintUrl: mint.mintUrl });
             }}
             selectedCurrency={selectedCurrency}

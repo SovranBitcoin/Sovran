@@ -233,6 +233,8 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
       className={cn(badgeVariants({ variant }), className)}
       justify="center"
       align="center"
+      blur
+      colorBlur={opacity(textColor, 0.2)}
       style={{
         ...variantStyles,
         paddingHorizontal: isIconOnly ? 0 : 10, // px-2.5 equivalent

@@ -63,7 +63,7 @@ const WalletIcon = ({ focused }: { focused: boolean }) => {
       </View>
 
       <LinearGradient
-        colors={[getPrimaryColor(focused ? '0' : '600'), getPrimaryColor(focused ? '100' : '700')]}
+        colors={[getPrimaryColor(focused ? '0' : '950'), getPrimaryColor(focused ? '200' : '900')]}
         style={{
           position: 'absolute',
           width: 52,

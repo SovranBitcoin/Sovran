@@ -583,9 +583,12 @@ const PaymentsContent = () => {
     ];
   }, [decryptedContacts, decryptedMints]);
 
-  const { events: profileEvents } = useSubscribe({
+  const { events: profileEvents, eose: profilesEose } = useSubscribe({
     filters: profileFilters,
   });
+
+  // Loading state for profiles: true until we receive EOSE
+  const isLoadingProfiles = !profilesEose;
 
   // DEBUG: Log raw profile events
   console.log('[DEBUG payments.tsx] profileEvents count:', profileEvents?.length || 0);
@@ -670,6 +673,7 @@ const PaymentsContent = () => {
                   data={decryptedContacts}
                   profilesMap={profilesMap}
                   isDecrypting={isDecrypting}
+                  isLoadingProfiles={isLoadingProfiles}
                   emptyMessage="No recent conversations found"
                   itemHeight={ITEM_HEIGHT}
                 />
@@ -679,6 +683,7 @@ const PaymentsContent = () => {
                   data={decryptedMints}
                   profilesMap={profilesMap}
                   isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                  isLoadingProfiles={isLoadingProfiles}
                   emptyMessage="No mints with nostr contacts found"
                   itemHeight={ITEM_HEIGHT}
                 />

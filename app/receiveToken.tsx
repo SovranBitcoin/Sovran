@@ -15,6 +15,7 @@
  * <ReceiveToken receiveHistoryEntry={historyEntry} />
  */
 
+import { Alert } from 'react-native';
 import React, { useState } from 'react';
 import { useMintManagement, useReceive } from 'hooks/coco';
 import Modal from 'components/blocks/Modal';
@@ -87,6 +88,7 @@ export function ReceiveToken({ receiveHistoryEntry }: ReceiveTokenProps) {
   const handleRedeem = async () => {
     setLoading(true);
     try {
+      Alert.alert('Redeeming token', 'Redeeming token...');
       await receive(token as string);
       popup({
         message: 'funds_received',
@@ -182,6 +184,8 @@ export function ReceiveToken({ receiveHistoryEntry }: ReceiveTokenProps) {
         <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
 
         <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
+
+        {/* TODO: it would be nice to have a timeline here. Since ecash can be received offline we might have a offline received state and a confimation of online receive. */}
 
         <Section
           items={[
