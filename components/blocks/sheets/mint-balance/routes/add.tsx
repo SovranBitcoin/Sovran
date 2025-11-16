@@ -22,7 +22,7 @@
  * @see {@link ./info}
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -71,96 +71,166 @@ const adaptDiscoveredMint = (mint: DiscoveredMintData): SearchableDiscoveredMint
   };
 };
 
-interface AddMintItemProps {
-  mint: SearchableMint;
-  onToggle: (url: string) => void;
-  selected: boolean;
-}
-
-const AddMintItem: React.FC<AddMintItemProps> = ({ mint, onToggle, selected }) => {
+// Skeleton component that matches AddMintItem layout
+const MintItemSkeleton = React.memo(({ index = 0 }: { index?: number }) => {
   const { getPrimaryColor } = useTheme();
-  const pseudo = isPseudoMint(mint);
-  const isDisabled = pseudo ? !looksLikeMintUrl(mint.url) : false;
 
-  // Get display values based on mint type
-  const displayName = pseudo
-    ? extractDomain(mint.url)
-    : mint.auditInfo.auditorData.name || extractDomain(mint.url);
-
-  const iconUrl =
-    !pseudo && mint.mintInfo
-      ? mint.mintInfo.icon_url
-      : pseudo && mint.mintInfo
-        ? mint.mintInfo.icon_url
-        : undefined;
-  const auditorState = !pseudo ? mint.auditInfo.auditorData.state : undefined;
-  const score = !pseudo ? mint.auditInfo.score : undefined;
-  const recommendations = !pseudo ? mint.auditInfo.recommendations : [];
+  // Deterministic "random" widths based on index
+  const nameWidth = 100 + ((index * 37) % 60);
+  const badge1Width = 60 + ((index * 23) % 40);
+  const badge2Width = 50 + ((index * 19) % 30);
 
   return (
     <View
       className="overflow-hidden rounded-lg"
       blur
       style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
-      <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mint.url)}>
-        <HStack
-          align="center"
-          justify="space-between"
-          className={`p-3 ${isDisabled ? 'opacity-50' : ''}`}>
-          <HStack align="center" gap={8}>
-            <Avatar
-              picture={iconUrl}
-              size={42}
-              variant="mint"
-              name={displayName}
-              alt={`${displayName} icon`}
-              status={auditorState}
-            />
-
-            <VStack spacing={2}>
-              <Text size={16} bold overpass className="text-primary-0">
-                {displayName}
-              </Text>
-
-              <HStack align="center" gap={4}>
-                {pseudo && (
-                  <Badge variant="warning" icon="humbleicons:url" size={12}>
-                    Custom URL
-                  </Badge>
-                )}
-                {typeof score === 'number' && (
-                  <Badge variant="success" icon="ic:round-star" size={12}>
-                    {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
-                    {recommendations.length})
-                  </Badge>
-                )}
-                {recommendations.length > 0 && (
-                  <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
-                    {(
-                      (recommendations.reduce((acc, rec) => acc + rec.score, 0) /
-                        recommendations.length /
-                        5) *
-                      100
-                    ).toFixed(1)}
-                    %
-                  </Badge>
-                )}
-              </HStack>
-            </VStack>
-          </HStack>
-
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => onToggle(mint.url)}
-            disabled={isDisabled}
-            size={24}
-            variant="success"
+      <HStack align="center" justify="space-between" className="p-3">
+        <HStack align="center" gap={8}>
+          <Skeleton
+            className="h-[42px] w-[42px] bg-primary-700"
+            style={{ borderRadius: 42 * 0.25 }} // Square rounded for mints
           />
+          <VStack spacing={2}>
+            <Skeleton className="h-[16px] bg-primary-700" style={{ width: nameWidth }} />
+            <HStack align="center" gap={4}>
+              <Skeleton
+                className="h-[20px] rounded-full bg-primary-700"
+                style={{ width: badge1Width }}
+              />
+              <Skeleton
+                className="h-[20px] rounded-full bg-primary-700"
+                style={{ width: badge2Width }}
+              />
+            </HStack>
+          </VStack>
         </HStack>
-      </TouchableOpacity>
+        <Skeleton className="h-[24px] w-[24px] rounded bg-primary-700" />
+      </HStack>
     </View>
   );
+});
+MintItemSkeleton.displayName = 'MintItemSkeleton';
+
+// Loading state component for the mints section
+const LoadingMintsList = ({ count = 5 }: { count?: number }) => (
+  <VStack spacing={0}>
+    {Array.from({ length: count }).map((_, index) => (
+      <MintItemSkeleton key={index} index={index} />
+    ))}
+  </VStack>
+);
+
+// Loading more indicator component - shows remaining skeletons to reach 5 total
+// Always shows at least 1 skeleton while loading to indicate progress
+const LoadingMoreIndicator = ({ currentMintCount }: { currentMintCount: number }) => {
+  // Show enough skeletons to reach 5 total items, with minimum of 1 skeleton
+  const skeletonCount = Math.max(1, 5 - currentMintCount);
+  return (
+    <VStack spacing={0}>
+      {Array.from({ length: skeletonCount }).map((_, index) => (
+        <MintItemSkeleton key={`loading-more-${index}`} index={currentMintCount + index} />
+      ))}
+    </VStack>
+  );
 };
+
+interface AddMintItemProps {
+  mint: SearchableMint;
+  onToggle: (url: string) => void;
+  selected: boolean;
+}
+
+const AddMintItem = React.memo<AddMintItemProps>(
+  ({ mint, onToggle, selected }) => {
+    const { getPrimaryColor } = useTheme();
+    const pseudo = isPseudoMint(mint);
+    const isDisabled = pseudo ? !looksLikeMintUrl(mint.url) : false;
+
+    // Get display values based on mint type
+    const displayName = pseudo
+      ? extractDomain(mint.url)
+      : mint.auditInfo.auditorData.name || extractDomain(mint.url);
+
+    const iconUrl =
+      !pseudo && mint.mintInfo
+        ? mint.mintInfo.icon_url
+        : pseudo && mint.mintInfo
+          ? mint.mintInfo.icon_url
+          : undefined;
+    const auditorState = !pseudo ? mint.auditInfo.auditorData.state : undefined;
+    const score = !pseudo ? mint.auditInfo.score : undefined;
+    const recommendations = !pseudo ? mint.auditInfo.recommendations : [];
+
+    return (
+      <View
+        className="overflow-hidden rounded-lg"
+        blur
+        style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
+        <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mint.url)}>
+          <HStack
+            align="center"
+            justify="space-between"
+            className={`p-3 ${isDisabled ? 'opacity-50' : ''}`}>
+            <HStack align="center" gap={8}>
+              <Avatar
+                picture={iconUrl}
+                size={42}
+                variant="mint"
+                name={displayName}
+                alt={`${displayName} icon`}
+                status={auditorState}
+              />
+
+              <VStack spacing={2}>
+                <Text size={16} bold overpass className="text-primary-0">
+                  {displayName}
+                </Text>
+
+                <HStack align="center" gap={4}>
+                  {pseudo && (
+                    <Badge variant="warning" icon="humbleicons:url" size={12}>
+                      Custom URL
+                    </Badge>
+                  )}
+                  {typeof score === 'number' && (
+                    <Badge variant="success" icon="ic:round-star" size={12}>
+                      {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
+                      {recommendations.length})
+                    </Badge>
+                  )}
+                  {recommendations.length > 0 && (
+                    <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
+                      {(
+                        (recommendations.reduce((acc, rec) => acc + rec.score, 0) /
+                          recommendations.length /
+                          5) *
+                        100
+                      ).toFixed(1)}
+                      %
+                    </Badge>
+                  )}
+                </HStack>
+              </VStack>
+            </HStack>
+
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onToggle(mint.url)}
+              disabled={isDisabled}
+              size={24}
+              variant="success"
+            />
+          </HStack>
+        </TouchableOpacity>
+      </View>
+    );
+  },
+  (prevProps, nextProps) => {
+    return prevProps.selected === nextProps.selected && prevProps.mint.url === nextProps.mint.url;
+  }
+);
+AddMintItem.displayName = 'AddMintItem';
 
 /**
  * AddRoute Component
@@ -206,44 +276,14 @@ const AddRoute = () => {
     // Get known mint URLs for exclusion (normalized)
     const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
 
-    console.log('🔍 ADD PAGE FILTERING DEBUG:');
-    console.log('📋 Known mints from useMintManagement:', knownMints.length);
-    console.log('📋 Known mint URLs (normalized):', Array.from(knownMintUrls));
-    console.log('🔍 Discovered mints from useDiscoveredMints:', discoveredMints.length);
-    console.log(
-      '🔍 Discovered mint URLs:',
-      discoveredMints.map((m) => m.url)
-    );
-
     // Convert discovered mints to searchable format and exclude known mints
     const searchableDiscoveredMints = discoveredMints
       .filter((mint) => {
         const normalizedDiscoveredUrl = normalizeUrl(mint.url);
         const isKnown = knownMintUrls.has(normalizedDiscoveredUrl);
-        if (isKnown) {
-          console.log(
-            `❌ EXCLUDING known mint: ${mint.url} (normalized: ${normalizedDiscoveredUrl})`
-          );
-        } else {
-          console.log(
-            `✅ INCLUDING unknown mint: ${mint.url} (normalized: ${normalizedDiscoveredUrl})`
-          );
-        }
         return !isKnown;
       })
       .map(adaptDiscoveredMint);
-
-    console.log(
-      '🔍 Filtered out',
-      knownMintUrls.size,
-      'known mints, showing',
-      searchableDiscoveredMints.length,
-      'discovered mints'
-    );
-    console.log(
-      '🔍 Final filtered mint URLs:',
-      searchableDiscoveredMints.map((m) => m.url)
-    );
 
     if (!url.trim()) return searchableDiscoveredMints;
 
@@ -264,7 +304,7 @@ const AddRoute = () => {
     return filtered;
   }, [discoveredMints, knownMints, url, customMintInfo]);
 
-  const handleToggleMint = (url: string) => {
+  const handleToggleMint = useCallback((url: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
       if (next.has(url)) {
@@ -274,7 +314,7 @@ const AddRoute = () => {
       }
       return next;
     });
-  };
+  }, []);
 
   const handleSelectCustomMint = () => {
     if (!url.trim()) {
@@ -395,67 +435,6 @@ const AddRoute = () => {
     } finally {
       setIsAdding(false);
     }
-  };
-
-  // Skeleton component that matches AddMintItem layout
-  const MintItemSkeleton = () => {
-    // Generate random widths for more realistic skeleton
-    const nameWidth = 100 + Math.random() * 60; // 100-160px
-    const badge1Width = 60 + Math.random() * 40; // 60-100px
-    const badge2Width = 50 + Math.random() * 30; // 50-80px
-
-    return (
-      <View
-        className="overflow-hidden rounded-lg"
-        blur
-        style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
-        <HStack align="center" justify="space-between" className="p-3">
-          <HStack align="center" gap={8}>
-            <Skeleton
-              className="h-[42px] w-[42px] bg-primary-700"
-              style={{ borderRadius: 42 * 0.25 }} // Square rounded for mints
-            />
-            <VStack spacing={2}>
-              <Skeleton className="h-[16px] bg-primary-700" style={{ width: nameWidth }} />
-              <HStack align="center" gap={4}>
-                <Skeleton
-                  className="h-[20px] rounded-full bg-primary-700"
-                  style={{ width: badge1Width }}
-                />
-                <Skeleton
-                  className="h-[20px] rounded-full bg-primary-700"
-                  style={{ width: badge2Width }}
-                />
-              </HStack>
-            </VStack>
-          </HStack>
-          <Skeleton className="h-[24px] w-[24px] rounded bg-primary-700" />
-        </HStack>
-      </View>
-    );
-  };
-
-  // Loading state component for the mints section
-  const LoadingMintsList = ({ count = 5 }: { count?: number }) => (
-    <VStack spacing={0}>
-      {Array.from({ length: count }).map((_, index) => (
-        <MintItemSkeleton key={index} />
-      ))}
-    </VStack>
-  );
-
-  // Loading more indicator component - shows remaining skeletons to reach 5 total
-  // Always shows at least 1 skeleton while loading to indicate progress
-  const LoadingMoreIndicator = ({ currentMintCount }: { currentMintCount: number }) => {
-    // Show enough skeletons to reach 5 total items, with minimum of 1 skeleton
-    const skeletonCount = Math.max(1, 5 - currentMintCount);
-    return (
-      <VStack spacing={0}>
-        {Array.from({ length: skeletonCount }).map((_, index) => (
-          <MintItemSkeleton key={`loading-more-${index}`} />
-        ))}
-      </VStack>
-    );
   };
 
   if (loading) {
