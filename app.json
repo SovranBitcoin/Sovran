@@ -51,6 +51,13 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
         }
       ],
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
+        }
+      ],
       "react-native-nfc-manager",
       "expo-build-properties",
       "expo-font",
@@ -58,7 +65,8 @@
       "expo-localization",
       "expo-video",
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-maps"
     ],
     "extra": {
       "router": {

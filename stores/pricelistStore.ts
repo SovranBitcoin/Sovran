@@ -45,7 +45,6 @@ export const usePricelistStore = create<PricelistStore>()(
 
       // Actions
       setPricelist: (data: PricelistData) => {
-        console.log('PricelistStore: setPricelist called with:', data);
         set({
           pricelist: data,
           lastUpdated: Date.now(),
@@ -54,7 +53,6 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       setBtcPrice: (price: number) => {
-        console.log('PricelistStore: setBtcPrice called with:', price);
         const currentState = get();
         const newPricelist: PricelistData = {
           usd: { btc: price },
@@ -69,17 +67,14 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       setLoading: (loading: boolean) => {
-        console.log('PricelistStore: setLoading called with:', loading);
         set({ isLoading: loading });
       },
 
       setError: (error: string | null) => {
-        console.log('PricelistStore: setError called with:', error);
         set({ error });
       },
 
       clearPricelist: () => {
-        console.log('PricelistStore: clearPricelist called');
         set({
           pricelist: null,
           lastUpdated: null,
@@ -90,7 +85,6 @@ export const usePricelistStore = create<PricelistStore>()(
       // Clear all data from both state and storage
       clearAllData: async () => {
         try {
-          console.log('PricelistStore: clearAllData called');
           // Clear from AsyncStorage
           await AsyncStorage.removeItem('pricelist-store');
           // Reset state to initial values
@@ -100,9 +94,7 @@ export const usePricelistStore = create<PricelistStore>()(
             lastUpdated: null,
             error: null,
           });
-          console.log('PricelistStore: All data cleared successfully');
         } catch (error) {
-          console.error('PricelistStore: Error clearing data:', error);
           throw error;
         }
       },
@@ -112,7 +104,6 @@ export const usePricelistStore = create<PricelistStore>()(
         if (!currentState.pricelist) return null;
 
         const price = (currentState.pricelist as any)[currency]?.btc;
-        console.log('PricelistStore: getBtcPrice called for currency:', currency, 'price:', price);
         return price || null;
       },
 
@@ -122,14 +113,6 @@ export const usePricelistStore = create<PricelistStore>()(
 
         const ageMinutes = (Date.now() - currentState.lastUpdated) / (1000 * 60);
         const isStale = ageMinutes > maxAgeMinutes;
-        console.log(
-          'PricelistStore: isStale called, age:',
-          ageMinutes,
-          'maxAge:',
-          maxAgeMinutes,
-          'isStale:',
-          isStale
-        );
         return isStale;
       },
     }),

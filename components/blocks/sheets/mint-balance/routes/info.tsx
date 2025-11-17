@@ -300,7 +300,7 @@ const StatsGrid = ({
 
 // RatingDisplay component
 const RatingDisplay = ({ score, recommendations }: { score?: number; recommendations?: any[] }) => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getYellowColor } = useTheme();
 
   if (score === undefined) {
     return null;
@@ -366,7 +366,11 @@ const RatingDisplay = ({ score, recommendations }: { score?: number; recommendat
                       name="ic:round-star"
                       size={12}
                       color={
-                        isFullGold ? '#FFD700' : isPartialGold ? '#FFD700' : getPrimaryColor('400')
+                        isFullGold
+                          ? getYellowColor('300')
+                          : isPartialGold
+                            ? getYellowColor('500')
+                            : getPrimaryColor('400')
                       }
                       style={
                         isPartialGold
@@ -385,7 +389,7 @@ const RatingDisplay = ({ score, recommendations }: { score?: number; recommendat
                   flex: 1,
                   minWidth: 0,
                   backgroundColor: isTargetRow
-                    ? 'rgba(255, 215, 0, 0.2)' // Off-gold background for gold bar
+                    ? getYellowColor('500') // Off-gold background for gold bar
                     : getPrimaryColor('700'),
                 }}>
                 <View
@@ -393,7 +397,7 @@ const RatingDisplay = ({ score, recommendations }: { score?: number; recommendat
                   style={{
                     width: isTargetRow ? `${goldPercentage * 100}%` : `${percentage * 100}%`,
                     backgroundColor: isTargetRow
-                      ? '#FFD700'
+                      ? getYellowColor('300')
                       : percentage > 0
                         ? getPrimaryColor('400')
                         : 'transparent',
@@ -410,7 +414,7 @@ const RatingDisplay = ({ score, recommendations }: { score?: number; recommendat
 
 // ReviewsList component
 const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getYellowColor } = useTheme();
   const [currentPage, setCurrentPage] = useState(0);
   const reviewsPerPage = 3;
 
@@ -486,7 +490,11 @@ const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
                         key={star}
                         name="ic:round-star"
                         size={14}
-                        color={star <= Math.round(reviewScore) ? '#FFD700' : getPrimaryColor('600')}
+                        color={
+                          star <= Math.round(reviewScore)
+                            ? getYellowColor('300')
+                            : getPrimaryColor('600')
+                        }
                       />
                     ))}
                   </HStack>
@@ -557,7 +565,7 @@ const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
  * @returns {JSX.Element}
  */
 const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
   const { getMintInfo } = useMintManagement();
@@ -882,7 +890,7 @@ const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
                       size={14}
                       bold
                       style={{
-                        color: '#FFD700',
+                        color: getYellowColor('300'),
                         textDecorationLine: 'underline',
                       }}
                       onPress={() => setShowReviews(true)}>

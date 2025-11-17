@@ -84,7 +84,7 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
       getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry.token)
     );
   });
-
+  console.log(12321323, JSON.stringify(currentTransaction, null, 2));
   // Load mint info when transaction is found
   useEffect(() => {
     const loadMintInfo = async () => {
@@ -368,11 +368,74 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
  * @returns JSX element representing the modal screen
  */
 function ModalScreen() {
-  const { sendHistoryEntry: sendHistoryEntryString } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     sendHistoryEntry: string;
   }>();
+  const { sendHistoryEntry: sendHistoryEntryString } = params;
 
-  const sendHistoryEntry = JSON.parse(sendHistoryEntryString) as SendHistoryEntry;
+  // Debug logging for JSON parse errors
+  console.log('[sendToken] Debug - Raw params:', { sendHistoryEntry: sendHistoryEntryString });
+  console.log('[sendToken] Debug - sendHistoryEntryString type:', typeof sendHistoryEntryString);
+  console.log('[sendToken] Debug - sendHistoryEntryString value:', sendHistoryEntryString);
+  console.log('[sendToken] Debug - Is undefined?', sendHistoryEntryString === undefined);
+  console.log('[sendToken] Debug - Is null?', sendHistoryEntryString === null);
+  console.log('[sendToken] Debug - String length:', sendHistoryEntryString?.length);
+
+  // Guard against missing parameter
+  if (!sendHistoryEntryString) {
+    console.error('[sendToken] Debug - Missing sendHistoryEntry parameter');
+    console.error('[sendToken] Debug - All params:', params);
+    return (
+      <Modal showClose title="Error">
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text>Missing transaction data. Please try again.</Text>
+          <ButtonHandler
+            buttons={[
+              {
+                text: 'Go Back',
+                icon: 'ri:arrow-left-line',
+                variant: 'primary',
+                onPress: async () => router.back(),
+              },
+            ]}
+          />
+        </View>
+      </Modal>
+    );
+  }
+
+  let sendHistoryEntry: SendHistoryEntry;
+  try {
+    sendHistoryEntry = JSON.parse(sendHistoryEntryString) as SendHistoryEntry;
+    console.log('[sendToken] Debug - Successfully parsed sendHistoryEntry');
+  } catch (error) {
+    console.error('[sendToken] Debug - JSON parse error:', error);
+    console.error('[sendToken] Debug - Failed to parse:', sendHistoryEntryString);
+    console.error('[sendToken] Debug - Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return (
+      <Modal showClose title="Error">
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text>Invalid transaction data. Please try again.</Text>
+          <Text style={{ marginTop: 10, fontSize: 12, color: '#666' }}>
+            {error instanceof Error ? error.message : String(error)}
+          </Text>
+          <ButtonHandler
+            buttons={[
+              {
+                text: 'Go Back',
+                icon: 'ri:arrow-left-line',
+                variant: 'primary',
+                onPress: async () => router.back(),
+              },
+            ]}
+          />
+        </View>
+      </Modal>
+    );
+  }
 
   return <SendToken sendHistoryEntry={sendHistoryEntry} />;
 }

@@ -1,3 +1,11 @@
+/**
+ * @deprecated This hook is deprecated. Use `useNostrDiscoveredMints` instead.
+ * This hook uses the KYM (Know Your Mint) system which is slower and less efficient.
+ * The new Nostr-based discovery provides faster, incremental updates.
+ *
+ * @see {@link ./useNostrDiscoveredMints}
+ */
+
 import { useState, useEffect } from 'react';
 import { KYMHandler } from 'cashu-kym';
 import { fetchMintInfo } from 'helper/apiClient';
@@ -22,6 +30,9 @@ interface UseDiscoveredMintsResult {
   retry: () => void;
 }
 
+/**
+ * @deprecated Use `useNostrDiscoveredMints` instead
+ */
 export const useDiscoveredMints = (): UseDiscoveredMintsResult => {
   const [mints, setMints] = useState<DiscoveredMintData[]>([]);
   const [loading, setLoading] = useState(true);

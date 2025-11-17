@@ -11,7 +11,7 @@
 export { useLightningOperations } from './useLightningOperations';
 export { useMintManagement } from './useMintManagement';
 export { useAuditedMint } from './useAuditedMint';
-export { useDiscoveredMints } from './useDiscoveredMints';
+export { useNostrDiscoveredMints } from './useNostrDiscoveredMints';
 export { useMelt } from './useMelt';
 
 // Re-export coco-cashu-react hooks for direct use when needed

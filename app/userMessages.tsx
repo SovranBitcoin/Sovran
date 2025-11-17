@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { SheetManager } from 'react-native-actions-sheet';
 
 // Custom hooks
 import { Message } from 'redux/nostr';
@@ -263,6 +264,7 @@ function ModalScreen() {
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = userInfo?.display_name || userInfo?.name || 'Unknown User';
   const userPicture = userInfo?.picture;
+  const lud16 = userInfo?.lud16;
 
   // Only show loading if we're still fetching metadata AND we don't have user info yet
   const shouldShowAvatarLoading = isMetadataLoading && !userInfo;
@@ -324,6 +326,51 @@ function ModalScreen() {
       setMessageText('');
     }
   };
+
+  const handleSendMoney = () => {
+    if (!lud16 || !userInfo) return;
+
+    SheetManager.show('button-handler', {
+      payload: {
+        buttons: [
+          {
+            text: 'Send Ecash',
+            icon: 'solar:wallet-bold',
+            variant: 'primary' as const,
+            onPress: async (close) => {
+              router.push({
+                pathname: '/currency',
+                params: {
+                  to: 'sendToken',
+                  lud16: lud16,
+                  profile: JSON.stringify(userInfo),
+                },
+              });
+              close({} as any);
+            },
+          },
+          {
+            text: 'Send Lightning',
+            icon: 'mingcute:lightning-fill',
+            variant: 'primary' as const,
+            onPress: async (close) => {
+              router.push({
+                pathname: '/currency',
+                params: {
+                  to: 'meltQuote',
+                  lnUrlOrAddress: lud16,
+                  profile: JSON.stringify(userInfo),
+                },
+              });
+              close({} as any);
+            },
+          },
+        ],
+      },
+    });
+  };
+
+  console.log(123123123123223, metadataEvents);
 
   return (
     <KeyboardAvoidingView
@@ -456,6 +503,32 @@ function ModalScreen() {
             borderTopWidth: 1,
             borderTopColor: getPrimaryColor('700'),
           }}>
+          {lud16 && (
+            <Pressable
+              onPress={handleSendMoney}
+              style={{
+                width: '100%',
+                backgroundColor: getPrimaryColor('600'),
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                marginBottom: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <HStack align="center" spacing={8}>
+                <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('0')} />
+                <Text
+                  size={16}
+                  bold
+                  style={{
+                    color: getPrimaryColor('0'),
+                  }}>
+                  Send Money
+                </Text>
+              </HStack>
+            </Pressable>
+          )}
           <HStack align="center" spacing={12}>
             {/* <Pressable>
               <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />

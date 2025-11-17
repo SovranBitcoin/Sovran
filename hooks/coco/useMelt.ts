@@ -80,7 +80,7 @@ export function useMelt() {
       try {
         // Access the melt quote repository directly through the manager
         // This is a workaround since the API doesn't expose getMeltQuote
-        const quote = await (manager as any).meltQuoteService.meltQuoteRepo.getMeltQuote(mintUrl, quoteId);
+        const quote = await manager.meltQuoteService.meltQuoteRepo.getMeltQuote(mintUrl, quoteId);
         return quote;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to get melt quote');

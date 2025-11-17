@@ -41,9 +41,9 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useDiscoveredMints } from '@/hooks/coco/useDiscoveredMints';
+import { useNostrDiscoveredMints } from '@/hooks/coco/useNostrDiscoveredMints';
 import { useMintManagement } from 'hooks/coco';
-import type { DiscoveredMintData } from '@/hooks/coco/useDiscoveredMints';
+import type { NostrDiscoveredMintData } from '@/hooks/coco/useNostrDiscoveredMints';
 
 interface PseudoMint {
   url: string;
@@ -52,9 +52,17 @@ interface PseudoMint {
   name?: string;
 }
 
-// Extend DiscoveredMintData to include name for compatibility with filterMints
-interface SearchableDiscoveredMint extends DiscoveredMintData {
+// Extend NostrDiscoveredMintData to include name for compatibility with filterMints
+interface SearchableDiscoveredMint extends NostrDiscoveredMintData {
   name: string;
+  auditInfo?: {
+    score: number;
+    auditorData: {
+      name: string;
+      state: string;
+    };
+    recommendations: any[];
+  };
 }
 
 type SearchableMint = SearchableDiscoveredMint | PseudoMint;
@@ -63,11 +71,20 @@ const isPseudoMint = (mint: SearchableMint): mint is PseudoMint => {
   return 'isPseudoMint' in mint && mint.isPseudoMint === true;
 };
 
-// Convert DiscoveredMintData to SearchableDiscoveredMint
-const adaptDiscoveredMint = (mint: DiscoveredMintData): SearchableDiscoveredMint => {
+// Convert NostrDiscoveredMintData to SearchableDiscoveredMint
+const adaptDiscoveredMint = (mint: NostrDiscoveredMintData): SearchableDiscoveredMint => {
   return {
     ...mint,
-    name: mint.auditInfo.auditorData.name || extractDomain(mint.url),
+    name: mint.mintInfo?.name || extractDomain(mint.url),
+    // Map Nostr data to expected structure for backward compatibility
+    auditInfo: {
+      score: mint.score,
+      auditorData: {
+        name: mint.mintInfo?.name || extractDomain(mint.url),
+        state: mint.mintInfo ? 'OK' : 'OFFLINE',
+      },
+      recommendations: [], // Nostr events don't have sub-recommendations
+    },
   };
 };
 
@@ -121,20 +138,6 @@ const LoadingMintsList = ({ count = 5 }: { count?: number }) => (
   </VStack>
 );
 
-// Loading more indicator component - shows remaining skeletons to reach 5 total
-// Always shows at least 1 skeleton while loading to indicate progress
-const LoadingMoreIndicator = ({ currentMintCount }: { currentMintCount: number }) => {
-  // Show enough skeletons to reach 5 total items, with minimum of 1 skeleton
-  const skeletonCount = Math.max(1, 5 - currentMintCount);
-  return (
-    <VStack spacing={0}>
-      {Array.from({ length: skeletonCount }).map((_, index) => (
-        <MintItemSkeleton key={`loading-more-${index}`} index={currentMintCount + index} />
-      ))}
-    </VStack>
-  );
-};
-
 interface AddMintItemProps {
   mint: SearchableMint;
   onToggle: (url: string) => void;
@@ -150,7 +153,7 @@ const AddMintItem = React.memo<AddMintItemProps>(
     // Get display values based on mint type
     const displayName = pseudo
       ? extractDomain(mint.url)
-      : mint.auditInfo.auditorData.name || extractDomain(mint.url);
+      : mint.auditInfo?.auditorData?.name || mint.mintInfo?.name || extractDomain(mint.url);
 
     const iconUrl =
       !pseudo && mint.mintInfo
@@ -158,9 +161,12 @@ const AddMintItem = React.memo<AddMintItemProps>(
         : pseudo && mint.mintInfo
           ? mint.mintInfo.icon_url
           : undefined;
-    const auditorState = !pseudo ? mint.auditInfo.auditorData.state : undefined;
-    const score = !pseudo ? mint.auditInfo.score : undefined;
-    const recommendations = !pseudo ? mint.auditInfo.recommendations : [];
+    const auditorState = !pseudo ? mint.auditInfo?.auditorData?.state : undefined;
+    // Use score from Nostr data if available, otherwise fall back to auditInfo.score
+    const score = !pseudo ? mint.score : undefined;
+    const recommendations = !pseudo ? mint?.recommendations : [];
+
+    console.log(12321323, JSON.stringify(mint, null, 2));
 
     return (
       <View
@@ -194,12 +200,13 @@ const AddMintItem = React.memo<AddMintItemProps>(
                     </Badge>
                   )}
                   {typeof score === 'number' && (
-                    <Badge variant="success" icon="ic:round-star" size={12}>
+                    <Badge variant="star" icon="ic:round-star" size={12}>
                       {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
                       {recommendations.length})
                     </Badge>
                   )}
-                  {recommendations.length > 0 && (
+
+                  {/* {recommendations.length > 0 && (
                     <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
                       {(
                         (recommendations.reduce((acc, rec) => acc + rec.score, 0) /
@@ -209,7 +216,7 @@ const AddMintItem = React.memo<AddMintItemProps>(
                       ).toFixed(1)}
                       %
                     </Badge>
-                  )}
+                  )} */}
                 </HStack>
               </VStack>
             </HStack>
@@ -256,9 +263,17 @@ const AddRoute = () => {
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  // Use the discovered mints hook
-  const { mints: discoveredMints, loading, loadingMore, error, retry } = useDiscoveredMints();
-
+  // Use the Nostr discovered mints hook
+  const { mints: discoveredMints, loading, error, retry } = useNostrDiscoveredMints();
+  // return (
+  //   <View>
+  //     <Text>
+  //       {JSON.stringify(discoveredMints, null, 2)}
+  //       {String(loading)}
+  //       {String(error)}
+  //     </Text>
+  //   </View>
+  // );
   // Get known mints for filtering
   const { mints: knownMints } = useMintManagement();
 
@@ -437,43 +452,52 @@ const AddRoute = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <Wrapper
-        buttons={
-          <ButtonHandler
-            context="sheet"
-            buttons={[
-              {
-                text: 'Close',
-                variant: 'secondary',
-                onPress: async () => sheetRef.current?.hide(),
-              },
-            ]}
-          />
-        }>
-        <VStack spacing={16}>
-          <MintSearchInput
-            value={url}
-            onChangeText={setUrl}
-            validationState={validationState}
-            onAddMint={handleSelectCustomMint}
-            canAddMint={url.trim().length > 0}
-          />
+  console.log('🔍 filteredMints:', JSON.stringify(filteredMints, null, 2));
+  console.log('🔍 loading:', loading);
+  console.log('🔍 error:', error);
+  console.log('🔍 selectedMints:', selectedMints);
+  console.log('🔍 isAdding:', isAdding);
+  console.log('🔍 url:', url);
+  console.log('🔍 validationState:', validationState);
+  console.log('🔍 customMintInfo:', customMintInfo);
+  console.log('🔍 knownMints:', knownMints);
+  // if (loading) {
+  //   return (
+  //     <Wrapper
+  //       buttons={
+  //         <ButtonHandler
+  //           context="sheet"
+  //           buttons={[
+  //             {
+  //               text: 'Close',
+  //               variant: 'secondary',
+  //               onPress: async () => sheetRef.current?.hide(),
+  //             },
+  //           ]}
+  //         />
+  //       }>
+  //       <VStack spacing={16}>
+  //         <MintSearchInput
+  //           value={url}
+  //           onChangeText={setUrl}
+  //           validationState={validationState}
+  //           onAddMint={handleSelectCustomMint}
+  //           canAddMint={url.trim().length > 0}
+  //         />
 
-          <MintCurrencySelector
-            mints={[]}
-            allowedCurrencies={allowedCurrencies}
-            currencyLabel="Currency options"
-            mintsLabel="Discovered mints"
-            renderItem={() => null}
-            customEmptyState={<LoadingMintsList />}
-            isLoading={true}
-          />
-        </VStack>
-      </Wrapper>
-    );
-  }
+  //         <MintCurrencySelector
+  //           mints={[]}
+  //           allowedCurrencies={allowedCurrencies}
+  //           currencyLabel="Currency options"
+  //           mintsLabel="Discovered mints"
+  //           renderItem={() => null}
+  //           customEmptyState={<LoadingMintsList />}
+  //           isLoading={true}
+  //         />
+  //       </VStack>
+  //     </Wrapper>
+  //   );
+  // }
 
   if (error) {
     return (
@@ -546,12 +570,9 @@ const AddRoute = () => {
                 selected={selectedMints.has(mint.url)}
               />
             )}
-            customEmptyState={loading || loadingMore ? <LoadingMintsList /> : undefined}
-            isLoading={loading || loadingMore}
+            customEmptyState={loading ? <LoadingMintsList /> : undefined}
+            isLoading={loading}
           />
-          {loadingMore && filteredMints.length > 0 && (
-            <LoadingMoreIndicator currentMintCount={filteredMints.length} />
-          )}
         </VStack>
       </VStack>
     </Wrapper>

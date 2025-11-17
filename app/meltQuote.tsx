@@ -119,7 +119,7 @@ export function MeltQuote({ meltQuote, meltHistoryEntry }: MeltQuoteProps) {
 
           // Fetch the melt quote using the quote ID
           const quote = await getMeltQuote(meltHistoryEntry.mintUrl, meltHistoryEntry.quoteId);
-
+          console.log('quote123', quote);
           if (!quote) {
             throw new Error('Melt quote not found');
           }

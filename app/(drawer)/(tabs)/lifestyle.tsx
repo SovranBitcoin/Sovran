@@ -77,6 +77,19 @@ const TabTwoScreen = () => {
               });
             }}
           />
+          <MenuItem
+            item={{
+              id: 'map',
+              icon: 'mdi:help-circle',
+              label: 'Map',
+            }}
+            onPress={() => {
+              router.push({
+                pathname: `userMessages`,
+                params: { pubkey: PUBLIC_KEYS.SUPPORT },
+              });
+            }}
+          />
         </HStack>
       </VStack>
     </VStack>

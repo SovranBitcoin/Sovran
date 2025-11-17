@@ -70,6 +70,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
+        star: '',
         primary: '',
         secondary: '',
         warning: '',
@@ -132,7 +133,7 @@ export interface BadgeProps extends VariantProps<typeof badgeVariants> {
  * <Badge variant="success" icon="fluent:checkmark-16-filled" size={12} />
  */
 function Badge({ className, variant, icon, size = 12, color, children }: BadgeProps) {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
 
   /**
    * Gets background and border styles based on variant
@@ -176,6 +177,11 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
           backgroundColor: opacity(getGreenColor('500'), 0.2),
           borderColor: 'transparent',
         };
+      case 'star':
+        return {
+          backgroundColor: opacity(getYellowColor('300'), 0.2),
+          borderColor: 'transparent',
+        };
       default:
         return {
           backgroundColor: opacity(getPrimaryColor('100'), 0.2),
@@ -217,6 +223,8 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
         return getRedColor('500');
       case 'success':
         return getGreenColor('300');
+      case 'star':
+        return getYellowColor('300');
       default:
         return getPrimaryColor('900');
     }

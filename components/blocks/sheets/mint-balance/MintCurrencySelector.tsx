@@ -15,6 +15,11 @@ interface MintData {
   iconUrl?: string | null;
   mintInfo?: any; // Make this completely flexible
   auditInfo?: any; // Add this for compatibility
+  score?: number; // Add for Nostr data
+  comment?: string; // Add for Nostr data
+  pubkey?: string; // Add for Nostr data
+  eventId?: string; // Add for Nostr data
+  created_at?: number; // Add for Nostr data
   [key: string]: any;
 }
 

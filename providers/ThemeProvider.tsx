@@ -13,6 +13,7 @@ const ThemeContext = createContext<{
   getRedColor: (shade: string, themeName?: string) => string;
   getGreenColor: (shade: string, themeName?: string) => string;
   getPurpleColor: (shade: string, themeName?: string) => string;
+  getYellowColor: (shade: string, themeName?: string) => string;
   primaryColors: Record<number, string>;
 }>({
   currentTheme: 'dark',
@@ -23,6 +24,7 @@ const ThemeContext = createContext<{
   getRedColor: () => '#000000',
   getGreenColor: () => '#000000',
   getPurpleColor: () => '#000000',
+  getYellowColor: () => '#000000',
   primaryColors: {},
 });
 
@@ -73,6 +75,18 @@ const getGreenColor = (themeName: string, shade: string): string => {
   };
 
   return staticGreens[shade as keyof typeof staticGreens] || '#0CED3E';
+};
+
+const getYellowColor = (themeName: string, shade: string): string => {
+  const staticYellows = {
+    '100': '#F8F8E0',
+    '200': '#E4E4A3',
+    '300': '#EDED0C',
+    '400': '#BFBF01',
+    '500': '#9A9A00',
+  };
+
+  return staticYellows[shade as keyof typeof staticYellows] || '#EDED0C';
 };
 
 const getPurpleColor = (themeName: string, shade: string): string => {
@@ -132,6 +146,10 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
 
   const getPurpleColorForShade = (shade: string, themeName?: string) => {
     return getPurpleColor(themeName || currentTheme, shade);
+  };
+
+  const getYellowColorForShade = (shade: string, themeName?: string) => {
+    return getYellowColor(themeName || currentTheme, shade);
   };
 
   // Get primary colors for the current theme
@@ -194,6 +212,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
         getRedColor: getRedColorForShade,
         getGreenColor: getGreenColorForShade,
         getPurpleColor: getPurpleColorForShade,
+        getYellowColor: getYellowColorForShade,
         primaryColors,
       }}>
       <View style={getThemeVariables(currentTheme)} className="flex-1">

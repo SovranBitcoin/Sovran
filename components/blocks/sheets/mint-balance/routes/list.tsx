@@ -37,12 +37,13 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack } from 'components/ui/View';
-import { formatAmount } from 'helper/currency';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { getMintDisplayName } from 'helper/url';
 import { Skeleton } from '@/components/ui/Skeleton';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
+import { AmountFormatter } from '@/components/ui/AmountFormatter';
+import { useTheme } from '@/providers/ThemeProvider';
 
 interface MintItemProps {
   mint: Mint & { amount: number; unit: string };
@@ -66,14 +67,7 @@ const MintItem: React.FC<MintItemProps> = ({
   showDetailsButton = false,
   onInspectPress,
 }) => {
-  const formattedBalance = balance.amount
-    ? formatAmount(
-        { amount: balance.amount, unit: balance.unit },
-        {
-          currencyDisplay: balance.unit.toLowerCase() === 'sat' ? 'name' : 'symbol',
-        }
-      )
-    : '0';
+  const { getPrimaryColor } = useTheme();
 
   return (
     <TouchableOpacity
@@ -104,9 +98,14 @@ const MintItem: React.FC<MintItemProps> = ({
           <Text className="text-primary-0" size={16} bold overpass>
             {getMintDisplayName(mint.mintUrl, mint.mintInfo)}
           </Text>
-          <Text className="text-primary-200" size={14}>
-            {formattedBalance}
-          </Text>
+
+          <AmountFormatter
+            amount={balance.amount}
+            unit={balance.unit.toLowerCase()}
+            size={16}
+            weight="heavy"
+            color={getPrimaryColor('0')}
+          />
         </VStack>
 
         {showDetailsButton && (

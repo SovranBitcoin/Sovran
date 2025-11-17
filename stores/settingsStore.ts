@@ -92,48 +92,40 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // Display settings
       setDisplayBtc: (display: number) => {
-        console.log('SettingsStore: setDisplayBtc called with:', display);
         set({ displayBtc: display });
       },
 
       getDisplayBtc: () => {
         const displayBtc = get().displayBtc;
-        console.log('SettingsStore: getDisplayBtc called, returning:', displayBtc);
         return displayBtc;
       },
 
       // Passcode management
       setPasscode: (passcode: string) => {
-        console.log('SettingsStore: setPasscode called');
         set({ passcode });
       },
 
       getPasscode: () => {
         const passcode = get().passcode;
-        console.log('SettingsStore: getPasscode called, returning:', passcode ? '[HIDDEN]' : '');
         return passcode;
       },
 
       clearPasscode: () => {
-        console.log('SettingsStore: clearPasscode called');
         set({ passcode: '' });
       },
 
       // Experimental features
       setExperimental: (experimental: boolean) => {
-        console.log('SettingsStore: setExperimental called with:', experimental);
         set({ experimental });
       },
 
       getExperimental: () => {
         const experimental = get().experimental;
-        console.log('SettingsStore: getExperimental called, returning:', experimental);
         return experimental;
       },
 
       // Terms acceptance
       acceptTerms: (date: string) => {
-        console.log('SettingsStore: acceptTerms called with date:', date);
         set({
           termsAccepted: {
             termsAccepted: true,
@@ -144,7 +136,6 @@ export const useSettingsStore = create<SettingsStore>()(
 
       getTermsAccepted: () => {
         const termsAccepted = get().termsAccepted;
-        console.log('SettingsStore: getTermsAccepted called, returning:', termsAccepted);
         return termsAccepted;
       },
 
