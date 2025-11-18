@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Dimensions } from 'react-native';
 import { View } from 'components/ui/View';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
@@ -45,41 +45,62 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
 
-  console.log('WalletHeader: keys from NostrKeysContext:', keys);
+  if (__DEV__) {
+    console.log('WalletHeader: keys from NostrKeysContext:', keys);
+  }
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
 
-  console.log('WalletHeader: props and state:', { unit, accounts, pubkey });
+  if (__DEV__) {
+    console.log('WalletHeader: props and state:', { unit, accounts, pubkey });
+  }
 
-  const handleMintSelected = async (
-    mint: { id: string; unit: string },
-    _balance?: { amount: number; unit: string }
-  ) => {
-    console.log('WalletHeader: handleMintSelected called with:', {
-      mint,
-      pubkey,
-      hasPubkey: !!pubkey,
-    });
+  const handleMintSelected = useCallback(
+    async (mint: { id: string; unit: string }, _balance?: { amount: number; unit: string }) => {
+      if (__DEV__) {
+        console.log('WalletHeader: handleMintSelected called with:', {
+          mint,
+          pubkey,
+          hasPubkey: !!pubkey,
+        });
+      }
 
-    if (!pubkey) {
-      console.warn('WalletHeader: No pubkey available, cannot set selected mint');
-      return;
-    }
+      if (!pubkey) {
+        if (__DEV__) {
+          console.warn('WalletHeader: No pubkey available, cannot set selected mint');
+        }
+        return;
+      }
 
-    console.log('WalletHeader: Setting selected mint in store:', {
-      pubkey,
-      mintId: mint.id,
-    });
-    setSelectedMint(pubkey, mint.id);
+      if (__DEV__) {
+        console.log('WalletHeader: Setting selected mint in store:', {
+          pubkey,
+          mintId: mint.id,
+        });
+      }
+      setSelectedMint(pubkey, mint.id);
 
-    const index = accounts.findIndex((a) => a.unit === mint.unit);
-    console.log('WalletHeader: Looking for account with unit:', mint.unit, 'found index:', index);
-    if (index !== -1) {
-      console.log('WalletHeader: Setting account to:', accounts[index]);
-      setAccount(accounts[index]);
-    } else {
-      console.warn('WalletHeader: No account found for unit:', mint.unit);
-    }
-  };
+      const index = accounts.findIndex((a) => a.unit === mint.unit);
+      if (__DEV__) {
+        console.log(
+          'WalletHeader: Looking for account with unit:',
+          mint.unit,
+          'found index:',
+          index
+        );
+      }
+      if (index !== -1) {
+        if (__DEV__) {
+          console.log('WalletHeader: Setting account to:', accounts[index]);
+        }
+        setAccount(accounts[index]);
+      } else {
+        if (__DEV__) {
+          console.warn('WalletHeader: No account found for unit:', mint.unit);
+        }
+      }
+    },
+    [pubkey, setSelectedMint, accounts, setAccount]
+  );
 
   return (
     <View

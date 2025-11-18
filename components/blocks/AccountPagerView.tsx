@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
@@ -42,6 +42,12 @@ export function AccountPagerView({
   account,
 }: AccountPagerViewProps): React.ReactElement {
   const { getPrimaryColor, getShadeColor } = useTheme();
+  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
+  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
+  const shadeColor100 = useMemo(() => getShadeColor('100'), [getShadeColor]);
+  const shadeColor300 = useMemo(() => getShadeColor('300'), [getShadeColor]);
+
   const { handlePermission } = useHandleCameraPermission();
   const { getBalances } = useMintManagement();
 
@@ -71,75 +77,83 @@ export function AccountPagerView({
     goToIndex(accounts.findIndex((a) => a.unit === account.unit));
   }, [accounts, account]);
 
-  const handleButtonPress = async (page: string, accountUnit: string) => {
-    // Get balance from Coco
-    let balance = 0;
-    try {
-      const balances = await getBalances();
-      balance = balances[selectedMintUrl || ''] || 0;
-    } catch (error) {
-      console.error('Failed to get balance:', error);
-      balance = 0;
-    }
+  const handleButtonPress = useCallback(
+    async (page: string, accountUnit: string) => {
+      // Get balance from Coco
+      let balance = 0;
+      try {
+        const balances = await getBalances();
+        balance = balances[selectedMintUrl || ''] || 0;
+      } catch (error) {
+        if (__DEV__) {
+          console.error('Failed to get balance:', error);
+        }
+        balance = 0;
+      }
 
-    if (page === 'currency' && balance <= 0) {
-      SheetManager.show('mint-balance', {
-        payload: {
-          navigate: true,
-          requireBalance: true,
-        },
-        onClose: (mint?: { id: string; unit: string }) => {
-          if (mint?.id) {
-            const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
-            if (idx !== -1) {
-              setAccount(accounts[idx]);
+      if (page === 'currency' && balance <= 0) {
+        SheetManager.show('mint-balance', {
+          payload: {
+            navigate: true,
+            requireBalance: true,
+          },
+          onClose: (mint?: { id: string; unit: string }) => {
+            if (mint?.id) {
+              const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
+              if (idx !== -1) {
+                setAccount(accounts[idx]);
+              }
             }
-          }
-        },
-      });
-      return;
-    }
-
-    if (page === 'camera') {
-      const granted = await handlePermission();
-      if (!granted) {
+          },
+        });
         return;
       }
-    }
 
-    router.push({
-      pathname: `/${page}`,
-      params: {
-        to: 'sendToken',
-        unit: accountUnit,
-      },
-    });
-  };
+      if (page === 'camera') {
+        const granted = await handlePermission();
+        if (!granted) {
+          return;
+        }
+      }
 
-  // Define action buttons
-  const actionButtons: ActionButton[] = [
-    {
-      page: 'receive',
-      text: {
-        children: 'Receive',
-      },
-      icon: <ArrowIcon size={24} color={getPrimaryColor('0')} rotate={180} />,
+      router.push({
+        pathname: `/${page}`,
+        params: {
+          to: 'sendToken',
+          unit: accountUnit,
+        },
+      });
     },
-    {
-      page: 'camera',
-      text: {
-        children: 'Scan',
+    [getBalances, selectedMintUrl, accounts, setAccount, handlePermission]
+  );
+
+  // Define action buttons - memoized to prevent recreation on every render
+  const actionButtons: ActionButton[] = useMemo(
+    () => [
+      {
+        page: 'receive' as const,
+        text: {
+          children: 'Receive',
+        },
+        icon: <ArrowIcon size={24} color={primaryColor0} rotate={180} />,
       },
-      icon: <Icon name="stash:qr-code" size={24} color={getPrimaryColor('0')} />,
-    },
-    {
-      page: 'currency',
-      text: {
-        children: 'Send',
+      {
+        page: 'camera' as const,
+        text: {
+          children: 'Scan',
+        },
+        icon: <Icon name="stash:qr-code" size={24} color={primaryColor0} />,
       },
-      icon: <ArrowIcon size={24} color={getPrimaryColor('0')} rotate={0} />,
-    },
-  ];
+      {
+        page: 'currency' as const,
+        text: {
+          children: 'Send',
+        },
+        icon: <ArrowIcon size={24} color={primaryColor0} rotate={0} />,
+      },
+    ],
+    [primaryColor0]
+  );
 
   return (
     <>
@@ -193,13 +207,13 @@ export function AccountPagerView({
                     ? {
                         maxWidth: 64,
                         zIndex: 10000,
-                        shadowColor: getShadeColor('300'),
+                        shadowColor: shadeColor300,
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.75,
                         shadowRadius: 8,
                         elevation: 5,
                         borderRadius: 10000,
-                        borderColor: getShadeColor('100'),
+                        borderColor: shadeColor100,
                         borderWidth: 0.5,
                       }
                     : { maxWidth: 'auto' }
@@ -208,9 +222,7 @@ export function AccountPagerView({
                 <LinearGradient
                   style={isCamera ? { padding: 8, borderRadius: 1000 } : undefined}
                   colors={
-                    isCamera
-                      ? [getShadeColor('100'), getShadeColor('300')]
-                      : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
+                    isCamera ? [shadeColor100, shadeColor300] : ['rgba(0,0,0,0)', 'rgba(0,0,0,0)']
                   }>
                   <VStack align="center" justify="center">
                     <HStack
@@ -221,8 +233,8 @@ export function AccountPagerView({
                       style={{
                         ...(isCamera && { borderRadius: 1000 }),
                         ...(!isCamera && {
-                          backgroundColor: getPrimaryColor('800'),
-                          borderColor: getPrimaryColor('700'),
+                          backgroundColor: primaryColor800,
+                          borderColor: primaryColor700,
                         }),
                         ...(isReceive && {
                           borderBottomLeftRadius: 1000,

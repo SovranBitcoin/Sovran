@@ -75,36 +75,30 @@ export function AnimatedText({
   const skeletonOpacity = useRef(new Animated.Value(loading ? 1 : 0)).current;
   const textOpacity = useRef(new Animated.Value(loading ? 0 : 1)).current;
 
-  // Track measured text width (only if skeletonWidth not provided)
+  // Track measured text width and position (only if skeletonWidth not provided)
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const [textLayout, setTextLayout] = useState<{ x: number; width: number } | null>(null);
   const hasMeasuredRef = useRef(false);
-  const previousChildrenRef = useRef(children);
 
   // Track if we have data (not loading and has children)
   const hasData = !loading && children !== undefined && children !== null;
 
-  // Reset measurement if content changes
-  useEffect(() => {
-    if (previousChildrenRef.current !== children && skeletonWidth === undefined) {
-      hasMeasuredRef.current = false;
-      setMeasuredWidth(null);
-    }
-    previousChildrenRef.current = children;
-  }, [children, skeletonWidth]);
-
   // Get skeleton color - use skeletonColor prop if provided, otherwise use color prop, otherwise default
   const finalSkeletonColor = skeletonColor || color || getPrimaryColor('700');
 
-  // Measure text width only if skeletonWidth is not provided
+  // Measure text width and position
+  // Lock in width after first measurement to prevent skeleton from changing size when content animates
   const handleTextLayout = useCallback(
     (event: any) => {
-      if (skeletonWidth !== undefined || hasMeasuredRef.current) {
-        return;
-      }
-      const { width } = event.nativeEvent.layout;
-      if (width > 0) {
+      const { x, width } = event.nativeEvent.layout;
+      // Only measure width once if skeletonWidth is not provided
+      if (skeletonWidth === undefined && !hasMeasuredRef.current && width > 0) {
         setMeasuredWidth(width);
         hasMeasuredRef.current = true;
+      }
+      // Always track text position for skeleton alignment (even if width is locked)
+      if (width > 0) {
+        setTextLayout({ x, width });
       }
     },
     [skeletonWidth]
@@ -168,8 +162,15 @@ export function AnimatedText({
         style={{
           position: 'absolute',
           top: 0,
-          left: '50%',
-          marginLeft: -finalSkeletonWidth / 2,
+          // Center skeleton: if we have text layout, align to text's center, otherwise use 50% with margin
+          ...(textLayout
+            ? {
+                left: textLayout.x + (textLayout.width - finalSkeletonWidth) / 2,
+              }
+            : {
+                left: '50%',
+                marginLeft: -finalSkeletonWidth / 2,
+              }),
           opacity: skeletonOpacity,
           pointerEvents: showSkeleton ? 'auto' : 'none',
         }}>
@@ -192,7 +193,7 @@ export function AnimatedText({
           capHeight={size}
           color={color}
           style={style}
-          onLayout={skeletonWidth === undefined ? handleTextLayout : undefined}
+          onLayout={handleTextLayout}
           {...textProps}>
           {children}
         </Text>

@@ -1009,8 +1009,8 @@ const RatingDisplay = ({
   // Bar width animations (one for each distribution row - always 5 rows)
   const barWidths = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
 
-  // Background bar width animations (one for each distribution row - always 5 rows)
-  const backgroundBarWidths = useRef(
+  // Background bar opacity animations (one for each distribution row - always 5 rows)
+  const backgroundBarOpacities = useRef(
     Array.from({ length: 5 }, () => new Animated.Value(0))
   ).current;
 
@@ -1055,10 +1055,10 @@ const RatingDisplay = ({
         bar.setValue(0);
       });
     });
-    backgroundBarWidths.forEach((bar) => {
-      bar.stopAnimation(() => {
+    backgroundBarOpacities.forEach((opacity) => {
+      opacity.stopAnimation(() => {
         // Reset after stopping
-        bar.setValue(0);
+        opacity.setValue(0);
       });
     });
     starBounces.forEach((star) => {
@@ -1084,17 +1084,17 @@ const RatingDisplay = ({
         });
       });
 
-      // Start background bar animations (animate to 100% for target rows)
-      const backgroundBarAnimations = distribution.map(({ stars, percentage }, index) => {
+      // Start background bar animations (animate opacity to 1 for target rows)
+      const backgroundBarAnimations = distribution.map(({ stars }, index) => {
         const isTargetRow = stars === targetRow;
-        const targetWidth = isTargetRow ? 100 : percentage * 100; // 100% for target rows
+        const targetOpacity = isTargetRow ? 1 : 0; // Opacity 1 for target rows, 0 otherwise
 
-        return Animated.timing(backgroundBarWidths[index], {
-          toValue: targetWidth,
+        return Animated.timing(backgroundBarOpacities[index], {
+          toValue: targetOpacity,
           duration: 800,
           delay: index * 50, // Stagger bars slightly (same as foreground)
-          easing: Easing.out(Easing.ease), // Ease-out for smooth fill
-          useNativeDriver: true, // Can use native driver with scaleX transform
+          easing: Easing.out(Easing.ease), // Ease-out for smooth fade
+          useNativeDriver: true, // Can use native driver for opacity
         });
       });
 
@@ -1193,7 +1193,7 @@ const RatingDisplay = ({
     contentOpacity,
     scoreScale,
     barWidths,
-    backgroundBarWidths,
+    backgroundBarOpacities,
     starBounces,
   ]);
 
@@ -1237,9 +1237,9 @@ const RatingDisplay = ({
           bar.stopAnimation();
           bar.setValue(0);
         });
-        backgroundBarWidths.forEach((bar) => {
-          bar.stopAnimation();
-          bar.setValue(0);
+        backgroundBarOpacities.forEach((opacity) => {
+          opacity.stopAnimation();
+          opacity.setValue(0);
         });
         starBounces.forEach((star) => {
           star.stopAnimation();
@@ -1263,17 +1263,17 @@ const RatingDisplay = ({
               });
             });
 
-            // Start background bar animations (animate to 100% for target rows)
-            const backgroundBarAnimations = distribution.map(({ stars, percentage }, index) => {
+            // Start background bar animations (animate opacity to 1 for target rows)
+            const backgroundBarAnimations = distribution.map(({ stars }, index) => {
               const isTargetRow = stars === targetRow;
-              const targetWidth = isTargetRow ? 100 : percentage * 100; // 100% for target rows
+              const targetOpacity = isTargetRow ? 1 : 0; // Opacity 1 for target rows, 0 otherwise
 
-              return Animated.timing(backgroundBarWidths[index], {
-                toValue: targetWidth,
+              return Animated.timing(backgroundBarOpacities[index], {
+                toValue: targetOpacity,
                 duration: 800,
                 delay: index * 50,
                 easing: Easing.out(Easing.ease),
-                useNativeDriver: true, // Can use native driver with scaleX transform
+                useNativeDriver: true, // Can use native driver for opacity
               });
             });
 
@@ -1375,9 +1375,9 @@ const RatingDisplay = ({
           const isTargetRow = stars === targetRow;
           const targetWidth = isTargetRow ? goldPercentage * 100 : percentage * 100;
           barWidths[index].setValue(targetWidth);
-          // Set background bar widths (100% for target rows)
-          const backgroundTargetWidth = isTargetRow ? 100 : percentage * 100;
-          backgroundBarWidths[index].setValue(backgroundTargetWidth);
+          // Set background bar opacities (1 for target rows, 0 otherwise)
+          const backgroundTargetOpacity = isTargetRow ? 1 : 0;
+          backgroundBarOpacities[index].setValue(backgroundTargetOpacity);
         });
       }
       // If loading on mount, keep skeleton visible (already set to opacity 1)
@@ -1392,7 +1392,7 @@ const RatingDisplay = ({
       contentOpacity.setValue(0);
       scoreScale.setValue(0.8);
       barWidths.forEach((bar) => bar.setValue(0));
-      backgroundBarWidths.forEach((bar) => bar.setValue(0));
+      backgroundBarOpacities.forEach((opacity) => opacity.setValue(0));
       starBounces.forEach((star) => star.setValue(1));
     }
 
@@ -1405,11 +1405,11 @@ const RatingDisplay = ({
       distribution.forEach(({ stars, percentage }, index) => {
         const isTargetRow = stars === targetRow;
         const targetWidth = isTargetRow ? goldPercentage * 100 : percentage * 100;
-        const backgroundTargetWidth = isTargetRow ? 100 : percentage * 100;
+        const backgroundTargetOpacity = isTargetRow ? 1 : 0;
 
         // Stop any ongoing animation
         barWidths[index].stopAnimation();
-        backgroundBarWidths[index].stopAnimation();
+        backgroundBarOpacities[index].stopAnimation();
 
         Animated.parallel([
           Animated.timing(barWidths[index], {
@@ -1418,11 +1418,11 @@ const RatingDisplay = ({
             easing: Easing.out(Easing.ease),
             useNativeDriver: true, // Can use native driver with scaleX transform
           }),
-          Animated.timing(backgroundBarWidths[index], {
-            toValue: backgroundTargetWidth,
+          Animated.timing(backgroundBarOpacities[index], {
+            toValue: backgroundTargetOpacity,
             duration: 400,
             easing: Easing.out(Easing.ease),
-            useNativeDriver: true, // Can use native driver with scaleX transform
+            useNativeDriver: true, // Can use native driver for opacity
           }),
         ]).start();
       });
@@ -1483,13 +1483,6 @@ const RatingDisplay = ({
             extrapolate: 'clamp',
           });
 
-          // Background bar animation interpolation (animates to 100% for target rows)
-          const animatedBackgroundScaleX = backgroundBarWidths[distIndex].interpolate({
-            inputRange: [0, 100],
-            outputRange: [0, 1],
-            extrapolate: 'clamp',
-          });
-
           return (
             <HStack
               key={stars}
@@ -1518,11 +1511,7 @@ const RatingDisplay = ({
                       position: 'absolute',
                       top: 0,
                       left: 0,
-                      opacity: animatedBackgroundScaleX.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 1],
-                        extrapolate: 'clamp',
-                      }),
+                      opacity: backgroundBarOpacities[distIndex],
                     }}>
                     <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
                       {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => {
@@ -1612,7 +1601,7 @@ const RatingDisplay = ({
                     backgroundColor: getPrimaryColor('400'),
                   }}
                 />
-                {/* Animated background bar (getYellowColor('500')) - animates to 100% for target rows */}
+                {/* Animated background bar (getYellowColor('500')) - animates opacity from 0 to 1 for target rows */}
                 {isTargetRow && (
                   <Animated.View
                     className="h-full rounded-full"
@@ -1621,15 +1610,7 @@ const RatingDisplay = ({
                       width: '100%',
                       height: '100%',
                       backgroundColor: getYellowColor('500'),
-                      transform: [
-                        {
-                          translateX: animatedBackgroundScaleX.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['-50%', '0%'],
-                          }),
-                        },
-                        { scaleX: animatedBackgroundScaleX },
-                      ],
+                      opacity: backgroundBarOpacities[distIndex],
                     }}
                   />
                 )}
@@ -1803,7 +1784,7 @@ const AnimatedReviewsButton = ({
           <AnimatedText
             color={getYellowColor('300')}
             loading={(loading || !hasData) && !showReviews}
-            size={showReviews ? 14 : 12}
+            size={10}
             bold
             onTriggerAnimationRef={onTriggerAnimationRef ? animatedTextTriggerRef : undefined}
             style={textStyle}
@@ -2473,6 +2454,7 @@ const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
               </View>
             </View>
           </VStack>
+          <Spacer size={4} />
           <View style={{ alignItems: 'center', marginBottom: 4 }}>
             <AnimatedText
               loading={isLoading}

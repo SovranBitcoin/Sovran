@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -47,6 +47,9 @@ export function MintCurrencySelector<T extends MintData = MintData>({
   isLoading = false,
 }: MintCurrencySelectorProps<T>) {
   const { getPrimaryColor } = useTheme();
+  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
+  const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
 
   // Extract available currencies from mints
   const availableCurrencies = useMemo(() => {
@@ -94,10 +97,13 @@ export function MintCurrencySelector<T extends MintData = MintData>({
     });
   }, [mints, selectedCurrency]);
 
-  const handleCurrencyChange = (currency: string) => {
-    setSelectedCurrency(currency);
-    onCurrencyChange?.(currency);
-  };
+  const handleCurrencyChange = useCallback(
+    (currency: string) => {
+      setSelectedCurrency(currency);
+      onCurrencyChange?.(currency);
+    },
+    [onCurrencyChange]
+  );
 
   return (
     <VStack flex={1}>
@@ -124,7 +130,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                   borderRadius: 8,
                   minWidth: 100,
                   backgroundColor:
-                    selectedCurrency === currency ? getPrimaryColor('700') : getPrimaryColor('900'),
+                    selectedCurrency === currency ? primaryColor700 : primaryColor900,
                 }}
                 onPress={() => handleCurrencyChange(currency)}>
                 <HStack align="center" justify="flex-start" gap={8}>
@@ -136,7 +142,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                   ) : currency === 'ALL' ? (
                     <Icon
                       name="clarity:internet-of-things-solid"
-                      color={getPrimaryColor('0')}
+                      color={primaryColor0}
                       size={32}
                     />
                   ) : (
@@ -170,7 +176,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
           {isLoading && mints.length === 0 ? (
             customEmptyState || null
           ) : filteredMints.length === 0 ? (
-            <Text style={{ color: getPrimaryColor('0'), textAlign: 'center', marginTop: 20 }}>
+            <Text style={{ color: primaryColor0, textAlign: 'center', marginTop: 20 }}>
               {selectedCurrency === 'ALL'
                 ? 'No mints available'
                 : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}

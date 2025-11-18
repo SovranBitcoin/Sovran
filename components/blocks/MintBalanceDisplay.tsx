@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useMintStore } from 'stores/mintStore';
@@ -49,13 +49,15 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
   // Debug logging
-  console.log('MintBalanceDisplay: Debug info:', {
-    hasKeys: !!keys,
-    pubkey: keys?.pubkey,
-    selectedMint,
-    selectedMints,
-    selectedMintFromStore: keys?.pubkey ? selectedMints[keys.pubkey] : 'no pubkey',
-  });
+  if (__DEV__) {
+    console.log('MintBalanceDisplay: Debug info:', {
+      hasKeys: !!keys,
+      pubkey: keys?.pubkey,
+      selectedMint,
+      selectedMints,
+      selectedMintFromStore: keys?.pubkey ? selectedMints[keys.pubkey] : 'no pubkey',
+    });
+  }
   const { getMintInfo } = useMintManagement();
 
   // Use coco's live balance context for real-time updates
@@ -71,21 +73,29 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   // Load mint info from Coco (balance updates automatically via context)
   useEffect(() => {
     const loadMintInfo = async () => {
-      console.log('MintBalanceDisplay: loadMintInfo called with selectedMint:', selectedMint);
+      if (__DEV__) {
+        console.log('MintBalanceDisplay: loadMintInfo called with selectedMint:', selectedMint);
+      }
       if (selectedMint) {
         setIsLoadingMintInfo(true);
         try {
           const mintInfoData = await getMintInfo(selectedMint);
-          console.log('MintBalanceDisplay: loaded mint info:', mintInfoData);
+          if (__DEV__) {
+            console.log('MintBalanceDisplay: loaded mint info:', mintInfoData);
+          }
           setMintInfo(mintInfoData);
         } catch (error) {
-          console.error('Failed to load mint info:', error);
+          if (__DEV__) {
+            console.error('Failed to load mint info:', error);
+          }
           setMintInfo(null);
         } finally {
           setIsLoadingMintInfo(false);
         }
       } else {
-        console.log('MintBalanceDisplay: no selectedMint, setting mintInfo to null');
+        if (__DEV__) {
+          console.log('MintBalanceDisplay: no selectedMint, setting mintInfo to null');
+        }
         setMintInfo(null);
       }
     };
@@ -100,7 +110,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 
   const showMintInfo = !(requireValidMint && !isMintAllowed);
 
-  const handlePress = async () => {
+  const handlePress = useCallback(async () => {
     SheetManager.show('mint-balance', {
       payload: {
         navigate: false,
@@ -114,25 +124,39 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         onMintPress: onMintSelected,
       },
       onClose: async (mint) => {
-        console.log('MintBalanceDisplay: onClose called with mint:', mint);
-        console.log('MintBalanceDisplay: onClose conditions:', {
-          hasMintId: !!mint?.id,
-          hasOnMintSelected: !!onMintSelected,
-          updateSelectedMint,
-        });
+        if (__DEV__) {
+          console.log('MintBalanceDisplay: onClose called with mint:', mint);
+          console.log('MintBalanceDisplay: onClose conditions:', {
+            hasMintId: !!mint?.id,
+            hasOnMintSelected: !!onMintSelected,
+            updateSelectedMint,
+          });
+        }
         if (mint?.id && onMintSelected) {
           // Use live balance from context instead of calling getBalances()
           const amt = liveBalances[mint.id] || 0;
-          console.log('MintBalanceDisplay: calling onMintSelected with:', {
-            mint,
-            amount: amt,
-            unit,
-          });
+          if (__DEV__) {
+            console.log('MintBalanceDisplay: calling onMintSelected with:', {
+              mint,
+              amount: amt,
+              unit,
+            });
+          }
           onMintSelected(mint, { amount: amt, unit });
         }
       },
     });
-  };
+  }, [
+    requireBalance,
+    updateSelectedMint,
+    allowedMints,
+    allowedUnits,
+    showAddMintsButton,
+    showDetailsButton,
+    onMintSelected,
+    liveBalances,
+    unit,
+  ]);
 
   return (
     <TouchableOpacity onPress={handlePress}>
