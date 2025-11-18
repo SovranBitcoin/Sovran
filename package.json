@@ -103,6 +103,7 @@
     "react-native": "0.81.4",
     "react-native-actions-sheet": "^0.9.7",
     "react-native-cache": "^2.0.3",
+    "react-native-capsize": "^0.2.2",
     "react-native-circular-progress": "^1.4.1",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "~1.11.0",

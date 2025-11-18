@@ -12,6 +12,7 @@ import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { useVersionCheck } from 'hooks/useVersionCheck';
 import { usePaginatedHistory } from 'coco-cashu-react';
+import { AnimatedText } from 'components/ui/AnimatedText';
 
 function TabOneScreen() {
   const supportedUnits = ['sat', 'usd', 'eur', 'gbp'];
@@ -69,6 +70,12 @@ function TabOneScreen() {
               end={{ x: 0.5, y: 0 }}
               style={[StyleSheet.absoluteFill, { zIndex: -1, top: -250, height: 250 }]}
             />
+            <AnimatedText loading={false} capHeight={24} bold>
+              Hello
+            </AnimatedText>
+            <AnimatedText loading={true} capHeight={24} bold>
+              Hello
+            </AnimatedText>
             <Transactions account={account} showMore={true} history={history} hideExpired={true} />
           </View>
         </ScrollView>

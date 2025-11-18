@@ -1,13 +1,11 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   ScrollView,
   Pressable,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Animated,
   Dimensions,
-  Text as RNText,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -25,6 +23,7 @@ import { withSheetProvider } from '@/hocs/withSheetProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { Text } from 'components/ui/Text';
+import { AnimatedText } from 'components/ui/AnimatedText';
 import { Avatar } from 'components/ui/Avatar';
 import TextInput from 'components/ui/TextInput';
 import Icon from 'assets/icons';
@@ -55,79 +54,6 @@ function formatTimestamp(timestamp: number): string {
   } else {
     return date.toLocaleDateString();
   }
-}
-
-// Animated scrolling text component for overflow handling
-function AnimatedScrollingText({
-  text,
-  style,
-  maxWidth,
-}: {
-  text: string;
-  style: any;
-  maxWidth: number;
-}) {
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [textWidth, setTextWidth] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(maxWidth);
-
-  const shouldAnimate = textWidth > containerWidth;
-
-  useEffect(() => {
-    if (shouldAnimate) {
-      const scrollDistance = textWidth - containerWidth;
-      const duration = Math.max(3000, scrollDistance * 30);
-
-      const animation = Animated.loop(
-        Animated.sequence([
-          Animated.delay(1000),
-          Animated.timing(scrollX, {
-            toValue: -scrollDistance,
-            duration: duration,
-            useNativeDriver: true,
-          }),
-          Animated.delay(1000),
-          Animated.timing(scrollX, {
-            toValue: 0,
-            duration: duration,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-      animation.start();
-
-      return () => {
-        animation.stop();
-        scrollX.setValue(0);
-      };
-    } else {
-      scrollX.setValue(0);
-    }
-  }, [shouldAnimate, textWidth, containerWidth, scrollX]);
-
-  const onTextLayout = (event: any) => {
-    const width = event.nativeEvent.layout.width;
-    setTextWidth(width);
-  };
-
-  const onContainerLayout = (event: any) => {
-    const width = event.nativeEvent.layout.width;
-    setContainerWidth(width);
-  };
-
-  return (
-    <View style={{ width: maxWidth, overflow: 'hidden' }} onLayout={onContainerLayout}>
-      <Animated.View
-        style={{
-          transform: [{ translateX: scrollX }],
-        }}>
-        <RNText style={style} onLayout={onTextLayout} numberOfLines={1}>
-          {text}
-        </RNText>
-      </Animated.View>
-    </View>
-  );
 }
 
 function MessageBubble({
@@ -408,15 +334,19 @@ function ModalScreen() {
               />
 
               <VStack spacing={2} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-                <AnimatedScrollingText
-                  text={displayName}
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    color: getPrimaryColor('0'),
-                  }}
-                  maxWidth={screenWidth - 240}
-                />
+                <View style={{ width: screenWidth - 240, overflow: 'hidden' }}>
+                  <AnimatedText
+                    loading={shouldShowAvatarLoading}
+                    size={16}
+                    bold
+                    style={{
+                      color: getPrimaryColor('0'),
+                    }}
+                    skeletonWidth={screenWidth - 240}
+                    skeletonHeight={18}>
+                    {displayName}
+                  </AnimatedText>
+                </View>
                 <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
                   {nip19.npubEncode(pubkey)}
                 </Text>

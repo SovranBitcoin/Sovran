@@ -4,6 +4,8 @@ import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { Skeleton } from 'react-native-skeleton-component';
+import capsize from 'react-native-capsize';
+import { getFontMetrics } from 'helper/fontMetrics';
 
 interface GradientTextProps extends TextProps {
   children: React.ReactNode;
@@ -116,6 +118,8 @@ export interface CustomTextProps extends TextProps {
   // Style props
   italic?: boolean;
   size?: number;
+  capHeight?: number;
+  lineGap?: number;
   style?: object;
   lightColor?: string;
   darkColor?: string;
@@ -147,7 +151,13 @@ function getFamilyFromProps(props: CustomTextProps): string {
   return 'overpass'; // default
 }
 
-export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
+export function UntranslatedText({
+  size = 14,
+  italic = false,
+  capHeight,
+  lineGap = 0,
+  ...props
+}: CustomTextProps) {
   const { getPrimaryColor } = useTheme();
   const { style, children, ...otherProps } = props;
 
@@ -246,33 +256,58 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
     }
   }
 
+  // Apply capsize if capHeight is provided and font metrics are available
+  const fontMetrics = getFontMetrics(family as 'overpass' | 'lexend', weight, italic);
+  const shouldUseCapsize = capHeight !== undefined && fontMetrics !== null;
+
+  // Build base style
+  const baseStyle: TextStyle = {
+    color: getPrimaryColor('0'),
+    fontFamily: fontFamily,
+  };
+
+  // Apply capsize styles if capHeight is provided
+  if (shouldUseCapsize) {
+    const capsizedStyles = capsize({
+      fontMetrics: fontMetrics!,
+      capHeight: capHeight!,
+      lineGap: lineGap,
+    });
+    Object.assign(baseStyle, capsizedStyles);
+  } else {
+    // Fall back to standard fontSize when capHeight is not provided
+    baseStyle.fontSize = size;
+  }
+
   return (
     <DefaultText
       testID={props.testID}
-      style={[
-        {
-          color: getPrimaryColor('0'),
-          fontFamily: fontFamily,
-          fontSize: size,
-        },
-        style,
-        ...(props?.color ? [{ color: props?.color }] : []),
-      ]}
+      style={[baseStyle, style, ...(props?.color ? [{ color: props?.color }] : [])]}
       {...otherProps}>
       {children}
     </DefaultText>
   );
 }
 
-export function Text({ loading = false, size = 14, italic = false, ...props }: CustomTextProps) {
+export function Text({
+  loading = false,
+  size = 14,
+  italic = false,
+  capHeight,
+  lineGap,
+  ...props
+}: CustomTextProps) {
   const { children, ...otherProps } = props;
+
+  // Use capHeight for skeleton height if provided, otherwise use size
+  const skeletonHeight = capHeight !== undefined ? capHeight + 2 : size + 2;
 
   if (loading) {
     return (
       <Skeleton
         style={{
           width: 120,
-          height: size + 2,
+          height: skeletonHeight,
           marginBottom: 2,
           borderRadius: 2,
         }}></Skeleton>
@@ -280,7 +315,13 @@ export function Text({ loading = false, size = 14, italic = false, ...props }: C
   }
 
   return (
-    <UntranslatedText testID={props.testID} size={size} italic={italic} {...otherProps}>
+    <UntranslatedText
+      testID={props.testID}
+      size={size}
+      italic={italic}
+      capHeight={capHeight}
+      lineGap={lineGap}
+      {...otherProps}>
       {children}
     </UntranslatedText>
   );

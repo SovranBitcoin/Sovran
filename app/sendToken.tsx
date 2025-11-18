@@ -84,7 +84,7 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
       getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry.token)
     );
   });
-  console.log(12321323, JSON.stringify(currentTransaction, null, 2));
+
   // Load mint info when transaction is found
   useEffect(() => {
     const loadMintInfo = async () => {

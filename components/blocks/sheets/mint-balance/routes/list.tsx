@@ -37,13 +37,12 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack } from 'components/ui/View';
-import { MintCurrencySelector } from '../MintCurrencySelector';
 import { getMintDisplayName } from 'helper/url';
-import { Skeleton } from '@/components/ui/Skeleton';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
 import { useTheme } from '@/providers/ThemeProvider';
+import { MintCurrencySelector } from '../MintCurrencySelector';
 
 interface MintItemProps {
   mint: Mint & { amount: number; unit: string };
@@ -158,36 +157,6 @@ const ListRoute = () => {
 
   console.log('MintBalance: keys from NostrKeysContext:', keys, 'using pubkey:', pubkey);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-
-  // Skeleton component that matches MintItem layout
-  const MintItemSkeleton = () => {
-    // Generate random widths for more realistic skeleton
-    const nameWidth = 100 + Math.random() * 60; // 100-160px
-    const balanceWidth = 60 + Math.random() * 40; // 60-100px
-
-    return (
-      <View
-        className="bg-primary-900"
-        style={{
-          padding: 16,
-          marginBottom: 4,
-          borderRadius: 16,
-        }}>
-        <HStack align="center" gap={12}>
-          <View style={{ position: 'relative' }}>
-            <Skeleton
-              className="h-[36px] w-[36px] bg-primary-700"
-              style={{ borderRadius: 36 * 0.25 }} // Square rounded for mints
-            />
-          </View>
-          <VStack flex={1}>
-            <Skeleton className="mb-2 h-[16px] bg-primary-700" style={{ width: nameWidth }} />
-            <Skeleton className="h-[14px] bg-primary-700" style={{ width: balanceWidth }} />
-          </VStack>
-        </HStack>
-      </View>
-    );
-  };
 
   // Load mints with balances
   useEffect(() => {
@@ -335,30 +304,6 @@ const ListRoute = () => {
       setLoadingId(null);
     }
   };
-
-  if (loading) {
-    return (
-      <Wrapper
-        buttons={
-          <ButtonHandler
-            context="sheet"
-            buttons={[
-              {
-                text: 'Close',
-                variant: 'secondary',
-                onPress: async () => sheetRef.current?.hide(),
-              },
-            ]}
-          />
-        }>
-        <VStack spacing={0}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <MintItemSkeleton key={index} />
-          ))}
-        </VStack>
-      </Wrapper>
-    );
-  }
 
   return (
     <Wrapper

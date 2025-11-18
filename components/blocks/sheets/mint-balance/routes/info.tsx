@@ -28,6 +28,7 @@ import { useSheetRef, useSheetPayload, RouteScreenProps } from 'react-native-act
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
+import { AnimatedText } from 'components/ui/AnimatedText';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack, Spacer, HStack, View } from 'components/ui/View';
@@ -1008,6 +1009,11 @@ const RatingDisplay = ({
   // Bar width animations (one for each distribution row - always 5 rows)
   const barWidths = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
 
+  // Background bar width animations (one for each distribution row - always 5 rows)
+  const backgroundBarWidths = useRef(
+    Array.from({ length: 5 }, () => new Animated.Value(0))
+  ).current;
+
   // Star bounce animations (one for each possible star position - always 5 stars max)
   const starBounces = useRef(Array.from({ length: 5 }, () => new Animated.Value(1))).current;
 
@@ -1018,6 +1024,10 @@ const RatingDisplay = ({
   const prevScoreRef = useRef(score);
   const hasAnimatedRef = useRef(false);
   const isInitialMount = useRef(true);
+
+  // Refs for AnimatedText components
+  const scoreAnimationRef = useRef<(() => void) | null>(null);
+  const outOfFiveAnimationRef = useRef<(() => void) | null>(null);
 
   // Function to trigger animation sequence (for testing)
   const triggerAnimation = React.useCallback(() => {
@@ -1034,8 +1044,18 @@ const RatingDisplay = ({
     contentOpacity.setValue(0);
     scoreScale.setValue(0.8);
 
+    // Trigger AnimatedText skeleton animations
+    scoreAnimationRef.current?.();
+    outOfFiveAnimationRef.current?.();
+
     // Stop any ongoing animations first to prevent conflicts
     barWidths.forEach((bar) => {
+      bar.stopAnimation(() => {
+        // Reset after stopping
+        bar.setValue(0);
+      });
+    });
+    backgroundBarWidths.forEach((bar) => {
       bar.stopAnimation(() => {
         // Reset after stopping
         bar.setValue(0);
@@ -1059,6 +1079,20 @@ const RatingDisplay = ({
           toValue: targetWidth,
           duration: 800,
           delay: index * 50, // Stagger bars slightly
+          easing: Easing.out(Easing.ease), // Ease-out for smooth fill
+          useNativeDriver: true, // Can use native driver with scaleX transform
+        });
+      });
+
+      // Start background bar animations (animate to 100% for target rows)
+      const backgroundBarAnimations = distribution.map(({ stars, percentage }, index) => {
+        const isTargetRow = stars === targetRow;
+        const targetWidth = isTargetRow ? 100 : percentage * 100; // 100% for target rows
+
+        return Animated.timing(backgroundBarWidths[index], {
+          toValue: targetWidth,
+          duration: 800,
+          delay: index * 50, // Stagger bars slightly (same as foreground)
           easing: Easing.out(Easing.ease), // Ease-out for smooth fill
           useNativeDriver: true, // Can use native driver with scaleX transform
         });
@@ -1120,7 +1154,7 @@ const RatingDisplay = ({
       }
 
       // Start bar animations (these can run in parallel)
-      Animated.parallel(barAnimations).start();
+      Animated.parallel([...barAnimations, ...backgroundBarAnimations]).start();
 
       // Start star bounce animations (these have delays, run separately)
       starBounceAnimations.forEach((animation) => {
@@ -1159,6 +1193,7 @@ const RatingDisplay = ({
     contentOpacity,
     scoreScale,
     barWidths,
+    backgroundBarWidths,
     starBounces,
   ]);
 
@@ -1202,6 +1237,10 @@ const RatingDisplay = ({
           bar.stopAnimation();
           bar.setValue(0);
         });
+        backgroundBarWidths.forEach((bar) => {
+          bar.stopAnimation();
+          bar.setValue(0);
+        });
         starBounces.forEach((star) => {
           star.stopAnimation();
           star.setValue(1);
@@ -1216,6 +1255,20 @@ const RatingDisplay = ({
               const targetWidth = isTargetRow ? goldPercentage * 100 : percentage * 100;
 
               return Animated.timing(barWidths[index], {
+                toValue: targetWidth,
+                duration: 800,
+                delay: index * 50,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true, // Can use native driver with scaleX transform
+              });
+            });
+
+            // Start background bar animations (animate to 100% for target rows)
+            const backgroundBarAnimations = distribution.map(({ stars, percentage }, index) => {
+              const isTargetRow = stars === targetRow;
+              const targetWidth = isTargetRow ? 100 : percentage * 100; // 100% for target rows
+
+              return Animated.timing(backgroundBarWidths[index], {
                 toValue: targetWidth,
                 duration: 800,
                 delay: index * 50,
@@ -1279,7 +1332,7 @@ const RatingDisplay = ({
 
             // Fade out skeleton and fade in content
             // Start bar animations (these can run in parallel)
-            Animated.parallel(barAnimations).start();
+            Animated.parallel([...barAnimations, ...backgroundBarAnimations]).start();
 
             // Start star bounce animations (these have delays, run separately)
             starBounceAnimations.forEach((animation) => {
@@ -1322,6 +1375,9 @@ const RatingDisplay = ({
           const isTargetRow = stars === targetRow;
           const targetWidth = isTargetRow ? goldPercentage * 100 : percentage * 100;
           barWidths[index].setValue(targetWidth);
+          // Set background bar widths (100% for target rows)
+          const backgroundTargetWidth = isTargetRow ? 100 : percentage * 100;
+          backgroundBarWidths[index].setValue(backgroundTargetWidth);
         });
       }
       // If loading on mount, keep skeleton visible (already set to opacity 1)
@@ -1336,6 +1392,7 @@ const RatingDisplay = ({
       contentOpacity.setValue(0);
       scoreScale.setValue(0.8);
       barWidths.forEach((bar) => bar.setValue(0));
+      backgroundBarWidths.forEach((bar) => bar.setValue(0));
       starBounces.forEach((star) => star.setValue(1));
     }
 
@@ -1348,16 +1405,26 @@ const RatingDisplay = ({
       distribution.forEach(({ stars, percentage }, index) => {
         const isTargetRow = stars === targetRow;
         const targetWidth = isTargetRow ? goldPercentage * 100 : percentage * 100;
+        const backgroundTargetWidth = isTargetRow ? 100 : percentage * 100;
 
         // Stop any ongoing animation
         barWidths[index].stopAnimation();
+        backgroundBarWidths[index].stopAnimation();
 
-        Animated.timing(barWidths[index], {
-          toValue: targetWidth,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true, // Can use native driver with scaleX transform
-        }).start();
+        Animated.parallel([
+          Animated.timing(barWidths[index], {
+            toValue: targetWidth,
+            duration: 400,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true, // Can use native driver with scaleX transform
+          }),
+          Animated.timing(backgroundBarWidths[index], {
+            toValue: backgroundTargetWidth,
+            duration: 400,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true, // Can use native driver with scaleX transform
+          }),
+        ]).start();
       });
     }
 
@@ -1369,56 +1436,39 @@ const RatingDisplay = ({
   const isLoading = score === -1;
 
   return (
-    <HStack align="flex-start" gap={16} className="w-full px-4">
+    <HStack align="center" gap={16} className="w-full px-4">
       {/* Large score display on the left */}
-      <VStack align="center" spacing={0}>
-        {/* Skeleton overlay */}
+      <VStack align="center" spacing={16} style={{ width: 60 }}>
+        {/* Score with AnimatedText */}
         <Animated.View
           style={{
-            position: 'absolute',
-            opacity: skeletonOpacity,
-            pointerEvents: isLoading ? 'auto' : 'none',
-          }}>
-          <Skeleton className="my-[3px] h-[32px] w-[48px] bg-primary-700" />
-        </Animated.View>
-
-        {/* Actual score content */}
-        <Animated.View
-          style={{
-            opacity: contentOpacity,
             transform: [{ scale: scoreScale }],
           }}>
-          <Text mono size={32} heavy className="text-primary-0">
+          <AnimatedText
+            loading={isLoading}
+            capHeight={24}
+            heavy
+            className="text-primary-0"
+            skeletonWidth={48}
+            skeletonHeight={32}
+            onTriggerAnimationRef={scoreAnimationRef}>
             {isLoading ? '0.0' : Number(displayScore).toFixed(1)}
-          </Text>
+          </AnimatedText>
         </Animated.View>
 
-        {/* Skeleton for "out of 5" */}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: 35,
-            opacity: skeletonOpacity,
-            pointerEvents: isLoading ? 'auto' : 'none',
-          }}>
-          <Skeleton className="my-1 h-[14px] w-[40px] bg-primary-700" />
-        </Animated.View>
-
-        {/* Actual "out of 5" text */}
-        <Animated.View
-          style={{
-            marginTop: 4,
-            opacity: contentOpacity,
-          }}>
-          <Text size={12} className="text-primary-300">
-            out of 5
-          </Text>
-        </Animated.View>
+        {/* "out of 5" with AnimatedText */}
+        <AnimatedText
+          loading={isLoading}
+          size={12}
+          className="text-primary-300"
+          onTriggerAnimationRef={outOfFiveAnimationRef}>
+          out of 5
+        </AnimatedText>
       </VStack>
 
       {/* Star distribution bars on the right */}
       <VStack spacing={4} className="flex-1" style={{ flex: 1, minWidth: 0 }}>
-        {distribution.map(({ stars, percentage }, distIndex) => {
+        {distribution.map(({ stars, percentage: _percentage }, distIndex) => {
           const isTargetRow = stars === targetRow;
           // Calculate how many full stars should be gold (e.g., 1.1 in 2-star row = 1 full star)
           const fullGoldStars = isTargetRow ? Math.floor(goldPercentage * stars) : 0;
@@ -1433,6 +1483,13 @@ const RatingDisplay = ({
             extrapolate: 'clamp',
           });
 
+          // Background bar animation interpolation (animates to 100% for target rows)
+          const animatedBackgroundScaleX = backgroundBarWidths[distIndex].interpolate({
+            inputRange: [0, 100],
+            outputRange: [0, 1],
+            extrapolate: 'clamp',
+          });
+
           return (
             <HStack
               key={stars}
@@ -1441,41 +1498,101 @@ const RatingDisplay = ({
               className="w-full"
               style={{ flex: 1, minWidth: 0 }}>
               {/* Star rating label */}
-              <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
-                {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => {
-                  const isFullGold = isTargetRow && idx < fullGoldStars;
-                  const isPartialGold = isTargetRow && idx === fullGoldStars && hasPartialStar;
+              <View style={{ position: 'relative' }}>
+                {/* Base layer: Primary color stars (always visible) */}
+                <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+                  {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => (
+                    <Icon
+                      key={`base-${idx}`}
+                      name="ic:round-star"
+                      size={12}
+                      color={getPrimaryColor('400')}
+                    />
+                  ))}
+                </HStack>
 
-                  // Use bounce animation for stars in target row that should be gold
-                  const bounceScale =
-                    isTargetRow && (isFullGold || isPartialGold) ? starBounces[idx] : noBounceScale;
+                {/* Middle layer: Yellow-500 stars (animate with background bar) */}
+                {isTargetRow && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      opacity: animatedBackgroundScaleX.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 1],
+                        extrapolate: 'clamp',
+                      }),
+                    }}>
+                    <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+                      {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => {
+                        const bounceScale =
+                          idx < fullGoldStars || (idx === fullGoldStars && hasPartialStar)
+                            ? starBounces[idx]
+                            : noBounceScale;
+                        return (
+                          <Animated.View
+                            key={`yellow500-${idx}`}
+                            style={{
+                              transform: [{ scale: bounceScale }],
+                            }}>
+                            <Icon name="ic:round-star" size={12} color={getYellowColor('500')} />
+                          </Animated.View>
+                        );
+                      })}
+                    </HStack>
+                  </Animated.View>
+                )}
 
-                  return (
-                    <Animated.View
-                      key={idx}
-                      style={{
-                        transform: [{ scale: bounceScale }],
-                      }}>
-                      <Icon
-                        name="ic:round-star"
-                        size={12}
-                        color={
-                          isFullGold
+                {/* Top layer: Yellow-300 stars (animate with foreground bar, only gold stars) */}
+                {isTargetRow && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      opacity: animatedScaleX.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 1],
+                        extrapolate: 'clamp',
+                      }),
+                    }}>
+                    <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+                      {[5, 4, 3, 2, 1].slice(0, stars).map((_, idx) => {
+                        const isFullGold = idx < fullGoldStars;
+                        const isPartialGold = idx === fullGoldStars && hasPartialStar;
+                        const bounceScale =
+                          isFullGold || isPartialGold ? starBounces[idx] : noBounceScale;
+
+                        // Non-gold stars use yellow-500 to match the layer below
+                        const starColor =
+                          isFullGold || isPartialGold
                             ? getYellowColor('300')
-                            : isPartialGold
-                              ? getYellowColor('500')
-                              : getPrimaryColor('400')
-                        }
-                        style={
-                          isPartialGold
-                            ? { opacity: goldPercentage * stars - fullGoldStars }
-                            : undefined
-                        }
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </HStack>
+                            : getYellowColor('500');
+
+                        return (
+                          <Animated.View
+                            key={`yellow300-${idx}`}
+                            style={{
+                              transform: [{ scale: bounceScale }],
+                            }}>
+                            <Icon
+                              name="ic:round-star"
+                              size={12}
+                              color={starColor}
+                              style={
+                                isPartialGold
+                                  ? { opacity: goldPercentage * stars - fullGoldStars }
+                                  : undefined
+                              }
+                            />
+                          </Animated.View>
+                        );
+                      })}
+                    </HStack>
+                  </Animated.View>
+                )}
+              </View>
 
               {/* Distribution bar directly after stars */}
               <View
@@ -1483,32 +1600,60 @@ const RatingDisplay = ({
                 style={{
                   flex: 1,
                   minWidth: 0,
-                  backgroundColor: isTargetRow
-                    ? getYellowColor('500') // Off-gold background for gold bar
-                    : getPrimaryColor('700'),
+                  backgroundColor: 'transparent',
                 }}>
-                <Animated.View
+                {/* Base bar - always visible, full width, static (bottom layer) */}
+                <View
                   className="h-full rounded-full"
                   style={{
+                    position: 'absolute',
                     width: '100%',
                     height: '100%',
-                    backgroundColor: isTargetRow
-                      ? getYellowColor('300')
-                      : percentage > 0
-                        ? getPrimaryColor('400')
-                        : 'transparent',
-                    // alignSelf: 'flex-start',
-                    transform: [
-                      {
-                        translateX: animatedScaleX.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['-50%', '0%'],
-                        }),
-                      },
-                      { scaleX: animatedScaleX },
-                    ],
+                    backgroundColor: getPrimaryColor('400'),
                   }}
                 />
+                {/* Animated background bar (getYellowColor('500')) - animates to 100% for target rows */}
+                {isTargetRow && (
+                  <Animated.View
+                    className="h-full rounded-full"
+                    style={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: getYellowColor('500'),
+                      transform: [
+                        {
+                          translateX: animatedBackgroundScaleX.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['-50%', '0%'],
+                          }),
+                        },
+                        { scaleX: animatedBackgroundScaleX },
+                      ],
+                    }}
+                  />
+                )}
+                {/* Animated foreground bar - only for target rows (yellow-300) */}
+                {isTargetRow && (
+                  <Animated.View
+                    className="h-full rounded-full"
+                    style={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: getYellowColor('300'),
+                      transform: [
+                        {
+                          translateX: animatedScaleX.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['-50%', '0%'],
+                          }),
+                        },
+                        { scaleX: animatedScaleX },
+                      ],
+                    }}
+                  />
+                )}
               </View>
             </HStack>
           );
@@ -1518,126 +1663,19 @@ const RatingDisplay = ({
   );
 };
 
-// AnimatedMintName component
-const AnimatedMintName = ({
-  mintInfo,
-  auditMintInfo,
-  auditInfo,
-  mintUrl,
-  isLoading,
-  onTriggerAnimationRef,
-}: {
-  mintInfo?: any;
-  auditMintInfo?: any;
-  auditInfo?: any;
-  mintUrl?: string;
-  isLoading?: boolean;
-  onTriggerAnimationRef?: React.MutableRefObject<(() => void) | null>;
-}) => {
-  // Calculate display name with fallback logic
-  const displayName = React.useMemo(() => {
-    return (
-      mintInfo?.name ||
-      auditMintInfo?.name ||
-      auditInfo?.auditorData?.name ||
-      mintUrl?.split('//')[1]?.split('/')[0] ||
-      'Unknown Mint'
-    );
-  }, [mintInfo?.name, auditMintInfo?.name, auditInfo?.auditorData?.name, mintUrl]);
-
-  // Check if we have name data
-  const hasData = !isLoading && (mintInfo || auditMintInfo || auditInfo || mintUrl);
-
-  // Animation values
-  const skeletonOpacity = useRef(new Animated.Value(1)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
-
-  // Trigger animation function
-  const triggerAnimation = React.useCallback(() => {
-    // Reset values
-    skeletonOpacity.setValue(1);
-    textOpacity.setValue(0);
-
-    // Start animations
-    requestAnimationFrame(() => {
-      // Fade out skeleton and fade in text
-      Animated.parallel([
-        Animated.timing(skeletonOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 300,
-          delay: 50,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  }, [skeletonOpacity, textOpacity]);
-
-  // Expose triggerAnimation via ref
-  React.useEffect(() => {
-    if (onTriggerAnimationRef) {
-      onTriggerAnimationRef.current = triggerAnimation;
-    }
-    return () => {
-      if (onTriggerAnimationRef) {
-        onTriggerAnimationRef.current = null;
-      }
-    };
-  }, [onTriggerAnimationRef, triggerAnimation]);
-
-  // Trigger animation when data becomes available (only if parent doesn't control via ref)
-  const isInitialMount = useRef(true);
-  React.useEffect(() => {
-    // If parent provides onTriggerAnimationRef, don't auto-trigger - let parent handle it
-    if (onTriggerAnimationRef) {
-      return;
-    }
-
-    if (hasData) {
-      if (isInitialMount.current) {
-        isInitialMount.current = false;
-        // Delay initial animation to ensure component is fully rendered
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            triggerAnimation();
-          }, 100);
-        });
-      } else {
-        // Data changed, trigger animation again
-        triggerAnimation();
-      }
-    }
-  }, [hasData, triggerAnimation, onTriggerAnimationRef]);
-
-  const showSkeleton = isLoading || !hasData;
-
+// Helper function to calculate mint display name
+const getMintDisplayName = (
+  mintInfo?: any,
+  auditMintInfo?: any,
+  auditInfo?: any,
+  mintUrl?: string
+): string => {
   return (
-    <View style={{ position: 'relative', alignItems: 'center', marginBottom: 4 }}>
-      {/* Skeleton */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          opacity: skeletonOpacity,
-          pointerEvents: showSkeleton ? 'auto' : 'none',
-        }}>
-        <Skeleton className="mb-1 h-[32px] w-[200px] bg-primary-700" />
-      </Animated.View>
-
-      {/* Text */}
-      <Animated.View
-        style={{
-          opacity: textOpacity,
-        }}>
-        <Text size={24} bold className="mb-1 text-center font-bold text-primary-0">
-          {displayName}
-        </Text>
-      </Animated.View>
-    </View>
+    mintInfo?.name ||
+    auditMintInfo?.name ||
+    auditInfo?.auditorData?.name ||
+    mintUrl?.split('//')[1]?.split('/')[0] ||
+    'Unknown Mint'
   );
 };
 
@@ -1662,10 +1700,11 @@ const AnimatedReviewsButton = ({
   const hasData = !loading && recommendations !== undefined;
   const hasReviews = targetCount > 0;
 
-  // Animation values
-  const skeletonOpacity = useRef(new Animated.Value(1)).current;
-  const contentOpacity = useRef(new Animated.Value(0)).current;
+  // Count animation for animating the number
   const countAnimation = useRef(new Animated.Value(0)).current;
+
+  // Ref for AnimatedText's animation trigger
+  const animatedTextTriggerRef = useRef<(() => void) | null>(null);
 
   // State for animated count (updated via listener)
   const [displayCount, setDisplayCount] = React.useState(0);
@@ -1681,79 +1720,57 @@ const AnimatedReviewsButton = ({
     };
   }, [countAnimation]);
 
-  // Trigger animation function
-  const triggerAnimation = React.useCallback(() => {
+  // Trigger count animation function
+  const triggerCountAnimation = React.useCallback(() => {
     // Stop any ongoing animations
     countAnimation.stopAnimation();
 
-    // Reset values
-    skeletonOpacity.setValue(1);
-    contentOpacity.setValue(0);
+    // Reset and start count animation
     countAnimation.setValue(0);
+    Animated.timing(countAnimation, {
+      toValue: targetCount,
+      duration: 1000,
+      delay: 150,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [targetCount, countAnimation]);
 
-    // Start animations
-    requestAnimationFrame(() => {
-      // Fade out skeleton and fade in content
-      Animated.parallel([
-        Animated.timing(skeletonOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentOpacity, {
-          toValue: 1,
-          duration: 300,
-          delay: 50,
-          useNativeDriver: true,
-        }),
-      ]).start();
+  // Combined trigger function that triggers both animations
+  const triggerAllAnimations = React.useCallback(() => {
+    // First trigger the skeleton-to-text animation
+    if (animatedTextTriggerRef.current) {
+      animatedTextTriggerRef.current();
+    }
+    // Then trigger the count animation after a short delay
+    setTimeout(() => {
+      triggerCountAnimation();
+    }, 200);
+  }, [triggerCountAnimation]);
 
-      // Count animation
-      Animated.timing(countAnimation, {
-        toValue: targetCount,
-        duration: 1000,
-        delay: 150,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }).start();
-    });
-  }, [targetCount, skeletonOpacity, contentOpacity, countAnimation]);
-
-  // Expose triggerAnimation via ref
+  // Expose combined trigger via ref (for manual control if needed)
   React.useEffect(() => {
     if (onTriggerAnimationRef) {
-      onTriggerAnimationRef.current = triggerAnimation;
+      onTriggerAnimationRef.current = triggerAllAnimations;
     }
     return () => {
       if (onTriggerAnimationRef) {
         onTriggerAnimationRef.current = null;
       }
     };
-  }, [onTriggerAnimationRef, triggerAnimation]);
+  }, [onTriggerAnimationRef, triggerAllAnimations]);
 
-  // Trigger animation when data becomes available (only if parent doesn't control via ref)
-  const isInitialMount = useRef(true);
+  // Trigger count animation when data becomes available
+  // (AnimatedText will auto-trigger its own animation if no ref is provided)
   React.useEffect(() => {
-    // If parent provides onTriggerAnimationRef, don't auto-trigger - let parent handle it
-    if (onTriggerAnimationRef) {
-      return;
-    }
-
     if (hasData) {
-      if (isInitialMount.current) {
-        isInitialMount.current = false;
-        // Delay initial animation to ensure component is fully rendered
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            triggerAnimation();
-          }, 100);
-        });
-      } else {
-        // Data changed, trigger animation again
-        triggerAnimation();
-      }
+      // Delay to coordinate with AnimatedText's animation
+      const timeoutId = setTimeout(() => {
+        triggerCountAnimation();
+      }, 200);
+      return () => clearTimeout(timeoutId);
     }
-  }, [hasData, triggerAnimation, onTriggerAnimationRef]);
+  }, [hasData, triggerCountAnimation]);
 
   // Format text with proper pluralization
   const formatText = (count: number) => {
@@ -1767,83 +1784,223 @@ const AnimatedReviewsButton = ({
   // (content opacity will handle visibility)
   const isClickable = hasReviews;
 
+  // Determine text content and style based on showReviews state
+  const textContent = showReviews ? 'Hide reviews' : formatText(displayCount);
+  const textStyle = showReviews
+    ? {
+        textDecorationLine: 'underline' as 'underline',
+      }
+    : {
+        textDecorationLine: (isClickable ? 'underline' : 'none') as 'underline' | 'none',
+        opacity: isClickable ? 1 : 0.5,
+      };
+
   return (
     <>
       <Spacer size={8} />
-      {!showReviews ? (
-        <View className="w-full px-4">
-          <HStack justify="flex-end" className="w-full">
-            <View style={{ position: 'relative' }}>
-              {/* Skeleton */}
-              <Animated.View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  opacity: skeletonOpacity,
-                  pointerEvents: 'none', // Never block clicks - skeleton is just visual
-                }}>
-                <Skeleton className="h-[20px] w-[120px] bg-primary-700" />
-              </Animated.View>
-
-              {/* Content */}
-              <Animated.View
-                style={{
-                  opacity: contentOpacity,
-                }}>
-                <Text
-                  size={14}
-                  bold
-                  style={{
-                    color: isClickable ? getYellowColor('300') : getYellowColor('500'),
-                    textDecorationLine: isClickable ? 'underline' : 'none',
-                    opacity: isClickable ? 1 : 0.5,
-                  }}
-                  onPress={isClickable ? onToggleReviews : undefined}>
-                  {formatText(displayCount)}
-                </Text>
-              </Animated.View>
-            </View>
-          </HStack>
-        </View>
-      ) : (
-        <>
-          <View className="w-full px-4">
-            <HStack justify="flex-end" className="w-full">
-              <Text
-                size={14}
-                bold
-                style={{
-                  color: getYellowColor('300'),
-                  textDecorationLine: 'underline',
-                }}
-                onPress={onToggleReviews}>
-                Hide reviews
-              </Text>
-            </HStack>
-          </View>
-          {hasReviews && <ReviewsList recommendations={recommendations} />}
-        </>
+      <View className="w-full px-4">
+        <HStack justify="flex-end" className="w-full">
+          <AnimatedText
+            color={getYellowColor('300')}
+            loading={(loading || !hasData) && !showReviews}
+            size={showReviews ? 14 : 12}
+            bold
+            onTriggerAnimationRef={onTriggerAnimationRef ? animatedTextTriggerRef : undefined}
+            style={textStyle}
+            onPress={onToggleReviews}>
+            {textContent}
+          </AnimatedText>
+        </HStack>
+      </View>
+      {showReviews && hasReviews && (
+        <ReviewsList recommendations={recommendations} showReviews={showReviews} />
       )}
     </>
   );
 };
 
-// ReviewsList component
-const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
+// AnimatedStarRating component
+const AnimatedStarRating = ({
+  score,
+  size = 14,
+  onTriggerAnimationRef,
+}: {
+  score: number;
+  size?: number;
+  onTriggerAnimationRef?: React.MutableRefObject<(() => void) | null>;
+}) => {
   const { getPrimaryColor, getYellowColor } = useTheme();
+
+  // Calculate filled stars
+  const filledStars = Math.round(score);
+  const hasScore = score >= 0;
+
+  // Animation values for each star (5 stars)
+  const starScales = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
+
+  // Track if animation has been triggered
+  const hasAnimatedRef = useRef(false);
+  const isInitialMount = useRef(true);
+
+  // Function to trigger animation
+  const triggerAnimation = React.useCallback(() => {
+    if (!hasScore || filledStars <= 0) {
+      // If no score, set all stars to 0 scale
+      starScales.forEach((scale) => scale.setValue(0));
+      return;
+    }
+
+    // Stop any ongoing animations
+    starScales.forEach((scale) => {
+      scale.stopAnimation();
+      scale.setValue(0);
+    });
+
+    // Animate stars sequentially
+    starScales.forEach((scale, index) => {
+      if (index < filledStars) {
+        const delay = index * 100; // 100ms delay between each star
+
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.spring(scale, {
+            toValue: 1.2,
+            friction: 4,
+            tension: 200,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scale, {
+            toValue: 1,
+            friction: 4,
+            tension: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    });
+
+    hasAnimatedRef.current = true;
+  }, [hasScore, filledStars, starScales]);
+
+  // Expose triggerAnimation via ref
+  React.useEffect(() => {
+    if (onTriggerAnimationRef) {
+      onTriggerAnimationRef.current = triggerAnimation;
+    }
+    return () => {
+      if (onTriggerAnimationRef) {
+        onTriggerAnimationRef.current = null;
+      }
+    };
+  }, [onTriggerAnimationRef, triggerAnimation]);
+
+  // Auto-trigger when score changes (only if no ref provided)
+  React.useEffect(() => {
+    if (onTriggerAnimationRef) {
+      return; // Parent controls via ref
+    }
+
+    if (hasScore && filledStars > 0) {
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        // Delay to ensure component is mounted
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            triggerAnimation();
+          }, 100);
+        });
+      } else {
+        triggerAnimation();
+      }
+    }
+  }, [hasScore, filledStars, triggerAnimation, onTriggerAnimationRef]);
+
+  return (
+    <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
+      {[1, 2, 3, 4, 5].map((star) => {
+        const isFilled = star <= filledStars;
+        const scale = starScales[star - 1];
+
+        return (
+          <Animated.View
+            key={star}
+            style={{
+              transform: [{ scale }],
+            }}>
+            <Icon
+              name="ic:round-star"
+              size={size}
+              color={isFilled ? getYellowColor('300') : getPrimaryColor('600')}
+            />
+          </Animated.View>
+        );
+      })}
+    </HStack>
+  );
+};
+
+// ReviewsList component
+const ReviewsList = ({
+  recommendations,
+  showReviews,
+}: {
+  recommendations?: any[];
+  showReviews: boolean;
+}) => {
+  const { getPrimaryColor } = useTheme();
   const [currentPage, setCurrentPage] = useState(0);
   const reviewsPerPage = 3;
+
+  // Refs for triggering animations for each review
+  const animationRefs = useRef<React.MutableRefObject<(() => void) | null>[]>([]);
+  // Track previous showReviews state
+  const prevShowReviewsRef = useRef(showReviews);
+
+  // Calculate pagination (before early return)
+  const totalPages = recommendations ? Math.ceil(recommendations.length / reviewsPerPage) : 0;
+  const startIndex = currentPage * reviewsPerPage;
+  const endIndex = recommendations
+    ? Math.min(startIndex + reviewsPerPage, recommendations.length)
+    : 0;
+  const currentReviews = React.useMemo(
+    () => (recommendations ? recommendations.slice(startIndex, endIndex) : []),
+    [recommendations, startIndex, endIndex]
+  );
+
+  // Ensure we have enough refs for current reviews
+  React.useEffect(() => {
+    while (animationRefs.current.length < currentReviews.length) {
+      animationRefs.current.push({ current: null });
+    }
+    while (animationRefs.current.length > currentReviews.length) {
+      animationRefs.current.pop();
+    }
+  }, [currentReviews.length]);
+
+  // Trigger animations when showReviews becomes true
+  React.useEffect(() => {
+    const wasHidden = !prevShowReviewsRef.current;
+    const isNowVisible = showReviews;
+
+    if (wasHidden && isNowVisible) {
+      // Trigger animations with stagger delay between reviews
+      currentReviews.forEach((_, index) => {
+        const delay = index * 200; // 200ms stagger delay between reviews
+        setTimeout(() => {
+          const ref = animationRefs.current[index];
+          if (ref?.current) {
+            ref.current();
+          }
+        }, delay);
+      });
+    }
+
+    prevShowReviewsRef.current = showReviews;
+  }, [showReviews, currentReviews]);
 
   if (!recommendations || recommendations.length === 0) {
     return null;
   }
-
-  // Calculate pagination
-  const totalPages = Math.ceil(recommendations.length / reviewsPerPage);
-  const startIndex = currentPage * reviewsPerPage;
-  const endIndex = Math.min(startIndex + reviewsPerPage, recommendations.length);
-  const currentReviews = recommendations.slice(startIndex, endIndex);
 
   const handlePrevPage = () => {
     setCurrentPage((prev) => Math.max(0, prev - 1));
@@ -1859,7 +2016,7 @@ const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
       <VStack spacing={0} className="w-full">
         {currentReviews.map((review, index) => {
           // Extract review data - adjust property names based on actual KYM structure
-          const reviewText = review.comment;
+          const reviewText = review.comment.split(']')[1];
           const reviewScore = review.score;
 
           // Determine display name - prefer name, fallback to truncated npub
@@ -1900,21 +2057,12 @@ const ReviewsList = ({ recommendations }: { recommendations?: any[] }) => {
                     </HStack>
                   </HStack>
 
-                  {/* Star rating */}
-                  <HStack align="center" gap={2} style={{ flexShrink: 0 }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Icon
-                        key={star}
-                        name="ic:round-star"
-                        size={14}
-                        color={
-                          star <= Math.round(reviewScore)
-                            ? getYellowColor('300')
-                            : getPrimaryColor('600')
-                        }
-                      />
-                    ))}
-                  </HStack>
+                  {/* Animated Star rating */}
+                  <AnimatedStarRating
+                    score={reviewScore ?? 0}
+                    size={14}
+                    onTriggerAnimationRef={animationRefs.current[index]}
+                  />
 
                   {/* Review text */}
                   {reviewText && (
@@ -2226,79 +2374,6 @@ const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
     };
   }, []);
 
-  if (false) {
-    return (
-      <Wrapper
-        buttons={
-          <ButtonHandler
-            context="sheet"
-            buttons={[
-              {
-                text: 'Close',
-                variant: 'secondary',
-                onPress: async () => sheetRef.current?.hide(),
-              },
-            ]}
-          />
-        }>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          <VStack align="center" className="py-6 pb-8">
-            <VStack align="center" className="mb-4">
-              <View style={{ position: 'relative', width: 84, height: 84 }}>
-                <DonutChart
-                  size={84}
-                  variant="round"
-                  sections={[
-                    {
-                      value: 5,
-                      color: getPrimaryColor('600'),
-                    },
-                    {
-                      value: 5,
-                      color: getPrimaryColor('700'),
-                    },
-                  ]}
-                  onAnimationComplete={handleDonutAnimationComplete}
-                />
-                {/* Persistent Avatar positioned absolutely over donut */}
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: 84,
-                    height: 84,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  <AnimatedAvatar
-                    picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
-                    name={mintInfo?.name || auditMintInfo?.name || extractDomain(mintUrl || '')}
-                    alt={`${mintInfo?.name || auditMintInfo?.name || 'Mint'} icon`}
-                    status={auditInfo?.auditorData?.state}
-                    size={70}
-                    isLoading={isLoading}
-                    onAnimationComplete={badgeAnimationRef}
-                    onResetRef={badgeResetRef}
-                  />
-                </View>
-              </View>
-            </VStack>
-            <Text size={24} bold className="mb-1 text-center font-bold text-primary-0">
-              {mintInfo?.name || 'Loading...'}
-            </Text>
-            {/* {mintInfo?.version && (
-              <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
-            )} */}
-            {/* Rating Display - Always render to prevent jarring appearance */}
-            <Spacer size={16} />
-            <RatingDisplay score={kymScore ?? -1} recommendations={kymRecommendations} />
-          </VStack>
-        </ScrollView>
-      </Wrapper>
-    );
-  }
-
   const hasError = error || auditError || !mintInfo;
 
   // Calculate stats from audit data
@@ -2398,14 +2473,17 @@ const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
               </View>
             </View>
           </VStack>
-          <AnimatedMintName
-            mintInfo={mintInfo}
-            auditMintInfo={auditMintInfo}
-            auditInfo={auditInfo}
-            mintUrl={mintUrl}
-            isLoading={isLoading}
-            onTriggerAnimationRef={mintNameAnimationRef}
-          />
+          <View style={{ alignItems: 'center', marginBottom: 4 }}>
+            <AnimatedText
+              loading={isLoading}
+              size={24}
+              bold
+              skeletonWidth={200}
+              className="mb-1 text-center font-bold text-primary-0"
+              onTriggerAnimationRef={mintNameAnimationRef}>
+              {getMintDisplayName(mintInfo, auditMintInfo, auditInfo, mintUrl)}
+            </AnimatedText>
+          </View>
           {/* {mintInfo?.version && (
             <Text className="text-center text-sm text-primary-100">{mintInfo.version}</Text>
           )} */}
