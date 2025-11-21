@@ -214,7 +214,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
 
     switch (variant) {
       case 'primary':
-        return getPrimaryColor('900');
+        return getPrimaryColor('0');
       case 'secondary':
         return getPrimaryColor('800');
       case 'warning':
@@ -247,8 +247,8 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
         ...variantStyles,
         paddingHorizontal: isIconOnly ? 0 : 10, // px-2.5 equivalent
         paddingVertical: isIconOnly ? 0 : 2, // py-0.5 equivalent
-        width: isIconOnly ? ((size + 4) as number) : undefined, // Make it square for icon-only
-        height: isIconOnly ? ((size + 4) as number) : undefined,
+        width: isIconOnly ? ((size + 4) as number) : null, // Make it square for icon-only
+        height: isIconOnly ? ((size + 4) as number) : null,
       }}>
       {/* Render icon if provided */}
       {icon && <Icon name={icon} size={size} color={textColor} />}

@@ -21,7 +21,10 @@ import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { requestInvoice, utils } from 'lnurl-pay';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { getEncodedToken } from '@cashu/cashu-ts';
+import { getEncodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { useRoutstrStore } from 'stores/routstrStore';
+import { topUpBalance, createWalletFromToken, checkBalance } from 'helper/routstr/api';
+import { ROUTSTR_PUBKEY } from 'helper/constants';
 
 interface ScanningData {
   data: string;
@@ -40,11 +43,13 @@ function ModalScreen() {
     allowedUnits?: string;
     mints?: string;
     lnUrlOrAddress?: string;
+    routstrTopUp?: string;
   }>();
 
   const { send } = useSend();
   const { requestLightningInvoice } = useLightningOperations();
   const { createMeltQuote } = useMelt();
+  const { apiKey, setApiKey, setBalance } = useRoutstrStore();
 
   const [amount, setAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
   const [loading, setLoading] = useState(false);
@@ -101,6 +106,92 @@ function ModalScreen() {
     }
 
     const result = await send(selectedMint, amount);
+
+    // Handle Routstr top-up flow immediately after token creation
+    if (params.routstrTopUp === 'true') {
+      try {
+        const encodedToken = getEncodedTokenV4(result);
+        let currentApiKey = apiKey;
+
+        // First time: Create wallet from token or use token directly as API key
+        if (!currentApiKey) {
+          // Try to create a persistent wallet (may not be available yet)
+          const walletResponse = await createWalletFromToken(encodedToken);
+          if (walletResponse) {
+            // Persistent wallet created, use the API key
+            currentApiKey = walletResponse.api_key;
+            setApiKey(currentApiKey);
+            setBalance(walletResponse.balance);
+            popup({
+              message: `Wallet created! Balance: ${(walletResponse.balance / 1000).toFixed(0)} sats`,
+              emoji: '🎉',
+              type: 'success',
+            });
+            // Navigate back to Routstr chat
+            router.replace({
+              pathname: '/userMessages',
+              params: { pubkey: ROUTSTR_PUBKEY },
+            });
+            return;
+          } else {
+            // Endpoint not available, use token directly as API key
+            currentApiKey = encodedToken;
+            setApiKey(currentApiKey);
+            // Check balance using token as API key
+            try {
+              const balanceData = await checkBalance(currentApiKey);
+              // If response includes an api_key, use that instead (persistent key)
+              if (balanceData.api_key && balanceData.api_key !== currentApiKey) {
+                currentApiKey = balanceData.api_key;
+                setApiKey(currentApiKey);
+              }
+              setBalance(balanceData.balance);
+              popup({
+                message: `Routstr wallet initialized! Balance: ${(balanceData.balance / 1000).toFixed(0)} sats`,
+                emoji: '🎉',
+                type: 'success',
+              });
+            } catch (balanceError) {
+              console.error('Failed to check balance:', balanceError);
+              popup({
+                message: 'Routstr wallet initialized! You can now use Routstr AI.',
+                emoji: '🎉',
+                type: 'success',
+              });
+            }
+            // Navigate back to Routstr chat
+            router.replace({
+              pathname: '/userMessages',
+              params: { pubkey: ROUTSTR_PUBKEY },
+            });
+            return;
+          }
+        } else {
+          // Existing API key: Top up balance
+          const topUpResult = await topUpBalance(currentApiKey, encodedToken);
+          setBalance(topUpResult.new_balance);
+          popup({
+            message: `Balance topped up! New balance: ${(topUpResult.new_balance / 1000).toFixed(0)} sats`,
+            emoji: '🎉',
+            type: 'success',
+          });
+          // Navigate back to Routstr chat after successful top-up
+          router.replace({
+            pathname: '/userMessages',
+            params: { pubkey: ROUTSTR_PUBKEY },
+          });
+          return;
+        }
+      } catch (error: any) {
+        console.error('Failed to handle Routstr top-up:', error);
+        popup({
+          message: error.error?.message || 'Failed to process Routstr transaction',
+          emoji: '🚨',
+          type: 'error',
+        });
+        // Still navigate to sendToken screen even if top-up fails
+      }
+    }
 
     // todo: is there a better way to do this? I just want to get the recently created historyEntry assosiated with my token.
     const sendHistoryEntry = await manager.history

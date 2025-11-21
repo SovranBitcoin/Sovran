@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { useKYMMintStore } from 'stores/kymMintStore';
 
 /**
  * Individual recommendation for a mint from Nostr
@@ -72,6 +73,10 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getCached = useKYMMintStore((state) => state.getCached);
+  const setCached = useKYMMintStore((state) => state.setCached);
+  const isStale = useKYMMintStore((state) => state.isStale);
+
   // Normalize the mint URL for comparison
   const normalizedMintUrl = useMemo(() => {
     return mintUrl ? normalizeUrl(mintUrl) : null;
@@ -94,6 +99,25 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
   const { events, eose } = useSubscribe({ filters });
 
   console.log('🔍 useKYMMint: Received events:', events?.length || 0, 'EOSE:', eose);
+
+  // Load cached data on mount or when mintUrl changes
+  useEffect(() => {
+    if (!normalizedMintUrl) {
+      setScore(undefined);
+      setRecommendations(undefined);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    const cached = getCached(normalizedMintUrl);
+    if (cached && !isStale(normalizedMintUrl)) {
+      console.log('📦 useKYMMint: Loaded cached score for', normalizedMintUrl);
+      setScore(cached.score);
+      setRecommendations(cached.recommendations);
+      // Still wait for EOSE to set loading to false, but we have cached data to show
+    }
+  }, [normalizedMintUrl, getCached, isStale]);
 
   // Loading state: true until we receive EOSE (end of stored events)
   useEffect(() => {
@@ -122,8 +146,7 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
       console.log('⚠️ useKYMMint: No events to process');
       if (eose) {
         console.log('⚠️ useKYMMint: EOSE received with no events');
-        setScore(undefined);
-        setRecommendations(undefined);
+        // Keep any cached data that was loaded, just set loading to false
         setLoading(false);
       }
       return;
@@ -202,8 +225,15 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
 
       if (validRecommendations.length === 0) {
         console.log('⚠️ useKYMMint: No valid recommendations found for this mint');
-        setScore(undefined);
-        setRecommendations(undefined);
+        // Check cache if no new recommendations found
+        const cached = getCached(normalizedMintUrl);
+        if (cached && !isStale(normalizedMintUrl)) {
+          setScore(cached.score);
+          setRecommendations(cached.recommendations);
+        } else {
+          setScore(undefined);
+          setRecommendations(undefined);
+        }
         return;
       }
 
@@ -221,13 +251,28 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
 
       setScore(avgScore);
       setRecommendations(validRecommendations);
+
+      // Update cache with new data
+      setCached(normalizedMintUrl, avgScore, validRecommendations);
+      console.log(`💾 Cached KYM score for ${normalizedMintUrl}`);
     } catch (err) {
       console.error('❌ useKYMMint: Failed to process Nostr events:', err);
       setError('Failed to process mint recommendations. Please try again.');
-      setScore(undefined);
-      setRecommendations(undefined);
+      // Don't clear on error - keep cached data if available
+      const cached = getCached(normalizedMintUrl);
+      if (cached && !isStale(normalizedMintUrl)) {
+        setScore(cached.score);
+        setRecommendations(cached.recommendations);
+      } else {
+        setScore(undefined);
+        setRecommendations(undefined);
+      }
+    } finally {
+      if (eose) {
+        setLoading(false);
+      }
     }
-  }, [events, normalizedMintUrl, eose]);
+  }, [events, normalizedMintUrl, eose, getCached, setCached, isStale]);
 
   console.log('📊 useKYMMint: Current state:', {
     mintUrl: normalizedMintUrl,

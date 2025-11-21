@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { auditMint, fetchMintInfo } from 'helper/apiClient';
+import { auditMint, fetchMintInfo, type AuditMintResponse } from 'helper/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+import { useAuditMintStore } from 'stores/auditMintStore';
 
 // Transform API response to match expected interface structure
 interface AuditInfo {
@@ -25,11 +26,46 @@ interface UseAuditedMintResult {
   error?: string;
 }
 
+// Helper function to transform audit data to AuditInfo
+const transformAuditData = (auditData: AuditMintResponse): AuditInfo => {
+  // Calculate success rate (score equivalent)
+  const totalOps = auditData.n_mints + auditData.n_melts;
+  const successRate = totalOps > 0 ? 1 - auditData.n_errors / totalOps : 1;
+  const score = successRate * 5; // Convert to 0-5 scale like KYM
+
+  // Calculate average speed from swaps
+  const validSwaps = auditData.swaps.filter((swap) => swap.time_taken > 0);
+  const avgSpeed =
+    validSwaps.length > 0
+      ? validSwaps.reduce((sum, swap) => sum + swap.time_taken, 0) / validSwaps.length / 1000 // Convert to seconds
+      : undefined;
+
+  // Transform to expected interface
+  return {
+    url: auditData.url,
+    name: auditData.name,
+    state: auditData.state,
+    score,
+    speedIndex: avgSpeed,
+    auditorData: {
+      name: auditData.name,
+      state: auditData.state,
+      mints: auditData.n_mints,
+      melts: auditData.n_melts,
+      errors: auditData.n_errors,
+    },
+  };
+};
+
 export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
   const [auditInfo, setAuditInfo] = useState<AuditInfo>();
   const [mintInfo, setMintInfo] = useState<GetInfoResponse>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+
+  const getCached = useAuditMintStore((state) => state.getCached);
+  const setCached = useAuditMintStore((state) => state.setCached);
+  const isStale = useAuditMintStore((state) => state.isStale);
 
   useEffect(() => {
     if (!mintUrl) {
@@ -45,6 +81,19 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         setLoading(true);
         setError(undefined);
 
+        // Check cache first
+        const cached = getCached(mintUrl);
+        const stale = isStale(mintUrl);
+
+        if (cached && !stale) {
+          // Use cached data
+          console.log(`📦 Using cached audit data for mint: ${mintUrl}`);
+          setAuditInfo(transformAuditData(cached.auditData));
+          setMintInfo(cached.mintInfo);
+          setLoading(false);
+          return;
+        }
+
         console.log(`🔍 Fetching audit data for mint: ${mintUrl}`);
 
         // Fetch audit data directly from API
@@ -52,36 +101,8 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         if (auditResult.isOk()) {
           const auditData = auditResult.value;
 
-          // Calculate success rate (score equivalent)
-          const totalOps = auditData.n_mints + auditData.n_melts;
-          const successRate = totalOps > 0 ? 1 - auditData.n_errors / totalOps : 1;
-          const score = successRate * 5; // Convert to 0-5 scale like KYM
-
-          // Calculate average speed from swaps
-          const validSwaps = auditData.swaps.filter((swap) => swap.time_taken > 0);
-          const avgSpeed =
-            validSwaps.length > 0
-              ? validSwaps.reduce((sum, swap) => sum + swap.time_taken, 0) /
-              validSwaps.length /
-              1000 // Convert to seconds
-              : undefined;
-
           // Transform to expected interface
-          const transformedAuditInfo: AuditInfo = {
-            url: auditData.url,
-            name: auditData.name,
-            state: auditData.state,
-            score,
-            speedIndex: avgSpeed,
-            auditorData: {
-              name: auditData.name,
-              state: auditData.state,
-              mints: auditData.n_mints,
-              melts: auditData.n_melts,
-              errors: auditData.n_errors,
-            },
-          };
-
+          const transformedAuditInfo = transformAuditData(auditData);
           setAuditInfo(transformedAuditInfo);
           console.log(`✅ Got audit info for ${mintUrl}`);
         } else {
@@ -92,8 +113,15 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         // Fetch mint info
         const mintInfoResult = await fetchMintInfo(mintUrl);
         if (mintInfoResult.isOk()) {
-          setMintInfo(mintInfoResult.value);
+          const mintInfoData = mintInfoResult.value;
+          setMintInfo(mintInfoData);
           console.log(`✅ Got mint info for ${mintUrl}`);
+
+          // Cache both audit data and mint info if both succeeded
+          if (auditResult.isOk()) {
+            setCached(mintUrl, auditResult.value, mintInfoData);
+            console.log(`💾 Cached audit data for ${mintUrl}`);
+          }
         } else {
           console.warn(`⚠️ Failed to get mint info for ${mintUrl}:`, mintInfoResult.error.message);
           setMintInfo(undefined);
@@ -109,7 +137,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
     };
 
     loadMint();
-  }, [mintUrl]);
+  }, [mintUrl, getCached, setCached, isStale]);
 
   return { auditInfo, mintInfo, loading, error };
 };

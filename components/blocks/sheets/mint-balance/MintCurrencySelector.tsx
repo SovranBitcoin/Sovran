@@ -140,11 +140,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
                       size={32}
                     />
                   ) : currency === 'ALL' ? (
-                    <Icon
-                      name="clarity:internet-of-things-solid"
-                      color={primaryColor0}
-                      size={32}
-                    />
+                    <Icon name="clarity:internet-of-things-solid" color={primaryColor0} size={32} />
                   ) : (
                     <CurrencyIcon width={32} currency={currency.toLowerCase()} />
                   )}

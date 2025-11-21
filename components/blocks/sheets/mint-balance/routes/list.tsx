@@ -31,48 +31,109 @@ import Icon from 'assets/icons';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Avatar } from 'components/ui/Avatar';
+import { Badge } from 'components/ui/Badge';
 import { popup } from '@/helper/popup';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
 import { View, HStack, VStack } from 'components/ui/View';
-import { getMintDisplayName } from 'helper/url';
+import { getMintDisplayName, extractDomain } from 'helper/url';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
-import { AmountFormatter } from '@/components/ui/AmountFormatter';
 import { useTheme } from '@/providers/ThemeProvider';
 import { MintCurrencySelector } from '../MintCurrencySelector';
+import { useKYMMints } from 'hooks/coco/useKYMMints';
+import { useAuditedMint } from 'hooks/coco/useAuditedMint';
+import { Skeleton } from '@/components/ui/Skeleton';
+import opacity from 'hex-color-opacity';
+import { Checkbox } from '@/components/ui/Checkbox';
 
 interface MintItemProps {
-  mint: Mint & { amount: number; unit: string };
-  balance: { amount: number; unit: string };
+  mint: Mint & { amount?: number; unit?: string };
+  balance?: { amount: number; unit: string };
+  mintUrl?: string;
   onPress: () => void;
-  isLoading: boolean;
-  globalLoading: boolean;
+  isLoading?: boolean;
+  globalLoading?: boolean;
   requireBalance?: boolean;
-  selectedCurrency: string;
+  selectedCurrency?: string;
   showDetailsButton?: boolean;
   onInspectPress?: () => void;
+  kymScore?: number;
+  kymLoading?: boolean;
+  showCheckbox?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
   mint,
   balance,
+  mintUrl: mintUrlProp,
   onPress,
-  isLoading,
-  globalLoading,
-  requireBalance: _requireBalance = true,
+  isLoading = false,
+  globalLoading = false,
+  requireBalance: _requireBalance = false,
   showDetailsButton = false,
   onInspectPress,
   selectedCurrency: _selectedCurrency,
+  kymScore,
+  kymLoading = false,
+  showCheckbox = false,
+  selected = false,
+  onToggle,
 }) => {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor = getPrimaryColor('0');
+  const { getGreenColor } = useTheme();
+  const displayMintUrl = mintUrlProp || mint.mintUrl;
   const displayName = useMemo(
-    () => getMintDisplayName(mint.mintUrl, mint.mintInfo),
-    [mint.mintUrl, mint.mintInfo]
+    () => getMintDisplayName(displayMintUrl, mint.mintInfo),
+    [displayMintUrl, mint.mintInfo]
   );
+
+  // Fetch audit data
+  const { auditInfo, loading: auditLoading } = useAuditedMint(displayMintUrl);
+
+  // Calculate success rate percentage
+  const successRate = useMemo(() => {
+    if (auditInfo?.score !== undefined) {
+      // Use auditInfo.score (0-5 scale), normalize to 0-1 then convert to percentage
+      return Math.round((auditInfo.score / 5) * 100);
+    }
+    if (auditInfo?.auditorData) {
+      const { mints, melts, errors } = auditInfo.auditorData;
+      const totalOps = (mints || 0) + (melts || 0);
+      if (totalOps > 0) {
+        return Math.round((1 - (errors || 0) / totalOps) * 100);
+      }
+    }
+    return undefined;
+  }, [auditInfo]);
+
+  // Format score (round to 1 decimal or whole number)
+  // Note: score of 0 is a valid value, so we check typeof === 'number' not just truthiness
+  const displayScore = useMemo(() => {
+    if (typeof kymScore !== 'number') return undefined;
+    return kymScore % 1 === 0 ? kymScore.toString() : kymScore.toFixed(1);
+  }, [kymScore]);
+
+  // Determine badge variant based on audit state
+  const activityBadgeVariant = useMemo(() => {
+    const state = auditInfo?.auditorData?.state;
+    if (state === 'ERROR') {
+      return 'error';
+    }
+    // Default to success for OK state or when state is undefined/loading
+    return 'success';
+  }, [auditInfo?.auditorData?.state]);
+  const { getYellowColor } = useTheme();
+
+  // Determine opacity based on balance and requirements
+  const itemOpacity = useMemo(() => {
+    if (globalLoading) return 0.5;
+    if (balance && balance.amount === 0 && _requireBalance) return 0.5;
+    return 1;
+  }, [globalLoading, balance, _requireBalance]);
 
   return (
     <TouchableOpacity
@@ -81,76 +142,114 @@ const MintItem: React.FC<MintItemProps> = ({
         padding: 16,
         marginBottom: 4,
         borderRadius: 16,
-        opacity: globalLoading ? 0.5 : balance.amount === 0 && _requireBalance ? 0.5 : 1,
+        opacity: itemOpacity,
       }}
       onPress={onPress}
       disabled={globalLoading}>
-      <HStack align="center" gap={12}>
-        <View style={{ position: 'relative' }}>
-          <Avatar
-            picture={mint.mintInfo.icon_url || undefined}
-            size={36}
-            variant="mint"
-            name={displayName}
-            alt={`${displayName} mint`}
-          />
-          <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
-            {isLoading && <View className="h-3 w-3 animate-pulse rounded-full bg-primary-600" />}
-          </View>
-        </View>
-
-        <VStack flex={1}>
-          <Text className="text-primary-0" size={16} bold overpass>
-            {displayName}
-          </Text>
-
-          <AmountFormatter
-            amount={balance.amount}
-            unit={balance.unit.toLowerCase()}
-            size={16}
-            weight="heavy"
-            color={primaryColor}
-          />
-        </VStack>
-
-        {showDetailsButton && (
-          <TouchableOpacity
-            onPress={() => {
-              if (onInspectPress) {
-                onInspectPress();
-              }
-            }}>
-            <Icon
-              className="bg-primary-800/75"
-              style={{
-                padding: 8,
-                borderRadius: 1000,
-              }}
-              name="bx:dots-vertical-rounded"
+      <VStack gap={12}>
+        {/* Top section: Logo, name, balance/URL, checkbox/dots */}
+        <HStack align="center" gap={12}>
+          <View style={{ position: 'relative' }}>
+            <Avatar
+              picture={mint.mintInfo?.icon_url || undefined}
+              size={42}
+              variant="mint"
+              name={displayName}
+              alt={`${displayName} mint`}
             />
-          </TouchableOpacity>
-        )}
-      </HStack>
+            <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
+              {isLoading && <View className="h-3 w-3 animate-pulse rounded-full bg-primary-600" />}
+            </View>
+          </View>
+
+          <VStack flex={1}>
+            <Text className="text-primary-0" size={16} bold overpass>
+              {displayName}
+            </Text>
+
+            <View style={{ alignSelf: 'flex-start' }}>
+              {balance ? (
+                <Badge variant="primary" icon={'material-symbols:currency-bitcoin'} size={14}>
+                  {balance.amount}
+                </Badge>
+              ) : displayMintUrl ? (
+                <Text heavy className="text-primary-300" size={14}>
+                  {extractDomain(displayMintUrl)}
+                </Text>
+              ) : null}
+            </View>
+          </VStack>
+
+          {showCheckbox ? (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => {
+                if (onToggle) {
+                  onToggle();
+                }
+              }}
+              size={24}
+              variant="success"
+            />
+          ) : (
+            showDetailsButton && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (onInspectPress) {
+                    onInspectPress();
+                  }
+                }}>
+                <Icon
+                  className="bg-primary-600"
+                  style={{
+                    padding: 8,
+                    borderRadius: 1000,
+                  }}
+                  name="bx:dots-vertical-rounded"
+                />
+              </TouchableOpacity>
+            )
+          )}
+        </HStack>
+
+        {/* Bottom section: Score and Success Rate badges */}
+        <HStack gap={8}>
+          {/* Score badge (left) - show skeleton when loading, badge when score available */}
+          {!kymLoading && displayScore ? (
+            <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
+              {displayScore}
+            </Badge>
+          ) : (
+            <Skeleton
+              className="h-[24px] w-[56px] rounded-full"
+              style={{
+                backgroundColor: opacity(getYellowColor('300'), 0.2),
+              }}
+            />
+          )}
+
+          {/* Success rate badge (right) - show skeleton when loading, badge when data available */}
+          {!auditLoading && successRate !== undefined ? (
+            <Badge
+              className="h-[24px] w-[60px]"
+              variant={activityBadgeVariant}
+              icon="lucide:activity"
+              size={14}>
+              {`${successRate}%`}
+            </Badge>
+          ) : (
+            <Skeleton
+              className="h-[24px] w-[60px] rounded-full"
+              style={{
+                backgroundColor: opacity(getGreenColor('300'), 0.2),
+              }}
+            />
+          )}
+        </HStack>
+      </VStack>
     </TouchableOpacity>
   );
 };
-
-// Memoize MintItem to prevent unnecessary re-renders
-const MemoizedMintItem = React.memo(MintItem, (prevProps, nextProps) => {
-  // Only re-render if these props change
-  return (
-    prevProps.mint.mintUrl === nextProps.mint.mintUrl &&
-    prevProps.mint.amount === nextProps.mint.amount &&
-    prevProps.mint.unit === nextProps.mint.unit &&
-    prevProps.balance.amount === nextProps.balance.amount &&
-    prevProps.balance.unit === nextProps.balance.unit &&
-    prevProps.isLoading === nextProps.isLoading &&
-    prevProps.globalLoading === nextProps.globalLoading &&
-    prevProps.requireBalance === nextProps.requireBalance &&
-    prevProps.selectedCurrency === nextProps.selectedCurrency &&
-    prevProps.showDetailsButton === nextProps.showDetailsButton
-  );
-});
 
 /**
  * ListRoute Component
@@ -231,6 +330,15 @@ const ListRoute = () => {
     setFilteredMints(processedMints);
     setLoading(false);
   }, [processedMints]);
+
+  // Fetch KYM scores for all mints in a single batch
+  const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
+  const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
+
+  // Helper to normalize URLs for lookup (same as in useKYMMints)
+  const normalizeUrl = useCallback((url: string): string => {
+    return url.replace(/\/$/, '');
+  }, []);
 
   // Debug logging (only in dev)
   useEffect(() => {
@@ -403,26 +511,42 @@ const ListRoute = () => {
         currencyLabel="Send payment in"
         mintsLabel="Send from"
         renderItem={useCallback(
-          (mint: Mint & { amount: number; unit: string }, selectedCurrency: string) => (
-            <MemoizedMintItem
-              key={mint.mintUrl}
-              mint={mint}
-              balance={{ amount: mint.amount, unit: mint.unit }}
-              isLoading={loadingId === mint.mintUrl}
-              globalLoading={loadingId !== null}
-              requireBalance={payload?.requireBalance}
-              showDetailsButton={showDetailsButton}
-              onInspectPress={() => {
-                if (__DEV__) {
-                  console.log('🔍 LIST PAGE: Navigating to info with mintUrl:', mint.mintUrl);
-                }
-                router?.navigate('info', { mintUrl: mint.mintUrl });
-              }}
-              selectedCurrency={selectedCurrency}
-              onPress={() => handleMintSelect(mint.mintUrl)}
-            />
-          ),
-          [loadingId, payload?.requireBalance, showDetailsButton, router, handleMintSelect]
+          (mint: Mint & { amount: number; unit: string }, selectedCurrency: string) => {
+            const normalizedUrl = normalizeUrl(mint.mintUrl);
+            const kymData = kymScores[normalizedUrl];
+            const kymScore = kymData?.score;
+            return (
+              <MintItem
+                key={mint.mintUrl}
+                mint={mint}
+                balance={{ amount: mint.amount, unit: mint.unit }}
+                isLoading={loadingId === mint.mintUrl}
+                globalLoading={loadingId !== null}
+                requireBalance={payload?.requireBalance}
+                showDetailsButton={showDetailsButton}
+                onInspectPress={() => {
+                  if (__DEV__) {
+                    console.log('🔍 LIST PAGE: Navigating to info with mintUrl:', mint.mintUrl);
+                  }
+                  router?.navigate('info', { mintUrl: mint.mintUrl });
+                }}
+                selectedCurrency={selectedCurrency}
+                kymScore={kymScore}
+                kymLoading={kymLoading}
+                onPress={() => handleMintSelect(mint.mintUrl)}
+              />
+            );
+          },
+          [
+            loadingId,
+            payload?.requireBalance,
+            showDetailsButton,
+            router,
+            handleMintSelect,
+            kymScores,
+            kymLoading,
+            normalizeUrl,
+          ]
         )}
       />
     </Wrapper>
@@ -430,3 +554,4 @@ const ListRoute = () => {
 };
 
 export default ListRoute;
+export { MintItem };

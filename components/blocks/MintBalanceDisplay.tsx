@@ -159,7 +159,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   ]);
 
   return (
-    <TouchableOpacity onPress={handlePress}>
+    <TouchableOpacity onPress={handlePress} haptics>
       <HStack
         blur
         align="center"

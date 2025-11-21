@@ -26,24 +26,23 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { popup } from '@/helper/popup';
-import { View, VStack, HStack } from 'components/ui/View';
+import { View, VStack } from 'components/ui/View';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { MintSearchInput } from 'components/ui/MintSearchInput';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { filterMints, looksLikeMintUrl } from 'helper/fuzzySearch';
 import { extractDomain } from '@/helper/url';
 import { CocoManager } from 'helper/coco/manager';
-import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
-import { Checkbox } from '@/components/ui/Checkbox';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useNostrDiscoveredMints } from '@/hooks/coco/useNostrDiscoveredMints';
 import { useMintManagement } from 'hooks/coco';
 import type { NostrDiscoveredMintData } from '@/hooks/coco/useNostrDiscoveredMints';
+import { MintItem } from './list';
+import { useKYMMints } from 'hooks/coco/useKYMMints';
+import { Mint } from 'coco-cashu-core';
 
 interface PseudoMint {
   url: string;
@@ -88,156 +87,40 @@ const adaptDiscoveredMint = (mint: NostrDiscoveredMintData): SearchableDiscovere
   };
 };
 
-// Skeleton component that matches AddMintItem layout
-const MintItemSkeleton = React.memo(({ index = 0 }: { index?: number }) => {
-  const { getPrimaryColor } = useTheme();
-
-  // Deterministic "random" widths based on index
-  const nameWidth = 100 + ((index * 37) % 60);
-  const badge1Width = 60 + ((index * 23) % 40);
-  const badge2Width = 50 + ((index * 19) % 30);
-
-  return (
-    <View
-      className="overflow-hidden rounded-lg"
-      blur
-      style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
-      <HStack align="center" justify="space-between" className="p-3">
-        <HStack align="center" gap={8}>
-          <Skeleton
-            className="h-[42px] w-[42px] bg-primary-700"
-            style={{ borderRadius: 42 * 0.25 }} // Square rounded for mints
-          />
-          <VStack spacing={2}>
-            <Skeleton className="h-[16px] bg-primary-700" style={{ width: nameWidth }} />
-            <HStack align="center" gap={4}>
-              <Skeleton
-                className="h-[20px] rounded-full bg-primary-700"
-                style={{ width: badge1Width }}
-              />
-              <Skeleton
-                className="h-[20px] rounded-full bg-primary-700"
-                style={{ width: badge2Width }}
-              />
-            </HStack>
-          </VStack>
-        </HStack>
-        <Skeleton className="h-[24px] w-[24px] rounded bg-primary-700" />
-      </HStack>
-    </View>
-  );
-});
-MintItemSkeleton.displayName = 'MintItemSkeleton';
-
 // Loading state component for the mints section
-const LoadingMintsList = ({ count = 5 }: { count?: number }) => (
-  <VStack spacing={0}>
-    {Array.from({ length: count }).map((_, index) => (
-      <MintItemSkeleton key={index} index={index} />
-    ))}
-  </VStack>
-);
-
-interface AddMintItemProps {
-  mint: SearchableMint;
-  onToggle: (url: string) => void;
-  selected: boolean;
-}
-
-const AddMintItem = React.memo<AddMintItemProps>(
-  ({ mint, onToggle, selected }) => {
-    const { getPrimaryColor } = useTheme();
-    const pseudo = isPseudoMint(mint);
-    const isDisabled = pseudo ? !looksLikeMintUrl(mint.url) : false;
-
-    // Get display values based on mint type
-    const displayName = pseudo
-      ? extractDomain(mint.url)
-      : mint.auditInfo?.auditorData?.name || mint.mintInfo?.name || extractDomain(mint.url);
-
-    const iconUrl =
-      !pseudo && mint.mintInfo
-        ? mint.mintInfo.icon_url
-        : pseudo && mint.mintInfo
-          ? mint.mintInfo.icon_url
-          : undefined;
-    const auditorState = !pseudo ? mint.auditInfo?.auditorData?.state : undefined;
-    // Use score from Nostr data if available, otherwise fall back to auditInfo.score
-    const score = !pseudo ? mint.score : undefined;
-    const recommendations = !pseudo ? mint?.recommendations : [];
-
-    console.log(12321323, JSON.stringify(mint, null, 2));
-
-    return (
-      <View
-        className="overflow-hidden rounded-lg"
-        blur
-        style={[{ backgroundColor: getPrimaryColor('800'), marginBottom: 12 }]}>
-        <TouchableOpacity disabled={isDisabled} onPress={() => !isDisabled && onToggle(mint.url)}>
-          <HStack
-            align="center"
-            justify="space-between"
-            className={`p-3 ${isDisabled ? 'opacity-50' : ''}`}>
-            <HStack align="center" gap={8}>
-              <Avatar
-                picture={iconUrl}
-                size={42}
-                variant="mint"
-                name={displayName}
-                alt={`${displayName} icon`}
-                status={auditorState}
+const LoadingMintsList = ({ count = 5 }: { count?: number }) => {
+  return (
+    <VStack spacing={0}>
+      {Array.from({ length: count }).map((_, index) => (
+        <View
+          key={index}
+          className="bg-primary-900"
+          style={{
+            padding: 16,
+            marginBottom: 4,
+            borderRadius: 16,
+          }}>
+          <VStack gap={12}>
+            <View className="flex-row items-center gap-3">
+              <Skeleton
+                className="h-[42px] w-[42px] bg-primary-700"
+                style={{ borderRadius: 42 * 0.25 }}
               />
-
-              <VStack spacing={2}>
-                <Text size={16} bold overpass className="text-primary-0">
-                  {displayName}
-                </Text>
-
-                <HStack align="center" gap={4}>
-                  {pseudo && (
-                    <Badge variant="warning" icon="humbleicons:url" size={12}>
-                      Custom URL
-                    </Badge>
-                  )}
-                  {typeof score === 'number' && (
-                    <Badge variant="star" icon="ic:round-star" size={12}>
-                      {score % 1 === 0 ? score.toString() : score.toFixed(1)} (
-                      {recommendations.length})
-                    </Badge>
-                  )}
-
-                  {/* {recommendations.length > 0 && (
-                    <Badge variant="success" icon="fluent:checkmark-16-filled" size={12}>
-                      {(
-                        (recommendations.reduce((acc, rec) => acc + rec.score, 0) /
-                          recommendations.length /
-                          5) *
-                        100
-                      ).toFixed(1)}
-                      %
-                    </Badge>
-                  )} */}
-                </HStack>
+              <VStack flex={1} gap={8}>
+                <Skeleton className="h-[16px] bg-primary-700" style={{ width: 150 }} />
+                <Skeleton className="h-[20px] rounded-full bg-primary-700" style={{ width: 80 }} />
               </VStack>
-            </HStack>
-
-            <Checkbox
-              checked={selected}
-              onCheckedChange={() => onToggle(mint.url)}
-              disabled={isDisabled}
-              size={24}
-              variant="success"
-            />
-          </HStack>
-        </TouchableOpacity>
-      </View>
-    );
-  },
-  (prevProps, nextProps) => {
-    return prevProps.selected === nextProps.selected && prevProps.mint.url === nextProps.mint.url;
-  }
-);
-AddMintItem.displayName = 'AddMintItem';
+            </View>
+            <View className="flex-row gap-2">
+              <Skeleton className="h-[24px] rounded-full bg-primary-700" style={{ width: 56 }} />
+              <Skeleton className="h-[24px] rounded-full bg-primary-700" style={{ width: 60 }} />
+            </View>
+          </VStack>
+        </View>
+      ))}
+    </VStack>
+  );
+};
 
 /**
  * AddRoute Component
@@ -247,9 +130,9 @@ AddMintItem.displayName = 'AddMintItem';
  * @returns {JSX.Element}
  */
 const AddRoute = () => {
-  const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef('mint-balance');
   const payload = useSheetPayload('mint-balance');
+  const { getPrimaryColor } = useTheme();
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
@@ -281,10 +164,10 @@ const AddRoute = () => {
   const allowedCurrencies = payload?.allowedUnits ?? ['SAT', 'USD', 'EUR', 'GBP'];
 
   // Helper function to normalize URLs for comparison
-  const normalizeUrl = (url: string): string => {
+  const normalizeUrl = useCallback((url: string): string => {
     // Remove trailing slash and normalize
     return url.replace(/\/$/, '');
-  };
+  }, []);
 
   // Filter mints based on search query and exclude known mints
   const filteredMints = useMemo((): SearchableMint[] => {
@@ -317,7 +200,11 @@ const AddRoute = () => {
     }
 
     return filtered;
-  }, [discoveredMints, knownMints, url, customMintInfo]);
+  }, [discoveredMints, knownMints, url, customMintInfo, normalizeUrl]);
+
+  // Fetch KYM scores for all mints in a single batch
+  const mintUrls = useMemo(() => filteredMints.map((mint) => mint.url), [filteredMints]);
+  const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
 
   const handleToggleMint = useCallback((url: string) => {
     setSelectedMints((prev) => {
@@ -452,52 +339,40 @@ const AddRoute = () => {
     }
   };
 
-  console.log('🔍 filteredMints:', JSON.stringify(filteredMints, null, 2));
-  console.log('🔍 loading:', loading);
-  console.log('🔍 error:', error);
-  console.log('🔍 selectedMints:', selectedMints);
-  console.log('🔍 isAdding:', isAdding);
-  console.log('🔍 url:', url);
-  console.log('🔍 validationState:', validationState);
-  console.log('🔍 customMintInfo:', customMintInfo);
-  console.log('🔍 knownMints:', knownMints);
-  // if (loading) {
-  //   return (
-  //     <Wrapper
-  //       buttons={
-  //         <ButtonHandler
-  //           context="sheet"
-  //           buttons={[
-  //             {
-  //               text: 'Close',
-  //               variant: 'secondary',
-  //               onPress: async () => sheetRef.current?.hide(),
-  //             },
-  //           ]}
-  //         />
-  //       }>
-  //       <VStack spacing={16}>
-  //         <MintSearchInput
-  //           value={url}
-  //           onChangeText={setUrl}
-  //           validationState={validationState}
-  //           onAddMint={handleSelectCustomMint}
-  //           canAddMint={url.trim().length > 0}
-  //         />
+  // Render item callback for MintCurrencySelector
+  const renderMintItem = useCallback(
+    (mint: SearchableMint, _selectedCurrency: string) => {
+      const pseudo = isPseudoMint(mint);
+      const normalizedUrl = normalizeUrl(mint.url);
+      const kymData = kymScores[normalizedUrl];
+      const kymScore = kymData?.score;
 
-  //         <MintCurrencySelector
-  //           mints={[]}
-  //           allowedCurrencies={allowedCurrencies}
-  //           currencyLabel="Currency options"
-  //           mintsLabel="Discovered mints"
-  //           renderItem={() => null}
-  //           customEmptyState={<LoadingMintsList />}
-  //           isLoading={true}
-  //         />
-  //       </VStack>
-  //     </Wrapper>
-  //   );
-  // }
+      // Create a compatible mint object for MintItem
+      const mintObject: Mint = {
+        mintUrl: mint.url,
+        mintInfo: pseudo ? mint.mintInfo : mint.mintInfo ? mint.mintInfo : undefined,
+      } as Mint;
+
+      return (
+        <MintItem
+          key={mint.url}
+          mint={mintObject}
+          mintUrl={mint.url}
+          balance={undefined}
+          showCheckbox={true}
+          selected={selectedMints.has(mint.url)}
+          onToggle={() => handleToggleMint(mint.url)}
+          onPress={() => handleToggleMint(mint.url)}
+          isLoading={false}
+          globalLoading={isAdding}
+          kymScore={kymScore}
+          kymLoading={kymLoading}
+          showDetailsButton={false}
+        />
+      );
+    },
+    [selectedMints, handleToggleMint, isAdding, kymScores, kymLoading, normalizeUrl]
+  );
 
   if (error) {
     return (
@@ -563,13 +438,7 @@ const AddRoute = () => {
             allowedCurrencies={allowedCurrencies}
             currencyLabel="Currency options"
             mintsLabel={url.trim() ? 'Search results' : 'Discovered mints'}
-            renderItem={(mint: any) => (
-              <AddMintItem
-                mint={mint}
-                onToggle={handleToggleMint}
-                selected={selectedMints.has(mint.url)}
-              />
-            )}
+            renderItem={renderMintItem}
             customEmptyState={loading ? <LoadingMintsList /> : undefined}
             isLoading={loading}
           />

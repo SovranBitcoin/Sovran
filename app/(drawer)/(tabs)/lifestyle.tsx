@@ -5,7 +5,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
-import { PUBLIC_KEYS } from 'helper/constants';
+import { PUBLIC_KEYS, ROUTSTR_PUBKEY } from 'helper/constants';
 
 interface MenuItemData {
   id: string;
@@ -79,14 +79,14 @@ const TabTwoScreen = () => {
           />
           <MenuItem
             item={{
-              id: 'map',
-              icon: 'mdi:help-circle',
-              label: 'Map',
+              id: 'routstr',
+              icon: 'mdi:robot',
+              label: 'Routstr',
             }}
             onPress={() => {
               router.push({
                 pathname: `userMessages`,
-                params: { pubkey: PUBLIC_KEYS.SUPPORT },
+                params: { pubkey: ROUTSTR_PUBKEY },
               });
             }}
           />

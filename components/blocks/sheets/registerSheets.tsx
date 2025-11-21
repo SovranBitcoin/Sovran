@@ -5,6 +5,8 @@ import { default as registerDelete } from 'components/blocks/sheets/delete';
 import { default as registerTransactionMessage } from 'components/blocks/sheets/transaction-message';
 import { default as registerEmojiPicker } from 'components/blocks/sheets/emoji-picker';
 import { default as registerMintBalance } from 'components/blocks/sheets/mint-balance';
+import { default as registerRoutstrModels } from 'components/blocks/sheets/routstr-models';
+import { default as registerRoutstrSessions } from 'components/blocks/sheets/routstr-sessions';
 
 /**
  * Registers all application sheets with the react-native-actions-sheet system.
@@ -43,4 +45,6 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerTransactionMessage({ context });
   registerEmojiPicker({ context });
   registerMintBalance({ context });
+  registerRoutstrModels({ context });
+  registerRoutstrSessions({ context });
 }

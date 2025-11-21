@@ -15,7 +15,10 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22.4.0"
+      "node": "22.4.0",
+      "env": {
+        "FLAVOR": "development"
+      }
     },
     "preview": {
       "ios": {
@@ -27,7 +30,10 @@
       "node": "22.4.0"
     },
     "production": {
-      "node": "22.4.0"
+      "node": "22.4.0",
+      "env": {
+        "FLAVOR": "production"
+      }
     }
   },
   "submit": {

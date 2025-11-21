@@ -1,31 +1,24 @@
 /**
- * @fileoverview MintBalance Sheet - Mint selection and management interface
+ * @fileoverview RoutstrModels Sheet - Model selection interface
  *
- * @module components/blocks/sheets/mint-balance
+ * @module components/blocks/sheets/routstr-models
  *
  * @description
- * Multi-route sheet for selecting mints, adding new mints, and viewing mint details.
- * Users can browse owned mints, add discovered mints, and inspect mint information.
+ * Single-route sheet for selecting AI models for Routstr chat.
+ * Users can browse available models with pricing and select one.
  *
- * **Routes:** 'list' (initial), 'add', 'info'
+ * **Route:** 'list' (only route)
  *
  * **Usage:**
  * ```typescript
- * // Open mint selection
- * SheetManager.show('mint-balance', {
- *   payload: {
- *     requireBalance: true,
- *     showAddMintsButton: true,
- *     onMintPress: (mint, balance) => { /* handle selection *\/ }
- *   }
+ * // Open model selector
+ * SheetManager.show('routstr-models', {
+ *   payload: {}
  * });
  *
- * // Navigate (inside routes)
- * router?.navigate('add');
- * router?.navigate('info', { mintUrl: 'https://mint.example.com' });
- *
- * // Close
- * SheetManager.hide('mint-balance');
+ * // Get selected model
+ * const result = await SheetManager.show('routstr-models');
+ * // result.payload.modelId
  * ```
  *
  * @see {@link registerAllSheets}
@@ -40,12 +33,12 @@ import { Dimensions } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 
 /**
- * MintBalanceSheet Component
+ * RoutstrModelsSheet Component
  *
  * @component
  * @description Main wrapper - do NOT render directly, use SheetManager.show()
  */
-function MintBalanceSheet(props: any) {
+function RoutstrModelsSheet(props: any) {
   const { getPrimaryColor } = useTheme();
   return (
     <ActionSheet
@@ -54,10 +47,10 @@ function MintBalanceSheet(props: any) {
       initialRoute="list"
       containerStyle={{
         backgroundColor: getPrimaryColor('950'),
-        height: Dimensions.get('screen').height - 32,
+        height: Dimensions.get('screen').height * 0.8,
       }}
       safeAreaInsets={{ ...useSafeAreaInsets(), bottom: 0, top: 0 }}
-      gestureEnabled={false}
+      gestureEnabled={true}
       {...props}
     />
   );
@@ -72,5 +65,6 @@ function MintBalanceSheet(props: any) {
  */
 export default ({ context }: { context?: 'global' }) =>
   context
-    ? registerSheet(sheetName, MintBalanceSheet, context)
-    : registerSheet(sheetName, MintBalanceSheet);
+    ? registerSheet(sheetName, RoutstrModelsSheet, context)
+    : registerSheet(sheetName, RoutstrModelsSheet);
+
