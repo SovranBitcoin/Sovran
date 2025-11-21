@@ -197,9 +197,40 @@ interface MessageBubbleProps {
   isMe: boolean;
   userPicture?: string;
   isLoadingMetadata?: boolean;
+  isStreaming?: boolean;
 }
 
-function MessageBubble({ message, isMe, userPicture, isLoadingMetadata }: MessageBubbleProps) {
+// Helper function to detect placeholder text patterns
+function isPlaceholderText(content: string): boolean {
+  if (!content || content.length === 0) return true;
+
+  // Very short content (< 10 chars) might be placeholder
+  if (content.length < 10) {
+    const trimmed = content.trim().toLowerCase();
+    // Common placeholder patterns
+    const placeholderPatterns = [
+      '...',
+      'processing...',
+      'thinking...',
+      'generating...',
+      'loading...',
+      'please wait...',
+    ];
+    return placeholderPatterns.some(
+      (pattern) => trimmed === pattern || trimmed.startsWith(pattern)
+    );
+  }
+
+  return false;
+}
+
+function MessageBubble({
+  message,
+  isMe,
+  userPicture,
+  isLoadingMetadata,
+  isStreaming,
+}: MessageBubbleProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
 
   const content = Array.isArray(message.content)
@@ -207,6 +238,18 @@ function MessageBubble({ message, isMe, userPicture, isLoadingMetadata }: Messag
     : typeof message.content === 'string'
       ? message.content
       : String(message.content || '');
+
+  // Check if stream is complete (from message object or prop)
+  const isStreamComplete = message.isStreamComplete !== undefined ? message.isStreamComplete : true;
+
+  // Determine if we should show skeleton:
+  // - Stream is active (isStreaming && !isStreamComplete)
+  // - Content is empty or looks like placeholder
+  const shouldShowSkeleton =
+    isStreaming && !isStreamComplete && (content.length === 0 || isPlaceholderText(content));
+
+  // Show skeleton for placeholder text, otherwise show actual content
+  const displayContent = shouldShowSkeleton ? '' : content;
 
   return (
     <HStack
@@ -232,17 +275,39 @@ function MessageBubble({ message, isMe, userPicture, isLoadingMetadata }: Messag
             borderTopLeftRadius: isMe ? 18 : 4,
             borderTopRightRadius: isMe ? 4 : 18,
             alignSelf: isMe ? 'flex-end' : 'flex-start',
+            minHeight: shouldShowSkeleton ? 44 : undefined, // Ensure skeleton has space
+            minWidth: shouldShowSkeleton ? 60 : undefined,
           }}>
-          <Text
-            size={16}
-            style={{
-              color: getPrimaryColor('0'),
-              lineHeight: 20,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}>
-            {content}
-          </Text>
+          {shouldShowSkeleton ? (
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+              }}>
+              <View
+                style={{
+                  width: 60,
+                  height: 16,
+                  backgroundColor: getPrimaryColor('600'),
+                  borderRadius: 8,
+                  opacity: 0.6,
+                }}
+              />
+            </View>
+          ) : (
+            <Text
+              size={16}
+              style={{
+                color: getPrimaryColor('0'),
+                lineHeight: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}>
+              {displayContent}
+            </Text>
+          )}
         </View>
 
         <HStack align="center" spacing={4}>
@@ -388,6 +453,7 @@ function ModalScreen() {
   const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
   const [availableModels, setAvailableModels] = useState<RoutstrModel[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   // Routstr mode detection
   const isRoutstrMode = pubkey === ROUTSTR_PUBKEY;
@@ -793,6 +859,12 @@ function ModalScreen() {
     };
     setMessages((prev) => [...prev, assistantMessageDisplay]);
 
+    // Mark as streaming immediately so bubble shows with loading state
+    setStreamingMessageId(assistantMessageId);
+
+    // Scroll to bottom to show the new assistant bubble
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
+
     try {
       // Build conversation history
       let apiMessages: { role: 'user' | 'assistant' | 'system'; content: string }[];
@@ -840,27 +912,117 @@ function ModalScreen() {
         throw new Error('Stream not available');
       }
 
-      // Process streaming response
+      // Process streaming response - update immediately as chunks arrive
       let fullContent = '';
+      let chunkCount = 0;
+      let hasReceivedAnyContent = false;
+      let isStreamComplete = false;
+
       for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
+        chunkCount++;
+
+        // Check finish_reason to determine if stream is complete
+        // finish_reason is null/undefined while streaming, has value when complete
+        const finishReason = chunk.choices?.[0]?.finish_reason;
+        if (finishReason !== null && finishReason !== undefined) {
+          isStreamComplete = true;
+        }
+
+        // Try multiple possible content locations (different API versions might structure differently)
+        const delta = chunk.choices?.[0]?.delta;
+        const content =
+          delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
+
+        // Log first few chunks for debugging
+        if (chunkCount <= 5) {
+          console.log('Stream chunk:', {
+            chunkCount,
+            hasContent: !!content,
+            contentLength: content?.length,
+            contentPreview: content?.substring(0, 30),
+            finishReason,
+            isStreamComplete,
+            chunkStructure: {
+              hasChoices: !!chunk.choices,
+              choicesLength: chunk.choices?.length,
+              hasDelta: !!chunk.choices?.[0]?.delta,
+              deltaKeys: chunk.choices?.[0]?.delta ? Object.keys(chunk.choices[0].delta) : [],
+            },
+          });
+        }
+
         if (content) {
+          hasReceivedAnyContent = true;
           fullContent += content;
+
+          // Update state immediately without batching - React will batch these automatically
           if (!isAnonymous) {
             updateMessage(assistantMessageId, fullContent);
           }
+
+          // Update messages state immediately for UI - include stream completion status
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === assistantMessageId ? { ...msg, content: fullContent } : msg
+              msg.id === assistantMessageId
+                ? { ...msg, content: fullContent, isStreamComplete }
+                : msg
             )
           );
-          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+
+          // Scroll to bottom periodically (not on every chunk to avoid performance issues)
+          // Scroll more frequently for short messages, less for long ones
+          if (fullContent.length < 100 || fullContent.length % 100 === 0) {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }
+        } else if (isStreamComplete) {
+          // Even if no content in this chunk, update completion status
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, isStreamComplete } : msg))
+          );
         }
       }
 
-      if (!isAnonymous) {
+      // Mark stream as complete after loop ends
+      isStreamComplete = true;
+
+      console.log('Streaming completed:', {
+        totalChunks: chunkCount,
+        finalContentLength: fullContent.length,
+        hasReceivedAnyContent,
+        isStreamComplete,
+      });
+
+      // Final update after streaming completes - ensure isStreamComplete is set
+      if (!isAnonymous && fullContent) {
         updateMessage(assistantMessageId, fullContent);
       }
+
+      // Final state update with completion status
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: fullContent, isStreamComplete: true }
+            : msg
+        )
+      );
+
+      // Always clear streaming state, but log warning if no content
+      setStreamingMessageId(null);
+
+      if (!hasReceivedAnyContent && chunkCount > 0) {
+        console.warn('No content received from stream after', chunkCount, 'chunks');
+        // Update message to show error or empty state
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: fullContent || '(No response received)' }
+              : msg
+          )
+        );
+      }
+
+      // Final scroll
+      scrollViewRef.current?.scrollToEnd({ animated: true });
 
       // Refresh balance
       try {
@@ -916,6 +1078,9 @@ function ModalScreen() {
         type: 'error',
       });
 
+      // Clear streaming state on error
+      setStreamingMessageId(null);
+
       setMessages((prev) =>
         prev.filter((msg) => msg.id !== userMessageId && msg.id !== assistantMessageId)
       );
@@ -927,6 +1092,8 @@ function ModalScreen() {
         .forEach((msg: any) => addMessage(msg));
     } finally {
       setIsSending(false);
+      // Ensure streaming state is cleared
+      setStreamingMessageId(null);
     }
   };
 
@@ -1478,6 +1645,7 @@ function ModalScreen() {
                 isMe={message.sender === 'me'}
                 userPicture={message.sender === 'other' ? userPicture : undefined}
                 isLoadingMetadata={shouldShowAvatarLoading}
+                isStreaming={streamingMessageId === message.id}
               />
             ))
           )}

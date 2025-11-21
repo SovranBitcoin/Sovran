@@ -367,78 +367,143 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
 
 /**
  * Parse SSE (Server-Sent Events) stream manually for React Native compatibility
- * React Native's fetch doesn't support streaming, so we read the full response
- * and parse it as SSE format, yielding chunks as we parse them
+ * Processes chunks incrementally as they arrive for true streaming behavior
  */
 async function* parseSSEStream(
   response: Response
 ): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
-  // React Native's fetch doesn't support response.body streaming
-  // We need to read the entire response and parse it
-  let text: string;
-
   // Try to use ReadableStream if available (works in some React Native versions)
   if (response.body && typeof response.body.getReader === 'function') {
     try {
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') {
-              return;
-            }
-            if (data) {
-              try {
-                const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
-                yield chunk;
-              } catch {
-                // Skip invalid JSON
-                console.warn('Failed to parse SSE chunk:', data);
+        
+        if (done) {
+          // Process any remaining data in buffer
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') {
+                  reader.releaseLock();
+                  return;
+                }
+                if (data) {
+                  try {
+                    const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+                    yield chunk;
+                  } catch (e) {
+                    console.warn('Failed to parse SSE chunk:', data, e);
+                  }
+                }
               }
+            }
+          }
+          reader.releaseLock();
+          return;
+        }
+
+        // Decode the chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Process complete lines (ending with \n)
+        const lines = buffer.split('\n');
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || '';
+
+        // Process each complete line immediately
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Skip empty lines and non-data lines
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
+            continue;
+          }
+
+          const data = trimmedLine.slice(6).trim();
+          
+          // Check for end marker
+          if (data === '[DONE]') {
+            reader.releaseLock();
+            return;
+          }
+
+          // Parse and yield chunk immediately
+          if (data) {
+            try {
+              const parsedChunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+              // Log first few chunks for debugging
+              const hasContent = !!parsedChunk.choices?.[0]?.delta?.content;
+              if (hasContent) {
+                console.log('SSE: Yielding chunk with content:', {
+                  contentLength: parsedChunk.choices[0].delta.content?.length,
+                  contentPreview: parsedChunk.choices[0].delta.content?.substring(0, 50),
+                });
+              }
+              yield parsedChunk;
+            } catch (e) {
+              // Skip invalid JSON - might be partial data or malformed chunk
+              console.warn('Failed to parse SSE chunk:', data.substring(0, 100), e);
             }
           }
         }
       }
-      reader.releaseLock();
-      return;
     } catch (error) {
-      // If streaming fails, fall back to reading full response
-      console.warn('Streaming not supported, falling back to full response:', error);
+      // If streaming fails, log error but don't fall back to full response
+      // This ensures we fail fast rather than silently degrading to non-streaming
+      console.error('Streaming error:', error);
+      throw new Error('Failed to stream response: ' + (error instanceof Error ? error.message : String(error)));
     }
   }
 
-  // Fallback: read entire response and parse SSE format
-  // This works but isn't true streaming (waits for full response)
-  text = await response.text();
-  const lines = text.split('\n');
+  // Fallback: If ReadableStream is not available, we need to read in chunks
+  // This is a last resort and will still try to process incrementally
+  console.warn('ReadableStream not available, using fallback method - this may cause delayed updates');
+  
+  try {
+    // Try to read response as text stream if possible
+    const text = await response.text();
+    console.log('Fallback: Read full response, length:', text.length);
+    const lines = text.split('\n');
+    console.log('Fallback: Total lines:', lines.length);
 
-  for (const line of lines) {
-    if (line.startsWith('data: ')) {
-      const data = line.slice(6).trim();
+    let chunkCount = 0;
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
+        continue;
+      }
+
+      const data = trimmedLine.slice(6).trim();
       if (data === '[DONE]') {
+        console.log('Fallback: Received [DONE] marker after', chunkCount, 'chunks');
         return;
       }
+      
       if (data) {
         try {
           const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+          chunkCount++;
+          const hasContent = !!chunk.choices?.[0]?.delta?.content;
+          if (hasContent && chunkCount <= 3) {
+            console.log('Fallback: Yielding chunk', chunkCount, 'with content');
+          }
           yield chunk;
-        } catch {
-          // Skip invalid JSON
-          console.warn('Failed to parse SSE chunk:', data);
+        } catch (e) {
+          console.warn('Failed to parse SSE chunk in fallback:', data.substring(0, 100), e);
         }
       }
     }
+    console.log('Fallback: Processed', chunkCount, 'chunks total');
+  } catch (error) {
+    console.error('Fallback parsing failed:', error);
+    throw error;
   }
 }
 
