@@ -37,6 +37,7 @@ const configWithMonicon = withMonicon(config, {
     'simple-icons:tiktok',
     'mdi:brain',
     'mdi:help-circle',
+    'mdi:check-circle',
 
     'lucide:activity',
     'fa6-solid:chevron-left',

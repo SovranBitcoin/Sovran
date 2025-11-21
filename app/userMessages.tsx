@@ -1,12 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import {
-  ScrollView,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  Dimensions,
-} from 'react-native';
+import { ScrollView, Pressable, Platform, StatusBar, Dimensions } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -21,7 +15,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 // Components
-import { View, VStack, HStack } from 'components/ui/View';
+import { View, VStack, HStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { AnimatedText } from 'components/ui/AnimatedText';
 import { Avatar } from 'components/ui/Avatar';
@@ -499,6 +493,16 @@ function ModalScreen() {
       return provider === selectedProvider;
     });
   }, [availableModels, selectedProvider]);
+
+  // Get selected model name
+  const selectedModelName = useMemo(() => {
+    if (!isRoutstrMode) return null;
+    const selectedModelId = getSelectedModel();
+    const model = availableModels.find((m) => m.id === selectedModelId);
+    if (!model) return selectedModelId;
+    const { modelName } = extractModelName(model);
+    return modelName;
+  }, [isRoutstrMode, availableModels, getSelectedModel]);
 
   // ===========================
   // EFFECTS
@@ -1031,8 +1035,7 @@ function ModalScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="light-content" backgroundColor={getPrimaryColor('800')} />
       <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
         {/* Header */}
@@ -1048,11 +1051,11 @@ function ModalScreen() {
           <HStack align="center" justify="space-between" style={{ height: 48 }}>
             <HStack align="center" spacing={12} style={{ flex: 1, minWidth: 0 }}>
               {isRoutstrMode ? (
-                <Pressable onPress={() => setIsSessionsPanelOpen(true)}>
+                <Pressable onPress={() => setIsSessionsPanelOpen(true)} className="p-2">
                   <Icon name="mdi:menu" size={24} color={getPrimaryColor('0')} />
                 </Pressable>
               ) : (
-                <Pressable onPress={() => router.back()}>
+                <Pressable onPress={() => router.back()} className="p-2">
                   <Icon
                     name="material-symbols:arrow-back-rounded"
                     size={24}
@@ -1099,7 +1102,7 @@ function ModalScreen() {
                         />
                         <View
                           style={{
-                            marginLeft: 12,
+                            marginLeft: 8,
                             flex: 1,
                             minWidth: 0,
                             justifyContent: 'flex-start',
@@ -1115,16 +1118,51 @@ function ModalScreen() {
                             }}>
                             {displayName}
                           </Text>
-                          <Text
-                            size={12}
-                            style={{ color: getShadeColor('400'), marginTop: 2, textAlign: 'left' }}
-                            numberOfLines={1}>
-                            {isRoutstrMode
-                              ? getAnonymousMode()
-                                ? `Temporary chat | Balance: ${formatBalance(balance)} • Model: ${getSelectedModel()}`
-                                : `Balance: ${formatBalance(balance)} • Model: ${getSelectedModel()}`
-                              : nip19.npubEncode(pubkey)}
-                          </Text>
+                          {isRoutstrMode ? (
+                            <HStack
+                              align="center"
+                              justify="flex-start"
+                              spacing={4}
+                              style={{ marginTop: 2 }}>
+                              {getAnonymousMode() && (
+                                <>
+                                  <Icon
+                                    name="mdi:anonymous"
+                                    size={14}
+                                    color={getShadeColor('400')}
+                                    className="border-r-[1.5px] border-r-shade-300 pr-1"
+                                  />
+                                </>
+                              )}
+                              <Icon
+                                name="material-symbols:account-balance-wallet"
+                                size={14}
+                                color={getShadeColor('400')}
+                              />
+                              <Text size={12} style={{ color: getShadeColor('400') }}>
+                                {formatBalance(balance)}
+                              </Text>
+                              <Spacer size={4} />
+                              <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
+                              <Text
+                                size={12}
+                                style={{ color: getShadeColor('400') }}
+                                numberOfLines={1}>
+                                {selectedModelName || getSelectedModel()}
+                              </Text>
+                            </HStack>
+                          ) : (
+                            <Text
+                              size={12}
+                              style={{
+                                color: getShadeColor('400'),
+                                marginTop: 2,
+                                textAlign: 'left',
+                              }}
+                              numberOfLines={1}>
+                              {nip19.npubEncode(pubkey)}
+                            </Text>
+                          )}
                         </View>
                       </View>
                     </ContextMenu.Trigger>
@@ -1153,11 +1191,26 @@ function ModalScreen() {
                         {displayName}
                       </AnimatedText>
                     </View>
-                    <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
-                      {isRoutstrMode
-                        ? `Balance: ${formatBalance(balance)} • Model: ${getSelectedModel()}`
-                        : nip19.npubEncode(pubkey)}
-                    </Text>
+                    {isRoutstrMode ? (
+                      <HStack align="center" justify="flex-start">
+                        <Icon
+                          name="material-symbols:account-balance-wallet"
+                          size={14}
+                          color={getShadeColor('400')}
+                        />
+                        <Text size={12} style={{ color: getShadeColor('400') }}>
+                          {formatBalance(balance)}
+                        </Text>
+                        <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
+                        <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                          {selectedModelName || getSelectedModel()}
+                        </Text>
+                      </HStack>
+                    ) : (
+                      <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                        {nip19.npubEncode(pubkey)}
+                      </Text>
+                    )}
                   </VStack>
                 </>
               )}
@@ -1167,11 +1220,11 @@ function ModalScreen() {
               {isRoutstrMode ? (
                 <>
                   {messages.length > 0 && !getAnonymousMode() ? (
-                    <Pressable onPress={handleNewSession}>
+                    <Pressable onPress={handleNewSession} className="p-2">
                       <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
                     </Pressable>
                   ) : (
-                    <Pressable onPress={toggleAnonymousMode}>
+                    <Pressable onPress={toggleAnonymousMode} className="p-2">
                       <Icon
                         name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
                         size={20}
@@ -1436,7 +1489,7 @@ function ModalScreen() {
             backgroundColor: getPrimaryColor('800'),
             paddingHorizontal: 16,
             paddingTop: 12,
-            paddingBottom: insets.bottom + 12,
+            paddingBottom: insets.bottom,
             borderTopWidth: 1,
             borderTopColor: getPrimaryColor('700'),
           }}>
@@ -1475,7 +1528,7 @@ function ModalScreen() {
                 borderRadius: 12,
                 paddingVertical: 12,
                 paddingHorizontal: 16,
-                marginBottom: 12,
+                marginBottom: 8,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
@@ -1519,7 +1572,7 @@ function ModalScreen() {
                 backgroundColor: getPrimaryColor('700'),
                 borderRadius: 20,
                 paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingVertical: 12,
                 borderWidth: 0,
                 margin: 0,
                 shadowOpacity: 0,

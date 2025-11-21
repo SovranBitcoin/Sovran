@@ -20,13 +20,11 @@ import { SheetProvider } from 'react-native-actions-sheet';
 // import * as Sentry from '@sentry/react-native';
 import { NostrProvider } from 'nostr-react';
 import { NDKPrivateKeySigner, useNDK, NDKCacheAdapterSqlite } from '@nostr-dev-kit/ndk-mobile';
-import { bytesToHex } from '@noble/hashes/utils';
-import { nip04, nip19 } from 'nostr-tools';
 // Import local components and utilities
 import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
 import { useNostrKeysContext, NostrKeysProvider } from 'providers/NostrKeysProvider';
-import ndk, { relays } from 'components/ndk';
+import { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
@@ -51,47 +49,6 @@ const RELAY_URLS = relays;
 
 // Initialize global configurations
 LogBox.ignoreAllLogs();
-
-/**
- * Handles DM message fetching and decryption
- */
-function useNostrDMs(addMessage: any, messages: any) {
-  const { keys: nostrKeys } = useNostrKeysContext();
-
-  useEffect(() => {
-    if (!nostrKeys?.nsec) return;
-
-    const { data: privKeyBytes } = nip19.decode(nostrKeys.nsec);
-    const privKey = bytesToHex(privKeyBytes as Uint8Array);
-    const pubKey = nostrKeys.pubkey;
-
-    // Set up subscription for direct messages
-    const fetchDMs = async () => {
-      const filters = [{ kinds: [4], '#p': [pubKey] }];
-      const subscription = ndk.subscribe(filters);
-
-      subscription.on('event', async (event) => {
-        try {
-          // Skip if message already exists
-          if (messages.some((msg: any) => msg.id === event.id)) return;
-
-          const decryptedMessage = await nip04.decrypt(privKey, event.pubkey, event.content);
-
-          addMessage(nostrKeys.pubkey, {
-            sender: event.pubkey,
-            receiver: nostrKeys.pubkey,
-            content: decryptedMessage,
-            created_at: event.created_at,
-            id: event.id,
-            sig: event.sig,
-          });
-        } catch {}
-      });
-    };
-
-    fetchDMs();
-  }, [nostrKeys?.pubkey, nostrKeys?.nsec, addMessage, messages]);
-}
 
 function MySplashScreen() {
   return (
@@ -173,6 +130,9 @@ function MainStack() {
           gestureEnabled: true,
           gestureDirection: 'horizontal',
           animation: 'slide_from_right',
+          contentStyle: {
+            backgroundColor: getPrimaryColor('800'),
+          },
         }}>
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
