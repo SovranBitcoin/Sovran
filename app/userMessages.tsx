@@ -1062,7 +1062,7 @@ function ModalScreen() {
               )}
 
               {Platform.OS === 'ios' && isRoutstrMode ? (
-                <Host style={{ width: screenWidth - 100, height: 48 }}>
+                <Host style={{ width: screenWidth - 100, height: 48, zIndex: 10 }}>
                   <ContextMenu>
                     <ContextMenu.Items>
                       <Button systemImage="arrow.clockwise" onPress={handleRefreshBalance}>
@@ -1200,7 +1200,15 @@ function ModalScreen() {
 
         {/* Attachments Bottom Sheet */}
         {isRoutstrMode && Platform.OS === 'ios' && (
-          <Host style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+          <Host
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: isAttachmentsBottomSheetOpen ? 100 : 1,
+              pointerEvents: isAttachmentsBottomSheetOpen ? 'auto' : 'none',
+            }}>
             <BottomSheet
               isOpened={isAttachmentsBottomSheetOpen}
               onIsOpenedChange={setIsAttachmentsBottomSheetOpen}>
@@ -1263,7 +1271,15 @@ function ModalScreen() {
 
         {/* OPTIMIZED: Model Switch Bottom Sheet - Using LegendList for Performance */}
         {isRoutstrMode && Platform.OS === 'ios' && (
-          <Host style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+          <Host
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: isModelSwitchBottomSheetOpen ? 100 : 1,
+              pointerEvents: isModelSwitchBottomSheetOpen ? 'auto' : 'none',
+            }}>
             <BottomSheet
               isOpened={isModelSwitchBottomSheetOpen}
               onIsOpenedChange={setIsModelSwitchBottomSheetOpen}
