@@ -1,10 +1,7 @@
-import React, { useState, useEffect, ReactNode } from 'react';
-import { View } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
-import { VideoScreen } from 'components/ui/VideoPlayer';
-import Image from 'components/ui/Image';
+import React, { useState, useEffect, ReactNode, useRef } from 'react';
 // Note: We don't need to use Redux hooks here since we're checking the store directly
 import { store } from 'redux/store';
+import { useInitializationStage } from '@/providers/InitializationProvider';
 
 interface MigrationGateProps {
   children: ReactNode;
@@ -15,19 +12,27 @@ interface MigrationGateProps {
  * This prevents race conditions where providers try to access data before migrations finish
  */
 export default function MigrationGate({ children }: MigrationGateProps) {
+  const stage = useInitializationStage('migrations', { message: 'Running migrations...' });
   const [migrationsComplete, setMigrationsComplete] = useState(false);
   const [migrationError, setMigrationError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
+    // Only run once
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+
     const checkMigrationsComplete = async () => {
       try {
         setIsChecking(true);
         setMigrationError(null);
+        stage.log('Running migrations...');
 
         console.log('MigrationGate: Starting migration check...');
 
         // Wait for Redux store to be rehydrated
+        stage.log('Rehydrating Redux store...');
         await new Promise<void>((resolve) => {
           const unsubscribe = store.subscribe(() => {
             const state = store.getState();
@@ -50,6 +55,7 @@ export default function MigrationGate({ children }: MigrationGateProps) {
 
         // Wait for async migrations to complete by checking for completion flags
         console.log('MigrationGate: Waiting for async migrations to complete...');
+        stage.log('Waiting for migrations to complete...');
 
         // Poll for migration completion by checking completion flags in state
         let attempts = 0;
@@ -87,10 +93,13 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         }
 
         setMigrationsComplete(true);
+        stage.complete();
         console.log('✅ MigrationGate: All migrations completed, rendering app');
       } catch (error) {
         console.error('MigrationGate: Migration check failed:', error);
-        setMigrationError(error instanceof Error ? error.message : 'Migration check failed');
+        const errorMessage = error instanceof Error ? error.message : 'Migration check failed';
+        setMigrationError(errorMessage);
+        stage.error(errorMessage);
         // Still allow the app to continue - don't block on migration errors
         setMigrationsComplete(true);
       } finally {
@@ -99,63 +108,14 @@ export default function MigrationGate({ children }: MigrationGateProps) {
     };
 
     checkMigrationsComplete();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show loading screen while migrations are running
+  // Render children once migrations are complete
+  // Loading UI is now handled by InitializationScreen
   if (!migrationsComplete || isChecking) {
-    return (
-      <View
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100%',
-          flexDirection: 'column',
-          gap: 16,
-        }}>
-        <View style={{ position: 'relative', width: 300, height: 300 }}>
-          <Image
-            style={{
-              width: 150,
-              height: 150,
-              position: 'absolute',
-              bottom: 10,
-              left: 150,
-              transform: [{ translateX: -75 }, { rotate: '10deg' }],
-              zIndex: 1,
-            }}
-            source={require('../../assets/images/initializing.png')}
-          />
-          <VideoScreen
-            style={
-              {
-                width: 300,
-                height: 300,
-                backgroundColor: 'black',
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-              } as any
-            }
-            videoSource={require('../../assets/videos/coco.mp4')}
-            muted={true}
-          />
-        </View>
-        <Text style={{ color: 'white', fontSize: 16, textAlign: 'center' }}>
-          {isChecking ? 'Running migrations...' : 'Preparing wallet...'}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 14, textAlign: 'center', opacity: 0.7 }}>
-          {isChecking ? 'Please wait while we migrate your data...' : 'Almost ready...'}
-        </Text>
-        {migrationError && (
-          <Text style={{ color: 'orange', fontSize: 14, textAlign: 'center' }}>
-            Warning: {migrationError}
-          </Text>
-        )}
-      </View>
-    );
+    return null;
   }
 
-  // Render children once migrations are complete
   return <>{children}</>;
 }

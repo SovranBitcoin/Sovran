@@ -24,12 +24,14 @@ import { NDKPrivateKeySigner, useNDK, NDKCacheAdapterSqlite } from '@nostr-dev-k
 import { persistor, store } from 'redux/store';
 import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
 import { useNostrKeysContext, NostrKeysProvider } from 'providers/NostrKeysProvider';
+import { InitializationProvider } from 'providers/InitializationProvider';
 import { relays } from 'components/ndk';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import AppGate from 'components/blocks/AppGate';
+import MigrationGate from 'components/blocks/MigrationGate';
 import { useFonts } from 'hooks/useFonts';
 import { PortalHost } from '@rn-primitives/portal';
 import { compose } from 'helper/utils';
@@ -160,6 +162,8 @@ const AppProviders = compose([
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
+  [InitializationProvider, { forceVisible: false }], // Set to true to always show loading screen
+  MigrationGate,
   [NostrKeysProvider, { defaultAccountIndex: 0 }],
   CocoProvider,
   ActionSheetProvider,

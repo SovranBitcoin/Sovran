@@ -38,6 +38,7 @@ const configWithMonicon = withMonicon(config, {
     'mdi:brain',
     'mdi:help-circle',
     'mdi:check-circle',
+    'mdi-light:check',
 
     'lucide:activity',
     'fa6-solid:chevron-left',

@@ -18,7 +18,8 @@
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "maestro": "maestro test ./.maestro",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "build:dev:ios": "eas build --profile development --platform ios"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
@@ -112,7 +113,6 @@
     "react-native-context-menu-view": "^1.20.0",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "~1.11.0",
-    "react-native-ios-utilities": "^4.1.0",
     "react-native-keyboard-controller": "1.18.5",
     "react-native-nfc-manager": "^3.14.12",
     "react-native-pager-view": "6.9.1",

@@ -4,6 +4,102 @@
 
 <img width="100%" src="./sovran.png" />
 
+## Scripts
+
+### Development
+
+Start the Expo development server:
+
+```sh
+yarn start
+```
+
+Run on iOS simulator/device:
+
+```sh
+yarn ios
+```
+
+Run on Android emulator/device:
+
+```sh
+yarn android
+```
+
+### Building
+
+Prebuild native projects (cleans existing native directories):
+
+```sh
+yarn prebuild
+```
+
+Build iOS app for production (via EAS):
+
+```sh
+yarn build:ios
+```
+
+Build iOS app for development (via EAS):
+
+```sh
+yarn build:dev:ios
+```
+
+Build Android APK (preview profile):
+
+```sh
+yarn build:android:apk
+```
+
+### Submitting to App Stores
+
+Submit iOS build to App Store:
+
+```sh
+yarn submit:ios
+```
+
+Submit Android build to Play Store:
+
+```sh
+yarn submit:android
+```
+
+### Code Quality
+
+Run ESLint:
+
+```sh
+yarn lint
+```
+
+Run TypeScript type checking:
+
+```sh
+yarn type-check
+```
+
+Format code with Prettier:
+
+```sh
+yarn pretty
+```
+
+### Testing
+
+Run Maestro UI tests:
+
+```sh
+yarn maestro
+```
+
+### Notes
+
+- Use `yarn build:dev:ios` for development builds that can be installed on physical devices
+- Run `yarn prebuild` after pulling changes that modify native code
+- `yarn postinstall` runs automatically after `yarn install` to apply patches
+
 ## Features
 
 ### Core Wallet Functionality ✅

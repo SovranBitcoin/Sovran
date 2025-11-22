@@ -1,11 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from 'coco-cashu-react';
 import { Manager } from 'coco-cashu-core';
 import { CocoManager } from './manager';
 import { DataMigration } from './migration';
-import { View } from 'components/ui/View';
-import { VideoScreen } from 'components/ui/VideoPlayer';
-import Image from 'components/ui/Image';
+import { useInitializationStage } from '@/providers/InitializationProvider';
 interface CocoContextValue {
   manager: Manager | null;
   isReady: boolean;
@@ -72,14 +70,24 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
  * This should wrap your entire app and be placed above other providers
  */
 export function CocoProvider({ children }: CocoProviderProps) {
+  const stage = useInitializationStage('coco', {
+    message: 'Initializing Coco...',
+    dependsOn: ['nostr'],
+  });
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState<Error | null>(null);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
+    if (!stage.canStart) return; // Wait for nostr to complete
+    if (hasStarted.current) return; // Only run once
+    hasStarted.current = true;
+
     const initializeCoco = async () => {
       try {
+        stage.log('Initializing Coco...');
         console.log('Initializing Coco Provider...');
 
         // Initialize the manager (includes enabling proof state watcher)
@@ -87,10 +95,12 @@ export function CocoProvider({ children }: CocoProviderProps) {
         setManager(mgr);
 
         // Check if migration is needed
+        stage.log('Checking for data migration...');
         const migration = new DataMigration(mgr);
         const needsMigration = await migration.isMigrationNeeded();
 
         if (needsMigration) {
+          stage.log('Migrating data...');
           console.log('Migration needed, starting data migration...');
           setIsMigrating(true);
 
@@ -113,12 +123,16 @@ export function CocoProvider({ children }: CocoProviderProps) {
         }
 
         // Initialize default mints for new users
+        stage.log('Initializing default mints...');
         await initializeDefaultMints(mgr);
 
         setIsReady(true);
+        stage.complete();
       } catch (error) {
         console.error('Failed to initialize Coco Provider:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Initialization failed';
         setMigrationError(error instanceof Error ? error : new Error('Initialization failed'));
+        stage.error(errorMessage);
       }
     };
 
@@ -132,7 +146,8 @@ export function CocoProvider({ children }: CocoProviderProps) {
         console.error('Failed to cleanup Coco Manager on unmount:', error);
       });
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage.canStart]);
 
   const contextValue: CocoContextValue = {
     manager,
@@ -141,53 +156,10 @@ export function CocoProvider({ children }: CocoProviderProps) {
     migrationError,
   };
 
-  // Show loading state while initializing
+  // Loading UI is now handled by InitializationScreen
+  // Only render children when ready
   if (!isReady || !manager) {
-    return (
-      <CocoContext.Provider value={contextValue}>
-        {/* You can replace this with your own loading component */}
-        <View
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100%',
-            flexDirection: 'column',
-            gap: 16,
-          }}>
-          <View style={{ position: 'relative', width: 300, height: 300 }}>
-            <Image
-              style={{
-                width: 150,
-                height: 150,
-                position: 'absolute',
-                bottom: 10,
-                left: 150,
-                transform: [{ translateX: -75 }, { rotate: '10deg' }],
-                zIndex: 1,
-              }}
-              source={require('../../assets/images/initializing.png')}
-            />
-            <VideoScreen
-              style={
-                {
-                  width: 300,
-                  height: 300,
-                  backgroundColor: 'black',
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                } as any
-              }
-              videoSource={require('../../assets/videos/coco.mp4')}
-              muted={true}
-            />
-          </View>
-          {isMigrating && <View>Migrating data...</View>}
-          {migrationError && <View style={{ color: 'red' }}>Error: {migrationError.message}</View>}
-        </View>
-      </CocoContext.Provider>
-    );
+    return <CocoContext.Provider value={contextValue}>{null}</CocoContext.Provider>;
   }
 
   // Wrap with CocoCashuProvider once manager is ready

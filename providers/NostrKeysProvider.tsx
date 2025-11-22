@@ -5,17 +5,17 @@ import React, {
   useState,
   ReactNode,
   useCallback,
+  useRef,
 } from 'react';
-import { View } from 'components/ui/View';
 import { useMnemonic } from 'hooks/useSecureStore';
 import { ensureMnemonicExists } from 'helper/secureStorage';
 import * as nip06 from 'nostr-tools/nip06';
 import { nip19 } from 'nostr-tools';
-import { Text } from '@/components/ui/Text';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { CocoManager } from 'helper/coco/manager';
+import { useInitializationStage } from './InitializationProvider';
 
 /**
  * Check if mnemonic exists in Redux store (profile 0) as fallback
@@ -23,7 +23,7 @@ import { CocoManager } from 'helper/coco/manager';
 function getMnemonicFromRedux(): string | null {
   try {
     // Import store dynamically to avoid circular dependencies
-
+    // eslint-disable-next-line
     const { store } = require('../redux/store');
     const state = store.getState();
     const nostrState = state.nostr;
@@ -104,6 +104,10 @@ interface NostrKeysProviderProps {
  * This prevents expensive key derivation from happening multiple times
  */
 export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKeysProviderProps) {
+  const stage = useInitializationStage('nostr', {
+    message: 'Initializing keys...',
+    dependsOn: ['migrations'],
+  });
   const { value: mnemonic, loading: mnemonicLoading, error: mnemonicError } = useMnemonic();
   const [keys, setKeys] = useState<NostrKeys | null>(null);
   const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);
@@ -112,6 +116,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const [error, setError] = useState<string | null>(null);
   const [cachedKeys, setCachedKeys] = useState<Map<number, NostrKeys>>(new Map());
   const [cachedCashuMnemonics, setCachedCashuMnemonics] = useState<Map<number, string>>(new Map());
+  const hasStarted = useRef(false);
 
   const deriveKeys = useCallback(
     async (accountIndex: number): Promise<NostrKeys | null> => {
@@ -259,6 +264,9 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   // Initialize default keys when mnemonic is available, or generate one if none exists
   useEffect(() => {
     if (mnemonicLoading) return;
+    if (!stage.canStart) return; // Wait for migrations to complete
+    if (hasStarted.current) return; // Only run once
+    hasStarted.current = true;
 
     const initializeKeys = async () => {
       try {
@@ -270,6 +278,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
         // If no mnemonic from secure storage, try Redux fallback first
         if (!mnemonicToUse) {
+          stage.log('Checking for existing wallet...');
           console.log('No mnemonic in secure storage, checking Redux store...');
           mnemonicToUse = getMnemonicFromRedux();
 
@@ -279,6 +288,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
               mnemonicToUse.split(' ').length,
               'words'
             );
+            stage.log('Migrating wallet to secure storage...');
 
             // Store the Redux mnemonic to secure storage for future use
             try {
@@ -297,10 +307,12 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           }
         } else {
           console.log('Using mnemonic from secure storage');
+          stage.log('Initializing keys...');
         }
 
         // If still no mnemonic, generate a new one (this handles both Redux and secure storage)
         if (!mnemonicToUse) {
+          stage.log('Generating new wallet...');
           console.log('Generating new mnemonic...');
           mnemonicToUse = await ensureMnemonicExists();
 
@@ -317,6 +329,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         const isFromRedux = mnemonicToUse !== originalMnemonic;
 
         if (isFromRedux) {
+          stage.log('Deriving keys from migrated wallet...');
           console.log('Using mnemonic from Redux, deriving keys manually...');
           // We need to derive keys with the Redux mnemonic since it's not in the hook's cache
           const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
@@ -335,6 +348,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           const seed = root.derive(path);
           defaultCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
         } else {
+          stage.log('Deriving keys...');
           console.log('Using mnemonic from secure storage, deriving keys normally...');
           // Use the normal derivation process
           defaultKeys = await deriveKeys(defaultAccountIndex);
@@ -350,10 +364,12 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         }
 
         setIsReady(true);
+        stage.complete();
         console.log('NostrKeysProvider initialization complete');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
         setError(errorMessage);
+        stage.error(errorMessage);
         console.error('Failed to initialize Nostr keys:', err);
       } finally {
         setIsLoading(false);
@@ -361,7 +377,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     };
 
     initializeKeys();
-  }, [mnemonic, mnemonicLoading, defaultAccountIndex, deriveKeys, deriveCashuMnemonic]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mnemonic, mnemonicLoading, stage.canStart]);
 
   // Update error state based on mnemonic error
   useEffect(() => {
@@ -381,26 +398,10 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     getCashuMnemonicForAccount,
   };
 
-  // Show loading state while initializing
+  // Loading UI is now handled by InitializationScreen
+  // Only render children when ready
   if (!isReady || isLoading) {
-    return (
-      <NostrKeysContext.Provider value={contextValue}>
-        <View
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100%',
-            flexDirection: 'column',
-            gap: 16,
-          }}>
-          <Text style={{ color: 'white', fontSize: 16, textAlign: 'center' }}>
-            {mnemonic ? 'Initializing keys...' : 'Generating new wallet...'}
-          </Text>
-          {error && <Text style={{ color: 'red' }}>Error: {error}</Text>}
-        </View>
-      </NostrKeysContext.Provider>
-    );
+    return <NostrKeysContext.Provider value={contextValue}>{null}</NostrKeysContext.Provider>;
   }
 
   return <NostrKeysContext.Provider value={contextValue}>{children}</NostrKeysContext.Provider>;
