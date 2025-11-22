@@ -598,6 +598,7 @@ function InitializationScreenInternal() {
   }, [activeIndex, logHistory.length, translateY]);
 
   if (!shouldRender && !isInitializing) {
+    return null;
     // Show test button when not initializing and screen has faded out
     return (
       <View

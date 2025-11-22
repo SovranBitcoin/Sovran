@@ -760,25 +760,11 @@ function ModalScreen() {
       return;
     }
 
-    SheetManager.show('button-handler', {
-      payload: {
-        buttons: [
-          {
-            text: 'Top Up with Ecash',
-            icon: 'solar:wallet-bold',
-            variant: 'primary' as const,
-            onPress: async (close) => {
-              router.push({
-                pathname: '/currency',
-                params: {
-                  to: 'sendToken',
-                  routstrTopUp: 'true',
-                },
-              });
-              close({} as any);
-            },
-          },
-        ],
+    router.push({
+      pathname: '/currency',
+      params: {
+        to: 'sendToken',
+        routstrTopUp: 'true',
       },
     });
   };
@@ -1237,6 +1223,9 @@ function ModalScreen() {
                     <ContextMenu.Items>
                       <Button systemImage="arrow.clockwise" onPress={handleRefreshBalance}>
                         Refresh Balance
+                      </Button>
+                      <Button systemImage="creditcard" onPress={handleTopUp}>
+                        Top Up Balance
                       </Button>
                       <Button
                         systemImage="cpu"
