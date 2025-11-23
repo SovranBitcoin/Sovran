@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.0.40</string>
+    <string>0.0.45</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -32,6 +32,12 @@
           <string>com.sovranbitcoin</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+sovran</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
@@ -42,7 +48,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NFCReaderUsageDescription</key>
-    <string>Sovran needs NFC access to send payment requests at the users request.</string>
+    <string>Interact with nearby NFC devices</string>
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
@@ -62,10 +68,12 @@
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Sovran will show the users location on some transactions to help them keep track of the location they spent the funds at.</string>
+    <string>Allow $(PRODUCT_NAME) to use your location</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow access to your microphone to use voice commands</string>
+    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSMotionUsageDescription</key>
     <string>Allow motion access to use the motion sensor to rotate the screen</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
@@ -88,6 +96,8 @@
     <array>
       <integer>1</integer>
     </array>
+    <key>RCTNewArchEnabled</key>
+    <true/>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

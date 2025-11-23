@@ -1,5 +1,14 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { ScrollView, Pressable, Platform, StatusBar, Dimensions } from 'react-native';
+import {
+  ScrollView,
+  Pressable,
+  Platform,
+  StatusBar,
+  Dimensions,
+  ColorValue,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -33,12 +42,17 @@ import {
 } from '@expo/ui/swift-ui';
 
 // Utilities
-import { maybeConvertNpub } from '@/helper/coco/utils';
+import { maybeConvertNpub, isValidEcashToken } from '@/helper/coco/utils';
 import { withSheetProvider } from '@/hocs/withSheetProvider';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from 'helper/routstr/api';
 import { popup } from '@/helper/popup';
+import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { Proof } from '@cashu/cashu-ts';
+import { formatAmount } from 'helper/currency';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   foregroundStyle,
   frame,
@@ -47,6 +61,7 @@ import {
   cornerRadius,
   fixedSize,
 } from '@expo/ui/swift-ui/modifiers';
+import opacity from 'hex-color-opacity';
 
 export type TimelineItemType = Message;
 
@@ -188,9 +203,227 @@ function getProviderIcon(provider: string): string {
   return iconMap[providerLower] || 'mdi:robot';
 }
 
+/**
+ * Extracts a cashu token from message content
+ * Looks for tokens starting with "cashuA" or "cashuB" and validates them
+ */
+function extractCashuToken(content: string): string | null {
+  if (!content || typeof content !== 'string') return null;
+
+  // Find the index of cashuA or cashuB (case insensitive)
+  const lowerContent = content.toLowerCase();
+  const cashuAIndex = lowerContent.indexOf('cashua');
+  const cashuBIndex = lowerContent.indexOf('cashub');
+
+  let tokenStartIndex = -1;
+  if (cashuAIndex !== -1 && (cashuBIndex === -1 || cashuAIndex < cashuBIndex)) {
+    tokenStartIndex = cashuAIndex;
+  } else if (cashuBIndex !== -1) {
+    tokenStartIndex = cashuBIndex;
+  }
+
+  if (tokenStartIndex === -1) return null;
+
+  // Extract token starting from the found index
+  // Tokens are base64 encoded and can be quite long, so we'll try to extract
+  // a reasonable length. Cashu tokens are typically several hundred characters
+  const remainingText = content.slice(tokenStartIndex);
+
+  // Try to find where the token ends (it might be followed by whitespace or end of string)
+  // We'll validate progressively longer substrings
+  let token = '';
+  const maxTokenLength = 5000; // Reasonable upper bound for cashu tokens
+
+  for (let i = 6; i <= Math.min(remainingText.length, maxTokenLength); i++) {
+    const candidate = remainingText.slice(0, i);
+    if (isValidEcashToken(candidate)) {
+      token = candidate;
+    } else if (token) {
+      // We found a valid token but the next character breaks it, so return what we have
+      break;
+    }
+
+    // If we hit whitespace or newline and haven't found a valid token yet, stop
+    if (/\s/.test(remainingText[i]) && !token) {
+      break;
+    }
+  }
+
+  return token || null;
+}
+
 // ===========================
 // COMPONENTS
 // ===========================
+
+interface CashuTokenBubbleProps {
+  token: string;
+  isMe: boolean;
+}
+
+/**
+ * Component to display a cashu token as a separate bubble
+ * Shows amount, USD value, and action button (Redeem/Cancel)
+ */
+function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
+  const { getPrimaryColor, getShadeColor } = useTheme();
+
+  let decoded;
+  let amount = 0;
+  let unit = '';
+  let mintUrl = '';
+  let isValid = false;
+
+  try {
+    decoded = getDecodedToken(token);
+    amount = decoded.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0);
+    unit = decoded.unit || 'sats';
+    mintUrl = decoded.mint || '';
+    isValid = true;
+  } catch (error) {
+    console.error('Failed to decode cashu token:', error);
+    isValid = false;
+  }
+
+  // Convert amount to USD
+  const usdAmount = isValid
+    ? formatAmount({ amount, unit }, { displayAs: 'usd', currencyDisplay: 'symbol' })
+    : '';
+
+  const handlePress = () => {
+    if (!isValid) {
+      popup({
+        message: 'Invalid token',
+        emoji: '🚨',
+        type: 'error',
+      });
+      return;
+    }
+
+    // Create receive history entry
+    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+      id: `receive-${Date.now()}`,
+      type: 'receive',
+      amount,
+      unit,
+      mintUrl,
+      createdAt: Date.now(),
+      metadata: {},
+      token,
+    };
+
+    router.push({
+      pathname: '/receiveToken',
+      params: {
+        receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
+      },
+    });
+  };
+
+  if (!isValid) {
+    return null;
+  }
+
+  const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
+    ? [getShadeColor('200'), getShadeColor('300')]
+    : [getPrimaryColor('600'), getPrimaryColor('700')];
+
+  const innerGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
+    ? [opacity(getPrimaryColor('0'), 0.2), opacity(getPrimaryColor('0'), 0.175)]
+    : [getPrimaryColor('800'), getPrimaryColor('900')];
+
+  return (
+    <View
+      style={{
+        marginTop: 8,
+        marginBottom: 8,
+        alignSelf: isMe ? 'flex-end' : 'flex-start',
+        maxWidth: '85%',
+      }}>
+      <Pressable onPress={handlePress}>
+        <LinearGradient
+          colors={gradientColors}
+          style={{
+            borderRadius: 18,
+            padding: 12,
+            minWidth: 200,
+          }}>
+          <VStack spacing={8}>
+            {/* Mint URL */}
+            {mintUrl && (
+              <Text
+                size={12}
+                style={{
+                  color: getPrimaryColor('0'),
+                  opacity: 0.75,
+                }}>
+                {mintUrl}
+              </Text>
+            )}
+
+            {/* Amount */}
+            <LinearGradient
+              colors={innerGradientColors}
+              style={{
+                borderRadius: 18,
+                margin: 0,
+              }}>
+              <VStack spacing={4} justify="center" align="center" className="p-5">
+                <AmountFormatter
+                  amount={amount}
+                  unit={unit}
+                  size={32}
+                  weight="heavy"
+                  color={getPrimaryColor('0')}
+                />
+                {usdAmount && (
+                  <Text
+                    size={14}
+                    style={{
+                      color: getPrimaryColor('0'),
+                      opacity: 0.9,
+                    }}>
+                    {usdAmount}
+                  </Text>
+                )}
+              </VStack>
+            </LinearGradient>
+
+            {/* Action Button */}
+            <Pressable
+              onPress={handlePress}
+              style={{
+                marginTop: 8,
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                backgroundColor: getPrimaryColor('0'),
+                borderRadius: 8,
+                alignItems: 'center',
+              }}>
+              <HStack align="center" spacing={6}>
+                {!isMe && (
+                  <Icon
+                    name="material-symbols:arrow-downward"
+                    size={16}
+                    color={getPrimaryColor('600')}
+                  />
+                )}
+                <Text
+                  size={14}
+                  bold
+                  style={{
+                    color: getPrimaryColor('600'),
+                  }}>
+                  {isMe ? 'Cancel' : 'Redeem'}
+                </Text>
+              </HStack>
+            </Pressable>
+          </VStack>
+        </LinearGradient>
+      </Pressable>
+    </View>
+  );
+}
 
 interface MessageBubbleProps {
   message: any;
@@ -248,89 +481,125 @@ function MessageBubble({
   const shouldShowSkeleton =
     isStreaming && !isStreamComplete && (content.length === 0 || isPlaceholderText(content));
 
+  // Extract cashu token from content
+  const cashuToken = extractCashuToken(content);
+
+  // Remove token from displayed content if found
+  let displayContent = content;
+  if (cashuToken && !shouldShowSkeleton) {
+    displayContent = content.replace(cashuToken, '').trim();
+    // If content is empty after removing token, don't show the text bubble
+    if (!displayContent) {
+      displayContent = '';
+    }
+  }
+
   // Show skeleton for placeholder text, otherwise show actual content
-  const displayContent = shouldShowSkeleton ? '' : content;
+  if (!shouldShowSkeleton && displayContent === '' && cashuToken) {
+    // If we only have a token and no other content, skip the text bubble
+    displayContent = '';
+  } else {
+    displayContent = shouldShowSkeleton ? '' : displayContent;
+  }
 
   return (
-    <HStack
-      align="flex-start"
-      justify={isMe ? 'flex-end' : 'flex-start'}
-      spacing={8}
-      style={{ marginBottom: 16 }}>
-      {!isMe && (
-        <Avatar
-          size={32}
-          picture={userPicture}
-          seed={message.pubkey}
-          name={message.sender === 'other' ? 'Other User' : 'Me'}
-          loading={isLoadingMetadata}
-        />
-      )}
+    <VStack
+      align={isMe ? 'flex-end' : 'flex-start'}
+      spacing={0}
+      style={{
+        marginBottom: 16,
+        maxWidth: '85%',
+        alignSelf: isMe ? 'flex-end' : 'flex-start',
+      }}>
+      <HStack
+        align="flex-start"
+        justify={isMe ? 'flex-end' : 'flex-start'}
+        spacing={8}
+        style={{ width: '100%' }}>
+        {!isMe && (
+          <Avatar
+            size={32}
+            picture={userPicture}
+            seed={message.pubkey}
+            name={message.sender === 'other' ? 'Other User' : 'Me'}
+            loading={isLoadingMetadata}
+          />
+        )}
 
-      <VStack align={isMe ? 'flex-end' : 'flex-start'} spacing={4} style={{ maxWidth: '85%' }}>
-        <View
-          style={{
-            backgroundColor: isMe ? getPrimaryColor('600') : getPrimaryColor('700'),
-            borderRadius: 18,
-            borderTopLeftRadius: isMe ? 18 : 4,
-            borderTopRightRadius: isMe ? 4 : 18,
-            alignSelf: isMe ? 'flex-end' : 'flex-start',
-            minHeight: shouldShowSkeleton ? 44 : undefined, // Ensure skeleton has space
-            minWidth: shouldShowSkeleton ? 60 : undefined,
-          }}>
-          {shouldShowSkeleton ? (
+        <VStack
+          align={isMe ? 'flex-end' : 'flex-start'}
+          spacing={4}
+          style={{ flex: 1, maxWidth: '85%' }}>
+          {/* Only show text bubble if there's content to display */}
+          {(displayContent || shouldShowSkeleton) && (
             <View
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                justifyContent: 'center',
-                alignItems: 'flex-start',
+                backgroundColor: isMe ? getPrimaryColor('600') : getPrimaryColor('700'),
+                borderRadius: 18,
+                borderTopLeftRadius: isMe ? 18 : 4,
+                borderTopRightRadius: isMe ? 4 : 18,
+                alignSelf: isMe ? 'flex-end' : 'flex-start',
+                minHeight: shouldShowSkeleton ? 44 : undefined, // Ensure skeleton has space
+                minWidth: shouldShowSkeleton ? 60 : undefined,
               }}>
-              <View
-                style={{
-                  width: 60,
-                  height: 16,
-                  backgroundColor: getPrimaryColor('600'),
-                  borderRadius: 8,
-                  opacity: 0.6,
-                }}
-              />
+              {shouldShowSkeleton ? (
+                <View
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    justifyContent: 'center',
+                    alignItems: 'flex-start',
+                  }}>
+                  <View
+                    style={{
+                      width: 60,
+                      height: 16,
+                      backgroundColor: getPrimaryColor('600'),
+                      borderRadius: 8,
+                      opacity: 0.6,
+                    }}
+                  />
+                </View>
+              ) : (
+                <Text
+                  size={16}
+                  style={{
+                    color: getPrimaryColor('0'),
+                    lineHeight: 20,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                  }}>
+                  {displayContent}
+                </Text>
+              )}
             </View>
-          ) : (
+          )}
+
+          {/* Cashu Token Bubble */}
+          {cashuToken && <CashuTokenBubble token={cashuToken} isMe={isMe} />}
+
+          <HStack align="center" spacing={4}>
             <Text
-              size={16}
+              size={12}
               style={{
-                color: getPrimaryColor('0'),
-                lineHeight: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
+                color: getShadeColor('400'),
+                marginLeft: isMe ? 0 : 8,
               }}>
-              {displayContent}
+              {message.timestamp}
             </Text>
-          )}
-        </View>
+            {isMe && (
+              <Icon
+                name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
+                size={14}
+                color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
+              />
+            )}
+          </HStack>
+        </VStack>
 
-        <HStack align="center" spacing={4}>
-          <Text
-            size={12}
-            style={{
-              color: getShadeColor('400'),
-              marginLeft: isMe ? 0 : 8,
-            }}>
-            {message.timestamp}
-          </Text>
-          {isMe && (
-            <Icon
-              name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
-              size={14}
-              color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
-            />
-          )}
-        </HStack>
-      </VStack>
-
-      {isMe && <Avatar size={32} seed={message.pubkey} name="Me" loading={false} />}
-    </HStack>
+        {isMe && <Avatar size={32} seed={message.pubkey} name="Me" loading={false} />}
+      </HStack>
+    </VStack>
   );
 }
 
@@ -1593,52 +1862,54 @@ function ModalScreen() {
         )}
 
         {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            padding: 16,
-            flexGrow: 1,
-          }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          {isLoading ? (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingTop: 50,
-              }}>
-              <Text size={16} style={{ color: getShadeColor('400') }}>
-                Loading messages...
-              </Text>
-            </View>
-          ) : messages.length === 0 ? (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingTop: 50,
-              }}>
-              <Text size={16} style={{ color: getShadeColor('400') }}>
-                No messages yet. Start the conversation!
-              </Text>
-            </View>
-          ) : (
-            messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isMe={message.sender === 'me'}
-                userPicture={message.sender === 'other' ? userPicture : undefined}
-                isLoadingMetadata={shouldShowAvatarLoading}
-                isStreaming={streamingMessageId === message.id}
-              />
-            ))
-          )}
-        </ScrollView>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              padding: 16,
+              flexGrow: 1,
+            }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
+            {isLoading ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingTop: 50,
+                }}>
+                <Text size={16} style={{ color: getShadeColor('400') }}>
+                  Loading messages...
+                </Text>
+              </View>
+            ) : messages.length === 0 ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingTop: 50,
+                }}>
+                <Text size={16} style={{ color: getShadeColor('400') }}>
+                  No messages yet. Start the conversation!
+                </Text>
+              </View>
+            ) : (
+              messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  isMe={message.sender === 'me'}
+                  userPicture={message.sender === 'other' ? userPicture : undefined}
+                  isLoadingMetadata={shouldShowAvatarLoading}
+                  isStreaming={streamingMessageId === message.id}
+                />
+              ))
+            )}
+          </ScrollView>
+        </TouchableWithoutFeedback>
 
         {/* Input Area */}
         <View

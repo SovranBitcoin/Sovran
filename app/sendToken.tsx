@@ -152,7 +152,7 @@ export function SendToken({ sendHistoryEntry }: SendTokenProps) {
    */
   const handleShare = async (onClose: (event: any) => void) => {
     await Share.share({
-      url: uri,
+      // url: uri,
       message: 'cashu://' + getEncodedTokenV4(sendHistoryEntry.token),
     });
     onClose({});

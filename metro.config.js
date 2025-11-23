@@ -57,6 +57,7 @@ const configWithMonicon = withMonicon(config, {
     'lucide:delete',
     'simple-line-icons:check',
     'material-symbols:check-rounded',
+    'lucide:nfc',
     'fluent:checkmark-16-filled',
     'ion:checkmark-done',
     'material-symbols:close-rounded',

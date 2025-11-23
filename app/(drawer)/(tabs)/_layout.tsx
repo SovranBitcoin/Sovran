@@ -1,20 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
-import Icon from 'assets/icons';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { popup } from '@/helper/popup';
 import WalletHeader, { Background } from 'components/blocks/WalletHeader';
-import { HStack, Spacer } from 'components/ui/View';
+import { HStack } from 'components/ui/View';
 import { Avatar } from 'components/ui/Avatar';
 import { TAB_SCREENS } from '@/app/(drawer)/(tabs)/_layout.tabs';
 import { useNavigation, usePathname } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-
+import { useSend } from 'hooks/coco';
+import { useMintStore } from 'stores/mintStore';
+import { handlePOSPaymentTest } from '@/helper/nfcPosPayment';
+import { Button } from '@/components/ui/Button';
+import Icon from '@/assets/icons';
+// import { Button, Host } from '@expo/ui/swift-ui';
 const Tab = createBottomTabNavigator();
 
 const SPACING_XS = 8;
@@ -106,18 +110,82 @@ const TabLayout = () => {
     );
   };
 
-  const HeaderRight = () => (
-    <Pressable
-      className="opacity-0"
-      onPress={() => popup({ message: 'not_implemented', type: 'info' })}>
-      <HStack spacing={8}>
-        <View className="rounded-full bg-primary-800 p-2">
-          <Icon name="solar:card-bold" color={getPrimaryColor('0')} />
-        </View>
-        <Spacer size={8} />
-      </HStack>
-    </Pressable>
-  );
+  const HeaderRight = () => {
+    const { send } = useSend();
+    const { keys: nostrKeys } = useNostrKeysContext();
+    const selectedMints = useMintStore((state) => state.selectedMints);
+    const selectedMint = nostrKeys?.pubkey ? selectedMints[nostrKeys.pubkey] : undefined;
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleNFCPress = async () => {
+      if (isProcessing) return;
+
+      await EnhancedHaptics.navigateHaptic();
+
+      if (!nostrKeys?.pubkey) {
+        popup({
+          message: 'Please set up your wallet first',
+          emoji: '🚨',
+          type: 'error',
+        });
+        return;
+      }
+
+      if (!selectedMint) {
+        popup({
+          message: 'Please select a mint first',
+          emoji: '🚨',
+          type: 'error',
+        });
+        return;
+      }
+
+      setIsProcessing(true);
+
+      try {
+        await handlePOSPaymentTest(send);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        popup({
+          message: `NFC payment failed: ${errorMessage}`,
+          emoji: '🚨',
+          type: 'error',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    // Only show button if user is authenticated and has a selected mint
+    if (!nostrKeys?.pubkey || !selectedMint) {
+      return null;
+    }
+
+    return (
+      <Button
+        style={{ width: 48, height: 48, marginRight: 12, marginTop: 58 }}
+        icon={<Icon name="lucide:nfc" size={20} />}
+        onPress={handleNFCPress}
+        variant="secondary"
+      />
+    );
+    // return (
+    //   <Host modifiers={[frame({ width: 100, height: 100, alignment: 'bottomTrailing' })]}>
+    //     <Button
+    //       variant="plain"
+    //       systemImage="antenna.radiowaves.left.and.right"
+    //       onPress={handleNFCPress}
+    //       modifiers={[
+    //         frame({ width: 64, height: 64, alignment: 'bottomTrailing' }),
+    //         // padding({ all: 16 }),
+    //         glassEffect({
+    //           shape: 'circle',
+    //         }),
+    //       ]}
+    //     />
+    //   </Host>
+    // );
+  };
 
   // Function to get header title component based on screen
   const getHeaderTitle = (title: string) => {

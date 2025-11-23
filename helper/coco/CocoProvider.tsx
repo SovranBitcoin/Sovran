@@ -4,6 +4,8 @@ import { Manager } from 'coco-cashu-core';
 import { CocoManager } from './manager';
 import { DataMigration } from './migration';
 import { useInitializationStage } from '@/providers/InitializationProvider';
+import { useNostrKeysContext } from '@/providers/NostrKeysProvider';
+import { useMintStore } from '@/stores/mintStore';
 interface CocoContextValue {
   manager: Manager | null;
   isReady: boolean;
@@ -33,12 +35,20 @@ interface CocoProviderProps {
 /**
  * Initialize default mints for new users
  * This adds the Sovran mint and Minibits mint so users have mints available immediately
+ * @param manager - The Coco Manager instance
+ * @param pubkey - The user's pubkey (optional, for setting selected mint)
+ * @param setSelectedMint - Function to set the selected mint (optional)
  */
-async function initializeDefaultMints(manager: Manager): Promise<void> {
+async function initializeDefaultMints(
+  manager: Manager,
+  pubkey?: string,
+  setSelectedMint?: (pubkey: string, mintUrl: string) => void
+): Promise<void> {
   try {
     console.log('Initializing default mints...');
 
     const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
+    const selectedMint = 'https://mint.minibits.cash/Bitcoin';
 
     // Add each default mint (only if not already exists)
     for (const mintUrl of defaultMints) {
@@ -50,11 +60,38 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
           continue;
         }
 
-        await manager.mint.addMint(mintUrl);
+        await manager.mint.addMint(mintUrl, { trusted: true });
         console.log(`✅ Added default mint: ${mintUrl}`);
       } catch (error) {
         console.warn(`⚠️ Failed to add default mint ${mintUrl}:`, error);
         // Continue with other mints even if one fails
+      }
+    }
+
+    // Set Sovran as the selected mint if pubkey is available and no mint is currently selected
+    if (pubkey && setSelectedMint) {
+      try {
+        const getSelectedMint = useMintStore.getState().getSelectedMint;
+        const currentSelectedMint = getSelectedMint(pubkey);
+
+        // Only set if no mint is currently selected (to avoid overwriting user preferences)
+        if (!currentSelectedMint) {
+          // Verify the mint was added successfully before setting as selected
+          const isSovranTrusted = await manager.mint.isTrustedMint(selectedMint);
+          if (isSovranTrusted) {
+            setSelectedMint(pubkey, selectedMint);
+            console.log(`✅ Set Sovran mint as selected for pubkey: ${pubkey}`);
+          } else {
+            console.warn(`⚠️ Sovran mint not trusted, skipping selection`);
+          }
+        } else {
+          console.log(
+            `ℹ️ Mint already selected (${currentSelectedMint}), skipping default selection`
+          );
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to set default selected mint:`, error);
+        // Don't throw - this is not critical
       }
     }
 
@@ -74,6 +111,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     message: 'Initializing Coco...',
     dependsOn: ['nostr'],
   });
+  const { keys } = useNostrKeysContext();
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -123,8 +161,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
         }
 
         // Initialize default mints for new users
+        // Get current pubkey and setSelectedMint from hooks (they may not be available immediately)
+        const currentPubkey = keys?.pubkey;
+        const currentSetSelectedMint = useMintStore.getState().setSelectedMint;
         stage.log('Initializing default mints...');
-        await initializeDefaultMints(mgr);
+        await initializeDefaultMints(mgr, currentPubkey, currentSetSelectedMint);
 
         setIsReady(true);
         stage.complete();
@@ -147,7 +188,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage.canStart]);
+  }, [stage.canStart, keys?.pubkey]);
 
   const contextValue: CocoContextValue = {
     manager,
