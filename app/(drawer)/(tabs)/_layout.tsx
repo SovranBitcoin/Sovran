@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
@@ -89,9 +89,24 @@ const TabLayout = () => {
   const pathname = usePathname();
   const { keys: nostrKeys } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
+  const hasNavigatedToIndex = useRef(false);
 
   const isNavigationVisible = nostrKeys?.pubkey && isTermsAccepted;
   const isPaymentsTab = pathname?.includes('/payments');
+
+  // Ensure wallet tab is selected on initial mount
+  useEffect(() => {
+    if (!hasNavigatedToIndex.current && isNavigationVisible) {
+      hasNavigatedToIndex.current = true;
+      // Only navigate if we're on the payments route on initial load
+      if (pathname?.includes('/payments')) {
+        // Use setTimeout to ensure navigation happens after tab navigator is ready
+        setTimeout(() => {
+          navigation.navigate('index' as never);
+        }, 100);
+      }
+    }
+  }, [isNavigationVisible, pathname, navigation]);
 
   const HeaderLeft = () => {
     if (!nostrKeys?.pubkey || isPaymentsTab) return null;
@@ -234,7 +249,7 @@ const TabLayout = () => {
                 />
               ),
               headerLeft: HeaderLeft,
-              headerRight: HeaderRight,
+              headerRight: name === 'index' ? HeaderRight : undefined,
               headerStyle: {
                 backgroundColor: getPrimaryColor('950'),
                 height: 0,

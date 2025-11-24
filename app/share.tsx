@@ -22,6 +22,14 @@ const SHARE_CONFIGS = {
     dataKey: 'npub',
     iconCurrency: 'nostr',
   },
+  p2pk: {
+    title: 'P2PK Public Key',
+    sectionTitle: 'PUBLIC KEY',
+    unit: 'p2pk',
+    popupMessage: 'p2pk_copied',
+    dataKey: 'publicKey',
+    iconCurrency: 'p2pk',
+  },
 };
 
 function ShareModal() {

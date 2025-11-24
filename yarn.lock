@@ -4598,14 +4598,14 @@ clsx@^2.1.1:
   resolved "https://registry.yarnpkg.com/clsx/-/clsx-2.1.1.tgz#eed397c9fd8bd882bfb18deab7102049a2f32999"
   integrity sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==
 
-coco-cashu-core@^1.0.0-rc.24:
+coco-cashu-core@^1.0.0-rc.25:
   version "1.0.0-rc11"
   resolved "https://registry.yarnpkg.com/coco-cashu-core/-/coco-cashu-core-1.0.0-rc11.tgz#7f202682b14e89e66875b3b4dc7cfb43f866919b"
   integrity sha512-I1bqKoaUUtj/WTQ2GIoQaINg7sEbeQmCQ73kbbStHaIowEhByiNlSElC+Q/4VD2AdKSu9RePU1fF5aY/YdePtw==
   dependencies:
     "@cashu/cashu-ts" "^2.7.2"
 
-coco-cashu-expo-sqlite@^1.0.0-rc.24:
+coco-cashu-expo-sqlite@^1.0.0-rc.25:
   version "1.0.0-rc11"
   resolved "https://registry.yarnpkg.com/coco-cashu-expo-sqlite/-/coco-cashu-expo-sqlite-1.0.0-rc11.tgz#fb390081b3c7efc27c2c7dcda0ac0d40223c0686"
   integrity sha512-Xz+aVusz77syCfPhNa7/w5Zo0CzfWTVvEUzykp2mV9dHM7w4m/OOZGP80tftucYNFLGkn8fVAu7bTjMcWI0lJA==

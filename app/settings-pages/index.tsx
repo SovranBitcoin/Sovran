@@ -235,6 +235,13 @@ const ModalScreen = () => {
             }}
             isFirst
           />
+          <RowButton
+            label="P2PK Keys"
+            onPress={() => {
+              router.push('/settings-pages/p2pk');
+            }}
+            isLast
+          />
         </Section>
         <Section title="Danger Zone" isDanger>
           <RowButton

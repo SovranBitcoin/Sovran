@@ -145,6 +145,11 @@ const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
     text: 'Nostr secret key has been copied to your clipboard.',
     type: MESSAGE_TYPES.SUCCESS,
   },
+  p2pk_copied: {
+    title: 'P2PK Key Copied',
+    text: 'P2PK public key has been copied to your clipboard.',
+    type: MESSAGE_TYPES.SUCCESS,
+  },
   lightning_address_copied: {
     title: 'Address Copied',
     text: 'Lightning address has been copied to your clipboard.',
