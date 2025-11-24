@@ -26,7 +26,6 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 // Components
 import { View, VStack, HStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
-import { AnimatedText } from 'components/ui/AnimatedText';
 import { Avatar } from 'components/ui/Avatar';
 import TextInput from 'components/ui/TextInput';
 import Icon from 'assets/icons';
@@ -802,7 +801,7 @@ function ModalScreen() {
   // ===========================
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = isRoutstrMode
-    ? userInfo?.display_name || userInfo?.name || 'Routstr AI'
+    ? userInfo?.display_name || userInfo?.name || 'routstr'
     : userInfo?.display_name || userInfo?.name || 'Unknown User';
   const userPicture = userInfo?.picture;
   const lud16 = userInfo?.lud16;
@@ -1594,7 +1593,13 @@ function ModalScreen() {
                   </ContextMenu>
                 </Host>
               ) : (
-                <>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    width: '100%',
+                    height: '100%',
+                  }}>
                   <Avatar
                     size={40}
                     picture={userPicture}
@@ -1602,19 +1607,38 @@ function ModalScreen() {
                     name={displayName}
                     loading={shouldShowAvatarLoading}
                   />
-                  <VStack spacing={2} style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-                    <View style={{ width: screenWidth - 240, overflow: 'hidden' }}>
-                      <AnimatedText
+                  <VStack
+                    spacing={2}
+                    style={{
+                      marginLeft: 8,
+                      flex: 1,
+                      minWidth: 0,
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                    }}>
+                    <View style={{ width: screenWidth, overflow: 'hidden' }}>
+                      {/* <AnimatedText
                         loading={shouldShowAvatarLoading}
                         size={16}
                         bold
                         style={{
                           color: getPrimaryColor('0'),
+                          textAlign: 'left',
                         }}
                         skeletonWidth={screenWidth - 240}
                         skeletonHeight={18}>
                         {displayName}
-                      </AnimatedText>
+                      </AnimatedText> */}
+                      <Text
+                        loading={shouldShowAvatarLoading}
+                        size={16}
+                        bold
+                        style={{
+                          color: getPrimaryColor('0'),
+                          textAlign: 'left',
+                        }}>
+                        {displayName}
+                      </Text>
                     </View>
                     {isRoutstrMode ? (
                       <HStack align="center" justify="flex-start">
@@ -1632,12 +1656,19 @@ function ModalScreen() {
                         </Text>
                       </HStack>
                     ) : (
-                      <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                      <Text
+                        size={12}
+                        style={{
+                          color: getShadeColor('400'),
+                          marginTop: 2,
+                          textAlign: 'left',
+                        }}
+                        numberOfLines={1}>
                         {nip19.npubEncode(pubkey)}
                       </Text>
                     )}
                   </VStack>
-                </>
+                </View>
               )}
             </HStack>
 
