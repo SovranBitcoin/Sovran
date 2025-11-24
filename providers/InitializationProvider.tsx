@@ -8,7 +8,7 @@ import React, {
   useRef,
   memo,
 } from 'react';
-import { Animated, TouchableOpacity, Easing, Dimensions } from 'react-native';
+import { Animated, Easing, Dimensions } from 'react-native';
 import { View } from '@/components/ui/View';
 import { Text } from '@/components/ui/Text';
 import Icon from '@/assets/icons';
@@ -132,14 +132,13 @@ export function InitializationProvider({
             if (stage) {
               const finalMessage = stage.message;
               setLogHistory((prevLog) => {
-                // Check if this exact message was added recently
-                const recentEntry = prevLog.find(
-                  (entry) =>
-                    entry.stageId === id &&
-                    entry.message === finalMessage &&
-                    Date.now() - entry.timestamp < 200
-                );
-                if (recentEntry) {
+                // Check if the most recent log entry for this stage already has the same message
+                // This prevents duplicates when completing immediately after logging
+                const mostRecentForStage = [...prevLog]
+                  .reverse()
+                  .find((entry) => entry.stageId === id);
+                if (mostRecentForStage && mostRecentForStage.message === finalMessage) {
+                  // Don't add duplicate - the message was already logged
                   return prevLog;
                 }
                 return [
@@ -215,10 +214,35 @@ export function InitializationProvider({
     [stages]
   );
 
-  const currentStage =
-    Array.from(stages.values()).find(
-      (stage) => stage.status === 'loading' || stage.status === 'error'
-    ) || null;
+  // Find currentStage based on the most recent log entry, not just the first 'loading' stage
+  // This ensures the pulsing animation matches what's actually being displayed
+  const currentStage = (() => {
+    if (logHistory.length === 0) {
+      // Fallback to first loading stage if no log history yet
+      return (
+        Array.from(stages.values()).find(
+          (stage) => stage.status === 'loading' || stage.status === 'error'
+        ) || null
+      );
+    }
+
+    // Get the most recent log entry
+    const mostRecentLog = logHistory[logHistory.length - 1];
+    const stageId = mostRecentLog.stageId;
+    const stage = stages.get(stageId);
+
+    // If the stage exists and is still loading/error, use it
+    if (stage && (stage.status === 'loading' || stage.status === 'error')) {
+      return stage;
+    }
+
+    // Fallback to first loading stage if most recent log's stage is complete
+    return (
+      Array.from(stages.values()).find(
+        (stage) => stage.status === 'loading' || stage.status === 'error'
+      ) || null
+    );
+  })();
 
   const isInitializing =
     forceVisible ||
@@ -509,8 +533,7 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
 });
 
 function InitializationScreenInternal() {
-  const { logHistory, currentStage, isInitializing, startTestAnimation, stages } =
-    useInitializationContext();
+  const { logHistory, currentStage, isInitializing, stages } = useInitializationContext();
   const [completedStages, setCompletedStages] = useState<Set<string>>(new Set());
   const [seenTimestamps, setSeenTimestamps] = useState<Set<number>>(new Set());
   const [shouldRender, setShouldRender] = useState(true);
@@ -599,33 +622,6 @@ function InitializationScreenInternal() {
 
   if (!shouldRender && !isInitializing) {
     return null;
-    // Show test button when not initializing and screen has faded out
-    return (
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 40,
-          left: 20,
-          right: 20,
-          alignItems: 'center',
-          zIndex: 9999,
-        }}>
-        <TouchableOpacity
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            paddingHorizontal: 28,
-            paddingVertical: 14,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.12)',
-          }}
-          onPress={startTestAnimation}>
-          <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 15, fontWeight: '600' }}>
-            Test Loading Animation
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
   }
 
   if (!shouldRender) {

@@ -48,26 +48,25 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
 
     setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    // For validation, we just need to check if we can get mint info
-    // We don't need to check if it's already known since we want to add new mints
+    // For validation, we need to successfully fetch mint info
+    // Only mark as valid if we actually get valid mint info back
     const mintInfoResult = await fetchMintInfo(mintUrl);
 
     if (mintInfoResult.isErr()) {
-      // If we can't get mint info, it might still be a valid URL
-      // Let's check if it looks like a valid mint URL
-      const looksValid = looksLikeMintUrl(mintUrl);
-
+      // If we can't get mint info, it's invalid
       setValidationState({
-        isValid: looksValid,
+        isValid: false,
         isLoading: false,
-        error: looksValid ? null : 'Invalid mint URL format',
+        error: 'Mint not accessible or invalid',
       });
       setMintInfo(null);
     } else {
+      // Only valid if we got actual mint info back
+      const hasValidInfo = mintInfoResult.value !== null;
       setValidationState({
-        isValid: mintInfoResult.value !== null,
+        isValid: hasValidInfo,
         isLoading: false,
-        error: mintInfoResult.value ? null : 'Mint not accessible or invalid',
+        error: hasValidInfo ? null : 'Mint not accessible or invalid',
       });
       setMintInfo(mintInfoResult.value);
     }

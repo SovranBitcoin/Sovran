@@ -13,8 +13,6 @@ interface MintSearchInputProps {
     isLoading: boolean;
     error: string | null;
   };
-  onAddMint?: () => void;
-  canAddMint?: boolean;
 }
 
 export function MintSearchInput({
@@ -22,8 +20,6 @@ export function MintSearchInput({
   onChangeText,
   placeholder = 'Enter mint URL or search mints...',
   validationState,
-  onAddMint,
-  canAddMint = false,
 }: MintSearchInputProps) {
   const { getPrimaryColor } = useTheme();
 
@@ -85,17 +81,6 @@ export function MintSearchInput({
 
         <HStack align="center" gap={8}>
           {getStatusIcon()}
-
-          {canAddMint && onAddMint && (
-            <Text
-              onPress={onAddMint}
-              className="rounded bg-green-300 px-2 py-1 text-white"
-              size={12}
-              bold
-              overpass>
-              Add
-            </Text>
-          )}
         </HStack>
       </HStack>
 

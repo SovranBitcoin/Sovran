@@ -5,6 +5,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { HStack, VStack, Spacer } from 'components/ui/View';
 import { useTheme } from '@/providers/ThemeProvider';
+import { LegendList } from '@legendapp/list';
 
 interface MintData {
   mintUrl?: string;
@@ -33,6 +34,7 @@ interface MintCurrencySelectorProps<T extends MintData = MintData> {
   onCurrencyChange?: (currency: string) => void;
   customEmptyState?: React.ReactNode;
   isLoading?: boolean;
+  extraData?: any; // Extra data to trigger re-renders when changed (e.g., selection state)
 }
 
 export function MintCurrencySelector<T extends MintData = MintData>({
@@ -45,6 +47,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
   onCurrencyChange,
   customEmptyState,
   isLoading = false,
+  extraData,
 }: MintCurrencySelectorProps<T>) {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
@@ -105,6 +108,21 @@ export function MintCurrencySelector<T extends MintData = MintData>({
     [onCurrencyChange]
   );
 
+  // Key extractor for LegendList
+  const keyExtractor = useCallback(
+    (mint: T) => mint.mintUrl || mint.url || Math.random().toString(),
+    []
+  );
+
+  // Render item wrapper for LegendList
+  const renderListItem = useCallback(
+    ({ item }: { item: T }) => renderItem(item, selectedCurrency),
+    [renderItem, selectedCurrency]
+  );
+
+  // Estimated item size based on Item component structure (padding + content + badges)
+  const estimatedItemSize = 120;
+
   return (
     <VStack flex={1}>
       {/* Currency Selector */}
@@ -157,7 +175,7 @@ export function MintCurrencySelector<T extends MintData = MintData>({
       <Spacer size={16} />
 
       {/* Mints List */}
-      <VStack>
+      <VStack flex={1}>
         <Text
           size={18}
           bold
@@ -168,23 +186,27 @@ export function MintCurrencySelector<T extends MintData = MintData>({
           }}>
           {mintsLabel}
         </Text>
-        <VStack>
-          {isLoading && mints.length === 0 ? (
-            customEmptyState || null
-          ) : filteredMints.length === 0 ? (
-            <Text style={{ color: primaryColor0, textAlign: 'center', marginTop: 20 }}>
-              {selectedCurrency === 'ALL'
-                ? 'No mints available'
-                : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
-            </Text>
-          ) : (
-            filteredMints.map((mint) => (
-              <React.Fragment key={mint.mintUrl || mint.url || Math.random()}>
-                {renderItem(mint, selectedCurrency)}
-              </React.Fragment>
-            ))
-          )}
-        </VStack>
+        {isLoading && mints.length === 0 ? (
+          customEmptyState || null
+        ) : filteredMints.length === 0 ? (
+          <Text style={{ color: primaryColor0, textAlign: 'center', marginTop: 20 }}>
+            {selectedCurrency === 'ALL'
+              ? 'No mints available'
+              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+          </Text>
+        ) : (
+          <LegendList
+            data={filteredMints}
+            renderItem={renderListItem}
+            keyExtractor={keyExtractor}
+            estimatedItemSize={estimatedItemSize}
+            // drawDistance={100}
+            enableAverages={true}
+            extraData={extraData}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 16 }}
+          />
+        )}
       </VStack>
     </VStack>
   );
