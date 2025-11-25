@@ -86,13 +86,6 @@ module.exports = ({ config }) => {
           },
         ],
         [
-          'expo-maps',
-          {
-            requestLocationPermission: true,
-            locationPermission: 'Allow $(PRODUCT_NAME) to use your location',
-          },
-        ],
-        [
           'react-native-nfc-manager',
           {
             includeNdefEntitlement: false,
@@ -106,7 +99,6 @@ module.exports = ({ config }) => {
         'expo-video',
         'expo-secure-store',
         'expo-sqlite',
-        'expo-maps',
       ],
       extra: {
         router: {

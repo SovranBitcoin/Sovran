@@ -2,8 +2,7 @@ import 'global.css';
 
 // Import core libraries
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Animated, Dimensions, StatusBar, LogBox, Platform } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Animated, Dimensions, StatusBar, LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import { View } from 'components/ui/View';
 
@@ -18,7 +17,6 @@ import { Easing } from 'react-native-reanimated';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { SheetProvider } from 'react-native-actions-sheet';
 // import * as Sentry from '@sentry/react-native';
-import { NostrProvider } from 'nostr-react';
 import { NDKPrivateKeySigner, useNDK, NDKCacheAdapterSqlite } from '@nostr-dev-kit/ndk-mobile';
 // Import local components and utilities
 import { persistor, store } from 'redux/store';
@@ -35,8 +33,8 @@ import MigrationGate from 'components/blocks/MigrationGate';
 import { useFonts } from 'hooks/useFonts';
 import { PortalHost } from '@rn-primitives/portal';
 import { compose } from 'helper/utils';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { CocoProvider } from '@/helper/coco';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
 
@@ -147,18 +145,9 @@ function MainStack() {
   );
 }
 
-const containerStyle = {
-  width:
-    Platform.OS === 'web'
-      ? Math.min(Dimensions.get('window').width, 600)
-      : Dimensions.get('window').width,
-};
-
 // Provider components for composition
 const AppProviders = compose([
-  [SafeAreaProvider, { style: containerStyle }],
   KeyboardProvider,
-  [NostrProvider, { relayUrls: RELAY_URLS }],
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,

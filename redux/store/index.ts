@@ -5,8 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PUBLIC_KEYS } from 'helper/constants';
 import _ from 'lodash/fp';
 import { Alert } from 'react-native';
-import bip39 from 'bip39';
 import { HDKey } from '@scure/bip32';
+import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { storeMnemonic } from 'helper/secureStorage';
 
@@ -67,7 +67,7 @@ const migrations = {
           if (profile.root) return profile;
           try {
             // Convert mnemonic to seed
-            const seed = bip39.mnemonicToSeedSync(profile.mnemonic);
+            const seed = bip39.mnemonicToSeedSync(profile.mnemonic, '');
             // Create HDKey from seed
             const hdKey = HDKey.fromMasterSeed(seed);
             // Derive xpriv and xpub
@@ -231,12 +231,12 @@ const migrations = {
             return profile;
           }
           try {
-            const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(profile.mnemonic));
+            const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(profile.mnemonic, ''));
             const DERIVATION_PATH = `m/44'/129372'`;
             const path = `${DERIVATION_PATH}/0'/${index}'/0/0`;
             const seed = root.derive(path);
             const derivedCashuMnemonic = bip39.entropyToMnemonic(
-              seed.privateKey as Buffer,
+              seed.privateKey as Uint8Array,
               wordlist
             );
             return {
@@ -267,7 +267,7 @@ const migrations = {
               return profile;
             }
             // Create root HDKey from the profile's mnemonic
-            const seed = bip39.mnemonicToSeedSync(profile.mnemonic);
+            const seed = bip39.mnemonicToSeedSync(profile.mnemonic, '');
             const root = HDKey.fromMasterSeed(seed);
             // NUT-13 derivation path for Cashu
             const DERIVATION_PATH = `m/44'/129372'`;
@@ -276,7 +276,7 @@ const migrations = {
             const derivedKey = root.derive(path);
             // Convert the derived private key back to a mnemonic
             const derivedCashuMnemonic = bip39.entropyToMnemonic(
-              derivedKey.privateKey as Buffer,
+              derivedKey.privateKey as Uint8Array,
               wordlist
             );
             return {

@@ -2,7 +2,6 @@ import { Manager, ConsoleLogger } from 'coco-cashu-core';
 import { ExpoSqliteRepositories } from 'coco-cashu-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import { retrieveMnemonic } from 'helper/secureStorage';
-import { mnemonicToSeedSync } from 'bip39';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
 import * as nip06 from 'nostr-tools/nip06';
 import { HDKey } from '@scure/bip32';
@@ -89,7 +88,7 @@ export class CocoManager {
       const seedGetter = async (): Promise<Uint8Array> => {
         if (this.cashuMnemonic) {
           // Use precomputed cashu mnemonic from NostrKeysProvider
-          return mnemonicToSeedSync(this.cashuMnemonic);
+          return bip39.mnemonicToSeedSync(this.cashuMnemonic, '');
         }
 
         // Fallback to computing from main mnemonic (for backward compatibility)
@@ -99,13 +98,13 @@ export class CocoManager {
         }
 
         // Derive cashu mnemonic using the same logic as useCashuMnemonic hook
-        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
+        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic, ''));
         const DERIVATION_PATH = `m/44'/129372'`;
         const path = `${DERIVATION_PATH}/0'/0'/0/0`; // Account index 0
         const seed = root.derive(path);
-        const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
+        const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Uint8Array, wordlist);
 
-        return mnemonicToSeedSync(derivedCashuMnemonic);
+        return bip39.mnemonicToSeedSync(derivedCashuMnemonic, '');
       };
 
       // Prepare plugins array
