@@ -266,23 +266,30 @@ export async function writeCashuTokenToPOS(cashuToken: string): Promise<boolean>
  * that use Host Card Emulation (HCE). It reads the payment request, creates a payment
  * token using the send function, and writes it back without closing the NFC session.
  *
+ * If the NFC write fails after the token has been created, the function will automatically
+ * call the receive function to reclaim the tokens and restore the balance.
+ *
  * **Process:** Request NFC → Read NDEF → Decode request → Create token → Write NDEF → Cleanup session
  * **Effects:** Payment request read, token created and written, session cleanup
+ * **Recovery:** If write fails after token creation, tokens are automatically reclaimed via receive
  *
  * @async
  * @param {Function} send - The send function from useSend() hook: (mintUrl: string, amount: number) => Promise<any>
+ * @param {Function} receive - The receive function from useReceive() hook: (token: string) => Promise<void>
  * @returns {Promise<string | null>} The payment request string if read and write successful, null otherwise
  * @throws {Error} When NFC operations fail
  *
  * @example
  * const { send } = useSend();
- * const paymentRequest = await readAndWriteNdefPOS(send);
+ * const { receive } = useReceive();
+ * const paymentRequest = await readAndWriteNdefPOS(send, receive);
  * if (paymentRequest) {
  *   // Payment request received and token sent
  * }
  */
 export async function readAndWriteNdefPOS(
-  send: (mintUrl: string, amount: number) => Promise<any>
+  send: (mintUrl: string, amount: number) => Promise<any>,
+  receive: (token: string) => Promise<void>
 ): Promise<string | null> {
   let paymentRequest: string | null = null;
   let writeSuccessful = false;
@@ -453,44 +460,45 @@ export async function readAndWriteNdefPOS(
             writeError instanceof Error ? writeError.message : String(writeError);
           console.error('[readAndWriteNdefPOS] Write error message:', errorMessage);
 
+          // NFC write failed after token was created - reclaim the tokens
+          console.log('[readAndWriteNdefPOS] Attempting to reclaim tokens via receive...');
+          try {
+            await receive(encodedToken);
+            console.log('[readAndWriteNdefPOS] Tokens reclaimed successfully');
+            if (Platform.OS === 'ios') {
+              try {
+                await NfcManager.setAlertMessageIOS('NFC write failed - tokens reclaimed');
+              } catch {
+                // Ignore alert errors
+              }
+            }
+          } catch (receiveError) {
+            console.error('[readAndWriteNdefPOS] Failed to reclaim tokens:', receiveError);
+            // Log the token so user can manually recover if needed
+            console.error('[readAndWriteNdefPOS] Unreclaimed token:', encodedToken);
+            if (Platform.OS === 'ios') {
+              try {
+                await NfcManager.setAlertMessageIOS('NFC write failed - token recovery failed');
+              } catch {
+                // Ignore alert errors
+              }
+            }
+          }
+
           // Check if it's a TagUpdateFailure (common on iOS with HCE devices)
           if (writeError instanceof NfcError.TagUpdateFailure) {
             console.warn(
               '[readAndWriteNdefPOS] TagUpdateFailure - iOS may not support writing to HCE devices'
             );
-            // On iOS, writing to HCE devices often fails, but the read was successful
-            // We'll still return the payment request so the user knows it was received
-            // The token was created successfully (balance changed), so payment was processed
-            if (Platform.OS === 'ios') {
-              try {
-                await NfcManager.setAlertMessageIOS('Payment processed (write may have failed)');
-              } catch {
-                // Ignore alert errors
-              }
-            }
-            // Don't throw - return the payment request even though write failed
-            // The token was created, so the payment was successful from our side
-            writeSuccessful = false; // Mark as not successful, but we'll still return the request
+            writeSuccessful = false;
           } else if (writeError instanceof NfcError.TagConnectionLost) {
             console.warn(
               '[readAndWriteNdefPOS] TagConnectionLost - NFC connection lost during write operation'
             );
-            // Connection was lost, likely because token creation took too long
-            // The token was created successfully (balance changed), so payment was processed
-            // This is acceptable - the payment was successful from our side
-            if (Platform.OS === 'ios') {
-              try {
-                await NfcManager.setAlertMessageIOS('Payment processed (connection lost)');
-              } catch {
-                // Ignore alert errors
-              }
-            }
-            // Don't throw - return the payment request even though write failed
-            // The token was created, so the payment was successful from our side
-            writeSuccessful = false; // Mark as not successful, but we'll still return the request
+            writeSuccessful = false;
           } else {
-            // For other errors, still throw
-            throw writeError;
+            // For other errors, mark as unsuccessful but don't throw since we tried to reclaim
+            writeSuccessful = false;
           }
         }
       } else {
@@ -514,10 +522,9 @@ export async function readAndWriteNdefPOS(
     writeSuccessful,
   });
 
-  // Return payment request if we successfully read it, even if write failed
-  // The token was created (balance changed), so payment was processed
-  // iOS limitations with HCE write are acceptable - the payment was successful
-  if (paymentRequest) {
+  // Only return payment request if the write was successful
+  // If write failed, tokens were reclaimed so we should indicate failure
+  if (paymentRequest && writeSuccessful) {
     return paymentRequest;
   }
 

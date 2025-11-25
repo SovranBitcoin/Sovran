@@ -13,7 +13,7 @@ import { useNavigation, usePathname } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useSend } from 'hooks/coco';
+import { useSend, useReceive } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { handlePOSPaymentTest } from '@/helper/nfcPosPayment';
 import { Button } from '@/components/ui/Button';
@@ -127,6 +127,7 @@ const TabLayout = () => {
 
   const HeaderRight = () => {
     const { send } = useSend();
+    const { receive } = useReceive();
     const { keys: nostrKeys } = useNostrKeysContext();
     const selectedMints = useMintStore((state) => state.selectedMints);
     const selectedMint = nostrKeys?.pubkey ? selectedMints[nostrKeys.pubkey] : undefined;
@@ -158,7 +159,7 @@ const TabLayout = () => {
       setIsProcessing(true);
 
       try {
-        await handlePOSPaymentTest(send);
+        await handlePOSPaymentTest(send, receive);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         popup({
@@ -178,6 +179,7 @@ const TabLayout = () => {
 
     return (
       <Button
+        blur
         style={{ width: 48, height: 48, marginRight: 12, marginTop: 58 }}
         icon={<Icon name="lucide:nfc" size={20} />}
         onPress={handleNFCPress}

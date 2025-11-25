@@ -1,7 +1,7 @@
 import 'shim';
 import React, { memo, useCallback, useState, useMemo } from 'react';
 import 'react-native-get-random-values';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { View } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { useTheme } from 'providers/ThemeProvider';
@@ -61,7 +61,12 @@ function TabOneScreen() {
           className="flex-1"
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          <View className="p-4 pt-0" style={{ backgroundColor: opacity(primaryColor900, 0.99) }}>
+          <View
+            className="p-4 pt-0"
+            style={{
+              backgroundColor: opacity(primaryColor900, 0.99),
+              height: Dimensions.get('window').height - 375,
+            }}>
             <LinearGradient
               colors={[
                 opacity(primaryColor900, 0.99),

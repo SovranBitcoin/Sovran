@@ -32,21 +32,29 @@ import type { Manager } from 'coco-cashu-core';
  * 2. Parses and validates the payment request
  * 3. Creates a Cashu token for the requested amount
  * 4. Writes the token back to the POS device
+ * 5. If write fails, attempts to reclaim the token via receive
  *
  * **Process:** Read NDEF → Parse request → Validate → Create token → Write NDEF
  * **Effects:** Payment token created and sent, user feedback shown
+ * **Recovery:** If write fails after token creation, tokens are automatically reclaimed
  *
  * @async
  * @param manager - The Coco Manager instance (required)
+ * @param receive - The receive function to reclaim tokens on failure (optional)
  * @param mintUrl - The mint URL to use for creating the token (optional, will use from payment request if not provided)
  * @returns {Promise<boolean>} True if payment was successful, false otherwise
  * @throws {Error} When NFC operations fail or payment creation fails
  *
  * @example
  * const manager = useManager();
- * const success = await handlePOSPayment(manager, 'https://mint.example.com');
+ * const { receive } = useReceive();
+ * const success = await handlePOSPayment(manager, receive, 'https://mint.example.com');
  */
-export async function handlePOSPayment(manager: Manager, mintUrl?: string): Promise<boolean> {
+export async function handlePOSPayment(
+  manager: Manager,
+  receive?: (token: string) => Promise<void>,
+  mintUrl?: string
+): Promise<boolean> {
   try {
     // Step 1: Read payment request from POS
     popup({
@@ -155,12 +163,33 @@ export async function handlePOSPayment(manager: Manager, mintUrl?: string): Prom
       });
       return true;
     } else {
-      popup({
-        message: 'Payment token created but failed to send to POS. Token copied to clipboard.',
-        emoji: '⚠️',
-        type: 'warning',
-      });
-      // Could copy token to clipboard as fallback
+      // NFC write failed - attempt to reclaim tokens
+      if (receive) {
+        console.log('[handlePOSPayment] Attempting to reclaim tokens via receive...');
+        try {
+          await receive(encodedToken);
+          console.log('[handlePOSPayment] Tokens reclaimed successfully');
+          popup({
+            message: 'NFC write failed - tokens reclaimed to wallet',
+            emoji: '⚠️',
+            type: 'warning',
+          });
+        } catch (receiveError) {
+          console.error('[handlePOSPayment] Failed to reclaim tokens:', receiveError);
+          console.error('[handlePOSPayment] Unreclaimed token:', encodedToken);
+          popup({
+            message: 'NFC write failed and token recovery failed. Check logs for token.',
+            emoji: '🚨',
+            type: 'error',
+          });
+        }
+      } else {
+        popup({
+          message: 'Payment token created but failed to send to POS.',
+          emoji: '⚠️',
+          type: 'warning',
+        });
+      }
       return false;
     }
   } catch (error) {
@@ -178,13 +207,16 @@ export async function handlePOSPayment(manager: Manager, mintUrl?: string): Prom
  * Simplified handler that reads payment request and sends payment token
  *
  * This function reads a payment request from POS, decodes it, creates a payment token,
- * and writes it back to the POS device.
+ * and writes it back to the POS device. If the NFC write fails, tokens are automatically
+ * reclaimed to prevent balance loss.
  *
  * @param send - The send function from useSend() hook to create payment tokens
+ * @param receive - The receive function from useReceive() hook to reclaim tokens on failure
  * @returns {Promise<boolean>} True if payment was successful
  */
 export async function handlePOSPaymentTest(
-  _send: (mintUrl: string, amount: number) => Promise<any>
+  _send: (mintUrl: string, amount: number) => Promise<any>,
+  _receive: (token: string) => Promise<void>
 ): Promise<boolean> {
   try {
     // Step 1: Read payment request from POS
@@ -195,7 +227,7 @@ export async function handlePOSPaymentTest(
 
     // Step 1 & 2: Read payment request, create token, and write back in same NFC session
     console.log('[handlePOSPaymentTest] Starting bidirectional NFC communication...');
-    const paymentRequestString = await readAndWriteNdefPOS(_send);
+    const paymentRequestString = await readAndWriteNdefPOS(_send, _receive);
 
     if (!paymentRequestString) {
       console.log('[handlePOSPaymentTest] Failed to read payment request or write token');
