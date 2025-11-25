@@ -14,7 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { nip19 } from 'nostr-tools';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import {
+  NDKEvent,
+  NDKPrivateKeySigner,
+  NDKUser,
+  useNDK,
+  useSubscribe,
+} from '@nostr-dev-kit/ndk-mobile';
 import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { LegendList } from '@legendapp/list';
 
@@ -61,6 +67,7 @@ import {
   fixedSize,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
+import { truncateMiddle } from '@/helper/strings';
 
 export type TimelineItemType = Message;
 
@@ -586,13 +593,16 @@ function MessageBubble({
               }}>
               {message.timestamp}
             </Text>
-            {isMe && (
-              <Icon
-                name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
-                size={14}
-                color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
-              />
-            )}
+            {isMe &&
+              (message.isSending ? (
+                <Icon name="svg-spinners:90-ring-with-bg" size={14} color={getShadeColor('500')} />
+              ) : (
+                <Icon
+                  name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
+                  size={14}
+                  color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
+                />
+              ))}
           </HStack>
         </VStack>
 
@@ -707,6 +717,7 @@ function ModalScreen() {
 
   const { getPrimaryColor, getShadeColor } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const { ndk } = useNDK();
 
   // ===========================
   // STATE
@@ -920,23 +931,56 @@ function ModalScreen() {
     setMessages(formattedMessages);
   }, [isRoutstrMode, getCurrentSessionId(), nostrKeys?.pubkey]);
 
+  // Track processed event IDs to avoid re-processing
+  const processedEventIds = useRef<Set<string>>(new Set());
+
+  // Reset processed events when conversation changes
+  useEffect(() => {
+    processedEventIds.current.clear();
+    setMessages([]);
+    setIsLoading(true);
+  }, [pubkey]);
+
   // Process DM events
   useEffect(() => {
     if (isRoutstrMode) return;
 
     const processDMs = async () => {
-      if (!dmEvents || !nostrKeys?.pubkey) {
+      // Need pubkey (counterparty), nostrKeys.pubkey, and nostrKeys.privateKey for decryption
+      if (!dmEvents || !nostrKeys?.pubkey || !nostrKeys?.privateKey || !pubkey) {
+        setIsLoading(false);
+        return;
+      }
+
+      // If no events yet, just wait
+      if (dmEvents.length === 0) {
         setIsLoading(false);
         return;
       }
 
       try {
+        // Find events that haven't been processed yet
+        const newEvents = dmEvents.filter((event) => !processedEventIds.current.has(event.id));
+
+        // If no new events, just ensure loading is false
+        if (newEvents.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+
         const processedMessages = await Promise.all(
-          dmEvents.map(async (event) => {
+          newEvents.map(async (event) => {
             try {
-              await event.decrypt();
+              // Use pubkey (the counterparty from route params) not event.pubkey
+              // because event.pubkey could be our own pubkey if we sent it
+              const counterparty = new NDKUser({ pubkey: pubkey });
+              const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+              await event.decrypt(counterparty, signer);
               const isMe = event.pubkey === nostrKeys.pubkey;
               const senderPubkey = isMe ? nostrKeys.pubkey : event.pubkey;
+
+              // Mark as processed
+              processedEventIds.current.add(event.id);
 
               return {
                 id: event.id,
@@ -949,16 +993,38 @@ function ModalScreen() {
               };
             } catch (error) {
               console.error('Failed to decrypt message:', error);
+              // Still mark as processed to avoid retrying failed decryptions
+              processedEventIds.current.add(event.id);
               return null;
             }
           })
         );
 
-        const validMessages = processedMessages
-          .filter((msg): msg is NonNullable<typeof msg> => msg !== null)
-          .sort((a, b) => a.created_at - b.created_at);
+        const validNewMessages = processedMessages.filter(
+          (msg): msg is NonNullable<typeof msg> => msg !== null
+        );
 
-        setMessages(validMessages);
+        // Merge new messages with existing ones (avoiding duplicates) and sort
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          // Also create a set of content+timestamp combinations to catch optimistic messages
+          // that might still have temp IDs
+          const existingContentKeys = new Set(
+            prev.map((m) => `${m.content}-${m.created_at}-${m.sender}`)
+          );
+
+          const uniqueNewMessages = validNewMessages.filter((m) => {
+            // Skip if ID already exists
+            if (existingIds.has(m.id)) return false;
+            // Skip if content+timestamp+sender combination already exists (optimistic message)
+            const contentKey = `${m.content}-${m.created_at}-${m.sender}`;
+            if (existingContentKeys.has(contentKey)) return false;
+            return true;
+          });
+
+          const merged = [...prev, ...uniqueNewMessages];
+          return merged.sort((a, b) => a.created_at - b.created_at);
+        });
       } catch (error) {
         console.error('Error processing DMs:', error);
       } finally {
@@ -967,7 +1033,7 @@ function ModalScreen() {
     };
 
     processDMs();
-  }, [dmEvents, nostrKeys?.pubkey, isRoutstrMode]);
+  }, [dmEvents, nostrKeys?.pubkey, nostrKeys?.privateKey, pubkey, isRoutstrMode]);
 
   // ===========================
   // HANDLERS
@@ -1360,7 +1426,93 @@ function ModalScreen() {
     if (isRoutstrMode) {
       await handleRoutstrSend(text);
     } else {
-      console.log('Sending message:', text);
+      // Send Nostr DM
+      await handleNostrDMSend(text);
+    }
+  };
+
+  const handleNostrDMSend = async (text: string) => {
+    if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
+      console.error('Missing required data for sending DM');
+      popup({
+        message: 'Unable to send message. Please try again.',
+        emoji: '🚨',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsSending(true);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const tempMessageId = `temp-${timestamp}`;
+
+    // Optimistically add the message to the UI with isSending flag
+    const optimisticMessage = {
+      id: tempMessageId,
+      content: text,
+      sender: 'me' as const,
+      timestamp: formatTimestamp(timestamp),
+      isRead: false,
+      isSending: true, // Show spinner while sending
+      created_at: timestamp,
+      pubkey: nostrKeys.pubkey,
+    };
+    setMessages((prev) => [...prev, optimisticMessage]);
+
+    // Scroll to bottom
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
+
+    try {
+      // Create the DM event
+      const dmEvent = new NDKEvent(ndk);
+      dmEvent.kind = EncryptedDirectMessage;
+      dmEvent.content = text;
+      dmEvent.tags = [['p', pubkey]];
+
+      // Create signer and recipient for encryption
+      const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+      const recipient = new NDKUser({ pubkey: pubkey });
+
+      // Encrypt the message
+      await dmEvent.encrypt(recipient, signer);
+
+      // Sign the event (this generates the event ID)
+      await dmEvent.sign(signer);
+
+      // Mark this event as processed BEFORE publishing to prevent race condition
+      // where subscription receives the event before we can mark it as processed
+      processedEventIds.current.add(dmEvent.id);
+
+      // Update the optimistic message with the real ID BEFORE publishing
+      // This ensures the ID is in place when the subscription receives the event
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempMessageId ? { ...msg, id: dmEvent.id } : msg))
+      );
+
+      // Publish the event
+      await dmEvent.publish();
+
+      console.log('DM sent successfully:', dmEvent.id);
+
+      // Mark as sent (not sending anymore)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === dmEvent.id ? { ...msg, isRead: true, isSending: false } : msg
+        )
+      );
+    } catch (error) {
+      console.error('Failed to send DM:', error);
+
+      // Remove the optimistic message on failure
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
+
+      popup({
+        message: 'Failed to send message. Please try again.',
+        emoji: '🚨',
+        type: 'error',
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -1664,7 +1816,7 @@ function ModalScreen() {
                           textAlign: 'left',
                         }}
                         numberOfLines={1}>
-                        {nip19.npubEncode(pubkey)}
+                        {truncateMiddle(nip19.npubEncode(pubkey), 5)}
                       </Text>
                     )}
                   </VStack>

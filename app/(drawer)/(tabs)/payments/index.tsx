@@ -7,7 +7,7 @@ import { View, VStack } from 'components/ui/View';
 import { useMintManagement } from 'hooks/coco';
 import { Mint } from 'coco-cashu-core';
 import { npubToPubkey } from 'components/blocks/Transaction';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import {
@@ -156,9 +156,13 @@ const PaymentsContent = () => {
         const decryptedResults = await Promise.all(
           recentActivityContacts.map(async (contact) => {
             try {
-              if (contact.dmEvent) {
+              if (contact.dmEvent instanceof NDKEvent) {
                 // Decrypt the message content
-                await contact.dmEvent.decrypt();
+                // Use contact.pubkey (the other party) not dmEvent.pubkey
+                // because dmEvent.pubkey could be our own pubkey if we sent it
+                const counterparty = new NDKUser({ pubkey: contact.pubkey });
+                const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+                await contact.dmEvent.decrypt(counterparty, signer);
                 return {
                   ...contact,
                   dmEvent: {
@@ -174,7 +178,7 @@ const PaymentsContent = () => {
                 ...contact,
                 dmEvent: {
                   ...contact.dmEvent,
-                  content: '[Encrypted message]', // Fallback for failed decryption
+                  content: '[Encrypted message2]', // Fallback for failed decryption
                 },
               };
             }
@@ -326,9 +330,13 @@ const PaymentsContent = () => {
         const decryptedResults = await Promise.all(
           mintsWithMetadata.map(async (mint) => {
             try {
-              if (mint.dmEvent) {
+              if (mint.dmEvent && mint.pubkey) {
                 // Decrypt the message content
-                await mint.dmEvent.decrypt();
+                // Use mint.pubkey (the mint's nostr pubkey) not dmEvent.pubkey
+                // because dmEvent.pubkey could be our own pubkey if we sent it
+                const counterparty = new NDKUser({ pubkey: mint.pubkey });
+                const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+                await mint.dmEvent.decrypt(counterparty, signer);
                 return {
                   ...mint,
                   dmEvent: {
