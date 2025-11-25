@@ -153,37 +153,40 @@ const PaymentsContent = () => {
         console.log('[PERF] Starting contact decryption...');
         const startTime = performance.now();
 
-        const decryptedResults = await Promise.all(
-          recentActivityContacts.map(async (contact) => {
-            try {
-              if (contact.dmEvent instanceof NDKEvent) {
-                // Decrypt the message content
-                // Use contact.pubkey (the other party) not dmEvent.pubkey
-                // because dmEvent.pubkey could be our own pubkey if we sent it
-                const counterparty = new NDKUser({ pubkey: contact.pubkey });
-                const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-                await contact.dmEvent.decrypt(counterparty, signer);
-                return {
-                  ...contact,
-                  dmEvent: {
-                    ...contact.dmEvent,
-                    content: contact.dmEvent.content, // Now decrypted
-                  },
-                };
-              }
-              return contact;
-            } catch (error) {
-              console.warn(`Failed to decrypt message for contact ${contact.pubkey}:`, error);
-              return {
+        // Create a single signer instance to reuse
+        const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+
+        // Decrypt sequentially to avoid race conditions with NDK's decrypt method
+        const decryptedResults = [];
+        for (const contact of recentActivityContacts) {
+          try {
+            if (contact.dmEvent instanceof NDKEvent) {
+              // Decrypt the message content
+              // Use contact.pubkey (the other party) not dmEvent.pubkey
+              // because dmEvent.pubkey could be our own pubkey if we sent it
+              const counterparty = new NDKUser({ pubkey: contact.pubkey });
+              await contact.dmEvent.decrypt(counterparty, signer);
+              decryptedResults.push({
                 ...contact,
                 dmEvent: {
                   ...contact.dmEvent,
-                  content: '[Encrypted message2]', // Fallback for failed decryption
+                  content: contact.dmEvent.content, // Now decrypted
                 },
-              };
+              });
+            } else {
+              decryptedResults.push(contact);
             }
-          })
-        );
+          } catch (error) {
+            console.warn(`Failed to decrypt message for contact ${contact.pubkey}:`, error);
+            decryptedResults.push({
+              ...contact,
+              dmEvent: {
+                ...contact.dmEvent,
+                content: '[Encrypted message]', // Fallback for failed decryption
+              },
+            });
+          }
+        }
 
         const endTime = performance.now();
         console.log(`[PERF] Contact decryption completed in ${endTime - startTime}ms`);
@@ -197,7 +200,7 @@ const PaymentsContent = () => {
     };
 
     decryptContacts();
-  }, [recentActivityContacts, nostrKeys?.pubkey]);
+  }, [recentActivityContacts, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   // Load mints and their info on component mount
   useEffect(() => {
@@ -327,37 +330,40 @@ const PaymentsContent = () => {
         console.log('[PERF] Starting mint decryption...');
         const startTime = performance.now();
 
-        const decryptedResults = await Promise.all(
-          mintsWithMetadata.map(async (mint) => {
-            try {
-              if (mint.dmEvent && mint.pubkey) {
-                // Decrypt the message content
-                // Use mint.pubkey (the mint's nostr pubkey) not dmEvent.pubkey
-                // because dmEvent.pubkey could be our own pubkey if we sent it
-                const counterparty = new NDKUser({ pubkey: mint.pubkey });
-                const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-                await mint.dmEvent.decrypt(counterparty, signer);
-                return {
-                  ...mint,
-                  dmEvent: {
-                    ...mint.dmEvent,
-                    content: mint.dmEvent.content, // Now decrypted
-                  },
-                };
-              }
-              return mint;
-            } catch (error) {
-              console.warn(`Failed to decrypt message for mint ${mint.mint?.mintUrl}:`, error);
-              return {
+        // Create a single signer instance to reuse
+        const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+
+        // Decrypt sequentially to avoid race conditions with NDK's decrypt method
+        const decryptedResults = [];
+        for (const mint of mintsWithMetadata) {
+          try {
+            if (mint.dmEvent && mint.pubkey) {
+              // Decrypt the message content
+              // Use mint.pubkey (the mint's nostr pubkey) not dmEvent.pubkey
+              // because dmEvent.pubkey could be our own pubkey if we sent it
+              const counterparty = new NDKUser({ pubkey: mint.pubkey });
+              await mint.dmEvent.decrypt(counterparty, signer);
+              decryptedResults.push({
                 ...mint,
                 dmEvent: {
                   ...mint.dmEvent,
-                  content: '[Encrypted message]', // Fallback for failed decryption
+                  content: mint.dmEvent.content, // Now decrypted
                 },
-              };
+              });
+            } else {
+              decryptedResults.push(mint);
             }
-          })
-        );
+          } catch (error) {
+            console.warn(`Failed to decrypt message for mint ${mint.mint?.mintUrl}:`, error);
+            decryptedResults.push({
+              ...mint,
+              dmEvent: {
+                ...mint.dmEvent,
+                content: '[Encrypted message]', // Fallback for failed decryption
+              },
+            });
+          }
+        }
 
         const endTime = performance.now();
         console.log(`[PERF] Mint decryption completed in ${endTime - startTime}ms`);
@@ -371,7 +377,7 @@ const PaymentsContent = () => {
     };
 
     decryptMints();
-  }, [mintsWithMetadata, nostrKeys?.pubkey]);
+  }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   const pagerRef = useRef<PagerView>(null);
   const { searchQuery, currentView } = usePaymentsAnimation();

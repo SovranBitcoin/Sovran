@@ -39,12 +39,13 @@ import { SessionsPanel } from 'components/blocks/routstr/SessionsPanel';
 import {
   ContextMenu,
   Host,
-  Button,
+  Button as SwiftUIButton,
   BottomSheet,
   Text as SwiftUIText,
   VStack as SwiftUIVStack,
   HStack as SwiftUIHStack,
 } from '@expo/ui/swift-ui';
+import { Button } from 'components/ui/Button';
 
 // Utilities
 import { maybeConvertNpub, isValidEcashToken } from '@/helper/coco/utils';
@@ -633,7 +634,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
 
   return (
     <Host matchContents={false} fixedSize={true} style={{ height: 96 }}>
-      <Button
+      <SwiftUIButton
         variant="plain"
         modifiers={[
           frame({
@@ -697,7 +698,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
             </SwiftUIHStack>
           </SwiftUIVStack>
         </SwiftUIHStack>
-      </Button>
+      </SwiftUIButton>
     </Host>
   );
 });
@@ -1641,25 +1642,25 @@ function ModalScreen() {
                 <Host style={{ width: screenWidth - 100, height: 48, zIndex: 10 }}>
                   <ContextMenu>
                     <ContextMenu.Items>
-                      <Button systemImage="arrow.clockwise" onPress={handleRefreshBalance}>
+                      <SwiftUIButton systemImage="arrow.clockwise" onPress={handleRefreshBalance}>
                         Refresh Balance
-                      </Button>
-                      <Button systemImage="creditcard" onPress={handleTopUp}>
+                      </SwiftUIButton>
+                      <SwiftUIButton systemImage="creditcard" onPress={handleTopUp}>
                         Top Up Balance
-                      </Button>
-                      <Button
+                      </SwiftUIButton>
+                      <SwiftUIButton
                         systemImage="cpu"
                         onPress={() => setIsModelSwitchBottomSheetOpen(true)}>
                         Switch Model
-                      </Button>
-                      <Button
+                      </SwiftUIButton>
+                      <SwiftUIButton
                         systemImage="square.stack"
                         onPress={() => setIsSessionsPanelOpen(true)}>
                         View Sessions
-                      </Button>
-                      <Button systemImage="plus.square" onPress={handleNewSession}>
+                      </SwiftUIButton>
+                      <SwiftUIButton systemImage="plus.square" onPress={handleNewSession}>
                         New Session
-                      </Button>
+                      </SwiftUIButton>
                     </ContextMenu.Items>
                     <ContextMenu.Trigger>
                       <View
@@ -1960,7 +1961,7 @@ function ModalScreen() {
                       modifiers={[padding({ leading: 16, trailing: 16, top: 8, bottom: 8 })]}>
                       {/* Individual Provider Buttons */}
                       {uniqueProviders.map((provider) => (
-                        <Button
+                        <SwiftUIButton
                           key={provider}
                           variant="plain"
                           onPress={() => setSelectedProvider(provider)}
@@ -1991,7 +1992,7 @@ function ModalScreen() {
                               {provider}
                             </SwiftUIText>
                           </SwiftUIHStack>
-                        </Button>
+                        </SwiftUIButton>
                       ))}
                     </SwiftUIHStack>
                   </Host>
@@ -2051,6 +2052,10 @@ function ModalScreen() {
             style={{ flex: 1 }}
             contentContainerStyle={{
               padding: 16,
+              paddingBottom:
+                (isRoutstrMode && (balance === null || balance < 1000)) || (!isRoutstrMode && lud16)
+                  ? 70
+                  : 16,
               flexGrow: 1,
             }}
             showsVerticalScrollIndicator={false}
@@ -2104,58 +2109,6 @@ function ModalScreen() {
             borderTopWidth: 1,
             borderTopColor: getPrimaryColor('700'),
           }}>
-          {isRoutstrMode && (balance === null || balance < 1000) && (
-            <Pressable
-              onPress={handleTopUp}
-              style={{
-                width: '100%',
-                backgroundColor: getPrimaryColor('600'),
-                borderRadius: 12,
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                marginBottom: 12,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <HStack align="center" spacing={8}>
-                <Icon name="solar:wallet-bold" size={20} color={getPrimaryColor('0')} />
-                <Text
-                  size={16}
-                  bold
-                  style={{
-                    color: getPrimaryColor('0'),
-                  }}>
-                  Top Up Balance
-                </Text>
-              </HStack>
-            </Pressable>
-          )}
-          {!isRoutstrMode && lud16 && (
-            <Pressable
-              onPress={handleSendMoney}
-              style={{
-                width: '100%',
-                backgroundColor: getPrimaryColor('600'),
-                borderRadius: 12,
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                marginBottom: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <HStack align="center" spacing={8}>
-                <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('0')} />
-                <Text
-                  size={16}
-                  bold
-                  style={{
-                    color: getPrimaryColor('0'),
-                  }}>
-                  Send Money
-                </Text>
-              </HStack>
-            </Pressable>
-          )}
           <HStack align="center" spacing={12}>
             {isRoutstrMode ? (
               <Pressable
@@ -2205,6 +2158,48 @@ function ModalScreen() {
             </Pressable>
           </HStack>
         </View>
+
+        {/* Action Buttons - Floating above input */}
+        {((isRoutstrMode && (balance === null || balance < 1000)) || (!isRoutstrMode && lud16)) && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              bottom: insets.bottom + 60,
+              left: 0,
+              right: 0,
+            }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingVertical: 6,
+                gap: 12,
+              }}>
+              {isRoutstrMode && (balance === null || balance < 1000) && (
+                <Button
+                  variant="primary"
+                  text="Top Up Balance"
+                  icon={<Icon name="solar:wallet-bold" size={20} color={getPrimaryColor('950')} />}
+                  onPress={handleTopUp}
+                  style={{ paddingHorizontal: 16 }}
+                />
+              )}
+              {!isRoutstrMode && lud16 && (
+                <Button
+                  variant="primary"
+                  text="Send Money"
+                  icon={
+                    <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('950')} />
+                  }
+                  onPress={handleSendMoney}
+                  style={{ paddingHorizontal: 16 }}
+                />
+              )}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Sessions Panel */}
