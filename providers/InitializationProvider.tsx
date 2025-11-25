@@ -123,40 +123,27 @@ export function InitializationProvider({
         return newStages;
       });
 
-      // Handle log history updates with debouncing for rapid message updates
+      // Handle log history updates
       if (updates.message || updates.status === 'complete') {
-        // If status is 'complete', add to log immediately (no debounce)
-        if (updates.status === 'complete' && !updates.message) {
-          setStages((prev) => {
-            const stage = prev.get(id);
-            if (stage) {
-              const finalMessage = stage.message;
-              setLogHistory((prevLog) => {
-                // Check if the most recent log entry for this stage already has the same message
-                // This prevents duplicates when completing immediately after logging
-                const mostRecentForStage = [...prevLog]
-                  .reverse()
-                  .find((entry) => entry.stageId === id);
-                if (mostRecentForStage && mostRecentForStage.message === finalMessage) {
-                  // Don't add duplicate - the message was already logged
-                  return prevLog;
-                }
-                return [
-                  ...prevLog,
-                  {
-                    message: finalMessage,
-                    timestamp: Date.now(),
-                    stageId: id,
-                  },
-                ];
-              });
-            }
-            return prev;
-          });
+        // If status is 'complete', flush any pending log for this stage immediately
+        if (updates.status === 'complete') {
+          const pending = pendingLogUpdates.current.get(id);
+          if (pending) {
+            clearTimeout(pending.timeout);
+            pendingLogUpdates.current.delete(id);
+            // Add the pending message immediately
+            setLogHistory((prevLog) => {
+              const recentEntry = prevLog.find(
+                (entry) => entry.stageId === id && entry.message === pending.message
+              );
+              if (recentEntry) return prevLog;
+              return [...prevLog, { message: pending.message, timestamp: Date.now(), stageId: id }];
+            });
+          }
           return;
         }
 
-        // For message updates, debounce rapid calls from the same stage
+        // For message updates, add immediately but dedupe rapid identical messages
         if (updates.message) {
           const message = updates.message;
           // Clear any pending update for this stage
@@ -165,34 +152,37 @@ export function InitializationProvider({
             clearTimeout(pending.timeout);
           }
 
-          // Set a new debounced update
-          const timeout = setTimeout(() => {
-            pendingLogUpdates.current.delete(id);
-            setLogHistory((prevLog) => {
-              // Improved deduplication: check for rapid updates from same stage
-              const now = Date.now();
-              const recentEntry = prevLog.find(
-                (entry) =>
-                  entry.stageId === id && entry.message === message && now - entry.timestamp < 300
-              );
+          // Add to log immediately (no debounce) for better visual feedback
+          const now = Date.now();
+          setLogHistory((prevLog) => {
+            // Dedupe: don't add if same message was added very recently for this stage
+            const recentEntry = prevLog.find(
+              (entry) =>
+                entry.stageId === id && entry.message === message && now - entry.timestamp < 100
+            );
 
-              if (recentEntry) {
-                return prevLog;
-              }
+            if (recentEntry) {
+              return prevLog;
+            }
 
-              console.log(`[InitializationProvider] Adding to log history: ${message}`);
-              return [
-                ...prevLog,
-                {
-                  message,
-                  timestamp: now,
-                  stageId: id,
-                },
-              ];
-            });
-          }, 150); // 150ms debounce for rapid log calls
+            console.log(`[InitializationProvider] Adding to log history: ${message}`);
+            return [
+              ...prevLog,
+              {
+                message,
+                timestamp: now,
+                stageId: id,
+              },
+            ];
+          });
 
-          pendingLogUpdates.current.set(id, { message, timeout });
+          // Track as pending in case stage completes immediately after
+          pendingLogUpdates.current.set(id, {
+            message,
+            timeout: setTimeout(() => {
+              pendingLogUpdates.current.delete(id);
+            }, 50),
+          });
         }
       }
     },
@@ -442,13 +432,15 @@ function PulsingText({ children }: { children: string }) {
 
   return (
     <Animated.Text
+      numberOfLines={1}
       style={{
         color: 'rgba(255, 255, 255, 1)',
-        fontSize: 16,
-        fontWeight: '600',
-        lineHeight: 24,
+        fontSize: 14,
+        fontWeight: '500',
+        lineHeight: 20,
         textAlign: 'center',
         opacity: pulseAnim,
+        flexShrink: 1,
       }}>
       {children}
     </Animated.Text>
@@ -518,12 +510,14 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
         <PulsingText>{entry.message}</PulsingText>
       ) : (
         <Text
+          numberOfLines={1}
           style={{
             color: isCompleted ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.5)',
-            fontSize: 16,
-            fontWeight: isCompleted ? '400' : '500',
-            lineHeight: 24,
+            fontSize: 14,
+            fontWeight: '500',
+            lineHeight: 20,
             textAlign: 'center',
+            flexShrink: 1,
           }}>
           {entry.message}
         </Text>
@@ -533,10 +527,15 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
 });
 
 function InitializationScreenInternal() {
-  const { logHistory, currentStage, isInitializing, stages } = useInitializationContext();
-  const [completedStages, setCompletedStages] = useState<Set<string>>(new Set());
+  const { logHistory, currentStage, isInitializing } = useInitializationContext();
   const [seenTimestamps, setSeenTimestamps] = useState<Set<number>>(new Set());
   const [shouldRender, setShouldRender] = useState(true);
+  // Track visual active index separately - ensures minimum visibility time
+  const [visualActiveIndex, setVisualActiveIndex] = useState(0);
+  const activeTransitionTimeout = useRef<NodeJS.Timeout | null>(null);
+  const rafId = useRef<number | null>(null);
+  const lastTransitionTime = useRef<number>(Date.now());
+  const MINIMUM_ACTIVE_TIME = 200; // Minimum ms each step stays visually active (reduced for snappier feel)
 
   // Animated value for translating the entire list
   // Start at 0 - items are initially centered by the container
@@ -546,9 +545,56 @@ function InitializationScreenInternal() {
   const ITEM_HEIGHT = 64; // Height of each step item
   const containerHeight = Dimensions.get('window').height;
 
-  // Fade out when initialization completes
+  // Calculate if we've finished showing all steps visually
+  const hasShownAllSteps = logHistory.length === 0 || visualActiveIndex >= logHistory.length - 1;
+  // Track if we're ready to fade (has shown all steps for minimum time)
+  const [readyToFade, setReadyToFade] = useState(false);
+  const fadeDelayTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Wait for minimum time on last step before allowing fade
+  const fadeRafId = useRef<number | null>(null);
   useEffect(() => {
-    if (!isInitializing && shouldRender) {
+    if (hasShownAllSteps && !isInitializing && logHistory.length > 0) {
+      // Clear any existing timeout
+      if (fadeDelayTimeout.current) {
+        clearTimeout(fadeDelayTimeout.current);
+      }
+      if (fadeRafId.current) {
+        cancelAnimationFrame(fadeRafId.current);
+      }
+      // Wait minimum time before allowing fade, use rAF for smooth transition
+      fadeDelayTimeout.current = setTimeout(() => {
+        fadeRafId.current = requestAnimationFrame(() => {
+          setReadyToFade(true);
+        });
+      }, MINIMUM_ACTIVE_TIME);
+    } else {
+      setReadyToFade(false);
+      if (fadeDelayTimeout.current) {
+        clearTimeout(fadeDelayTimeout.current);
+        fadeDelayTimeout.current = null;
+      }
+      if (fadeRafId.current) {
+        cancelAnimationFrame(fadeRafId.current);
+        fadeRafId.current = null;
+      }
+    }
+
+    return () => {
+      if (fadeDelayTimeout.current) {
+        clearTimeout(fadeDelayTimeout.current);
+      }
+      if (fadeRafId.current) {
+        cancelAnimationFrame(fadeRafId.current);
+      }
+    };
+  }, [hasShownAllSteps, isInitializing, logHistory.length]);
+
+  // Fade out when initialization completes AND we've shown all steps for minimum time
+  useEffect(() => {
+    // Only fade out when initialization is done AND we've shown all steps AND waited minimum time
+    const canFade = !isInitializing && hasShownAllSteps && (readyToFade || logHistory.length === 0);
+    if (canFade && shouldRender) {
       Animated.timing(screenOpacity, {
         toValue: 0,
         duration: 500,
@@ -563,17 +609,32 @@ function InitializationScreenInternal() {
       screenOpacity.setValue(1);
       setShouldRender(true);
     }
-  }, [isInitializing, shouldRender, screenOpacity]);
+  }, [
+    isInitializing,
+    shouldRender,
+    screenOpacity,
+    hasShownAllSteps,
+    readyToFade,
+    logHistory.length,
+  ]);
 
+  // Track completed stages for visual feedback
+  const [visuallyCompletedStages, setVisuallyCompletedStages] = useState<Set<string>>(new Set());
+
+  // Update visually completed stages based on visual active index
+  // A stage is visually complete when its index is less than the visual active index
   useEffect(() => {
-    const completed = new Set<string>();
-    stages.forEach((stage) => {
-      if (stage.status === 'complete') {
-        completed.add(stage.id);
+    if (logHistory.length === 0) return;
+
+    const newVisuallyCompleted = new Set<string>();
+    logHistory.forEach((entry, index) => {
+      if (index < visualActiveIndex) {
+        newVisuallyCompleted.add(entry.stageId);
       }
     });
-    setCompletedStages(completed);
-  }, [stages]);
+
+    setVisuallyCompletedStages(newVisuallyCompleted);
+  }, [visualActiveIndex, logHistory]);
 
   useEffect(() => {
     const currentTime = Date.now();
@@ -587,15 +648,64 @@ function InitializationScreenInternal() {
     });
 
     if (newTimestamps.size > 0) {
-      setTimeout(() => {
+      // Use requestAnimationFrame for smoother state updates
+      requestAnimationFrame(() => {
         setSeenTimestamps((prev) => new Set([...prev, ...newTimestamps]));
-      }, 100);
+      });
     }
   }, [logHistory, seenTimestamps]);
 
-  // Calculate which item is currently active
-  const currentIndex = logHistory.findIndex((entry) => currentStage?.id === entry.stageId);
-  const activeIndex = currentIndex >= 0 ? currentIndex : logHistory.length - 1;
+  // The target active index is the last log entry (most recent)
+  const targetActiveIndex = logHistory.length - 1;
+
+  // Manage visual active index with minimum visibility time using requestAnimationFrame
+  useEffect(() => {
+    if (logHistory.length === 0) {
+      setVisualActiveIndex(0);
+      lastTransitionTime.current = Date.now();
+      return;
+    }
+
+    // If the target is ahead of visual, transition with minimum time
+    if (targetActiveIndex > visualActiveIndex) {
+      // Clear any pending transitions
+      if (activeTransitionTimeout.current) {
+        clearTimeout(activeTransitionTimeout.current);
+      }
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+      }
+
+      // Calculate how long since last transition
+      const timeSinceLastTransition = Date.now() - lastTransitionTime.current;
+      const remainingTime = Math.max(0, MINIMUM_ACTIVE_TIME - timeSinceLastTransition);
+
+      // Schedule transition using setTimeout + requestAnimationFrame for smoother updates
+      activeTransitionTimeout.current = setTimeout(() => {
+        // Use requestAnimationFrame to sync with display refresh
+        rafId.current = requestAnimationFrame(() => {
+          lastTransitionTime.current = Date.now();
+          setVisualActiveIndex((prev) => {
+            // Move one step at a time to ensure each gets minimum visibility
+            const next = Math.min(prev + 1, targetActiveIndex);
+            return next;
+          });
+        });
+      }, remainingTime);
+    }
+
+    return () => {
+      if (activeTransitionTimeout.current) {
+        clearTimeout(activeTransitionTimeout.current);
+      }
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+      }
+    };
+  }, [targetActiveIndex, visualActiveIndex, logHistory.length]);
+
+  // Use visual active index for display
+  const activeIndex = visualActiveIndex;
 
   // Animate translateY to keep active item centered
   useEffect(() => {
@@ -673,8 +783,10 @@ function InitializationScreenInternal() {
             }}>
             {logHistory.map((entry, index) => {
               const stageId = entry.stageId;
-              const isCompleted = completedStages.has(stageId);
-              const isActive = currentStage?.id === stageId;
+              // Use visual states for smooth transitions
+              const isVisuallyActive = index === visualActiveIndex;
+              const isVisuallyCompleted =
+                visuallyCompletedStages.has(stageId) && index < visualActiveIndex;
               const shouldAnimate = !seenTimestamps.has(entry.timestamp);
 
               return (
@@ -682,8 +794,8 @@ function InitializationScreenInternal() {
                   height={ITEM_HEIGHT}
                   key={`${entry.stageId}-${entry.timestamp}-${index}`}
                   entry={entry}
-                  isActive={isActive}
-                  isCompleted={isCompleted}
+                  isActive={isVisuallyActive}
+                  isCompleted={isVisuallyCompleted}
                   shouldAnimate={shouldAnimate}
                 />
               );
