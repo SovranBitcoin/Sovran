@@ -1816,7 +1816,7 @@ function ModalScreen() {
                           textAlign: 'left',
                         }}
                         numberOfLines={1}>
-                        {truncateMiddle(nip19.npubEncode(pubkey), 5)}
+                        {truncateMiddle(nip19.npubEncode(pubkey), 8)}
                       </Text>
                     )}
                   </VStack>
