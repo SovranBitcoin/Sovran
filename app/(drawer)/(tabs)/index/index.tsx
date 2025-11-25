@@ -65,7 +65,7 @@ function TabOneScreen() {
             className="p-4 pt-0"
             style={{
               backgroundColor: opacity(primaryColor900, 0.99),
-              height: Dimensions.get('window').height - 375,
+              minHeight: Dimensions.get('window').height - 375,
             }}>
             <LinearGradient
               colors={[

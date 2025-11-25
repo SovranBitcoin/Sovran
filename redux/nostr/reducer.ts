@@ -11,6 +11,7 @@ import {
 } from './actionTypes';
 import { NostrAction } from './actions';
 import { PUBLIC_KEYS } from '@/helper/constants';
+import { nostrState } from 'redux/store/migrationTest';
 
 type NostrProfile = {
   created_at: number;
@@ -98,8 +99,7 @@ type NostrState = {
 
 const initialState: NostrState = {
   currentProfile: {
-    id: 0,
-    // mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
+    id: nostrState.currentProfile.id,
   },
   search: [
     {
@@ -167,10 +167,10 @@ const initialState: NostrState = {
     },
   ],
   profiles: [
-    // {
-    //   id: 0,
-    //   mnemonic: 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire',
-    // },
+    {
+      id: nostrState.profiles[0].id,
+      mnemonic: nostrState.profiles[0].mnemonic,
+    },
   ],
   messages: {
     loaded_messages: [],

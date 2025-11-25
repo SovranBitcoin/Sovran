@@ -7,11 +7,11 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
-import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
 import Icon from 'assets/icons';
 import { View, HStack } from 'components/ui/View';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
+import * as Clipboard from 'expo-clipboard';
 
 // Screen dimensions
 const { width: screenWidth } = Dimensions.get('window');

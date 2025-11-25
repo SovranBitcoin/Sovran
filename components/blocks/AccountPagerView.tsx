@@ -11,7 +11,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 
 import { useMintStore } from 'stores/mintStore';
-import { useMintManagement } from 'hooks/coco';
+import { useMintManagement, useReceive } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -126,6 +126,8 @@ export function AccountPagerView({
     },
     [getBalances, selectedMintUrl, accounts, setAccount, handlePermission]
   );
+
+  const { receive } = useReceive();
 
   // Define action buttons - memoized to prevent recreation on every render
   const actionButtons: ActionButton[] = useMemo(
