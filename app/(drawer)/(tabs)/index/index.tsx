@@ -22,15 +22,15 @@ function TabOneScreen() {
         {
           unit: 'sat',
         },
-        {
-          unit: 'usd',
-        },
-        {
-          unit: 'eur',
-        },
-        {
-          unit: 'gbp',
-        },
+        // {
+        //   unit: 'usd',
+        // },
+        // {
+        //   unit: 'eur',
+        // },
+        // {
+        //   unit: 'gbp',
+        // },
       ].filter((u) => supportedUnits.includes(u.unit)),
     [supportedUnits]
   );
