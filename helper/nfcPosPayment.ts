@@ -21,7 +21,6 @@
 
 import { readNdefFromPOS, writeCashuTokenToPOS, readAndWriteNdefPOS } from './nfc';
 import { decodePaymentRequest, getEncodedTokenV4 } from '@cashu/cashu-ts';
-import { popup } from './popup';
 import type { Manager } from 'coco-cashu-core';
 
 /**
@@ -57,19 +56,10 @@ export async function handlePOSPayment(
 ): Promise<boolean> {
   try {
     // Step 1: Read payment request from POS
-    popup({
-      message: 'Reading payment request from POS...',
-      type: 'info',
-    });
-
     const paymentRequestString = await readNdefFromPOS();
 
     if (!paymentRequestString) {
-      popup({
-        message: 'Failed to read payment request from POS device',
-        emoji: '🚨',
-        type: 'error',
-      });
+      console.log('[handlePOSPayment] Failed to read payment request from POS device');
       return false;
     }
 
@@ -79,20 +69,11 @@ export async function handlePOSPayment(
       paymentRequest = decodePaymentRequest(paymentRequestString);
     } catch (error) {
       console.error('[handlePOSPayment] Failed to decode payment request:', error);
-      popup({
-        message: 'Invalid payment request format',
-        emoji: '🚨',
-        type: 'error',
-      });
       return false;
     }
 
     if (!paymentRequest) {
-      popup({
-        message: 'Invalid payment request format',
-        emoji: '🚨',
-        type: 'error',
-      });
+      console.error('[handlePOSPayment] Invalid payment request format');
       return false;
     }
 
@@ -102,11 +83,7 @@ export async function handlePOSPayment(
     const allowedMints = paymentRequest.mints || [];
 
     if (amount <= 0) {
-      popup({
-        message: 'Invalid payment amount',
-        emoji: '🚨',
-        type: 'error',
-      });
+      console.error('[handlePOSPayment] Invalid payment amount:', amount);
       return false;
     }
 
@@ -118,49 +95,28 @@ export async function handlePOSPayment(
       if (allowedMints.length > 0) {
         targetMintUrl = allowedMints[0];
       } else {
-        // Get user's default mint (would need to be passed in or retrieved)
-        popup({
-          message: 'No mint specified for payment',
-          emoji: '🚨',
-          type: 'error',
-        });
+        console.error('[handlePOSPayment] No mint specified for payment');
         return false;
       }
     }
 
     // Validate mint is trusted/allowed
     if (allowedMints.length > 0 && !allowedMints.includes(targetMintUrl)) {
-      popup({
-        message: `Mint ${targetMintUrl} is not allowed for this payment`,
-        emoji: '🚨',
-        type: 'error',
-      });
+      console.error('[handlePOSPayment] Mint not allowed for this payment:', targetMintUrl);
       return false;
     }
 
     // Step 4: Create Cashu token
-    popup({
-      message: `Creating payment token for ${amount} ${unit}...`,
-      type: 'info',
-    });
-
+    console.log(`[handlePOSPayment] Creating payment token for ${amount} ${unit}...`);
     const token = await manager.wallet.send(targetMintUrl, amount);
     const encodedToken = getEncodedTokenV4(token);
 
     // Step 5: Write token back to POS
-    popup({
-      message: 'Sending payment token to POS...',
-      type: 'info',
-    });
-
+    console.log('[handlePOSPayment] Sending payment token to POS...');
     const writeSuccess = await writeCashuTokenToPOS(encodedToken);
 
     if (writeSuccess) {
-      popup({
-        message: `Payment of ${amount} ${unit} sent successfully!`,
-        emoji: '✅',
-        type: 'success',
-      });
+      console.log(`[handlePOSPayment] Payment of ${amount} ${unit} sent successfully!`);
       return true;
     } else {
       // NFC write failed - attempt to reclaim tokens
@@ -169,36 +125,15 @@ export async function handlePOSPayment(
         try {
           await receive(encodedToken);
           console.log('[handlePOSPayment] Tokens reclaimed successfully');
-          popup({
-            message: 'NFC write failed - tokens reclaimed to wallet',
-            emoji: '⚠️',
-            type: 'warning',
-          });
         } catch (receiveError) {
           console.error('[handlePOSPayment] Failed to reclaim tokens:', receiveError);
           console.error('[handlePOSPayment] Unreclaimed token:', encodedToken);
-          popup({
-            message: 'NFC write failed and token recovery failed. Check logs for token.',
-            emoji: '🚨',
-            type: 'error',
-          });
         }
-      } else {
-        popup({
-          message: 'Payment token created but failed to send to POS.',
-          emoji: '⚠️',
-          type: 'warning',
-        });
       }
       return false;
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    popup({
-      message: `Payment failed: ${errorMessage}`,
-      emoji: '🚨',
-      type: 'error',
-    });
+    console.error('[handlePOSPayment] Payment failed:', error);
     return false;
   }
 }
@@ -219,23 +154,12 @@ export async function handlePOSPaymentTest(
   _receive: (token: string) => Promise<void>
 ): Promise<boolean> {
   try {
-    // Step 1: Read payment request from POS
-    popup({
-      message: 'Reading payment request from POS...',
-      type: 'info',
-    });
-
     // Step 1 & 2: Read payment request, create token, and write back in same NFC session
     console.log('[handlePOSPaymentTest] Starting bidirectional NFC communication...');
     const paymentRequestString = await readAndWriteNdefPOS(_send, _receive);
 
     if (!paymentRequestString) {
       console.log('[handlePOSPaymentTest] Failed to read payment request or write token');
-      popup({
-        message: 'Failed to complete NFC payment',
-        emoji: '🚨',
-        type: 'error',
-      });
       return false;
     }
 
@@ -260,34 +184,13 @@ export async function handlePOSPaymentTest(
       // Still consider it successful if token was written
     }
 
-    const writeSuccess = true; // If we got here, the write succeeded
+    const amount = paymentRequest?.amount || 0;
+    const unit = paymentRequest?.unit || 'sat';
+    console.log(`[handlePOSPaymentTest] Payment of ${amount} ${unit} completed successfully`);
 
-    if (writeSuccess) {
-      const amount = paymentRequest?.amount || 0;
-      const unit = paymentRequest?.unit || 'sat';
-      popup({
-        message: `Payment of ${amount} ${unit} sent successfully!`,
-        emoji: '✅',
-        type: 'success',
-      });
-      console.log('[handlePOSPaymentTest] Payment completed successfully');
-    } else {
-      popup({
-        message: 'Payment token created but failed to send to POS',
-        emoji: '⚠️',
-        type: 'warning',
-      });
-      console.log('[handlePOSPaymentTest] Token created but write failed');
-    }
-
-    return writeSuccess;
+    return true;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    popup({
-      message: `Test failed: ${errorMessage}`,
-      emoji: '🚨',
-      type: 'error',
-    });
+    console.error('[handlePOSPaymentTest] Failed:', error);
     return false;
   }
 }

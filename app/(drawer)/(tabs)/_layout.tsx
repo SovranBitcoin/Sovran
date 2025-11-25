@@ -161,12 +161,7 @@ const TabLayout = () => {
       try {
         await handlePOSPaymentTest(send, receive);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        popup({
-          message: `NFC payment failed: ${errorMessage}`,
-          emoji: '🚨',
-          type: 'error',
-        });
+        console.error('[HeaderRight] NFC payment failed:', error);
       } finally {
         setIsProcessing(false);
       }
