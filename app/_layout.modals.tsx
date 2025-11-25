@@ -60,6 +60,10 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
+    name: 'settings-pages/index',
+    title: 'Settings',
+  },
+  {
     name: 'settings-pages/about',
     title: 'About',
   },
