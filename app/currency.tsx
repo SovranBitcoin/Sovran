@@ -5,8 +5,7 @@
  */
 
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { CurrencyScreen } from 'components/screens/CurrencyScreen';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
@@ -14,7 +13,6 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { useTheme } from 'providers/ThemeProvider';
-import Icon from 'assets/icons';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -41,22 +39,8 @@ function ModalScreen() {
     onLoading: () => {},
   });
 
-  const CloseButton = () => (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
-    </TouchableOpacity>
-  );
-
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'Select Amount',
-          headerTitleStyle: { color: getPrimaryColor('0') },
-          headerTintColor: getPrimaryColor('0'),
-          headerLeft: () => <CloseButton />,
-        }}
-      />
       <CurrencyScreen
         params={params}
         onMintQuoteCreated={(mintHistoryEntry) => {

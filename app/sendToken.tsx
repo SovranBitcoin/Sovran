@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
 import { View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
@@ -14,7 +13,6 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useTheme } from 'providers/ThemeProvider';
 import { SendTokenScreen } from 'components/screens/SendTokenScreen';
-import Icon from 'assets/icons';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -23,23 +21,9 @@ function ModalScreen() {
   const { sendHistoryEntry: sendHistoryEntryString } = params;
   const { getPrimaryColor } = useTheme();
 
-  const CloseButton = () => (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
-    </TouchableOpacity>
-  );
-
-  const headerOptions = {
-    title: 'Send Ecash',
-    headerTitleStyle: { color: getPrimaryColor('0') },
-    headerTintColor: getPrimaryColor('0'),
-    headerLeft: () => <CloseButton />,
-  };
-
   if (!sendHistoryEntryString) {
     return (
       <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <Stack.Screen options={headerOptions} />
         <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
           <Text>Missing transaction data. Please try again.</Text>
           <ButtonHandler
