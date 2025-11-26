@@ -18,7 +18,7 @@ module.exports = ({ config }) => {
     expo: {
       name: 'Sovran',
       slug: 'sovran',
-      version: '0.0.45',
+      version: '0.0.50',
       orientation: 'portrait',
       scheme: ['sovran', 'cashu'],
       userInterfaceStyle: 'automatic',
