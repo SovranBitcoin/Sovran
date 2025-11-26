@@ -28,7 +28,7 @@ import { useDrawer } from './drawer-context';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
 const VELOCITY_THRESHOLD = 500;
-const SWIPE_EDGE_WIDTH = 25;
+const SWIPE_EDGE_WIDTH = 40;
 
 const SPRING_CONFIG = {
   damping: 22,
@@ -162,6 +162,7 @@ export function Drawer({ children }: { children: React.ReactNode }) {
   const translateX = useSharedValue(-DRAWER_WIDTH);
   const backdropOpacity = useSharedValue(0);
   const contextX = useSharedValue(0);
+  const startedFromEdge = useSharedValue(false);
 
   // Sync animation with isOpen state
   useEffect(() => {
@@ -206,14 +207,20 @@ export function Drawer({ children }: { children: React.ReactNode }) {
       }
     });
 
-  // Edge swipe gesture to open
+  // Edge swipe gesture to open - only responds when starting near left edge
   const edgeGesture = Gesture.Pan()
     .activeOffsetX(10)
-    .hitSlop({ left: 0, right: SCREEN_WIDTH - SWIPE_EDGE_WIDTH, top: 0, bottom: 0 })
+    .onBegin((event) => {
+      // Check if the gesture started near the left edge of the screen
+      startedFromEdge.value = event.absoluteX <= SWIPE_EDGE_WIDTH;
+    })
     .onStart(() => {
-      contextX.value = translateX.value;
+      if (startedFromEdge.value) {
+        contextX.value = translateX.value;
+      }
     })
     .onUpdate((event) => {
+      if (!startedFromEdge.value) return;
       if (event.translationX > 0) {
         const newValue = -DRAWER_WIDTH + event.translationX;
         translateX.value = Math.min(0, newValue);
@@ -226,6 +233,7 @@ export function Drawer({ children }: { children: React.ReactNode }) {
       }
     })
     .onEnd((event) => {
+      if (!startedFromEdge.value) return;
       const shouldOpen =
         event.velocityX > VELOCITY_THRESHOLD ||
         (event.velocityX > -VELOCITY_THRESHOLD && translateX.value > -DRAWER_WIDTH / 2);

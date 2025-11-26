@@ -63,26 +63,11 @@ const AppProviders = compose([
   AppGate,
 ]);
 
-export default function RootLayout() {
+// Inner component that can access theme context
+function RootLayoutContent() {
   const colorScheme = useColorScheme();
   const { getPrimaryColor, currentTheme } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const [fontsLoaded, fontError] = useFonts();
-
-  // Hide splash screen once fonts are loaded
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
-  // Don't render anything until fonts are loaded
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
-
-  // Set up DM subscriptions
-  // useNostrDMs(addMessage, messages);
 
   // Close button component for modal presentations
   const CloseButton = () => (
@@ -152,38 +137,58 @@ export default function RootLayout() {
   };
 
   return (
-    <AppProviders>
-      <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <DrawerProvider>
-          <Drawer>
-            <StatusBar
-              backgroundColor={getPrimaryColor('950')}
-              style={currentTheme.includes('light') ? 'dark' : 'light'}
-            />
-            <Stack
-              key={currentTheme}
-              screenOptions={{
-                headerShown: false,
-                gestureEnabled: true,
-                contentStyle: {
-                  backgroundColor: getPrimaryColor('950'),
-                },
-              }}>
-              {/* Main tabs - the base/anchor of the app */}
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <DrawerProvider>
+        <Drawer>
+          <StatusBar
+            backgroundColor={getPrimaryColor('950')}
+            style={currentTheme.includes('light') ? 'dark' : 'light'}
+          />
+          <Stack
+            key={currentTheme}
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: true,
+              contentStyle: {
+                backgroundColor: getPrimaryColor('950'),
+              },
+            }}>
+            {/* Main tabs - the base/anchor of the app */}
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-              {/* All modal screens configured from MODAL_SCREENS */}
-              {MODAL_SCREENS.map((screen) => (
-                <Stack.Screen
-                  key={screen.name}
-                  name={screen.name}
-                  options={getScreenOptions(screen)}
-                />
-              ))}
-            </Stack>
-          </Drawer>
-        </DrawerProvider>
-      </NavigationThemeProvider>
+            {/* All modal screens configured from MODAL_SCREENS */}
+            {MODAL_SCREENS.map((screen) => (
+              <Stack.Screen
+                key={screen.name}
+                name={screen.name}
+                options={getScreenOptions(screen)}
+              />
+            ))}
+          </Stack>
+        </Drawer>
+      </DrawerProvider>
+    </NavigationThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts();
+
+  // Hide splash screen once fonts are loaded
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Don't render anything until fonts are loaded
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
+  return (
+    <AppProviders>
+      <RootLayoutContent />
     </AppProviders>
   );
 }

@@ -1,7 +1,6 @@
 import React from 'react';
 import { ScrollView, Linking } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useSettingsStore } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { Avatar } from 'components/ui/Avatar';
 
@@ -10,7 +9,7 @@ import {
   connectActionSheet,
   useActionSheet,
 } from '@expo/react-native-action-sheet';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -32,8 +31,23 @@ export const Section: React.FC<{
   isDanger?: boolean;
 }> = ({ title, children, isDanger }) => {
   const { getPrimaryColor, getRedColor } = useTheme();
+
+  const CloseButton = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+    </TouchableOpacity>
+  );
+
+  const headerOptions = {
+    title: 'Send Ecash',
+    headerTitleStyle: { color: getPrimaryColor('0') },
+    headerTintColor: getPrimaryColor('0'),
+    headerLeft: () => <CloseButton />,
+  };
+
   return (
     <View className="py-3">
+      <Stack.Screen options={headerOptions} />
       <Text
         className={`my-2 ml-3 uppercase tracking-wide ${isDanger ? '' : ''}`}
         size={13}
@@ -187,8 +201,6 @@ const ModalScreen = () => {
       }
     );
   };
-
-  const _settings = useSettingsStore((state) => state.getAllSettings());
 
   return (
     <Container>
