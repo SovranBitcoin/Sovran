@@ -3,6 +3,7 @@ import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { Transactions } from 'components/blocks/Transactions';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { View } from 'components/ui/View';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useDeeplink } from 'hooks/useDeeplink';
@@ -55,6 +56,11 @@ function TabOneScreen() {
         height: '100%',
       }}>
       <AnimatedSpriteBackground backgroundColor={primaryColor900} />
+      <BlurView
+        intensity={50}
+        tint="dark"
+        style={[StyleSheet.absoluteFillObject, { height: '25%', top: 'auto' }]}
+      />
 
       <View className="flex-1">
         <ScrollView
