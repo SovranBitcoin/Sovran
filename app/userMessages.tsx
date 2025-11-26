@@ -1096,7 +1096,7 @@ function ModalScreen() {
     }
 
     router.push({
-      pathname: '/currency',
+      pathname: '/(send-flow)/currency',
       params: {
         to: 'sendToken',
         routstrTopUp: 'true',
@@ -1529,7 +1529,7 @@ function ModalScreen() {
             variant: 'primary' as const,
             onPress: async (close) => {
               router.push({
-                pathname: '/currency',
+                pathname: '/(send-flow)/currency',
                 params: {
                   to: 'sendToken',
                   lud16: lud16,
@@ -1545,7 +1545,7 @@ function ModalScreen() {
             variant: 'primary' as const,
             onPress: async (close) => {
               router.push({
-                pathname: '/currency',
+                pathname: '/(send-flow)/currency',
                 params: {
                   to: 'meltQuote',
                   lnUrlOrAddress: lud16,
