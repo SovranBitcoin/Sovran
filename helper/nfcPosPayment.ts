@@ -147,16 +147,19 @@ export async function handlePOSPayment(
  *
  * @param send - The send function from useSend() hook to create payment tokens
  * @param receive - The receive function from useReceive() hook to reclaim tokens on failure
+ * @param maxAmount - Optional maximum amount cap to prevent merchants from requesting excessive amounts
  * @returns {Promise<boolean>} True if payment was successful
  */
 export async function handlePOSPaymentTest(
   _send: (mintUrl: string, amount: number) => Promise<any>,
-  _receive: (token: string) => Promise<void>
+  _receive: (token: string) => Promise<void>,
+  maxAmount?: number
 ): Promise<boolean> {
   try {
     // Step 1 & 2: Read payment request, create token, and write back in same NFC session
     console.log('[handlePOSPaymentTest] Starting bidirectional NFC communication...');
-    const paymentRequestString = await readAndWriteNdefPOS(_send, _receive);
+    console.log('[handlePOSPaymentTest] Max amount cap:', maxAmount || 'none');
+    const paymentRequestString = await readAndWriteNdefPOS(_send, _receive, maxAmount);
 
     if (!paymentRequestString) {
       console.log('[handlePOSPaymentTest] Failed to read payment request or write token');

@@ -269,27 +269,29 @@ export async function writeCashuTokenToPOS(cashuToken: string): Promise<boolean>
  * If the NFC write fails after the token has been created, the function will automatically
  * call the receive function to reclaim the tokens and restore the balance.
  *
- * **Process:** Request NFC → Read NDEF → Decode request → Create token → Write NDEF → Cleanup session
+ * **Process:** Request NFC → Read NDEF → Decode request → Validate amount → Create token → Write NDEF → Cleanup session
  * **Effects:** Payment request read, token created and written, session cleanup
  * **Recovery:** If write fails after token creation, tokens are automatically reclaimed via receive
  *
  * @async
  * @param {Function} send - The send function from useSend() hook: (mintUrl: string, amount: number) => Promise<any>
  * @param {Function} receive - The receive function from useReceive() hook: (token: string) => Promise<void>
+ * @param {number} [maxAmount] - Optional maximum amount cap to prevent merchants from requesting excessive amounts
  * @returns {Promise<string | null>} The payment request string if read and write successful, null otherwise
- * @throws {Error} When NFC operations fail
+ * @throws {Error} When NFC operations fail or requested amount exceeds maxAmount
  *
  * @example
  * const { send } = useSend();
  * const { receive } = useReceive();
- * const paymentRequest = await readAndWriteNdefPOS(send, receive);
+ * const paymentRequest = await readAndWriteNdefPOS(send, receive, 10000); // Max 10,000 sats
  * if (paymentRequest) {
  *   // Payment request received and token sent
  * }
  */
 export async function readAndWriteNdefPOS(
   send: (mintUrl: string, amount: number) => Promise<any>,
-  receive: (token: string) => Promise<void>
+  receive: (token: string) => Promise<void>,
+  maxAmount?: number
 ): Promise<string | null> {
   let paymentRequest: string | null = null;
   let writeSuccessful = false;
@@ -399,6 +401,24 @@ export async function readAndWriteNdefPOS(
 
       if (!amount || amount <= 0) {
         console.error('[readAndWriteNdefPOS] Invalid amount:', amount);
+        return null;
+      }
+
+      // Check if requested amount exceeds the safety cap
+      if (maxAmount !== undefined && amount > maxAmount) {
+        console.error(
+          `[readAndWriteNdefPOS] Amount ${amount} exceeds maximum allowed ${maxAmount} sats`
+        );
+        if (Platform.OS === 'ios') {
+          await NfcManager.setAlertMessageIOS(
+            `Payment rejected: ${amount} sats exceeds your ${maxAmount} sat limit`
+          );
+        } else {
+          Alert.alert(
+            'Payment Rejected',
+            `The merchant requested ${amount} sats which exceeds your safety limit of ${maxAmount} sats.`
+          );
+        }
         return null;
       }
 

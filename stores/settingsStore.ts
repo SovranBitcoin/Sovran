@@ -7,11 +7,14 @@ export interface TermsAccepted {
   date: string;
 }
 
+export type DisplayCurrency = 'usd' | 'eur' | 'gbp';
+
 export interface SettingsState {
   // Core settings
   theme: string;
   language: string;
   displayBtc: number;
+  displayCurrency: DisplayCurrency;
   passcode: string;
   experimental: boolean;
   termsAccepted: TermsAccepted | null;
@@ -29,6 +32,8 @@ interface SettingsActions {
   // Display settings
   setDisplayBtc: (display: number) => void;
   getDisplayBtc: () => number;
+  setDisplayCurrency: (currency: DisplayCurrency) => void;
+  getDisplayCurrency: () => DisplayCurrency;
 
   // Passcode management
   setPasscode: (passcode: string) => void;
@@ -62,6 +67,7 @@ export const useSettingsStore = create<SettingsStore>()(
       theme: 'dark',
       language: 'en',
       displayBtc: 3,
+      displayCurrency: 'usd',
       passcode: '',
       experimental: false,
       termsAccepted: null,
@@ -98,6 +104,14 @@ export const useSettingsStore = create<SettingsStore>()(
       getDisplayBtc: () => {
         const displayBtc = get().displayBtc;
         return displayBtc;
+      },
+
+      setDisplayCurrency: (currency: DisplayCurrency) => {
+        set({ displayCurrency: currency });
+      },
+
+      getDisplayCurrency: () => {
+        return get().displayCurrency;
       },
 
       // Passcode management
@@ -159,6 +173,7 @@ export const useSettingsStore = create<SettingsStore>()(
           theme: 'dark',
           language: 'en',
           displayBtc: 3,
+          displayCurrency: 'usd',
           passcode: '',
           experimental: false,
           termsAccepted: null,
@@ -176,6 +191,7 @@ export const useSettingsStore = create<SettingsStore>()(
             theme: 'dark',
             language: 'en',
             displayBtc: 3,
+            displayCurrency: 'usd',
             passcode: '',
             experimental: false,
             termsAccepted: null,
@@ -195,6 +211,7 @@ export const useSettingsStore = create<SettingsStore>()(
         theme: state.theme,
         language: state.language,
         displayBtc: state.displayBtc,
+        displayCurrency: state.displayCurrency,
         experimental: state.experimental,
         termsAccepted: state.termsAccepted,
         // Note: passcode is not persisted for security reasons

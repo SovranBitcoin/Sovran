@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Pressable, View, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Pressable, View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { useSettingsStore } from 'stores/settingsStore';
@@ -18,7 +18,9 @@ import { useMintStore } from 'stores/mintStore';
 import { handlePOSPaymentTest } from '@/helper/nfcPosPayment';
 import { Button } from '@/components/ui/Button';
 import Icon from '@/assets/icons';
-// import { Button, Host } from '@expo/ui/swift-ui';
+import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
+import { frame } from '@expo/ui/swift-ui/modifiers';
+import { useBtcPrice } from 'stores/pricelistStore';
 const Tab = createBottomTabNavigator();
 
 const SPACING_XS = 8;
@@ -132,71 +134,108 @@ const TabLayout = () => {
     const selectedMints = useMintStore((state) => state.selectedMints);
     const selectedMint = nostrKeys?.pubkey ? selectedMints[nostrKeys.pubkey] : undefined;
     const [isProcessing, setIsProcessing] = useState(false);
+    const btcPrice = useBtcPrice('usd');
 
-    const handleNFCPress = async () => {
-      if (isProcessing) return;
+    // Convert USD to sats: (usdAmount / btcPrice) * 100_000_000
+    const usdToSats = useCallback(
+      (usdAmount: number): number => {
+        if (!btcPrice) return 0;
+        return Math.round((usdAmount / btcPrice) * 100_000_000);
+      },
+      [btcPrice]
+    );
 
-      await EnhancedHaptics.navigateHaptic();
+    const handleNFCPayment = useCallback(
+      async (maxAmount: number) => {
+        if (isProcessing) return;
 
-      if (!nostrKeys?.pubkey) {
-        popup({
-          message: 'Please set up your wallet first',
-          emoji: '🚨',
-          type: 'error',
-        });
-        return;
-      }
+        await EnhancedHaptics.navigateHaptic();
 
-      if (!selectedMint) {
-        popup({
-          message: 'Please select a mint first',
-          emoji: '🚨',
-          type: 'error',
-        });
-        return;
-      }
+        if (!nostrKeys?.pubkey) {
+          popup({
+            message: 'Please set up your wallet first',
+            emoji: '🚨',
+            type: 'error',
+          });
+          return;
+        }
 
-      setIsProcessing(true);
+        if (!selectedMint) {
+          popup({
+            message: 'Please select a mint first',
+            emoji: '🚨',
+            type: 'error',
+          });
+          return;
+        }
 
-      try {
-        await handlePOSPaymentTest(send, receive);
-      } catch (error) {
-        console.error('[HeaderRight] NFC payment failed:', error);
-      } finally {
-        setIsProcessing(false);
-      }
-    };
+        setIsProcessing(true);
+
+        try {
+          // maxAmount is a safety cap to prevent merchants from requesting excessive amounts
+          await handlePOSPaymentTest(send, receive, maxAmount);
+        } catch (error) {
+          console.error('[HeaderRight] NFC payment failed:', error);
+        } finally {
+          setIsProcessing(false);
+        }
+      },
+      [isProcessing, nostrKeys?.pubkey, selectedMint, send, receive]
+    );
 
     // Only show button if user is authenticated and has a selected mint
     if (!nostrKeys?.pubkey || !selectedMint) {
       return null;
     }
 
+    // Use SwiftUI liquid glass button with context menu on iOS
+    if (Platform.OS === 'ios') {
+      return (
+        <Host
+          style={{ width: 48, height: 48, marginRight: 12, marginTop: 50, zIndex: 10 }}
+          matchContents={false}
+          fixedSize={true}>
+          <ContextMenu>
+            <ContextMenu.Items>
+              <SwiftUIButton
+                systemImage="cup.and.saucer.fill"
+                onPress={() => handleNFCPayment(usdToSats(10))}>
+                {`<$10`}
+              </SwiftUIButton>
+              <SwiftUIButton
+                systemImage="fork.knife"
+                onPress={() => handleNFCPayment(usdToSats(50))}>
+                {`<$50`}
+              </SwiftUIButton>
+              <SwiftUIButton
+                systemImage="bag.fill"
+                onPress={() => handleNFCPayment(usdToSats(100))}>
+                {`<$100`}
+              </SwiftUIButton>
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
+              <SwiftUIButton
+                variant="glass"
+                controlSize={'large'}
+                systemImage="antenna.radiowaves.left.and.right"
+                modifiers={[frame({ width: 100, height: 100 })]}
+              />
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
+      );
+    }
+
+    // Fallback for non-iOS platforms - use $50 as default cap
     return (
       <Button
         blur
         style={{ width: 48, height: 48, marginRight: 12, marginTop: 58 }}
         icon={<Icon name="lucide:nfc" size={20} />}
-        onPress={handleNFCPress}
+        onPress={() => handleNFCPayment(usdToSats(50))}
         variant="secondary"
       />
     );
-    // return (
-    //   <Host modifiers={[frame({ width: 100, height: 100, alignment: 'bottomTrailing' })]}>
-    //     <Button
-    //       variant="plain"
-    //       systemImage="antenna.radiowaves.left.and.right"
-    //       onPress={handleNFCPress}
-    //       modifiers={[
-    //         frame({ width: 64, height: 64, alignment: 'bottomTrailing' }),
-    //         // padding({ all: 16 }),
-    //         glassEffect({
-    //           shape: 'circle',
-    //         }),
-    //       ]}
-    //     />
-    //   </Host>
-    // );
   };
 
   // Function to get header title component based on screen
