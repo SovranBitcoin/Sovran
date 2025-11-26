@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-export default function HomeLayout() {
+export default function PaymentsLayout() {
   return (
     <Stack>
       <Stack.Screen

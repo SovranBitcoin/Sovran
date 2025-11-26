@@ -1,12 +1,16 @@
-import { useDrawer } from '@/components/drawer';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
 import { Pressable } from 'react-native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 
-export default function HomeLayout() {
+export default function ExploreLayout() {
   const iconColor = useThemeColor({}, 'text');
-  const { openDrawer } = useDrawer();
+  const navigation = useNavigation();
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   return (
     <Stack>

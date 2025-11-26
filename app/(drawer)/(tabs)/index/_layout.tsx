@@ -2,15 +2,18 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
 import { Pressable, Alert } from 'react-native';
-import { useDrawer } from '@/components/drawer';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor({}, 'text');
-  const { openDrawer } = useDrawer();
+  const navigation = useNavigation();
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   const handleNFCPress = async () => {
-    // TODO: Re-enable when NFC functionality is uncommented in helper/nfc.ts
     Alert.alert(
       'NFC Payments',
       'Tap your device to a POS terminal to make contactless payments with ecash.',

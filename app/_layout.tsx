@@ -13,7 +13,6 @@ import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
-import { Drawer, DrawerProvider } from '@/components/drawer';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
 import Icon from 'assets/icons';
@@ -137,35 +136,27 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <DrawerProvider>
-        <Drawer>
-          <StatusBar
-            backgroundColor={getPrimaryColor('950')}
-            style={currentTheme.includes('light') ? 'dark' : 'light'}
-          />
-          <Stack
-            key={currentTheme}
-            screenOptions={{
-              headerShown: false,
-              gestureEnabled: true,
-              contentStyle: {
-                backgroundColor: getPrimaryColor('950'),
-              },
-            }}>
-            {/* Main tabs - the base/anchor of the app */}
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <StatusBar
+        backgroundColor={getPrimaryColor('950')}
+        style={currentTheme.includes('light') ? 'dark' : 'light'}
+      />
+      <Stack
+        key={currentTheme}
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: true,
+          contentStyle: {
+            backgroundColor: getPrimaryColor('950'),
+          },
+        }}>
+        {/* Main drawer with tabs inside */}
+        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
-            {/* All modal screens configured from MODAL_SCREENS */}
-            {MODAL_SCREENS.map((screen) => (
-              <Stack.Screen
-                key={screen.name}
-                name={screen.name}
-                options={getScreenOptions(screen)}
-              />
-            ))}
-          </Stack>
-        </Drawer>
-      </DrawerProvider>
+        {/* All modal screens configured from MODAL_SCREENS */}
+        {MODAL_SCREENS.map((screen) => (
+          <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
+        ))}
+      </Stack>
     </NavigationThemeProvider>
   );
 }
