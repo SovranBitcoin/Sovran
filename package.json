@@ -136,7 +136,6 @@
     "unique-username-generator": "^1.5.1",
     "usehooks-ts": "^3.1.0",
     "zustand": "^5.0.8",
-    "babel-plugin-module-resolver": "^5.0.2",
     "expo-blur": "^15.0.7"
   },
   "devDependencies": {

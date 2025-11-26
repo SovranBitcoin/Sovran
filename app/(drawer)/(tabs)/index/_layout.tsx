@@ -49,15 +49,25 @@ export default function HomeLayout() {
         usdLimit !== undefined ? `$${usdLimit} (~${maxSats?.toLocaleString()} sats)` : 'unlimited';
 
       console.log(`[NFC Payment] Starting with limit: ${limitText}`);
+      console.log(`[NFC Payment] send function exists: ${!!send}`);
+      console.log(`[NFC Payment] receive function exists: ${!!receive}`);
+
+      if (!send || !receive) {
+        Alert.alert('Error', 'Wallet not ready. Please try again.');
+        return;
+      }
 
       try {
+        console.log('[NFC Payment] Calling handlePOSPaymentTest...');
         const success = await handlePOSPaymentTest(send, receive, maxSats);
+        console.log(`[NFC Payment] Result: ${success}`);
         if (success) {
           Alert.alert('Payment Sent', 'Your NFC payment was successful!');
         }
       } catch (error) {
         console.error('[NFC Payment] Error:', error);
-        Alert.alert('Payment Failed', 'There was an error processing your payment.');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        Alert.alert('Payment Failed', `Error: ${errorMessage}`);
       }
     },
     [send, receive, usdToSats]
