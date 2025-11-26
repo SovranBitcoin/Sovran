@@ -37,6 +37,7 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from 'redux/store';
 import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
+import { getBaseModalHeaderOptions } from './_layout.modals.config';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
@@ -78,22 +79,9 @@ function RootLayoutContent() {
 
   // Screen options builder
   const getScreenOptions = (screen: ModalConfig) => {
-    // Base header styling options
-    const baseHeaderOptions = {
-      headerTitleStyle: {
-        color: getPrimaryColor('0'),
-      },
-      headerTintColor: getPrimaryColor('0'),
-      headerBackTitleStyle: {
-        fontSize: 16,
-      },
-      headerStyle: {
-        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
-      },
-      headerLargeStyle: {
-        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
-      },
-    };
+    // Base header styling options from shared config
+    const backgroundColor = nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent';
+    const baseHeaderOptions = getBaseModalHeaderOptions(getPrimaryColor, backgroundColor);
 
     // Check if this is a modal/formSheet presentation
     const isModalPresentation =
@@ -105,15 +93,24 @@ function RootLayoutContent() {
       return {
         ...screen.options,
         // Ensure no header-related options leak through
-        headerBackTitleVisible: false,
+        headerBackButtonDisplayMode: 'minimal' as const,
       };
     }
 
     // If the screen has explicit options, merge with base options
     if (screen.options) {
+      // If headerTransparent is true, use transparent background to avoid opaque header
+      const headerStyleOverride = screen.options.headerTransparent
+        ? {
+            headerStyle: { backgroundColor: 'transparent' },
+            headerLargeStyle: { backgroundColor: 'transparent' },
+          }
+        : {};
+
       return {
         ...baseHeaderOptions,
         ...screen.options,
+        ...headerStyleOverride,
         ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
         // Add close button for modal presentations (only when header is shown)
         ...(isModalPresentation ? { headerLeft: CloseButton } : {}),
@@ -126,8 +123,10 @@ function RootLayoutContent() {
         ...baseHeaderOptions,
         headerShown: true,
         headerTitle: screen.title,
-        headerBlurEffect: 'regular',
+        headerBlurEffect: 'regular' as const,
         headerTransparent: true,
+        headerStyle: { backgroundColor: 'transparent' },
+        headerLargeStyle: { backgroundColor: 'transparent' },
         headerBackTitle: 'Back',
       };
     }

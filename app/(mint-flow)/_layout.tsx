@@ -11,55 +11,15 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
-import { Stack, router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
-import Icon from 'assets/icons';
+import { Stack } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
+import { createFlowLayoutScreenOptions } from '../_layout.modals.config';
 
 export default function MintFlowLayout() {
   const { getPrimaryColor } = useTheme();
 
-  // Dynamic header button based on stack depth
-  const HeaderButton = ({ isFirstScreen }: { isFirstScreen: boolean }) => (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon
-        name={
-          isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
-        }
-        size={24}
-        color={getPrimaryColor('0')}
-      />
-    </TouchableOpacity>
-  );
-
   return (
-    <Stack
-      screenOptions={({ navigation }) => {
-        const state = navigation.getState();
-        const isFirstScreen = state.index === 0;
-
-        return {
-          headerShown: true,
-          headerTransparent: true,
-          headerStyle: {
-            backgroundColor: 'transparent',
-          },
-          headerTitleStyle: {
-            color: getPrimaryColor('0'),
-          },
-          headerTintColor: getPrimaryColor('0'),
-          headerLeft: () => <HeaderButton isFirstScreen={isFirstScreen} />,
-          // Hide any back title that might show parent route names
-          headerBackTitleVisible: false,
-          headerBackVisible: false,
-          animation: 'slide_from_right',
-          gestureEnabled: true,
-          gestureDirection: 'horizontal',
-          contentStyle: {
-            backgroundColor: getPrimaryColor('950'),
-          },
-        };
-      }}>
+    <Stack screenOptions={createFlowLayoutScreenOptions(getPrimaryColor)}>
       <Stack.Screen name="list" options={{ title: 'Select Mint' }} />
       <Stack.Screen name="add" options={{ title: 'Add Mints' }} />
       <Stack.Screen name="info" options={{ title: 'Mint Details' }} />

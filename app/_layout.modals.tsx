@@ -1,36 +1,9 @@
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+
 export interface ModalConfig {
   name: string;
   title?: string;
-  options?: {
-    presentation?:
-      | 'modal'
-      | 'card'
-      | 'formSheet'
-      | 'containedModal'
-      | 'fullScreenModal'
-      | 'containedTransparentModal'
-      | 'transparentModal';
-    headerShown?: boolean;
-    headerLargeTitle?: boolean;
-    fullScreenGestureEnabled?: boolean;
-    headerBlurEffect?: 'regular' | 'prominent' | 'systemMaterial' | 'systemUltraThinMaterial';
-    headerTransparent?: boolean;
-    headerBackTitleVisible?: boolean;
-    gestureDirection?: 'horizontal' | 'vertical' | 'horizontal-inverted' | 'vertical-inverted';
-    animation?:
-      | 'default'
-      | 'fade'
-      | 'fade_from_bottom'
-      | 'flip'
-      | 'none'
-      | 'simple_push'
-      | 'slide_from_bottom'
-      | 'slide_from_right'
-      | 'slide_from_left'
-      | 'ios_from_right'
-      | 'ios_from_left';
-    [key: string]: any;
-  };
+  options?: NativeStackNavigationOptions;
 }
 
 export const MODAL_SCREENS: ModalConfig[] = [
@@ -88,7 +61,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
     },
   },
   // Standalone receive screen (for deep linking)
@@ -99,7 +72,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
     },
   },
   {
@@ -112,7 +85,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
     },
   },
   {
@@ -123,7 +96,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       gestureDirection: 'vertical',
     },
   },
@@ -135,7 +108,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       gestureDirection: 'vertical',
     },
   },
@@ -147,7 +120,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       gestureDirection: 'vertical',
     },
   },
@@ -188,7 +161,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       animation: 'slide_from_bottom',
     },
   },
@@ -200,7 +173,7 @@ export const MODAL_SCREENS: ModalConfig[] = [
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackTitleVisible: false,
+      headerBackButtonDisplayMode: 'minimal',
       gestureDirection: 'vertical',
     },
   },
