@@ -1,32 +1,18 @@
-import React, { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
-import NDK from '@nostr-dev-kit/ndk';
-import { useNDKInit } from '@nostr-dev-kit/ndk-mobile';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from 'components/ndk';
 import { useInitializationStage } from './InitializationProvider';
+import { useNostrKeysContext } from './NostrKeysProvider';
 
-/**
- * Initialize NDK instance with relays
- * Cache adapter disabled temporarily due to version conflicts
- * @returns NDK instance
- */
-function createNDKInstance() {
-  const ndk = new NDK({
-    explicitRelayUrls: relays,
-  });
-  return ndk;
-}
-
-// Create NDK instance at module level (but don't connect yet)
-const ndkInstance = createNDKInstance();
+// Cache adapter at module level
+const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
 
 interface NostrNDKContextValue {
-  ndk: NDK;
-  isConnected: boolean;
+  isInitialized: boolean;
 }
 
 const NostrNDKContext = createContext<NostrNDKContextValue>({
-  ndk: ndkInstance,
-  isConnected: false,
+  isInitialized: false,
 });
 
 export const useNostrNDK = () => useContext(NostrNDKContext);
@@ -36,8 +22,10 @@ interface NostrNDKProviderProps {
 }
 
 export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
-  const initializeNDKHook = useNDKInit();
-  const isInitialized = useRef(false);
+  const { init: initializeNDK } = useNDK();
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const hasInitialized = useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Register with initialization system, depends on NostrKeysProvider
   const stage = useInitializationStage('nostr-ndk', {
@@ -46,30 +34,28 @@ export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
   });
 
   useEffect(() => {
-    if (isInitialized.current) return;
+    if (hasInitialized.current) return;
     if (!stage.canStart) return;
+    if (!nostrKeys?.privateKey) return;
 
-    isInitialized.current = true;
+    hasInitialized.current = true;
 
-    stage.log('Connecting to Nostr relays...');
+    stage.log('Initializing NDK with signer...');
 
-    // Connect to relays (async, doesn't block)
-    ndkInstance.connect();
+    // Initialize NDK with cache adapter, relays, and signer
+    // @ts-ignore - initializeNDK expects slightly different types
+    initializeNDK({
+      cacheAdapter,
+      explicitRelayUrls: relays,
+      signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
+    });
 
-    stage.log('Registering NDK hooks...');
-
-    // Register with NDK hooks system
-    initializeNDKHook(ndkInstance);
-
+    setIsInitialized(true);
     stage.log('Nostr initialized');
     stage.complete();
-  }, [stage.canStart, initializeNDKHook, stage]);
+  }, [stage.canStart, initializeNDK, nostrKeys?.privateKey, stage]);
 
-  return (
-    <NostrNDKContext.Provider value={{ ndk: ndkInstance, isConnected: true }}>
-      {children}
-    </NostrNDKContext.Provider>
-  );
+  return <NostrNDKContext.Provider value={{ isInitialized }}>{children}</NostrNDKContext.Provider>;
 }
 
 export default NostrNDKProvider;

@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ScrollView, Animated, Alert, Linking, Easing, StyleSheet } from 'react-native';
+import { ScrollView, Animated, Alert, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -33,8 +33,6 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import Svg, { Circle } from 'react-native-svg';
-import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
-import { frame } from '@expo/ui/swift-ui/modifiers';
 
 // ============================================================================
 // Simple Progress Ring using SVG - Static (no animation for better performance)
@@ -667,29 +665,18 @@ function MintInfoModal() {
       <Stack.Screen
         options={{
           title: isLoading ? 'Mint Details' : displayName,
-          headerRight: () =>
-            kymRecommendations && kymRecommendations.length > 0 ? (
-              <Host matchContents>
-                <SwiftUIButton
-                  variant="glass"
-                  systemImage="star"
-                  color={getYellowColor('300')}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/(mint-flow)/reviews',
-                      params: { mintUrl: mintUrl || '' },
-                    });
-                  }}
-                  modifiers={[
-                    frame({
-                      width: 36,
-                      height: 36,
-                      alignment: 'center',
-                    }),
-                  ]}
-                />
-              </Host>
-            ) : null,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => {
+                router.push({
+                  pathname: '/(mint-flow)/reviews',
+                  params: { mintUrl: mintUrl || '' },
+                });
+              }}
+              style={{ padding: 8 }}>
+              <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
+            </TouchableOpacity>
+          ),
         }}
       />
 

@@ -14,10 +14,8 @@ import 'react-native-reanimated';
 
 import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
 import { Drawer, DrawerProvider } from '@/components/drawer';
-import { relays } from '@/components/ndk';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
-import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import Icon from 'assets/icons';
 import { LogBox, TouchableOpacity } from 'react-native';
 
@@ -29,6 +27,7 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { compose } from 'helper/utils';
 import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { NostrNDKProvider } from 'providers/NostrNDKProvider';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
 import { useEffect } from 'react';
@@ -42,11 +41,7 @@ import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
 
-const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
-
 registerAllSheets({ context: 'global' });
-
-const RELAY_URLS = relays;
 
 LogBox.ignoreAllLogs();
 
@@ -59,6 +54,7 @@ const AppProviders = compose([
   [InitializationProvider, { forceVisible: false }], // Set to true to always show loading screen
   MigrationGate,
   [NostrKeysProvider, { defaultAccountIndex: 0 }],
+  NostrNDKProvider, // Initialize NDK with signer after keys are available
   CocoProvider,
   ActionSheetProvider,
   [SheetProvider, { context: 'global' }],
@@ -71,7 +67,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { getPrimaryColor, currentTheme } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { init: initializeNDK } = useNDK();
   const [fontsLoaded, fontError] = useFonts();
 
   // Hide splash screen once fonts are loaded
@@ -80,19 +75,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
-
-  // Initialize NDK with signer when keys are available
-  useEffect(() => {
-    if (nostrKeys?.privateKey) {
-      // @ts-ignore
-      initializeNDK({
-        // todo: Cache adapter
-        cacheAdapter,
-        explicitRelayUrls: RELAY_URLS,
-        signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
-      });
-    }
-  }, [initializeNDK, nostrKeys?.privateKey]);
 
   // Don't render anything until fonts are loaded
   if (!fontsLoaded && !fontError) {
