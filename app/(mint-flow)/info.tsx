@@ -607,7 +607,7 @@ function MintInfoModal() {
             await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
             break;
           case 'nostr':
-            router.push({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
+            router.push({ pathname: '/(mint-flow)/userMessages', params: { pubkey: npubToPubkey(info) } });
             break;
           default:
             await handleCopy(info);
