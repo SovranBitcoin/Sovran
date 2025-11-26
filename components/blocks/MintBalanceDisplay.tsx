@@ -133,8 +133,6 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         style={[
           {
             flex: 1,
-            width: '100%',
-            maxWidth: 200,
             padding: 8,
             borderWidth: 0.2,
             borderColor: getPrimaryColor('600'),

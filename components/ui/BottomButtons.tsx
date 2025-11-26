@@ -15,7 +15,7 @@ interface BottomButtonsProps {
  * A lightweight wrapper for positioning buttons at the bottom of a screen.
  * Handles safe area insets and absolute positioning automatically.
  */
-export function BottomButtons({ children, paddingBottom = 16, style }: BottomButtonsProps) {
+export function BottomButtons({ children, paddingBottom = 0, style }: BottomButtonsProps) {
   const insets = useSafeAreaInsets();
 
   return (

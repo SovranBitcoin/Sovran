@@ -39,6 +39,7 @@ export default function WalletHeaderTitle() {
         updateSelectedMint={true}
         showAddMintsButton={true}
         showDetailsButton={true}
+        style={{ width: '100%' }}
       />
     </View>
   );

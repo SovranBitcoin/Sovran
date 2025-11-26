@@ -135,8 +135,8 @@ function MintListScreen() {
             },
           });
         } else {
-          // Default: dismiss and go back
-          router.dismissAll();
+          // Default: go back one level (only dismiss this modal, keep parent modals open)
+          router.back();
         }
       } catch {
         popup({

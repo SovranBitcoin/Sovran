@@ -213,7 +213,7 @@ export function ButtonHandler({
       align="center"
       justify="space-between"
       spacing={0}
-      className={`flex-row pb-3 ${className || ''}`}
+      className={`flex-row pb-6 ${className || ''}`}
       style={[style]}>
       <LinearGradient
         colors={[
