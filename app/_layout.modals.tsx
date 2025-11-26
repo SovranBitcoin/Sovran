@@ -2,10 +2,13 @@ export interface ModalConfig {
   name: string;
   title?: string;
   options?: {
-    presentation?: 'modal' | 'card';
+    presentation?: 'modal' | 'card' | 'formSheet';
     headerShown?: boolean;
     headerLargeTitle?: boolean;
     fullScreenGestureEnabled?: boolean;
+    headerBlurEffect?: 'regular' | 'prominent' | 'systemMaterial' | 'systemUltraThinMaterial';
+    headerTransparent?: boolean;
+    headerBackTitleVisible?: boolean;
     [key: string]: any;
   };
 }
@@ -20,16 +23,63 @@ export const MODAL_SCREENS: ModalConfig[] = [
       presentation: 'card',
     },
   },
+  // Receive flow modal group - slides up as a modal, internal screens push horizontally
   {
-    name: 'currency',
+    name: '(receive-flow)',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: false, // The nested layout handles headers
+      animation: 'slide_from_bottom', // Ensure it slides up
     },
   },
+  // Send flow modal group - slides up as a modal, internal screens push horizontally
+  {
+    name: '(send-flow)',
+    options: {
+      presentation: 'formSheet',
+      headerShown: false, // The nested layout handles headers
+      animation: 'slide_from_bottom', // Ensure it slides up
+    },
+  },
+  // Transactions flow modal group - slides up as a modal, internal screens push horizontally
+  {
+    name: '(transactions-flow)',
+    options: {
+      presentation: 'formSheet',
+      headerShown: false, // The nested layout handles headers
+      animation: 'slide_from_bottom', // Ensure it slides up like other modals
+    },
+  },
+  // Mint flow modal group - mint selection, add, info
+  {
+    name: '(mint-flow)',
+    options: {
+      presentation: 'formSheet',
+      headerShown: false, // The nested layout handles headers
+      animation: 'slide_from_bottom',
+    },
+  },
+  // Standalone currency screen (for direct navigation from other flows)
+  {
+    name: 'currency',
+    title: 'Select Amount',
+    options: {
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
+    },
+  },
+  // Standalone receive screen (for deep linking)
   {
     name: 'receive',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
   {
@@ -38,25 +88,44 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'share',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
   {
     name: 'meltQuote',
+    title: 'Send Lightning',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
   {
     name: 'receiveToken',
+    title: 'Receive Ecash',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
   {
     name: 'mintQuote',
+    title: 'Receive Lightning',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
   {
@@ -87,19 +156,28 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'settings-pages/theme',
     title: 'Theme',
   },
-  // Transactions
+  // Standalone Transactions (for deep linking)
   {
     name: 'transactions',
     title: 'Transactions',
     options: {
-      headerLargeTitle: true,
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
+      animation: 'slide_from_bottom',
     },
   },
   {
     name: 'sendToken',
     title: 'Send Ecash',
     options: {
-      presentation: 'modal',
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackTitleVisible: false,
     },
   },
 ];

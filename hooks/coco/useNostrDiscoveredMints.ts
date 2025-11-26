@@ -70,32 +70,19 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
     []
   );
 
-  console.log('🔍 useNostrDiscoveredMints: Subscribing to Nostr with filters:', filters);
-
   const { events, eose } = useSubscribe({ filters });
-
-  console.log('🔍 useNostrDiscoveredMints: Events:', JSON.stringify(events, null, 2));
-
-  console.log('🔍 useNostrDiscoveredMints: Received events:', events?.length || 0, 'EOSE:', eose);
 
   // Loading state: true until we receive EOSE (end of stored events)
   useEffect(() => {
     if (eose) {
-      console.log('✅ useNostrDiscoveredMints: EOSE received, setting loading to false');
       setLoading(false);
     }
   }, [eose]);
 
   // Process events using parallel async pattern
   useEffect(() => {
-    console.log('🔄 useNostrDiscoveredMints: Processing events effect triggered');
-    console.log('📊 Events count:', events?.length || 0);
-    console.log('📊 Known mints count:', knownMints.length);
-
     if (!events || events.length === 0) {
-      console.log('⚠️ useNostrDiscoveredMints: No events to process');
       if (eose) {
-        console.log('⚠️ useNostrDiscoveredMints: EOSE received with no events');
         setLoading(false);
       }
       return;
@@ -106,64 +93,26 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
       // Get known mint URLs for blacklist (normalized)
       const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
-      console.log(
-        '🚫 useNostrDiscoveredMints: Known mint URLs (blacklist):',
-        Array.from(knownMintUrls)
-      );
 
       // Aggregate recommendations by URL
       const recommendationsByUrl = new Map<string, MintRecommendation[]>();
 
-      let cashuEventCount = 0;
-      let extractedUrlCount = 0;
-      let blacklistedCount = 0;
-      let failedParseCount = 0;
-
-      events.forEach((event: any, index: number) => {
-        if (index < 3) {
-          console.log(`🔍 Event ${index}:`, {
-            id: event.id,
-            kind: event.kind,
-            tags: event.tags,
-            content: event.content?.substring(0, 100),
-          });
-        }
-
+      events.forEach((event: any) => {
         // Validate it's a Cashu recommendation
-        const isCashu = isCashuRecommendationEvent(event as NostrEvent);
-        if (!isCashu) {
-          if (index < 3) console.log(`❌ Event ${index} is not a Cashu recommendation`);
-          return;
-        }
-        cashuEventCount++;
+        if (!isCashuRecommendationEvent(event as NostrEvent)) return;
 
         // Extract mint URL
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
-        if (!mintUrl) {
-          if (index < 3) console.log(`❌ Event ${index} has no mint URL`);
-          return;
-        }
-        extractedUrlCount++;
-        if (index < 3) console.log(`✅ Event ${index} mint URL:`, mintUrl);
+        if (!mintUrl) return;
 
         const normalized = normalizeUrl(mintUrl);
 
         // Skip blacklisted (known mints)
-        if (knownMintUrls.has(normalized)) {
-          blacklistedCount++;
-          if (index < 3) console.log(`🚫 Event ${index} is blacklisted (known mint):`, normalized);
-          return;
-        }
+        if (knownMintUrls.has(normalized)) return;
 
         // Parse recommendation
         const recommendation = parseRecommendation(event.content);
-        if (!recommendation) {
-          failedParseCount++;
-          if (index < 3)
-            console.log(`❌ Event ${index} failed to parse recommendation:`, event.content);
-          return;
-        }
-        if (index < 3) console.log(`✅ Event ${index} parsed recommendation:`, recommendation);
+        if (!recommendation) return;
 
         // Aggregate recommendations by URL
         const existingRecommendations = recommendationsByUrl.get(normalized) || [];
@@ -177,55 +126,30 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         recommendationsByUrl.set(normalized, existingRecommendations);
       });
 
-      console.log('📊 useNostrDiscoveredMints: Processing stats:');
-      console.log('  - Total events:', events.length);
-      console.log('  - Cashu events:', cashuEventCount);
-      console.log('  - With URLs:', extractedUrlCount);
-      console.log('  - Blacklisted:', blacklistedCount);
-      console.log('  - Failed to parse:', failedParseCount);
-      console.log('  - Unique mints:', recommendationsByUrl.size);
-
       // Single pass: find new URLs to process
       const urlsToProcess: string[] = [];
 
       recommendationsByUrl.forEach((recommendations, url) => {
         // Skip if already processed
-        if (processedUrls.current.has(url)) {
-          console.log(`⏭️  Skipping already processed: ${url}`);
-          return;
-        }
+        if (processedUrls.current.has(url)) return;
 
         // Mark as processed immediately
         processedUrls.current.add(url);
-        console.log(`✔️  Marked as processed: ${url} (${recommendations.length} recommendations)`);
 
         // Collect for processing
         urlsToProcess.push(url);
       });
 
-      console.log('📊 URLs to process:', urlsToProcess.length);
-
-      if (urlsToProcess.length === 0) {
-        console.log('⚠️ useNostrDiscoveredMints: No URLs to process after filtering');
-        return;
-      }
-
-      console.log('🔄 useNostrDiscoveredMints: Processing', urlsToProcess.length, 'URLs...');
+      if (urlsToProcess.length === 0) return;
 
       // Process all URLs in parallel, updating state incrementally as each completes
-      urlsToProcess.forEach(async (url, index) => {
+      urlsToProcess.forEach(async (url) => {
         try {
           const recommendations = recommendationsByUrl.get(url)!;
 
           // Calculate average score
           const sumScore = recommendations.reduce((sum, r) => sum + r.score, 0);
           const avgScore = Number((sumScore / recommendations.length).toFixed(2));
-
-          console.log(
-            `🔄 Fetching mint info ${index + 1}/${urlsToProcess.length}:`,
-            url,
-            `(${recommendations.length} recommendations, avg score: ${avgScore})`
-          );
 
           const mintInfoResult = await fetchMintInfo(url);
           const result: NostrDiscoveredMintData = {
@@ -235,31 +159,17 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
             mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
           };
 
-          console.log(`✅ Fetched mint info ${index + 1}/${urlsToProcess.length}:`, {
-            url,
-            hasInfo: mintInfoResult.isOk(),
-            name: result.mintInfo?.name,
-            recommendationCount: recommendations.length,
-            avgScore,
-          });
-
           // Update state immediately as this mint completes
           setMints((prev) => {
             // Avoid duplicates (in case of race conditions)
             const existingUrls = new Set(prev.map((m) => m.url));
-            if (existingUrls.has(result.url)) {
-              console.log('⏭️  Skipping duplicate mint:', result.url);
-              return prev;
-            }
-            console.log('➕ Adding mint to state:', result.url);
+            if (existingUrls.has(result.url)) return prev;
             return [...prev, result];
           });
-        } catch (err) {
+        } catch {
           const recommendations = recommendationsByUrl.get(url)!;
           const sumScore = recommendations.reduce((sum, r) => sum + r.score, 0);
           const avgScore = Number((sumScore / recommendations.length).toFixed(2));
-
-          console.warn(`⚠️ Failed to fetch mint info for ${url}:`, err);
 
           const result: NostrDiscoveredMintData = {
             url,
@@ -271,17 +181,12 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
           // Update state even for failed fetches (with null mintInfo)
           setMints((prev) => {
             const existingUrls = new Set(prev.map((m) => m.url));
-            if (existingUrls.has(result.url)) {
-              console.log('⏭️  Skipping duplicate mint:', result.url);
-              return prev;
-            }
-            console.log('➕ Adding mint to state (failed fetch):', result.url);
+            if (existingUrls.has(result.url)) return prev;
             return [...prev, result];
           });
         }
       });
-    } catch (err) {
-      console.error('❌ useNostrDiscoveredMints: Failed to process Nostr events:', err);
+    } catch {
       setError('Failed to process mint recommendations. Please try again.');
     }
   }, [events, knownMints, eose]);
@@ -289,7 +194,6 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
   // Reset on retry
   useEffect(() => {
     if (retryCount > 0) {
-      console.log('🔄 useNostrDiscoveredMints: Retrying...');
       setMints([]);
       setError(null);
       setLoading(true);
@@ -298,16 +202,8 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
   }, [retryCount]);
 
   const retry = () => {
-    console.log('🔄 useNostrDiscoveredMints: Retry requested');
     setRetryCount((prev) => prev + 1);
   };
-
-  console.log('📊 useNostrDiscoveredMints: Current state:', {
-    mintsCount: mints.length,
-    loading,
-    error,
-    processedUrlsCount: processedUrls.current.size,
-  });
 
   return { mints, loading, error, retry };
 };

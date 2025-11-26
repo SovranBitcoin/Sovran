@@ -11,6 +11,7 @@
 export { useLightningOperations } from './useLightningOperations';
 export { useMintManagement } from './useMintManagement';
 export { useAuditedMint } from './useAuditedMint';
+export { useAuditedMints } from './useAuditedMints';
 export { useNostrDiscoveredMints } from './useNostrDiscoveredMints';
 export { useMelt } from './useMelt';
 

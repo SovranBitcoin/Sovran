@@ -38,6 +38,8 @@ interface Props {
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
   hideExpired?: boolean; // If true, expired transactions will be filtered out
+  /** Optional custom press handler for transactions */
+  onTransactionPress?: (historyEntry: HistoryEntry) => void;
 }
 
 export const Transactions = React.memo(
@@ -53,6 +55,7 @@ export const Transactions = React.memo(
     tab = 'All',
     days = 1,
     hideExpired = false,
+    onTransactionPress,
   }: Props) => {
     const { getPrimaryColor } = useTheme();
 
@@ -243,13 +246,19 @@ export const Transactions = React.memo(
                               : JSON.stringify(historyEntry.token);
                           return Math.random().toString();
                         })();
-                        return <Transaction key={key} historyEntry={historyEntry} />;
+                        return (
+                          <Transaction
+                            key={key}
+                            historyEntry={historyEntry}
+                            onPress={onTransactionPress}
+                          />
+                        );
                       })}
                       {label === 'Confirmed' && (
                         <TouchableOpacity
                           onPress={() =>
                             router.push({
-                              pathname: '/transactions',
+                              pathname: '/(transactions-flow)/transactions',
                               params: {
                                 account: JSON.stringify(account),
                                 tab: 'Confirmed',
@@ -323,7 +332,9 @@ export const Transactions = React.memo(
                 borderBottomRightRadius: isLast ? 8 : 0,
                 height: ITEM_HEIGHT,
               }}>
-              {'historyEntry' in item && <Transaction historyEntry={item.historyEntry} />}
+              {'historyEntry' in item && (
+                <Transaction historyEntry={item.historyEntry} onPress={onTransactionPress} />
+              )}
             </View>
           );
         }}

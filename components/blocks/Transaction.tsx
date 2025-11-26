@@ -87,10 +87,19 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   };
 };
 
-export const Transaction = React.memo(({ historyEntry }: { historyEntry: HistoryEntry }) => {
+interface TransactionProps {
+  historyEntry: HistoryEntry;
+  /** Optional custom press handler - if provided, overrides default navigation */
+  onPress?: (historyEntry: HistoryEntry) => void;
+}
+
+export const Transaction = React.memo(({ historyEntry, onPress }: TransactionProps) => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
-  const { isSend, isReceive, fiatAmount, handlePress } = useHistoryEntry(historyEntry);
+  const { isSend, isReceive, fiatAmount, handlePress: defaultHandlePress } =
+    useHistoryEntry(historyEntry);
+
+  const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 
   return (
     <TouchableOpacity

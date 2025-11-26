@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import Modal from 'components/blocks/Modal';
+import { ScrollView } from 'react-native';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -10,7 +10,8 @@ import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Configuration for different share types
 const SHARE_CONFIGS = {
@@ -41,6 +42,7 @@ function ShareModal() {
   const { type = 'profile', data } = params;
   const config = SHARE_CONFIGS[type];
   const { getPrimaryColor } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(data);
@@ -48,30 +50,40 @@ function ShareModal() {
   }, [data, config.popupMessage]);
 
   return (
-    <Modal showClose title={config.title} buttons={<></>}>
-      <PaymentInfo popupMessage={config.popupMessage} data={data} unit={config.iconCurrency} />
-      <View style={{ marginHorizontal: 16 }}>
-        <Section title={config.sectionTitle}>
-          <RowButton
-            isFirst
-            onPress={handleCopy}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
-            label={
-              <HStack align="center" gap={8}>
-                <CurrencyIcon
-                  colors={[getPrimaryColor('400')]}
-                  width={20}
-                  currency={config.iconCurrency}
-                />
-                <Text className="text-primary-50" bold>
-                  {truncateMiddle(data, 10)}
-                </Text>
-              </HStack>
-            }
-          />
-        </Section>
-      </View>
-    </Modal>
+    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+      <Stack.Screen options={{ headerTitle: config.title }} />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: insets.top + 48,
+          paddingBottom: 40,
+        }}>
+        <PaymentInfo popupMessage={config.popupMessage} data={data} unit={config.iconCurrency} />
+        <View style={{ marginHorizontal: 16 }}>
+          <Section title={config.sectionTitle}>
+            <RowButton
+              isFirst
+              onPress={handleCopy}
+              rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+              label={
+                <HStack align="center" gap={8}>
+                  <CurrencyIcon
+                    colors={[getPrimaryColor('400')]}
+                    width={20}
+                    currency={config.iconCurrency}
+                  />
+                  <Text className="text-primary-50" bold>
+                    {truncateMiddle(data, 10)}
+                  </Text>
+                </HStack>
+              }
+            />
+          </Section>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 

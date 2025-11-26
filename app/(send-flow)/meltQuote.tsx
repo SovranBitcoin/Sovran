@@ -1,11 +1,11 @@
 /**
- * @fileoverview Standalone meltQuote route wrapper
+ * @fileoverview Send flow meltQuote route wrapper
  *
- * This is the standalone version used for direct navigation and deep linking.
+ * Part of the (send-flow) modal group - displays with back button.
  */
 
 import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { MeltHistoryEntry } from 'coco-cashu-core';
@@ -26,14 +26,17 @@ function ModalScreen() {
     : undefined;
 
   return (
-    <MeltQuoteScreen
-      meltQuote={meltQuote}
-      meltHistoryEntry={meltHistoryEntry}
-      onCancel={() => {
-        router.dismissAll();
-        router.push('/(drawer)/(tabs)');
-      }}
-    />
+    <>
+      <Stack.Screen options={{ title: 'Send Lightning' }} />
+      <MeltQuoteScreen
+        meltQuote={meltQuote}
+        meltHistoryEntry={meltHistoryEntry}
+        onCancel={() => {
+          router.dismissAll();
+          router.push('/(drawer)/(tabs)');
+        }}
+      />
+    </>
   );
 }
 

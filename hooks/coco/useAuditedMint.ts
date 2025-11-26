@@ -87,14 +87,11 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
 
         if (cached && !stale) {
           // Use cached data
-          console.log(`📦 Using cached audit data for mint: ${mintUrl}`);
           setAuditInfo(transformAuditData(cached.auditData));
           setMintInfo(cached.mintInfo);
           setLoading(false);
           return;
         }
-
-        console.log(`🔍 Fetching audit data for mint: ${mintUrl}`);
 
         // Fetch audit data directly from API
         const auditResult = await auditMint({ mintUrl });
@@ -104,9 +101,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
           // Transform to expected interface
           const transformedAuditInfo = transformAuditData(auditData);
           setAuditInfo(transformedAuditInfo);
-          console.log(`✅ Got audit info for ${mintUrl}`);
         } else {
-          console.warn(`⚠️ Failed to get audit info for ${mintUrl}:`, auditResult.error.message);
           setAuditInfo(undefined);
         }
 
@@ -115,19 +110,15 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         if (mintInfoResult.isOk()) {
           const mintInfoData = mintInfoResult.value;
           setMintInfo(mintInfoData);
-          console.log(`✅ Got mint info for ${mintUrl}`);
 
           // Cache both audit data and mint info if both succeeded
           if (auditResult.isOk()) {
             setCached(mintUrl, auditResult.value, mintInfoData);
-            console.log(`💾 Cached audit data for ${mintUrl}`);
           }
         } else {
-          console.warn(`⚠️ Failed to get mint info for ${mintUrl}:`, mintInfoResult.error.message);
           setMintInfo(undefined);
         }
-      } catch (err) {
-        console.error('❌ Failed to load mint data:', err);
+      } catch {
         setError('Failed to load mint information');
         setAuditInfo(undefined);
         setMintInfo(undefined);

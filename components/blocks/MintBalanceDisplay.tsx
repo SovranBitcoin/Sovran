@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import { SheetManager } from 'react-native-actions-sheet';
+import { router } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -111,52 +111,17 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const showMintInfo = !(requireValidMint && !isMintAllowed);
 
   const handlePress = useCallback(async () => {
-    SheetManager.show('mint-balance', {
-      payload: {
-        navigate: false,
-        requireBalance,
-        updateSelectedMint,
-        allowedMints,
-        allowedUnits,
-        showAddMintsButton,
-        showDetailsButton,
-        // Always pass the callback, even when updateSelectedMint is true
-        onMintPress: onMintSelected,
-      },
-      onClose: async (mint) => {
-        if (__DEV__) {
-          console.log('MintBalanceDisplay: onClose called with mint:', mint);
-          console.log('MintBalanceDisplay: onClose conditions:', {
-            hasMintId: !!mint?.id,
-            hasOnMintSelected: !!onMintSelected,
-            updateSelectedMint,
-          });
-        }
-        if (mint?.id && onMintSelected) {
-          // Use live balance from context instead of calling getBalances()
-          const amt = liveBalances[mint.id] || 0;
-          if (__DEV__) {
-            console.log('MintBalanceDisplay: calling onMintSelected with:', {
-              mint,
-              amount: amt,
-              unit,
-            });
-          }
-          onMintSelected(mint, { amount: amt, unit });
-        }
+    // Navigate to mint-flow modal instead of showing a sheet
+    router.push({
+      pathname: '/(mint-flow)/list',
+      params: {
+        requireBalance: String(requireBalance),
+        showAddMintsButton: String(showAddMintsButton),
+        showDetailsButton: String(showDetailsButton),
+        onSelectAction: 'goBack', // Default behavior: select and go back
       },
     });
-  }, [
-    requireBalance,
-    updateSelectedMint,
-    allowedMints,
-    allowedUnits,
-    showAddMintsButton,
-    showDetailsButton,
-    onMintSelected,
-    liveBalances,
-    unit,
-  ]);
+  }, [requireBalance, showAddMintsButton, showDetailsButton]);
 
   return (
     <TouchableOpacity onPress={handlePress} haptics>

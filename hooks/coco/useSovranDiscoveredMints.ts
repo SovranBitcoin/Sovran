@@ -51,18 +51,14 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         setError(null);
         processedUrls.current.clear();
 
-        console.log('🔍 useSovranDiscoveredMints: Fetching mints from Sovran API...');
-
         const response = await fetch(SOVRAN_MINTS_API_URL);
         if (!response.ok) {
           throw new Error(`Failed to fetch mints: ${response.statusText}`);
         }
 
         const mintUrls: string[] = await response.json();
-        console.log(`✅ useSovranDiscoveredMints: Received ${mintUrls.length} mint URLs from Sovran API`);
 
         if (!mintUrls || mintUrls.length === 0) {
-          console.warn('⚠️ useSovranDiscoveredMints: No mints returned from API');
           setMints([]);
           setLoading(false);
           return;
@@ -84,10 +80,6 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
             return false;
           });
 
-        console.log(
-          `🔄 useSovranDiscoveredMints: Processing ${urlsToProcess.length} unique mints (${mintUrls.length - urlsToProcess.length} filtered out)`
-        );
-
         if (urlsToProcess.length === 0) {
           setMints([]);
           setLoading(false);
@@ -95,13 +87,8 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         }
 
         // Process all URLs in parallel, updating state incrementally as each completes
-        urlsToProcess.forEach(async (url, index) => {
+        urlsToProcess.forEach(async (url) => {
           try {
-            console.log(
-              `🔄 useSovranDiscoveredMints: Fetching mint info ${index + 1}/${urlsToProcess.length}:`,
-              url
-            );
-
             const mintInfoResult = await fetchMintInfo(url);
             const result: SovranDiscoveredMintData = {
               url,
@@ -110,25 +97,14 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
               mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
             };
 
-            console.log(`✅ useSovranDiscoveredMints: Fetched mint info ${index + 1}/${urlsToProcess.length}:`, {
-              url,
-              hasInfo: mintInfoResult.isOk(),
-              name: result.mintInfo?.name,
-            });
-
             // Update state immediately as this mint completes
             setMints((prev) => {
               // Avoid duplicates (in case of race conditions)
               const existingUrls = new Set(prev.map((m) => normalizeUrl(m.url)));
-              if (existingUrls.has(normalizeUrl(result.url))) {
-                console.log('⏭️  useSovranDiscoveredMints: Skipping duplicate mint:', result.url);
-                return prev;
-              }
-              console.log('➕ useSovranDiscoveredMints: Adding mint to state:', result.url);
+              if (existingUrls.has(normalizeUrl(result.url))) return prev;
               return [...prev, result];
             });
-          } catch (err) {
-            console.warn(`⚠️ useSovranDiscoveredMints: Error processing mint ${url}:`, err);
+          } catch {
             // Still add the mint even if info fetch fails (with null mintInfo)
             const result: SovranDiscoveredMintData = {
               url,
@@ -138,9 +114,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
             };
             setMints((prev) => {
               const existingUrls = new Set(prev.map((m) => normalizeUrl(m.url)));
-              if (existingUrls.has(normalizeUrl(result.url))) {
-                return prev;
-              }
+              if (existingUrls.has(normalizeUrl(result.url))) return prev;
               return [...prev, result];
             });
           }
@@ -150,7 +124,6 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         // (individual mints will update incrementally)
         setLoading(false);
       } catch (err) {
-        console.error('❌ useSovranDiscoveredMints: Failed to fetch mints:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch mints from Sovran API');
         setLoading(false);
       }
@@ -165,5 +138,3 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
   return { mints, loading, error, retry };
 };
-
-

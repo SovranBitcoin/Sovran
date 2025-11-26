@@ -1,11 +1,11 @@
 /**
- * @fileoverview Standalone receiveToken route wrapper
+ * @fileoverview Transactions flow receiveToken route wrapper
  *
- * This is the standalone version used for direct navigation and deep linking.
+ * Part of the (transactions-flow) modal group - displays with back button.
  */
 
 import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { ReceiveTokenScreen } from 'components/screens/ReceiveTokenScreen';
@@ -20,14 +20,17 @@ function ModalScreen() {
   };
 
   return (
-    <ReceiveTokenScreen
-      receiveHistoryEntry={receiveHistoryEntry}
-      onNavigateBack={() => router.back()}
-      onRedeemSuccess={() => {
-        router.dismissAll();
-        router.push('/(drawer)/(tabs)');
-      }}
-    />
+    <>
+      <Stack.Screen options={{ title: 'Receive Ecash' }} />
+      <ReceiveTokenScreen
+        receiveHistoryEntry={receiveHistoryEntry}
+        onNavigateBack={() => router.back()}
+        onRedeemSuccess={() => {
+          router.dismissAll();
+          router.push('/(drawer)/(tabs)');
+        }}
+      />
+    </>
   );
 }
 

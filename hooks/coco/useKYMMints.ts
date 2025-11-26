@@ -76,8 +76,6 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
     filters,
   });
 
-  console.log('🔍 useKYMMints: Received events:', events?.length || 0, 'EOSE:', eose);
-
   // Load cached data on mount or when mintUrls change
   useEffect(() => {
     if (normalizedMintUrls.size === 0) {
@@ -103,24 +101,13 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
     });
 
     if (hasCachedData) {
-      console.log(
-        '📦 useKYMMints: Loaded cached scores for',
-        Object.keys(cachedScores).length,
-        'mints'
-      );
       setScores(cachedScores);
-      // Still set loading to false only after EOSE, but we have cached data to show
     }
   }, [normalizedMintUrls, getCached, isStale]);
 
   // Process events
   useEffect(() => {
-    console.log('🔄 useKYMMints: Processing events effect triggered');
-    console.log('📊 Events count:', events?.length || 0);
-    console.log('📊 Target mint URLs count:', normalizedMintUrls.size);
-
     if (normalizedMintUrls.size === 0) {
-      console.log('⚠️ useKYMMints: No mint URLs provided');
       setScores({});
       setLoading(false);
       setError(null);
@@ -128,10 +115,7 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
     }
 
     if (!events || events.length === 0) {
-      console.log('⚠️ useKYMMints: No events to process');
       if (eose) {
-        console.log('⚠️ useKYMMints: EOSE received with no events');
-        // Keep any cached data that was loaded, just set loading to false
         setLoading(false);
       }
       return;
@@ -143,58 +127,22 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
       // Aggregate recommendations by URL
       const recommendationsByUrl = new Map<string, MintRecommendation[]>();
 
-      let totalEventCount = 0;
-      let cashuEventCount = 0;
-      let extractedUrlCount = 0;
-      let targetMintCount = 0;
-      let failedParseCount = 0;
-
-      events.forEach((event: any, index: number) => {
-        totalEventCount++;
-
-        if (index < 3) {
-          console.log(`🔍 Event ${index}:`, {
-            id: event.id,
-            kind: event.kind,
-            tags: event.tags,
-            content: event.content?.substring(0, 100),
-          });
-        }
-
+      events.forEach((event: any) => {
         // Validate it's a Cashu recommendation
-        const isCashu = isCashuRecommendationEvent(event as NostrEvent);
-        if (!isCashu) {
-          if (index < 3) console.log(`❌ Event ${index} is not a Cashu recommendation`);
-          return;
-        }
-        cashuEventCount++;
+        if (!isCashuRecommendationEvent(event as NostrEvent)) return;
 
         // Extract mint URL
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
-        if (!mintUrl) {
-          if (index < 3) console.log(`❌ Event ${index} has no mint URL`);
-          return;
-        }
-        extractedUrlCount++;
+        if (!mintUrl) return;
 
         const normalized = normalizeUrl(mintUrl);
 
         // Filter by our target mint URLs
-        if (!normalizedMintUrls.has(normalized)) {
-          if (index < 3) console.log(`⏭️ Event ${index} is for different mint:`, normalized);
-          return;
-        }
-        targetMintCount++;
+        if (!normalizedMintUrls.has(normalized)) return;
 
         // Parse recommendation
         const recommendation = parseRecommendation(event.content);
-        if (!recommendation) {
-          failedParseCount++;
-          if (index < 3)
-            console.log(`❌ Event ${index} failed to parse recommendation:`, event.content);
-          return;
-        }
-        if (index < 3) console.log(`✅ Event ${index} parsed recommendation:`, recommendation);
+        if (!recommendation) return;
 
         // Aggregate recommendations by URL
         const existingRecommendations = recommendationsByUrl.get(normalized) || [];
@@ -207,14 +155,6 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
         });
         recommendationsByUrl.set(normalized, existingRecommendations);
       });
-
-      console.log('📊 useKYMMints: Processing stats:');
-      console.log('  - Total events:', totalEventCount);
-      console.log('  - Cashu events:', cashuEventCount);
-      console.log('  - With URLs:', extractedUrlCount);
-      console.log('  - For target mints:', targetMintCount);
-      console.log('  - Failed to parse:', failedParseCount);
-      console.log('  - Unique mints with recommendations:', recommendationsByUrl.size);
 
       // Calculate scores for each mint
       const newScores: Record<string, KYMMintData> = {};
@@ -245,37 +185,18 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
 
         // Update cache with new data
         setCached(normalizedUrl, avgScore, recommendations);
-        console.log(`💾 Cached KYM score for ${normalizedUrl}`);
       });
-
-      console.log('✅ useKYMMints: Calculated scores for', Object.keys(newScores).length, 'mints');
 
       // Merge with existing cached scores for mints that didn't get new events
       setScores((prevScores) => ({ ...prevScores, ...newScores }));
-    } catch (err) {
-      console.error('❌ useKYMMints: Failed to process Nostr events:', err);
+    } catch {
       setError('Failed to process mint recommendations. Please try again.');
-      // Don't clear scores on error - keep cached data if available
-      setScores((prevScores) => {
-        // Only clear if we have no cached data
-        if (Object.keys(prevScores).length === 0) {
-          return {};
-        }
-        return prevScores;
-      });
     } finally {
       if (eose) {
         setLoading(false);
       }
     }
   }, [events, normalizedMintUrls, eose, getCached, setCached, isStale]);
-
-  console.log('📊 useKYMMints: Current state:', {
-    mintUrlsCount: normalizedMintUrls.size,
-    scoresCount: Object.keys(scores).length,
-    loading,
-    error,
-  });
 
   return { scores, loading, error };
 };

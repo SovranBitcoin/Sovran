@@ -14,7 +14,6 @@ import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useReceive } from 'hooks/coco';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { SheetManager } from 'react-native-actions-sheet';
 import { Account } from './Account';
 import { router } from 'expo-router';
 
@@ -91,19 +90,13 @@ export function AccountPagerView({
         balance = 0;
       }
 
+      // If no balance on selected mint, go to mint selection first
       if (page === 'currency' && balance <= 0) {
-        SheetManager.show('mint-balance', {
-          payload: {
-            navigate: true,
-            requireBalance: true,
-          },
-          onClose: (mint?: { id: string; unit: string }) => {
-            if (mint?.id) {
-              const idx = accounts.findIndex((a) => a.unit === mint.unit.toLowerCase());
-              if (idx !== -1) {
-                setAccount(accounts[idx]);
-              }
-            }
+        router.push({
+          pathname: '/(send-flow)/mintSelect',
+          params: {
+            to: 'sendToken',
+            unit: accountUnit,
           },
         });
         return;
@@ -116,8 +109,18 @@ export function AccountPagerView({
         }
       }
 
+      // Use modal groups for nested navigation behavior
+      let pathname: string;
+      if (page === 'receive') {
+        pathname = '/(receive-flow)/receive';
+      } else if (page === 'currency') {
+        pathname = '/(send-flow)/currency';
+      } else {
+        pathname = `/${page}`;
+      }
+
       router.push({
-        pathname: `/${page}`,
+        pathname,
         params: {
           to: 'sendToken',
           unit: accountUnit,
@@ -127,7 +130,7 @@ export function AccountPagerView({
     [getBalances, selectedMintUrl, accounts, setAccount, handlePermission]
   );
 
-  const { receive } = useReceive();
+  const { receive: _receive } = useReceive();
 
   // Define action buttons - memoized to prevent recreation on every render
   const actionButtons: ActionButton[] = useMemo(

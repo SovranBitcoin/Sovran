@@ -2,9 +2,10 @@ import 'global.css';
 
 // Import core libraries
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Animated, Dimensions, StatusBar, LogBox } from 'react-native';
-import { Stack } from 'expo-router';
+import { Animated, Dimensions, StatusBar, LogBox, TouchableOpacity } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { View } from 'components/ui/View';
+import Icon from 'assets/icons';
 
 // Import third-party libraries
 import 'intl';
@@ -83,34 +84,56 @@ function MainStack() {
   // Set up DM subscriptions
   // useNostrDMs(addMessage, messages);
 
+  // Close button component for modal presentations
+  const CloseButton = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+    </TouchableOpacity>
+  );
+
   // Screen options builder
   const getScreenOptions = (screen: ModalConfig) => {
-    // If the screen has explicit options, use them
+    // Base header styling options
+    const baseHeaderOptions = {
+      headerTitleStyle: {
+        color: getPrimaryColor('0'),
+      },
+      headerTintColor: getPrimaryColor('0'),
+      headerBackTitleStyle: {
+        fontSize: 16,
+      },
+      headerStyle: {
+        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
+      },
+      headerLargeStyle: {
+        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
+      },
+    };
+
+    // Check if this is a modal/formSheet presentation
+    const isModalPresentation =
+      screen.options?.presentation === 'modal' || screen.options?.presentation === 'formSheet';
+
+    // If the screen has explicit options, merge with base options
     if (screen.options) {
-      return screen.options;
+      return {
+        ...baseHeaderOptions,
+        ...screen.options,
+        ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
+        // Add close button for modal presentations
+        ...(isModalPresentation ? { headerLeft: CloseButton } : {}),
+      };
     }
 
     // Default options for screens with titles (non-modal screens)
     if (screen.title !== undefined) {
       return {
+        ...baseHeaderOptions,
         headerShown: true,
         headerTitle: screen.title,
-        headerTitleStyle: {
-          color: getPrimaryColor('0'),
-        },
         headerBlurEffect: 'regular',
         headerTransparent: true,
         headerBackTitle: 'Back',
-        headerTintColor: getPrimaryColor('0'),
-        headerBackTitleStyle: {
-          fontSize: 16,
-        },
-        headerStyle: {
-          backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
-        },
-        headerLargeStyle: {
-          backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
-        },
       };
     }
 

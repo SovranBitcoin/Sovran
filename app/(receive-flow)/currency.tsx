@@ -1,7 +1,7 @@
 /**
- * @fileoverview Standalone currency route wrapper
+ * @fileoverview Receive flow currency route wrapper
  *
- * This is the standalone version used for direct navigation and deep linking.
+ * Part of the (receive-flow) modal group - displays with back button.
  */
 
 import React from 'react';
@@ -43,14 +43,16 @@ function ModalScreen() {
       <CurrencyScreen
         params={params}
         onMintQuoteCreated={(mintHistoryEntry) => {
-          router.replace({
-            pathname: `/${params.to}` as any,
+          // Navigate within receive-flow (horizontal push)
+          router.push({
+            pathname: '/(receive-flow)/mintQuote',
             params: {
               mintHistoryEntry: JSON.stringify(mintHistoryEntry),
             },
           });
         }}
         onSendTokenCreated={(sendHistoryEntry) => {
+          // sendToken is a separate flow, navigate to root-level screen
           router.replace({
             pathname: `/${params.to}` as any,
             params: {
@@ -59,6 +61,7 @@ function ModalScreen() {
           });
         }}
         onMeltQuoteCreated={(meltQuote) => {
+          // meltQuote is a separate flow, navigate to root-level screen
           router.push({
             pathname: `/${params.to}` as any,
             params: {
