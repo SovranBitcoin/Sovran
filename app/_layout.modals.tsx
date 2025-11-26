@@ -2,13 +2,33 @@ export interface ModalConfig {
   name: string;
   title?: string;
   options?: {
-    presentation?: 'modal' | 'card' | 'formSheet';
+    presentation?:
+      | 'modal'
+      | 'card'
+      | 'formSheet'
+      | 'containedModal'
+      | 'fullScreenModal'
+      | 'containedTransparentModal'
+      | 'transparentModal';
     headerShown?: boolean;
     headerLargeTitle?: boolean;
     fullScreenGestureEnabled?: boolean;
     headerBlurEffect?: 'regular' | 'prominent' | 'systemMaterial' | 'systemUltraThinMaterial';
     headerTransparent?: boolean;
     headerBackTitleVisible?: boolean;
+    gestureDirection?: 'horizontal' | 'vertical' | 'horizontal-inverted' | 'vertical-inverted';
+    animation?:
+      | 'default'
+      | 'fade'
+      | 'fade_from_bottom'
+      | 'flip'
+      | 'none'
+      | 'simple_push'
+      | 'slide_from_bottom'
+      | 'slide_from_right'
+      | 'slide_from_left'
+      | 'ios_from_right'
+      | 'ios_from_left';
     [key: string]: any;
   };
 }
@@ -27,36 +47,36 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: '(receive-flow)',
     options: {
-      presentation: 'formSheet',
+      presentation: 'modal', // Modal presentation - slides up from bottom
       headerShown: false, // The nested layout handles headers
-      animation: 'slide_from_bottom', // Ensure it slides up
+      gestureDirection: 'vertical', // Swipe down to dismiss
     },
   },
   // Send flow modal group - slides up as a modal, internal screens push horizontally
   {
     name: '(send-flow)',
     options: {
-      presentation: 'formSheet',
-      headerShown: false, // The nested layout handles headers
-      animation: 'slide_from_bottom', // Ensure it slides up
+      presentation: 'modal',
+      headerShown: false,
+      gestureDirection: 'vertical',
     },
   },
   // Transactions flow modal group - slides up as a modal, internal screens push horizontally
   {
     name: '(transactions-flow)',
     options: {
-      presentation: 'formSheet',
-      headerShown: false, // The nested layout handles headers
-      animation: 'slide_from_bottom', // Ensure it slides up like other modals
+      presentation: 'modal',
+      headerShown: false,
+      gestureDirection: 'vertical',
     },
   },
   // Mint flow modal group - mint selection, add, info
   {
     name: '(mint-flow)',
     options: {
-      presentation: 'formSheet',
-      headerShown: false, // The nested layout handles headers
-      animation: 'slide_from_bottom',
+      presentation: 'modal',
+      headerShown: false,
+      gestureDirection: 'vertical',
     },
   },
   // Standalone currency screen (for direct navigation from other flows)

@@ -2,7 +2,8 @@
  * @fileoverview Mint Flow Modal Layout
  *
  * This layout creates a nested stack navigator inside a modal presentation.
- * Screens within this group:
+ * The parent root Stack presents this group as a modal (slides up from bottom).
+ * Screens within this group push horizontally:
  * - list: Entry point, shows owned mints with balances
  * - add: Discover and add new mints (horizontal push)
  * - info: Mint details and audit info (horizontal push)
@@ -14,11 +15,6 @@ import { Stack, router } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
-
-// Anchor ensures deep-linking maintains navigation context
-export const unstable_settings = {
-  anchor: 'list',
-};
 
 export default function MintFlowLayout() {
   const { getPrimaryColor } = useTheme();
@@ -53,6 +49,9 @@ export default function MintFlowLayout() {
           },
           headerTintColor: getPrimaryColor('0'),
           headerLeft: () => <HeaderButton isFirstScreen={isFirstScreen} />,
+          // Hide any back title that might show parent route names
+          headerBackTitleVisible: false,
+          headerBackVisible: false,
           animation: 'slide_from_right',
           gestureEnabled: true,
           gestureDirection: 'horizontal',
@@ -68,4 +67,3 @@ export default function MintFlowLayout() {
     </Stack>
   );
 }
-

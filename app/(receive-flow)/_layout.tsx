@@ -2,7 +2,8 @@
  * @fileoverview Receive Flow Modal Layout
  *
  * This layout creates a nested stack navigator inside a modal presentation.
- * Screens within this group:
+ * The parent root Stack presents this group as a modal (slides up from bottom).
+ * Screens within this group push horizontally:
  * - receive: Entry point, shows receive options
  * - currency: Amount selector (pushes horizontally)
  * - mintQuote: Lightning invoice display (pushes horizontally)
@@ -14,11 +15,6 @@ import { Stack, router } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
-
-// Anchor ensures deep-linking maintains navigation context
-export const unstable_settings = {
-  anchor: 'receive',
-};
 
 export default function ReceiveFlowLayout() {
   const { getPrimaryColor } = useTheme();
@@ -46,10 +42,7 @@ export default function ReceiveFlowLayout() {
 
         return {
           headerShown: true,
-          // iOS liquid glass blur effect
-          // headerBlurEffect: 'systemMaterialDark',
           headerTransparent: true,
-          // Truly transparent background to let blur show through
           headerStyle: {
             backgroundColor: 'transparent',
           },
@@ -59,6 +52,9 @@ export default function ReceiveFlowLayout() {
           headerTintColor: getPrimaryColor('0'),
           // Dynamic back/close button based on stack depth
           headerLeft: () => <HeaderButton isFirstScreen={isFirstScreen} />,
+          // Hide any back title that might show parent route names
+          headerBackTitleVisible: false,
+          headerBackVisible: false,
           // Horizontal slide animation within the modal
           animation: 'slide_from_right',
           gestureEnabled: true,
@@ -68,7 +64,7 @@ export default function ReceiveFlowLayout() {
           },
         };
       }}>
-      <Stack.Screen name="receive" />
+      <Stack.Screen name="receive" options={{ title: 'Receive' }} />
       <Stack.Screen name="currency" options={{ title: 'Select Amount' }} />
       <Stack.Screen name="mintQuote" options={{ title: 'Receive Lightning' }} />
       <Stack.Screen name="receiveToken" options={{ title: 'Receive Ecash' }} />

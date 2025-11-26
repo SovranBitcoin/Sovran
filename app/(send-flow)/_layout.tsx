@@ -2,7 +2,8 @@
  * @fileoverview Send Flow Modal Layout
  *
  * This layout creates a nested stack navigator inside a modal presentation.
- * Screens within this group:
+ * The parent root Stack presents this group as a modal (slides up from bottom).
+ * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
  * - currency: Amount selection (entry point when has balance)
  * - sendToken: Ecash token display after creation
@@ -16,11 +17,6 @@ import { Stack, router } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
-
-// Anchor ensures deep-linking maintains navigation context
-export const unstable_settings = {
-  anchor: 'mintSelect',
-};
 
 export default function SendFlowLayout() {
   const { getPrimaryColor } = useTheme();
@@ -48,10 +44,7 @@ export default function SendFlowLayout() {
 
         return {
           headerShown: true,
-          // iOS liquid glass blur effect
-          // headerBlurEffect: 'systemMaterialDark',
           headerTransparent: true,
-          // Truly transparent background to let blur show through
           headerStyle: {
             backgroundColor: 'transparent',
           },
@@ -61,6 +54,9 @@ export default function SendFlowLayout() {
           headerTintColor: getPrimaryColor('0'),
           // Dynamic back/close button based on stack depth
           headerLeft: () => <HeaderButton isFirstScreen={isFirstScreen} />,
+          // Hide any back title that might show parent route names
+          headerBackTitleVisible: false,
+          headerBackVisible: false,
           // Horizontal slide animation within the modal
           animation: 'slide_from_right',
           gestureEnabled: true,
