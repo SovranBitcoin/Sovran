@@ -96,8 +96,12 @@ interface TransactionProps {
 export const Transaction = React.memo(({ historyEntry, onPress }: TransactionProps) => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
-  const { isSend, isReceive, fiatAmount, handlePress: defaultHandlePress } =
-    useHistoryEntry(historyEntry);
+  const {
+    isSend,
+    isReceive,
+    fiatAmount,
+    handlePress: defaultHandlePress,
+  } = useHistoryEntry(historyEntry);
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 

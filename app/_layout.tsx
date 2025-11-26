@@ -179,6 +179,7 @@ export default function RootLayout() {
               style={currentTheme.includes('light') ? 'dark' : 'light'}
             />
             <Stack
+              key={currentTheme}
               screenOptions={{
                 headerShown: false,
                 gestureEnabled: true,

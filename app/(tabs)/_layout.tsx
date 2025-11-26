@@ -21,14 +21,24 @@ export default function TabLayout() {
         }),
       })}
       disableTransparentOnScrollEdge>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Home</Label>
+      <NativeTabs.Trigger name="payments">
+        <Icon
+          sf={{
+            default: 'arrow.up.arrow.down',
+            selected: 'arrow.up.arrow.down',
+          }}
+        />
+        <Label>Payments</Label>
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="payments">
-        <Icon sf={{ default: 'creditcard', selected: 'creditcard.fill' }} />
-        <Label>Payments</Label>
+      <NativeTabs.Trigger name="index">
+        <Icon
+          sf={{
+            default: 'wallet.bifold',
+            selected: 'wallet.bifold',
+          }}
+        />
+        <Label>Walet</Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="explore">

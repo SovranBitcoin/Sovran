@@ -119,33 +119,36 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'meltQuote',
     title: 'Send Lightning',
     options: {
-      presentation: 'formSheet',
+      presentation: 'modal',
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackTitleVisible: false,
+      gestureDirection: 'vertical',
     },
   },
   {
     name: 'receiveToken',
     title: 'Receive Ecash',
     options: {
-      presentation: 'formSheet',
+      presentation: 'modal',
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackTitleVisible: false,
+      gestureDirection: 'vertical',
     },
   },
   {
     name: 'mintQuote',
     title: 'Receive Lightning',
     options: {
-      presentation: 'formSheet',
+      presentation: 'modal',
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackTitleVisible: false,
+      gestureDirection: 'vertical',
     },
   },
   {
@@ -193,11 +196,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'sendToken',
     title: 'Send Ecash',
     options: {
-      presentation: 'formSheet',
+      presentation: 'modal',
       headerShown: true,
       headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackTitleVisible: false,
+      gestureDirection: 'vertical',
     },
   },
 ];

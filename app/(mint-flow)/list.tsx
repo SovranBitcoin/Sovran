@@ -8,7 +8,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { View, VStack } from 'components/ui/View';
+import { TouchableOpacity } from 'react-native';
+import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintManagement } from 'hooks/coco';
@@ -22,12 +23,11 @@ import { popup } from 'helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
-import { frame } from '@expo/ui/swift-ui/modifiers';
+import Icon from 'assets/icons';
 import _ from 'lodash';
 
 function MintListScreen() {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     requireBalance?: string;
@@ -138,7 +138,7 @@ function MintListScreen() {
           // Default: dismiss and go back
           router.dismissAll();
         }
-      } catch (e) {
+      } catch {
         popup({
           message: 'general_error',
           emoji: '🚨',
@@ -178,21 +178,13 @@ function MintListScreen() {
           title: 'Select Mint',
           headerRight: () =>
             showAddMintsButton ? (
-              <Host matchContents>
-                <SwiftUIButton
-                  variant="glass"
-                  systemImage="plus"
-                  color={getGreenColor('300')}
-                  onPress={handleAddMints}
-                  modifiers={[
-                    frame({
-                      width: 36,
-                      height: 36,
-                      alignment: 'center',
-                    }),
-                  ]}
-                />
-              </Host>
+              <TouchableOpacity
+                onPress={handleAddMints}
+                style={{
+                  padding: 8,
+                }}>
+                <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+              </TouchableOpacity>
             ) : null,
         }}
       />
@@ -258,4 +250,3 @@ function MintListScreen() {
 }
 
 export default withSheetProvider(MintListScreen);
-

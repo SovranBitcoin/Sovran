@@ -132,10 +132,14 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         className="rounded-2xl"
         style={[
           {
+            flex: 1,
+            width: '100%',
+            maxWidth: 200,
             padding: 8,
             borderWidth: 0.2,
             borderColor: getPrimaryColor('600'),
-            marginVertical: 4,
+            marginVertical: 0,
+            marginHorizontal: 0,
             alignSelf: 'center',
             backgroundColor: getPrimaryColor('800'),
           },

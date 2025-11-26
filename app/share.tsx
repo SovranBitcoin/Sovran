@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, TouchableOpacity } from 'react-native';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -10,7 +10,7 @@ import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Configuration for different share types
@@ -49,10 +49,22 @@ function ShareModal() {
     popup({ message: config.popupMessage, type: 'success' });
   }, [data, config.popupMessage]);
 
-  return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <Stack.Screen options={{ headerTitle: config.title }} />
+  const CloseButton = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+    </TouchableOpacity>
+  );
 
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerTitle: config.title,
+          headerTitleStyle: { color: getPrimaryColor('0') },
+          headerTintColor: getPrimaryColor('0'),
+          headerLeft: () => <CloseButton />,
+        }}
+      />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -83,7 +95,7 @@ function ShareModal() {
           </Section>
         </View>
       </ScrollView>
-    </View>
+    </>
   );
 }
 

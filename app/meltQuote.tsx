@@ -5,11 +5,14 @@
  */
 
 import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { TouchableOpacity } from 'react-native';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { MeltHistoryEntry } from 'coco-cashu-core';
 import { MeltQuoteScreen } from 'components/screens/MeltQuoteScreen';
+import { useTheme } from 'providers/ThemeProvider';
+import Icon from 'assets/icons';
 
 function ModalScreen() {
   const { meltQuote: meltQuoteString, meltHistoryEntry: meltHistoryEntryString } =
@@ -17,6 +20,7 @@ function ModalScreen() {
       meltQuote?: string;
       meltHistoryEntry?: string;
     }>();
+  const { getPrimaryColor } = useTheme();
 
   const meltQuote = meltQuoteString
     ? (JSON.parse(meltQuoteString) as MeltQuoteResponse)
@@ -25,15 +29,31 @@ function ModalScreen() {
     ? (JSON.parse(meltHistoryEntryString) as MeltHistoryEntry)
     : undefined;
 
+  const CloseButton = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+    </TouchableOpacity>
+  );
+
   return (
-    <MeltQuoteScreen
-      meltQuote={meltQuote}
-      meltHistoryEntry={meltHistoryEntry}
-      onCancel={() => {
-        router.dismissAll();
-        router.push('/(drawer)/(tabs)');
-      }}
-    />
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Send Lightning',
+          headerTitleStyle: { color: getPrimaryColor('0') },
+          headerTintColor: getPrimaryColor('0'),
+          headerLeft: () => <CloseButton />,
+        }}
+      />
+      <MeltQuoteScreen
+        meltQuote={meltQuote}
+        meltHistoryEntry={meltHistoryEntry}
+        onCancel={() => {
+          router.dismissAll();
+          router.push('/(drawer)/(tabs)');
+        }}
+      />
+    </>
   );
 }
 

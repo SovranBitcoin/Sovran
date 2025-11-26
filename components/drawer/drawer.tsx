@@ -1,20 +1,6 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from 'react-native-gesture-handler';
+import { Dimensions, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -24,7 +10,19 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { nip19 } from 'nostr-tools';
+import { router } from 'expo-router';
+import opacity from 'hex-color-opacity';
+
+import Icon from 'assets/icons';
+import { useTheme } from 'providers/ThemeProvider';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { Text } from 'components/ui/Text';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { View, VStack, HStack, Spacer } from 'components/ui/View';
+import { Avatar } from 'components/ui/Avatar';
+import { getUsername } from 'helper/username';
 import { useDrawer } from './drawer-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -38,29 +36,132 @@ const SPRING_CONFIG = {
   mass: 0.8,
 };
 
-type DrawerItem = {
+type MenuItem = {
   icon: string;
   label: string;
   href: string;
 };
 
-const MENU_ITEMS: DrawerItem[] = [
-  { icon: 'house.fill', label: 'Home', href: '/(tabs)/index' },
-  { icon: 'paperplane.fill', label: 'Explore', href: '/(tabs)/explore' },
+const MENU_ITEMS: MenuItem[] = [
+  { icon: 'fluent:wallet-20-filled', label: 'Wallet', href: '/(tabs)/index' },
+  { icon: 'fluent:arrow-swap-16-filled', label: 'Payments', href: '/(tabs)/payments' },
+  { icon: 'clarity:internet-of-things-solid', label: 'Lifestyle', href: '/(tabs)/explore' },
+  { icon: 'material-symbols:settings-rounded', label: 'Settings', href: '/settings-pages' },
 ];
+
+function ProfileHeader() {
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const { getPrimaryColor } = useTheme();
+  const { closeDrawer } = useDrawer();
+
+  return (
+    <LinearGradient
+      colors={[
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        getPrimaryColor('900'),
+        opacity(getPrimaryColor('900'), 0),
+      ]}
+      style={styles.gradientContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}>
+      <View style={styles.headerContent}>
+        <TouchableOpacity
+          style={styles.profileTouchable}
+          onPress={() => {
+            if (nostrKeys?.pubkey) {
+              closeDrawer();
+              router.push({
+                pathname: '/share',
+                params: {
+                  type: 'profile',
+                  data: nostrKeys?.npub || nip19.npubEncode(nostrKeys?.pubkey),
+                },
+              });
+            }
+          }}>
+          {nostrKeys?.pubkey && (
+            <VStack align="center" spacing={16}>
+              <Avatar seed={nostrKeys?.pubkey} size={64} variant="person" />
+              <VStack align="center" spacing={8}>
+                <Text bold size={20} style={{ textAlign: 'center', color: getPrimaryColor('0') }}>
+                  {getUsername(nostrKeys?.pubkey)}
+                </Text>
+                <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
+              </VStack>
+            </VStack>
+          )}
+        </TouchableOpacity>
+      </View>
+      <Spacer size={58} />
+    </LinearGradient>
+  );
+}
+
+function ProfileButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <Pressable onPress={onPress} style={styles.menuButton}>
+      <HStack align="center" spacing={12}>
+        <Icon name={icon} color={getPrimaryColor('0')} size={24} />
+        <Text size={18} bold style={{ color: getPrimaryColor('0') }}>
+          {label}
+        </Text>
+      </HStack>
+    </Pressable>
+  );
+}
+
+function DrawerContent() {
+  const { getPrimaryColor } = useTheme();
+  const { closeDrawer } = useDrawer();
+
+  const handleNavigation = (href: string) => {
+    closeDrawer();
+    router.push(href as any);
+  };
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      style={{ backgroundColor: getPrimaryColor('900') }}
+      contentContainerStyle={styles.scrollContent}>
+      <Spacer size={64} />
+      <ProfileHeader />
+      <VStack spacing={0} style={{ marginTop: -16 }}>
+        {MENU_ITEMS.map((item, index) => (
+          <ProfileButton
+            key={index}
+            icon={item.icon}
+            label={item.label}
+            onPress={() => handleNavigation(item.href)}
+          />
+        ))}
+      </VStack>
+      <Spacer size={48} />
+    </ScrollView>
+  );
+}
 
 export function Drawer({ children }: { children: React.ReactNode }) {
   const { isOpen, closeDrawer, openDrawer } = useDrawer();
-  const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const router = useRouter();
+  const { getPrimaryColor } = useTheme();
 
   const translateX = useSharedValue(-DRAWER_WIDTH);
   const backdropOpacity = useSharedValue(0);
   const contextX = useSharedValue(0);
-
-  const colors = Colors[colorScheme ?? 'light'];
 
   // Sync animation with isOpen state
   useEffect(() => {
@@ -71,6 +172,7 @@ export function Drawer({ children }: { children: React.ReactNode }) {
       translateX.value = withSpring(-DRAWER_WIDTH, SPRING_CONFIG);
       backdropOpacity.value = withTiming(0, { duration: 200 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Pan gesture for the drawer
@@ -150,12 +252,7 @@ export function Drawer({ children }: { children: React.ReactNode }) {
   }));
 
   const contentAnimatedStyle = useAnimatedStyle(() => {
-    const scale = interpolate(
-      translateX.value,
-      [-DRAWER_WIDTH, 0],
-      [1, 0.92],
-      Extrapolation.CLAMP
-    );
+    const scale = interpolate(translateX.value, [-DRAWER_WIDTH, 0], [1, 0.92], Extrapolation.CLAMP);
     const borderRadius = interpolate(
       translateX.value,
       [-DRAWER_WIDTH, 0],
@@ -176,7 +273,7 @@ export function Drawer({ children }: { children: React.ReactNode }) {
     <GestureHandlerRootView style={styles.container}>
       {/* Black background layer */}
       <View style={styles.blackBackground} />
-      
+
       {/* Main Content with Edge Gesture */}
       <GestureDetector gesture={edgeGesture}>
         <Animated.View style={[styles.contentContainer, contentAnimatedStyle]}>
@@ -184,15 +281,10 @@ export function Drawer({ children }: { children: React.ReactNode }) {
         </Animated.View>
       </GestureDetector>
 
-      {/* Backdrop with blur-like effect */}
-      <Animated.View
-        style={[
-          styles.backdrop,
-          backdropAnimatedStyle,
-        ]}
-      >
+      {/* Backdrop */}
+      <Animated.View style={[styles.backdrop, backdropAnimatedStyle]}>
         <Pressable style={styles.backdropPressable} onPress={handleBackdropPress}>
-          <View style={[styles.backdropInner, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }]} />
+          <View style={[styles.backdropInner, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
         </Pressable>
       </Animated.View>
 
@@ -204,44 +296,10 @@ export function Drawer({ children }: { children: React.ReactNode }) {
             drawerAnimatedStyle,
             {
               width: DRAWER_WIDTH,
-              backgroundColor: isDark ? '#1a1a1d' : '#ffffff',
-              paddingTop: insets.top + 20,
-              paddingBottom: insets.bottom + 20,
+              backgroundColor: getPrimaryColor('900'),
             },
-          ]}
-        >
-          {/* Menu Items */}
-          <View style={styles.menuContainer}>
-            {MENU_ITEMS.map((item, index) => (
-              <Pressable
-                key={index}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  {
-                    backgroundColor: pressed
-                      ? isDark
-                        ? 'rgba(255,255,255,0.08)'
-                        : 'rgba(0,0,0,0.04)'
-                      : 'transparent',
-                  },
-                ]}
-                onPress={() => {
-                  router.push(item.href as any);
-                  closeDrawer();
-                }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
-                  <IconSymbol name={item.icon as any} size={20} color={colors.tint} />
-                </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* Drag Handle Indicator */}
-          <View style={styles.dragHandleContainer}>
-            <View style={[styles.dragHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }]} />
-          </View>
+          ]}>
+          <DrawerContent />
         </Animated.View>
       </GestureDetector>
     </GestureHandlerRootView>
@@ -285,40 +343,27 @@ const styles = StyleSheet.create({
     elevation: 25,
     borderTopRightRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: 'hidden',
   },
-  menuContainer: {
+  gradientContainer: {
     flex: 1,
-    paddingHorizontal: 12,
+    padding: 16,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    gap: 14,
+  headerContent: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    padding: 16,
+    paddingTop: 0,
   },
-  menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
+  profileTouchable: {
     alignItems: 'center',
   },
-  menuLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+  menuButton: {
+    padding: 32,
+    paddingBottom: 32,
+    paddingTop: 0,
   },
-  dragHandleContainer: {
-    position: 'absolute',
-    right: 8,
-    top: '50%',
-    transform: [{ translateY: -20 }],
-  },
-  dragHandle: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
+  scrollContent: {
+    flexGrow: 1,
   },
 });
-
