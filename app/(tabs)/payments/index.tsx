@@ -1,34 +1,34 @@
-import React, { useCallback, useRef, useState, useEffect, useMemo } from 'react';
-import PagerView from 'react-native-pager-view';
-import { useTheme } from 'providers/ThemeProvider';
-import { Tabs } from 'components/ui/Tabs';
-import { ContactItem } from 'components/blocks/payments';
-import { View, VStack } from 'components/ui/View';
-import { useMintManagement } from 'hooks/coco';
-import { Mint } from 'coco-cashu-core';
-import { npubToPubkey } from 'components/blocks/Transaction';
+import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Mint } from 'coco-cashu-core';
+import { SearchResult } from 'components/blocks/contacts';
+import { NoResultsFound } from 'components/blocks/contacts/NoResultsFound';
+import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
+import { ContactItem } from 'components/blocks/payments';
+import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
+import { CancelButton } from 'components/blocks/payments/CancelButton';
+import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
+import { npubToPubkey } from 'components/blocks/Transaction';
+import { Tabs } from 'components/ui/Tabs';
+import { Text } from 'components/ui/Text';
+import { View, VStack } from 'components/ui/View';
+import { router } from 'expo-router';
+import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
+import { useMintManagement } from 'hooks/coco';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import {
   PaymentsAnimationProvider,
   usePaymentsAnimation,
 } from 'providers/PaymentsAnimationProvider';
-import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
-import { CancelButton } from 'components/blocks/payments/CancelButton';
-import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
+import { useTheme } from 'providers/ThemeProvider';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, ScrollView } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 import { SkeletonContainer } from 'react-native-skeleton-component';
-import { store } from 'redux/store';
 import { setSearch } from 'redux/nostr';
-import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
-import { SearchResult } from 'components/blocks/contacts';
-import { NoResultsFound } from 'components/blocks/contacts/NoResultsFound';
-import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
-import { router } from 'expo-router';
-import { Text } from 'components/ui/Text';
+import { store } from 'redux/store';
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
@@ -55,6 +55,7 @@ const PaymentsContent = () => {
   usePaymentsAnimation();
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
+
   const { mints, loadMints, getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
 

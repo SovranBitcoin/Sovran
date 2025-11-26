@@ -12,7 +12,6 @@ import { Animated, Easing, Dimensions } from 'react-native';
 import { View } from '@/components/ui/View';
 import { Text } from '@/components/ui/Text';
 import Icon from '@/assets/icons';
-import { useTheme } from '@/providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
@@ -71,7 +70,6 @@ export function InitializationProvider({
   forceVisible = false,
   testMode = false,
 }: InitializationProviderProps) {
-  const { getPrimaryColor } = useTheme();
   const [stages, setStages] = useState<Map<string, Stage>>(new Map());
   const [logHistory, setLogHistory] = useState<
     { message: string; timestamp: number; stageId: string }[]
@@ -351,34 +349,12 @@ export function InitializationProvider({
     startTestAnimation,
   };
 
-  // Animated opacity for children (main app content)
-  const childrenOpacity = useRef(new Animated.Value(0)).current;
-
-  // Fade in children when initialization completes
-  useEffect(() => {
-    if (!isInitializing) {
-      Animated.timing(childrenOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.ease),
-      }).start();
-    } else {
-      childrenOpacity.setValue(0);
-    }
-  }, [isInitializing, childrenOpacity]);
-
+  // Render children directly without Animated.View wrapper to preserve native blur effects (liquid glass)
+  // The InitializationScreenInternal handles its own overlay and fade out
   return (
     <InitializationContext.Provider value={contextValue}>
+      {children}
       <InitializationScreenInternal />
-      <Animated.View
-        style={{
-          flex: 1,
-          opacity: childrenOpacity,
-          backgroundColor: getPrimaryColor('950'), // Match app background to prevent white flash
-        }}>
-        {children}
-      </Animated.View>
     </InitializationContext.Provider>
   );
 }

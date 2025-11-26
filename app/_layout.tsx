@@ -1,54 +1,52 @@
-import 'global.css';
-
-// Import core libraries
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Animated, Dimensions, StatusBar, LogBox, TouchableOpacity } from 'react-native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider as NavigationThemeProvider,
+} from '@react-navigation/native';
 import { Stack, router } from 'expo-router';
-import { View } from 'components/ui/View';
-import Icon from 'assets/icons';
-
-// Import third-party libraries
+import { StatusBar } from 'expo-status-bar';
+import 'global.css';
 import 'intl';
 import 'intl/locale-data/jsonp/en';
 import 'react-native-gesture-handler';
-import { PersistGate } from 'redux-persist/integration/react';
-import { Provider } from 'react-redux';
-import * as SplashScreen from 'expo-splash-screen';
-import { Easing } from 'react-native-reanimated';
-import { ActionSheetProvider } from '@expo/react-native-action-sheet';
-import { SheetProvider } from 'react-native-actions-sheet';
-// import * as Sentry from '@sentry/react-native';
-import { NDKPrivateKeySigner, useNDK, NDKCacheAdapterSqlite } from '@nostr-dev-kit/ndk-mobile';
-// Import local components and utilities
-import { persistor, store } from 'redux/store';
-import { useTheme, ThemeProvider } from 'providers/ThemeProvider';
-import { useNostrKeysContext, NostrKeysProvider } from 'providers/NostrKeysProvider';
-import { InitializationProvider } from 'providers/InitializationProvider';
-import { relays } from 'components/ndk';
-import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
-import { PricelistProvider } from 'providers/PricelistProvider';
-import { registerAllSheets } from 'components/blocks/sheets/registerSheets';
-import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
-import AppGate from 'components/blocks/AppGate';
-import MigrationGate from 'components/blocks/MigrationGate';
-import { useFonts } from 'hooks/useFonts';
-import { PortalHost } from '@rn-primitives/portal';
-import { compose } from 'helper/utils';
+import 'react-native-reanimated';
+
+import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
+import { Drawer, DrawerProvider } from '@/components/drawer';
+import { relays } from '@/components/ndk';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import Icon from 'assets/icons';
+import { Animated, Dimensions, LogBox, TouchableOpacity } from 'react-native';
+
+import AppGate from '@/components/blocks/AppGate';
+import MigrationGate from '@/components/blocks/MigrationGate';
 import { CocoProvider } from '@/helper/coco';
+import { InitializationProvider } from '@/providers/InitializationProvider';
+import { ActionSheetProvider } from '@expo/react-native-action-sheet';
+import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
+import { compose } from 'helper/utils';
+import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { PricelistProvider } from 'providers/PricelistProvider';
+import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
+import { useEffect } from 'react';
+import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { persistor, store } from 'redux/store';
+import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
 
 const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
 
-/**
- * Splash screen component
- */
-
 registerAllSheets({ context: 'global' });
 
-// Configure constants
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
 const RELAY_URLS = relays;
 
-// Initialize global configurations
 LogBox.ignoreAllLogs();
 
 function MySplashScreen() {
@@ -185,52 +183,98 @@ const AppProviders = compose([
   AppGate,
 ]);
 
-/**
- * Main application component
- */
 export default function RootLayout() {
-  const [appIsReady, setAppIsReady] = useState(false);
-  const scaleRef = useRef(new Animated.Value(1));
-  const { getPrimaryColor } = useTheme();
-  const [fontsLoaded, fontsError] = useFonts();
+  const colorScheme = useColorScheme();
+  const { getPrimaryColor, currentTheme } = useTheme();
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const { init: initializeNDK } = useNDK();
 
+  // Initialize NDK with signer when keys are available
   useEffect(() => {
-    if (fontsError) throw fontsError;
-  }, [fontsError]);
-
-  useEffect(() => {
-    if (fontsLoaded) {
-      setTimeout(() => {
-        Animated.timing(scaleRef.current, {
-          toValue: 0,
-          duration: 500,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }).start(() => setAppIsReady(true));
-      }, 0);
+    if (nostrKeys?.privateKey) {
+      // @ts-ignore
+      initializeNDK({
+        // todo: Cache adapter
+        cacheAdapter,
+        explicitRelayUrls: RELAY_URLS,
+        signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
+      });
     }
-  }, [fontsLoaded]);
+  }, [initializeNDK, nostrKeys?.privateKey]);
 
-  const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) await SplashScreen.hideAsync();
-  }, [appIsReady]);
+  // Set up DM subscriptions
+  // useNostrDMs(addMessage, messages);
 
-  if (!appIsReady) {
-    return <MySplashScreen />;
-  }
+  // Close button component for modal presentations
+  const CloseButton = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+    </TouchableOpacity>
+  );
+
+  // Screen options builder
+  const getScreenOptions = (screen: ModalConfig) => {
+    // Base header styling options
+    const baseHeaderOptions = {
+      headerTitleStyle: {
+        color: getPrimaryColor('0'),
+      },
+      headerTintColor: getPrimaryColor('0'),
+      headerBackTitleStyle: {
+        fontSize: 16,
+      },
+      headerStyle: {
+        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
+      },
+      headerLargeStyle: {
+        backgroundColor: nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent',
+      },
+    };
+
+    // Check if this is a modal/formSheet presentation
+    const isModalPresentation =
+      screen.options?.presentation === 'modal' || screen.options?.presentation === 'formSheet';
+
+    // If the screen has explicit options, merge with base options
+    if (screen.options) {
+      return {
+        ...baseHeaderOptions,
+        ...screen.options,
+        ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
+        // Add close button for modal presentations
+        ...(isModalPresentation ? { headerLeft: CloseButton } : {}),
+      };
+    }
+
+    // Default options for screens with titles (non-modal screens)
+    if (screen.title !== undefined) {
+      return {
+        ...baseHeaderOptions,
+        headerShown: true,
+        headerTitle: screen.title,
+        headerBlurEffect: 'regular',
+        headerTransparent: true,
+        headerBackTitle: 'Back',
+      };
+    }
+
+    // Default: no special options
+    return {};
+  };
 
   return (
     <AppProviders>
-      <View
-        onLayout={onLayoutRootView}
-        style={{
-          flex: 1,
-          backgroundColor: getPrimaryColor('950'),
-        }}
-        className="bg-background-950">
-        <MainStack />
-        <PortalHost />
-      </View>
+      <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <DrawerProvider>
+          <Drawer>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+          </Drawer>
+          <StatusBar style="auto" />
+        </DrawerProvider>
+      </NavigationThemeProvider>
     </AppProviders>
   );
 }

@@ -5,16 +5,16 @@
  * Has inline payment processing for send-flow aware routing.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
-import { router, useLocalSearchParams, Stack } from 'expo-router';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { isValidEcashToken } from '@/helper/coco/utils';
 import { useMelt } from '@/hooks/coco';
-import { URDecoder } from '@gandlaf21/bc-ur';
-import Haptics from 'components/ui/Haptics';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Proof } from '@cashu/cashu-ts';
-import { getLightningAmount, isValidEcashToken, lnTrim } from '@/helper/coco/utils';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import Haptics from 'components/ui/Haptics';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import React, { useCallback, useRef, useState } from 'react';
+import { useMintStore } from 'stores/mintStore';
 // import { utils as lnurlPayUtils } from 'lnurl-pay';
 import { CameraScreen, ScanningData } from 'components/screens/CameraScreen';
 
@@ -115,32 +115,7 @@ const Camera: React.FC = () => {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
           });
-        } else if (
-          false
-          // (lnurlPayUtils.isLightningAddress(lnTrim(scanning.data)) ||
-          //   lnurlPayUtils.isLnurlp(lnTrim(scanning.data)) ||
-          //   isLightningInvoice(lnTrim(scanning.data))) &&
-          // selectedMint
-        ) {
-          // Lightning payments - stay in send flow
-          const amount = getLightningAmount(lnTrim(scanning.data));
-          if (!amount) {
-            // Go back to currency with updated params
-            router.back();
-            router.setParams({
-              to: 'meltQuote',
-              lnUrlOrAddress: lnTrim(scanning.data),
-            });
-            return;
-          }
-
-          const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
-          router.push({
-            pathname: '/(send-flow)/meltQuote',
-            params: {
-              meltQuote: JSON.stringify(quote),
-            },
-          });
+        } else {
         }
       }
     },

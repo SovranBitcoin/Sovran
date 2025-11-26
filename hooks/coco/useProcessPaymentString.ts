@@ -1,18 +1,18 @@
-import { useCallback, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { router } from 'expo-router';
-import { URDecoder } from '@gandlaf21/bc-ur';
-import Haptics from 'components/ui/Haptics';
-import { useMelt } from '@/hooks/coco';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { Proof } from '@cashu/cashu-ts';
 import {
   getLightningAmount,
   isLightningInvoice,
   isValidEcashToken,
   lnTrim,
 } from '@/helper/coco/utils';
-import { utils as lnurlPayUtils } from 'lnurl-pay';
+import { useMelt } from '@/hooks/coco';
+import { Proof } from '@cashu/cashu-ts';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import Haptics from 'components/ui/Haptics';
+import { router } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+// import { utils as lnurlPayUtils } from 'lnurl-pay';
 
 interface ScanningData {
   data: string;

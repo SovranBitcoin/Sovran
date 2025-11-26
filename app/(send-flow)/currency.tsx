@@ -5,24 +5,24 @@
  * Has inline payment string processing for send-flow aware routing.
  */
 
-import React, { useState } from 'react';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { CurrencyScreen } from 'components/screens/CurrencyScreen';
-import { useMelt } from 'hooks/coco';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { ROUTSTR_PUBKEY } from 'helper/constants';
-import { URDecoder } from '@gandlaf21/bc-ur';
-import Haptics from 'components/ui/Haptics';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { Proof } from '@cashu/cashu-ts';
 import {
   getLightningAmount,
   isLightningInvoice,
   isValidEcashToken,
   lnTrim,
 } from '@/helper/coco/utils';
+import { Proof } from '@cashu/cashu-ts';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { CurrencyScreen } from 'components/screens/CurrencyScreen';
+import Haptics from 'components/ui/Haptics';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { ROUTSTR_PUBKEY } from 'helper/constants';
+import { withSheetProvider } from 'hocs/withSheetProvider';
+import { useMelt } from 'hooks/coco';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { useState } from 'react';
+import { useMintStore } from 'stores/mintStore';
 // import { utils as lnurlPayUtils } from 'lnurl-pay';
 import { popup } from '@/helper/popup';
 

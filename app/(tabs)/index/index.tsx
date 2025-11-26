@@ -1,17 +1,17 @@
-import 'shim';
-import React, { memo, useCallback, useState, useMemo } from 'react';
-import 'react-native-get-random-values';
-import { Dimensions, RefreshControl, ScrollView, StyleSheet } from 'react-native';
-import { View } from 'components/ui/View';
+import { usePaginatedHistory } from 'coco-cashu-react';
+import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { Transactions } from 'components/blocks/Transactions';
-import { useTheme } from 'providers/ThemeProvider';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
+import { View } from 'components/ui/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { useVersionCheck } from 'hooks/useVersionCheck';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { useTheme } from 'providers/ThemeProvider';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { Dimensions, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import 'react-native-get-random-values';
+import 'shim';
 
 function TabOneScreen() {
   const supportedUnits = useMemo(() => ['sat', 'usd', 'eur', 'gbp'], []);
@@ -58,7 +58,7 @@ function TabOneScreen() {
 
       <View className="flex-1">
         <ScrollView
-          className="flex-1"
+          style={{ flex: 1 }}
           refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
           <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
           <View

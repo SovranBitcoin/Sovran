@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { THEMES, THEME_NAMES } from '../themes';
 import { useSettingsStore } from 'stores/settingsStore';
 import { colorThemes } from '../helper/colorTheme';
+import { THEMES, THEME_NAMES } from '../themes';
 
 const ThemeContext = createContext<{
   currentTheme: string;

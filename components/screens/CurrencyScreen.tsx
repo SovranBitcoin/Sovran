@@ -5,31 +5,31 @@
  * Navigation routing is handled by callbacks passed from route wrappers.
  */
 
-import React, { useState, useEffect } from 'react';
-import { ScrollView } from 'react-native';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { useLightningOperations, useMelt, useManager, useSend } from 'hooks/coco';
-import CustomKeyboard from 'components/blocks/CustomKeyboard';
-import { useTheme } from 'providers/ThemeProvider';
-import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { popup } from '@/helper/popup';
-import { HStack, View } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
-import * as Clipboard from 'expo-clipboard';
-import { SheetManager } from 'react-native-actions-sheet';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { Avatar } from 'components/ui/Avatar';
-import Icon from 'assets/icons';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { requestInvoice, utils } from 'lnurl-pay';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getEncodedToken, getEncodedTokenV4, MeltQuoteResponse } from '@cashu/cashu-ts';
-import { useRoutstrStore } from 'stores/routstrStore';
-import { topUpBalance, createWalletFromToken, checkBalance } from 'helper/routstr/api';
+import Icon from 'assets/icons';
+import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+import CustomKeyboard from 'components/blocks/CustomKeyboard';
+import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { Avatar } from 'components/ui/Avatar';
 import { BottomButtons } from 'components/ui/BottomButtons';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { Text } from 'components/ui/Text';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { HStack, View } from 'components/ui/View';
+import * as Clipboard from 'expo-clipboard';
+import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
+import { useLightningOperations, useManager, useMelt, useSend } from 'hooks/coco';
+// import { requestInvoice, utils } from 'lnurl-pay';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { useTheme } from 'providers/ThemeProvider';
+import { useEffect, useState } from 'react';
+import { ScrollView } from 'react-native';
+import { SheetManager } from 'react-native-actions-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MintHistoryEntry, SendHistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { useMintStore } from 'stores/mintStore';
+import { useRoutstrStore } from 'stores/routstrStore';
 
 export interface CurrencyScreenParams {
   amount?: string;

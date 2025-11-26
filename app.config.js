@@ -29,6 +29,7 @@ module.exports = ({ config }) => {
       },
       icon: './assets/images/sovran_black.png',
       assetBundlePatterns: ['**/*'],
+      newArchEnabled: true,
       ios: {
         buildNumber: '1',
         infoPlist: {

@@ -1,11 +1,10 @@
-import React from 'react';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import Icon from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { HStack, Spacer, View, VStack } from 'components/ui/View';
 import { router } from 'expo-router';
 import { PUBLIC_KEYS, ROUTSTR_PUBKEY } from 'helper/constants';
+import { useTheme } from 'providers/ThemeProvider';
 
 interface MenuItemData {
   id: string;
