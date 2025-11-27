@@ -3,31 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-jsx",
-    "module": "esnext",
+
     "baseUrl": ".",
     "paths": {
-      "~/*": [
-        "src/*"
-      ],
-      "@/*": [
-        "./*"
-      ]
+      "~/*": ["src/*"]
     }
-  },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build",
-    "coco/**/*"
-  ],
-  "expo": {
-    "experiments": {
-      "typedRoutes": true
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "nativewind-env.d.ts"
-  ]
+  }
 }
