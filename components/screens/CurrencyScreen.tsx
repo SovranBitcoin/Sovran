@@ -395,7 +395,7 @@ export function CurrencyScreen({
         )}
       </ScrollView>
 
-      <BottomButtons paddingBottom={24}>
+      <BottomButtons>
         {!params?.amount && (
           <CustomKeyboard
             loading={loading}

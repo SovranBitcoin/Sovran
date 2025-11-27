@@ -80,7 +80,7 @@ const Camera: React.FC = () => {
             };
 
             // Navigate within receive-flow
-            router.push({
+            router.navigate({
               pathname: '/(receive-flow)/receiveToken',
               params: {
                 receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -108,13 +108,12 @@ const Camera: React.FC = () => {
             token: scanning.data,
           };
 
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
           });
-        } else {
         }
       }
     },

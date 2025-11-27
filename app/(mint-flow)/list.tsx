@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
@@ -127,7 +127,7 @@ function MintListScreen() {
         if (onSelectAction === 'continue' && params.continuePathname) {
           // Continue to next screen in a flow
           const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
-          router.push({
+          router.navigate({
             pathname: params.continuePathname as any,
             params: {
               ...continueParams,
@@ -158,14 +158,9 @@ function MintListScreen() {
     ]
   );
 
-  // Handle add mints
-  const handleAddMints = useCallback(() => {
-    router.push('/(mint-flow)/add');
-  }, []);
-
-  // Handle inspect mint
+  // Handle inspect mint - using router.navigate to prevent duplicate navigation
   const handleInspectMint = useCallback((mintUrl: string) => {
-    router.push({
+    router.navigate({
       pathname: '/(mint-flow)/info',
       params: { mintUrl },
     });
@@ -178,13 +173,14 @@ function MintListScreen() {
           title: 'Select Mint',
           headerRight: () =>
             showAddMintsButton ? (
-              <TouchableOpacity
-                onPress={handleAddMints}
-                style={{
-                  padding: 8,
-                }}>
-                <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
-              </TouchableOpacity>
+              <Link href="/(mint-flow)/add" asChild>
+                <TouchableOpacity
+                  style={{
+                    padding: 8,
+                  }}>
+                  <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+                </TouchableOpacity>
+              </Link>
             ) : null,
         }}
       />

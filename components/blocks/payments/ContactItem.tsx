@@ -1,10 +1,10 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { getMintDisplayName } from '@/helper/url';
 
@@ -97,19 +97,18 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
     return formatCustomDate(new Date(item.dmEvent.created_at * 1000));
   }, [item.dmEvent?.created_at]);
 
-  const handlePress = useCallback(() => {
-    if (item.pubkey) {
-      router.push({
-        pathname: '/userMessages',
-        params: {
-          pubkey: item.pubkey,
-        },
-      });
-    }
-  }, [item.pubkey]);
+  const linkHref = useMemo(
+    () =>
+      item.pubkey
+        ? {
+            pathname: '/userMessages' as const,
+            params: { pubkey: item.pubkey },
+          }
+        : null,
+    [item.pubkey]
+  );
 
-  return (
-    <TouchableOpacity style={styles.contactItem} onPress={handlePress}>
+  const content = (
       <HStack align="center" justify="space-between" style={styles.row}>
         <HStack align="center">
           <VStack style={{ marginRight: 8 }}>
@@ -144,6 +143,15 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
           </Text>
         )}
       </HStack>
-    </TouchableOpacity>
   );
+
+  if (linkHref) {
+    return (
+      <Link href={linkHref as any} asChild>
+        <TouchableOpacity style={styles.contactItem}>{content}</TouchableOpacity>
+      </Link>
+    );
+  }
+
+  return <TouchableOpacity style={styles.contactItem}>{content}</TouchableOpacity>;
 };

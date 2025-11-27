@@ -17,7 +17,7 @@ const EcashLightningReceiver = () => {
       <ReceiveScreen
         unit={unit || 'sat'}
         onReceiveToken={(receiveHistoryEntry) => {
-          router.push({
+          router.navigate({
             pathname: '/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -25,13 +25,13 @@ const EcashLightningReceiver = () => {
           });
         }}
         onCamera={(unit) => {
-          router.push({
+          router.navigate({
             pathname: '/camera',
             params: { unit },
           });
         }}
         onFixedAmount={(unit) => {
-          router.push({
+          router.navigate({
             pathname: '/currency',
             params: {
               to: 'mintQuote',

@@ -92,7 +92,7 @@ export function AccountPagerView({
 
       // If no balance on selected mint, go to mint selection first
       if (page === 'currency' && balance <= 0) {
-        router.push({
+        router.navigate({
           pathname: '/(send-flow)/mintSelect',
           params: {
             to: 'sendToken',
@@ -119,7 +119,7 @@ export function AccountPagerView({
         pathname = `/${page}`;
       }
 
-      router.push({
+      router.navigate({
         pathname,
         params: {
           to: 'sendToken',

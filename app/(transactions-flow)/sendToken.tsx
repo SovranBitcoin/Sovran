@@ -73,7 +73,7 @@ function ModalScreen() {
         sendHistoryEntry={sendHistoryEntry}
         onNavigateBack={() => router.back()}
         onNavigateToMessages={(pubkey) =>
-          router.push({
+          router.navigate({
             pathname: '/userMessages',
             params: { pubkey },
           })

@@ -53,7 +53,7 @@ export const PUBLIC_KEYS = {
  * @constant {string} ROUTSTR_PUBKEY
  * @example
  * // Navigate to Routstr chat
- * router.push({
+ * router.navigate({
  *   pathname: 'userMessages',
  *   params: { pubkey: ROUTSTR_PUBKEY }
  * });

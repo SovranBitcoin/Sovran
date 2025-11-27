@@ -94,7 +94,7 @@ const RouteA = ({ router }: RouteScreenProps<'popup-sheet', 'route-a'>) => {
                 if (button.onPress) {
                   button.onPress();
                 } else if (button.page) {
-                  expoRouter.push(`/${button.page}` as any);
+                  expoRouter.navigate(`/${button.page}` as any);
                 }
               }}
               text={button.text}

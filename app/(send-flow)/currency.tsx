@@ -94,7 +94,7 @@ function ModalScreen() {
             token: _tokenString,
           };
 
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -122,7 +122,7 @@ function ModalScreen() {
           token: scanning.data,
         };
 
-        router.push({
+        router.navigate({
           pathname: '/(receive-flow)/receiveToken',
           params: {
             receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -146,7 +146,7 @@ function ModalScreen() {
         }
 
         const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
-        router.push({
+        router.navigate({
           pathname: '/(send-flow)/meltQuote',
           params: {
             meltQuote: JSON.stringify(quote),
@@ -174,7 +174,7 @@ function ModalScreen() {
         }}
         onSendTokenCreated={(sendHistoryEntry) => {
           // Navigate within send-flow (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(send-flow)/sendToken',
             params: {
               sendHistoryEntry: JSON.stringify(sendHistoryEntry),
@@ -183,7 +183,7 @@ function ModalScreen() {
         }}
         onMeltQuoteCreated={(meltQuote) => {
           // Navigate within send-flow (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(send-flow)/meltQuote',
             params: {
               meltQuote: JSON.stringify(meltQuote),
@@ -192,7 +192,7 @@ function ModalScreen() {
         }}
         onCameraPress={(unit) => {
           // Navigate within send-flow (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(send-flow)/camera',
             params: { unit },
           });

@@ -434,7 +434,7 @@ const ListRoute = () => {
         if (payload?.navigate) {
           await new Promise((resolve) => setTimeout(resolve, 300));
 
-          expoRouter.push({
+          expoRouter.navigate({
             pathname: '/currency',
             params: {
               to: 'sendToken',

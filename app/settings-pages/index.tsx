@@ -9,7 +9,7 @@ import {
   connectActionSheet,
   useActionSheet,
 } from '@expo/react-native-action-sheet';
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -54,40 +54,39 @@ const ProfileButton = () => {
   const { getPrimaryColor } = useTheme();
 
   return (
-    <TouchableOpacity
-      onPress={() => {
-        router.push('/settings-pages/profile');
-      }}>
-      <View
-        blur
-        className="flex-row items-center justify-start bg-transparent p-3"
-        style={{
-          backgroundColor: getPrimaryColor('800'),
-        }}>
-        <HStack spacing={12} flex={1}>
-          <Avatar seed={nostrKeys?.pubkey} variant="person" size={60} />
-          <VStack spacing={2} flex={1}>
-            <Text
-              size={18}
-              bold
-              overpass
-              style={{
-                color: getPrimaryColor('0'),
-              }}>
-              {getUsername(nostrKeys?.pubkey || '')}
-            </Text>
-            <Text
-              size={16}
-              style={{
-                color: getPrimaryColor('400'),
-              }}>
-              {truncateMiddle(nostrKeys?.npub || '', 8)}
-            </Text>
-          </VStack>
-        </HStack>
-        <Icon name="fa6-solid:chevron-right" color={getPrimaryColor('400')} size={22} />
-      </View>
-    </TouchableOpacity>
+    <Link href="/settings-pages/profile" asChild>
+      <TouchableOpacity>
+        <View
+          blur
+          className="flex-row items-center justify-start bg-transparent p-3"
+          style={{
+            backgroundColor: getPrimaryColor('800'),
+          }}>
+          <HStack spacing={12} flex={1}>
+            <Avatar seed={nostrKeys?.pubkey} variant="person" size={60} />
+            <VStack spacing={2} flex={1}>
+              <Text
+                size={18}
+                bold
+                overpass
+                style={{
+                  color: getPrimaryColor('0'),
+                }}>
+                {getUsername(nostrKeys?.pubkey || '')}
+              </Text>
+              <Text
+                size={16}
+                style={{
+                  color: getPrimaryColor('400'),
+                }}>
+                {truncateMiddle(nostrKeys?.npub || '', 8)}
+              </Text>
+            </VStack>
+          </HStack>
+          <Icon name="fa6-solid:chevron-right" color={getPrimaryColor('400')} size={22} />
+        </View>
+      </TouchableOpacity>
+    </Link>
   );
 };
 
@@ -95,13 +94,15 @@ export const RowButton: React.FC<{
   label: string | React.ReactElement;
   value?: string;
   onPress?: () => void;
+  href?: string;
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
   rightIcon?: React.ReactNode;
-}> = ({ label, value, onPress, isFirst, isLast, isDanger, rightIcon }) => {
+}> = ({ label, value, onPress, href, isFirst, isLast, isDanger, rightIcon }) => {
   const { getPrimaryColor, getRedColor } = useTheme();
-  return (
+
+  const content = (
     <View
       blur
       className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
@@ -110,10 +111,7 @@ export const RowButton: React.FC<{
         borderColor: getPrimaryColor('700'),
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={!onPress}
-        className="w-full flex-row items-center justify-start pr-1">
+      <View className="w-full flex-row items-center justify-start pr-1">
         <Text
           className="tracking-tight"
           size={16}
@@ -135,7 +133,7 @@ export const RowButton: React.FC<{
             {value}
           </Text>
         )}
-        {onPress ? (
+        {onPress || href ? (
           (rightIcon ?? (
             <Icon
               name="fa6-solid:chevron-right"
@@ -146,8 +144,22 @@ export const RowButton: React.FC<{
         ) : (
           <Spacer size={4} />
         )}
-      </TouchableOpacity>
+      </View>
     </View>
+  );
+
+  if (href) {
+    return (
+      <Link href={href as any} asChild>
+        <TouchableOpacity>{content}</TouchableOpacity>
+      </Link>
+    );
+  }
+
+  return (
+    <TouchableOpacity onPress={onPress} disabled={!onPress}>
+      {content}
+    </TouchableOpacity>
   );
 };
 
@@ -197,21 +209,10 @@ const ModalScreen = () => {
         <Section title="Preferences">
           <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
           <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
-          <RowButton
-            label="Theme"
-            onPress={() => {
-              router.push('/settings-pages/theme');
-            }}
-          />
+          <RowButton label="Theme" href="/settings-pages/theme" />
         </Section>
         <Section title="App Information">
-          <RowButton
-            isFirst
-            label="About This Release"
-            onPress={() => {
-              router.push('/settings-pages/about');
-            }}
-          />
+          <RowButton isFirst label="About This Release" href="/settings-pages/about" />
           <RowButton
             label="View Source on GitHub"
             onPress={() => {
@@ -226,13 +227,7 @@ const ModalScreen = () => {
           />
         </Section>
         <Section title="Security">
-          <RowButton
-            label="Passcode"
-            onPress={() => {
-              router.push('/settings-pages/passcode');
-            }}
-            isFirst
-          />
+          <RowButton label="Passcode" href="/settings-pages/passcode" isFirst />
         </Section>
         <Section title="Danger Zone" isDanger>
           <RowButton
@@ -245,33 +240,32 @@ const ModalScreen = () => {
           />
         </Section>
 
-        <TouchableOpacity
-          onPress={() => {
-            router.push('/settings-pages/design');
-          }}>
-          <VStack spacing={4}>
-            <Text
-              className="text-center"
-              overpass
-              bold
-              size={13}
-              style={{
-                color: getPrimaryColor('300'),
-              }}>
-              {name}
-            </Text>
-            <Text
-              className="text-center"
-              size={13}
-              overpass
-              medium
-              style={{
-                color: getPrimaryColor('300'),
-              }}>
-              App Version {version} ({buildNumber})
-            </Text>
-          </VStack>
-        </TouchableOpacity>
+        <Link href="/settings-pages/design" asChild>
+          <TouchableOpacity>
+            <VStack spacing={4}>
+              <Text
+                className="text-center"
+                overpass
+                bold
+                size={13}
+                style={{
+                  color: getPrimaryColor('300'),
+                }}>
+                {name}
+              </Text>
+              <Text
+                className="text-center"
+                size={13}
+                overpass
+                medium
+                style={{
+                  color: getPrimaryColor('300'),
+                }}>
+                App Version {version} ({buildNumber})
+              </Text>
+            </VStack>
+          </TouchableOpacity>
+        </Link>
       </ScrollView>
     </Container>
   );

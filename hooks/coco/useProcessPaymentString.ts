@@ -101,7 +101,7 @@ export const useProcessPaymentString = ({
               token: _tokenString,
             };
 
-            router.push({
+            router.navigate({
               pathname: '/receiveToken',
               params: {
                 receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -131,7 +131,7 @@ export const useProcessPaymentString = ({
             token: scanning.data,
           };
 
-          router.push({
+          router.navigate({
             pathname: '/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -145,7 +145,7 @@ export const useProcessPaymentString = ({
         ) {
           const amount = getLightningAmount(lnTrim(scanning.data));
           if (!amount) {
-            router.push({
+            router.navigate({
               pathname: '/currency',
               params: {
                 to: 'meltQuote',
@@ -157,7 +157,7 @@ export const useProcessPaymentString = ({
           }
 
           const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
-          router.push({
+          router.navigate({
             pathname: '/meltQuote',
             params: {
               meltQuote: JSON.stringify(quote),

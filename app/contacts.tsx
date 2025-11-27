@@ -138,7 +138,7 @@ function ModalScreen() {
     ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
       router.back();
       router.back();
-      router.push({
+      router.navigate({
         pathname: '/userMessages',
         params: {
           pubkey: pubkey,

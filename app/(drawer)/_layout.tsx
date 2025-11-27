@@ -1,3 +1,4 @@
+import React, { useCallback } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
@@ -28,16 +29,49 @@ type MenuItem = {
 };
 
 const MENU_ITEMS: MenuItem[] = [
-  { icon: 'fluent:wallet-20-filled', label: 'Wallet', route: '(drawer)/(tabs)/index', drawerLabel: 'index' },
-  { icon: 'fluent:arrow-swap-16-filled', label: 'Payments', route: '(drawer)/(tabs)/payments', drawerLabel: 'payments' },
-  { icon: 'clarity:internet-of-things-solid', label: 'Explore', route: '(drawer)/(tabs)/explore', drawerLabel: 'explore' },
-  { icon: 'material-symbols:settings-rounded', label: 'Settings', route: 'settings-pages', drawerLabel: 'settings' },
+  {
+    icon: 'fluent:wallet-20-filled',
+    label: 'Wallet',
+    route: '(drawer)/(tabs)/index',
+    drawerLabel: 'index',
+  },
+  {
+    icon: 'fluent:arrow-swap-16-filled',
+    label: 'Payments',
+    route: '(drawer)/(tabs)/payments',
+    drawerLabel: 'payments',
+  },
+  {
+    icon: 'clarity:internet-of-things-solid',
+    label: 'Explore',
+    route: '(drawer)/(tabs)/explore',
+    drawerLabel: 'explore',
+  },
+  {
+    icon: 'material-symbols:settings-rounded',
+    label: 'Settings',
+    route: 'settings-pages',
+    drawerLabel: 'settings',
+  },
 ];
 
 function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
   const { getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const handlePress = useCallback(() => {
+    if (nostrKeys?.pubkey) {
+      closeDrawer();
+      router.navigate({
+        pathname: '/share',
+        params: {
+          type: 'profile',
+          data: nostrKeys?.npub || nip19.npubEncode(nostrKeys?.pubkey),
+        },
+      });
+    }
+  }, [nostrKeys, closeDrawer]);
 
   return (
     <LinearGradient
@@ -54,20 +88,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}>
       <View style={styles.headerContent}>
-        <TouchableOpacity
-          style={styles.profileTouchable}
-          onPress={() => {
-            if (nostrKeys?.pubkey) {
-              closeDrawer();
-              router.push({
-                pathname: '/share',
-                params: {
-                  type: 'profile',
-                  data: nostrKeys?.npub || nip19.npubEncode(nostrKeys?.pubkey),
-                },
-              });
-            }
-          }}>
+        <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
               <Avatar seed={nostrKeys?.pubkey} size={64} variant="person" />
@@ -100,24 +121,22 @@ function MenuButton({
   const { getPrimaryColor } = useTheme();
 
   return (
-    <Pressable 
-      onPress={onPress} 
+    <Pressable
+      onPress={onPress}
       style={[
         styles.menuButton,
-        isActive && { backgroundColor: opacity(getPrimaryColor('700'), 0.5) }
-      ]}
-    >
+        isActive && { backgroundColor: opacity(getPrimaryColor('700'), 0.5) },
+      ]}>
       <HStack align="center" spacing={12}>
-        <Icon 
-          name={icon} 
-          color={isActive ? getPrimaryColor('0') : getPrimaryColor('300')} 
-          size={24} 
+        <Icon
+          name={icon}
+          color={isActive ? getPrimaryColor('0') : getPrimaryColor('300')}
+          size={24}
         />
-        <Text 
-          size={18} 
-          bold 
-          style={{ color: isActive ? getPrimaryColor('0') : getPrimaryColor('300') }}
-        >
+        <Text
+          size={18}
+          bold
+          style={{ color: isActive ? getPrimaryColor('0') : getPrimaryColor('300') }}>
           {label}
         </Text>
       </HStack>
@@ -129,13 +148,19 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { getPrimaryColor } = useTheme();
   const pathname = usePathname();
 
-  const handleNavigation = (route: string) => {
-    props.navigation.closeDrawer();
-    router.push(`/${route}` as any);
-  };
+  const handleNavigation = useCallback(
+    (route: string) => {
+      props.navigation.closeDrawer();
+      router.navigate(`/${route}` as any);
+    },
+    [props.navigation]
+  );
 
   const isRouteActive = (route: string) => {
-    if (route.includes('(tabs)/index') && (pathname === '/' || pathname === '/index' || pathname.startsWith('/(tabs)/index'))) {
+    if (
+      route.includes('(tabs)/index') &&
+      (pathname === '/' || pathname === '/index' || pathname.startsWith('/(tabs)/index'))
+    ) {
       return true;
     }
     if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
@@ -191,8 +216,7 @@ export default function DrawerLayout() {
           swipeEdgeWidth: 40,
           swipeMinDistance: 10,
         }}
-        drawerContent={(props) => <CustomDrawerContent {...props} />}
-      >
+        drawerContent={(props) => <CustomDrawerContent {...props} />}>
         <Drawer.Screen
           name="(tabs)"
           options={{
@@ -231,4 +255,3 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 });
-

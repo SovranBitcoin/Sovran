@@ -26,10 +26,11 @@ function ModalScreen() {
   const initialTab = (tab_ as 'All' | 'Confirmed' | 'Pending' | 'Expired') || 'All';
 
   // Handle transaction press - navigate within the transactions flow
+  // Using router.navigate to prevent duplicate navigation on rapid presses
   const handleTransactionPress = (historyEntry: HistoryEntry) => {
     switch (historyEntry.type) {
       case 'mint': {
-        router.push({
+        router.navigate({
           pathname: '/(transactions-flow)/mintQuote',
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
@@ -38,7 +39,7 @@ function ModalScreen() {
         return;
       }
       case 'melt': {
-        router.push({
+        router.navigate({
           pathname: '/(transactions-flow)/meltQuote',
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
@@ -47,7 +48,7 @@ function ModalScreen() {
         return;
       }
       case 'send': {
-        router.push({
+        router.navigate({
           pathname: '/(transactions-flow)/sendToken',
           params: {
             sendHistoryEntry: JSON.stringify(historyEntry),
@@ -57,7 +58,7 @@ function ModalScreen() {
       }
       case 'receive': {
         const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
-        router.push({
+        router.navigate({
           pathname: '/(transactions-flow)/receiveToken',
           params: {
             receiveHistoryEntry: JSON.stringify(receiveEntry),

@@ -33,7 +33,7 @@ function ModalScreen() {
         meltHistoryEntry={meltHistoryEntry}
         onCancel={() => {
           router.dismissAll();
-          router.push('/(drawer)/(tabs)');
+          router.navigate('/(drawer)/(tabs)');
         }}
       />
     </>

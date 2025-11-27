@@ -294,7 +294,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       token,
     };
 
-    router.push({
+    router.navigate({
       pathname: '/receiveToken',
       params: {
         receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -1044,7 +1044,7 @@ export function UserMessagesScreen({
       return;
     }
 
-    router.push({
+    router.navigate({
       pathname: '/(send-flow)/currency',
       params: {
         to: 'sendToken',
@@ -1443,7 +1443,7 @@ export function UserMessagesScreen({
             icon: 'solar:wallet-bold',
             variant: 'primary' as const,
             onPress: async (close) => {
-              router.push({
+              router.navigate({
                 pathname: '/(send-flow)/currency',
                 params: {
                   to: 'sendToken',
@@ -1459,7 +1459,7 @@ export function UserMessagesScreen({
             icon: 'mingcute:lightning-fill',
             variant: 'primary' as const,
             onPress: async (close) => {
-              router.push({
+              router.navigate({
                 pathname: '/(send-flow)/currency',
                 params: {
                   to: 'meltQuote',
@@ -1746,7 +1746,7 @@ export function UserMessagesScreen({
               ) : (
                 <Pressable
                   onPress={() =>
-                    router.push({
+                    router.navigate({
                       pathname: 'share',
                       params: {
                         type: 'profile',
@@ -1779,7 +1779,7 @@ export function UserMessagesScreen({
                 <Pressable
                   onPress={() => {
                     setIsAttachmentsBottomSheetOpen(false);
-                    router.push('/camera');
+                    router.navigate('/camera');
                   }}
                   style={{
                     flexDirection: 'row',

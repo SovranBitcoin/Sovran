@@ -60,7 +60,7 @@ function ModalScreen() {
           });
         }}
         onMeltQuoteCreated={(meltQuote) => {
-          router.push({
+          router.navigate({
             pathname: `/${params.to}` as any,
             params: {
               meltQuote: JSON.stringify(meltQuote),
@@ -68,7 +68,7 @@ function ModalScreen() {
           });
         }}
         onCameraPress={(unit) => {
-          router.push({
+          router.navigate({
             pathname: '/camera',
             params: { unit },
           });

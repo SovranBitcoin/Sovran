@@ -2205,7 +2205,7 @@ const InfoRoute = ({ params }: RouteScreenProps<'mint-balance', 'info'>) => {
         case 'nostr':
           // Convert npub to pubkey if needed and navigate to userMessages
           const pubkey = npubToPubkey(info);
-          router.push({
+          router.navigate({
             pathname: '/userMessages',
             params: {
               pubkey: pubkey,

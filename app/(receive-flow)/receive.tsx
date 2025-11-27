@@ -20,7 +20,7 @@ const EcashLightningReceiver = () => {
         unit={unit || 'sat'}
         onReceiveToken={(receiveHistoryEntry) => {
           // Navigate within the receive-flow modal (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -29,14 +29,14 @@ const EcashLightningReceiver = () => {
         }}
         onCamera={(unit) => {
           // Navigate within the receive-flow modal (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/camera',
             params: { unit },
           });
         }}
         onFixedAmount={(unit) => {
           // Navigate within the same modal stack (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/currency',
             params: {
               to: 'mintQuote',

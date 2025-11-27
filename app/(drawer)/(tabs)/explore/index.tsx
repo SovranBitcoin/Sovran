@@ -2,7 +2,7 @@ import Icon from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, Spacer, View, VStack } from 'components/ui/View';
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
 import { PUBLIC_KEYS, ROUTSTR_PUBKEY } from 'helper/constants';
 import { useTheme } from 'providers/ThemeProvider';
 
@@ -15,32 +15,33 @@ interface MenuItemData {
 
 interface MenuItemProps {
   item: MenuItemData;
-  onPress: () => void;
+  href: { pathname: string; params: Record<string, string> };
 }
 
-const MenuItem = ({ item, onPress }: MenuItemProps) => {
+const MenuItem = ({ item, href }: MenuItemProps) => {
   const { getPrimaryColor } = useTheme();
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="items-center justify-center rounded-lg"
-      style={{
-        flexBasis: '22%',
-        opacity: item.empty ? 0 : 1,
-        pointerEvents: item.empty ? 'none' : 'auto',
-        marginBottom: 16,
-      }}>
-      {item.icon && (
-        <View className="items-center justify-center rounded-lg bg-primary-800 p-4">
-          <Icon name={item.icon} size={32} color={getPrimaryColor('0')} />
-        </View>
-      )}
-      <Spacer size={8} />
-      <Text className="text-center text-primary-100" overpass heavy size={11}>
-        {item.label}
-      </Text>
-    </TouchableOpacity>
+    <Link href={href as any} asChild>
+      <TouchableOpacity
+        className="items-center justify-center rounded-lg"
+        style={{
+          flexBasis: '22%',
+          opacity: item.empty ? 0 : 1,
+          pointerEvents: item.empty ? 'none' : 'auto',
+          marginBottom: 16,
+        }}>
+        {item.icon && (
+          <View className="items-center justify-center rounded-lg bg-primary-800 p-4">
+            <Icon name={item.icon} size={32} color={getPrimaryColor('0')} />
+          </View>
+        )}
+        <Spacer size={8} />
+        <Text className="text-center text-primary-100" overpass heavy size={11}>
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    </Link>
   );
 };
 
@@ -69,11 +70,9 @@ const TabTwoScreen = () => {
               icon: 'mdi:help-circle',
               label: 'Support',
             }}
-            onPress={() => {
-              router.push({
-                pathname: `userMessages`,
-                params: { pubkey: PUBLIC_KEYS.SUPPORT },
-              });
+            href={{
+              pathname: 'userMessages',
+              params: { pubkey: PUBLIC_KEYS.SUPPORT },
             }}
           />
           <MenuItem
@@ -82,11 +81,9 @@ const TabTwoScreen = () => {
               icon: 'mdi:robot',
               label: 'Routstr',
             }}
-            onPress={() => {
-              router.push({
-                pathname: `userMessages`,
-                params: { pubkey: ROUTSTR_PUBKEY },
-              });
+            href={{
+              pathname: 'userMessages',
+              params: { pubkey: ROUTSTR_PUBKEY },
             }}
           />
         </HStack>

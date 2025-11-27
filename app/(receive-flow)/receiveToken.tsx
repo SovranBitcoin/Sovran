@@ -27,7 +27,7 @@ function ModalScreen() {
         onNavigateBack={() => router.back()}
         onRedeemSuccess={() => {
           router.dismissAll();
-          router.push('/(drawer)/(tabs)');
+          router.navigate('/(drawer)/(tabs)');
         }}
       />
     </>

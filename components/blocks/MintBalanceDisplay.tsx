@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -110,21 +110,22 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 
   const showMintInfo = !(requireValidMint && !isMintAllowed);
 
-  const handlePress = useCallback(async () => {
-    // Navigate to mint-flow modal instead of showing a sheet
-    router.push({
-      pathname: '/(mint-flow)/list',
+  const linkHref = useMemo(
+    () => ({
+      pathname: '/(mint-flow)/list' as const,
       params: {
         requireBalance: String(requireBalance),
         showAddMintsButton: String(showAddMintsButton),
         showDetailsButton: String(showDetailsButton),
-        onSelectAction: 'goBack', // Default behavior: select and go back
+        onSelectAction: 'goBack',
       },
-    });
-  }, [requireBalance, showAddMintsButton, showDetailsButton]);
+    }),
+    [requireBalance, showAddMintsButton, showDetailsButton]
+  );
 
   return (
-    <TouchableOpacity onPress={handlePress} haptics>
+    <Link href={linkHref as any} asChild>
+      <TouchableOpacity haptics>
       <HStack
         blur
         align="center"
@@ -209,7 +210,8 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           <Spacer size={8} />
         </HStack>
       </HStack>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Link>
   );
 };
 

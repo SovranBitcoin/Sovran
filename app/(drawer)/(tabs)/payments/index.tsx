@@ -524,7 +524,7 @@ const PaymentsContent = () => {
 
   const navigateToUserMessages = useCallback(
     ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
-      router.push({
+      router.navigate({
         pathname: '/userMessages',
         params: {
           pubkey: pubkey,

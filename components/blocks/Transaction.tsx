@@ -7,7 +7,7 @@ import TransactionIcon from 'components/blocks/TransactionIcon';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { HStack, VStack } from 'components/ui/View';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { router } from 'expo-router';
 
@@ -32,11 +32,12 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
     { displayAs: 'usd' }
   );
 
-  const handlePress = (): void => {
+  const handlePress = useCallback((): void => {
+    // Using router.navigate instead of router.push to prevent duplicate navigation
     switch (historyEntry.type) {
       case 'mint': {
         // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)
-        router.push({
+        router.navigate({
           pathname: '/mintQuote',
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
@@ -46,7 +47,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       }
       case 'melt': {
         // Coco uses 'melt' for ecash-to-Lightning (Lightning send)
-        router.push({
+        router.navigate({
           pathname: '/meltQuote',
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
@@ -56,7 +57,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       }
       case 'send': {
         // Coco uses 'send' for ecash sends
-        router.push({
+        router.navigate({
           pathname: '/sendToken',
           params: {
             sendHistoryEntry: JSON.stringify(historyEntry),
@@ -68,7 +69,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
         // Coco uses 'receive' for ecash receives
         // Extended ReceiveHistoryEntry with token property
         const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
-        router.push({
+        router.navigate({
           pathname: '/receiveToken',
           params: {
             receiveHistoryEntry: JSON.stringify(receiveEntry),
@@ -77,7 +78,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
         return;
       }
     }
-  };
+  }, [historyEntry]);
 
   return {
     isSend,

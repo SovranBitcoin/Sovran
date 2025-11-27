@@ -6,25 +6,16 @@
  */
 
 import { isValidEcashToken } from '@/helper/coco/utils';
-import { useMelt } from '@/hooks/coco';
 import { Proof } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import Haptics from 'components/ui/Haptics';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { router, Stack } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-import { useMintStore } from 'stores/mintStore';
 // import { utils as lnurlPayUtils } from 'lnurl-pay';
 import { CameraScreen, ScanningData } from 'components/screens/CameraScreen';
 
 const Camera: React.FC = () => {
-  const { unit } = useLocalSearchParams<{ unit: string }>();
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-  const { createMeltQuote } = useMelt();
-
   const urDecoderRef = useRef<URDecoder>(new URDecoder());
   const [scanned, setScanned] = useState<boolean>(false);
 
@@ -81,7 +72,7 @@ const Camera: React.FC = () => {
               token: _tokenString,
             };
 
-            router.push({
+            router.navigate({
               pathname: '/(receive-flow)/receiveToken',
               params: {
                 receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
@@ -109,17 +100,16 @@ const Camera: React.FC = () => {
             token: scanning.data,
           };
 
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/receiveToken',
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
           });
-        } else {
         }
       }
     },
-    [scanned, unit, selectedMint, createMeltQuote]
+    [scanned]
   );
 
   return (

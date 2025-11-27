@@ -44,7 +44,7 @@ function ModalScreen() {
         params={params}
         onMintQuoteCreated={(mintHistoryEntry) => {
           // Navigate within receive-flow (horizontal push)
-          router.push({
+          router.navigate({
             pathname: '/(receive-flow)/mintQuote',
             params: {
               mintHistoryEntry: JSON.stringify(mintHistoryEntry),
@@ -62,7 +62,7 @@ function ModalScreen() {
         }}
         onMeltQuoteCreated={(meltQuote) => {
           // meltQuote is a separate flow, navigate to root-level screen
-          router.push({
+          router.navigate({
             pathname: `/${params.to}` as any,
             params: {
               meltQuote: JSON.stringify(meltQuote),
@@ -70,7 +70,7 @@ function ModalScreen() {
           });
         }}
         onCameraPress={(unit) => {
-          router.push({
+          router.navigate({
             pathname: '/camera',
             params: { unit },
           });

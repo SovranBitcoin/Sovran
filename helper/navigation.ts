@@ -78,7 +78,7 @@ export function navigateToReceiveToken(
   receiveHistoryEntry: ReceiveHistoryEntry & { token?: string },
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getReceiveTokenPath(context) as any,
     params: { receiveHistoryEntry: JSON.stringify(receiveHistoryEntry) },
   });
@@ -88,7 +88,7 @@ export function navigateToSendToken(
   sendHistoryEntry: SendHistoryEntry,
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getSendTokenPath(context) as any,
     params: { sendHistoryEntry: JSON.stringify(sendHistoryEntry) },
   });
@@ -98,7 +98,7 @@ export function navigateToMintQuote(
   mintHistoryEntry: MintHistoryEntry,
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getMintQuotePath(context) as any,
     params: { mintHistoryEntry: JSON.stringify(mintHistoryEntry) },
   });
@@ -111,7 +111,7 @@ export function navigateToMeltQuote(
   },
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getMeltQuotePath(context) as any,
     params: {
       ...(options.meltQuote && { meltQuote: JSON.stringify(options.meltQuote) }),
@@ -131,7 +131,7 @@ export function navigateToCurrency(
   },
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getCurrencyPath(context) as any,
     params,
   });
@@ -141,7 +141,7 @@ export function navigateToCamera(
   unit: string,
   context: FlowContext = 'standalone'
 ) {
-  router.push({
+  router.navigate({
     pathname: getCameraPath(context) as any,
     params: { unit },
   });

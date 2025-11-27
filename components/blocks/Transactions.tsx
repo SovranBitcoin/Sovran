@@ -5,7 +5,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { View, VStack, Spacer } from 'components/ui/View';
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
 import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
@@ -255,24 +255,25 @@ export const Transactions = React.memo(
                         );
                       })}
                       {label === 'Confirmed' && (
-                        <TouchableOpacity
-                          onPress={() =>
-                            router.push({
-                              pathname: '/(transactions-flow)/transactions',
-                              params: {
-                                account: JSON.stringify(account),
-                                tab: 'Confirmed',
-                              },
-                            })
-                          }>
-                          <View
-                            blur
-                            className="flex items-center rounded-lg border border-primary-700 bg-primary-800 p-3">
-                            <Text size={14} bold>
-                              View all ({filteredHistory.length})
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
+                        <Link
+                          href={{
+                            pathname: '/(transactions-flow)/transactions',
+                            params: {
+                              account: JSON.stringify(account),
+                              tab: 'Confirmed',
+                            },
+                          }}
+                          asChild>
+                          <TouchableOpacity>
+                            <View
+                              blur
+                              className="flex items-center rounded-lg border border-primary-700 bg-primary-800 p-3">
+                              <Text size={14} bold>
+                                View all ({filteredHistory.length})
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        </Link>
                       )}
                     </View>
                   </VStack>

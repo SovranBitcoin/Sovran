@@ -12,7 +12,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ScrollView, Animated, Alert, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -607,7 +607,7 @@ function MintInfoModal() {
             await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
             break;
           case 'nostr':
-            router.push({ pathname: '/(mint-flow)/userMessages', params: { pubkey: npubToPubkey(info) } });
+            router.navigate({ pathname: '/(mint-flow)/userMessages', params: { pubkey: npubToPubkey(info) } });
             break;
           default:
             await handleCopy(info);
@@ -666,16 +666,16 @@ function MintInfoModal() {
         options={{
           title: isLoading ? 'Mint Details' : displayName,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                router.push({
-                  pathname: '/(mint-flow)/reviews',
-                  params: { mintUrl: mintUrl || '' },
-                });
+            <Link
+              href={{
+                pathname: '/(mint-flow)/reviews',
+                params: { mintUrl: mintUrl || '' },
               }}
-              style={{ padding: 8 }}>
-              <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
-            </TouchableOpacity>
+              asChild>
+              <TouchableOpacity style={{ padding: 8 }}>
+                <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
+              </TouchableOpacity>
+            </Link>
           ),
         }}
       />

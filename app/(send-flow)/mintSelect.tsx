@@ -8,9 +8,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { View, VStack, HStack } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintManagement } from 'hooks/coco';
@@ -88,6 +86,9 @@ function MintSelectScreen() {
   // Handle mint selection
   const handleMintSelect = useCallback(
     async (mintUrl: string) => {
+      // Prevent rapid button presses from triggering multiple navigations
+      if (loadingId !== null) return;
+
       const mint = processedMints.find((m) => m.mintUrl === mintUrl);
       if (!mint) return;
 
@@ -112,14 +113,14 @@ function MintSelectScreen() {
         }
 
         // Navigate to currency screen (horizontal push within the flow)
-        router.push({
+        router.navigate({
           pathname: '/(send-flow)/currency',
           params: {
             to: params.to || 'sendToken',
             unit: mint.unit.toLowerCase(),
           },
         });
-      } catch (e) {
+      } catch {
         popup({
           message: 'general_error',
           emoji: '🚨',
@@ -128,7 +129,7 @@ function MintSelectScreen() {
         setLoadingId(null);
       }
     },
-    [processedMints, pubkey, setSelectedMint, params.to]
+    [processedMints, pubkey, setSelectedMint, params.to, loadingId]
   );
 
   return (
@@ -186,4 +187,3 @@ function MintSelectScreen() {
 }
 
 export default withSheetProvider(MintSelectScreen);
-
