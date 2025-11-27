@@ -31,7 +31,7 @@ module.exports = ({ config }) => {
       assetBundlePatterns: ['**/*'],
       newArchEnabled: true,
       ios: {
-        buildNumber: '3',
+        buildNumber: '6',
         infoPlist: {
           NSCameraUsageDescription:
             'Sovran will use your camera to scan QR codes to make it easier to send and receive payments.',
@@ -109,10 +109,9 @@ module.exports = ({ config }) => {
           projectId: '09112d75-3a3a-49ba-bec6-ab881c5a2fa6',
         },
       },
-    },
-    experiments: {
-      typedRoutes: true,
-      reactCompiler: true,
+      experiments: {
+        typedRoutes: true,
+      },
     },
   };
 };

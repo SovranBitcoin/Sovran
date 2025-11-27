@@ -9,6 +9,16 @@ module.exports = defineConfig([
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),
     },
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+        },
+        node: {
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        },
+      },
+    },
     rules: {
       'no-empty': 0,
       // Remove unused imports
@@ -23,6 +33,8 @@ module.exports = defineConfig([
           argsIgnorePattern: '^_',
         },
       ],
+      // Disable import/no-unresolved since TypeScript handles this
+      'import/no-unresolved': 'off',
     },
     ignores: ['dist/*'],
   },

@@ -4,6 +4,19 @@ const { withMonicon } = require('@monicon/metro');
 
 const config = getDefaultConfig(__dirname);
 
+// Enable source maps for better debugging
+config.transformer = {
+  ...config.transformer,
+  minifierConfig: {
+    keep_classnames: true,
+    keep_fnames: true,
+    mangle: {
+      keep_classnames: true,
+      keep_fnames: true,
+    },
+  },
+};
+
 // First apply NativeWind
 const nativeWindConfig = withNativeWind(config, { input: './global.css' });
 
