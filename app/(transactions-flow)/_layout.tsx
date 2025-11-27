@@ -15,7 +15,7 @@
 
 import { Stack } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
-import { createFlowLayoutScreenOptions } from '../_layout.modals.config';
+import { createFlowLayoutScreenOptions } from '../../components/__layout.modals.config';
 
 export default function TransactionsFlowLayout() {
   const { getPrimaryColor } = useTheme();

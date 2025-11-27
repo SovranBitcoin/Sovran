@@ -35,8 +35,8 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from 'redux/store';
-import { MODAL_SCREENS, ModalConfig } from './_layout.modals';
-import { getBaseModalHeaderOptions } from './_layout.modals.config';
+import { MODAL_SCREENS, ModalConfig } from '../components/__layout.modals';
+import { getBaseModalHeaderOptions } from '../components/__layout.modals.config';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
