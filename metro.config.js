@@ -1,18 +1,14 @@
-const { getDefaultConfig } = require('expo/metro-config'); // Changed this line
-const { withMonicon } = require('@monicon/metro');
+const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
+const { withMonicon } = require('@monicon/metro');
 
 const config = getDefaultConfig(__dirname);
-config.resolver.unstable_conditionNames = ['browser', 'require', 'react-native'];
-config.resolver.sourceExts = [...config.resolver.sourceExts, 'cjs'];
 
-// Add path alias support
-config.resolver.alias = {
-  '@': __dirname,
-};
+// First apply NativeWind
+const nativeWindConfig = withNativeWind(config, { input: './global.css' });
 
-// First, apply Monicon
-const configWithMonicon = withMonicon(config, {
+// Then apply Monicon
+module.exports = withMonicon(nativeWindConfig, {
   collections: ['circle-flags'],
   icons: [
     // Your existing icons array...
@@ -120,8 +116,3 @@ const configWithMonicon = withMonicon(config, {
     'mdi:anonymous',
   ],
 });
-
-// Then apply NativeWind
-const finalConfig = withNativeWind(configWithMonicon, { input: './global.css' });
-
-module.exports = finalConfig;

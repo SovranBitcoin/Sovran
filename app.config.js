@@ -31,7 +31,7 @@ module.exports = ({ config }) => {
       assetBundlePatterns: ['**/*'],
       newArchEnabled: true,
       ios: {
-        buildNumber: '1',
+        buildNumber: '2',
         infoPlist: {
           NSCameraUsageDescription:
             'Sovran will use your camera to scan QR codes to make it easier to send and receive payments.',

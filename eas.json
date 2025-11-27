@@ -1,42 +1,31 @@
 {
   "cli": {
-    "version": ">= 7.8.5"
+    "version": ">= 5.0.0"
   },
   "build": {
-    "e2e-iOS": {
-      "distribution": "internal",
-      "environment": "development",
-      "ios": {
-        "simulator": true
-      },
-      "channel": "e2e-simulator",
-      "node": "22.4.0"
-    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22.4.0",
       "env": {
         "APP_VARIANT": "development"
-      },
-      "ios": {
-        "buildConfiguration": "Debug"
       }
     },
     "preview": {
-      "ios": {
-        "simulator": true
-      },
-      "android": {
-        "buildType": "apk"
-      },
-      "node": "22.4.0"
+      "distribution": "internal"
     },
     "production": {
-      "node": "22.4.0"
+      "ios": {
+        "credentialsSource": "remote"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "business@sovranbitcoin.com",
+        "ascAppId": "6499554529",
+        "appleTeamId": "2ZTL7KLN2V"
+      }
+    }
   }
 }
