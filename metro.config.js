@@ -127,5 +127,6 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:menu',
     'mdi:anonymous-off',
     'mdi:anonymous',
+    'ph:coins',
   ],
 });

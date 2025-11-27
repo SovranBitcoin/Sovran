@@ -1440,7 +1440,7 @@ export function UserMessagesScreen({
         buttons: [
           {
             text: 'Send Ecash',
-            icon: 'solar:wallet-bold',
+            icon: 'ph:coins',
             variant: 'primary' as const,
             onPress: async (close) => {
               router.navigate({
