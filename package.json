@@ -2,13 +2,23 @@
   "name": "Sovran",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": ["react-native-nfc-manager"]
+      }
+    }
+  },
+  "overrides": {
+    "@react-native-async-storage/async-storage": "2.2.0"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "prebuild": "expo prebuild --clean",
-    "build:ios": "eas build -p ios --clear-cache",
+    "build:ios": "eas build --platform ios --profile production --non-interactive --auto-submit",
     "build:android:apk": "eas build -p android --profile preview",
     "submit:ios": "eas submit -p ios",
     "submit:android": "eas submit -p android",
@@ -83,7 +93,7 @@
     "expo-status-bar": "~3.0.8",
     "expo-symbols": "~1.0.7",
     "expo-system-ui": "~6.0.8",
-    "expo-updates": "29.0.12",
+    "expo-updates": "~29.0.13",
     "expo-video": "~3.0.11",
     "expo-web-browser": "~15.0.9",
     "hex-color-opacity": "^0.4.2",
@@ -116,7 +126,7 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-skeleton-component": "^1.0.0",
-    "react-native-svg": "^15.15.0",
+    "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-view-shot": "~4.0.3",
     "react-native-web": "~0.21.0",
@@ -145,7 +155,6 @@
     "@types/react": "~19.1.10",
     "@types/semver": "^7.7.0",
     "babel-plugin-module-resolver": "^5.0.2",
-    "eas-cli": "^0.0.0",
     "eslint": "^9.25.1",
     "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.2",
