@@ -178,3 +178,4 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
 ];
+

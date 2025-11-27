@@ -13,7 +13,7 @@
 
 import { Stack } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
-import { createFlowLayoutScreenOptions } from '../../components/__layout.modals.config';
+import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 export default function ReceiveFlowLayout() {
   const { getPrimaryColor } = useTheme();
