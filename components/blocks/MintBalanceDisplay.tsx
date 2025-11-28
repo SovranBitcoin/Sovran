@@ -5,7 +5,6 @@ import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
@@ -124,94 +123,100 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   );
 
   return (
-    <Link href={linkHref as any} asChild>
-      <TouchableOpacity haptics>
-      <HStack
-        blur
-        align="center"
-        justify="space-between"
-        className="rounded-2xl"
-        style={[
-          {
-            flex: 1,
-            padding: 8,
-            borderWidth: 0.2,
-            borderColor: getPrimaryColor('600'),
-            marginVertical: 0,
-            marginHorizontal: 0,
-            alignSelf: 'center',
-            backgroundColor: getPrimaryColor('800'),
-          },
-          style,
-        ]}>
-        <HStack align="center">
-          {showMintInfo ? (
-            <>
-              <View style={{ marginRight: 4 }}>
-                {isLoadingMintInfo ? (
-                  <Skeleton className="h-[32px] w-[32px] bg-primary-700" />
-                ) : (
-                  <Avatar
-                    picture={mintInfo?.icon_url || undefined}
-                    size={32}
-                    variant="mint"
-                    name={mintInfo?.name}
-                    alt={`${mintInfo?.name || 'Mint'} icon`}
-                  />
-                )}
-              </View>
-              <VStack align="flex-start">
-                {isLoadingMintInfo ? (
-                  <>
-                    <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
-                    <Spacer size={4} />
-                    <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
-                  </>
-                ) : (
-                  <>
-                    <Text
-                      style={{
-                        color: getPrimaryColor('50'),
-                      }}
-                      size={12}
-                      bold
-                      overpass>
-                      {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
-                    </Text>
-                    <AmountFormatter
-                      className="ml-[4px]"
-                      size={12}
-                      weight="heavy"
-                      amount={balance}
-                      unit={unit}
+    <View style={{ overflow: 'hidden', width: '100%', height: '100%' }}>
+      <Link
+        href={linkHref}
+        style={{
+          width: '100%',
+          height: '100%',
+          // padding: 8,
+        }}>
+        {/* <TouchableOpacity haptics> */}
+        <HStack
+          // glass
+          align="center"
+          justify="space-between"
+          style={[
+            {
+              flex: 1,
+              // borderWidth: 0.2,
+              // borderColor: getPrimaryColor('600'),
+              marginVertical: 0,
+              marginHorizontal: 0,
+              alignSelf: 'center',
+              // backgroundColor: getPrimaryColor('800'),
+            },
+            style,
+          ]}>
+          <HStack align="center">
+            {showMintInfo ? (
+              <>
+                <View style={{ marginRight: 4 }}>
+                  {isLoadingMintInfo ? (
+                    <Skeleton className="h-[32px] w-[32px] bg-primary-700" />
+                  ) : (
+                    <Avatar
+                      picture={mintInfo?.icon_url || undefined}
+                      size={32}
+                      variant="mint"
+                      name={mintInfo?.name}
+                      alt={`${mintInfo?.name || 'Mint'} icon`}
                     />
-                  </>
-                )}
-              </VStack>
-            </>
-          ) : (
-            <HStack align="center" gap={8}>
-              <Icon name="fluent:add-24-filled" size={20} color={getPrimaryColor('0')} />
-              <Text
-                style={{
-                  color: getPrimaryColor('50'),
-                }}
-                className="ml-[-2px]"
-                size={12}
-                bold
-                overpass>
-                Selected mint
-              </Text>
-            </HStack>
-          )}
+                  )}
+                </View>
+                <VStack align="flex-start">
+                  {isLoadingMintInfo ? (
+                    <>
+                      <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                      <Spacer size={4} />
+                      <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                    </>
+                  ) : (
+                    <>
+                      <Text
+                        style={{
+                          color: getPrimaryColor('50'),
+                        }}
+                        size={12}
+                        bold
+                        overpass>
+                        {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
+                      </Text>
+                      <AmountFormatter
+                        className="ml-[4px]"
+                        size={12}
+                        weight="heavy"
+                        amount={balance}
+                        unit={unit}
+                      />
+                    </>
+                  )}
+                </VStack>
+              </>
+            ) : (
+              <HStack align="center" gap={8}>
+                <Icon name="fluent:add-24-filled" size={20} color={getPrimaryColor('0')} />
+                <Text
+                  style={{
+                    color: getPrimaryColor('50'),
+                  }}
+                  className="ml-[-2px]"
+                  size={12}
+                  bold
+                  overpass>
+                  Selected mint
+                </Text>
+              </HStack>
+            )}
+          </HStack>
+          <HStack justify="flex-end" align="center">
+            <Icon name="fluent:chevron-down-12-filled" size={12} color={getPrimaryColor('0')} />
+            <Spacer size={8} />
+          </HStack>
         </HStack>
-        <HStack justify="flex-end" align="center">
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={getPrimaryColor('0')} />
-          <Spacer size={8} />
-        </HStack>
-      </HStack>
-      </TouchableOpacity>
-    </Link>
+        {/* </TouchableOpacity> */}
+      </Link>
+    </View>
   );
 };
 

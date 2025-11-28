@@ -10,7 +10,7 @@ import { getEncodedToken, getEncodedTokenV4, MeltQuoteResponse } from '@cashu/ca
 import Icon from 'assets/icons';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
-import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
+import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { Avatar } from 'components/ui/Avatar';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -347,14 +347,14 @@ export function CurrencyScreen({
           }
           centered
         />
-        <MintBalanceDisplay
-          onMintSelected={handleMintSelected}
-          unit={unit}
-          allowedMints={params?.mints as unknown as string[]}
-          allowedUnits={params?.allowedUnits as unknown as string[]}
-          requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
-          requireValidMint={!!params?.allowedUnits}
-        />
+        <View style={{ marginVertical: 8 }}>
+          <WalletHeaderTitle
+            width={280}
+            unit={unit}
+            requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
+            onMintSelected={handleMintSelected}
+          />
+        </View>
         {params.to === 'sendToken' && params?.profile && (
           <TouchableOpacity
             style={[

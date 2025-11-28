@@ -11,7 +11,7 @@ import { formatAmount } from 'helper/currency';
 import { useMintManagement, useMelt, useManager } from 'hooks/coco';
 import { VStack, HStack, View } from 'components/ui/View';
 import { router } from 'expo-router';
-import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
+import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
@@ -212,7 +212,11 @@ export function MeltQuoteScreen({ meltQuote, meltHistoryEntry, onCancel }: MeltQ
           <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
 
           {displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
-            <MintBalanceDisplay onMintSelected={handleMintSelected} unit={unit} updateSelectedMint />
+            <WalletHeaderTitle
+              width={280}
+              unit={unit}
+              onMintSelected={handleMintSelected}
+            />
           ) : (
             <HistoryEntryRefresh
               mintInfo={mintInfo}
