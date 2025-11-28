@@ -38,8 +38,12 @@ interface Props {
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
   hideExpired?: boolean; // If true, expired transactions will be filtered out
+  /** Selected month for filtering (format: "YYYY-MM") */
+  selectedMonth?: string | null;
   /** Optional custom press handler for transactions */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
+  /** Optional scroll handler for tracking scroll position */
+  onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
 }
 
 export const Transactions = React.memo(
@@ -55,7 +59,9 @@ export const Transactions = React.memo(
     tab = 'All',
     days = 1,
     hideExpired = false,
+    selectedMonth,
     onTransactionPress,
+    onScroll,
   }: Props) => {
     const { getPrimaryColor } = useTheme();
 
@@ -80,9 +86,20 @@ export const Transactions = React.memo(
             if (isExpired) return false;
           }
 
+          // Filter by selected month if provided
+          if (selectedMonth) {
+            const [yearStr, monthStr] = selectedMonth.split('-');
+            const filterYear = parseInt(yearStr, 10);
+            const filterMonthNum = parseInt(monthStr, 10) - 1; // 0-indexed
+            const date = new Date(historyEntry.createdAt);
+            if (date.getFullYear() !== filterYear || date.getMonth() !== filterMonthNum) {
+              return false;
+            }
+          }
+
           return true;
         }),
-      [history, account.unit, filter, type, hideExpired]
+      [history, account.unit, filter, type, hideExpired, selectedMonth]
     );
 
     const sortedHistory = useMemo(
@@ -297,12 +314,15 @@ export const Transactions = React.memo(
       <LegendList
         waitForInitialLayout={false}
         key={listKey}
-        style={{ height: Dimensions.get('screen').height, overflow: 'hidden' }}
+        style={{ flex: 1 }}
         data={flattenedData}
         estimatedItemSize={ITEM_HEIGHT}
         scrollEnabled
         maintainVisibleContentPosition
+        contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={header}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item, index }) => {
           if (item.type === 'header') {
             return (
@@ -339,7 +359,7 @@ export const Transactions = React.memo(
             </View>
           );
         }}
-        contentContainerStyle={{ width: '100%', paddingBottom: 250 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
       />
     );
   }

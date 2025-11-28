@@ -25,6 +25,7 @@ module.exports = withMonicon(nativeWindConfig, {
   collections: ['circle-flags'],
   icons: [
     // Your existing icons array...
+    'fluent:apps-16-filled',
     'ri:openai-fill', // Using robot as OpenAI icon
     'ri:anthropic-fill',
     'ri:google-fill',
@@ -68,6 +69,10 @@ module.exports = withMonicon(nativeWindConfig, {
     'material-symbols:check-rounded',
     'lucide:nfc',
     'fluent:checkmark-16-filled',
+    'fluent:checkmark-circle-16-filled',
+    'fluent:list-16-filled',
+    'fluent:clock-16-filled',
+    'fluent:dismiss-circle-16-filled',
     'ion:checkmark-done',
     'material-symbols:close-rounded',
     'simple-line-icons:close',

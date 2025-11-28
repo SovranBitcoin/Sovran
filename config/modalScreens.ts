@@ -52,6 +52,15 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
+  // Filter flow modal group - transaction filters
+  {
+    name: '(filter-flow)',
+    options: {
+      presentation: 'modal',
+      headerShown: false,
+      gestureDirection: 'vertical',
+    },
+  },
   // Standalone currency screen (for direct navigation from other flows)
   {
     name: 'currency',
@@ -151,19 +160,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'settings-pages/theme',
     title: 'Theme',
-  },
-  // Standalone Transactions (for deep linking)
-  {
-    name: 'transactions',
-    title: 'Transactions',
-    options: {
-      presentation: 'formSheet',
-      headerShown: true,
-      headerBlurEffect: 'systemMaterial',
-      headerTransparent: true,
-      headerBackButtonDisplayMode: 'minimal',
-      animation: 'slide_from_bottom',
-    },
   },
   {
     name: 'sendToken',
