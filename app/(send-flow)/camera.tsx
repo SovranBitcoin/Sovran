@@ -5,19 +5,32 @@
  * Has inline payment processing for send-flow aware routing.
  */
 
-import { isValidEcashToken } from '@/helper/coco/utils';
+import {
+  isValidEcashToken,
+  isLightningInvoice,
+  lnTrim,
+  getLightningAmount,
+  isLightningAddress,
+  isLnurlp,
+} from '@/helper/coco/utils';
 import { Proof } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import Haptics from 'components/ui/Haptics';
 import { router, Stack } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-// import { utils as lnurlPayUtils } from 'lnurl-pay';
 import { CameraScreen, ScanningData } from 'components/screens/CameraScreen';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { useMelt } from 'hooks/coco';
 
 const Camera: React.FC = () => {
   const urDecoderRef = useRef<URDecoder>(new URDecoder());
   const [scanned, setScanned] = useState<boolean>(false);
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const { createMeltQuote } = useMelt();
 
   const handleReset = useCallback(() => {
     setScanned(false);
@@ -106,10 +119,44 @@ const Camera: React.FC = () => {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
           });
+          return;
+        }
+
+        // Handle Lightning invoices, addresses, and LNURL
+        const trimmedData = lnTrim(scanning.data);
+        const isLnInvoice = isLightningInvoice(trimmedData);
+        const isLnAddress = isLightningAddress(trimmedData);
+        const isLnurlpUrl = isLnurlp(trimmedData);
+
+        if ((isLnInvoice || isLnAddress || isLnurlpUrl) && selectedMint) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          // For invoices with amount, create melt quote directly
+          if (isLnInvoice) {
+            const lnAmount = getLightningAmount(trimmedData);
+            if (lnAmount > 0) {
+              const quote = await createMeltQuote(selectedMint, trimmedData);
+              router.navigate({
+                pathname: '/(send-flow)/meltQuote',
+                params: { meltQuote: JSON.stringify(quote) },
+              });
+              return;
+            }
+          }
+
+          // For addresses/LNURL or invoices without amount, go to amount selection
+          router.replace({
+            pathname: '/(send-flow)/currency',
+            params: {
+              to: 'meltQuote',
+              unit: 'sat',
+              lnUrlOrAddress: trimmedData,
+            },
+          });
         }
       }
     },
-    [scanned]
+    [scanned, selectedMint, createMeltQuote]
   );
 
   return (

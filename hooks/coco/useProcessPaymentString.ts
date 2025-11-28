@@ -3,6 +3,8 @@ import {
   isLightningInvoice,
   isValidEcashToken,
   lnTrim,
+  isLightningAddress,
+  isLnurlp,
 } from '@/helper/coco/utils';
 import { useMelt } from '@/hooks/coco';
 import { Proof } from '@cashu/cashu-ts';
@@ -12,7 +14,6 @@ import Haptics from 'components/ui/Haptics';
 import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-// import { utils as lnurlPayUtils } from 'lnurl-pay';
 
 interface ScanningData {
   data: string;
@@ -138,15 +139,15 @@ export const useProcessPaymentString = ({
             },
           });
         } else if (
-          (lnurlPayUtils.isLightningAddress(lnTrim(scanning.data)) ||
-            lnurlPayUtils.isLnurlp(lnTrim(scanning.data)) ||
+          (isLightningAddress(lnTrim(scanning.data)) ||
+            isLnurlp(lnTrim(scanning.data)) ||
             isLightningInvoice(lnTrim(scanning.data))) &&
           selectedMint
         ) {
           const amount = getLightningAmount(lnTrim(scanning.data));
           if (!amount) {
             router.navigate({
-              pathname: '/currency',
+              pathname: '/(send-flow)/currency',
               params: {
                 to: 'meltQuote',
                 lnUrlOrAddress: lnTrim(scanning.data),

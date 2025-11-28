@@ -62,6 +62,7 @@ export function CameraScreen({
       setIsFocused(true);
       setProgress(0);
       setLoading(false);
+      isProcessingRef.current = false;
       onReset?.();
 
       return () => {
@@ -70,17 +71,21 @@ export function CameraScreen({
     }, [onReset])
   );
 
+  const isProcessingRef = useRef<boolean>(false);
+
   const handleScan = useCallback(
     async (data: ScanningData) => {
-      if (appStateRef.current !== 'active' || !isFocused) {
+      if (appStateRef.current !== 'active' || !isFocused || isProcessingRef.current) {
         return;
       }
 
+      isProcessingRef.current = true;
       setLoading(true);
       try {
         await onScan(data);
       } finally {
         setLoading(false);
+        isProcessingRef.current = false;
       }
     },
     [onScan, isFocused]

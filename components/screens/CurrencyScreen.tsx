@@ -21,7 +21,7 @@ import { HStack, View } from 'components/ui/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
 import { useLightningOperations, useManager, useMelt, useSend } from 'hooks/coco';
-// import { requestInvoice, utils } from 'lnurl-pay';
+import { requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useEffect, useState } from 'react';
@@ -229,19 +229,16 @@ export function CurrencyScreen({
         }
 
         try {
-          const { invoice } = await requestInvoice({
-            lnUrlOrAddress: params.lnUrlOrAddress,
-            tokens: utils.toSats(amount),
-          });
-
-          if (!invoice) {
-            popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
+          if (!selectedMint) {
+            popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
             setLoading(false);
             return;
           }
 
-          if (!selectedMint) {
-            popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+          const invoice = await requestInvoiceFromLnurl(params.lnUrlOrAddress, amount);
+
+          if (!invoice) {
+            popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
             setLoading(false);
             return;
           }

@@ -10,6 +10,8 @@ import {
   isLightningInvoice,
   isValidEcashToken,
   lnTrim,
+  isLightningAddress,
+  isLnurlp,
 } from '@/helper/coco/utils';
 import { Proof } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
@@ -23,7 +25,6 @@ import { useMelt } from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useState } from 'react';
 import { useMintStore } from 'stores/mintStore';
-// import { utils as lnurlPayUtils } from 'lnurl-pay';
 import { popup } from '@/helper/popup';
 
 function ModalScreen() {
@@ -129,8 +130,8 @@ function ModalScreen() {
           },
         });
       } else if (
-        (lnurlPayUtils.isLightningAddress(lnTrim(scanning.data)) ||
-          lnurlPayUtils.isLnurlp(lnTrim(scanning.data)) ||
+        (isLightningAddress(lnTrim(scanning.data)) ||
+          isLnurlp(lnTrim(scanning.data)) ||
           isLightningInvoice(lnTrim(scanning.data))) &&
         selectedMint
       ) {

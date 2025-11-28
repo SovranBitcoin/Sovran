@@ -304,3 +304,118 @@ export function lnTrim(str: string) {
   });
   return str.trim();
 }
+
+// ============================================================================
+// LNURL Utilities (replaces lnurl-pay library which has React Native issues)
+// ============================================================================
+
+const LN_ADDRESS_REGEX =
+  /^((?:[^<>()[\]\\.,;:\s@"]+(?:\.[^<>()[\]\\.,;:\s@"]+)*)|(?:".+"))@((?:\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(?:(?:[a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
+const LNURLP_REGEX = /^lnurlp:\/\/([\w-]+\.)+[\w-]+(:\d{1,5})?(\/[\w-./?%&=]*)?$/;
+
+export interface LightningAddress {
+  username: string;
+  domain: string;
+}
+
+/**
+ * Validates if a string is a lightning address (user@domain.com format)
+ */
+export const isLightningAddress = (address: string): boolean => {
+  if (!address) return false;
+  return LN_ADDRESS_REGEX.test(address);
+};
+
+/**
+ * Validates if a string is an lnurlp URL
+ */
+export const isLnurlp = (url: string): boolean => {
+  if (!url) return false;
+  return LNURLP_REGEX.test(url);
+};
+
+/**
+ * Parses a lightning address into username and domain
+ */
+export const parseLightningAddress = (address: string): LightningAddress | null => {
+  if (!address) return null;
+  const result = LN_ADDRESS_REGEX.exec(address);
+  return result ? { username: result[1], domain: result[2] } : null;
+};
+
+/**
+ * Parses an lnurlp URL and returns a proper HTTP(S) URL
+ */
+export const parseLnurlp = (url: string): string | null => {
+  if (!url) return null;
+  const parsedUrl = url.toLowerCase();
+  if (!LNURLP_REGEX.test(parsedUrl)) return null;
+  const protocol = parsedUrl.includes('.onion') ? 'http://' : 'https://';
+  return parsedUrl.replace('lnurlp://', protocol);
+};
+
+/**
+ * Decodes a lightning address or lnurlp URL to a callback URL
+ */
+export const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
+  const address = parseLightningAddress(lnUrlOrAddress);
+  if (address) {
+    const { username, domain } = address;
+    const protocol = domain.match(/\.onion$/) ? 'http' : 'https';
+    return `${protocol}://${domain}/.well-known/lnurlp/${username}`;
+  }
+  return parseLnurlp(lnUrlOrAddress);
+};
+
+export interface LnUrlPayParams {
+  callback: string;
+  minSendable: number;
+  maxSendable: number;
+  tag: string;
+}
+
+/**
+ * Fetches LNURL pay parameters from a lightning address or lnurlp URL
+ */
+export const getLnurlPayParams = async (lnUrlOrAddress: string): Promise<LnUrlPayParams | null> => {
+  const url = decodeUrlOrAddress(lnUrlOrAddress);
+  if (!url) return null;
+
+  const response = await fetch(url);
+  const data = await response.json();
+  return data as LnUrlPayParams;
+};
+
+/**
+ * Requests an invoice from a lightning address or lnurlp URL
+ * @param lnUrlOrAddress - Lightning address (user@domain.com) or lnurlp URL
+ * @param amountSats - Amount in satoshis
+ * @returns The lightning invoice (payment request)
+ */
+export const requestInvoiceFromLnurl = async (
+  lnUrlOrAddress: string,
+  amountSats: number
+): Promise<string> => {
+  const params = await getLnurlPayParams(lnUrlOrAddress);
+  if (!params || !params.callback) {
+    throw new Error('Invalid LNURL or lightning address');
+  }
+
+  const amountMsats = amountSats * 1000;
+
+  if (amountMsats < params.minSendable || amountMsats > params.maxSendable) {
+    throw new Error(
+      `Amount must be between ${params.minSendable / 1000} and ${params.maxSendable / 1000} sats`
+    );
+  }
+
+  const response = await fetch(`${params.callback}?amount=${amountMsats}`);
+  const data = await response.json();
+
+  if (!data.pr) {
+    throw new Error('No invoice returned from LNURL endpoint');
+  }
+
+  return data.pr;
+};
