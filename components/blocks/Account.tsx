@@ -136,12 +136,7 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         </HStack>
       </VStack>
 
-      <View
-        className="absolute bottom-6 -z-10 h-[300px] w-full overflow-hidden"
-        style={{
-          borderBottomColor: getPrimaryColor('600'),
-          borderBottomWidth: 0.2,
-        }}>
+      <View className="absolute bottom-6 -z-10 h-[300px] w-full overflow-hidden">
         <View className="absolute bottom-0 right-0 rounded-full">
           {!image && renderCurrencyIcon()}
         </View>
