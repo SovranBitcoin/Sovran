@@ -4,44 +4,56 @@
       "name": "cosmicpurple",
       "displayName": "Cosmic Purple",
       "filename": "cosmic-purple.png",
-      "hue": 259,
-      "saturation": 35
+      "dominantDarkHex": "#0d041b",
+      "hue": 263,
+      "saturation": 74,
+      "lightness": 6
     },
     {
       "name": "deepocean",
       "displayName": "Deep Ocean",
       "filename": "deep-ocean.png",
-      "hue": 190,
-      "saturation": 35
+      "dominantDarkHex": "#081e1e",
+      "hue": 180,
+      "saturation": 58,
+      "lightness": 7
+    },
+    {
+      "name": "mountainpeaks",
+      "displayName": "Mountain Peaks",
+      "filename": "mountain-peaks.png",
+      "dominantDarkHex": "#15212a",
+      "hue": 206,
+      "saturation": 33,
+      "lightness": 12
+    },
+    {
+      "name": "mountainsky",
+      "displayName": "Mountain Sky",
+      "filename": "mountain-sky.png",
+      "dominantDarkHex": "#151d2a",
+      "hue": 217,
+      "saturation": 33,
+      "lightness": 12
     },
     {
       "name": "mysticblue",
       "displayName": "Mystic Blue",
       "filename": "mystic-blue.png",
-      "hue": 191,
-      "saturation": 35
+      "dominantDarkHex": "#050418",
+      "hue": 243,
+      "saturation": 71,
+      "lightness": 5
     },
     {
       "name": "royalpurple",
       "displayName": "Royal Purple",
       "filename": "royal-purple.png",
+      "dominantDarkHex": "#180628",
       "hue": 272,
-      "saturation": 35
+      "saturation": 74,
+      "lightness": 9
     }
   ],
-  "generatedAt": "2025-11-28T08:29:10.651Z",
-  "lightnessTargets": {
-    "0": 100,
-    "50": 92,
-    "100": 78,
-    "200": 65.9,
-    "300": 47.1,
-    "400": 32.2,
-    "500": 17.3,
-    "600": 12.5,
-    "700": 11,
-    "800": 9.4,
-    "900": 7.9,
-    "950": 3.7
-  }
+  "generatedAt": "2025-11-28T08:45:03.430Z"
 }

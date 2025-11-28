@@ -28,22 +28,6 @@ const getColors = require('get-image-colors');
 const BACKGROUNDS_DIR = path.join(__dirname, '..', 'assets', 'images', 'backgrounds');
 const ROOT_DIR = path.join(__dirname, '..');
 
-// The discovered lightness curve from reverse-engineering existing themes
-const LIGHTNESS_TARGETS = {
-  950: 3.7,
-  900: 7.9,
-  800: 9.4,
-  700: 11.0,
-  600: 12.5,
-  500: 17.3,
-  400: 32.2,
-  300: 47.1,
-  200: 65.9,
-  100: 78.0,
-  50: 92.0,
-  0: 100.0,
-};
-
 const SHADE_ORDER = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
 
 /**
@@ -71,83 +55,149 @@ function fileToDisplayName(filename) {
 }
 
 /**
- * Extract dominant color from image using chroma-js for consistent color handling
+ * Extract the dominant dark color from an image.
+ * This finds the most prevalent dark color in the 5-12% lightness range
+ * to use as shade 900 - the key anchor color for background overlays.
+ *
+ * Priority: Prevalence (order from get-image-colors) > Darkness > Saturation
  */
-async function extractDominantColor(imagePath) {
+async function extractDominantDarkColor(imagePath) {
   try {
-    const colors = await getColors(imagePath, { count: 10, type: 'image/png' });
+    const colors = await getColors(imagePath, { count: 20, type: 'image/png' });
 
-    // Convert to chroma objects for consistent handling
-    const chromaColors = colors.map((c) => {
+    // Convert to chroma objects, keeping original order (prevalence)
+    const chromaColors = colors.map((c, index) => {
       const chromaColor = chroma(c.hex());
       const [h, s, l] = chromaColor.hsl();
       return {
         hex: c.hex(),
-        hue: h || 0, // hue can be NaN for grayscale
+        hue: h || 0,
         saturation: s,
         lightness: l,
-        score: 0,
+        prevalence: index, // Lower = more prevalent in image
       };
     });
 
-    // Filter for colors with good saturation and mid-range lightness
-    const validColors = chromaColors.filter((c) => {
-      return c.saturation > 0.05 && c.lightness > 0.05 && c.lightness < 0.7;
+    // Target range for shade 900: 5-12% lightness (the "dominant dark" range)
+    // This is darker than 900's typical 8% but gives room for the anchor
+    const idealDarkColors = chromaColors.filter((c) => {
+      return c.saturation > 0.15 && c.lightness >= 0.05 && c.lightness <= 0.12;
     });
 
-    if (validColors.length === 0) {
-      // Fallback: use first color with any saturation
-      const fallback = chromaColors.find((c) => c.saturation > 0.01);
-      if (fallback) {
-        return { hue: fallback.hue, saturation: Math.max(0.2, fallback.saturation) };
-      }
-      return { hue: 240, saturation: 0.25 }; // Default blue
+    // If we found colors in the ideal range, pick the most prevalent (first in list)
+    // that's also reasonably dark
+    if (idealDarkColors.length > 0) {
+      // Sort by: darkness first, then prevalence
+      idealDarkColors.sort((a, b) => {
+        // Prefer darker colors
+        const darkDiff = a.lightness - b.lightness;
+        if (Math.abs(darkDiff) > 0.02) return darkDiff;
+        // Then prefer more prevalent
+        return a.prevalence - b.prevalence;
+      });
+      const best = idealDarkColors[0];
+      return {
+        hue: best.hue,
+        saturation: best.saturation,
+        lightness: best.lightness,
+        hex: best.hex,
+      };
     }
 
-    // Score colors by saturation and preference for darker colors
-    validColors.forEach((c) => {
-      c.score = c.saturation * (1 - c.lightness) * 2;
+    // Fallback: expand range to 5-20% and find darkest with good saturation
+    const darkColors = chromaColors.filter((c) => {
+      return c.saturation > 0.1 && c.lightness >= 0.03 && c.lightness <= 0.2;
     });
 
-    validColors.sort((a, b) => b.score - a.score);
-    const best = validColors[0];
+    if (darkColors.length > 0) {
+      // Sort by darkness, then saturation
+      darkColors.sort((a, b) => {
+        const darkDiff = a.lightness - b.lightness;
+        if (Math.abs(darkDiff) > 0.03) return darkDiff;
+        return b.saturation - a.saturation;
+      });
+      const best = darkColors[0];
+      return {
+        hue: best.hue,
+        saturation: best.saturation,
+        lightness: best.lightness,
+        hex: best.hex,
+      };
+    }
 
-    // Use saturation from image but constrain to reasonable range for our palette
-    const targetSaturation = Math.max(0.15, Math.min(0.35, best.saturation * 0.8 + 0.1));
+    // Ultimate fallback: any dark color
+    const anyDark = chromaColors
+      .filter((c) => c.lightness < 0.25)
+      .sort((a, b) => a.lightness - b.lightness)[0];
 
-    return {
-      hue: best.hue,
-      saturation: targetSaturation,
-    };
+    if (anyDark) {
+      return {
+        hue: anyDark.hue,
+        saturation: Math.max(0.3, anyDark.saturation),
+        lightness: anyDark.lightness,
+        hex: anyDark.hex,
+      };
+    }
+
+    return { hue: 220, saturation: 0.5, lightness: 0.08, hex: '#0D1520' };
   } catch (error) {
     console.error(`Error extracting colors from ${imagePath}:`, error.message);
-    return { hue: 240, saturation: 0.25 };
+    return { hue: 220, saturation: 0.5, lightness: 0.08, hex: '#0D1520' };
   }
 }
 
 /**
- * Generate a palette from hue and saturation
+ * Generate a palette anchored to the dominant dark color (shade 900).
+ * This ensures shade 900 matches the image's dominant dark color.
  */
-function generatePalette(hue, baseSaturation) {
+function generatePalette(dominantDark) {
+  const { hue, saturation, lightness: l900 } = dominantDark;
   const palette = {};
 
-  SHADE_ORDER.forEach((shade) => {
-    const lightness = LIGHTNESS_TARGETS[shade] / 100;
+  // Lightness targets relative to shade 900
+  // shade 900 is our anchor, other shades are calculated from it
+  const lightnessMap = {
+    950: l900 * 0.5, // Darker than 900
+    900: l900, // Anchor - dominant dark color
+    800: l900 * 1.2, // Slightly lighter
+    700: l900 * 1.4,
+    600: l900 * 1.6,
+    500: l900 * 2.2, // Mid-dark
+    400: Math.min(0.35, l900 * 4), // Transitioning to mid
+    300: Math.min(0.5, l900 * 6), // Mid-light
+    200: Math.min(0.68, l900 * 8.5), // Light
+    100: Math.min(0.8, l900 * 10), // Very light
+    50: Math.min(0.92, l900 * 12), // Near white
+    0: 1.0, // White
+  };
 
-    // Shade 0 is always white
+  // Saturation adjustments - darker shades are more saturated
+  const saturationMap = {
+    950: Math.min(0.95, saturation * 1.3),
+    900: saturation,
+    800: saturation * 0.95,
+    700: saturation * 0.9,
+    600: saturation * 0.85,
+    500: saturation * 0.8,
+    400: saturation * 0.6,
+    300: saturation * 0.45,
+    200: saturation * 0.3,
+    100: saturation * 0.2,
+    50: saturation * 0.1,
+    0: 0,
+  };
+
+  SHADE_ORDER.forEach((shade) => {
     if (shade === 0) {
       palette[shade] = '#FFFFFF';
       return;
     }
 
-    // Boost saturation at shade 950
-    let saturation = baseSaturation;
-    if (shade === 950) {
-      saturation = Math.min(0.9, baseSaturation * 2.5);
-    }
+    const targetL = Math.max(0.02, Math.min(0.98, lightnessMap[shade]));
+    const targetS = Math.max(0.05, Math.min(0.95, saturationMap[shade]));
 
     try {
-      const color = chroma.hsl(hue, saturation, lightness);
+      const color = chroma.hsl(hue, targetS, targetL);
       palette[shade] = color.hex().toUpperCase();
     } catch (e) {
       palette[shade] = '#000000';
@@ -174,15 +224,21 @@ async function scanBackgrounds() {
 
     console.log(`  Processing: ${file} -> "${displayName}" (${themeName})`);
 
-    const { hue, saturation } = await extractDominantColor(imagePath);
-    const palette = generatePalette(hue, saturation);
+    const dominantDark = await extractDominantDarkColor(imagePath);
+    const palette = generatePalette(dominantDark);
+
+    console.log(
+      `    -> Dominant dark: ${dominantDark.hex} (H:${Math.round(dominantDark.hue)}° S:${Math.round(dominantDark.saturation * 100)}% L:${Math.round(dominantDark.lightness * 100)}%)`
+    );
 
     themes.push({
       name: themeName,
       displayName,
       filename: file,
-      hue: Math.round(hue),
-      saturation: Math.round(saturation * 100),
+      hue: Math.round(dominantDark.hue),
+      saturation: Math.round(dominantDark.saturation * 100),
+      lightness: Math.round(dominantDark.lightness * 100),
+      dominantDarkHex: dominantDark.hex,
       palette,
     });
   }
@@ -220,7 +276,7 @@ function updateThemesJS(themes) {
 
   // Generate new background themes content
   const newContent = generateThemesJSContent(themes);
-  const fullBlock = `  ${bgMarker}\n${newContent}  ${bgEndMarker}`;
+  const fullBlock = `\n  ${bgMarker}\n${newContent}  ${bgEndMarker}`;
 
   // Check if markers exist
   if (content.includes(bgMarker)) {
@@ -341,10 +397,13 @@ async function main() {
   console.log('='.repeat(60));
 
   themes.forEach((theme) => {
+    console.log(`\n"${theme.displayName}" (${theme.name})`);
     console.log(
-      `\n"${theme.displayName}" (${theme.name}) - Hue: ${theme.hue}°, Sat: ${theme.saturation}%`
+      `  Anchor (900): ${theme.dominantDarkHex} (H:${theme.hue}° S:${theme.saturation}% L:${theme.lightness}%)`
     );
-    console.log(`  950: ${theme.palette[950]} ... 0: ${theme.palette[0]}`);
+    console.log(
+      `  Generated: 950:${theme.palette[950]} 900:${theme.palette[900]} 500:${theme.palette[500]}`
+    );
   });
 
   console.log('\n' + '='.repeat(60));
@@ -365,11 +424,12 @@ async function main() {
           name: t.name,
           displayName: t.displayName,
           filename: t.filename,
+          dominantDarkHex: t.dominantDarkHex,
           hue: t.hue,
           saturation: t.saturation,
+          lightness: t.lightness,
         })),
         generatedAt: new Date().toISOString(),
-        lightnessTargets: LIGHTNESS_TARGETS,
       },
       null,
       2

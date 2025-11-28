@@ -17,6 +17,8 @@ import { ImageSource } from 'expo-image';
 export const backgroundImageThemes: Record<string, ImageSource> = {
   cosmicpurple: require('assets/images/backgrounds/cosmic-purple.png'),
   deepocean: require('assets/images/backgrounds/deep-ocean.png'),
+  mountainpeaks: require('assets/images/backgrounds/mountain-peaks.png'),
+  mountainsky: require('assets/images/backgrounds/mountain-sky.png'),
   mysticblue: require('assets/images/backgrounds/mystic-blue.png'),
   royalpurple: require('assets/images/backgrounds/royal-purple.png'),
 };
@@ -24,7 +26,7 @@ export const backgroundImageThemes: Record<string, ImageSource> = {
 /**
  * Array of all background image theme names.
  */
-export const BACKGROUND_THEME_NAMES = ['cosmicpurple', 'deepocean', 'mysticblue', 'royalpurple'];
+export const BACKGROUND_THEME_NAMES = ['cosmicpurple', 'deepocean', 'mountainpeaks', 'mountainsky', 'mysticblue', 'royalpurple'];
 
 /**
  * Display names for background image themes (from filename).
@@ -32,6 +34,8 @@ export const BACKGROUND_THEME_NAMES = ['cosmicpurple', 'deepocean', 'mysticblue'
 export const backgroundThemeDisplayNames: Record<string, string> = {
   cosmicpurple: 'Cosmic Purple',
   deepocean: 'Deep Ocean',
+  mountainpeaks: 'Mountain Peaks',
+  mountainsky: 'Mountain Sky',
   mysticblue: 'Mystic Blue',
   royalpurple: 'Royal Purple',
 };
