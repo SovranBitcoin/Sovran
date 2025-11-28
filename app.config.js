@@ -18,7 +18,7 @@ module.exports = ({ config }) => {
     expo: {
       name: 'Sovran',
       slug: 'sovran',
-      version: '0.0.50',
+      version: '0.0.51',
       orientation: 'portrait',
       scheme: ['sovran', 'cashu'],
       userInterfaceStyle: 'automatic',
@@ -31,7 +31,7 @@ module.exports = ({ config }) => {
       assetBundlePatterns: ['**/*'],
       newArchEnabled: true,
       ios: {
-        buildNumber: '10',
+        buildNumber: '1',
         infoPlist: {
           NSCameraUsageDescription:
             'Sovran will use your camera to scan QR codes to make it easier to send and receive payments.',
