@@ -40,8 +40,6 @@ const getPrimaryColor = (themeName: string, shade: string): string => {
 };
 
 const getShadeColor = (themeName: string, shade: string): string => {
-  // For now, use the static shades from colors.tsx
-  // In the future, this could be theme-specific
   const staticShades = {
     '100': '#FF5841',
     '200': '#FF353C',
@@ -155,50 +153,18 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   // Get primary colors for the current theme
   const primaryColors = THEMES[currentTheme as keyof typeof THEMES] || THEMES['dark'];
 
-  // Get the CSS variables for the current theme
+  /**
+   * Get the CSS variables for the current theme.
+   * colorThemes now contains both full theme names and aliases,
+   * so we can look up directly without a manual mapping.
+   */
   const getThemeVariables = (themeName: string) => {
-    // Map theme names to their variable keys
-    const themeMap: Record<string, keyof typeof colorThemes> = {
-      navy: 'navy',
-      'coral-sunrise': 'coral',
-      'ice-queen': 'ice',
-      'tropical-forest': 'tropical',
-      'desert-dune': 'desert',
-      'misty-morning': 'misty',
-      'neon-dream': 'neon',
-      'cosmic-ember': 'cosmic',
-      'digital-oasis': 'digital',
-      'celestial-aura': 'celestial',
-      'urban-concrete': 'urban',
-      'volcanic-crimson': 'volcanic',
-      'crimson-night': 'crimson',
-      'velvet-emerald': 'velvet',
-      'twilight-amber': 'twilight',
-      'retro-outrun': 'retro',
-      'light-beige': 'lightbeige',
-      beige: 'beige',
-      'middle-beige': 'middlebeige',
-      light: 'light',
-      forest: 'forest',
-      sunset: 'sunset',
-      ocean: 'ocean',
-      'dark-grey': 'darkgrey',
-      'slate-shadow': 'slate',
-      'mystic-fog': 'mystic',
-      'eclipse-steel': 'eclipse',
-      'aurora-twilight': 'aurora',
-      rose: 'rose',
-      autumn: 'autumn',
-      dark: 'dark',
-      // Background Image Themes - now using human names directly
-      deepocean: 'deepocean',
-      cosmicpurple: 'cosmicpurple',
-      mysticblue: 'mysticblue',
-      royalpurple: 'royalpurple',
-    };
-
-    const themeKey = themeMap[themeName] || 'dark';
-    return colorThemes[themeKey];
+    // Try direct lookup first (works for both full names and aliases)
+    if (colorThemes[themeName]) {
+      return colorThemes[themeName];
+    }
+    // Fallback to dark theme
+    return colorThemes['dark'];
   };
 
   return (

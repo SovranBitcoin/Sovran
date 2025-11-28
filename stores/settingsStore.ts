@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  BACKGROUND_THEME_NAMES,
+  isBackgroundImageTheme,
+  getBackgroundImage,
+} from 'config/backgroundImageThemes';
 
 export interface TermsAccepted {
   termsAccepted: boolean;
@@ -56,9 +61,6 @@ interface SettingsActions {
 }
 
 type SettingsStore = SettingsState & SettingsActions;
-
-// Background image themes that should be treated as background images
-const BACKGROUND_IMAGE_THEMES = ['royalpurple', 'mysticblue', 'cosmicpurple', 'deepocean'];
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
@@ -228,12 +230,10 @@ export const useSettingsStore = create<SettingsStore>()(
   )
 );
 
-// Helper function to check if a theme is a background image theme
-export const isBackgroundImageTheme = (theme: string): boolean => {
-  return BACKGROUND_IMAGE_THEMES.includes(theme);
-};
+// Re-export background image helpers from the config file
+export { BACKGROUND_THEME_NAMES, isBackgroundImageTheme, getBackgroundImage };
 
-// Helper function to get the background image for a theme
+// Legacy helper for backwards compatibility
 export const getBackgroundImageForTheme = (theme: string): string | null => {
   return isBackgroundImageTheme(theme) ? theme : null;
 };

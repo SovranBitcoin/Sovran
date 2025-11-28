@@ -1,0 +1,47 @@
+{
+  "themes": [
+    {
+      "name": "cosmicpurple",
+      "displayName": "Cosmic Purple",
+      "filename": "cosmic-purple.png",
+      "hue": 259,
+      "saturation": 35
+    },
+    {
+      "name": "deepocean",
+      "displayName": "Deep Ocean",
+      "filename": "deep-ocean.png",
+      "hue": 190,
+      "saturation": 35
+    },
+    {
+      "name": "mysticblue",
+      "displayName": "Mystic Blue",
+      "filename": "mystic-blue.png",
+      "hue": 191,
+      "saturation": 35
+    },
+    {
+      "name": "royalpurple",
+      "displayName": "Royal Purple",
+      "filename": "royal-purple.png",
+      "hue": 272,
+      "saturation": 35
+    }
+  ],
+  "generatedAt": "2025-11-28T08:29:10.651Z",
+  "lightnessTargets": {
+    "0": 100,
+    "50": 92,
+    "100": 78,
+    "200": 65.9,
+    "300": 47.1,
+    "400": 32.2,
+    "500": 17.3,
+    "600": 12.5,
+    "700": 11,
+    "800": 9.4,
+    "900": 7.9,
+    "950": 3.7
+  }
+}

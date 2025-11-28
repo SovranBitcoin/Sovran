@@ -9,9 +9,14 @@ import { ThemeIcon } from 'assets/icons';
 import { SearchableList } from 'components/ui/SearchableList';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import {
+  backgroundImageThemes,
+  backgroundThemeDisplayNames,
+  BACKGROUND_THEME_NAMES,
+} from 'config/backgroundImageThemes';
 
-// An array of available themes
-const themes = [
+// Base themes (non-background image themes)
+const baseThemes = [
   'dark',
   'navy',
   'sunset',
@@ -21,16 +26,8 @@ const themes = [
   'velvet-emerald',
 ];
 
-// Background image themes
-export const backgroundImageThemes = {
-  royalpurple: require('assets/images/backgrounds/royalpurple.png'),
-  mysticblue: require('assets/images/backgrounds/mysticblue.png'),
-  cosmicpurple: require('assets/images/backgrounds/cosmicpurple.png'),
-  deepocean: require('assets/images/backgrounds/deepocean.png'),
-};
-
-// Mapping of theme names to user-friendly names (only for used themes)
-const themeNameMap: Record<string, string> = {
+// Display names for base themes
+const baseThemeDisplayNames: Record<string, string> = {
   dark: 'Dark',
   navy: 'Navy',
   beige: 'Beige',
@@ -38,11 +35,12 @@ const themeNameMap: Record<string, string> = {
   'crimson-night': 'Crimson Night',
   'twilight-amber': 'Twilight Amber',
   'velvet-emerald': 'Velvet Emerald',
-  // Background image themes
-  royalpurple: 'Royal Purple',
-  mysticblue: 'Mystic Blue',
-  cosmicpurple: 'Cosmic Purple',
-  deepocean: 'Deep Ocean',
+};
+
+// Combined display names (base + background themes from config)
+const themeNameMap: Record<string, string> = {
+  ...baseThemeDisplayNames,
+  ...backgroundThemeDisplayNames,
 };
 
 function ThemeSettings() {
@@ -50,27 +48,25 @@ function ThemeSettings() {
   const [searchText, setSearchText] = useState('');
   const setTheme = useSettingsStore((state) => state.setTheme);
 
-  // Combine regular themes and background image themes
-  const allThemes = [...themes, ...Object.keys(backgroundImageThemes)];
+  // Combine base themes and background image themes
+  const allThemes = [...baseThemes, ...BACKGROUND_THEME_NAMES];
 
   const filteredThemes = allThemes.filter((theme) =>
     theme.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const handleThemePress = (themeName: string) => {
-    // Unified theme handling - the store will handle background image themes
     setTheme(themeName);
     router.back();
   };
 
   const renderThemeIcon = (themeName: string) => {
     // Check if it's a background image theme
-    if (Object.keys(backgroundImageThemes).includes(themeName)) {
-      const backgroundImage = backgroundImageThemes[themeName];
+    if (backgroundImageThemes[themeName]) {
       return (
         <View className="h-12 w-12 overflow-hidden rounded-full">
           <Image
-            source={backgroundImage}
+            source={backgroundImageThemes[themeName]}
             style={{
               width: '100%',
               height: '100%',
@@ -100,7 +96,7 @@ function ThemeSettings() {
         onSearchChange={setSearchText}
         data={filteredThemes}
         renderIcon={renderThemeIcon}
-        getLabel={(themeName) => themeNameMap[themeName]}
+        getLabel={(themeName) => themeNameMap[themeName] || themeName}
         onItemPress={handleThemePress}
         searchPlaceholder="Search for theme"
       />

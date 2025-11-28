@@ -3,7 +3,7 @@ import { Animated, StyleSheet } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import { View } from './View';
 import Image from './Image';
-import { backgroundImageThemes } from '@/app/settings-pages/theme';
+import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/providers/ThemeProvider';
 
 const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {

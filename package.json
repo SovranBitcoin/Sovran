@@ -28,7 +28,8 @@
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "postinstall": "patch-package",
     "prebuild": "expo prebuild --clean",
-    "maestro": "maestro test ./.maestro"
+    "maestro": "maestro test ./.maestro",
+    "build:themes": "node scripts/build-background-themes.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
@@ -156,11 +157,13 @@
     "@types/react": "~19.1.10",
     "@types/semver": "^7.7.0",
     "babel-plugin-module-resolver": "^5.0.2",
+    "chroma-js": "^3.1.4",
     "eslint": "^9.25.1",
     "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-unused-imports": "^4.1.4",
+    "get-image-colors": "^4.0.1",
     "patch-package": "^8.0.1",
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.5.11",
