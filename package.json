@@ -16,10 +16,9 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
-    "prebuild": "expo prebuild --clean",
+    "start:emulator:ios": "expo run:ios",
+    "start:emulator:android": "expo run:android",
+    "build:dev:ios": "eas build --platform ios --profile development --non-interactive",
     "build:ios": "eas build --platform ios --profile production --non-interactive --auto-submit",
     "build:android:apk": "eas build -p android --profile preview",
     "submit:ios": "eas submit -p ios",
@@ -27,9 +26,9 @@
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
-    "maestro": "maestro test ./.maestro",
     "postinstall": "patch-package",
-    "build:dev:ios": "eas build --profile development --platform ios"
+    "prebuild": "expo prebuild --clean",
+    "maestro": "maestro test ./.maestro"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
