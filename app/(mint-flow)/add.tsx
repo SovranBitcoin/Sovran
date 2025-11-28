@@ -557,6 +557,7 @@ function AddMintsScreen() {
                 data={sortedMints}
                 renderItem={renderItem}
                 keyExtractor={keyExtractor}
+                extraData={selectedMints}
                 estimatedItemSize={120}
                 recycleItems={true}
                 drawDistance={300}
