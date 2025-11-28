@@ -24,11 +24,6 @@ export default function ExploreLayout() {
               <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
             </Pressable>
           ),
-          headerRight: () => (
-            <Pressable onPress={() => console.log('Settings pressed')} style={{ margin: 2 }}>
-              <IconSymbol name="gearshape" size={30} color={iconColor} />
-            </Pressable>
-          ),
         }}
       />
     </Stack>

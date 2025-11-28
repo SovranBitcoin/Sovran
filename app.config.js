@@ -111,6 +111,7 @@ module.exports = ({ config }) => {
       },
       experiments: {
         typedRoutes: true,
+        reactCompiler: true,
       },
     },
   };

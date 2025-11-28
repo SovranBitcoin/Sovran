@@ -1,12 +1,9 @@
-import { AnimatedBlur } from '@/components/blocks/payments/AnimatedBlur';
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult } from 'components/blocks/contacts';
 import { NoResultsFound } from 'components/blocks/contacts/NoResultsFound';
 import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { ContactItem } from 'components/blocks/payments';
-import { AnimatedSearchBar } from 'components/blocks/payments/AnimatedSearchBar';
-import { CancelButton } from 'components/blocks/payments/CancelButton';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { Tabs } from 'components/ui/Tabs';
@@ -17,10 +14,6 @@ import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 
 import { useMintManagement } from 'hooks/coco';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import {
-  PaymentsAnimationProvider,
-  usePaymentsAnimation,
-} from 'providers/PaymentsAnimationProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, ScrollView } from 'react-native';
@@ -29,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SkeletonContainer } from 'react-native-skeleton-component';
 import { setSearch } from 'redux/nostr';
 import { store } from 'redux/store';
+import { usePaymentsSearch } from './_layout';
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
@@ -52,9 +46,11 @@ interface PlaceholderResult {
 type DisplayResult = SearchResultData | PlaceholderResult;
 
 const PaymentsContent = () => {
-  usePaymentsAnimation();
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
+
+  // Get search state from layout context
+  const { searchQuery, isSearching } = usePaymentsSearch();
 
   const { mints, loadMints, getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -381,13 +377,12 @@ const PaymentsContent = () => {
   }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   const pagerRef = useRef<PagerView>(null);
-  const { searchQuery, currentView } = usePaymentsAnimation();
+
   // Fetch recommended users
   const fetchRecommendedUsers = useCallback(async () => {
     try {
       setRecommendedLoading(true);
       const result = await getRecommendedUsers({
-        // source: nostrKeys?.pubkey,
         limit: 10,
         sort: 'globalPagerank',
       });
@@ -509,7 +504,6 @@ const PaymentsContent = () => {
     searchQuery.trim().length > 0 && (searchLoading || searchResults.length > 0);
   const showNoResults =
     searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
-  const isSearchMode = currentView === 'search';
 
   // Skeleton configuration
   const skeletonConfig = useMemo(
@@ -556,8 +550,7 @@ const PaymentsContent = () => {
     searchQuery,
     searchLoading,
     searchResultsLength: searchResults.length,
-    currentView,
-    isSearchMode,
+    isSearching,
   });
 
   const onPageSelected = useCallback((event: any) => {
@@ -639,28 +632,24 @@ const PaymentsContent = () => {
     return map;
   }, [profileEvents]);
 
+  // Use safe area insets for consistent header spacing
+  const HEADER_HEIGHT = 100;
+
   return (
-    <SafeAreaView className="flex-1 bg-primary-900">
+    <SafeAreaView className="flex-1 bg-primary-900" edges={['bottom']}>
       <SkeletonContainer
         backgroundColor={skeletonConfig.backgroundColor}
         highlightColor={skeletonConfig.highlightColor}
         speed={skeletonConfig.speed}
         animation={skeletonConfig.animation}>
-        <View className="relative flex-1 bg-primary-900">
-          {/* Search Bar and Cancel Button */}
-          <View
-            style={{
-              flexDirection: 'row',
-              height: 48,
-              zIndex: 1001,
-            }}>
-            <AnimatedSearchBar />
-            <CancelButton />
-          </View>
-
+        <View className="relative flex-1 bg-primary-900" style={{ paddingTop: HEADER_HEIGHT }}>
+          {/* Tabs - Always render but hide with height when searching */}
           <View
             style={{
               paddingHorizontal: 12,
+              height: isSearching ? 0 : 'auto',
+              overflow: 'hidden',
+              opacity: isSearching ? 0 : 1,
             }}>
             <Tabs
               tabs={tabs}
@@ -669,61 +658,14 @@ const PaymentsContent = () => {
               amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
             />
           </View>
-          <View
-            style={{
-              flex: 1,
-              paddingLeft: 16,
-              paddingRight: 16,
-            }}>
-            <PagerView
-              ref={pagerRef}
-              onPageSelected={onPageSelected}
-              style={{
-                height: Dimensions.get('window').height,
-              }}
-              initialPage={0}
-              scrollEnabled={true}>
-              <View key="1" style={{ flex: 1 }}>
-                <DraggableContactsList
-                  data={decryptedContacts}
-                  profilesMap={profilesMap}
-                  isDecrypting={isDecrypting}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No recent conversations found"
-                  itemHeight={ITEM_HEIGHT}
-                />
-              </View>
-              <View key="2" style={{ flex: 1 }}>
-                <DraggableContactsList
-                  data={decryptedMints}
-                  profilesMap={profilesMap}
-                  isDecrypting={mintsLoadingInfo || isDecryptingMints}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No mints with nostr contacts found"
-                  itemHeight={ITEM_HEIGHT}
-                />
-              </View>
-            </PagerView>
-          </View>
 
-          {/* Search results overlay */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 48,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 1000,
-              paddingVertical: 8,
-              pointerEvents: isSearchMode ? 'auto' : 'none',
-            }}
-            onStartShouldSetResponder={() => {
-              console.log('[DEBUG overlay] onStartShouldSetResponder, isSearchMode:', isSearchMode);
-              return true;
-            }}>
-            <ScrollView pointerEvents={isSearchMode ? 'auto' : 'none'}>
-              {/* Recommended Users - Always show, but in different layouts */}
+          {/* Search results overlay - positioned absolutely to avoid layout shifts */}
+          {isSearching && (
+            <ScrollView
+              style={{ flex: 1, paddingHorizontal: 16 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none">
+              {/* Recommended Users */}
               <RecommendedUsers
                 users={recommendedUsers}
                 onUserPress={handleRecommendedUserPress}
@@ -738,10 +680,8 @@ const PaymentsContent = () => {
                     flex: 1,
                     borderRadius: 12,
                     marginTop: 16,
-                  }}
-                  onStartShouldSetResponder={() => true}
-                  onTouchEnd={(e) => e.stopPropagation()}>
-                  <View className="mx-4 mb-4">
+                  }}>
+                  <View className="mb-4">
                     <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
                       Search results
                     </Text>
@@ -769,20 +709,50 @@ const PaymentsContent = () => {
               {/* No Results Found */}
               {showNoResults && <NoResultsFound />}
             </ScrollView>
+          )}
+
+          {/* Main content - PagerView for tabs - always rendered but hidden when searching */}
+          <View
+            style={{
+              flex: isSearching ? 0 : 1,
+              paddingLeft: 16,
+              paddingRight: 16,
+              display: isSearching ? 'none' : 'flex',
+            }}>
+            <PagerView
+              ref={pagerRef}
+              onPageSelected={onPageSelected}
+              style={{
+                height: Dimensions.get('window').height - HEADER_HEIGHT - 100,
+              }}
+              initialPage={0}
+              scrollEnabled={true}>
+              <View key="1" style={{ flex: 1 }}>
+                <DraggableContactsList
+                  data={decryptedContacts}
+                  profilesMap={profilesMap}
+                  isDecrypting={isDecrypting}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No recent conversations found"
+                  itemHeight={ITEM_HEIGHT}
+                />
+              </View>
+              <View key="2" style={{ flex: 1 }}>
+                <DraggableContactsList
+                  data={decryptedMints}
+                  profilesMap={profilesMap}
+                  isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No mints with nostr contacts found"
+                  itemHeight={ITEM_HEIGHT}
+                />
+              </View>
+            </PagerView>
           </View>
-          <AnimatedBlur />
         </View>
       </SkeletonContainer>
     </SafeAreaView>
   );
 };
 
-const TabOneScreen = () => {
-  return (
-    <PaymentsAnimationProvider>
-      <PaymentsContent />
-    </PaymentsAnimationProvider>
-  );
-};
-
-export default TabOneScreen;
+export default PaymentsContent;
