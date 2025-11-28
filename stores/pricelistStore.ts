@@ -21,9 +21,16 @@ export interface PricelistState {
   error: string | null;
 }
 
+export interface BitcoinPrices {
+  USD: number;
+  GBP: number;
+  EUR: number;
+}
+
 interface PricelistActions {
   setPricelist: (data: PricelistData) => void;
   setBtcPrice: (price: number) => void;
+  setBtcPrices: (prices: BitcoinPrices) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearPricelist: () => void;
@@ -57,6 +64,20 @@ export const usePricelistStore = create<PricelistStore>()(
         const newPricelist: PricelistData = {
           usd: { btc: price },
           ...currentState.pricelist,
+        };
+
+        set({
+          pricelist: newPricelist,
+          lastUpdated: Date.now(),
+          error: null,
+        });
+      },
+
+      setBtcPrices: (prices: BitcoinPrices) => {
+        const newPricelist: PricelistData = {
+          usd: { btc: prices.USD },
+          eur: { btc: prices.EUR },
+          gbp: { btc: prices.GBP },
         };
 
         set({

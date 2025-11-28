@@ -1,5 +1,5 @@
 import React, { useEffect, createContext, useContext } from 'react';
-import { usePricelistStore } from 'stores/pricelistStore';
+import { usePricelistStore, BitcoinPrices } from 'stores/pricelistStore';
 import { PRICELIST_URL } from 'helper/apiClient';
 
 interface PricelistContextType {
@@ -25,6 +25,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     isLoading,
     error,
     setBtcPrice,
+    setBtcPrices,
     setLoading,
     setError,
     isStale: isDataStale,
@@ -59,6 +60,20 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
             const data = JSON.parse(event.data);
             console.log('PricelistProvider: Received data:', data);
 
+            // Handle multi-currency format: { btcPrices: { USD, GBP, EUR } }
+            if (data?.btcPrices && typeof data.btcPrices === 'object') {
+              const prices = data.btcPrices as BitcoinPrices;
+              if (
+                typeof prices.USD === 'number' &&
+                typeof prices.GBP === 'number' &&
+                typeof prices.EUR === 'number'
+              ) {
+                setBtcPrices(prices);
+                return;
+              }
+            }
+
+            // Legacy: single price format
             if (typeof data?.btcPrice === 'number') {
               setBtcPrice(data.btcPrice);
             } else if (data?.usd?.btc) {
@@ -117,7 +132,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         ws.close();
       }
     };
-  }, [setBtcPrice, setLoading, setError]);
+  }, [setBtcPrice, setBtcPrices, setLoading, setError]);
 
   const contextValue: PricelistContextType = {
     btcPrice: pricelist?.usd?.btc,
