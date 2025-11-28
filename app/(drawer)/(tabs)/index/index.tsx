@@ -84,6 +84,23 @@ function TabOneScreen() {
         height: '100%',
       }}>
       <AnimatedSpriteBackground backgroundColor={primaryColor900} />
+      <MaskedView
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            top: 'auto',
+            height: '50%',
+          },
+        ]}
+        maskElement={
+          <LinearGradient
+            colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
+            locations={[0, 1]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        }>
+        <BlurView intensity={200} tint="prominent" style={StyleSheet.absoluteFillObject} />
+      </MaskedView>
 
       <View className="flex-1">
         <ScrollView
