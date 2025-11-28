@@ -210,4 +210,3 @@ export function ReceiveScreen({
 export function getFormattedReceiveTitle(unit: string): string {
   return `Receive ${unit === 'sat' ? 'Bitcoin' : (unit || 'SAT').toUpperCase()}`;
 }
-
