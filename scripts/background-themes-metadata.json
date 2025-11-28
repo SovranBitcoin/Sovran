@@ -7,7 +7,68 @@
       "dominantDarkHex": "#0d041b",
       "hue": 263,
       "saturation": 74,
-      "lightness": 6
+      "lightness": 6,
+      "dominantColors": [
+        {
+          "hex": "#68194A",
+          "hue": 323,
+          "saturation": 61,
+          "lightness": 25
+        },
+        {
+          "hex": "#322B84",
+          "hue": 245,
+          "saturation": 51,
+          "lightness": 34
+        },
+        {
+          "hex": "#14BA73",
+          "hue": 154,
+          "saturation": 81,
+          "lightness": 40
+        },
+        {
+          "hex": "#3D95B3",
+          "hue": 195,
+          "saturation": 49,
+          "lightness": 47
+        },
+        {
+          "hex": "#C64555",
+          "hue": 353,
+          "saturation": 53,
+          "lightness": 52
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#3D95B3",
+          "position": "light",
+          "hsb": {
+            "hue": 195,
+            "saturation": 66,
+            "brightness": 70
+          }
+        },
+        {
+          "hex": "#2F277E",
+          "position": "mid",
+          "hsb": {
+            "hue": 246,
+            "saturation": 69,
+            "brightness": 49
+          }
+        },
+        {
+          "hex": "#13092F",
+          "position": "dark",
+          "hsb": {
+            "hue": 256,
+            "saturation": 81,
+            "brightness": 18
+          }
+        }
+      ]
     },
     {
       "name": "deepocean",
@@ -16,7 +77,68 @@
       "dominantDarkHex": "#081e1e",
       "hue": 180,
       "saturation": 58,
-      "lightness": 7
+      "lightness": 7,
+      "dominantColors": [
+        {
+          "hex": "#056176",
+          "hue": 191,
+          "saturation": 92,
+          "lightness": 24
+        },
+        {
+          "hex": "#0C7158",
+          "hue": 165,
+          "saturation": 81,
+          "lightness": 25
+        },
+        {
+          "hex": "#07B697",
+          "hue": 169,
+          "saturation": 93,
+          "lightness": 37
+        },
+        {
+          "hex": "#AA625A",
+          "hue": 6,
+          "saturation": 32,
+          "lightness": 51
+        },
+        {
+          "hex": "#5AD185",
+          "hue": 142,
+          "saturation": 56,
+          "lightness": 59
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#05B597",
+          "position": "light",
+          "hsb": {
+            "hue": 170,
+            "saturation": 97,
+            "brightness": 71
+          }
+        },
+        {
+          "hex": "#04777E",
+          "position": "mid",
+          "hsb": {
+            "hue": 183,
+            "saturation": 97,
+            "brightness": 49
+          }
+        },
+        {
+          "hex": "#062E30",
+          "position": "dark",
+          "hsb": {
+            "hue": 183,
+            "saturation": 88,
+            "brightness": 19
+          }
+        }
+      ]
     },
     {
       "name": "mountainpeaks",
@@ -25,7 +147,62 @@
       "dominantDarkHex": "#15212a",
       "hue": 206,
       "saturation": 33,
-      "lightness": 12
+      "lightness": 12,
+      "dominantColors": [
+        {
+          "hex": "#3C3435",
+          "hue": 353,
+          "saturation": 7,
+          "lightness": 22
+        },
+        {
+          "hex": "#345968",
+          "hue": 197,
+          "saturation": 33,
+          "lightness": 31
+        },
+        {
+          "hex": "#BCB49C",
+          "hue": 45,
+          "saturation": 19,
+          "lightness": 67
+        },
+        {
+          "hex": "#9AB4C4",
+          "hue": 203,
+          "saturation": 26,
+          "lightness": 69
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#A1BCC4",
+          "position": "light",
+          "hsb": {
+            "hue": 194,
+            "saturation": 18,
+            "brightness": 77
+          }
+        },
+        {
+          "hex": "#345966",
+          "position": "mid",
+          "hsb": {
+            "hue": 196,
+            "saturation": 49,
+            "brightness": 40
+          }
+        },
+        {
+          "hex": "#0C1C24",
+          "position": "dark",
+          "hsb": {
+            "hue": 200,
+            "saturation": 67,
+            "brightness": 14
+          }
+        }
+      ]
     },
     {
       "name": "mountainsky",
@@ -34,7 +211,68 @@
       "dominantDarkHex": "#151d2a",
       "hue": 217,
       "saturation": 33,
-      "lightness": 12
+      "lightness": 12,
+      "dominantColors": [
+        {
+          "hex": "#24334C",
+          "hue": 218,
+          "saturation": 36,
+          "lightness": 22
+        },
+        {
+          "hex": "#31628C",
+          "hue": 208,
+          "saturation": 48,
+          "lightness": 37
+        },
+        {
+          "hex": "#806C67",
+          "hue": 12,
+          "saturation": 11,
+          "lightness": 45
+        },
+        {
+          "hex": "#5B98B2",
+          "hue": 198,
+          "saturation": 36,
+          "lightness": 53
+        },
+        {
+          "hex": "#B5A8A3",
+          "hue": 17,
+          "saturation": 11,
+          "lightness": 67
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#5B98B2",
+          "position": "light",
+          "hsb": {
+            "hue": 198,
+            "saturation": 49,
+            "brightness": 70
+          }
+        },
+        {
+          "hex": "#2E567C",
+          "position": "mid",
+          "hsb": {
+            "hue": 209,
+            "saturation": 63,
+            "brightness": 49
+          }
+        },
+        {
+          "hex": "#121925",
+          "position": "dark",
+          "hsb": {
+            "hue": 218,
+            "saturation": 51,
+            "brightness": 15
+          }
+        }
+      ]
     },
     {
       "name": "mysticblue",
@@ -43,7 +281,68 @@
       "dominantDarkHex": "#050418",
       "hue": 243,
       "saturation": 71,
-      "lightness": 5
+      "lightness": 5,
+      "dominantColors": [
+        {
+          "hex": "#055C6C",
+          "hue": 189,
+          "saturation": 91,
+          "lightness": 22
+        },
+        {
+          "hex": "#0493A0",
+          "hue": 185,
+          "saturation": 95,
+          "lightness": 32
+        },
+        {
+          "hex": "#A3045A",
+          "hue": 328,
+          "saturation": 95,
+          "lightness": 33
+        },
+        {
+          "hex": "#04E6E3",
+          "hue": 179,
+          "saturation": 97,
+          "lightness": 46
+        },
+        {
+          "hex": "#F30462",
+          "hue": 336,
+          "saturation": 97,
+          "lightness": 48
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#A3045A",
+          "position": "light",
+          "hsb": {
+            "hue": 328,
+            "saturation": 98,
+            "brightness": 64
+          }
+        },
+        {
+          "hex": "#2B2061",
+          "position": "mid",
+          "hsb": {
+            "hue": 250,
+            "saturation": 67,
+            "brightness": 38
+          }
+        },
+        {
+          "hex": "#050418",
+          "position": "dark",
+          "hsb": {
+            "hue": 243,
+            "saturation": 83,
+            "brightness": 9
+          }
+        }
+      ]
     },
     {
       "name": "royalpurple",
@@ -52,8 +351,69 @@
       "dominantDarkHex": "#180628",
       "hue": 272,
       "saturation": 74,
-      "lightness": 9
+      "lightness": 9,
+      "dominantColors": [
+        {
+          "hex": "#091244",
+          "hue": 231,
+          "saturation": 77,
+          "lightness": 15
+        },
+        {
+          "hex": "#882385",
+          "hue": 302,
+          "saturation": 59,
+          "lightness": 34
+        },
+        {
+          "hex": "#403380",
+          "hue": 250,
+          "saturation": 43,
+          "lightness": 35
+        },
+        {
+          "hex": "#F04EA4",
+          "hue": 328,
+          "saturation": 84,
+          "lightness": 62
+        },
+        {
+          "hex": "#EF8BB0",
+          "hue": 338,
+          "saturation": 76,
+          "lightness": 74
+        }
+      ],
+      "gradientColors": [
+        {
+          "hex": "#C33493",
+          "position": "light",
+          "hsb": {
+            "hue": 320,
+            "saturation": 73,
+            "brightness": 76
+          }
+        },
+        {
+          "hex": "#89247F",
+          "position": "mid",
+          "hsb": {
+            "hue": 306,
+            "saturation": 74,
+            "brightness": 54
+          }
+        },
+        {
+          "hex": "#180628",
+          "position": "dark",
+          "hsb": {
+            "hue": 272,
+            "saturation": 85,
+            "brightness": 16
+          }
+        }
+      ]
     }
   ],
-  "generatedAt": "2025-11-28T08:45:03.430Z"
+  "generatedAt": "2025-11-28T21:01:05.852Z"
 }

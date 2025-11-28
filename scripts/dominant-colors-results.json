@@ -1,0 +1,206 @@
+{
+  "cosmicpurple": {
+    "filename": "cosmic-purple.png",
+    "dominantColors": [
+      {
+        "hex": "#201E5F",
+        "hue": 242,
+        "saturation": 52,
+        "lightness": 25
+      },
+      {
+        "hex": "#68194A",
+        "hue": 323,
+        "saturation": 61,
+        "lightness": 25
+      },
+      {
+        "hex": "#3C98B1",
+        "hue": 193,
+        "saturation": 49,
+        "lightness": 46
+      },
+      {
+        "hex": "#467BB2",
+        "hue": 211,
+        "saturation": 44,
+        "lightness": 49
+      },
+      {
+        "hex": "#C64F8C",
+        "hue": 329,
+        "saturation": 51,
+        "lightness": 54
+      }
+    ]
+  },
+  "deepocean": {
+    "filename": "deep-ocean.png",
+    "dominantColors": [
+      {
+        "hex": "#043343",
+        "hue": 195,
+        "saturation": 89,
+        "lightness": 14
+      },
+      {
+        "hex": "#056176",
+        "hue": 191,
+        "saturation": 92,
+        "lightness": 24
+      },
+      {
+        "hex": "#058181",
+        "hue": 180,
+        "saturation": 93,
+        "lightness": 26
+      },
+      {
+        "hex": "#08B797",
+        "hue": 169,
+        "saturation": 92,
+        "lightness": 37
+      },
+      {
+        "hex": "#AD6B5C",
+        "hue": 11,
+        "saturation": 33,
+        "lightness": 52
+      }
+    ]
+  },
+  "mountainpeaks": {
+    "filename": "mountain-peaks.png",
+    "dominantColors": [
+      {
+        "hex": "#2A3E47",
+        "hue": 199,
+        "saturation": 26,
+        "lightness": 22
+      },
+      {
+        "hex": "#4E7684",
+        "hue": 196,
+        "saturation": 26,
+        "lightness": 41
+      },
+      {
+        "hex": "#BCB49C",
+        "hue": 45,
+        "saturation": 19,
+        "lightness": 67
+      },
+      {
+        "hex": "#AFC5CA",
+        "hue": 191,
+        "saturation": 20,
+        "lightness": 74
+      }
+    ]
+  },
+  "mountainsky": {
+    "filename": "mountain-sky.png",
+    "dominantColors": [
+      {
+        "hex": "#24334C",
+        "hue": 218,
+        "saturation": 36,
+        "lightness": 22
+      },
+      {
+        "hex": "#806C67",
+        "hue": 12,
+        "saturation": 11,
+        "lightness": 45
+      },
+      {
+        "hex": "#4A84A6",
+        "hue": 202,
+        "saturation": 38,
+        "lightness": 47
+      },
+      {
+        "hex": "#77C0CF",
+        "hue": 190,
+        "saturation": 48,
+        "lightness": 64
+      },
+      {
+        "hex": "#BDAEA6",
+        "hue": 21,
+        "saturation": 15,
+        "lightness": 70
+      }
+    ]
+  },
+  "mysticblue": {
+    "filename": "mystic-blue.png",
+    "dominantColors": [
+      {
+        "hex": "#5D053E",
+        "hue": 321,
+        "saturation": 90,
+        "lightness": 19
+      },
+      {
+        "hex": "#0D586C",
+        "hue": 193,
+        "saturation": 79,
+        "lightness": 24
+      },
+      {
+        "hex": "#B6045C",
+        "hue": 330,
+        "saturation": 96,
+        "lightness": 36
+      },
+      {
+        "hex": "#24639F",
+        "hue": 209,
+        "saturation": 63,
+        "lightness": 38
+      },
+      {
+        "hex": "#04CDCF",
+        "hue": 181,
+        "saturation": 96,
+        "lightness": 41
+      }
+    ]
+  },
+  "royalpurple": {
+    "filename": "royal-purple.png",
+    "dominantColors": [
+      {
+        "hex": "#4A1869",
+        "hue": 277,
+        "saturation": 63,
+        "lightness": 25
+      },
+      {
+        "hex": "#19386F",
+        "hue": 218,
+        "saturation": 63,
+        "lightness": 27
+      },
+      {
+        "hex": "#90298A",
+        "hue": 303,
+        "saturation": 56,
+        "lightness": 36
+      },
+      {
+        "hex": "#D13F9B",
+        "hue": 322,
+        "saturation": 61,
+        "lightness": 53
+      },
+      {
+        "hex": "#EF8BB1",
+        "hue": 337,
+        "saturation": 76,
+        "lightness": 74
+      }
+    ]
+  }
+}

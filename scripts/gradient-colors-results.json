@@ -1,0 +1,200 @@
+{
+  "cosmicpurple": {
+    "filename": "cosmic-purple.png",
+    "dominantHue": 270,
+    "gradient": [
+      {
+        "hex": "#3D95B3",
+        "position": "light",
+        "hsb": {
+          "hue": 195,
+          "saturation": 66,
+          "brightness": 70
+        }
+      },
+      {
+        "hex": "#2F277E",
+        "position": "mid",
+        "hsb": {
+          "hue": 246,
+          "saturation": 69,
+          "brightness": 49
+        }
+      },
+      {
+        "hex": "#13092F",
+        "position": "dark",
+        "hsb": {
+          "hue": 256,
+          "saturation": 81,
+          "brightness": 18
+        }
+      }
+    ]
+  },
+  "deepocean": {
+    "filename": "deep-ocean.png",
+    "dominantHue": 172,
+    "gradient": [
+      {
+        "hex": "#05B597",
+        "position": "light",
+        "hsb": {
+          "hue": 170,
+          "saturation": 97,
+          "brightness": 71
+        }
+      },
+      {
+        "hex": "#04777E",
+        "position": "mid",
+        "hsb": {
+          "hue": 183,
+          "saturation": 97,
+          "brightness": 49
+        }
+      },
+      {
+        "hex": "#062E30",
+        "position": "dark",
+        "hsb": {
+          "hue": 183,
+          "saturation": 88,
+          "brightness": 19
+        }
+      }
+    ]
+  },
+  "mountainpeaks": {
+    "filename": "mountain-peaks.png",
+    "dominantHue": 199,
+    "gradient": [
+      {
+        "hex": "#A1BCC4",
+        "position": "light",
+        "hsb": {
+          "hue": 194,
+          "saturation": 18,
+          "brightness": 77
+        }
+      },
+      {
+        "hex": "#345966",
+        "position": "mid",
+        "hsb": {
+          "hue": 196,
+          "saturation": 49,
+          "brightness": 40
+        }
+      },
+      {
+        "hex": "#0C1C24",
+        "position": "dark",
+        "hsb": {
+          "hue": 200,
+          "saturation": 67,
+          "brightness": 14
+        }
+      }
+    ]
+  },
+  "mountainsky": {
+    "filename": "mountain-sky.png",
+    "dominantHue": 207,
+    "gradient": [
+      {
+        "hex": "#5B98B2",
+        "position": "light",
+        "hsb": {
+          "hue": 198,
+          "saturation": 49,
+          "brightness": 70
+        }
+      },
+      {
+        "hex": "#2E567C",
+        "position": "mid",
+        "hsb": {
+          "hue": 209,
+          "saturation": 63,
+          "brightness": 49
+        }
+      },
+      {
+        "hex": "#121925",
+        "position": "dark",
+        "hsb": {
+          "hue": 218,
+          "saturation": 51,
+          "brightness": 15
+        }
+      }
+    ]
+  },
+  "mysticblue": {
+    "filename": "mystic-blue.png",
+    "dominantHue": 255,
+    "gradient": [
+      {
+        "hex": "#A3045A",
+        "position": "light",
+        "hsb": {
+          "hue": 328,
+          "saturation": 98,
+          "brightness": 64
+        }
+      },
+      {
+        "hex": "#2B2061",
+        "position": "mid",
+        "hsb": {
+          "hue": 250,
+          "saturation": 67,
+          "brightness": 38
+        }
+      },
+      {
+        "hex": "#050418",
+        "position": "dark",
+        "hsb": {
+          "hue": 243,
+          "saturation": 83,
+          "brightness": 9
+        }
+      }
+    ]
+  },
+  "royalpurple": {
+    "filename": "royal-purple.png",
+    "dominantHue": 295,
+    "gradient": [
+      {
+        "hex": "#C33493",
+        "position": "light",
+        "hsb": {
+          "hue": 320,
+          "saturation": 73,
+          "brightness": 76
+        }
+      },
+      {
+        "hex": "#89247F",
+        "position": "mid",
+        "hsb": {
+          "hue": 306,
+          "saturation": 74,
+          "brightness": 54
+        }
+      },
+      {
+        "hex": "#180628",
+        "position": "dark",
+        "hsb": {
+          "hue": 272,
+          "saturation": 85,
+          "brightness": 16
+        }
+      }
+    ]
+  }
+}

@@ -9,15 +9,18 @@
       "env": {
         "APP_VARIANT": "development",
         "EXPO_NO_DEV_CLIENT": "1"
-      }
+      },
+      "autoIncrement": true
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "autoIncrement": true
     },
     "production": {
       "ios": {
         "credentialsSource": "remote"
-      }
+      },
+      "autoIncrement": true
     }
   },
   "submit": {

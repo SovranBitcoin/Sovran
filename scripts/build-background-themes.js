@@ -24,6 +24,10 @@ const path = require('path');
 const chroma = require('chroma-js');
 const getColors = require('get-image-colors');
 
+// Import color extraction functions
+const { extractDominantColors } = require('./extract-dominant-colors');
+const { extractGradientColors } = require('./extract-gradient-colors');
+
 // Configuration
 const BACKGROUNDS_DIR = path.join(__dirname, '..', 'assets', 'images', 'backgrounds');
 const ROOT_DIR = path.join(__dirname, '..');
@@ -224,12 +228,25 @@ async function scanBackgrounds() {
 
     console.log(`  Processing: ${file} -> "${displayName}" (${themeName})`);
 
+    // Extract dominant dark color for palette generation
     const dominantDark = await extractDominantDarkColor(imagePath);
     const palette = generatePalette(dominantDark);
+
+    // Extract dominant colors (5 visually distinct colors from image)
+    const dominantColors = await extractDominantColors(imagePath, {
+      count: 5,
+      extractCount: 50,
+      minDistance: 22,
+    });
+
+    // Extract gradient colors (light → mid → dark for CSS gradients)
+    const { gradient: gradientColors, dominantHue } = await extractGradientColors(imagePath);
 
     console.log(
       `    -> Dominant dark: ${dominantDark.hex} (H:${Math.round(dominantDark.hue)}° S:${Math.round(dominantDark.saturation * 100)}% L:${Math.round(dominantDark.lightness * 100)}%)`
     );
+    console.log(`    -> Dominant colors: ${dominantColors.map((c) => c.hex).join(', ')}`);
+    console.log(`    -> Gradient colors: ${gradientColors.map((c) => c.hex).join(' → ')}`);
 
     themes.push({
       name: themeName,
@@ -239,6 +256,8 @@ async function scanBackgrounds() {
       saturation: Math.round(dominantDark.saturation * 100),
       lightness: Math.round(dominantDark.lightness * 100),
       dominantDarkHex: dominantDark.hex,
+      dominantColors, // Array of { hex, hue, saturation, lightness }
+      gradientColors, // Array of { hex, position, hsb: { hue, saturation, brightness } }
       palette,
     });
   }
@@ -317,6 +336,34 @@ function generateBackgroundConfigContent(themes) {
  */
 
 /**
+ * Dominant color extracted from an image
+ */
+export interface DominantColor {
+  hex: string;
+  hue: number;
+  saturation: number;
+  lightness: number;
+}
+
+/**
+ * HSB (Hue, Saturation, Brightness) values
+ */
+export interface HSB {
+  hue: number;
+  saturation: number;
+  brightness: number;
+}
+
+/**
+ * Gradient color for creating CSS gradients
+ */
+export interface GradientColor {
+  hex: string;
+  position: 'light' | 'mid' | 'dark';
+  hsb: HSB;
+}
+
+/**
  * Background image require() mappings.
  * Maps theme name to the image asset.
  */
@@ -347,6 +394,42 @@ export const backgroundThemeDisplayNames: Record<string, string> = {
   content += `};
 
 /**
+ * Dominant colors extracted from each background image.
+ * These are the 5 most visually distinct colors from the image.
+ * Useful for accent colors, gradients, or UI elements that should match the background.
+ */
+export const backgroundThemeDominantColors: Record<string, DominantColor[]> = {
+`;
+
+  themes.forEach((theme) => {
+    content += `  ${theme.name}: [\n`;
+    theme.dominantColors.forEach((color) => {
+      content += `    { hex: '${color.hex}', hue: ${color.hue}, saturation: ${color.saturation}, lightness: ${color.lightness} },\n`;
+    });
+    content += `  ],\n`;
+  });
+
+  content += `};
+
+/**
+ * Gradient colors extracted from each background image.
+ * These are 3 colors (light → mid → dark) suitable for CSS gradients.
+ * The gradient captures the atmospheric color transition of the image.
+ */
+export const backgroundThemeGradientColors: Record<string, GradientColor[]> = {
+`;
+
+  themes.forEach((theme) => {
+    content += `  ${theme.name}: [\n`;
+    theme.gradientColors.forEach((color) => {
+      content += `    { hex: '${color.hex}', position: '${color.position}', hsb: { hue: ${color.hsb.hue}, saturation: ${color.hsb.saturation}, brightness: ${color.hsb.brightness} } },\n`;
+    });
+    content += `  ],\n`;
+  });
+
+  content += `};
+
+/**
  * Check if a theme is a background image theme.
  */
 export const isBackgroundImageTheme = (themeName: string): boolean => {
@@ -365,6 +448,44 @@ export const getBackgroundImage = (themeName: string): ImageSource | null => {
  */
 export const getBackgroundThemeDisplayName = (themeName: string): string | undefined => {
   return backgroundThemeDisplayNames[themeName];
+};
+
+/**
+ * Get the dominant colors for a background theme.
+ * Returns an array of 5 visually distinct colors extracted from the image.
+ */
+export const getBackgroundThemeDominantColors = (themeName: string): DominantColor[] | undefined => {
+  return backgroundThemeDominantColors[themeName];
+};
+
+/**
+ * Get just the hex values of dominant colors for a theme.
+ * Convenience function for when you just need the color strings.
+ */
+export const getBackgroundThemeDominantHexColors = (themeName: string): string[] | undefined => {
+  return backgroundThemeDominantColors[themeName]?.map(c => c.hex);
+};
+
+/**
+ * Get the gradient colors for a background theme.
+ * Returns an array of 3 colors (light → mid → dark) for CSS gradients.
+ */
+export const getBackgroundThemeGradientColors = (themeName: string): GradientColor[] | undefined => {
+  return backgroundThemeGradientColors[themeName];
+};
+
+/**
+ * Get a CSS linear-gradient string for a theme.
+ * Direction defaults to 'to bottom' (light at top, dark at bottom).
+ */
+export const getBackgroundThemeGradientCSS = (
+  themeName: string, 
+  direction: string = 'to bottom'
+): string | undefined => {
+  const gradient = backgroundThemeGradientColors[themeName];
+  if (!gradient || gradient.length === 0) return undefined;
+  const colors = gradient.map(c => c.hex).join(', ');
+  return \`linear-gradient(\${direction}, \${colors})\`;
 };
 `;
 
@@ -428,6 +549,8 @@ async function main() {
           hue: t.hue,
           saturation: t.saturation,
           lightness: t.lightness,
+          dominantColors: t.dominantColors, // Array of { hex, hue, saturation, lightness }
+          gradientColors: t.gradientColors, // Array of { hex, position, hsb }
         })),
         generatedAt: new Date().toISOString(),
       },

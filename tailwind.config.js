@@ -93,6 +93,24 @@ module.exports = {
           500: 'var(--color-purple-500)',
         },
 
+        // Dominant colors (5 visually distinct colors from theme background)
+        // Use: bg-dominant-100, text-dominant-300, border-dominant-500, etc.
+        dominant: {
+          100: 'var(--color-dominant-100)',
+          200: 'var(--color-dominant-200)',
+          300: 'var(--color-dominant-300)',
+          400: 'var(--color-dominant-400)',
+          500: 'var(--color-dominant-500)',
+        },
+
+        // Gradient colors (light → mid → dark from theme background)
+        // Use: bg-gradient-100 (light), bg-gradient-200 (mid), bg-gradient-300 (dark)
+        gradient: {
+          100: 'var(--color-gradient-100)',
+          200: 'var(--color-gradient-200)',
+          300: 'var(--color-gradient-300)',
+        },
+
         // All theme colors - dynamically includes all themes from themes.js
         ...THEMES,
       },

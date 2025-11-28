@@ -1,5 +1,10 @@
 import { vars } from 'nativewind';
 import { THEMES } from '../themes';
+import {
+  backgroundThemeDominantColors,
+  backgroundThemeGradientColors,
+  isBackgroundImageTheme,
+} from '../config/backgroundImageThemes';
 
 /**
  * Shade colors that persist across all themes
@@ -31,9 +36,76 @@ const shadeColors = {
 };
 
 /**
+ * Default fallback colors for non-background-image themes
+ * Uses neutral grays as fallback
+ */
+const defaultDominantColors = {
+  '--color-dominant-100': '#666666',
+  '--color-dominant-200': '#555555',
+  '--color-dominant-300': '#444444',
+  '--color-dominant-400': '#333333',
+  '--color-dominant-500': '#222222',
+};
+
+const defaultGradientColors = {
+  '--color-gradient-100': '#888888', // light
+  '--color-gradient-200': '#555555', // mid
+  '--color-gradient-300': '#222222', // dark
+};
+
+/**
+ * Get dominant color CSS variables for a theme
+ * Maps 5 dominant colors to 100-500 scale
+ */
+function getDominantColorVars(themeName: string): Record<string, string> {
+  if (!isBackgroundImageTheme(themeName)) {
+    return defaultDominantColors;
+  }
+
+  const dominantColors = backgroundThemeDominantColors[themeName];
+  if (!dominantColors || dominantColors.length === 0) {
+    return defaultDominantColors;
+  }
+
+  return {
+    '--color-dominant-100': dominantColors[0]?.hex || '#666666',
+    '--color-dominant-200': dominantColors[1]?.hex || '#555555',
+    '--color-dominant-300': dominantColors[2]?.hex || '#444444',
+    '--color-dominant-400': dominantColors[3]?.hex || '#333333',
+    '--color-dominant-500': dominantColors[4]?.hex || '#222222',
+  };
+}
+
+/**
+ * Get gradient color CSS variables for a theme
+ * Maps 3 gradient colors (light, mid, dark) to 100-300 scale
+ */
+function getGradientColorVars(themeName: string): Record<string, string> {
+  if (!isBackgroundImageTheme(themeName)) {
+    return defaultGradientColors;
+  }
+
+  const gradientColors = backgroundThemeGradientColors[themeName];
+  if (!gradientColors || gradientColors.length === 0) {
+    return defaultGradientColors;
+  }
+
+  // Find colors by position, fallback to index
+  const light = gradientColors.find((c) => c.position === 'light') || gradientColors[0];
+  const mid = gradientColors.find((c) => c.position === 'mid') || gradientColors[1];
+  const dark = gradientColors.find((c) => c.position === 'dark') || gradientColors[2];
+
+  return {
+    '--color-gradient-100': light?.hex || '#888888',
+    '--color-gradient-200': mid?.hex || '#555555',
+    '--color-gradient-300': dark?.hex || '#222222',
+  };
+}
+
+/**
  * Convert a palette object to NativeWind CSS variables
  */
-function createThemeVars(palette: Record<number, string>) {
+function createThemeVars(themeName: string, palette: Record<number, string>) {
   return vars({
     '--color-primary-950': palette[950],
     '--color-primary-900': palette[900],
@@ -48,6 +120,8 @@ function createThemeVars(palette: Record<number, string>) {
     '--color-primary-50': palette[50],
     '--color-primary-0': palette[0],
     ...shadeColors,
+    ...getDominantColorVars(themeName),
+    ...getGradientColorVars(themeName),
   });
 }
 
@@ -59,5 +133,24 @@ export const colorThemes: Record<string, ReturnType<typeof vars>> = {};
 
 // Generate colorThemes for all themes in THEMES
 for (const [themeName, palette] of Object.entries(THEMES)) {
-  colorThemes[themeName] = createThemeVars(palette as Record<number, string>);
+  colorThemes[themeName] = createThemeVars(themeName, palette as Record<number, string>);
+}
+
+/**
+ * Get dominant color by scale (100-500)
+ * @param scale - '100' | '200' | '300' | '400' | '500'
+ * @returns CSS variable reference
+ */
+export function getDominantColor(scale: '100' | '200' | '300' | '400' | '500'): string {
+  return `var(--color-dominant-${scale})`;
+}
+
+/**
+ * Get gradient color by scale (100-300)
+ * 100 = light, 200 = mid, 300 = dark
+ * @param scale - '100' | '200' | '300'
+ * @returns CSS variable reference
+ */
+export function getGradientColor(scale: '100' | '200' | '300'): string {
+  return `var(--color-gradient-${scale})`;
 }

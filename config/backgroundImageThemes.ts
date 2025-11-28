@@ -11,6 +11,34 @@ import { ImageSource } from 'expo-image';
  */
 
 /**
+ * Dominant color extracted from an image
+ */
+export interface DominantColor {
+  hex: string;
+  hue: number;
+  saturation: number;
+  lightness: number;
+}
+
+/**
+ * HSB (Hue, Saturation, Brightness) values
+ */
+export interface HSB {
+  hue: number;
+  saturation: number;
+  brightness: number;
+}
+
+/**
+ * Gradient color for creating CSS gradients
+ */
+export interface GradientColor {
+  hex: string;
+  position: 'light' | 'mid' | 'dark';
+  hsb: HSB;
+}
+
+/**
  * Background image require() mappings.
  * Maps theme name to the image asset.
  */
@@ -26,7 +54,14 @@ export const backgroundImageThemes: Record<string, ImageSource> = {
 /**
  * Array of all background image theme names.
  */
-export const BACKGROUND_THEME_NAMES = ['cosmicpurple', 'deepocean', 'mountainpeaks', 'mountainsky', 'mysticblue', 'royalpurple'];
+export const BACKGROUND_THEME_NAMES = [
+  'cosmicpurple',
+  'deepocean',
+  'mountainpeaks',
+  'mountainsky',
+  'mysticblue',
+  'royalpurple',
+];
 
 /**
  * Display names for background image themes (from filename).
@@ -38,6 +73,93 @@ export const backgroundThemeDisplayNames: Record<string, string> = {
   mountainsky: 'Mountain Sky',
   mysticblue: 'Mystic Blue',
   royalpurple: 'Royal Purple',
+};
+
+/**
+ * Dominant colors extracted from each background image.
+ * These are the 5 most visually distinct colors from the image.
+ * Useful for accent colors, gradients, or UI elements that should match the background.
+ */
+export const backgroundThemeDominantColors: Record<string, DominantColor[]> = {
+  cosmicpurple: [
+    { hex: '#68194A', hue: 323, saturation: 61, lightness: 25 },
+    { hex: '#322B84', hue: 245, saturation: 51, lightness: 34 },
+    { hex: '#14BA73', hue: 154, saturation: 81, lightness: 40 },
+    { hex: '#3D95B3', hue: 195, saturation: 49, lightness: 47 },
+    { hex: '#C64555', hue: 353, saturation: 53, lightness: 52 },
+  ],
+  deepocean: [
+    { hex: '#056176', hue: 191, saturation: 92, lightness: 24 },
+    { hex: '#0C7158', hue: 165, saturation: 81, lightness: 25 },
+    { hex: '#07B697', hue: 169, saturation: 93, lightness: 37 },
+    { hex: '#AA625A', hue: 6, saturation: 32, lightness: 51 },
+    { hex: '#5AD185', hue: 142, saturation: 56, lightness: 59 },
+  ],
+  mountainpeaks: [
+    { hex: '#3C3435', hue: 353, saturation: 7, lightness: 22 },
+    { hex: '#345968', hue: 197, saturation: 33, lightness: 31 },
+    { hex: '#BCB49C', hue: 45, saturation: 19, lightness: 67 },
+    { hex: '#9AB4C4', hue: 203, saturation: 26, lightness: 69 },
+  ],
+  mountainsky: [
+    { hex: '#24334C', hue: 218, saturation: 36, lightness: 22 },
+    { hex: '#31628C', hue: 208, saturation: 48, lightness: 37 },
+    { hex: '#806C67', hue: 12, saturation: 11, lightness: 45 },
+    { hex: '#5B98B2', hue: 198, saturation: 36, lightness: 53 },
+    { hex: '#B5A8A3', hue: 17, saturation: 11, lightness: 67 },
+  ],
+  mysticblue: [
+    { hex: '#055C6C', hue: 189, saturation: 91, lightness: 22 },
+    { hex: '#0493A0', hue: 185, saturation: 95, lightness: 32 },
+    { hex: '#A3045A', hue: 328, saturation: 95, lightness: 33 },
+    { hex: '#04E6E3', hue: 179, saturation: 97, lightness: 46 },
+    { hex: '#F30462', hue: 336, saturation: 97, lightness: 48 },
+  ],
+  royalpurple: [
+    { hex: '#091244', hue: 231, saturation: 77, lightness: 15 },
+    { hex: '#882385', hue: 302, saturation: 59, lightness: 34 },
+    { hex: '#403380', hue: 250, saturation: 43, lightness: 35 },
+    { hex: '#F04EA4', hue: 328, saturation: 84, lightness: 62 },
+    { hex: '#EF8BB0', hue: 338, saturation: 76, lightness: 74 },
+  ],
+};
+
+/**
+ * Gradient colors extracted from each background image.
+ * These are 3 colors (light → mid → dark) suitable for CSS gradients.
+ * The gradient captures the atmospheric color transition of the image.
+ */
+export const backgroundThemeGradientColors: Record<string, GradientColor[]> = {
+  cosmicpurple: [
+    { hex: '#3D95B3', position: 'light', hsb: { hue: 195, saturation: 66, brightness: 70 } },
+    { hex: '#2F277E', position: 'mid', hsb: { hue: 246, saturation: 69, brightness: 49 } },
+    { hex: '#13092F', position: 'dark', hsb: { hue: 256, saturation: 81, brightness: 18 } },
+  ],
+  deepocean: [
+    { hex: '#05B597', position: 'light', hsb: { hue: 170, saturation: 97, brightness: 71 } },
+    { hex: '#04777E', position: 'mid', hsb: { hue: 183, saturation: 97, brightness: 49 } },
+    { hex: '#062E30', position: 'dark', hsb: { hue: 183, saturation: 88, brightness: 19 } },
+  ],
+  mountainpeaks: [
+    { hex: '#A1BCC4', position: 'light', hsb: { hue: 194, saturation: 18, brightness: 77 } },
+    { hex: '#345966', position: 'mid', hsb: { hue: 196, saturation: 49, brightness: 40 } },
+    { hex: '#0C1C24', position: 'dark', hsb: { hue: 200, saturation: 67, brightness: 14 } },
+  ],
+  mountainsky: [
+    { hex: '#5B98B2', position: 'light', hsb: { hue: 198, saturation: 49, brightness: 70 } },
+    { hex: '#2E567C', position: 'mid', hsb: { hue: 209, saturation: 63, brightness: 49 } },
+    { hex: '#121925', position: 'dark', hsb: { hue: 218, saturation: 51, brightness: 15 } },
+  ],
+  mysticblue: [
+    { hex: '#A3045A', position: 'light', hsb: { hue: 328, saturation: 98, brightness: 64 } },
+    { hex: '#2B2061', position: 'mid', hsb: { hue: 250, saturation: 67, brightness: 38 } },
+    { hex: '#050418', position: 'dark', hsb: { hue: 243, saturation: 83, brightness: 9 } },
+  ],
+  royalpurple: [
+    { hex: '#C33493', position: 'light', hsb: { hue: 320, saturation: 73, brightness: 76 } },
+    { hex: '#89247F', position: 'mid', hsb: { hue: 306, saturation: 74, brightness: 54 } },
+    { hex: '#180628', position: 'dark', hsb: { hue: 272, saturation: 85, brightness: 16 } },
+  ],
 };
 
 /**
@@ -59,4 +181,157 @@ export const getBackgroundImage = (themeName: string): ImageSource | null => {
  */
 export const getBackgroundThemeDisplayName = (themeName: string): string | undefined => {
   return backgroundThemeDisplayNames[themeName];
+};
+
+/**
+ * Get the dominant colors for a background theme.
+ * Returns an array of 5 visually distinct colors extracted from the image.
+ */
+export const getBackgroundThemeDominantColors = (
+  themeName: string
+): DominantColor[] | undefined => {
+  return backgroundThemeDominantColors[themeName];
+};
+
+/**
+ * Get just the hex values of dominant colors for a theme.
+ * Convenience function for when you just need the color strings.
+ */
+export const getBackgroundThemeDominantHexColors = (themeName: string): string[] | undefined => {
+  return backgroundThemeDominantColors[themeName]?.map((c) => c.hex);
+};
+
+/**
+ * Get the gradient colors for a background theme.
+ * Returns an array of 3 colors (light → mid → dark) for CSS gradients.
+ */
+export const getBackgroundThemeGradientColors = (
+  themeName: string
+): GradientColor[] | undefined => {
+  return backgroundThemeGradientColors[themeName];
+};
+
+/**
+ * Get a CSS linear-gradient string for a theme.
+ * Direction defaults to 'to bottom' (light at top, dark at bottom).
+ */
+export const getBackgroundThemeGradientCSS = (
+  themeName: string,
+  direction: string = 'to bottom'
+): string | undefined => {
+  const gradient = backgroundThemeGradientColors[themeName];
+  if (!gradient || gradient.length === 0) return undefined;
+  const colors = gradient.map((c) => c.hex).join(', ');
+  return `linear-gradient(${direction}, ${colors})`;
+};
+
+/**
+ * Dominant color scale type (100-500)
+ */
+export type DominantScale = '100' | '200' | '300' | '400' | '500';
+
+/**
+ * Gradient color scale type (100-300)
+ */
+export type GradientScale = '100' | '200' | '300';
+
+/**
+ * Scale to index mapping for dominant colors
+ */
+const dominantScaleToIndex: Record<DominantScale, number> = {
+  '100': 0,
+  '200': 1,
+  '300': 2,
+  '400': 3,
+  '500': 4,
+};
+
+/**
+ * Scale to position mapping for gradient colors
+ */
+const gradientScaleToPosition: Record<GradientScale, 'light' | 'mid' | 'dark'> = {
+  '100': 'light',
+  '200': 'mid',
+  '300': 'dark',
+};
+
+/**
+ * Get a specific dominant color by scale (100-500) for a theme.
+ * Returns the hex color string.
+ *
+ * @example
+ * getDominantColorByScale('cosmicpurple', '100') // '#68194A'
+ * getDominantColorByScale('cosmicpurple', '300') // '#14BA73'
+ */
+export const getDominantColorByScale = (
+  themeName: string,
+  scale: DominantScale
+): string | undefined => {
+  const colors = backgroundThemeDominantColors[themeName];
+  if (!colors) return undefined;
+  const index = dominantScaleToIndex[scale];
+  return colors[index]?.hex;
+};
+
+/**
+ * Get a specific gradient color by scale (100-300) for a theme.
+ * 100 = light, 200 = mid, 300 = dark
+ * Returns the hex color string.
+ *
+ * @example
+ * getGradientColorByScale('cosmicpurple', '100') // '#3D95B3' (light)
+ * getGradientColorByScale('cosmicpurple', '300') // '#13092F' (dark)
+ */
+export const getGradientColorByScale = (
+  themeName: string,
+  scale: GradientScale
+): string | undefined => {
+  const colors = backgroundThemeGradientColors[themeName];
+  if (!colors) return undefined;
+  const position = gradientScaleToPosition[scale];
+  return colors.find((c) => c.position === position)?.hex;
+};
+
+/**
+ * Get all dominant colors as a scale object for a theme.
+ * Useful for creating inline styles or passing to components.
+ *
+ * @example
+ * getDominantColorScale('cosmicpurple')
+ * // { 100: '#68194A', 200: '#322B84', 300: '#14BA73', 400: '#3D95B3', 500: '#C64555' }
+ */
+export const getDominantColorScale = (
+  themeName: string
+): Record<DominantScale, string> | undefined => {
+  const colors = backgroundThemeDominantColors[themeName];
+  if (!colors) return undefined;
+  return {
+    '100': colors[0]?.hex || '',
+    '200': colors[1]?.hex || '',
+    '300': colors[2]?.hex || '',
+    '400': colors[3]?.hex || '',
+    '500': colors[4]?.hex || '',
+  };
+};
+
+/**
+ * Get all gradient colors as a scale object for a theme.
+ *
+ * @example
+ * getGradientColorScale('cosmicpurple')
+ * // { 100: '#3D95B3', 200: '#2F277E', 300: '#13092F' }
+ */
+export const getGradientColorScale = (
+  themeName: string
+): Record<GradientScale, string> | undefined => {
+  const colors = backgroundThemeGradientColors[themeName];
+  if (!colors) return undefined;
+  const light = colors.find((c) => c.position === 'light');
+  const mid = colors.find((c) => c.position === 'mid');
+  const dark = colors.find((c) => c.position === 'dark');
+  return {
+    '100': light?.hex || '',
+    '200': mid?.hex || '',
+    '300': dark?.hex || '',
+  };
 };
