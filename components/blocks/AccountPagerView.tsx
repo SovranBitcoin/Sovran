@@ -16,6 +16,7 @@ import { EnhancedHaptics } from 'components/ui/Haptics';
 
 import { useMintStore } from 'stores/mintStore';
 import { useMintManagement, useReceive } from 'hooks/coco';
+import { useProcessPaymentString } from 'hooks/coco/useProcessPaymentString';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
@@ -52,6 +53,13 @@ export function AccountPagerView({
 
   const loopedAccounts = accounts;
   const swiperRef = useRef<any>(null);
+
+  // Payment processing hook for clipboard paste
+  const { processPaymentString } = useProcessPaymentString({
+    unit: account.unit,
+    selectedMint: selectedMintUrl,
+    isFocused: true,
+  });
 
   const onPageSelected = useCallback(
     async (index: number): Promise<void> => {
@@ -94,11 +102,8 @@ export function AccountPagerView({
       Alert.alert('Clipboard Empty', 'No text found in clipboard.');
       return;
     }
-    router.navigate({
-      pathname: '/camera' as any,
-      params: { to: 'sendToken', unit: account.unit, clipboardData: text },
-    });
-  }, [account.unit]);
+    await processPaymentString({ data: text });
+  }, [processPaymentString]);
 
   const handleSend = useCallback(async () => {
     let balance = 0;
