@@ -92,7 +92,7 @@ export default function WalletHeaderTitle({
   }, []);
 
   // Calculate width - use provided width or default header width calculation
-  const defaultHeaderWidth = Dimensions.get('window').width - 124 - 24;
+  const defaultHeaderWidth = Dimensions.get('window').width - 124 - 24 + 4;
   const componentWidth = width ?? defaultHeaderWidth;
 
   // Format balance for display

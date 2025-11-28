@@ -21,14 +21,6 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
 import { router } from 'expo-router';
 
-interface ActionButton {
-  page: 'receive' | 'camera' | 'currency';
-  text: {
-    children: string;
-  };
-  icon: React.ReactNode;
-}
-
 interface AccountType {
   unit: string;
 }
@@ -58,10 +50,7 @@ export function AccountPagerView({
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMintUrl = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
-  // Use all accounts - don't filter based on balance data
-  // The balance will be displayed as 0 if no data is available
   const loopedAccounts = accounts;
-
   const swiperRef = useRef<any>(null);
 
   const onPageSelected = useCallback(
@@ -80,133 +69,271 @@ export function AccountPagerView({
     goToIndex(accounts.findIndex((a) => a.unit === account.unit));
   }, [accounts, account]);
 
-  const handleButtonPress = useCallback(
-    async (page: string, accountUnit: string) => {
-      // Get balance from Coco
-      let balance = 0;
-      try {
-        const balances = await getBalances();
-        balance = balances[selectedMintUrl || ''] || 0;
-      } catch (error) {
-        if (__DEV__) {
-          console.error('Failed to get balance:', error);
-        }
-        balance = 0;
-      }
-
-      // If no balance on selected mint, go to mint selection first
-      if (page === 'currency' && balance <= 0) {
-        router.navigate({
-          pathname: '/(send-flow)/mintSelect',
-          params: {
-            to: 'sendToken',
-            unit: accountUnit,
-          },
-        });
-        return;
-      }
-
-      if (page === 'camera') {
-        const granted = await handlePermission();
-        if (!granted) {
-          return;
-        }
-      }
-
-      // Use modal groups for nested navigation behavior
-      let pathname: string;
-      if (page === 'receive') {
-        pathname = '/(receive-flow)/receive';
-      } else if (page === 'currency') {
-        pathname = '/(send-flow)/currency';
-      } else {
-        pathname = `/${page}`;
-      }
-
-      router.navigate({
-        pathname: pathname as any,
-        params: {
-          to: 'sendToken',
-          unit: accountUnit,
-        },
-      });
-    },
-    [getBalances, selectedMintUrl, handlePermission]
-  );
-
   useReceive();
 
-  // Handler for scanning QR code via camera
-  const handleScanQR = useCallback(
-    async (accountUnit: string) => {
-      const granted = await handlePermission();
-      if (!granted) {
-        return;
-      }
-      router.navigate({
-        pathname: '/camera',
-        params: {
-          to: 'sendToken',
-          unit: accountUnit,
-        },
-      });
-    },
-    [handlePermission]
-  );
+  // Handlers
+  const handleReceive = useCallback(() => {
+    router.navigate({
+      pathname: '/(receive-flow)/receive',
+      params: { to: 'sendToken', unit: account.unit },
+    });
+  }, [account.unit]);
 
-  // Handler for pasting from clipboard
-  const handleClipboardPaste = useCallback(async (accountUnit: string) => {
+  const handleScanQR = useCallback(async () => {
+    const granted = await handlePermission();
+    if (!granted) return;
+    router.navigate({
+      pathname: '/camera',
+      params: { to: 'sendToken', unit: account.unit },
+    });
+  }, [handlePermission, account.unit]);
+
+  const handleClipboardPaste = useCallback(async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
       Alert.alert('Clipboard Empty', 'No text found in clipboard.');
       return;
     }
-    // Navigate to camera screen with clipboard data as initial value
     router.navigate({
       pathname: '/camera' as any,
-      params: {
-        to: 'sendToken',
-        unit: accountUnit,
-        clipboardData: text,
-      },
+      params: { to: 'sendToken', unit: account.unit, clipboardData: text },
     });
-  }, []);
+  }, [account.unit]);
 
-  // Define action buttons - memoized to prevent recreation on every render
-  const actionButtons: ActionButton[] = useMemo(
-    () => [
-      {
-        page: 'receive' as const,
-        text: {
-          children: 'Receive',
-        },
-        icon: <ArrowIcon size={24} color={primaryColor0} rotate={180} />,
-      },
-      {
-        page: 'camera' as const,
-        text: {
-          children: 'Scan',
-        },
-        icon: <Icon name="stash:qr-code" size={24} color={primaryColor0} />,
-      },
-      {
-        page: 'currency' as const,
-        text: {
-          children: 'Send',
-        },
-        icon: <ArrowIcon size={24} color={primaryColor0} rotate={0} />,
-      },
-    ],
-    [primaryColor0]
-  );
+  const handleSend = useCallback(async () => {
+    let balance = 0;
+    try {
+      const balances = await getBalances();
+      balance = balances[selectedMintUrl || ''] || 0;
+    } catch (error) {
+      if (__DEV__) console.error('Failed to get balance:', error);
+    }
+
+    if (balance <= 0) {
+      router.navigate({
+        pathname: '/(send-flow)/mintSelect',
+        params: { to: 'sendToken', unit: account.unit },
+      });
+      return;
+    }
+
+    router.navigate({
+      pathname: '/(send-flow)/currency',
+      params: { to: 'sendToken', unit: account.unit },
+    });
+  }, [getBalances, selectedMintUrl, account.unit]);
+
+  // Button components
+  const ReceiveButton = () => {
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={{ flex: 1, zIndex: 1, position: 'absolute', left: 8 }}>
+          <Host style={{ height: 48, width: 140 }} matchContents fixedSize>
+            <ContextMenu activationMethod="longPress">
+              <ContextMenu.Items>
+                <SwiftUIButton systemImage="arrow.down.circle" onPress={handleReceive}>
+                  Receive
+                </SwiftUIButton>
+              </ContextMenu.Items>
+              <ContextMenu.Trigger>
+                <SwiftUIButton
+                  variant="glass"
+                  modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
+                  onPress={handleReceive}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      width: 140 - 32 - 16,
+                      height: 48 - 16,
+                    }}>
+                    <ArrowIcon size={20} color={primaryColor0} rotate={0} />
+                    <Text>Receive</Text>
+                  </View>
+                </SwiftUIButton>
+              </ContextMenu.Trigger>
+            </ContextMenu>
+          </Host>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity className="-mr-3 flex-1" onPress={handleReceive}>
+        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
+          <VStack align="center" justify="center">
+            <HStack
+              blur
+              align="center"
+              justify="flex-start"
+              className="p-3"
+              style={{
+                backgroundColor: primaryColor800,
+                borderColor: primaryColor700,
+                borderBottomLeftRadius: 1000,
+                borderTopLeftRadius: 1000,
+              }}>
+              <ArrowIcon size={24} color={primaryColor0} rotate={180} />
+              <Text weight="bold" size={14} className="text-primary-0">
+                Receive
+              </Text>
+            </HStack>
+          </VStack>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  const ScanButton = () => {
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={{ maxWidth: 72, zIndex: 10000, position: 'absolute' }}>
+          <Host style={{ height: 72, width: 72 }} matchContents fixedSize>
+            <ContextMenu activationMethod="longPress">
+              <ContextMenu.Items>
+                <SwiftUIButton systemImage="qrcode.viewfinder" onPress={handleScanQR}>
+                  Scan QR
+                </SwiftUIButton>
+                <SwiftUIButton systemImage="doc.on.clipboard" onPress={handleClipboardPaste}>
+                  Paste from Clipboard
+                </SwiftUIButton>
+              </ContextMenu.Items>
+              <ContextMenu.Trigger>
+                <SwiftUIButton
+                  variant="glass"
+                  modifiers={[
+                    frame({ height: 72, width: 72 }),
+                    background(getShadeColor('300')),
+                    cornerRadius(36),
+                  ]}
+                  onPress={handleScanQR}>
+                  <View
+                    style={{
+                      width: 48,
+                      height: 56,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Icon name="stash:qr-code" size={28} color={primaryColor0} />
+                  </View>
+                </SwiftUIButton>
+              </ContextMenu.Trigger>
+            </ContextMenu>
+          </Host>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={{
+          maxWidth: 64,
+          zIndex: 10000,
+          shadowColor: shadeColor300,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.75,
+          shadowRadius: 8,
+          elevation: 5,
+          borderRadius: 10000,
+          borderColor: shadeColor100,
+          borderWidth: 0.5,
+        }}
+        onPress={() => {
+          Alert.alert('Scan Options', 'Choose how to scan', [
+            { text: 'Scan QR', onPress: handleScanQR },
+            { text: 'Paste from Clipboard', onPress: handleClipboardPaste },
+            { text: 'Cancel', style: 'cancel' },
+          ]);
+        }}>
+        <LinearGradient
+          style={{ padding: 8, borderRadius: 1000 }}
+          colors={[shadeColor100, shadeColor300]}>
+          <VStack align="center" justify="center">
+            <HStack
+              align="center"
+              justify="center"
+              className="w-full min-w-[90px] p-3"
+              style={{ borderRadius: 1000 }}>
+              <Icon name="stash:qr-code" size={24} color={primaryColor0} />
+            </HStack>
+          </VStack>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  const SendButton = () => {
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={{ flex: 1, zIndex: 4, position: 'absolute', right: 8 }}>
+          <Host style={{ height: 48, width: 140 }} matchContents fixedSize>
+            <ContextMenu activationMethod="longPress">
+              <ContextMenu.Items>
+                <SwiftUIButton systemImage="arrow.up.circle" onPress={handleSend}>
+                  Send
+                </SwiftUIButton>
+              </ContextMenu.Items>
+              <ContextMenu.Trigger>
+                <SwiftUIButton
+                  variant="glass"
+                  modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
+                  onPress={handleReceive}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      width: 140 - 32,
+                      height: 48 - 16,
+                    }}>
+                    <ArrowIcon size={20} color={primaryColor0} rotate={0} />
+                    <Text>Send</Text>
+                  </View>
+                </SwiftUIButton>
+              </ContextMenu.Trigger>
+            </ContextMenu>
+          </Host>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity className="-ml-3 flex-1" onPress={handleSend}>
+        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
+          <VStack align="center" justify="center">
+            <HStack
+              blur
+              align="center"
+              justify="center"
+              className="w-full min-w-[90px] p-3"
+              style={{
+                backgroundColor: primaryColor800,
+                borderColor: primaryColor700,
+                borderBottomRightRadius: 1000,
+                borderTopRightRadius: 1000,
+                paddingLeft: 0,
+              }}>
+              <ArrowIcon size={24} color={primaryColor0} rotate={0} />
+              <Text weight="bold" size={14} className="text-primary-0">
+                Send
+              </Text>
+            </HStack>
+          </VStack>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <>
       <View className="flex h-[350px] w-full">
         <Swiper
-          containerStyle={{
-            height: 350,
-          }}
+          containerStyle={{ height: 350 }}
           controlsEnabled={false}
           loop
           infinite
@@ -214,10 +341,7 @@ export function AccountPagerView({
           ref={swiperRef}
           minDistanceForAction={0.1}
           onIndexChanged={onPageSelected}
-          controlsProps={{
-            dotsTouchable: true,
-            dotsPos: 'top',
-          }}>
+          controlsProps={{ dotsTouchable: true, dotsPos: 'top' }}>
           {loopedAccounts.map((acc, index) => (
             <VStack key={`${acc.unit}-${index}`} align="center" justify="center" className="flex-1">
               <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
@@ -225,233 +349,14 @@ export function AccountPagerView({
           ))}
         </Swiper>
       </View>
+
       <HStack
         justify="space-around"
-        style={{
-          position: 'absolute',
-          width: '100%',
-          padding: 0,
-          margin: 0,
-          marginTop: 350,
-          height: 0,
-          paddingLeft: 16,
-          paddingRight: 16,
-        }}>
-        <HStack align="center" justify="space-around" className="absolute bottom-0 w-full">
-          {actionButtons.map(({ page, text, icon }) => {
-            const isCamera = page === 'camera';
-            const isReceive = page === 'receive';
-            const isSend = page === 'currency';
-
-            // Render receive button with ContextMenu on iOS
-            if (isReceive && Platform.OS === 'ios') {
-              return (
-                <View key={page} style={{ flex: 1, marginRight: -12, zIndex: 1 }}>
-                  <Host style={{ height: 48, width: 130 }} matchContents fixedSize={true}>
-                    <ContextMenu activationMethod="longPress">
-                      <ContextMenu.Items>
-                        <SwiftUIButton
-                          systemImage="arrow.down.circle"
-                          onPress={() => handleButtonPress(page, account.unit)}>
-                          Receive
-                        </SwiftUIButton>
-                      </ContextMenu.Items>
-                      <ContextMenu.Trigger>
-                        <SwiftUIButton
-                          variant="glass"
-                          modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
-                          onPress={() => handleButtonPress(page, account.unit)}>
-                          <View
-                            style={{
-                              width: 80,
-                              height: 36,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                            }}>
-                            <ArrowIcon size={20} color={primaryColor0} rotate={180} />
-                            <Text weight="bold" size={14} style={{ color: primaryColor0 }}>
-                              Receive
-                            </Text>
-                          </View>
-                        </SwiftUIButton>
-                      </ContextMenu.Trigger>
-                    </ContextMenu>
-                  </Host>
-                </View>
-              );
-            }
-
-            // Render camera button with ContextMenu on iOS
-            if (isCamera && Platform.OS === 'ios') {
-              return (
-                <View key={page} style={{ maxWidth: 72, zIndex: 10000 }}>
-                  <Host style={{ height: 72, width: 72 }} matchContents fixedSize={true}>
-                    <ContextMenu activationMethod="longPress">
-                      <ContextMenu.Items>
-                        <SwiftUIButton
-                          systemImage="qrcode.viewfinder"
-                          onPress={() => handleScanQR(account.unit)}>
-                          Scan QR
-                        </SwiftUIButton>
-                        <SwiftUIButton
-                          systemImage="doc.on.clipboard"
-                          onPress={() => handleClipboardPaste(account.unit)}>
-                          Paste from Clipboard
-                        </SwiftUIButton>
-                      </ContextMenu.Items>
-                      <ContextMenu.Trigger>
-                        <SwiftUIButton
-                          variant="glass"
-                          modifiers={[
-                            frame({ height: 72, width: 72 }),
-                            background(getShadeColor('300')),
-                            cornerRadius(36),
-                          ]}
-                          onPress={() => handleScanQR(account.unit)}>
-                          <View
-                            style={{
-                              width: 48,
-                              height: 48 + 8,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                            <Icon name="stash:qr-code" size={28} color={primaryColor0} />
-                          </View>
-                        </SwiftUIButton>
-                      </ContextMenu.Trigger>
-                    </ContextMenu>
-                  </Host>
-                </View>
-              );
-            }
-
-            // Render send button with ContextMenu on iOS
-            if (isSend && Platform.OS === 'ios') {
-              return (
-                <View key={page} style={{ flex: 1, marginLeft: -24, zIndex: 1 }}>
-                  <Host style={{ height: 48, width: 130 }} matchContents fixedSize={true}>
-                    <ContextMenu activationMethod="longPress">
-                      <ContextMenu.Items>
-                        <SwiftUIButton
-                          systemImage="arrow.up.circle"
-                          onPress={() => handleButtonPress(page, account.unit)}>
-                          Send
-                        </SwiftUIButton>
-                      </ContextMenu.Items>
-                      <ContextMenu.Trigger>
-                        <SwiftUIButton
-                          variant="glass"
-                          modifiers={[frame({ height: 48, width: 130 }), cornerRadius(24)]}
-                          onPress={() => handleButtonPress(page, account.unit)}>
-                          <View
-                            style={{
-                              width: 100,
-                              height: 36,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                            }}>
-                            <ArrowIcon size={20} color={primaryColor0} rotate={0} />
-                            <Text weight="bold" size={14} style={{ color: primaryColor0 }}>
-                              Send
-                            </Text>
-                          </View>
-                        </SwiftUIButton>
-                      </ContextMenu.Trigger>
-                    </ContextMenu>
-                  </Host>
-                </View>
-              );
-            }
-
-            // Render camera button with Alert menu on Android
-            if (isCamera && Platform.OS === 'android') {
-              return (
-                <TouchableOpacity
-                  key={page}
-                  style={{
-                    maxWidth: 64,
-                    zIndex: 10000,
-                    shadowColor: shadeColor300,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.75,
-                    shadowRadius: 8,
-                    elevation: 5,
-                    borderRadius: 10000,
-                    borderColor: shadeColor100,
-                    borderWidth: 0.5,
-                  }}
-                  onPress={() => {
-                    Alert.alert('Scan Options', 'Choose how to scan', [
-                      {
-                        text: 'Scan QR',
-                        onPress: () => handleScanQR(account.unit),
-                      },
-                      {
-                        text: 'Paste from Clipboard',
-                        onPress: () => handleClipboardPaste(account.unit),
-                      },
-                      { text: 'Cancel', style: 'cancel' },
-                    ]);
-                  }}>
-                  <LinearGradient
-                    style={{ padding: 8, borderRadius: 1000 }}
-                    colors={[shadeColor100, shadeColor300]}>
-                    <VStack align="center" justify="center">
-                      <HStack
-                        align="center"
-                        justify="center"
-                        className="w-full min-w-[90px] p-3"
-                        style={{ borderRadius: 1000 }}>
-                        {icon}
-                      </HStack>
-                    </VStack>
-                  </LinearGradient>
-                </TouchableOpacity>
-              );
-            }
-
-            // Render receive and send buttons on Android (fallback)
-            return (
-              <TouchableOpacity
-                key={page}
-                className={`flex-1 ${isReceive ? '-mr-3' : ''} ${isSend ? '-ml-3' : ''}`}
-                style={{ maxWidth: 'auto' }}
-                onPress={() => handleButtonPress(page, account.unit)}>
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
-                  <VStack align="center" justify="center">
-                    <HStack
-                      blur
-                      align="center"
-                      justify={isReceive ? 'flex-start' : 'center'}
-                      className="w-full min-w-[90px] p-3"
-                      style={{
-                        backgroundColor: primaryColor800,
-                        borderColor: primaryColor700,
-                        ...(isReceive && {
-                          borderBottomLeftRadius: 1000,
-                          borderTopLeftRadius: 1000,
-                        }),
-                        ...(isSend && {
-                          borderBottomRightRadius: 1000,
-                          borderTopRightRadius: 1000,
-                          paddingLeft: 0,
-                        }),
-                      }}>
-                      {icon}
-                      <Text weight="bold" size={14} className="text-primary-0">
-                        {text.children}
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          })}
-        </HStack>
+        align="center"
+        style={{ width: '100%', marginTop: -24, paddingBottom: 32, zIndex: 10 }}>
+        <ReceiveButton />
+        <ScanButton />
+        <SendButton />
       </HStack>
     </>
   );
