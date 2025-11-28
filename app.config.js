@@ -58,6 +58,10 @@ module.exports = ({ config }) => {
             'This app uses Bluetooth to connect with nearby devices for decentralized messaging.',
           NSBluetoothPeripheralUsageDescription:
             'This app uses Bluetooth to connect with nearby devices for decentralized messaging.',
+          NFCReaderUsageDescription: 'Sovran uses NFC to send and receive contactless payments.',
+        },
+        entitlements: {
+          'com.apple.developer.nfc.readersession.formats': ['TAG'],
         },
         bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
         supportsTablet: false,

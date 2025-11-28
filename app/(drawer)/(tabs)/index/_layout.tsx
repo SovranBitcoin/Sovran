@@ -6,11 +6,14 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
 import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { frame, padding } from '@expo/ui/swift-ui/modifiers';
-import { handlePOSPaymentTest } from '@/helper/nfcPosPayment';
+import { NfcPayment, NfcError } from '@/helper/nfc';
 import { useSend, useReceive } from 'hooks/coco';
+import { useMintStore } from 'stores/mintStore';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useCallback } from 'react';
+import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 
 // Payment limit tiers in USD
 const PAYMENT_TIERS = [
@@ -25,6 +28,13 @@ export default function HomeLayout() {
   const navigation = useNavigation();
   const { send } = useSend();
   const { receive } = useReceive();
+
+  // Get user's selected mint for NFC payments
+  const { keys } = useNostrKeysContext();
+  const getSelectedMint = useMintStore((state) => state.getSelectedMint);
+  const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
+
+  // Get BTC price for USD to sats conversion
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const btcPrice = useBtcPrice(displayCurrency);
 
@@ -34,8 +44,8 @@ export default function HomeLayout() {
 
   // Convert USD to sats based on current BTC price
   const usdToSats = useCallback(
-    (usd: number): number => {
-      if (!btcPrice) return 0;
+    (usd: number): number | undefined => {
+      if (!btcPrice) return undefined;
       // btcPrice is USD per BTC, 1 BTC = 100,000,000 sats
       return Math.floor((usd / btcPrice) * 100_000_000);
     },
@@ -44,13 +54,13 @@ export default function HomeLayout() {
 
   const handleNFCPayment = useCallback(
     async (usdLimit?: number) => {
-      const maxSats = usdLimit !== undefined ? usdToSats(usdLimit) : undefined;
-      const limitText =
-        usdLimit !== undefined ? `$${usdLimit} (~${maxSats?.toLocaleString()} sats)` : 'unlimited';
+      // Convert USD limit to sats
+      const maxAmountSats = usdLimit !== undefined ? usdToSats(usdLimit) : undefined;
 
-      console.log(`[NFC Payment] Starting with limit: ${limitText}`);
-      console.log(`[NFC Payment] send function exists: ${!!send}`);
-      console.log(`[NFC Payment] receive function exists: ${!!receive}`);
+      console.log('[NFC Payment] Starting...');
+      console.log(`[NFC Payment] USD limit: ${usdLimit ?? 'none'}`);
+      console.log(`[NFC Payment] Sats limit: ${maxAmountSats ?? 'none'}`);
+      console.log(`[NFC Payment] Preferred mint: ${selectedMint || 'none'}`);
 
       if (!send || !receive) {
         Alert.alert('Error', 'Wallet not ready. Please try again.');
@@ -58,19 +68,70 @@ export default function HomeLayout() {
       }
 
       try {
-        console.log('[NFC Payment] Calling handlePOSPaymentTest...');
-        const success = await handlePOSPaymentTest(send, receive, maxSats);
-        console.log(`[NFC Payment] Result: ${success}`);
-        if (success) {
-          Alert.alert('Payment Sent', 'Your NFC payment was successful!');
-        }
+        const result = await NfcPayment.performPayment({
+          createToken: async (mintUrl, amount) => {
+            const token = await send(mintUrl, amount);
+            return getEncodedTokenV4(token);
+          },
+          recoverToken: async (token) => {
+            await receive(token);
+          },
+          preferredMint: selectedMint,
+          maxAmountSats,
+        });
+
+        console.log('[NFC Payment] Success:', result);
+        Alert.alert('Payment Sent', `Successfully sent ${result.amount} sats via NFC!`);
       } catch (error) {
         console.error('[NFC Payment] Error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        Alert.alert('Payment Failed', `Error: ${errorMessage}`);
+
+        if (error instanceof NfcError) {
+          // Handle specific error codes
+          switch (error.code) {
+            case 'AMOUNT_EXCEEDED':
+              Alert.alert(
+                'Payment Rejected',
+                `The merchant requested more than your limit of ${maxAmountSats?.toLocaleString()} sats.`
+              );
+              break;
+            case 'NOT_SUPPORTED':
+              Alert.alert('NFC Not Supported', 'Your device does not support NFC.');
+              break;
+            case 'NOT_ENABLED':
+              Alert.alert(
+                'NFC Disabled',
+                'Please enable NFC in your device settings and try again.'
+              );
+              break;
+            case 'EMPTY_PAYMENT_REQUEST':
+              Alert.alert(
+                'POS Not Ready',
+                'The terminal returned an empty payment request. Please try again.'
+              );
+              break;
+            case 'TAG_LOST':
+            case 'TRANSCEIVE_FAILED':
+              Alert.alert(
+                'Connection Lost',
+                'Lost connection to the terminal. Please hold your device steady and try again.'
+              );
+              break;
+            case 'TECHNOLOGY_REQUEST_FAILED':
+              Alert.alert(
+                'Connection Failed',
+                'Could not connect to the terminal. Make sure NFC is enabled and try again.'
+              );
+              break;
+            default:
+              Alert.alert('Payment Failed', error.message);
+          }
+        } else {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          Alert.alert('Payment Failed', errorMessage);
+        }
       }
     },
-    [send, receive, usdToSats]
+    [send, receive, selectedMint, usdToSats]
   );
 
   const renderHeaderRight = () => {

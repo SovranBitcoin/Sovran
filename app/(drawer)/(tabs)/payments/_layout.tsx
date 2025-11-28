@@ -1,14 +1,13 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
-import { Pressable, Platform, Dimensions } from 'react-native';
+import { Pressable, Platform, Dimensions, TextInput } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View';
-import { TextInput } from 'react-native';
 
 // Search context for sharing state between layout and index
 interface PaymentsSearchContextValue {
@@ -35,10 +34,7 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
 
   return (
     <View style={{ alignItems: 'center' }}>
-      <Host
-        style={{ zIndex: 10, height: 44, width }}
-        matchContents={false}
-        fixedSize={true}>
+      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false} fixedSize={true}>
         <SwiftUIVStack
           modifiers={[
             padding({ horizontal: 12, vertical: 8 }),
