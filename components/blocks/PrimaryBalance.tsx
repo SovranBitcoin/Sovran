@@ -11,7 +11,7 @@ import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { ContextMenu, Host, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
-import { frame } from '@expo/ui/swift-ui/modifiers';
+import { frame, background, cornerRadius } from '@expo/ui/swift-ui/modifiers';
 
 interface Account {
   unit: CurrencyUnit;
@@ -99,13 +99,20 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             <ContextMenu.Trigger>
               <SwiftUIButton
                 variant="glass"
-                color={getGreenColor('500')}
-                modifiers={[frame({ height: 28, alignment: 'center', width: 100 })]}>
+                modifiers={[
+                  frame({ alignment: 'center' }),
+                  background(opacity(getGreenColor('500'), 0.15)),
+                  cornerRadius(100),
+                ]}>
                 <SwiftUIText
                   design={'monospaced'}
                   weight="bold"
                   color={getGreenColor('300')}
-                  size={12}>
+                  size={14}
+                  modifiers={[
+                    // padding({ horizontal: 12, vertical: 4 }),
+                    frame({ height: 22, alignment: 'center', width: displayText.length * 10 + 12 }),
+                  ]}>
                   {displayText}
                 </SwiftUIText>
               </SwiftUIButton>

@@ -113,24 +113,20 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         zIndex: 10,
         height: 335,
         width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-      <View>
-        <View
-          className="z-[9] p-4"
-          style={{
-            marginTop: Platform.OS === 'web' ? 64 : 16,
-            paddingBottom: 0,
-            paddingTop: 16,
-          }}
-        />
-        <View className="h-[110px]" />
+      <VStack
+        align="center"
+        justify="center"
+        style={{
+          flex: 1,
+          paddingTop: Platform.OS === 'web' ? 64 : 100,
+          paddingBottom: 48,
+        }}>
         <PrimaryBalance account={account} />
-      </View>
 
-      <VStack align="center" justify="space-around" className="w-full self-center">
-        <HStack />
-
-        <HStack spacing={2}>
+        <HStack spacing={2} style={{ marginTop: 8 }}>
           {/* Onchain account indicators */}
           {renderDotIndicators(accounts, 0)}
         </HStack>
