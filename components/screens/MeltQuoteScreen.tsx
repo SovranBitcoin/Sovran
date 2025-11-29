@@ -136,6 +136,17 @@ export function MeltQuoteScreen({
     manager.history.getPaginatedHistory().then(setHistory);
   }, [manager, displayQuote]);
 
+  // Subscribe to history:updated events to refresh when melt quote state changes
+  useEffect(() => {
+    const handler = () => {
+      manager.history.getPaginatedHistory().then(setHistory);
+    };
+    manager.on('history:updated', handler);
+    return () => {
+      manager.off('history:updated', handler);
+    };
+  }, [manager]);
+
   const [unit, setUnit] = useState(meltQuote?.unit || meltHistoryEntry?.unit || 'sat');
   const amount = displayQuote?.amount || 0;
   const feeReserve = displayQuote?.fee_reserve || 0;
@@ -234,7 +245,7 @@ export function MeltQuoteScreen({
   }
 
   const displayMeltHistoryEntry = history.find(
-    (h) => h.type === 'melt' && h.quoteId === displayQuote?.quote
+    (h): h is MeltHistoryEntry => h.type === 'melt' && h.quoteId === displayQuote?.quote
   );
 
   if (!displayMeltHistoryEntry || isCreatingQuote) {
@@ -253,7 +264,7 @@ export function MeltQuoteScreen({
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
 
-          {displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
+          {displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
             <WalletHeaderTitle width={280} unit={unit} onMintSelected={handleMintSelected} />
           ) : (
             <HistoryEntryRefresh
@@ -289,7 +300,7 @@ export function MeltQuoteScreen({
               },
               {
                 title: 'State',
-                value: displayQuote.state,
+                value: displayMeltHistoryEntry.state,
               },
             ]}
           />
@@ -305,14 +316,15 @@ export function MeltQuoteScreen({
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => onCancel(),
-                condition: displayQuote.state === 'PAID',
+                condition: displayMeltHistoryEntry.state === 'PAID',
               },
               {
                 text: 'Cancel',
                 icon: 'ri:close-circle-line',
                 variant: 'secondary',
                 onPress: async () => onCancel(),
-                condition: displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
+                condition:
+                  displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
               },
               {
                 text: 'Close',
@@ -326,7 +338,8 @@ export function MeltQuoteScreen({
                 icon: isCreatingQuote ? 'ri:loader-line' : 'ri:send-plane-2-fill',
                 variant: 'primary',
                 onPress: async () => handleMelt(),
-                condition: displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
+                condition:
+                  displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
                 disabled: isCreatingQuote,
               },
             ]}

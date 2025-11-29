@@ -103,7 +103,7 @@ export const useProcessPaymentString = ({
             };
 
             router.navigate({
-              pathname: '/receiveToken' as any,
+              pathname: '/(receive-flow)/receiveToken' as any,
               params: {
                 receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
               },
@@ -133,7 +133,7 @@ export const useProcessPaymentString = ({
           };
 
           router.navigate({
-            pathname: '/receiveToken' as any,
+            pathname: '/(receive-flow)/receiveToken' as any,
             params: {
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
@@ -159,7 +159,7 @@ export const useProcessPaymentString = ({
 
           const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
           router.navigate({
-            pathname: '/meltQuote' as any,
+            pathname: '/(send-flow)/meltQuote' as any,
             params: {
               meltQuote: JSON.stringify(quote),
             },
