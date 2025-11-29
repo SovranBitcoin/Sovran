@@ -77,7 +77,7 @@ export default function WalletHeaderTitle({
 
   const handleShowAllMints = useCallback(() => {
     router.push({
-      pathname: '/(mint-flow)/list',
+      pathname: '/list',
       params: {
         requireBalance: 'false',
         showAddMintsButton: 'true',
@@ -88,7 +88,7 @@ export default function WalletHeaderTitle({
   }, []);
 
   const handleAddMint = useCallback(() => {
-    router.push('/(mint-flow)/add');
+    router.push('/add');
   }, []);
 
   // Calculate width - use provided width or default header width calculation

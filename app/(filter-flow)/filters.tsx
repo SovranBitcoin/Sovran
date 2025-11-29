@@ -108,7 +108,7 @@ export default function FiltersScreen() {
 
   const handleApply = useCallback(() => {
     router.dismissTo({
-      pathname: '/(transactions-flow)/transactions',
+      pathname: '/transactions',
       params: {
         filterCurrency: currency.toLowerCase(),
         filterPaymentType: paymentType,

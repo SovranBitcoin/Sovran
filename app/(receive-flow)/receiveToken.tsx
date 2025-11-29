@@ -2,22 +2,16 @@
  * @fileoverview Receive flow receiveToken route wrapper
  *
  * Part of the (receive-flow) modal group - displays with back button.
+ * Param parsing and error handling is done by ReceiveTokenScreen.
  */
 
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { ReceiveTokenScreen } from 'components/screens/ReceiveTokenScreen';
 
 function ModalScreen() {
-  const { receiveHistoryEntry: receiveHistoryEntryString } = useLocalSearchParams<{
-    receiveHistoryEntry: string;
-  }>();
-
-  const receiveHistoryEntry = JSON.parse(receiveHistoryEntryString) as ReceiveHistoryEntry & {
-    token?: string;
-  };
+  const { receiveHistoryEntry } = useLocalSearchParams<{ receiveHistoryEntry: string }>();
 
   return (
     <>

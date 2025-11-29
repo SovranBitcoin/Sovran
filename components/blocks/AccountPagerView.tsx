@@ -285,7 +285,7 @@ export function AccountPagerView({
                 <SwiftUIButton
                   variant="glass"
                   modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
-                  onPress={handleReceive}>
+                  onPress={handleSend}>
                   <View
                     style={{
                       position: 'absolute',

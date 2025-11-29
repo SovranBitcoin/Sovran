@@ -2111,4 +2111,3 @@ export function UserMessagesScreen({
     </KeyboardAvoidingView>
   );
 }
-

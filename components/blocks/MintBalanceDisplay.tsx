@@ -111,7 +111,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 
   const linkHref = useMemo(
     () => ({
-      pathname: '/(mint-flow)/list' as const,
+      pathname: '/list' as const,
       params: {
         requireBalance: String(requireBalance),
         showAddMintsButton: String(showAddMintsButton),

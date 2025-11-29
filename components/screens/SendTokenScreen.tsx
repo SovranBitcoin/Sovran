@@ -3,9 +3,14 @@
  *
  * This module provides the core UI and logic for sending ecash tokens.
  * It is used by both standalone and flow-based route wrappers.
+ *
+ * The Screen component handles:
+ * - Parsing sendHistoryEntry from string params
+ * - Error states for missing/invalid data
+ * - All UI and business logic
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Share, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -31,13 +36,43 @@ import { useTheme } from 'providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface SendTokenScreenProps {
-  sendHistoryEntry: SendHistoryEntry;
+  /** Either the parsed entry or a JSON string to be parsed internally */
+  sendHistoryEntry: SendHistoryEntry | string | undefined;
   onNavigateBack: () => void;
   onNavigateToMessages?: (pubkey: string) => void;
 }
 
+/** Error screen shown when transaction data is missing or invalid */
+function ErrorState({
+  message,
+  onNavigateBack,
+}: {
+  message: string;
+  onNavigateBack: () => void;
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+        <Text>{message}</Text>
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Go Back',
+              icon: 'ri:arrow-left-line',
+              variant: 'primary',
+              onPress: async () => onNavigateBack(),
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 export function SendTokenScreen({
-  sendHistoryEntry,
+  sendHistoryEntry: sendHistoryEntryProp,
   onNavigateBack,
   onNavigateToMessages,
 }: SendTokenScreenProps) {
@@ -48,7 +83,40 @@ export function SendTokenScreen({
   const [_uri, setUri] = useState('');
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
 
+  // Parse sendHistoryEntry - handles both string (from params) and object
+  const { sendHistoryEntry, parseError } = useMemo(() => {
+    if (!sendHistoryEntryProp) {
+      return { sendHistoryEntry: null, parseError: 'Missing transaction data. Please try again.' };
+    }
+
+    if (typeof sendHistoryEntryProp === 'string') {
+      try {
+        return {
+          sendHistoryEntry: JSON.parse(sendHistoryEntryProp) as SendHistoryEntry,
+          parseError: null,
+        };
+      } catch {
+        return {
+          sendHistoryEntry: null,
+          parseError: 'Invalid transaction data. Please try again.',
+        };
+      }
+    }
+
+    return { sendHistoryEntry: sendHistoryEntryProp, parseError: null };
+  }, [sendHistoryEntryProp]);
+
   const { history } = usePaginatedHistory();
+
+  // Show error state if parsing failed
+  if (parseError || !sendHistoryEntry) {
+    return (
+      <ErrorState
+        message={parseError || 'Missing transaction data. Please try again.'}
+        onNavigateBack={onNavigateBack}
+      />
+    );
+  }
 
   const currentTransaction = history.find((tx) => {
     return (

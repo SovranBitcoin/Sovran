@@ -2,28 +2,19 @@
  * @fileoverview Transactions flow meltQuote route wrapper
  *
  * Part of the (transactions-flow) modal group - displays with back button.
+ * Param parsing is done by MeltQuoteScreen.
  */
 
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { MeltQuoteResponse } from '@cashu/cashu-ts';
-import { MeltHistoryEntry } from 'coco-cashu-core';
 import { MeltQuoteScreen } from 'components/screens/MeltQuoteScreen';
 
 function ModalScreen() {
-  const { meltQuote: meltQuoteString, meltHistoryEntry: meltHistoryEntryString } =
-    useLocalSearchParams<{
-      meltQuote?: string;
-      meltHistoryEntry?: string;
-    }>();
-
-  const meltQuote = meltQuoteString
-    ? (JSON.parse(meltQuoteString) as MeltQuoteResponse)
-    : undefined;
-  const meltHistoryEntry = meltHistoryEntryString
-    ? (JSON.parse(meltHistoryEntryString) as MeltHistoryEntry)
-    : undefined;
+  const { meltQuote, meltHistoryEntry } = useLocalSearchParams<{
+    meltQuote?: string;
+    meltHistoryEntry?: string;
+  }>();
 
   return (
     <>

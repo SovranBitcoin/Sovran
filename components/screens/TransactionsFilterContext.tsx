@@ -56,7 +56,7 @@ export function TransactionsFilterProvider({
 
   const openFilterSheet = useCallback(() => {
     router.push({
-      pathname: '/(filter-flow)/filters',
+      pathname: '/filters',
       params: {
         currency,
         paymentType,

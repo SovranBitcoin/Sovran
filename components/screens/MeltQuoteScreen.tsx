@@ -3,9 +3,14 @@
  *
  * This module provides the core UI and logic for Lightning melt quotes (sending).
  * It is used by both standalone and flow-based route wrappers.
+ *
+ * The Screen component handles:
+ * - Parsing meltQuote and meltHistoryEntry from string params
+ * - Loading and error states
+ * - All UI and business logic
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ScrollView, Alert } from 'react-native';
 import { formatAmount } from 'helper/currency';
 import { useMintManagement, useMelt, useManager } from 'hooks/coco';
@@ -32,12 +37,49 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface MeltQuoteScreenProps {
-  meltQuote?: MeltQuoteResponse;
-  meltHistoryEntry?: MeltHistoryEntry;
+  /** Either the parsed quote or a JSON string to be parsed internally */
+  meltQuote?: MeltQuoteResponse | string;
+  /** Either the parsed entry or a JSON string to be parsed internally */
+  meltHistoryEntry?: MeltHistoryEntry | string;
   onCancel: () => void;
 }
 
-export function MeltQuoteScreen({ meltQuote, meltHistoryEntry, onCancel }: MeltQuoteScreenProps) {
+export function MeltQuoteScreen({
+  meltQuote: meltQuoteProp,
+  meltHistoryEntry: meltHistoryEntryProp,
+  onCancel,
+}: MeltQuoteScreenProps) {
+  // Parse props - handles both string (from params) and object
+  const { meltQuote, meltHistoryEntry } = useMemo(() => {
+    let parsedQuote: MeltQuoteResponse | undefined;
+    let parsedHistoryEntry: MeltHistoryEntry | undefined;
+
+    if (meltQuoteProp) {
+      if (typeof meltQuoteProp === 'string') {
+        try {
+          parsedQuote = JSON.parse(meltQuoteProp) as MeltQuoteResponse;
+        } catch {
+          parsedQuote = undefined;
+        }
+      } else {
+        parsedQuote = meltQuoteProp;
+      }
+    }
+
+    if (meltHistoryEntryProp) {
+      if (typeof meltHistoryEntryProp === 'string') {
+        try {
+          parsedHistoryEntry = JSON.parse(meltHistoryEntryProp) as MeltHistoryEntry;
+        } catch {
+          parsedHistoryEntry = undefined;
+        }
+      } else {
+        parsedHistoryEntry = meltHistoryEntryProp;
+      }
+    }
+
+    return { meltQuote: parsedQuote, meltHistoryEntry: parsedHistoryEntry };
+  }, [meltQuoteProp, meltHistoryEntryProp]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -212,11 +254,7 @@ export function MeltQuoteScreen({ meltQuote, meltHistoryEntry, onCancel }: MeltQ
           <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
 
           {displayQuote.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
-            <WalletHeaderTitle
-              width={280}
-              unit={unit}
-              onMintSelected={handleMintSelected}
-            />
+            <WalletHeaderTitle width={280} unit={unit} onMintSelected={handleMintSelected} />
           ) : (
             <HistoryEntryRefresh
               mintInfo={mintInfo}
@@ -298,4 +336,3 @@ export function MeltQuoteScreen({ meltQuote, meltHistoryEntry, onCancel }: MeltQ
     </View>
   );
 }
-

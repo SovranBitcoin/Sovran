@@ -6,34 +6,21 @@
  * Can navigate to add/info screens.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
-import { View } from 'components/ui/View';
 import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMintManagement } from 'hooks/coco';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { MintCurrencySelector } from 'components/blocks/sheets/mint-balance/MintCurrencySelector';
-import { MintItem } from 'components/blocks/sheets/mint-balance/routes/list';
-import { Mint } from 'coco-cashu-core';
-import { useKYMMints } from 'hooks/coco/useKYMMints';
-import { popup } from 'helper/popup';
-import { BottomButtons } from 'components/ui/BottomButtons';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { MintListScreen } from 'components/screens/MintListScreen';
 import Icon from 'assets/icons';
-import _ from 'lodash';
 
-function MintListScreen() {
+function MintListRoute() {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     requireBalance?: string;
     showAddMintsButton?: string;
     showDetailsButton?: string;
-    onSelectAction?: string; // 'goBack' | 'continue'
+    onSelectAction?: string;
     continuePathname?: string;
     continueParams?: string;
   }>();
@@ -43,206 +30,51 @@ function MintListScreen() {
   const showDetailsButton = params.showDetailsButton !== 'false';
   const onSelectAction = params.onSelectAction || 'goBack';
 
-  const { getBalances, mints } = useMintManagement();
-  const [balances, setBalances] = useState<Record<string, number>>({});
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-
-  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
-  const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey;
-
-  // Load balances
-  useEffect(() => {
-    let cancelled = false;
-    const loadBalances = async () => {
-      try {
-        const newBalances = await getBalances();
-        if (!cancelled) {
-          setBalances(newBalances);
-        }
-      } catch (error) {
-        if (__DEV__) {
-          console.error('Failed to load balances:', error);
-        }
-        if (!cancelled) {
-          setBalances({});
-        }
-      }
-    };
-
-    loadBalances();
-    return () => {
-      cancelled = true;
-    };
-  }, [getBalances]);
-
-  // Process mints with balances
-  const processedMints = useMemo(() => {
-    if (mints.length === 0) return [];
-
-    const mintsWithBalances = mints.map((mint) => ({
-      unit: 'SAT',
-      amount: balances[mint.mintUrl] || 0,
-      ...mint,
-    }));
-
-    return _.orderBy(mintsWithBalances, ['amount'], ['desc']);
-  }, [mints, balances]);
-
-  // Fetch KYM scores
-  const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
-  const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
-
-  const normalizeUrl = useCallback((url: string): string => {
-    return url.replace(/\/$/, '');
-  }, []);
-
-  // Handle mint selection
-  const handleMintSelect = useCallback(
-    async (mintUrl: string) => {
-      const mint = processedMints.find((m) => m.mintUrl === mintUrl);
-      if (!mint) return;
-
-      // Check if mint has balance (if required)
-      if (requireBalance && mint.amount === 0) {
-        popup({
-          message: 'insufficient_balance',
-          params: {
-            amount: mint.amount,
-            unit: mint.unit,
-            fee: 0,
-          },
-        });
-        return;
-      }
-
-      setLoadingId(mint.mintUrl);
-      try {
-        // Update selected mint in store
-        if (pubkey) {
-          setSelectedMint(pubkey, mint.mintUrl);
-        }
-
-        // Handle action based on context
-        if (onSelectAction === 'continue' && params.continuePathname) {
-          // Continue to next screen in a flow
-          const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
-          router.navigate({
-            pathname: params.continuePathname as any,
-            params: {
-              ...continueParams,
-              unit: mint.unit.toLowerCase(),
-            },
-          });
-        } else {
-          // Default: go back one level (only dismiss this modal, keep parent modals open)
-          router.back();
-        }
-      } catch {
-        popup({
-          message: 'general_error',
-          emoji: '🚨',
-        });
-      } finally {
-        setLoadingId(null);
-      }
-    },
-    [
-      processedMints,
-      pubkey,
-      setSelectedMint,
-      requireBalance,
-      onSelectAction,
-      params.continuePathname,
-      params.continueParams,
-    ]
-  );
-
-  // Handle inspect mint - using router.navigate to prevent duplicate navigation
-  const handleInspectMint = useCallback((mintUrl: string) => {
-    router.navigate({
-      pathname: '/(mint-flow)/info',
-      params: { mintUrl },
-    });
-  }, []);
-
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <>
       <Stack.Screen
         options={{
           title: 'Select Mint',
           headerRight: () =>
             showAddMintsButton ? (
-              <Link href="/(mint-flow)/add" asChild>
-                <TouchableOpacity
-                  style={{
-                    padding: 8,
-                  }}>
+              <Link href="/add" asChild>
+                <TouchableOpacity style={{ padding: 8 }}>
                   <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
                 </TouchableOpacity>
               </Link>
             ) : null,
         }}
       />
-      <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + 48,
-          paddingHorizontal: 16,
-        }}>
-        <MintCurrencySelector
-          mints={processedMints}
-          allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
-          currencyLabel="Currency"
-          mintsLabel="Your mints"
-          renderItem={useCallback(
-            (mint: Mint & { amount: number; unit: string }, selectedCurrency: string) => {
-              const normalizedUrl = normalizeUrl(mint.mintUrl);
-              const kymData = kymScores[normalizedUrl];
-              const kymScore = kymData?.score;
-              return (
-                <MintItem
-                  key={mint.mintUrl}
-                  mint={mint}
-                  balance={{ amount: mint.amount, unit: mint.unit }}
-                  isLoading={loadingId === mint.mintUrl}
-                  globalLoading={loadingId !== null}
-                  requireBalance={requireBalance}
-                  showDetailsButton={showDetailsButton}
-                  onInspectPress={() => handleInspectMint(mint.mintUrl)}
-                  selectedCurrency={selectedCurrency}
-                  kymScore={kymScore}
-                  kymLoading={kymLoading}
-                  onPress={() => handleMintSelect(mint.mintUrl)}
-                />
-              );
-            },
-            [
-              loadingId,
-              requireBalance,
-              showDetailsButton,
-              handleMintSelect,
-              handleInspectMint,
-              kymScores,
-              kymLoading,
-              normalizeUrl,
-            ]
-          )}
-        />
-      </View>
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Close',
-              variant: 'secondary' as const,
-              onPress: async () => router.back(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    </View>
+      <MintListScreen
+        requireBalance={requireBalance}
+        showDetailsButton={showDetailsButton}
+        currencyLabel="Currency"
+        mintsLabel="Your mints"
+        closeButtonLabel="Close"
+        onMintSelect={(mint) => {
+          if (onSelectAction === 'continue' && params.continuePathname) {
+            const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
+            router.navigate({
+              pathname: params.continuePathname as any,
+              params: {
+                ...continueParams,
+                unit: mint.unit.toLowerCase(),
+              },
+            });
+          } else {
+            router.back();
+          }
+        }}
+        onInspectMint={(mintUrl) => {
+          router.navigate({
+            pathname: '/info',
+            params: { mintUrl },
+          });
+        }}
+        onClose={() => router.back()}
+      />
+    </>
   );
 }
 
-export default withSheetProvider(MintListScreen);
+export default withSheetProvider(MintListRoute);

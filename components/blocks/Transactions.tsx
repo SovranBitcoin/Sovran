@@ -274,7 +274,7 @@ export const Transactions = React.memo(
                       {label === 'Confirmed' && (
                         <Link
                           href={{
-                            pathname: '/(transactions-flow)/transactions',
+                            pathname: '/transactions',
                             params: {
                               account: JSON.stringify(account),
                               tab: 'Confirmed',

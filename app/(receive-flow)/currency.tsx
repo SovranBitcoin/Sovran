@@ -43,9 +43,8 @@ function ModalScreen() {
       <CurrencyScreen
         params={params}
         onMintQuoteCreated={(mintHistoryEntry) => {
-          // Navigate within receive-flow (horizontal push)
-          router.navigate({
-            pathname: '/(receive-flow)/mintQuote',
+          router.push({
+            pathname: '/mintQuote',
             params: {
               mintHistoryEntry: JSON.stringify(mintHistoryEntry),
             },
@@ -62,7 +61,7 @@ function ModalScreen() {
         }}
         onMeltQuoteCreated={(meltQuote) => {
           // meltQuote is a separate flow, navigate to root-level screen
-          router.navigate({
+          router.push({
             pathname: `/${params.to}` as any,
             params: {
               meltQuote: JSON.stringify(meltQuote),
@@ -70,7 +69,7 @@ function ModalScreen() {
           });
         }}
         onCameraPress={(unit) => {
-          router.navigate({
+          router.push({
             pathname: '/camera',
             params: { unit },
           });

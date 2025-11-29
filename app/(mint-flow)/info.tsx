@@ -11,7 +11,15 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ScrollView, Animated, Alert, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  ScrollView,
+  Animated,
+  Alert,
+  Linking,
+  Easing,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -607,7 +615,7 @@ function MintInfoModal() {
             await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
             break;
           case 'nostr':
-            router.navigate({ pathname: '/(mint-flow)/userMessages', params: { pubkey: npubToPubkey(info) } });
+            router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
             break;
           default:
             await handleCopy(info);
@@ -668,7 +676,7 @@ function MintInfoModal() {
           headerRight: () => (
             <Link
               href={{
-                pathname: '/(mint-flow)/reviews',
+                pathname: '/reviews',
                 params: { mintUrl: mintUrl || '' },
               }}
               asChild>

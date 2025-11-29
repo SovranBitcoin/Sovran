@@ -169,12 +169,12 @@ function ModalScreen() {
 
   const initialAccount = account ? JSON.parse(account) : undefined;
 
-  // Handle transaction press - navigate within the transactions flow
+  // Handle transaction press
   const handleTransactionPress = useCallback((historyEntry: HistoryEntry) => {
     switch (historyEntry.type) {
       case 'mint': {
         router.navigate({
-          pathname: '/(transactions-flow)/mintQuote',
+          pathname: '/mintQuote',
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -183,7 +183,7 @@ function ModalScreen() {
       }
       case 'melt': {
         router.navigate({
-          pathname: '/(transactions-flow)/meltQuote',
+          pathname: '/meltQuote',
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -192,7 +192,7 @@ function ModalScreen() {
       }
       case 'send': {
         router.navigate({
-          pathname: '/(transactions-flow)/sendToken',
+          pathname: '/sendToken',
           params: {
             sendHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -202,7 +202,7 @@ function ModalScreen() {
       case 'receive': {
         const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
         router.navigate({
-          pathname: '/(transactions-flow)/receiveToken',
+          pathname: '/receiveToken',
           params: {
             receiveHistoryEntry: JSON.stringify(receiveEntry),
           },

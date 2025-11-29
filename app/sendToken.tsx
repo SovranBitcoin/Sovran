@@ -2,81 +2,28 @@
  * @fileoverview Standalone sendToken route wrapper
  *
  * This is the standalone version used for direct navigation and deep linking.
+ * Param parsing and error handling is done by SendTokenScreen.
  */
 
 import React from 'react';
-import { View } from 'components/ui/View';
-import { Text } from 'components/ui/Text';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import type { SendHistoryEntry } from 'coco-cashu-core';
-import { useTheme } from 'providers/ThemeProvider';
 import { SendTokenScreen } from 'components/screens/SendTokenScreen';
 
 function ModalScreen() {
-  const params = useLocalSearchParams<{
-    sendHistoryEntry: string;
-  }>();
-  const { sendHistoryEntry: sendHistoryEntryString } = params;
-  const { getPrimaryColor } = useTheme();
-
-  if (!sendHistoryEntryString) {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>Missing transaction data. Please try again.</Text>
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Go Back',
-                icon: 'ri:arrow-left-line',
-                variant: 'primary',
-                onPress: async () => router.back(),
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  let sendHistoryEntry: SendHistoryEntry;
-  try {
-    sendHistoryEntry = JSON.parse(sendHistoryEntryString) as SendHistoryEntry;
-  } catch {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>Invalid transaction data. Please try again.</Text>
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Go Back',
-                icon: 'ri:arrow-left-line',
-                variant: 'primary',
-                onPress: async () => router.back(),
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  }
+  const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry: string }>();
 
   return (
-    <>
-      <SendTokenScreen
-        sendHistoryEntry={sendHistoryEntry}
-        onNavigateBack={() => router.back()}
-        onNavigateToMessages={(pubkey) =>
-          router.navigate({
-            pathname: '/userMessages',
-            params: { pubkey },
-          })
-        }
-      />
-    </>
+    <SendTokenScreen
+      sendHistoryEntry={sendHistoryEntry}
+      onNavigateBack={() => router.back()}
+      onNavigateToMessages={(pubkey) =>
+        router.navigate({
+          pathname: '/userMessages',
+          params: { pubkey },
+        })
+      }
+    />
   );
 }
 
