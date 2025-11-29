@@ -14,6 +14,8 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { Dimensions, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import 'react-native-get-random-values';
 import 'shim';
+import { useSettingsStore } from 'stores/settingsStore';
+import { isBackgroundImageTheme, getGradientColorScale } from 'config/backgroundImageThemes';
 
 function TabOneScreen() {
   const supportedUnits = useMemo(() => ['sat', 'usd', 'eur', 'gbp'], []);
@@ -70,6 +72,15 @@ function TabOneScreen() {
 
   const { getPrimaryColor } = useTheme();
   const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
+
+  // Get gradient colors for background image themes
+  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const gradientColors = useMemo(() => {
+    if (isBackgroundImageTheme(currentTheme)) {
+      return getGradientColorScale(currentTheme);
+    }
+    return null;
+  }, [currentTheme]);
 
   const { history } = usePaginatedHistory();
 
@@ -128,8 +139,15 @@ function TabOneScreen() {
               }>
               <BlurView intensity={200} tint="prominent" style={StyleSheet.absoluteFillObject} />
             </MaskedView>
+            {gradientColors && (
+              <LinearGradient
+                colors={['transparent', opacity(gradientColors?.['300'], 0.33)]}
+                locations={gradientLocations.overlayLocations}
+                style={StyleSheet.absoluteFillObject}
+              />
+            )}
             <LinearGradient
-              colors={['transparent', opacity(getPrimaryColor('950'), 0.6)]}
+              colors={['transparent', opacity(getPrimaryColor('950'), 0.33)]}
               locations={gradientLocations.overlayLocations}
               style={StyleSheet.absoluteFillObject}
             />
