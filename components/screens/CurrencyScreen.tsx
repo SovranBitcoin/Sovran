@@ -15,21 +15,34 @@ import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { Avatar } from 'components/ui/Avatar';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, View } from 'components/ui/View';
+import { HStack, View, VStack } from 'components/ui/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
 import { useLightningOperations, useManager, useMelt, useSend } from 'hooks/coco';
 import { requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintStore } from 'stores/mintStore';
 import { useRoutstrStore } from 'stores/routstrStore';
+import { useSettingsStore, DisplayCurrency } from 'stores/settingsStore';
+import { useBtcPrice } from 'stores/pricelistStore';
+import opacity from 'hex-color-opacity';
+
+// Currency display configuration
+const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
+  usd: { symbol: '$', label: 'USD' },
+  eur: { symbol: '€', label: 'EUR' },
+  gbp: { symbol: '£', label: 'GBP' },
+};
+
+type InputMode = 'sats' | 'fiat';
 
 export interface CurrencyScreenParams {
   amount?: string;
@@ -64,7 +77,7 @@ export function CurrencyScreen({
   onRoutstrSuccess,
   processPaymentStringFn,
 }: CurrencyScreenProps) {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getGreenColor } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { send } = useSend();
@@ -72,7 +85,15 @@ export function CurrencyScreen({
   const { createMeltQuote } = useMelt();
   const { apiKey, setApiKey, setBalance } = useRoutstrStore();
 
-  const [amount, setAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
+  // Get user's preferred fiat currency and BTC price
+  const displayCurrency = useSettingsStore((state) => state.displayCurrency);
+  const btcPrice = useBtcPrice(displayCurrency);
+  const currencyConfig = CURRENCY_CONFIG[displayCurrency];
+
+  // Input mode: 'sats' or 'fiat'
+  const [inputMode, setInputMode] = useState<InputMode>('sats');
+  // The raw input amount in current mode (sats or fiat cents)
+  const [inputAmount, setInputAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
   const [loading, setLoading] = useState(false);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -80,9 +101,48 @@ export function CurrencyScreen({
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
 
+  // Convert input amount to sats (for API calls)
+  const satsAmount = useMemo(() => {
+    if (inputMode === 'sats') {
+      return inputAmount;
+    }
+    // Convert fiat to sats: fiat / (btcPrice / 100_000_000)
+    if (!btcPrice) return 0;
+    const sats = Math.round((inputAmount / btcPrice) * 100_000_000);
+    return sats;
+  }, [inputMode, inputAmount, btcPrice]);
+
+  // The amount to use for API calls (always in sats)
+  const amount = satsAmount;
+
+  // Toggle between sats and fiat input modes
+  const handleToggleInputMode = useCallback(async () => {
+    await EnhancedHaptics.successHaptic();
+
+    if (inputMode === 'sats') {
+      // Switching to fiat: convert current sats to fiat
+      if (btcPrice && inputAmount > 0) {
+        const fiat = (inputAmount / 100_000_000) * btcPrice;
+        setInputAmount(Math.round(fiat * 100) / 100); // Round to 2 decimal places
+      } else {
+        setInputAmount(0);
+      }
+      setInputMode('fiat');
+    } else {
+      // Switching to sats: convert current fiat to sats
+      if (btcPrice && inputAmount > 0) {
+        const sats = Math.round((inputAmount / btcPrice) * 100_000_000);
+        setInputAmount(sats);
+      } else {
+        setInputAmount(0);
+      }
+      setInputMode('sats');
+    }
+  }, [inputMode, inputAmount, btcPrice]);
+
   useEffect(() => {
-    setIsValidAmount(amount > 0);
-  }, [amount]);
+    setIsValidAmount(satsAmount > 0);
+  }, [satsAmount]);
 
   const manager = useManager();
 
@@ -322,6 +382,24 @@ export function CurrencyScreen({
     );
   };
 
+  // Get the unit to pass to keyboard based on input mode
+  const keyboardUnit = inputMode === 'sats' ? 'sat' : displayCurrency;
+
+  // Format the secondary display value
+  const secondaryDisplay = useMemo(() => {
+    if (inputMode === 'sats') {
+      // Show fiat equivalent
+      if (!btcPrice || inputAmount === 0) return null;
+      const fiat = (inputAmount / 100_000_000) * btcPrice;
+      return `≈ ${currencyConfig.symbol}${fiat.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      // Show sats equivalent
+      if (!btcPrice || inputAmount === 0) return null;
+      const sats = Math.round((inputAmount / btcPrice) * 100_000_000);
+      return `≈ ${sats.toLocaleString('en-US')} sats`;
+    }
+  }, [inputMode, inputAmount, btcPrice, currencyConfig.symbol]);
+
   if (!params) return null;
 
   return (
@@ -332,26 +410,64 @@ export function CurrencyScreen({
           flexGrow: 1,
           paddingTop: insets.top + 48,
         }}>
-        <AmountFormatter
-          amount={typeof amount === 'string' ? parseFloat(amount) || 0 : amount}
-          unit={unit}
-          size={48}
-          weight="heavy"
-          animated
-          useTypeColors
-          transactionType={
-            params?.to === 'sendToken' || params?.to === 'meltQuote' ? 'send' : 'receive'
-          }
-          centered
-        />
+        <VStack align="center" spacing={4}>
+          {/* Main amount display */}
+          {inputMode === 'sats' ? (
+            <AmountFormatter
+              amount={inputAmount}
+              unit={unit}
+              size={48}
+              weight="heavy"
+              animated
+              useTypeColors
+              transactionType={
+                params?.to === 'sendToken' || params?.to === 'meltQuote' ? 'send' : 'receive'
+              }
+              centered
+            />
+          ) : (
+            <Text size={48} weight="heavy" style={{ color: getPrimaryColor('0') }}>
+              {currencyConfig.symbol}
+              {inputAmount.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          )}
+        </VStack>
         <View style={{ marginVertical: 8 }}>
           <WalletHeaderTitle
-            width={280}
+            width={200}
             unit={unit}
             requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
             onMintSelected={handleMintSelected}
           />
         </View>
+        <VStack align="center" spacing={4}>
+          {/* Secondary converted value with toggle - always visible */}
+          <TouchableOpacity onPress={handleToggleInputMode}>
+            <HStack
+              align="center"
+              justify="center"
+              spacing={6}
+              style={{
+                backgroundColor: opacity(getGreenColor('500'), 0.15),
+                borderRadius: 100,
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+              }}>
+              <Text
+                size={14}
+                bold
+                overpass
+                style={{ color: getGreenColor('300'), letterSpacing: 0.3 }}>
+                {secondaryDisplay ||
+                  (inputMode === 'sats' ? `≈ ${currencyConfig.symbol}0.00` : '≈ 0 sats')}
+              </Text>
+              <Icon name="fluent:arrow-swap-16-filled" size={14} color={getGreenColor('300')} />
+            </HStack>
+          </TouchableOpacity>
+        </VStack>
         {params.to === 'sendToken' && params?.profile && (
           <TouchableOpacity
             style={[
@@ -396,8 +512,8 @@ export function CurrencyScreen({
         {!params?.amount && (
           <CustomKeyboard
             loading={loading}
-            unit={unit}
-            onKeyPress={(value: string) => setAmount(parseFloat(value) || 0)}
+            unit={keyboardUnit}
+            onKeyPress={(value: string) => setInputAmount(parseFloat(value) || 0)}
           />
         )}
         {renderButtons()}

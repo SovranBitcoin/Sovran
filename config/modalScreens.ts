@@ -62,10 +62,11 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   // Map flow modal group - Bitcoin merchant map
+  // Using 'modal' instead of 'fullScreenModal' for faster animation
   {
     name: '(map-flow)',
     options: {
-      presentation: 'fullScreenModal',
+      presentation: 'modal',
       headerShown: false,
       gestureDirection: 'vertical',
     },

@@ -5,6 +5,11 @@
  * - O(log n) spatial queries via k-d tree
  * - Battle-tested (used by Mapbox GL, Google Maps, etc.)
  * - Automatic zoom-level adaptation
+ *
+ * Performance optimizations:
+ * - Shows screen immediately with skeleton/loading state
+ * - Defers heavy operations using InteractionManager
+ * - Location fetch runs in parallel, doesn't block UI
  */
 
 import Icon from 'assets/icons';
@@ -18,7 +23,14 @@ import { frame, cornerRadius } from '@expo/ui/swift-ui/modifiers';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Platform, StyleSheet } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  InteractionManager,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from 'utils/mapClustering';
@@ -67,6 +79,9 @@ const ASPECT_RATIO = SCREEN_WIDTH / SCREEN_HEIGHT;
 const DEFAULT_LAT = 48;
 const DEFAULT_LON = 10;
 const DEFAULT_ZOOM = 4;
+
+// Track if we're ready to render the map (after transition completes)
+const DEFER_MAP_RENDER_MS = 50; // Small delay to let modal animation start
 
 // ============================================================================
 // Components
@@ -204,13 +219,21 @@ function MapScreen() {
   // BTCMap store
   const {
     placesCache,
-    isLoading: loading,
+    isLoading: storeLoading,
     error,
     fetchPlaces,
     fetchPlaceDetails,
     setError,
   } = useBTCMapStore();
   const places = useMemo(() => placesCache?.data ?? [], [placesCache]);
+
+  // Track initialization stages for progressive loading
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [isClusteringReady, setIsClusteringReady] = useState(false);
+  const [isLocationFetching, setIsLocationFetching] = useState(false);
+
+  // Combined loading state
+  const loading = storeLoading || !isClusteringReady;
 
   // Category filter
   const [category, setCategory] = useState<CategoryFilter>('all');
@@ -278,30 +301,52 @@ function MapScreen() {
     setVisibleCount(count);
   }, []);
 
-  // Initialize/update cluster manager when points change
+  // Defer map rendering until after navigation transition
+  useEffect(() => {
+    // Small delay to let the modal open animation start
+    const timer = setTimeout(() => {
+      setIsMapReady(true);
+    }, DEFER_MAP_RENDER_MS);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Initialize/update cluster manager when points change - DEFERRED
   useEffect(() => {
     if (filteredPoints.length === 0) {
       clusterManagerRef.current = null;
       setMarkers([]);
       setVisibleCount(0);
+      setIsClusteringReady(true);
       return;
     }
 
-    const manager = new ClusterManager({
-      radius: 50,
-      maxZoom: 17,
-      minPoints: 2,
-    });
-    manager.load(filteredPoints);
-    clusterManagerRef.current = manager;
+    // Defer clustering work until after interactions complete
+    const task = InteractionManager.runAfterInteractions(() => {
+      const manager = new ClusterManager({
+        radius: 50,
+        maxZoom: 17,
+        minPoints: 2,
+      });
+      manager.load(filteredPoints);
+      clusterManagerRef.current = manager;
 
-    // Update markers with current camera
-    updateMarkersForCamera(camLat, camLon, zoom);
+      // Update markers with current camera
+      updateMarkersForCamera(camLat, camLon, zoom);
+      setIsClusteringReady(true);
+    });
+
+    return () => task.cancel();
   }, [filteredPoints]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch places on mount
+  // Fetch places on mount - DEFERRED
   useEffect(() => {
-    fetchPlaces().catch(console.error);
+    // Defer fetch until after modal transition completes
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchPlaces().catch(console.error);
+    });
+
+    return () => task.cancel();
   }, [fetchPlaces]);
 
   // Handle marker click
@@ -336,22 +381,31 @@ function MapScreen() {
     [fetchPlaceDetails, updateMarkersForCamera]
   );
 
-  // Get user location on mount
+  // Get user location on mount - DEFERRED and non-blocking
   useEffect(() => {
-    (async () => {
+    // Defer location request until after interactions complete
+    const task = InteractionManager.runAfterInteractions(async () => {
       try {
+        setIsLocationFetching(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+        if (status !== 'granted') {
+          setIsLocationFetching(false);
+          return;
+        }
 
         const loc = await Location.getCurrentPositionAsync({});
         setCamLat(loc.coords.latitude);
         setCamLon(loc.coords.longitude);
         setZoom(12);
         updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 12);
+        setIsLocationFetching(false);
       } catch (err) {
         console.error('Location error:', err);
+        setIsLocationFetching(false);
       }
-    })();
+    });
+
+    return () => task.cancel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // My location button
@@ -429,28 +483,42 @@ function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <MapComponent.View
-        style={StyleSheet.absoluteFillObject}
-        cameraPosition={{
-          coordinates: { latitude: camLat, longitude: camLon },
-          zoom,
-        }}
-        properties={{ isMyLocationEnabled: true }}
-        uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
-        markers={markers}
-        onMarkerClick={handleMarkerClick}
-        onCameraMove={handleCameraChange}
-      />
+      {/* Show a placeholder background immediately while map loads */}
+      {!isMapReady && (
+        <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
+          <ActivityIndicator size="large" color="#F7931A" />
+          <Text size={14} style={{ color: '#fff', marginTop: 16, opacity: 0.8 }}>
+            Loading map...
+          </Text>
+        </View>
+      )}
 
-      {loading && (
-        <View style={styles.loadingOverlay}>
+      {/* Render map only after initial transition */}
+      {isMapReady && (
+        <MapComponent.View
+          style={StyleSheet.absoluteFillObject}
+          cameraPosition={{
+            coordinates: { latitude: camLat, longitude: camLon },
+            zoom,
+          }}
+          properties={{ isMyLocationEnabled: true }}
+          uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
+          markers={markers}
+          onMarkerClick={handleMarkerClick}
+          onCameraMove={handleCameraChange}
+        />
+      )}
+
+      {/* Show loading overlay while fetching data (after map is visible) */}
+      {isMapReady && loading && (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" color="#F7931A" />
             <Text size={14} style={{ color: '#fff', marginTop: 12 }}>
               Loading merchants...
             </Text>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       <StatsCard
@@ -477,6 +545,11 @@ function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  mapSkeleton: {
+    backgroundColor: '#1a1a2e',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorContainer: {
     flex: 1,
