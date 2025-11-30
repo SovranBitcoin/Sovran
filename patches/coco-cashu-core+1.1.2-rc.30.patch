@@ -1,0 +1,44 @@
+diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
+index 209a67b..1e2c92b 100644
+--- a/node_modules/coco-cashu-core/dist/index.d.cts
++++ b/node_modules/coco-cashu-core/dist/index.d.cts
+@@ -1279,7 +1279,7 @@ declare class Manager {
+   readonly history: HistoryApi;
+   private mintService;
+   private walletService;
+-  private proofService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private keyRingService;
+   private eventBus;
+@@ -1293,7 +1293,7 @@ declare class Manager {
+   private meltQuoteService;
+   private historyService;
+   private seedService;
+-  private counterService;
++  counterService: CounterService;
+   private transactionService;
+   private paymentRequestService;
+   private readonly pluginHost;
+diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
+index 209a67b..1e2c92b 100644
+--- a/node_modules/coco-cashu-core/dist/index.d.ts
++++ b/node_modules/coco-cashu-core/dist/index.d.ts
+@@ -1279,7 +1279,7 @@ declare class Manager {
+   readonly history: HistoryApi;
+   private mintService;
+   private walletService;
+-  private proofService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private keyRingService;
+   private eventBus;
+@@ -1293,7 +1293,7 @@ declare class Manager {
+   private meltQuoteService;
+   private historyService;
+   private seedService;
+-  private counterService;
++  counterService: CounterService;
+   private transactionService;
+   private paymentRequestService;
+   private readonly pluginHost;

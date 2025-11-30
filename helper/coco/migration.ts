@@ -2,13 +2,14 @@ import { Manager } from 'coco-cashu-core';
 import { store } from 'redux/store';
 import { RootState } from 'redux/store/reducer';
 import { CashuProfile } from 'redux/cashu/types';
+import { Alert } from 'react-native';
 
 /**
  * Data migration utility to move from Redux-based Cashu state to Coco repositories
  * This handles the migration of existing user data safely
  */
 export class DataMigration {
-  constructor(private manager: Manager) { }
+  constructor(private manager: Manager) {}
 
   /**
    * Migrate all Redux Cashu data to Coco repositories
@@ -115,7 +116,7 @@ export class DataMigration {
           }));
 
           // Use the ProofService to save proofs
-          await (this.manager as any).proofService.saveProofs(mintUrl, coreProofs);
+          await this.manager.proofService.saveProofs(mintUrl, coreProofs);
 
           result.proofsMigrated += proofs.length;
           console.log(`Migrated ${proofs.length} proofs for ${mintUrl}`);
@@ -151,11 +152,12 @@ export class DataMigration {
 
     console.log(`Found ${totalCounters} counters to migrate`);
 
+    Alert.alert(`Migrated counter for ${totalCounters} counters`);
     for (const profile of profiles) {
       for (const [mintUrl, counters] of Object.entries(profile.counters)) {
         for (const [keysetId, counter] of Object.entries(counters)) {
           try {
-            await (this.manager as any).counterService.overwriteCounter(mintUrl, keysetId, counter);
+            await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
             result.countersMigrated++;
             console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
           } catch (error) {
