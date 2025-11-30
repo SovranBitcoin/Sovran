@@ -29,7 +29,7 @@ const Camera: React.FC = () => {
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
-      await processPaymentString(data);
+      return processPaymentString(data);
     },
     [processPaymentString]
   );

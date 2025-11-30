@@ -43,10 +43,10 @@ export const useProcessPaymentString = ({
   const { createMeltQuote } = useMelt();
 
   const processPaymentString = useCallback(
-    async (scanning: ScanningData): Promise<void> => {
+    async (scanning: ScanningData): Promise<{ urInProgress: boolean }> => {
       // Don't process scans if app is backgrounded or screen is not focused
       if (appStateRef.current !== 'active' || !isFocused) {
-        return;
+        return { urInProgress: false };
       }
 
       if (!scanned || scanning.data.startsWith('ur:')) {
@@ -59,7 +59,7 @@ export const useProcessPaymentString = ({
         if (scanning.data.startsWith('ur:')) {
           // Don't process if UR is already complete
           if (urDecoder.isComplete() && urDecoder.isSuccess()) {
-            return;
+            return { urInProgress: false };
           }
 
           const prevPer = urDecoder.getProgress();
@@ -111,8 +111,11 @@ export const useProcessPaymentString = ({
 
             // Reset the UR decoder after successful completion
             setUrDecoder(new URDecoder());
-            return;
+            return { urInProgress: false };
           }
+          
+          // UR is in progress but not complete - keep loading state
+          return { urInProgress: true, progress: nextPer };
         }
 
         // Handle regular ecash tokens
@@ -138,6 +141,7 @@ export const useProcessPaymentString = ({
               receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
             },
           });
+          return { urInProgress: false };
         } else if (
           (isLightningAddress(lnTrim(scanning.data)) ||
             isLnurlp(lnTrim(scanning.data)) ||
@@ -154,7 +158,7 @@ export const useProcessPaymentString = ({
                 unit,
               },
             });
-            return;
+            return { urInProgress: false };
           }
 
           const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
@@ -164,8 +168,11 @@ export const useProcessPaymentString = ({
               meltQuote: JSON.stringify(quote),
             },
           });
+          return { urInProgress: false };
         }
       }
+      
+      return { urInProgress: false };
     },
     [
       scanned,

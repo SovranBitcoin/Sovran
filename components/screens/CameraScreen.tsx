@@ -27,7 +27,7 @@ export interface ScanningData {
 }
 
 export interface CameraScreenProps {
-  onScan: (data: ScanningData) => Promise<void>;
+  onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number }>;
   onReset?: () => void;
   showCustomCloseButton?: boolean;
   onClose?: () => void;
@@ -75,16 +75,42 @@ export function CameraScreen({
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
-      if (appStateRef.current !== 'active' || !isFocused || isProcessingRef.current) {
+      // For UR codes, allow processing even when isProcessingRef is true
+      // to accumulate multiple parts
+      const isUrCode = data.data.toLowerCase().startsWith('ur:');
+      
+      if (appStateRef.current !== 'active' || !isFocused) {
+        return;
+      }
+      
+      // For non-UR codes, skip if already processing
+      if (!isUrCode && isProcessingRef.current) {
         return;
       }
 
       isProcessingRef.current = true;
       setLoading(true);
       try {
-        await onScan(data);
-      } finally {
+        const result = await onScan(data);
+        // Only reset loading state if UR is not in progress
+        // result may be undefined for older implementations
+        const urInProgress = result && typeof result === 'object' && 'urInProgress' in result 
+          ? result.urInProgress 
+          : false;
+        
+        // Update progress if available
+        if (result && typeof result === 'object' && 'progress' in result && typeof result.progress === 'number') {
+          setProgress(result.progress);
+        }
+        
+        if (!urInProgress) {
+          setLoading(false);
+          setProgress(0);
+          isProcessingRef.current = false;
+        }
+      } catch {
         setLoading(false);
+        setProgress(0);
         isProcessingRef.current = false;
       }
     },
