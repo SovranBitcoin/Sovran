@@ -4,10 +4,14 @@ import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { View } from 'components/ui/View';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useTheme } from 'providers/ThemeProvider';
 import { LinearGradient } from 'expo-linear-gradient';
+
+// Maximum characters that can fit in a QR code (conservative limit for binary/alphanumeric)
+const MAX_QR_DATA_LENGTH = 2000;
+
 /**
  * Circle background for the QR code center logo
  */
@@ -41,12 +45,15 @@ interface AnimatedQRCodeProps {
 
 /**
  * Animated QR code with currency/location logo
+ *
+ * When data is too large for a single QR code, it will automatically
+ * use UR encoding to split the data into multiple animated frames.
  */
 export const AnimatedQRCode = memo(function AnimatedQRCode({
   padding = 10,
   unit,
   address,
-  animate = false,
+  animate: animateProp = false,
   variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
@@ -54,44 +61,120 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const [index, setIndex] = useState(0);
   const [parts, setParts] = useState<string[]>([]);
+  const [isEncoding, setIsEncoding] = useState(false);
+  const [encodingError, setEncodingError] = useState<string | null>(null);
+
+  // Determine if we need to animate based on data size or explicit prop
+  // If data is too large for a single QR code, force animation
+  const needsAnimation = animateProp || (address && address.length > MAX_QR_DATA_LENGTH);
 
   // Encode address for animated QR code
   useEffect(() => {
-    if (!animate || !address) return;
+    if (!address) return;
+
+    // Reset state when address changes
+    setParts([]);
+    setIndex(0);
+    setEncodingError(null);
+
+    // If we don't need animation and data fits in a single QR, skip encoding
+    if (!needsAnimation) return;
+
+    setIsEncoding(true);
 
     try {
       const messageBuffer = Buffer.from(address);
       const ur = UR.fromBuffer(messageBuffer);
-      const encoder = new UREncoder(ur, 300, 0);
-      setParts(encoder.encodeWhole());
+      // Use smaller fragment size for more reliable QR codes
+      const encoder = new UREncoder(ur, 200, 0);
+      const encodedParts = encoder.encodeWhole();
+
+      if (encodedParts.length === 0) {
+        throw new Error('UR encoding produced no parts');
+      }
+
+      setParts(encodedParts);
+      setEncodingError(null);
     } catch (error) {
       console.error('Error encoding address:', error);
+      setEncodingError(error instanceof Error ? error.message : 'Failed to encode QR data');
+      // Don't fall back to raw address if it's too large - it will just error again
+      setParts([]);
+    } finally {
+      setIsEncoding(false);
     }
-  }, [address, animate]);
+  }, [address, needsAnimation]);
 
   // Cycle through QR code parts
   useInterval(
     () => setIndex((prev) => (prev + 1) % parts.length),
-    animate && parts.length > 0 ? 250 : null
+    needsAnimation && parts.length > 1 ? 250 : null
   );
 
-  const qrData = animate && parts.length > 0 ? parts[index] : address;
+  // Determine what data to show
+  // - If animation is needed and parts are ready, use animated parts
+  // - If animation is not needed and data fits, use raw address
+  // - Otherwise, show loading or error state
+  const qrData = needsAnimation && parts.length > 0 ? parts[index] : address;
+  const showLoading = needsAnimation && isEncoding;
+  const showError = needsAnimation && encodingError && parts.length === 0;
+  const canRenderQR = !showLoading && !showError && qrData && qrData.length <= MAX_QR_DATA_LENGTH;
+
   const width = Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
-  const gradientColors = animate
+  const gradientColors = needsAnimation
     ? ([getPrimaryColor('700'), getPrimaryColor('700')] as const)
     : ([getShadeColor('200'), getShadeColor('300')] as const);
+  const qrSize = width - 2 * padding;
 
   return (
     <View className="flex-row items-center justify-center bg-transparent">
-      {/* QR Code */}
+      {/* QR Code Container */}
       <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
-        <EQRCode
-          color={getPrimaryColor('0')}
-          backgroundColor="transparent"
-          value={qrData}
-          size={width - 2 * padding}
-        />
+        {showLoading ? (
+          // Loading state while encoding large data
+          <View
+            style={{
+              width: qrSize,
+              height: qrSize,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <ActivityIndicator size="large" color={getPrimaryColor('0')} />
+          </View>
+        ) : showError ? (
+          // Error state if encoding failed
+          <View
+            style={{
+              width: qrSize,
+              height: qrSize,
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}>
+            <Icon name="ri:error-warning-line" size={48} color={getPrimaryColor('300')} />
+          </View>
+        ) : canRenderQR ? (
+          // Normal QR code render
+          <EQRCode
+            color={getPrimaryColor('0')}
+            backgroundColor="transparent"
+            value={qrData}
+            size={qrSize}
+          />
+        ) : (
+          // Fallback: data too large and couldn't be encoded
+          <View
+            style={{
+              width: qrSize,
+              height: qrSize,
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            }}>
+            <ActivityIndicator size="large" color={getPrimaryColor('0')} />
+          </View>
+        )}
       </LinearGradient>
 
       {/* Circle background for the logo */}
