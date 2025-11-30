@@ -61,6 +61,15 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
+  // Map flow modal group - Bitcoin merchant map
+  {
+    name: '(map-flow)',
+    options: {
+      presentation: 'fullScreenModal',
+      headerShown: false,
+      gestureDirection: 'vertical',
+    },
+  },
   // Standalone currency screen (for direct navigation from other flows)
   {
     name: 'currency',

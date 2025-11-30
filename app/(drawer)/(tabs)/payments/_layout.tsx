@@ -136,7 +136,7 @@ export default function PaymentsLayout() {
       <Stack
         screenOptions={{
           contentStyle: {
-            backgroundColor: getPrimaryColor('900'),
+            backgroundColor: 'transparent',
           },
         }}>
         <Stack.Screen

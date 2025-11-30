@@ -7,6 +7,7 @@ import { default as registerEmojiPicker } from 'components/blocks/sheets/emoji-p
 import { default as registerMintBalance } from 'components/blocks/sheets/mint-balance';
 import { default as registerRoutstrModels } from 'components/blocks/sheets/routstr-models';
 import { default as registerRoutstrSessions } from 'components/blocks/sheets/routstr-sessions';
+import { default as registerMerchantDetail } from 'components/blocks/sheets/merchant-detail';
 
 /**
  * Registers all application sheets with the react-native-actions-sheet system.
@@ -47,4 +48,5 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerMintBalance({ context });
   registerRoutstrModels({ context });
   registerRoutstrSessions({ context });
+  registerMerchantDetail({ context });
 }

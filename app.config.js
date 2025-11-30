@@ -21,6 +21,7 @@ module.exports = ({ config }) => {
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
+    plugins: [...(config.plugins || []), 'expo-maps'],
     ios: {
       ...config.ios,
       bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',

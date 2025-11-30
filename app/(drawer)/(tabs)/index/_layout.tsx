@@ -183,7 +183,12 @@ export default function HomeLayout() {
   };
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        contentStyle: {
+          backgroundColor: 'transparent',
+        },
+      }}>
       <Stack.Screen
         name="index"
         options={{

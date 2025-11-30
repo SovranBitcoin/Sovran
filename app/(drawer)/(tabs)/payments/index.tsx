@@ -6,6 +6,7 @@ import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
 import { npubToPubkey } from 'components/blocks/Transaction';
+import { AnimatedBackgroundView, ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Tabs } from 'components/ui/Tabs';
 import { Text } from 'components/ui/Text';
 import { View, VStack } from 'components/ui/View';
@@ -13,6 +14,7 @@ import { router } from 'expo-router';
 import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
 import { useMintManagement } from 'hooks/coco';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -46,6 +48,9 @@ interface PlaceholderResult {
 type DisplayResult = SearchResultData | PlaceholderResult;
 
 const PaymentsContent = () => {
+  // Register this tab's background configuration
+  useBackgroundConfig({ blurMode: 'full' });
+
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
 
@@ -636,13 +641,17 @@ const PaymentsContent = () => {
   const HEADER_HEIGHT = 100;
 
   return (
-    <SafeAreaView className="flex-1 bg-primary-900" edges={['bottom']}>
-      <SkeletonContainer
-        backgroundColor={skeletonConfig.backgroundColor}
-        highlightColor={skeletonConfig.highlightColor}
-        speed={skeletonConfig.speed}
-        animation={skeletonConfig.animation}>
-        <View className="relative flex-1 bg-primary-900" style={{ paddingTop: HEADER_HEIGHT }}>
+    <AnimatedBackgroundView>
+      {/* Gradient overlay for the entire page */}
+      <ScrollableGradientOverlay contentHeight={Dimensions.get('window').height * 1.5} />
+
+      <SafeAreaView className="flex-1" edges={['bottom']}>
+        <SkeletonContainer
+          backgroundColor={skeletonConfig.backgroundColor}
+          highlightColor={skeletonConfig.highlightColor}
+          speed={skeletonConfig.speed}
+          animation={skeletonConfig.animation}>
+          <View className="relative flex-1" style={{ paddingTop: HEADER_HEIGHT }}>
           {/* Tabs - Always render but hide with height when searching */}
           <View
             style={{
@@ -749,9 +758,10 @@ const PaymentsContent = () => {
               </View>
             </PagerView>
           </View>
-        </View>
-      </SkeletonContainer>
-    </SafeAreaView>
+          </View>
+        </SkeletonContainer>
+      </SafeAreaView>
+    </AnimatedBackgroundView>
   );
 };
 

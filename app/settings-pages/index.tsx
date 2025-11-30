@@ -207,8 +207,6 @@ const ModalScreen = () => {
           <ProfileButton />
         </Section>
         <Section title="Preferences">
-          <RowButton isFirst label="Bitcoin Display Format" onPress={handleBTCFormatPress} />
-          <RowButton label="Preferred Fiat Currency" onPress={handleFiatCurrencyPress} />
           <RowButton label="Theme" href="/settings-pages/theme" />
         </Section>
         <Section title="App Information">
