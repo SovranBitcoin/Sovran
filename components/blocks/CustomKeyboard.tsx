@@ -1,3 +1,35 @@
+/**
+ * @fileoverview Custom numeric keyboard for amount entry
+ *
+ * ## Unit-Based Behavior
+ *
+ * ### Sats Mode (`unit === 'sat'`)
+ * - No decimal point button shown
+ * - Leading zeros not allowed (typing "0" is blocked)
+ * - Integer-only input
+ *
+ * ### Fiat Mode (`unit !== 'sat'`)
+ * - Decimal point button shown
+ * - Maximum 2 decimal places enforced
+ * - Special zero handling (see below)
+ *
+ * ## Fiat Zero Replacement
+ *
+ * When current value is exactly "0" and user types a digit (not decimal):
+ * - The zero is REPLACED, not appended
+ * - Prevents invalid inputs like "05", "07", etc.
+ * - Keeps input stack clean (backspace won't reveal stale zero)
+ *
+ * | Current | User Types | Result | Why                              |
+ * |---------|------------|--------|----------------------------------|
+ * | `0`     | `.`        | `0.`   | Valid: starting decimal entry    |
+ * | `0`     | `5`        | `5`    | Zero replaced (not "05")         |
+ * | `0.`    | `5`        | `0.5`  | Normal append after decimal      |
+ * | `12`    | `0`        | `120`  | Normal append (not leading zero) |
+ *
+ * @see CurrencyScreen - for full fiat input display behavior documentation
+ */
+
 import React, { useState, useCallback, memo } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
@@ -28,7 +60,14 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
           newValue = prevInputValue.slice(0, -1);
         } else {
           EnhancedHaptics.buttonHaptic();
-          newValue = prevInputValue + stringValue;
+          
+          // In fiat mode: if current value is exactly "0" and user types a digit (not decimal),
+          // replace the 0 instead of appending (so typing "5" gives "5", not "05")
+          if (unit !== 'sat' && prevInputValue === '0' && stringValue !== '.') {
+            newValue = stringValue;
+          } else {
+            newValue = prevInputValue + stringValue;
+          }
         }
 
         // Validation rules

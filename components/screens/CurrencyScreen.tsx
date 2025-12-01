@@ -3,6 +3,50 @@
  *
  * This module provides the core UI and logic for amount selection.
  * Navigation routing is handled by callbacks passed from route wrappers.
+ *
+ * ## Fiat Input Mode Behavior
+ *
+ * The fiat input has special styling and behavior to match the sats input experience:
+ *
+ * ### Display Styling
+ * - **Receive transactions**: Active digits use `primaryColor('0')` (white)
+ * - **Send transactions**: Active digits use `shadeColor('300')` (shade color)
+ * - Placeholder decimals use the same color at 35% opacity (semi-transparent)
+ * - Empty state uses `primaryColor('400')` (dimmed)
+ *
+ * ### Decimal Placeholder Examples
+ *
+ * | User Types | Display                    | Notes                                    |
+ * |------------|----------------------------|------------------------------------------|
+ * | (nothing)  | `$0`                       | Dimmed placeholder color                 |
+ * | `1`        | `$1`                       | No decimals shown                        |
+ * | `12`       | `$12`                      | No decimals shown                        |
+ * | `12.`      | `$12.` + `00`              | Decimal active, "00" semi-transparent    |
+ * | `12.3`     | `$12.3` + `0`              | "0" semi-transparent placeholder         |
+ * | `12.34`    | `$12.34`                   | Full amount, no placeholder              |
+ * | `0`        | `$0` + `.00`               | Special: shows decimal placeholder       |
+ * | `0.`       | `$0.` + `00`               | Decimal active, "00" semi-transparent    |
+ * | `0.5`      | `$0.5` + `0`               | "0" semi-transparent placeholder         |
+ * | `0.50`     | `$0.50`                    | Full amount, no placeholder              |
+ *
+ * ### Zero Replacement Behavior
+ *
+ * When in fiat mode with value "0", typing a digit (1-9) replaces the zero:
+ * - Type `0` → `$0.00` (placeholder shown, ready for decimals)
+ * - Type `.` → `$0.00` (continue entering like `$0.50`)
+ * - Type `5` → `$5` (zero is REPLACED, not appended to make "05")
+ *
+ * This prevents invalid inputs like "05" and removes "0" from the input stack,
+ * so backspace doesn't reveal a stale zero.
+ *
+ * ### Mode Toggle Behavior
+ *
+ * - Sats → Fiat: Converts amount and sets `rawFiatInput` for display
+ * - Fiat → Sats: Converts amount and clears `rawFiatInput`
+ * - The `rawFiatInput` state preserves the exact typed string to track decimals
+ *
+ * @see CustomKeyboard - handles the zero replacement logic
+ * @see FiatAmountDisplay - handles the decimal placeholder rendering
  */
 
 import { popup } from '@/helper/popup';
@@ -44,6 +88,77 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 
 type InputMode = 'sats' | 'fiat';
 
+/**
+ * Displays fiat amount with styled decimal placeholders
+ * - Shows no decimals when no decimal entered
+ * - Shows semi-transparent placeholder for remaining decimal places
+ */
+interface FiatAmountDisplayProps {
+  rawInput: string;
+  symbol: string;
+  activeColor: string;
+  placeholderColor: string;
+}
+
+function FiatAmountDisplay({
+  rawInput,
+  symbol,
+  activeColor,
+  placeholderColor,
+}: FiatAmountDisplayProps) {
+  // Determine what to display based on raw input
+  const hasDecimal = rawInput.includes('.');
+  const parts = rawInput.split('.');
+  const wholePart = parts[0] || '';
+  const decimalPart = parts[1] || '';
+
+  // Format the whole number part with commas, default to '0' if empty
+  const parsedWhole = parseInt(wholePart, 10);
+  const formattedWhole = !isNaN(parsedWhole) ? parsedWhole.toLocaleString('en-US') : '0';
+
+  // Show decimal placeholder when:
+  // 1. User has typed a decimal point, OR
+  // 2. User typed "0" (they'll need to add decimals like $0.50)
+  const showDecimalSection = hasDecimal || wholePart === '0';
+
+  // Calculate placeholder decimals needed (2 total for fiat)
+  const placeholderDecimals = showDecimalSection
+    ? '0'.repeat(Math.max(0, 2 - decimalPart.length))
+    : '';
+
+  return (
+    <HStack align="baseline" justify="center">
+      <Text size={48} weight="heavy" style={{ color: activeColor }}>
+        {symbol}
+        {formattedWhole}
+      </Text>
+      {showDecimalSection && (
+        <>
+          {/* Show the decimal point - in active color if user typed it, placeholder if auto-shown for "0" */}
+          <Text
+            size={48}
+            weight="heavy"
+            style={{ color: hasDecimal ? activeColor : placeholderColor }}>
+            .
+          </Text>
+          {/* Show any typed decimal digits */}
+          {decimalPart && (
+            <Text size={48} weight="heavy" style={{ color: activeColor }}>
+              {decimalPart}
+            </Text>
+          )}
+          {/* Show placeholder for remaining decimal places */}
+          {placeholderDecimals && (
+            <Text size={48} weight="heavy" style={{ color: placeholderColor }}>
+              {placeholderDecimals}
+            </Text>
+          )}
+        </>
+      )}
+    </HStack>
+  );
+}
+
 export interface CurrencyScreenParams {
   amount?: string;
   unit: string;
@@ -77,7 +192,7 @@ export function CurrencyScreen({
   onRoutstrSuccess,
   processPaymentStringFn,
 }: CurrencyScreenProps) {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getGreenColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { send } = useSend();
@@ -94,6 +209,8 @@ export function CurrencyScreen({
   const [inputMode, setInputMode] = useState<InputMode>('sats');
   // The raw input amount in current mode (sats or fiat cents)
   const [inputAmount, setInputAmount] = useState(params?.amount ? parseFloat(params.amount) : 0);
+  // Track raw input string for fiat mode to preserve decimal state
+  const [rawFiatInput, setRawFiatInput] = useState('');
   const [loading, setLoading] = useState(false);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -123,9 +240,15 @@ export function CurrencyScreen({
       // Switching to fiat: convert current sats to fiat
       if (btcPrice && inputAmount > 0) {
         const fiat = (inputAmount / 100_000_000) * btcPrice;
-        setInputAmount(Math.round(fiat * 100) / 100); // Round to 2 decimal places
+        const roundedFiat = Math.round(fiat * 100) / 100;
+        setInputAmount(roundedFiat);
+        // Format with up to 2 decimal places, preserving decimals when present
+        const fiatStr = roundedFiat.toString();
+        // If the number has decimals but fewer than 2, keep as is (user can continue typing)
+        setRawFiatInput(fiatStr);
       } else {
         setInputAmount(0);
+        setRawFiatInput('');
       }
       setInputMode('fiat');
     } else {
@@ -136,6 +259,7 @@ export function CurrencyScreen({
       } else {
         setInputAmount(0);
       }
+      setRawFiatInput('');
       setInputMode('sats');
     }
   }, [inputMode, inputAmount, btcPrice]);
@@ -426,13 +550,23 @@ export function CurrencyScreen({
               centered
             />
           ) : (
-            <Text size={48} weight="heavy" style={{ color: getPrimaryColor('0') }}>
-              {currencyConfig.symbol}
-              {inputAmount.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </Text>
+            <FiatAmountDisplay
+              rawInput={rawFiatInput}
+              symbol={currencyConfig.symbol}
+              activeColor={
+                rawFiatInput
+                  ? params?.to === 'sendToken' || params?.to === 'meltQuote'
+                    ? getShadeColor('300')
+                    : getPrimaryColor('0')
+                  : getPrimaryColor('400')
+              }
+              placeholderColor={opacity(
+                params?.to === 'sendToken' || params?.to === 'meltQuote'
+                  ? getShadeColor('300')
+                  : getPrimaryColor('0'),
+                0.35
+              )}
+            />
           )}
         </VStack>
         <View style={{ marginVertical: 8 }}>
@@ -513,7 +647,12 @@ export function CurrencyScreen({
           <CustomKeyboard
             loading={loading}
             unit={keyboardUnit}
-            onKeyPress={(value: string) => setInputAmount(parseFloat(value) || 0)}
+            onKeyPress={(value: string) => {
+              setInputAmount(parseFloat(value) || 0);
+              if (inputMode === 'fiat') {
+                setRawFiatInput(value);
+              }
+            }}
           />
         )}
         {renderButtons()}

@@ -53,7 +53,8 @@ export function AmountFormatter({
   // Dynamic color logic (only if useTypeColors is true)
   const getTypeColor = (): string => {
     if (!amount) return getPrimaryColor('400');
-    return transactionType === 'receive' ? getShadeColor('300') : getShadeColor('300');
+    // Receive = white, Send = shade color
+    return transactionType === 'receive' ? getPrimaryColor('0') : getShadeColor('300');
   };
 
   // Final color: prioritize passed color, then type colors, then default
