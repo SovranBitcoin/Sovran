@@ -9,6 +9,7 @@ import { Host, Button as SwiftUIButton, ContextMenu, HStack } from '@expo/ui/swi
 import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { getMintDisplayName } from 'helper/url';
 import { View } from 'components/ui/View';
+import { supportsLiquidGlass } from '@/helper/version';
 
 interface WalletHeaderTitleProps {
   /** Custom width (defaults to header width calculation) */
@@ -92,14 +93,8 @@ export default function WalletHeaderTitle({
     router.push('/add');
   }, []);
 
-  // Calculate width - use provided width or default header width calculation
+  // Get window dimensions for width calculations
   const { width: windowWidth } = useWindowDimensions();
-
-  // Header buttons are ~44px each (icon + touch target), plus ~16px padding on each side
-  // Total horizontal space taken: 2 * (44 + 16) = 120px
-  // Add some breathing room for visual balance: 24px
-  const defaultHeaderWidth = windowWidth;
-  const componentWidth = width ?? defaultHeaderWidth;
 
   // Format balance for display
   const formatBalance = (amount: number) => {
@@ -112,6 +107,32 @@ export default function WalletHeaderTitle({
     return `${amount} sats`;
   };
 
+  // Blur fallback for older devices (pre-liquid glass)
+  if (!supportsLiquidGlass()) {
+    // Calculate width to fit between header buttons
+    const headerWidth = windowWidth - 124 - 16;
+
+    return (
+      <View
+        className="pointer-events-box-none"
+        style={{
+          width: headerWidth,
+          alignItems: 'center',
+        }}>
+        <MintBalanceDisplay
+          unit={unit}
+          onMintSelected={handleMintSelectedInternal}
+          requireBalance={requireBalance}
+          updateSelectedMint={true}
+          showAddMintsButton={true}
+          showDetailsButton={true}
+          style={{ width: '100%' }}
+        />
+      </View>
+    );
+  }
+
+  // Liquid Glass UI (iOS 26+, iPadOS 26+, macOS 26+)
   return (
     <View
       style={{
