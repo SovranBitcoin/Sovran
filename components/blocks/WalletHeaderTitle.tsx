@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useMintStore } from 'stores/mintStore';
@@ -30,7 +30,8 @@ export default function WalletHeaderTitle({
   unit = 'sat',
   requireBalance = false,
   onMintSelected,
-}: WalletHeaderTitleProps = {}) {
+  style,
+}: WalletHeaderTitleProps & { style?: ViewStyle }) {
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
@@ -116,8 +117,7 @@ export default function WalletHeaderTitle({
       style={{
         alignItems: 'center',
         width: '100%',
-        // backgroundColor: 'red',
-        marginLeft: -42,
+        ...style,
       }}>
       <Host style={{ zIndex: 10, height: 50, width: '100%' }} matchContents fixedSize={true}>
         <ContextMenu activationMethod="longPress">

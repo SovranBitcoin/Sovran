@@ -162,7 +162,7 @@ export function AccountPagerView({
                       width: buttonWidth - 32 - 16,
                       height: buttonHeight - 16,
                     }}>
-                    <ArrowIcon size={20} color={primaryColor0} rotate={0} />
+                    <ArrowIcon size={20} color={primaryColor0} rotate={180} />
                     <Text>Receive</Text>
                   </View>
                 </SwiftUIButton>

@@ -194,7 +194,7 @@ export default function HomeLayout() {
         options={{
           headerTransparent: true,
           headerTitleAlign: 'center',
-          headerTitle: () => <WalletHeaderTitle />,
+          headerTitle: () => <WalletHeaderTitle style={{ marginLeft: -42 }} />,
           headerLeft: () => (
             <Pressable onPress={openDrawer} style={{ margin: 2 }}>
               <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
