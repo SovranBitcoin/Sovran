@@ -1,5 +1,4 @@
 import MaskedView from '@react-native-masked-view/masked-view';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
@@ -11,6 +10,8 @@ import { useSettingsStore } from 'stores/settingsStore';
 import { isBackgroundImageTheme, getGradientColorScale } from 'config/backgroundImageThemes';
 import AnimatedSpriteBackground from './SpriteView';
 import { View } from './View';
+import { BlurView } from './BlurView';
+import { supportsBlur } from 'helper/version';
 
 /**
  * Blur mode options:
@@ -439,6 +440,9 @@ function AnimatedBackgroundViewComponent({
   // Get animated values from context
   const { partialBlurOpacity, fullBlurOpacity } = useBackgroundContext();
 
+  // Check if blur is supported on this device
+  const blurSupported = supportsBlur();
+
   // Animated styles for partial blur overlay
   const partialBlurAnimatedStyle = useAnimatedStyle(() => ({
     opacity: partialBlurOpacity.value,
@@ -455,32 +459,36 @@ function AnimatedBackgroundViewComponent({
       <AnimatedSpriteBackground backgroundColor={primaryColor900} />
 
       {/* Partial blur overlay (bottom half) - animated opacity */}
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFillObject,
-          { top: 'auto', height: '50%' },
-          partialBlurAnimatedStyle,
-        ]}
-        pointerEvents="none">
-        <MaskedView
-          style={StyleSheet.absoluteFillObject}
-          maskElement={
-            <LinearGradient
-              colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
-              locations={[0, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
-          }>
-          <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-        </MaskedView>
-      </Animated.View>
+      {blurSupported && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { top: 'auto', height: '50%' },
+            partialBlurAnimatedStyle,
+          ]}
+          pointerEvents="none">
+          <MaskedView
+            style={StyleSheet.absoluteFillObject}
+            maskElement={
+              <LinearGradient
+                colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
+                locations={[0, 1]}
+                style={StyleSheet.absoluteFillObject}
+              />
+            }>
+            <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
+          </MaskedView>
+        </Animated.View>
+      )}
 
       {/* Full blur overlay - animated opacity */}
-      <Animated.View
-        style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
-        pointerEvents="none">
-        <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-      </Animated.View>
+      {blurSupported && (
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
+          pointerEvents="none">
+          <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
+        </Animated.View>
+      )}
 
       {/* Content */}
       <View style={styles.content}>{children}</View>

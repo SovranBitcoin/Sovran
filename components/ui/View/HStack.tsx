@@ -47,6 +47,7 @@
 import React from 'react';
 import { FlexStyle, DimensionValue, StyleSheet } from 'react-native';
 import { View, ViewProps } from './View';
+import { supportsBlur } from 'helper/version';
 
 /**
  * Props for the HStack component
@@ -159,11 +160,14 @@ const HStack = React.forwardRef<any, HStackProps>((props, ref) => {
     return child;
   });
 
-  // Strip background classes when blur is enabled
-  const cleanClassName = blur ? className?.replace(/bg-\S+/g, '').trim() : className;
+  // Only enable blur if the device supports it
+  const effectiveBlur = blur && supportsBlur();
+
+  // Strip background classes when blur is enabled and supported
+  const cleanClassName = effectiveBlur ? className?.replace(/bg-\S+/g, '').trim() : className;
 
   return (
-    <View ref={ref} style={stackStyle} className={cleanClassName} blur={blur} {...rest}>
+    <View ref={ref} style={stackStyle} className={cleanClassName} blur={effectiveBlur} {...rest}>
       {processedChildren}
     </View>
   );

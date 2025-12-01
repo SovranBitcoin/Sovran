@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Dimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { View } from 'components/ui/View';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useTheme } from 'providers/ThemeProvider';
@@ -42,6 +42,7 @@ export function Background() {
 }
 
 export default function WalletHeader({ unit, accounts, setAccount }: WalletHeaderProps) {
+  const { width } = useWindowDimensions();
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
 
@@ -113,7 +114,7 @@ export default function WalletHeader({ unit, accounts, setAccount }: WalletHeade
         updateSelectedMint={true}
         showAddMintsButton={true}
         showDetailsButton={true}
-        style={{ width: Dimensions.get('window').width - 124 - 16 }}
+        style={{ width: width - 124 - 16 }}
       />
     </View>
   );

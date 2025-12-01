@@ -26,12 +26,13 @@ import { Platform } from 'react-native';
  * Generic device platform version checking with fluent API
  *
  * This class provides a chainable interface for checking device platform versions.
- * It supports iOS, Android, Web, Windows, and macOS platforms with various
+ * It supports iOS, iPadOS, Android, Web, Windows, and macOS platforms with various
  * comparison operators (gt, gte, lt, lte, eq).
  *
  * @example
  * // Basic usage
- * device.platform('ios').gte(10) // true if iOS 10 or higher
+ * device.platform('ios').gte(10) // true if iOS/iPadOS 10 or higher
+ * device.platform('ipados').gte(13) // true if specifically iPadOS 13 or higher
  * device.platform('android').lt(21) // true if Android below 5.0
  *
  * // Chaining
@@ -50,19 +51,26 @@ class DeviceChecker {
    * parses the current platform's version number. For iOS and Android,
    * the version is parsed as an integer, while other platforms use float parsing.
    *
-   * @param platform - The target platform to check ('ios', 'android', 'web', 'windows', 'macos')
+   * Note: 'ios' matches both iPhone and iPad. Use 'ipados' to specifically target iPads only.
+   *
+   * @param platform - The target platform to check ('ios', 'ipados', 'android', 'web', 'windows', 'macos')
    * @returns The DeviceChecker instance for method chaining
    *
    * @example
-   * device.platform('ios') // Configure to check iOS version
+   * device.platform('ios') // Configure to check iOS version (includes iPad)
+   * device.platform('ipados').gte(13) // Check if specifically iPad running iPadOS 13+
    * device.platform('android').gte(21) // Check if Android 5.0+
    */
-  platform(platform: 'ios' | 'android' | 'web' | 'windows' | 'macos'): DeviceChecker {
+  platform(platform: 'ios' | 'ipados' | 'android' | 'web' | 'windows' | 'macos'): DeviceChecker {
     this.platformOS = platform;
 
-    if (Platform.OS === platform) {
-      if (platform === 'ios' || platform === 'android') {
-        // For iOS and Android, parse the version as integer
+    // Handle iPadOS as a special case - it reports as 'ios' but we check Platform.isPad
+    const isTargetPlatform =
+      platform === 'ipados' ? Platform.OS === 'ios' && Platform.isPad : Platform.OS === platform;
+
+    if (isTargetPlatform) {
+      if (platform === 'ios' || platform === 'ipados' || platform === 'android') {
+        // For iOS, iPadOS, and Android, parse the version as integer
         this.platformVersion = parseInt(Platform.Version as string, 10);
       } else {
         // For other platforms, use float parsing
@@ -176,3 +184,59 @@ class DeviceChecker {
  * }
  */
 export const device = new DeviceChecker();
+
+/**
+ * Checks if the current device supports blur effects well
+ *
+ * Blur effects using expo-blur work best on:
+ * - iOS 13+ for consistent vibrancy and blur rendering
+ * - iPadOS 13+ for consistent vibrancy and blur rendering
+ * - Android 12+ (API 31) for native blur support
+ * - macOS 14+ for NSVisualEffectView support
+ *
+ * @returns True if the device supports blur effects reliably
+ *
+ * @example
+ * import { supportsBlur } from '@/helper/version';
+ *
+ * if (supportsBlur()) {
+ *   // Enable blur effects
+ * } else {
+ *   // Use solid background fallback
+ * }
+ */
+export const supportsBlur = (): boolean => {
+  return (
+    device.platform('ios').gte(13) ||
+    device.platform('ipados').gte(13) ||
+    device.platform('android').gte(31) ||
+    device.platform('macos').gte(14)
+  );
+};
+
+/**
+ * Checks if the current device supports Apple's Liquid Glass design language
+ *
+ * Liquid Glass was introduced at WWDC 2025:
+ * - iOS 26+ for iPhone
+ * - iPadOS 26+ for iPad
+ * - macOS 26+ for Mac
+ *
+ * @returns True if the device supports Liquid Glass effects
+ *
+ * @example
+ * import { supportsLiquidGlass } from '@/helper/version';
+ *
+ * if (supportsLiquidGlass()) {
+ *   // Use SwiftUI glass variant buttons
+ * } else {
+ *   // Use fallback styling
+ * }
+ */
+export const supportsLiquidGlass = (): boolean => {
+  return (
+    device.platform('ios').gte(26) ||
+    device.platform('ipados').gte(26) ||
+    device.platform('macos').gte(26)
+  );
+};

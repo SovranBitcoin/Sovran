@@ -3,7 +3,8 @@ import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Alert, Dimensions, useWindowDimensions } from 'react-native';
+import { Alert, Dimensions, useWindowDimensions } from 'react-native';
+import { supportsLiquidGlass } from 'helper/version';
 import * as Clipboard from 'expo-clipboard';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
 import { frame, cornerRadius, background } from '@expo/ui/swift-ui/modifiers';
@@ -137,7 +138,7 @@ export function AccountPagerView({
 
   // Button components
   const ReceiveButton = () => {
-    if (Platform.OS === 'ios') {
+    if (supportsLiquidGlass()) {
       return (
         <View>
           <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
@@ -174,14 +175,17 @@ export function AccountPagerView({
     }
 
     return (
-      <TouchableOpacity className="-mr-3 flex-1" onPress={handleReceive}>
+      <TouchableOpacity
+        className="-mr-3 ml-3 flex-1"
+        style={{ maxWidth: 'auto' }}
+        onPress={handleReceive}>
         <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
           <VStack align="center" justify="center">
             <HStack
               blur
               align="center"
-              justify="flex-start"
-              className="p-3"
+              justify="center"
+              className="w-full min-w-[90px] p-3"
               style={{
                 backgroundColor: primaryColor800,
                 borderColor: primaryColor700,
@@ -200,7 +204,7 @@ export function AccountPagerView({
   };
 
   const ScanButton = () => {
-    if (Platform.OS === 'ios') {
+    if (supportsLiquidGlass()) {
       return (
         <View style={{ width: 72, marginLeft: -36, zIndex: 1 }}>
           <Host style={{ height: 72, width: 72 }} matchContents fixedSize>
@@ -278,7 +282,7 @@ export function AccountPagerView({
   };
 
   const SendButton = () => {
-    if (Platform.OS === 'ios') {
+    if (supportsLiquidGlass()) {
       return (
         <View style={{ marginLeft: -36 }}>
           <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
@@ -318,7 +322,10 @@ export function AccountPagerView({
     }
 
     return (
-      <TouchableOpacity className="-ml-3 flex-1" onPress={handleSend}>
+      <TouchableOpacity
+        className="-ml-3 mr-3 flex-1"
+        style={{ maxWidth: 'auto' }}
+        onPress={handleSend}>
         <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
           <VStack align="center" justify="center">
             <HStack
@@ -331,7 +338,6 @@ export function AccountPagerView({
                 borderColor: primaryColor700,
                 borderBottomRightRadius: 1000,
                 borderTopRightRadius: 1000,
-                paddingLeft: 0,
               }}>
               <ArrowIcon size={24} color={primaryColor0} rotate={0} />
               <Text weight="bold" size={14} className="text-primary-0">

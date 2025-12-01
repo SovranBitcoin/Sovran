@@ -42,6 +42,7 @@
 import { BlurTint, BlurView } from 'expo-blur';
 import React from 'react';
 import { View as RNView, ViewProps as RNViewProps, StyleSheet } from 'react-native';
+import { supportsBlur } from 'helper/version';
 
 /**
  * Props for the View component
@@ -137,8 +138,11 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   const flattenedStyle = StyleSheet.flatten(style);
   const { backgroundColor: _backgroundColor, ...cleanStyle } = flattenedStyle || {};
 
-  if (!blur) {
-    // 🔁 Normal unwrapped View – no blur requested
+  // Only enable blur if the device supports it
+  const effectiveBlur = blur && supportsBlur();
+
+  if (!effectiveBlur) {
+    // 🔁 Normal unwrapped View – no blur requested or not supported
     return (
       <RNView ref={ref} style={style} className={className} {...rest}>
         {children}
