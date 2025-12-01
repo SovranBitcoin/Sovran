@@ -84,19 +84,16 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
 
   if (isDecrypting) {
     return (
-      <View style={{ padding: 20, alignItems: 'center' }}>
-        <Text style={{ color: getPrimaryColor('400') }}>Decrypting messages...</Text>
+      <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
+        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>Decrypting messages...</Text>
       </View>
     );
   }
 
   if (data.length === 0) {
     return (
-      <View style={{ padding: 20, alignItems: 'center' }}>
-        <Text style={{ color: getPrimaryColor('400') }}>{emptyMessage}</Text>
-        <Text style={{ color: getPrimaryColor('300'), marginTop: 10 }}>
-          Debug: Data length is {data?.length || 0}
-        </Text>
+      <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
+        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>{emptyMessage}</Text>
       </View>
     );
   }

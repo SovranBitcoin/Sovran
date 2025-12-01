@@ -1,7 +1,7 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
-import { Pressable, Platform, Dimensions, TextInput } from 'react-native';
+import { Pressable, Platform, useWindowDimensions, TextInput } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
@@ -120,9 +120,12 @@ export default function PaymentsLayout() {
 
   const isSearching = searchQuery.trim().length > 0;
 
+  // Use responsive window dimensions for proper layout across device sizes
+  const { width: windowWidth } = useWindowDimensions();
+  
   // Calculate width for header - match WalletHeaderTitle calculation
   // 124px for left/right button areas + 24px padding
-  const headerWidth = Dimensions.get('window').width - 124 - 24;
+  const headerWidth = windowWidth - 124 - 24;
 
   const contextValue: PaymentsSearchContextValue = {
     searchQuery,

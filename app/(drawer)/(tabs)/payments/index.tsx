@@ -18,9 +18,9 @@ import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, ScrollView } from 'react-native';
+import { ScrollView, useWindowDimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonContainer } from 'react-native-skeleton-component';
 import { setSearch } from 'redux/nostr';
 import { store } from 'redux/store';
@@ -637,13 +637,20 @@ const PaymentsContent = () => {
     return map;
   }, [profileEvents]);
 
-  // Use safe area insets for consistent header spacing
-  const HEADER_HEIGHT = 100;
+  // Use dynamic window dimensions for responsive layout
+  const { height: windowHeight } = useWindowDimensions();
+
+  // Get safe area insets for proper header spacing on all devices
+  const insets = useSafeAreaInsets();
+
+  // Header height accounts for the transparent header with search bar + safe area
+  // Standard iOS nav bar (44px) + small buffer (12px) + top safe area inset
+  const HEADER_HEIGHT = 56 + insets.top;
 
   return (
     <AnimatedBackgroundView>
       {/* Gradient overlay for the entire page */}
-      <ScrollableGradientOverlay contentHeight={Dimensions.get('window').height * 1.5} />
+      <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
       <SafeAreaView className="flex-1" edges={['bottom']}>
         <SkeletonContainer
@@ -652,112 +659,110 @@ const PaymentsContent = () => {
           speed={skeletonConfig.speed}
           animation={skeletonConfig.animation}>
           <View className="relative flex-1" style={{ paddingTop: HEADER_HEIGHT }}>
-          {/* Tabs - Always render but hide with height when searching */}
-          <View
-            style={{
-              paddingHorizontal: 12,
-              height: isSearching ? 0 : 'auto',
-              overflow: 'hidden',
-              opacity: isSearching ? 0 : 1,
-            }}>
-            <Tabs
-              tabs={tabs}
-              selectedTab={selectedTab}
-              handleTabPress={handleTabPress}
-              amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
-            />
-          </View>
-
-          {/* Search results overlay - positioned absolutely to avoid layout shifts */}
-          {isSearching && (
-            <ScrollView
-              style={{ flex: 1, paddingHorizontal: 16 }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="none">
-              {/* Recommended Users */}
-              <RecommendedUsers
-                users={recommendedUsers}
-                onUserPress={handleRecommendedUserPress}
-                loading={recommendedLoading}
-                isSearching={searchLoading}
-              />
-
-              {/* Search Results */}
-              {showSearchResults && (
-                <View
-                  style={{
-                    flex: 1,
-                    borderRadius: 12,
-                    marginTop: 16,
-                  }}>
-                  <View className="mb-4">
-                    <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
-                      Search results
-                    </Text>
-                  </View>
-                  <VStack spacing={12}>
-                    {displayResults.map((result) => (
-                      <SearchResult
-                        key={result.pubkey}
-                        loading={searchLoading}
-                        result={result}
-                        onPress={() => {
-                          if (!searchLoading && result.profile) {
-                            navigateToUserMessages({
-                              pubkey: result.pubkey,
-                              profile: result.profile,
-                            });
-                          }
-                        }}
-                      />
-                    ))}
-                  </VStack>
-                </View>
-              )}
-
-              {/* No Results Found */}
-              {showNoResults && <NoResultsFound />}
-            </ScrollView>
-          )}
-
-          {/* Main content - PagerView for tabs - always rendered but hidden when searching */}
-          <View
-            style={{
-              flex: isSearching ? 0 : 1,
-              paddingLeft: 16,
-              paddingRight: 16,
-              display: isSearching ? 'none' : 'flex',
-            }}>
-            <PagerView
-              ref={pagerRef}
-              onPageSelected={onPageSelected}
+            {/* Tabs - Always render but hide with height when searching */}
+            <View
               style={{
-                height: Dimensions.get('window').height - HEADER_HEIGHT - 100,
-              }}
-              initialPage={0}
-              scrollEnabled={true}>
-              <View key="1" style={{ flex: 1 }}>
-                <DraggableContactsList
-                  data={decryptedContacts}
-                  profilesMap={profilesMap}
-                  isDecrypting={isDecrypting}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No recent conversations found"
-                  itemHeight={ITEM_HEIGHT}
+                paddingHorizontal: 12,
+                height: isSearching ? 0 : 'auto',
+                overflow: 'hidden',
+                opacity: isSearching ? 0 : 1,
+              }}>
+              <Tabs
+                tabs={tabs}
+                selectedTab={selectedTab}
+                handleTabPress={handleTabPress}
+                amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
+              />
+            </View>
+
+            {/* Search results overlay - positioned absolutely to avoid layout shifts */}
+            {isSearching && (
+              <ScrollView
+                style={{ flex: 1, paddingHorizontal: 16 }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="none">
+                {/* Recommended Users */}
+                <RecommendedUsers
+                  users={recommendedUsers}
+                  onUserPress={handleRecommendedUserPress}
+                  loading={recommendedLoading}
+                  isSearching={searchLoading}
                 />
+
+                {/* Search Results */}
+                {showSearchResults && (
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: 12,
+                      marginTop: 16,
+                    }}>
+                    <View className="mb-4">
+                      <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
+                        Search results
+                      </Text>
+                    </View>
+                    <VStack spacing={12}>
+                      {displayResults.map((result) => (
+                        <SearchResult
+                          key={result.pubkey}
+                          loading={searchLoading}
+                          result={result}
+                          onPress={() => {
+                            if (!searchLoading && result.profile) {
+                              navigateToUserMessages({
+                                pubkey: result.pubkey,
+                                profile: result.profile,
+                              });
+                            }
+                          }}
+                        />
+                      ))}
+                    </VStack>
+                  </View>
+                )}
+
+                {/* No Results Found */}
+                {showNoResults && <NoResultsFound />}
+              </ScrollView>
+            )}
+
+            {/* Main content - PagerView for tabs - always rendered but hidden when searching */}
+            {!isSearching && (
+              <View
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 16,
+                }}>
+                <PagerView
+                  ref={pagerRef}
+                  onPageSelected={onPageSelected}
+                  style={{ flex: 1 }}
+                  initialPage={0}
+                  scrollEnabled={true}>
+                  <View key="1" style={{ flex: 1 }}>
+                    <DraggableContactsList
+                      data={decryptedContacts}
+                      profilesMap={profilesMap}
+                      isDecrypting={isDecrypting}
+                      isLoadingProfiles={isLoadingProfiles}
+                      emptyMessage="No recent conversations found"
+                      itemHeight={ITEM_HEIGHT}
+                    />
+                  </View>
+                  <View key="2" style={{ flex: 1 }}>
+                    <DraggableContactsList
+                      data={decryptedMints}
+                      profilesMap={profilesMap}
+                      isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                      isLoadingProfiles={isLoadingProfiles}
+                      emptyMessage="No mints with nostr contacts found"
+                      itemHeight={ITEM_HEIGHT}
+                    />
+                  </View>
+                </PagerView>
               </View>
-              <View key="2" style={{ flex: 1 }}>
-                <DraggableContactsList
-                  data={decryptedMints}
-                  profilesMap={profilesMap}
-                  isDecrypting={mintsLoadingInfo || isDecryptingMints}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No mints with nostr contacts found"
-                  itemHeight={ITEM_HEIGHT}
-                />
-              </View>
-            </PagerView>
-          </View>
+            )}
           </View>
         </SkeletonContainer>
       </SafeAreaView>
