@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import 'react-native-get-random-values';
 import { Animated, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -20,10 +21,12 @@ interface AccountProps {
   accounts: AccountData[];
   account: AccountData;
   goToIndex: (index: number) => void;
+  pagerHeight: number;
 }
 
-export function Account({ accounts, account }: AccountProps): React.ReactElement {
+export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
   const { getPrimaryColor } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // Animation values
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -104,6 +107,9 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
   const theme = useSettingsStore((state) => state.getTheme());
   const image = isBackgroundImageTheme(theme) ? theme : null;
 
+  // Account for safe area at top (status bar + navigation header)
+  const topInset = Platform.OS === 'web' ? 64 : insets.top + 56;
+
   return (
     <NonGestureView
       key={account.unit}
@@ -111,18 +117,16 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
       style={{
         overflow: 'hidden',
         zIndex: 10,
-        height: 335,
+        height: pagerHeight,
         width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
       }}>
+      {/* Main content area with flexbox centering */}
       <VStack
         align="center"
         justify="center"
         style={{
           flex: 1,
-          paddingTop: Platform.OS === 'web' ? 64 : 100,
-          paddingBottom: 48,
+          paddingTop: topInset,
         }}>
         <PrimaryBalance account={account} />
 
@@ -132,11 +136,19 @@ export function Account({ accounts, account }: AccountProps): React.ReactElement
         </HStack>
       </VStack>
 
-      <View className="absolute bottom-6 -z-10 h-[300px] w-full overflow-hidden">
-        <View className="absolute bottom-0 right-0 rounded-full">
-          {!image && renderCurrencyIcon()}
+      {/* Background currency icon - decorative only */}
+      {!image && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            right: 0,
+            zIndex: -10,
+          }}>
+          {renderCurrencyIcon()}
         </View>
-      </View>
+      )}
     </NonGestureView>
   );
 }

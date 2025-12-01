@@ -83,7 +83,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     // Use SwiftUI ContextMenu with liquid glass button on iOS
     if (Platform.OS === 'ios') {
       return (
-        <Host style={{ marginTop: -16, zIndex: 10 }} matchContents fixedSize={true}>
+        <Host style={{ zIndex: 10 }} matchContents fixedSize={true}>
           <ContextMenu>
             <ContextMenu.Items>
               <SwiftUIButton systemImage="dollarsign" onPress={() => handleCurrencySelect('usd')}>
@@ -128,7 +128,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         align="center"
         justify="center"
         gap={6}
-        className="mt-[-16px] overflow-hidden rounded-full"
+        className="overflow-hidden rounded-full"
         style={{
           backgroundColor: opacity(getGreenColor('500'), 0.15),
           borderWidth: 1,
@@ -144,7 +144,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   };
 
   return (
-    <VStack align="center" className="z-9">
+    <VStack align="center" gap={8} className="z-9">
       {renderFiatBadge()}
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
         <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />

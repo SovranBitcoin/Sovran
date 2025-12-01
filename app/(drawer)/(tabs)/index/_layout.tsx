@@ -193,6 +193,7 @@ export default function HomeLayout() {
         name="index"
         options={{
           headerTransparent: true,
+          headerTitleAlign: 'center',
           headerTitle: () => <WalletHeaderTitle />,
           headerLeft: () => (
             <Pressable onPress={openDrawer} style={{ margin: 2 }}>

@@ -7,7 +7,7 @@ import { useDeeplink } from 'hooks/useDeeplink';
 import { useVersionCheck } from 'hooks/useVersionCheck';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Dimensions, RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl, ScrollView, useWindowDimensions } from 'react-native';
 import 'react-native-get-random-values';
 import 'shim';
 
@@ -15,6 +15,7 @@ function TabOneScreen() {
   // Register this tab's background configuration - animates on focus
   useBackgroundConfig({ blurMode: 'partial' });
 
+  const { height: windowHeight } = useWindowDimensions();
   const supportedUnits = useMemo(() => ['sat', 'usd', 'eur', 'gbp'], []);
 
   const accounts = useMemo(
@@ -64,7 +65,8 @@ function TabOneScreen() {
           <View
             className="p-4 pt-0"
             style={{
-              minHeight: Dimensions.get('window').height - 375,
+              // Account for the AccountPagerView height (50% of screen) plus button area (~88px)
+              minHeight: windowHeight - windowHeight * 0.5 - 88,
             }}>
             <Transactions account={account} showMore={true} history={history} hideExpired={true} />
           </View>

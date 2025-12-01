@@ -3,7 +3,7 @@ import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, Dimensions, useWindowDimensions } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
 import { frame, cornerRadius, background } from '@expo/ui/swift-ui/modifiers';
@@ -37,12 +37,16 @@ export function AccountPagerView({
   setAccount,
   account,
 }: AccountPagerViewProps): React.ReactElement {
+  const { height: windowHeight } = useWindowDimensions();
   const { getPrimaryColor, getShadeColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
   const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
   const shadeColor100 = useMemo(() => getShadeColor('100'), [getShadeColor]);
   const shadeColor300 = useMemo(() => getShadeColor('300'), [getShadeColor]);
+
+  // Calculate 50% of screen height for the pager view
+  const pagerHeight = windowHeight * 0.5;
 
   const { handlePermission } = useHandleCameraPermission();
   const { getBalances } = useMintManagement();
@@ -128,12 +132,15 @@ export function AccountPagerView({
     });
   }, [getBalances, selectedMintUrl, account.unit]);
 
+  const buttonWidth = Dimensions.get('window').width / 2 - 24;
+  const buttonHeight = 48;
+
   // Button components
   const ReceiveButton = () => {
     if (Platform.OS === 'ios') {
       return (
-        <View style={{ flex: 1, zIndex: 1, position: 'absolute', left: 8 }}>
-          <Host style={{ height: 48, width: 140 }} matchContents fixedSize>
+        <View>
+          <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
             <ContextMenu activationMethod="longPress">
               <ContextMenu.Items>
                 <SwiftUIButton systemImage="arrow.down.circle" onPress={handleReceive}>
@@ -143,7 +150,7 @@ export function AccountPagerView({
               <ContextMenu.Trigger>
                 <SwiftUIButton
                   variant="glass"
-                  modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
+                  modifiers={[frame({ height: 48, width: buttonWidth }), cornerRadius(24)]}
                   onPress={handleReceive}>
                   <View
                     style={{
@@ -152,8 +159,8 @@ export function AccountPagerView({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      width: 140 - 32 - 16,
-                      height: 48 - 16,
+                      width: buttonWidth - 32 - 16,
+                      height: buttonHeight - 16,
                     }}>
                     <ArrowIcon size={20} color={primaryColor0} rotate={0} />
                     <Text>Receive</Text>
@@ -195,7 +202,7 @@ export function AccountPagerView({
   const ScanButton = () => {
     if (Platform.OS === 'ios') {
       return (
-        <View style={{ maxWidth: 72, zIndex: 10000, position: 'absolute' }}>
+        <View style={{ width: 72, marginLeft: -36, zIndex: 1 }}>
           <Host style={{ height: 72, width: 72 }} matchContents fixedSize>
             <ContextMenu activationMethod="longPress">
               <ContextMenu.Items>
@@ -273,8 +280,8 @@ export function AccountPagerView({
   const SendButton = () => {
     if (Platform.OS === 'ios') {
       return (
-        <View style={{ flex: 1, zIndex: 4, position: 'absolute', right: 8 }}>
-          <Host style={{ height: 48, width: 140 }} matchContents fixedSize>
+        <View style={{ marginLeft: -36 }}>
+          <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
             <ContextMenu activationMethod="longPress">
               <ContextMenu.Items>
                 <SwiftUIButton systemImage="arrow.up.circle" onPress={handleSend}>
@@ -284,7 +291,10 @@ export function AccountPagerView({
               <ContextMenu.Trigger>
                 <SwiftUIButton
                   variant="glass"
-                  modifiers={[frame({ height: 48, width: 140 }), cornerRadius(24)]}
+                  modifiers={[
+                    frame({ height: buttonHeight, width: buttonWidth }),
+                    cornerRadius(24),
+                  ]}
                   onPress={handleSend}>
                   <View
                     style={{
@@ -293,8 +303,8 @@ export function AccountPagerView({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      width: 140 - 32,
-                      height: 48 - 16,
+                      width: buttonWidth - 32,
+                      height: buttonHeight - 16,
                     }}>
                     <ArrowIcon size={20} color={primaryColor0} rotate={0} />
                     <Text>Send</Text>
@@ -336,9 +346,9 @@ export function AccountPagerView({
 
   return (
     <>
-      <View className="flex h-[350px] w-full">
+      <View style={{ height: pagerHeight, width: '100%' }}>
         <Swiper
-          containerStyle={{ height: 350 }}
+          containerStyle={{ height: pagerHeight }}
           controlsEnabled={false}
           loop
           infinite
@@ -349,16 +359,18 @@ export function AccountPagerView({
           controlsProps={{ dotsTouchable: true, dotsPos: 'top' }}>
           {loopedAccounts.map((acc, index) => (
             <VStack key={`${acc.unit}-${index}`} align="center" justify="center" className="flex-1">
-              <Account accounts={loopedAccounts} account={acc} goToIndex={goToIndex} />
+              <Account
+                accounts={loopedAccounts}
+                account={acc}
+                goToIndex={goToIndex}
+                pagerHeight={pagerHeight}
+              />
             </VStack>
           ))}
         </Swiper>
       </View>
 
-      <HStack
-        justify="space-around"
-        align="center"
-        style={{ width: '100%', marginTop: -24, paddingBottom: 32, zIndex: 10 }}>
+      <HStack justify="space-around" align="center">
         <ReceiveButton />
         <ScanButton />
         <SendButton />

@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
-import { Dimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useMintManagement, useBalanceContext } from 'hooks/coco';
-import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
-import { frame } from '@expo/ui/swift-ui/modifiers';
+import { Host, Button as SwiftUIButton, ContextMenu, HStack } from '@expo/ui/swift-ui';
+import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { getMintDisplayName } from 'helper/url';
 import { View } from 'components/ui/View';
 
@@ -92,7 +92,12 @@ export default function WalletHeaderTitle({
   }, []);
 
   // Calculate width - use provided width or default header width calculation
-  const defaultHeaderWidth = Dimensions.get('window').width - 124 - 24 + 4;
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Header buttons are ~44px each (icon + touch target), plus ~16px padding on each side
+  // Total horizontal space taken: 2 * (44 + 16) = 120px
+  // Add some breathing room for visual balance: 24px
+  const defaultHeaderWidth = windowWidth;
   const componentWidth = width ?? defaultHeaderWidth;
 
   // Format balance for display
@@ -107,11 +112,14 @@ export default function WalletHeaderTitle({
   };
 
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Host
-        style={{ zIndex: 10, height: 50, width: componentWidth }}
-        matchContents
-        fixedSize={true}>
+    <View
+      style={{
+        alignItems: 'center',
+        width: '100%',
+        // backgroundColor: 'red',
+        marginLeft: -42,
+      }}>
+      <Host style={{ zIndex: 10, height: 50, width: '100%' }} matchContents fixedSize={true}>
         <ContextMenu activationMethod="longPress">
           <ContextMenu.Items>
             {/* Quick Mint Selection - Top 3 mints */}
@@ -135,19 +143,21 @@ export default function WalletHeaderTitle({
             </SwiftUIButton>
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <SwiftUIButton
-              variant="glass"
-              modifiers={[frame({ height: 50, alignment: 'center', width: componentWidth })]}>
-              <MintBalanceDisplay
-                unit={unit}
-                onMintSelected={handleMintSelectedInternal}
-                requireBalance={requireBalance}
-                updateSelectedMint={true}
-                showAddMintsButton={true}
-                showDetailsButton={true}
-                style={{ width: '100%' }}
-              />
-            </SwiftUIButton>
+            <HStack modifiers={[padding({ horizontal: 64 })]}>
+              <SwiftUIButton
+                variant="glass"
+                modifiers={[frame({ height: 50, alignment: 'center' })]}>
+                <MintBalanceDisplay
+                  unit={unit}
+                  onMintSelected={handleMintSelectedInternal}
+                  requireBalance={requireBalance}
+                  updateSelectedMint={true}
+                  showAddMintsButton={true}
+                  showDetailsButton={true}
+                  style={{ width: '100%' }}
+                />
+              </SwiftUIButton>
+            </HStack>
           </ContextMenu.Trigger>
         </ContextMenu>
       </Host>
