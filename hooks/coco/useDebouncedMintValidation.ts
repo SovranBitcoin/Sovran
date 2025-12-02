@@ -22,6 +22,16 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
   const [mintInfo, setMintInfo] = useState<any>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Normalize URL for API calls by ensuring https:// prefix
+  const normalizeUrlForApi = useCallback((rawUrl: string): string => {
+    let normalized = rawUrl.trim().toLowerCase();
+    // Remove www. prefix if present (after removing protocol)
+    const withoutProtocol = normalized.replace(/^https?:\/\//, '');
+    const withoutWww = withoutProtocol.replace(/^www\./, '');
+    // Add https:// back for API call
+    return `https://${withoutWww}`;
+  }, []);
+
   const validateUrl = useCallback(async (mintUrl: string) => {
     if (!mintUrl.trim()) {
       setValidationState({
@@ -33,9 +43,12 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       return;
     }
 
+    // Normalize URL for API call (ensures https:// prefix)
+    const normalizedUrl = normalizeUrlForApi(mintUrl);
+
     // Basic URL validation
     try {
-      new URL(mintUrl);
+      new URL(normalizedUrl);
     } catch {
       setValidationState({
         isValid: false,
@@ -50,7 +63,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
 
     // For validation, we need to successfully fetch mint info
     // Only mark as valid if we actually get valid mint info back
-    const mintInfoResult = await fetchMintInfo(mintUrl);
+    const mintInfoResult = await fetchMintInfo(normalizedUrl);
 
     if (mintInfoResult.isErr()) {
       // If we can't get mint info, it's invalid

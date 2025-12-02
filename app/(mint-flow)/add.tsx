@@ -1,22 +1,29 @@
 /**
  * @fileoverview Add Mints screen for Mint Flow
  *
- * PERFORMANCE OPTIMIZED VERSION:
- * - Batch loads audit data for all mints at once (not per-item)
- * - Uses LegendList for virtualized rendering
- * - Proper memoization to prevent re-renders
- * - Removed console.log statements
+ * REFACTORED VERSION:
+ * - Uses ModalLayoutWrapper for consistent modal styling
+ * - Liquid glass search input in header (iOS) with Android fallback
+ * - MintCurrencyTabs as sticky content with scroll-based animations
+ * - LegendList for virtualized rendering with scroll animations support
+ * - Batch loads audit data for all mints at once
  */
 
 import React, { useState, useMemo, useCallback, memo } from 'react';
-import { TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import {
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+  useWindowDimensions,
+} from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
+import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { View, VStack, HStack } from 'components/ui/View';
+import { View, VStack, HStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintManagement, useAuditedMints } from 'hooks/coco';
-import { MintSearchInput } from 'components/ui/MintSearchInput';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { useNostrDiscoveredMints } from 'hooks/coco/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from 'hooks/coco/useSovranDiscoveredMints';
@@ -33,8 +40,15 @@ import { Avatar } from 'components/ui/Avatar';
 import { Badge } from 'components/ui/Badge';
 import { Checkbox } from 'components/ui/Checkbox';
 import { LegendList } from '@legendapp/list';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import { ModalLayoutWrapper } from 'app/debugModal';
+import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
+import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
+import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { AuditedMintData } from 'hooks/coco/useAuditedMints';
+
+// Height constant for currency tabs (same as MintListScreen)
+const CURRENCY_TABS_HEIGHT = 48;
 
 interface PseudoMint {
   url: string;
@@ -56,6 +70,125 @@ type SearchableMint = SearchableDiscoveredMint | PseudoMint;
 const adaptDiscoveredMint = (mint: any): SearchableDiscoveredMint => ({
   ...mint,
   name: mint.mintInfo?.name || extractDomain(mint.url),
+});
+
+// Native search header for iOS with liquid glass effect
+const NativeSearchHeader = memo(function NativeSearchHeader({
+  width,
+  onSearchChange,
+  validationState,
+  clearKey,
+}: {
+  width: number;
+  onSearchChange: (text: string) => void;
+  validationState: {
+    isValid: boolean | null;
+    isLoading: boolean;
+    error: string | null;
+  };
+  clearKey: number;
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false} fixedSize={true}>
+        <SwiftUIVStack
+          modifiers={[
+            padding({ horizontal: 12, vertical: 8 }),
+            frame({ width, height: 44, alignment: 'center' }),
+            glassEffect(),
+          ]}>
+          <TextField
+            key={clearKey}
+            defaultValue=""
+            placeholder="Search mints or enter URL..."
+            onChangeText={onSearchChange}
+            keyboardType="url"
+            autocorrection={false}
+            modifiers={[
+              foregroundStyle(getPrimaryColor('0')),
+              frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
+            ]}
+          />
+        </SwiftUIVStack>
+      </Host>
+      {validationState.isLoading && (
+        <View style={{ position: 'absolute', right: 24, top: 12 }}>
+          <ActivityIndicator size="small" color={getPrimaryColor('400')} />
+        </View>
+      )}
+    </View>
+  );
+});
+
+// Fallback search header for Android
+const FallbackSearchHeader = memo(function FallbackSearchHeader({
+  searchQuery,
+  onSearchChange,
+  validationState,
+}: {
+  searchQuery: string;
+  onSearchChange: (text: string) => void;
+  validationState: {
+    isValid: boolean | null;
+    isLoading: boolean;
+    error: string | null;
+  };
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  const getStatusColor = () => {
+    if (validationState.isLoading) return getPrimaryColor('400');
+    if (validationState.isValid === true) return '#10B981';
+    if (validationState.isValid === false) return '#EF4444';
+    return getPrimaryColor('600');
+  };
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: getPrimaryColor('800'),
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: getStatusColor(),
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginRight: 8,
+      }}>
+      <TextInput
+        value={searchQuery}
+        onChangeText={onSearchChange}
+        placeholder="Search mints or enter URL..."
+        placeholderTextColor={getPrimaryColor('500')}
+        style={{
+          flex: 1,
+          color: getPrimaryColor('0'),
+          fontSize: 16,
+          fontFamily: 'OverpassRegular',
+        }}
+        keyboardType="url"
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+      {validationState.isLoading && (
+        <ActivityIndicator size="small" color={getPrimaryColor('400')} />
+      )}
+      {!validationState.isLoading && validationState.isValid === true && (
+        <Text size={16} style={{ color: '#10B981' }}>
+          ✓
+        </Text>
+      )}
+      {!validationState.isLoading && validationState.isValid === false && (
+        <Text size={16} style={{ color: '#EF4444' }}>
+          ✗
+        </Text>
+      )}
+    </View>
+  );
 });
 
 // Loading skeleton
@@ -228,69 +361,20 @@ const MintItem = memo(function MintItem({
   );
 });
 
-// Currency filter tabs - styled to match MintCurrencySelector
-const CurrencyTabs = memo(function CurrencyTabs({
-  currencies,
-  selected,
-  onSelect,
-}: {
-  currencies: string[];
-  selected: string;
-  onSelect: (currency: string) => void;
-}) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor0 = getPrimaryColor('0');
-  const primaryColor700 = getPrimaryColor('700');
-  const primaryColor900 = getPrimaryColor('900');
-
-  return (
-    <VStack>
-      <Text size={18} bold overpass className="text-primary-0" style={{ marginBottom: 4 }}>
-        Currency options
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 1 }}>
-        <HStack gap={8}>
-          {currencies.map((currency) => (
-            <TouchableOpacity
-              key={currency}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 12,
-                borderRadius: 8,
-                minWidth: 100,
-                backgroundColor: selected === currency ? primaryColor700 : primaryColor900,
-              }}
-              onPress={() => onSelect(currency)}>
-              <HStack align="center" justify="flex-start" gap={8}>
-                {currency === 'USD' || currency === 'EUR' || currency === 'GBP' ? (
-                  <Icon
-                    name={`circle-flags:${currency === 'USD' ? 'us' : currency === 'EUR' ? 'eu' : 'gb'}`}
-                    size={32}
-                  />
-                ) : currency === 'ALL' ? (
-                  <Icon name="clarity:internet-of-things-solid" color={primaryColor0} size={32} />
-                ) : (
-                  <CurrencyIcon width={32} currency={currency.toLowerCase()} />
-                )}
-                <Text size={14} bold overpass className="text-primary-0">
-                  {currency === 'SAT' ? 'BTC' : currency === 'ALL' ? 'ALL' : currency}
-                </Text>
-              </HStack>
-            </TouchableOpacity>
-          ))}
-        </HStack>
-      </ScrollView>
-    </VStack>
-  );
-});
-
 function AddMintsScreen() {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Scroll tracking for animated currency tabs
+  const scrollY = useSharedValue(0);
+
+  // Track header height from ModalLayoutWrapper
+  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
+  const [clearKey, setClearKey] = useState(0);
 
   const {
     url,
@@ -299,7 +383,23 @@ function AddMintsScreen() {
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  const normalizeUrl = useCallback((u: string): string => u.replace(/\/$/, ''), []);
+  // Normalize URL by removing protocol, www, trailing slash, and lowercasing for consistent comparison
+  const normalizeUrl = useCallback((u: string): string => {
+    return u
+      .toLowerCase() // Force lowercase
+      .replace(/^https?:\/\//, '') // Remove http:// or https://
+      .replace(/^www\./, '') // Remove www.
+      .replace(/\/$/, ''); // Remove trailing slash
+  }, []);
+
+  // Normalize URL for API calls by ensuring https:// prefix
+  const normalizeUrlForApi = useCallback(
+    (rawUrl: string): string => {
+      const normalized = normalizeUrl(rawUrl);
+      return `https://${normalized}`;
+    },
+    [normalizeUrl]
+  );
 
   const { mints: nostrDiscoveredMints, loading: nostrLoading } = useNostrDiscoveredMints();
   const { mints: sovranDiscoveredMints, loading: sovranLoading } = useSovranDiscoveredMints();
@@ -337,17 +437,27 @@ function AddMintsScreen() {
     const urlExists = filtered.some((mint) => normalizeUrl(mint.url) === normalizedUrl);
 
     if (validationState.isValid === true && customMintInfo !== null && !urlExists) {
+      // Use normalized URL with https:// for the mint
+      const apiUrl = normalizeUrlForApi(url);
       const pseudoMint: PseudoMint = {
-        url,
+        url: apiUrl,
         isPseudoMint: true,
         mintInfo: customMintInfo,
-        name: extractDomain(url),
+        name: extractDomain(apiUrl),
       };
       return [pseudoMint, ...filtered];
     }
 
     return filtered;
-  }, [discoveredMints, knownMints, url, customMintInfo, validationState, normalizeUrl]);
+  }, [
+    discoveredMints,
+    knownMints,
+    url,
+    customMintInfo,
+    validationState,
+    normalizeUrl,
+    normalizeUrlForApi,
+  ]);
 
   // Filter by currency
   const currencyFilteredMints = useMemo(() => {
@@ -390,7 +500,7 @@ function AddMintsScreen() {
   const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
 
   // Batch load audit data (the key optimization!)
-  const { getAuditData, loading: auditLoading } = useAuditedMints(mintUrls);
+  const { getAuditData } = useAuditedMints(mintUrls);
 
   // Sort mints by success rate and KYM score
   const sortedMints = useMemo((): SearchableMint[] => {
@@ -436,7 +546,24 @@ function AddMintsScreen() {
     });
   }, []);
 
-  const handleSave = async () => {
+  // Handle currency change
+  const handleCurrencyChange = useCallback((currency: string) => {
+    setSelectedCurrency(currency);
+  }, []);
+
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setUrl(text);
+    },
+    [setUrl]
+  );
+
+  const handleClearSearch = useCallback(() => {
+    setUrl('');
+    setClearKey((prev) => prev + 1);
+  }, [setUrl]);
+
+  const handleSave = useCallback(async () => {
     if (selectedMints.size === 0) {
       popup({ message: 'Please select at least one mint to add', type: 'warning' });
       return;
@@ -454,7 +581,10 @@ function AddMintsScreen() {
       const manager = CocoManager.getInstance();
       const results: string[] = [];
       const errors: { mintUrl: string; error: string }[] = [];
-      const mintUrlsToAdd = Array.from(selectedMints);
+      // Normalize all URLs to ensure https:// prefix before adding
+      const mintUrlsToAdd = Array.from(selectedMints).map((u) =>
+        u.startsWith('https://') || u.startsWith('http://') ? u : normalizeUrlForApi(u)
+      );
 
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
@@ -489,7 +619,16 @@ function AddMintsScreen() {
     } finally {
       setIsAdding(false);
     }
-  };
+  }, [selectedMints, isAdding, normalizeUrlForApi]);
+
+  // Regular scroll handler for LegendList - updates scrollY for currency tab animations
+  // Note: Using regular callback since LegendList doesn't support Reanimated worklets
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
+    },
+    [scrollY]
+  );
 
   // Render item for LegendList
   const renderItem = useCallback(
@@ -516,58 +655,30 @@ function AddMintsScreen() {
 
   // Show content as soon as discovery completes, don't wait for audit/kym
   const showContent = !discoveryLoading || discoveredMints.length > 0;
+  const isSearching = url.trim().length > 0;
 
-  return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <Stack.Screen options={{ title: 'Add Mints' }} />
-      <View style={{ flex: 1, paddingTop: insets.top + 48, paddingHorizontal: 16 }}>
-        <VStack spacing={16} style={{ flex: 1 }}>
-          <MintSearchInput value={url} onChangeText={setUrl} validationState={validationState} />
+  // Calculate header width for search input
+  const headerWidth = windowWidth - 124 - 24;
 
-          <CurrencyTabs
-            currencies={availableCurrencies}
-            selected={selectedCurrency}
-            onSelect={setSelectedCurrency}
-          />
+  // Memoize colors
+  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
 
-          <VStack flex={1}>
-            <HStack align="center" gap={8} style={{ marginBottom: 4 }}>
-              <Text size={18} bold overpass className="text-primary-0">
-                {url.trim() ? 'Search results' : 'Discovered mints'}
-              </Text>
-              {(auditLoading || kymLoading) && showContent && (
-                <ActivityIndicator size="small" color={getPrimaryColor('400')} />
-              )}
-            </HStack>
+  // Sticky currency tabs component (same as MintListScreen)
+  const currencyTabs = useMemo(
+    () => (
+      <MintCurrencyTabs
+        currencies={availableCurrencies}
+        selectedCurrency={selectedCurrency}
+        onCurrencyChange={handleCurrencyChange}
+        scrollY={scrollY}
+      />
+    ),
+    [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
+  );
 
-            {!showContent ? (
-              <LoadingMintsList />
-            ) : sortedMints.length === 0 ? (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text className="text-primary-400" size={16}>
-                  {url.trim()
-                    ? 'No mints found matching your search'
-                    : selectedCurrency !== 'ALL'
-                      ? `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`
-                      : 'No mints available'}
-                </Text>
-              </View>
-            ) : (
-              <LegendList
-                data={sortedMints}
-                renderItem={renderItem}
-                keyExtractor={keyExtractor}
-                extraData={selectedMints}
-                estimatedItemSize={120}
-                recycleItems={true}
-                drawDistance={300}
-                style={{ flex: 1, maxHeight: 400 }}
-                contentContainerStyle={{ paddingBottom: 16 }}
-              />
-            )}
-          </VStack>
-        </VStack>
-      </View>
+  // Bottom buttons
+  const bottomButtons = useMemo(
+    () => (
       <BottomButtons>
         <ButtonHandler
           buttons={[
@@ -585,7 +696,96 @@ function AddMintsScreen() {
           ]}
         />
       </BottomButtons>
-    </View>
+    ),
+    [isAdding, selectedMints.size, handleSave]
+  );
+
+  // List header spacer to push content below sticky header + currency tabs
+  const listHeader = useMemo(
+    () => <View style={{ height: totalHeaderHeight }} />,
+    [totalHeaderHeight]
+  );
+
+  // Empty state component
+  const emptyComponent = useMemo(
+    () => (
+      <View style={{ paddingTop: 20, alignItems: 'center' }}>
+        <Text style={{ color: primaryColor0, textAlign: 'center' }}>
+          {url.trim()
+            ? 'No mints found matching your search'
+            : selectedCurrency === 'ALL'
+              ? 'No mints available'
+              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+        </Text>
+      </View>
+    ),
+    [url, selectedCurrency, primaryColor0]
+  );
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Add Mints',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTitle: () =>
+            Platform.OS === 'ios' ? (
+              <NativeSearchHeader
+                width={headerWidth}
+                onSearchChange={handleSearchChange}
+                validationState={validationState}
+                clearKey={clearKey}
+              />
+            ) : (
+              <FallbackSearchHeader
+                searchQuery={url}
+                onSearchChange={handleSearchChange}
+                validationState={validationState}
+              />
+            ),
+          headerRight: () =>
+            isSearching ? (
+              <TouchableOpacity onPress={handleClearSearch} style={{ padding: 8 }}>
+                <IconSymbol name="xmark" size={20} color={getPrimaryColor('0')} />
+              </TouchableOpacity>
+            ) : null,
+        }}
+      />
+
+      <ModalLayoutWrapper
+        headerGradient
+        stickyContent={currencyTabs}
+        stickyContentHeight={CURRENCY_TABS_HEIGHT}
+        useCustomScrollView
+        onHeaderHeightChange={setTotalHeaderHeight}
+        bottomContent={bottomButtons}>
+        <Spacer size={16} />
+        {/* Virtualized list with scroll-linked animations */}
+        {!showContent ? (
+          <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: totalHeaderHeight }}>
+            <LoadingMintsList />
+          </View>
+        ) : (
+          <LegendList
+            data={sortedMints}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            extraData={selectedMints}
+            estimatedItemSize={120}
+            recycleItems
+            drawDistance={300}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={emptyComponent}
+            // Wire up scroll events to update scrollY for currency tab animations
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          />
+        )}
+      </ModalLayoutWrapper>
+    </>
   );
 }
 
