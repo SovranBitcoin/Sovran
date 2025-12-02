@@ -14,7 +14,7 @@ import opacity from 'hex-color-opacity';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useRoutstrStore } from 'stores/routstrStore';
 
@@ -178,30 +178,133 @@ const BITREFILL_PRODUCTS = [
 const BITCOIN_CONFERENCES = [
   {
     id: '1',
-    name: 'Bitcoin 2025',
-    location: 'Las Vegas, USA',
-    date: 'May 27-29, 2025',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
-    attendees: '35,000+',
-    hasEsim: true,
+    name: 'Plan ₿ Forum El Salvador',
+    location: 'San Salvador, El Salvador',
+    date: 'Jan 30-31, 2026',
+    image: 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800',
+    attendees: '2,000+',
+    website: 'https://planb.sv/',
+    discountCode: null,
   },
   {
     id: '2',
-    name: 'Baltic Honeybadger',
-    location: 'Riga, Latvia',
-    date: 'Sep 5-6, 2025',
-    image: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800',
-    attendees: '2,000+',
-    hasEsim: true,
+    name: 'Adopting Bitcoin Cape Town',
+    location: 'Cape Town, South Africa',
+    date: 'Jan 30-31, 2026',
+    image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=800',
+    attendees: '1,000+',
+    website: 'https://za26.adoptingbitcoin.org/',
+    discountCode: null,
   },
   {
     id: '3',
-    name: 'Adopting Bitcoin',
-    location: 'San Salvador',
-    date: 'Nov 15-16, 2025',
-    image: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=800',
+    name: 'BitBlockBoom 2026',
+    location: 'Fort Worth, Texas',
+    date: 'Apr 9-12, 2026',
+    image: 'https://images.unsplash.com/photo-1531218150217-54595bc2b934?w=800',
+    attendees: '3,000+',
+    website: 'https://bitblockboom.com/',
+    discountCode: null,
+  },
+  {
+    id: '4',
+    name: 'Bitcoin 2026',
+    location: 'Las Vegas, Nevada',
+    date: 'Apr 27-29, 2026',
+    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
+    attendees: '35,000+',
+    website: 'https://b.tc/conference/2026',
+    discountCode: 'CYBORG',
+  },
+  {
+    id: '5',
+    name: 'Oslo Freedom Forum',
+    location: 'Oslo, Norway',
+    date: 'Jun 1-3, 2026',
+    image: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800',
     attendees: '1,500+',
-    hasEsim: true,
+    website: 'https://oslofreedomforum.com/event/oslo-freedom-forum-2026/',
+    discountCode: null,
+  },
+  {
+    id: '6',
+    name: 'Bitcoin FilmFest',
+    location: 'Warsaw, Poland',
+    date: 'Jun 4-7, 2026',
+    image: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800',
+    attendees: '210',
+    website: 'https://bitcoinfilmfest.com/bff26/',
+    discountCode: null,
+  },
+  {
+    id: '7',
+    name: 'BTC Prague 2026',
+    location: 'Prague, Czech Republic',
+    date: 'Jun 11-13, 2026',
+    image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=800',
+    attendees: '10,000+',
+    website: 'https://btcprague.com/',
+    discountCode: 'FOMO',
+  },
+  {
+    id: '8',
+    name: 'Baltic Honeybadger',
+    location: 'Riga, Latvia',
+    date: 'Aug 2026 (TBA)',
+    image: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800',
+    attendees: '2,000+',
+    website: 'https://baltichoneybadger.com/',
+    discountCode: null,
+  },
+  {
+    id: '9',
+    name: 'Bitcoin Hong Kong',
+    location: 'Hong Kong',
+    date: 'Aug 27-28, 2026',
+    image: 'https://images.unsplash.com/photo-1536599018102-9f803c140fc1?w=800',
+    attendees: '5,000+',
+    website: 'https://asia.b.tc/2026',
+    discountCode: 'DISCO',
+  },
+  {
+    id: '10',
+    name: 'Bitcoin Amsterdam',
+    location: 'Amsterdam, Netherlands',
+    date: 'Autumn 2026 (TBA)',
+    image: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=800',
+    attendees: '5,000+',
+    website: 'https://www.bitcoin.amsterdam/',
+    discountCode: null,
+  },
+  {
+    id: '11',
+    name: 'Plan ₿ Forum Lugano',
+    location: 'Lugano, Switzerland',
+    date: 'Oct 23-24, 2026',
+    image: 'https://images.unsplash.com/photo-1527668752968-14dc70a27c95?w=800',
+    attendees: '4,000+',
+    website: 'https://planb.lugano.ch/planb-forum/',
+    discountCode: null,
+  },
+  {
+    id: '12',
+    name: 'Africa Bitcoin Conference',
+    location: 'Location TBA',
+    date: 'Dec 2026 (TBA)',
+    image: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+    attendees: '1,500+',
+    website: 'https://afrobitcoin.org/',
+    discountCode: null,
+  },
+  {
+    id: '13',
+    name: 'Bitcoin MENA',
+    location: 'Abu Dhabi, UAE',
+    date: 'Dec 2025',
+    image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800',
+    attendees: '12,000+',
+    website: 'https://mena.b.tc/',
+    discountCode: 'CYBORG',
   },
 ];
 
@@ -449,21 +552,24 @@ const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) =
 const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCES)[0] }) => {
   const { getPrimaryColor } = useTheme();
 
+  const handlePress = useCallback(() => {
+    if (conference.website) {
+      Linking.openURL(conference.website);
+    }
+  }, [conference.website]);
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={styles.conferenceCard}
-      onPress={() => popup('not_implemented')}>
+    <TouchableOpacity activeOpacity={0.9} style={styles.conferenceCard} onPress={handlePress}>
       <Image source={{ uri: conference.image }} style={styles.conferenceImage} contentFit="cover" />
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.9)']}
         style={[StyleSheet.absoluteFillObject, { top: '40%' }]}
       />
-      {conference.hasEsim && (
-        <View style={styles.esimBadge}>
-          <Icon name="mdi:sim" size={12} color="#fff" />
+      {conference.discountCode && (
+        <View style={styles.discountBadge}>
+          <Icon name="mdi:ticket-percent" size={12} color="#fff" />
           <Text size={10} heavy style={{ color: '#fff', marginLeft: 4 }}>
-            eSIM Available
+            {conference.discountCode}
           </Text>
         </View>
       )}
@@ -473,7 +579,10 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
         </Text>
         <HStack align="center" style={{ marginTop: 4 }}>
           <Icon name="mdi:map-marker" size={12} color="rgba(255,255,255,0.7)" />
-          <Text size={12} style={{ color: 'rgba(255,255,255,0.7)', marginLeft: 4 }}>
+          <Text
+            size={12}
+            style={{ color: 'rgba(255,255,255,0.7)', marginLeft: 4 }}
+            numberOfLines={1}>
             {conference.location}
           </Text>
         </HStack>
@@ -695,7 +804,7 @@ const ExploreScreen = () => {
               <TouchableOpacity
                 activeOpacity={0.9}
                 style={styles.esimPromo}
-                onPress={() => popup('not_implemented')}>
+                onPress={() => Linking.openURL('https://sovran.money/esims')}>
                 <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
                 <LinearGradient
                   colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
@@ -846,13 +955,13 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
   },
-  esimBadge: {
+  discountBadge: {
     position: 'absolute',
     top: 12,
     right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(99,102,241,0.9)',
+    backgroundColor: 'rgba(245,158,11,0.9)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
