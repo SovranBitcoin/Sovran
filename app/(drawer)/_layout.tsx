@@ -32,8 +32,8 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '(drawer)/(tabs)/index',
-    drawerLabel: 'index',
+    route: '(drawer)/(tabs)',
+    drawerLabel: 'wallet',
   },
   {
     icon: 'fluent:arrow-swap-16-filled',
@@ -158,8 +158,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const isRouteActive = (route: string) => {
     if (
-      route.includes('(tabs)/index') &&
-      (pathname === '/' || pathname === '/index' || pathname.startsWith('/(tabs)/index'))
+      route.includes('(tabs)/wallet') &&
+      (pathname === '/' || pathname === '/wallet' || pathname.includes('wallet'))
     ) {
       return true;
     }
