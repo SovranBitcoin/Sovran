@@ -15,6 +15,7 @@ import {
   ColorValue,
   Keyboard,
   TouchableWithoutFeedback,
+  InteractionManager,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -820,62 +821,78 @@ export function UserMessagesScreen({
   // EFFECTS
   // ===========================
 
-  // Initialize Routstr
+  // Initialize Routstr - deferred to allow smooth navigation
   useEffect(() => {
     if (!isRoutstrMode) return;
 
-    const initRoutstr = async () => {
-      setIsLoading(true);
-      try {
-        if (!getCurrentSessionId()) {
-          const sessions = getAllSessions();
-          if (sessions.length > 0) {
-            switchSession(sessions[0].id);
-          } else {
-            createSession();
-          }
-        }
+    // Immediately set up session and messages (sync operations)
+    if (!getCurrentSessionId()) {
+      const sessions = getAllSessions();
+      if (sessions.length > 0) {
+        switchSession(sessions[0].id);
+      } else {
+        createSession();
+      }
+    }
 
-        const history = getConversationHistory();
-        const formattedMessages = history.map((msg) => ({
-          id: msg.id,
-          content: msg.content,
-          sender: msg.role === 'user' ? 'me' : 'other',
-          timestamp: formatTimestamp(msg.timestamp),
-          isRead: true,
-          created_at: msg.timestamp,
-          pubkey: msg.role === 'user' ? nostrKeys?.pubkey || 'me' : ROUTSTR_PUBKEY,
-        }));
-        setMessages(formattedMessages);
+    const history = getConversationHistory();
+    const formattedMessages = history.map((msg) => ({
+      id: msg.id,
+      content: msg.content,
+      sender: msg.role === 'user' ? 'me' : 'other',
+      timestamp: formatTimestamp(msg.timestamp),
+      isRead: true,
+      created_at: msg.timestamp,
+      pubkey: msg.role === 'user' ? nostrKeys?.pubkey || 'me' : ROUTSTR_PUBKEY,
+    }));
+    setMessages(formattedMessages);
+    setIsLoading(false); // Show UI immediately with cached data
 
-        if (apiKey) {
-          try {
-            const balanceData = await checkBalance(apiKey);
+    // Defer expensive API calls until after navigation animation completes
+    const interactionHandle = InteractionManager.runAfterInteractions(() => {
+      if (!apiKey) return;
+
+      // Run balance check and models loading in parallel
+      Promise.all([
+        checkBalance(apiKey)
+          .then((balanceData) => {
             if (balanceData.api_key && balanceData.api_key !== apiKey) {
               setApiKey(balanceData.api_key);
             }
             setBalance(balanceData.balance);
-          } catch (error) {
+          })
+          .catch((error) => {
             console.error('Failed to check balance:', error);
-          }
+          }),
+        loadModels(),
+      ]).catch((error) => {
+        console.error('Error during deferred initialization:', error);
+      });
+    });
 
-          await loadModels();
-        }
-      } catch (error) {
-        console.error('Error initializing Routstr:', error);
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      interactionHandle.cancel();
     };
-
-    initRoutstr();
   }, [isRoutstrMode, apiKey, nostrKeys?.pubkey]);
 
-  // Load models when API key becomes available
+  // Load models when API key becomes available - deferred
   useEffect(() => {
     if (!isRoutstrMode || !apiKey || availableModels.length > 0) return;
-    loadModels();
-  }, [isRoutstrMode, apiKey, availableModels.length]);
+
+    // Use cached models immediately if available
+    const cached = getCachedModels();
+    if (cached && cached.length > 0) {
+      setAvailableModels(cached);
+      return;
+    }
+
+    // Defer network request until after interactions
+    const handle = InteractionManager.runAfterInteractions(() => {
+      loadModels();
+    });
+
+    return () => handle.cancel();
+  }, [isRoutstrMode, apiKey, availableModels.length, getCachedModels]);
 
   // Listen for session changes
   useEffect(() => {
@@ -904,29 +921,30 @@ export function UserMessagesScreen({
     setIsLoading(true);
   }, [pubkey]);
 
-  // Process DM events
+  // Process DM events - deferred to avoid blocking navigation
   useEffect(() => {
     if (isRoutstrMode) return;
 
-    const processDMs = async () => {
-      if (!dmEvents || !nostrKeys?.pubkey || !nostrKeys?.privateKey || !pubkey) {
-        setIsLoading(false);
-        return;
-      }
+    if (!dmEvents || !nostrKeys?.pubkey || !nostrKeys?.privateKey || !pubkey) {
+      setIsLoading(false);
+      return;
+    }
 
-      if (dmEvents.length === 0) {
-        setIsLoading(false);
-        return;
-      }
+    if (dmEvents.length === 0) {
+      setIsLoading(false);
+      return;
+    }
 
+    const newEvents = dmEvents.filter((event) => !processedEventIds.current.has(event.id));
+
+    if (newEvents.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Defer expensive decryption until after navigation completes
+    const handle = InteractionManager.runAfterInteractions(async () => {
       try {
-        const newEvents = dmEvents.filter((event) => !processedEventIds.current.has(event.id));
-
-        if (newEvents.length === 0) {
-          setIsLoading(false);
-          return;
-        }
-
         const processedMessages = await Promise.all(
           newEvents.map(async (event) => {
             try {
@@ -980,9 +998,9 @@ export function UserMessagesScreen({
       } finally {
         setIsLoading(false);
       }
-    };
+    });
 
-    processDMs();
+    return () => handle.cancel();
   }, [dmEvents, nostrKeys?.pubkey, nostrKeys?.privateKey, pubkey, isRoutstrMode]);
 
   // ===========================
