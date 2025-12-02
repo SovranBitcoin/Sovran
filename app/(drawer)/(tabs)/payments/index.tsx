@@ -47,12 +47,32 @@ interface PlaceholderResult {
 
 type DisplayResult = SearchResultData | PlaceholderResult;
 
+// Default contacts that should always appear in Recent activity
+const DEFAULT_CONTACTS = [
+  {
+    npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
+    label: 'Sovran',
+  },
+  {
+    npub: 'npub1ceel7z6ly287kz4mzqqcsgtc6nzc30zw2ru9w9e4gj64gw69f7qscyf0p8',
+    label: 'kelbie',
+  },
+];
+
 const PaymentsContent = () => {
   // Register this tab's background configuration
   useBackgroundConfig({ blurMode: 'full' });
 
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
+
+  // Convert default contact npubs to pubkeys (memoized for performance)
+  const defaultContactPubkeys = useMemo(() => {
+    return DEFAULT_CONTACTS.map((contact) => ({
+      pubkey: npubToPubkey(contact.npub),
+      label: contact.label,
+    }));
+  }, []);
 
   // Get search state from layout context
   const { searchQuery, isSearching } = usePaymentsSearch();
@@ -142,10 +162,30 @@ const PaymentsContent = () => {
     return result;
   }, [dmEvents, nostrKeys?.pubkey]);
 
+  // Merge default contacts with recent activity contacts
+  const contactsWithDefaults = useMemo(() => {
+    // Create a set of existing pubkeys from recent activity
+    const existingPubkeys = new Set(recentActivityContacts.map((c) => c.pubkey));
+
+    // Filter out default contacts that already exist in recent activity
+    const defaultsToAdd = defaultContactPubkeys
+      .filter((dc) => !existingPubkeys.has(dc.pubkey))
+      .map((dc) => ({
+        type: 'contact' as const,
+        pubkey: dc.pubkey,
+        dmEvent: null,
+        timestamp: 0, // No timestamp for default contacts without messages
+        isDefault: true,
+      }));
+
+    // Combine: recent activity first (sorted by time), then defaults at the end
+    return [...recentActivityContacts, ...defaultsToAdd];
+  }, [recentActivityContacts, defaultContactPubkeys]);
+
   // Decrypt DM events for contacts
   useEffect(() => {
     const decryptContacts = async () => {
-      if (!recentActivityContacts.length || !nostrKeys?.pubkey) {
+      if (!contactsWithDefaults.length || !nostrKeys?.pubkey) {
         setDecryptedContacts([]);
         return;
       }
@@ -160,8 +200,14 @@ const PaymentsContent = () => {
 
         // Decrypt sequentially to avoid race conditions with NDK's decrypt method
         const decryptedResults = [];
-        for (const contact of recentActivityContacts) {
+        for (const contact of contactsWithDefaults) {
           try {
+            // Skip decryption for contacts without DM events (default contacts)
+            if (!contact.dmEvent) {
+              decryptedResults.push(contact);
+              continue;
+            }
+
             if (contact.dmEvent instanceof NDKEvent) {
               // Decrypt the message content
               // Use contact.pubkey (the other party) not dmEvent.pubkey
@@ -195,14 +241,14 @@ const PaymentsContent = () => {
         setDecryptedContacts(decryptedResults);
       } catch (error) {
         console.error('Error decrypting contacts:', error);
-        setDecryptedContacts(recentActivityContacts);
+        setDecryptedContacts(contactsWithDefaults);
       } finally {
         setIsDecrypting(false);
       }
     };
 
     decryptContacts();
-  }, [recentActivityContacts, nostrKeys?.pubkey, nostrKeys?.privateKey]);
+  }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   // Load mints and their info on component mount
   useEffect(() => {
@@ -574,27 +620,35 @@ const PaymentsContent = () => {
   // Constants for LegendList
   const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
-  // Fetch kind 0 (profile) events for all contacts
+  // Fetch kind 0 (profile) events for all contacts including defaults
   const profileFilters = useMemo(() => {
-    const allPubkeys = [...decryptedContacts, ...decryptedMints]
-      .map((item: any) => item.pubkey)
-      .filter((pubkey): pubkey is string => !!pubkey);
+    // Include default contact pubkeys to always fetch their profiles
+    const defaultPubkeys = defaultContactPubkeys.map((dc) => dc.pubkey);
 
-    console.log('[DEBUG payments.tsx] Requesting profiles for pubkeys:', allPubkeys.length);
+    const allPubkeys = [
+      ...defaultPubkeys,
+      ...decryptedContacts.map((item: any) => item.pubkey),
+      ...decryptedMints.map((item: any) => item.pubkey),
+    ].filter((pubkey): pubkey is string => !!pubkey);
+
+    // Deduplicate pubkeys
+    const uniquePubkeys = [...new Set(allPubkeys)];
+
+    console.log('[DEBUG payments.tsx] Requesting profiles for pubkeys:', uniquePubkeys.length);
     console.log(
       '[DEBUG payments.tsx] First 5 pubkeys:',
-      allPubkeys.slice(0, 5).map((p) => p.slice(0, 8))
+      uniquePubkeys.slice(0, 5).map((p) => p.slice(0, 8))
     );
 
-    if (allPubkeys.length === 0) return null;
+    if (uniquePubkeys.length === 0) return null;
 
     return [
       {
         kinds: [0],
-        authors: allPubkeys,
+        authors: uniquePubkeys,
       },
     ];
-  }, [decryptedContacts, decryptedMints]);
+  }, [decryptedContacts, decryptedMints, defaultContactPubkeys]);
 
   const { events: profileEvents, eose: profilesEose } = useSubscribe({
     filters: profileFilters,
