@@ -437,6 +437,15 @@ function AnimatedBackgroundViewComponent({
   const { getPrimaryColor } = useTheme();
   const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
 
+  // Get gradient colors for background image themes
+  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const gradientColors = useMemo(() => {
+    if (isBackgroundImageTheme(currentTheme)) {
+      return getGradientColorScale(currentTheme);
+    }
+    return null;
+  }, [currentTheme]);
+
   // Get animated values from context
   const { partialBlurOpacity, fullBlurOpacity } = useBackgroundContext();
 
@@ -458,6 +467,15 @@ function AnimatedBackgroundViewComponent({
       {/* Animated background image or solid color */}
       <AnimatedSpriteBackground backgroundColor={primaryColor900} />
 
+      {/* Gradient overlay for image themes */}
+      {gradientColors && (
+        <LinearGradient
+          colors={['transparent', opacity(gradientColors['300'], 1)]}
+          locations={[0, 1]}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+      )}
       {/* Partial blur overlay (bottom half) - animated opacity */}
       {blurSupported && (
         <Animated.View
