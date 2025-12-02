@@ -1,3 +1,4 @@
+import React, { useState, useCallback, ReactNode, useEffect } from 'react';
 import { Text } from 'components/ui/Text';
 import { View, ScrollView, NativeScrollEvent, StyleSheet } from 'react-native';
 import Animated, {
@@ -7,7 +8,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useCallback, ReactNode } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { BlurView } from 'expo-blur';
@@ -70,6 +70,17 @@ export interface ModalLayoutWrapperProps {
   bottomContent?: ReactNode;
   /** Bottom padding for scroll content (default: 120) */
   bottomPadding?: number;
+  /**
+   * When true, children are rendered directly without wrapping in ScrollView.
+   * Use this when you need to provide your own scrollable component (e.g., FlatList, LegendList).
+   * You should add your own header spacer using the totalHeaderHeight value.
+   */
+  useCustomScrollView?: boolean;
+  /**
+   * Callback that receives the total header height (headerHeight + stickyContentHeight).
+   * Useful when useCustomScrollView is true to add proper spacing to your custom scroll content.
+   */
+  onHeaderHeightChange?: (height: number) => void;
 }
 
 export const ModalLayoutWrapper = ({
@@ -84,6 +95,8 @@ export const ModalLayoutWrapper = ({
   scrollY: externalScrollY,
   bottomContent,
   bottomPadding = 120,
+  useCustomScrollView = false,
+  onHeaderHeightChange,
 }: ModalLayoutWrapperProps) => {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -118,6 +131,11 @@ export const ModalLayoutWrapper = ({
 
   const gradientHeight = headerGradientHeight ?? headerHeight;
   const totalHeaderHeight = headerHeight + stickyContentHeight;
+
+  // Notify parent of header height changes
+  useEffect(() => {
+    onHeaderHeightChange?.(totalHeaderHeight);
+  }, [totalHeaderHeight, onHeaderHeightChange]);
 
   // Scroll content container style
   const scrollContentStyle = {
@@ -199,8 +217,11 @@ export const ModalLayoutWrapper = ({
         )}
       </View>
 
-      {/* Main ScrollView - either Animated or regular */}
-      {useAnimatedScroll ? (
+      {/* Main content - either custom scroll, Animated ScrollView, or regular ScrollView */}
+      {useCustomScrollView ? (
+        // Custom scroll view mode - render children directly, consumer handles scrolling
+        <View style={{ flex: 1 }}>{children}</View>
+      ) : useAnimatedScroll ? (
         <Animated.ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={scrollContentStyle}

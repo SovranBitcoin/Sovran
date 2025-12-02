@@ -6,29 +6,24 @@
  *
  * Features:
  * - Native Stack header handles title and buttons
- * - Sticky month selector with blur/gradient below header
+ * - Sticky month selector with blur/gradient below header (via ModalLayoutWrapper)
  * - Virtualized transaction list
  * - Filter support via external props (from filter flow)
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
 import { View } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { MonthSelector } from 'components/blocks/MonthSelector';
 import { HistoryEntry } from 'coco-cashu-core';
 import { usePaginatedHistory } from 'coco-cashu-react';
-import { useHeaderHeight } from '@react-navigation/elements';
-import { useTheme } from 'providers/ThemeProvider';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
+import { ModalLayoutWrapper } from 'app/debugModal';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
 
-// Height constant for month selector
+// Height constant for month selector (sticky content)
 const MONTH_SELECTOR_HEIGHT = 48;
 
 export interface TransactionsScreenProps {
@@ -58,9 +53,6 @@ export function TransactionsScreen({
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
-  const headerHeight = useHeaderHeight();
-  const { getPrimaryColor } = useTheme();
-
   // Use external filter props if provided, otherwise use internal state
   const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
   const paymentType = filterPaymentType;
@@ -71,6 +63,9 @@ export function TransactionsScreen({
   const [internalMonth, setInternalMonth] = useState<string | null>(null);
   const selectedMonth = filterMonth !== undefined ? filterMonth : internalMonth;
   const handleMonthChange = onMonthChange || setInternalMonth;
+
+  // Track total header height from ModalLayoutWrapper
+  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   const getCocoTransactionTypes = useCallback((): HistoryEntry['type'][] => {
     if (paymentType === 'all' && direction === 'all') {
@@ -114,10 +109,7 @@ export function TransactionsScreen({
 
   const parsedAccount = { unit: selectedCurrency };
 
-  // Total header height for content padding (native header + month selector)
-  const totalHeaderHeight = headerHeight + MONTH_SELECTOR_HEIGHT;
-
-  // Month selector content
+  // Month selector sticky content
   const monthSelectorContent = useMemo(
     () => (
       <MonthSelector
@@ -136,32 +128,12 @@ export function TransactionsScreen({
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      {/* Header gradient with blur effect - positioned at top */}
-      <View
-        style={[styles.headerGradientContainer, { height: headerHeight * 2 }]}
-        pointerEvents="none">
-        <MaskedView
-          style={StyleSheet.absoluteFill}
-          maskElement={
-            <LinearGradient
-              colors={['black', 'black', 'transparent']}
-              locations={[0, 0.5, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-          }>
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-          <LinearGradient
-            colors={[getPrimaryColor('950'), 'transparent']}
-            locations={[0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </MaskedView>
-      </View>
-
-      {/* Sticky month selector below native header */}
-      <View style={[styles.stickyContainer, { top: headerHeight }]}>{monthSelectorContent}</View>
-
+    <ModalLayoutWrapper
+      headerGradient
+      stickyContent={monthSelectorContent}
+      stickyContentHeight={MONTH_SELECTOR_HEIGHT}
+      useCustomScrollView
+      onHeaderHeightChange={setTotalHeaderHeight}>
       {/* Transaction list with proper header spacer */}
       <Transactions
         listKey={listKey}
@@ -176,23 +148,8 @@ export function TransactionsScreen({
         selectedMonth={selectedMonth}
         onTransactionPress={onTransactionPress}
         header={listHeader}
+        disableContentInsetAdjustment
       />
-    </View>
+    </ModalLayoutWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  headerGradientContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
-  stickyContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 99,
-  },
-});

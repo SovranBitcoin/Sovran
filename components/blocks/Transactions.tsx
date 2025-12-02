@@ -44,6 +44,11 @@ interface Props {
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
   /** Optional scroll handler for tracking scroll position */
   onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
+  /**
+   * When true, disables automatic content inset adjustment.
+   * Use when header spacing is handled externally (e.g., via ModalLayoutWrapper).
+   */
+  disableContentInsetAdjustment?: boolean;
 }
 
 export const Transactions = React.memo(
@@ -62,6 +67,7 @@ export const Transactions = React.memo(
     selectedMonth,
     onTransactionPress,
     onScroll,
+    disableContentInsetAdjustment = false,
   }: Props) => {
     const { getPrimaryColor } = useTheme();
 
@@ -319,7 +325,7 @@ export const Transactions = React.memo(
         estimatedItemSize={ITEM_HEIGHT}
         scrollEnabled
         maintainVisibleContentPosition
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
         ListHeaderComponent={header}
         onScroll={onScroll}
         scrollEventThrottle={16}
