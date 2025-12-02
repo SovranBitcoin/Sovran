@@ -3,23 +3,34 @@
  *
  * This module provides the core UI and logic for mint selection.
  * It is used by both the mint-flow list and send-flow mintSelect routes.
+ *
+ * Features:
+ * - Native Stack header handles title and buttons
+ * - Sticky animated currency tabs below header
+ * - Full-page scrolling mint list
+ * - Uses ModalLayoutWrapper for consistent modal styling
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View } from 'components/ui/View';
+import { useSharedValue } from 'react-native-reanimated';
+import { View, VStack } from 'components/ui/View';
+import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintManagement } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { MintCurrencySelector } from 'components/blocks/sheets/mint-balance/MintCurrencySelector';
 import { MintItem } from 'components/blocks/sheets/mint-balance/routes/list';
+import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
+import { ModalLayoutWrapper } from 'app/debugModal';
 import { Mint } from 'coco-cashu-core';
 import { useKYMMints } from 'hooks/coco/useKYMMints';
 import { popup } from 'helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
+
+// Height constant for currency tabs
+const CURRENCY_TABS_HEIGHT = 48;
 
 export interface MintListScreenProps {
   /** Whether to require balance for selection (default: false) */
@@ -32,29 +43,31 @@ export interface MintListScreenProps {
   mintsLabel?: string;
   /** Label for close/cancel button (default: "Close") */
   closeButtonLabel?: string;
-  /** Called when a mint is selected. Return true to allow default behavior (router.back) */
+  /** Called when a mint is selected */
   onMintSelect: (mint: Mint & { amount: number; unit: string }) => void | Promise<void>;
   /** Called when inspect/details button is pressed on a mint */
   onInspectMint?: (mintUrl: string) => void;
   /** Called when close/cancel button is pressed */
   onClose: () => void;
-  /** Header right component (e.g., add button) */
-  headerRight?: React.ReactNode;
+  /** Allowed currencies to filter by */
+  allowedCurrencies?: string[];
 }
 
 export function MintListScreen({
   requireBalance = false,
   showDetailsButton = true,
-  currencyLabel = 'Currency',
-  mintsLabel = 'Your mints',
+  currencyLabel: _currencyLabel = 'Currency',
+  mintsLabel: _mintsLabel = 'Your mints',
   closeButtonLabel = 'Close',
   onMintSelect,
   onInspectMint,
   onClose,
-  headerRight,
+  allowedCurrencies = ['SAT', 'USD', 'EUR', 'GBP'],
 }: MintListScreenProps) {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
+
+  // Scroll tracking for animated currency tabs
+  const scrollY = useSharedValue(0);
 
   const { getBalances, mints } = useMintManagement();
   const [balances, setBalances] = useState<Record<string, number>>({});
@@ -63,6 +76,9 @@ export function MintListScreen({
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
+
+  // Currency selection state
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
 
   // Load balances
   useEffect(() => {
@@ -102,6 +118,41 @@ export function MintListScreen({
     return _.orderBy(mintsWithBalances, ['amount'], ['desc']);
   }, [mints, balances]);
 
+  // Extract available currencies from mints
+  const availableCurrencies = useMemo(() => {
+    const units: string[] = [];
+    processedMints.forEach((mint) => {
+      if (mint.mintInfo?.nuts?.['4']?.methods) {
+        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
+          if (method.unit) {
+            units.push(method.unit.toUpperCase());
+          }
+        });
+      } else {
+        units.push('SAT');
+      }
+    });
+    const uniqueUnits = [...new Set(units)];
+    const filtered = uniqueUnits.filter((c) => allowedCurrencies.includes(c));
+    return ['ALL', ...filtered];
+  }, [processedMints, allowedCurrencies]);
+
+  // Filter mints by selected currency
+  const filteredMints = useMemo(() => {
+    if (selectedCurrency === 'ALL') {
+      return processedMints;
+    }
+
+    return processedMints.filter((mint) => {
+      if (!mint.mintInfo?.nuts?.['4']?.methods) {
+        return selectedCurrency === 'SAT';
+      }
+      return mint.mintInfo.nuts['4'].methods.some(
+        (method: any) => method.unit?.toUpperCase() === selectedCurrency
+      );
+    });
+  }, [processedMints, selectedCurrency]);
+
   // Fetch KYM scores
   const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
   const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
@@ -110,16 +161,19 @@ export function MintListScreen({
     return url.replace(/\/$/, '');
   }, []);
 
+  // Handle currency change
+  const handleCurrencyChange = useCallback((currency: string) => {
+    setSelectedCurrency(currency);
+  }, []);
+
   // Handle mint selection
   const handleMintSelect = useCallback(
     async (mintUrl: string) => {
-      // Prevent rapid button presses
       if (loadingId !== null) return;
 
       const mint = processedMints.find((m) => m.mintUrl === mintUrl);
       if (!mint) return;
 
-      // Check if mint has balance (if required)
       if (requireBalance && mint.amount === 0) {
         popup({
           message: 'insufficient_balance',
@@ -134,12 +188,9 @@ export function MintListScreen({
 
       setLoadingId(mint.mintUrl);
       try {
-        // Update selected mint in store
         if (pubkey) {
           setSelectedMint(pubkey, mint.mintUrl);
         }
-
-        // Call the provided handler
         await onMintSelect(mint);
       } catch {
         popup({
@@ -161,21 +212,59 @@ export function MintListScreen({
     [onInspectMint]
   );
 
+  // Memoize colors
+  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+
+  // Sticky currency tabs component
+  const currencyTabs = useMemo(
+    () => (
+      <MintCurrencyTabs
+        currencies={availableCurrencies}
+        selectedCurrency={selectedCurrency}
+        onCurrencyChange={handleCurrencyChange}
+        scrollY={scrollY}
+      />
+    ),
+    [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
+  );
+
+  // Bottom buttons component
+  const bottomButtons = useMemo(
+    () => (
+      <BottomButtons>
+        <ButtonHandler
+          buttons={[
+            {
+              text: closeButtonLabel,
+              variant: 'secondary' as const,
+              onPress: async () => onClose(),
+            },
+          ]}
+        />
+      </BottomButtons>
+    ),
+    [closeButtonLabel, onClose]
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + 48,
-          paddingHorizontal: 16,
-        }}>
-        <MintCurrencySelector
-          mints={processedMints}
-          allowedCurrencies={['SAT', 'USD', 'EUR', 'GBP']}
-          currencyLabel={currencyLabel}
-          mintsLabel={mintsLabel}
-          renderItem={useCallback(
-            (mint: Mint & { amount: number; unit: string }, selectedCurrency: string) => {
+    <ModalLayoutWrapper
+      headerGradient
+      stickyContent={currencyTabs}
+      stickyContentHeight={CURRENCY_TABS_HEIGHT}
+      useAnimatedScroll
+      scrollY={scrollY}
+      bottomContent={bottomButtons}>
+      {/* Mints list section */}
+      <View className="pt-3">
+        {filteredMints.length === 0 ? (
+          <Text style={{ color: primaryColor0, textAlign: 'center', marginTop: 20 }}>
+            {selectedCurrency === 'ALL'
+              ? 'No mints available'
+              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+          </Text>
+        ) : (
+          <VStack gap={4}>
+            {filteredMints.map((mint) => {
               const normalizedUrl = normalizeUrl(mint.mintUrl);
               const kymData = kymScores[normalizedUrl];
               const kymScore = kymData?.score;
@@ -195,33 +284,10 @@ export function MintListScreen({
                   onPress={() => handleMintSelect(mint.mintUrl)}
                 />
               );
-            },
-            [
-              loadingId,
-              requireBalance,
-              showDetailsButton,
-              handleMintSelect,
-              handleInspectMint,
-              kymScores,
-              kymLoading,
-              normalizeUrl,
-              onInspectMint,
-            ]
-          )}
-        />
+            })}
+          </VStack>
+        )}
       </View>
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: closeButtonLabel,
-              variant: 'secondary' as const,
-              onPress: async () => onClose(),
-            },
-          ]}
-        />
-      </BottomButtons>
-    </View>
+    </ModalLayoutWrapper>
   );
 }
-

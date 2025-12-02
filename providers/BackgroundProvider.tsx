@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, ReactNode } from 'react';
 import { useSharedValue, withTiming, SharedValue, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
 
@@ -128,7 +128,14 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
           break;
       }
     },
-    [blurMode, blurIntensity, blurGradientStart, blurGradientEnd, partialBlurOpacity, fullBlurOpacity]
+    [
+      blurMode,
+      blurIntensity,
+      blurGradientStart,
+      blurGradientEnd,
+      partialBlurOpacity,
+      fullBlurOpacity,
+    ]
   );
 
   const value: BackgroundContextValue = {
@@ -167,7 +174,13 @@ export function useBackgroundConfig(config: BackgroundConfig) {
       if (context) {
         context.setConfig(config);
       }
-    }, [context, config.blurMode, config.blurIntensity, config.blurGradientStart, config.blurGradientEnd])
+    }, [
+      context,
+      config.blurMode,
+      config.blurIntensity,
+      config.blurGradientStart,
+      config.blurGradientEnd,
+    ])
   );
 }
 
@@ -182,7 +195,12 @@ export function useOptionalBackgroundConfig(config: BackgroundConfig) {
       if (context) {
         context.setConfig(config);
       }
-    }, [context, config.blurMode, config.blurIntensity, config.blurGradientStart, config.blurGradientEnd])
+    }, [
+      context,
+      config.blurMode,
+      config.blurIntensity,
+      config.blurGradientStart,
+      config.blurGradientEnd,
+    ])
   );
 }
-

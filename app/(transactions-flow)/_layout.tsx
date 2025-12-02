@@ -4,15 +4,14 @@
  * This layout creates a nested stack navigator inside a modal presentation.
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
- * - transactions: Entry point, shows transaction list with custom collapsing header
+ * - transactions: Entry point, shows transaction list with native header
  * - mintQuote: Lightning receive details (pushes horizontally)
  * - meltQuote: Lightning send details (pushes horizontally)
  * - sendToken: Ecash send details (pushes horizontally)
  * - receiveToken: Ecash receive details (pushes horizontally)
  *
  * The first screen shows a close button, subsequent screens show a back button.
- * The transactions screen uses a custom CollapsingHeader instead of native large title
- * for more reliable animation behavior.
+ * Uses native header for liquid glass button animations.
  */
 
 import { Stack } from 'expo-router';
@@ -28,7 +27,9 @@ function TransactionsFlowContent() {
       <Stack.Screen
         name="transactions"
         options={{
-          headerShown: false, // Using custom CollapsingHeader instead
+          title: 'Transactions',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
           contentStyle: {
             backgroundColor: getPrimaryColor('950'),
           },

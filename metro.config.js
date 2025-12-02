@@ -50,7 +50,7 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:check-circle',
     'mdi-light:check',
     'lucide:arrow-down-left',
-
+    'fluent:filter-16-filled',
     'lucide:activity',
     'fa6-solid:chevron-left',
     'fa6-solid:chevron-right',

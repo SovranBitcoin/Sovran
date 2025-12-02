@@ -5,23 +5,31 @@
  * It is used by both standalone and flow-based route wrappers.
  *
  * Features:
- * - Custom collapsing header with Revolut-style large/small title animation
- * - Revolut-style month selector below header
+ * - Native Stack header handles title and buttons
+ * - Sticky month selector with blur/gradient below header
+ * - Virtualized transaction list
  * - Filter support via external props (from filter flow)
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 import { View } from 'components/ui/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { MonthSelector } from 'components/blocks/MonthSelector';
-import { CollapsingHeader, useCollapsingHeader } from 'components/blocks/CollapsingHeader';
 import { HistoryEntry } from 'coco-cashu-core';
 import { usePaginatedHistory } from 'coco-cashu-react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useTheme } from 'providers/ThemeProvider';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
+
+// Height constant for month selector
+const MONTH_SELECTOR_HEIGHT = 48;
 
 export interface TransactionsScreenProps {
   initialAccount?: { unit: string };
@@ -38,10 +46,6 @@ export interface TransactionsScreenProps {
   filterMonth?: string | null;
   /** Callback when month selection changes */
   onMonthChange?: (month: string | null) => void;
-  /** Left header button (e.g., close/back) */
-  headerLeft?: React.ReactNode;
-  /** Right header button (e.g., filter) */
-  headerRight?: React.ReactNode;
 }
 
 export function TransactionsScreen({
@@ -53,11 +57,9 @@ export function TransactionsScreen({
   filterDirection = 'all',
   filterMonth,
   onMonthChange,
-  headerLeft,
-  headerRight,
 }: TransactionsScreenProps) {
-  const insets = useSafeAreaInsets();
-  const { scrollY, scrollHandler } = useCollapsingHeader();
+  const headerHeight = useHeaderHeight();
+  const { getPrimaryColor } = useTheme();
 
   // Use external filter props if provided, otherwise use internal state
   const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
@@ -112,10 +114,10 @@ export function TransactionsScreen({
 
   const parsedAccount = { unit: selectedCurrency };
 
-  // Header height for content padding (safe area + header bar + large title)
-  const HEADER_HEIGHT = insets.top + 44 + 52; // safe area + small header + large title
+  // Total header height for content padding (native header + month selector)
+  const totalHeaderHeight = headerHeight + MONTH_SELECTOR_HEIGHT;
 
-  // Month selector as sticky content in the collapsing header
+  // Month selector content
   const monthSelectorContent = useMemo(
     () => (
       <MonthSelector
@@ -127,24 +129,40 @@ export function TransactionsScreen({
     [filteredByTypeHistory, selectedMonth, handleMonthChange]
   );
 
-  // List header spacer
+  // List header spacer to push content below sticky header
   const listHeader = useMemo(
-    () => <View style={{ height: HEADER_HEIGHT + 48 }} />,
-    [HEADER_HEIGHT]
+    () => <View style={{ height: totalHeaderHeight }} />,
+    [totalHeaderHeight]
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Custom collapsing header */}
-      <CollapsingHeader
-        title="Transactions"
-        headerLeft={headerLeft}
-        headerRight={headerRight}
-        stickyContent={monthSelectorContent}
-        scrollY={scrollY}
-      />
+    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+      {/* Header gradient with blur effect - positioned at top */}
+      <View
+        style={[styles.headerGradientContainer, { height: headerHeight * 2 }]}
+        pointerEvents="none">
+        <MaskedView
+          style={StyleSheet.absoluteFill}
+          maskElement={
+            <LinearGradient
+              colors={['black', 'black', 'transparent']}
+              locations={[0, 0.5, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+          }>
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={[getPrimaryColor('950'), 'transparent']}
+            locations={[0.5, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </MaskedView>
+      </View>
 
-      {/* Transaction list */}
+      {/* Sticky month selector below native header */}
+      <View style={[styles.stickyContainer, { top: headerHeight }]}>{monthSelectorContent}</View>
+
+      {/* Transaction list with proper header spacer */}
       <Transactions
         listKey={listKey}
         account={{ ...parsedAccount, unit: selectedCurrency }}
@@ -158,8 +176,23 @@ export function TransactionsScreen({
         selectedMonth={selectedMonth}
         onTransactionPress={onTransactionPress}
         header={listHeader}
-        onScroll={scrollHandler}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  headerGradientContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+  },
+  stickyContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 99,
+  },
+});

@@ -3,13 +3,13 @@
  *
  * Part of the (transactions-flow) modal group.
  * Clicking on a transaction navigates horizontally within the modal.
- * Uses custom CollapsingHeader for Revolut-style large/small title animation.
+ * Uses native header with liquid glass buttons.
  * Includes filter button in header right that opens filter sheet.
  */
 
 import React, { useCallback } from 'react';
-import { Platform, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { TouchableOpacity } from 'react-native';
+import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionsScreen } from 'components/screens/TransactionsScreen';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
@@ -18,80 +18,10 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { useTransactionsFilter } from 'components/screens/TransactionsFilterContext';
-import { Host, Button } from '@expo/ui/swift-ui';
-import { frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-
-function CloseButton() {
-  const { getPrimaryColor } = useTheme();
-
-  if (Platform.OS === 'ios') {
-    return (
-      <Host matchContents={false} fixedSize={true} style={{ width: 44, height: 44 }}>
-        <Button
-          variant="plain"
-          systemImage="xmark"
-          onPress={() => router.back()}
-          modifiers={[
-            frame({ width: 44, height: 44, alignment: 'center' }),
-            glassEffect({ shape: 'circle' }),
-          ]}
-        />
-      </Host>
-    );
-  }
-
-  return (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
-    </TouchableOpacity>
-  );
-}
 
 function FilterButton() {
   const { getPrimaryColor } = useTheme();
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
-
-  if (Platform.OS === 'ios') {
-    return (
-      <>
-        <Host matchContents={false} fixedSize={true} style={{ width: 44, height: 44 }}>
-          <Button
-            variant="plain"
-            systemImage="line.3.horizontal.decrease"
-            onPress={openFilterSheet}
-            modifiers={[
-              frame({ width: 44, height: 44, alignment: 'center' }),
-              glassEffect({ shape: 'circle' }),
-            ]}
-          />
-        </Host>
-        {hasActiveFilters && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              backgroundColor: getPrimaryColor('500'),
-              borderRadius: 10,
-              minWidth: 16,
-              height: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Text
-              size={10}
-              style={{
-                color: getPrimaryColor('0'),
-                fontFamily: 'OverpassBold',
-              }}>
-              {activeFilterCount}
-            </Text>
-          </View>
-        )}
-      </>
-    );
-  }
 
   return (
     <TouchableOpacity onPress={openFilterSheet} style={{ padding: 8, position: 'relative' }}>
@@ -127,7 +57,7 @@ function FilterButton() {
   );
 }
 
-function ModalScreen() {
+function TransactionsRoute() {
   const { account, filterCurrency, filterPaymentType, filterDirection, filterStatus } =
     useLocalSearchParams<{
       account: string;
@@ -213,23 +143,29 @@ function ModalScreen() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <>
+      {/* Native header - transparent with filter button */}
+      <Stack.Screen
+        options={{
+          title: 'Transactions',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerRight: () => <FilterButton />,
+        }}
+      />
+
       <TransactionsScreen
         initialAccount={initialAccount}
         initialTab={status}
         onTransactionPress={handleTransactionPress}
-        // Pass filter state from context
         filterCurrency={currency}
         filterPaymentType={paymentType}
         filterDirection={direction}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
-        // Header components for custom CollapsingHeader
-        headerLeft={<CloseButton />}
-        headerRight={<FilterButton />}
       />
-    </View>
+    </>
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default withSheetProvider(TransactionsRoute);

@@ -3,6 +3,7 @@
  *
  * Entry point for mint management modal.
  * Shows owned mints with balances for selection.
+ * Uses native header with liquid glass buttons for iOS feel.
  * Can navigate to add/info screens.
  */
 
@@ -32,9 +33,12 @@ function MintListRoute() {
 
   return (
     <>
+      {/* Native header - transparent to match other flows */}
       <Stack.Screen
         options={{
           title: 'Select Mint',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
           headerRight: () =>
             showAddMintsButton ? (
               <Link href="/add" asChild>
@@ -45,6 +49,7 @@ function MintListRoute() {
             ) : null,
         }}
       />
+
       <MintListScreen
         requireBalance={requireBalance}
         showDetailsButton={showDetailsButton}
