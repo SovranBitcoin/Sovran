@@ -6,7 +6,6 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useMintManagement } from 'hooks/coco';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
@@ -18,7 +17,7 @@ import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryR
 import { View } from 'components/ui/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
-import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
+import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
@@ -26,8 +25,10 @@ import { Proof } from '@cashu/cashu-ts';
 import { isValidEcashToken } from '@/helper/coco/utils';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { BottomButtons } from 'components/ui/BottomButtons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Tabs } from 'components/ui/Tabs';
+import { useSettingsStore } from 'stores/settingsStore';
+import { useManager } from 'coco-cashu-react';
+import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 
 export interface ReceiveScreenProps {
   unit: string;
@@ -43,12 +44,20 @@ export function ReceiveScreen({
   onFixedAmount,
 }: ReceiveScreenProps) {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
   const [hasPermission, requestPermission] = useCameraPermissions();
   const { getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const manager = useManager();
 
   const [mintInfo, setMintInfo] = useState<any>(null);
+  const [selectedTab, setSelectedTab] = useState('Lightning');
+  const [latestKeypair, setLatestKeypair] = useState<Keypair | null>(null);
+
+  // Check if P2PK quick access is enabled
+  const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
+
+  // Build tabs array based on settings
+  const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];
 
   useEffect(() => {
     const loadMintInfo = async () => {
@@ -61,6 +70,24 @@ export function ReceiveScreen({
     };
     loadMintInfo();
   }, [getMintInfo]);
+
+  // Load latest keypair when P2PK tab is available
+  useEffect(() => {
+    const loadLatestKeypair = async () => {
+      if (!manager || !quickAccessP2PK) return;
+      try {
+        const latest = await manager.keyring.getLatestKeyPair();
+        setLatestKeypair(latest);
+      } catch (error) {
+        console.error('Failed to load latest keypair:', error);
+      }
+    };
+    loadLatestKeypair();
+  }, [manager, quickAccessP2PK]);
+
+  const handleTabPress = useCallback((tab: string) => {
+    setSelectedTab(tab);
+  }, []);
 
   const handleEcashToken = ({ token }: { token: string }): void => {
     const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
@@ -127,83 +154,142 @@ export function ReceiveScreen({
     popup({ message: 'lightning_address_copied', type: 'success' });
   }, [nostrKeys?.npub]);
 
-  const formattedTitle = `Receive ${unit === 'sat' ? 'Bitcoin' : (unit || 'SAT').toUpperCase()}`;
   const showLightningAddress = Boolean(nostrKeys?.npub && unit === 'sat');
 
-  return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-          paddingBottom: 120,
-        }}>
-        {showLightningAddress && (
-          <PaymentInfo
-            data={`${nostrKeys?.npub}@npubx.cash`}
-            popupMessage="lightning_address_copied"
-            unit="sat"
-          />
-        )}
-        {showLightningAddress && (
+  const handleCopyP2PKKey = useCallback(async () => {
+    if (!latestKeypair) return;
+    await EnhancedHaptics.copyHaptic();
+    await Clipboard.setStringAsync(latestKeypair.publicKeyHex);
+    popup({ message: 'p2pk_copied', type: 'success' });
+  }, [latestKeypair]);
+
+  // Render Lightning content
+  const renderLightningContent = () => (
+    <>
+      {showLightningAddress && (
+        <PaymentInfo
+          data={`${nostrKeys?.npub}@npubx.cash`}
+          popupMessage="lightning_address_copied"
+          unit="sat"
+        />
+      )}
+      {showLightningAddress && (
+        <View style={{ marginHorizontal: 16 }}>
+          <Section title="RECEIVE ADDRESS">
+            <RowButton
+              label={
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
+                  <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
+                    {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
+                  </Text>
+                </View>
+              }
+              isFirst
+              onPress={handleCopyLightningAddress}
+              rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+            />
+          </Section>
+        </View>
+      )}
+
+      {showLightningAddress && (
+        <HistoryEntryRefresh
+          mintInfo={mintInfo}
+          historyEntry={{
+            type: 'receive',
+            mintUrl: mintInfo?.mintUrl,
+          }}
+        />
+      )}
+    </>
+  );
+
+  // Render P2PK content
+  const renderP2PKContent = () => (
+    <>
+      {latestKeypair ? (
+        <>
+          <PaymentInfo data={latestKeypair.publicKeyHex} popupMessage="p2pk_copied" unit="p2pk" />
           <View style={{ marginHorizontal: 16 }}>
-            <Section title="RECEIVE ADDRESS">
+            <Section title="P2PK PUBLIC KEY">
               <RowButton
                 label={
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
+                    <Icon name="solar:key-bold" size={20} color={getPrimaryColor('400')} />
                     <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
-                      {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
+                      {truncateMiddle(latestKeypair.publicKeyHex, 10)}
                     </Text>
                   </View>
                 }
                 isFirst
-                onPress={handleCopyLightningAddress}
+                onPress={handleCopyP2PKKey}
                 rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
               />
             </Section>
           </View>
-        )}
-
-        {showLightningAddress && (
-          <HistoryEntryRefresh
-            mintInfo={mintInfo}
-            historyEntry={{
-              type: 'receive',
-              mintUrl: mintInfo?.mintUrl,
-            }}
-          />
-        )}
-      </ScrollView>
-
-      <BottomButtons>
-        <View className="flex-row items-center justify-center bg-transparent pb-2">
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Paste',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleEcashPaste,
-              },
-              {
-                text: 'Fixed Amount',
-                icon: 'mdi:decimal',
-                variant: 'secondary',
-                onPress: handleFixedAmount,
-              },
-              {
-                text: 'Scan QR',
-                icon: 'stash:qr-code',
-                variant: 'secondary',
-                onPress: handleScanQR,
-              },
-            ]}
-          />
+        </>
+      ) : (
+        <View style={{ marginHorizontal: 16, marginTop: 32 }}>
+          <View
+            style={{
+              backgroundColor: getPrimaryColor('800'),
+              borderRadius: 12,
+              padding: 24,
+              alignItems: 'center',
+            }}>
+            <Icon name="mdi:key-variant" size={48} color={getPrimaryColor('600')} />
+            <Text
+              size={14}
+              style={{
+                color: getPrimaryColor('400'),
+                marginTop: 12,
+                textAlign: 'center',
+              }}>
+              No P2PK keys yet. Generate one in Settings → P2PK Keys.
+            </Text>
+          </View>
         </View>
-      </BottomButtons>
-    </View>
+      )}
+    </>
+  );
+
+  return (
+    <ModalScreenLayout
+      bottomButtons={
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Paste',
+              icon: 'lets-icons:copy',
+              variant: 'primary',
+              onPress: handleEcashPaste,
+            },
+            {
+              text: 'Fixed Amount',
+              icon: 'mdi:decimal',
+              variant: 'secondary',
+              onPress: handleFixedAmount,
+            },
+            {
+              text: 'Scan QR',
+              icon: 'stash:qr-code',
+              variant: 'secondary',
+              onPress: handleScanQR,
+            },
+          ]}
+        />
+      }>
+      {/* Tab bar - only show if P2PK quick access is enabled */}
+      {quickAccessP2PK && (
+        <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+        </View>
+      )}
+
+      {/* Content based on selected tab */}
+      {selectedTab === 'Lightning' ? renderLightningContent() : renderP2PKContent()}
+    </ModalScreenLayout>
   );
 }
 

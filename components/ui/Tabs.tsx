@@ -24,7 +24,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
   return (
     <TouchableOpacity className={isScrollable ? '' : 'flex-1'} key={tab} onPress={handlePress}>
       <View
-        blur={isSelected}
+        // blur={isSelected}
         className="shrink-0 flex-row items-center justify-center rounded-3xl px-4 py-2.5"
         style={{
           ...(isSelected && {
@@ -38,7 +38,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
           <Text
             className="text-center text-sm"
             style={{
-              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('100'),
+              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('300'),
               fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
             }}>
             {tab}
@@ -48,7 +48,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
               className="text-xs"
               style={{
                 fontFamily: 'OverpassBold',
-                color: getPrimaryColor('300'),
+                color: isSelected ? getPrimaryColor('0') : getPrimaryColor('300'),
               }}>
               {`(${amount})`}
             </Text>
@@ -95,7 +95,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         width: isScrollable ? undefined : '100%',
       }}>
       <HStack
-        blur
         className="rounded-3xl p-1.5"
         style={[
           {
@@ -106,6 +105,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
             minWidth: isScrollable ? undefined : '100%',
             borderRadius: 1000,
             padding: 1.5,
+            backgroundColor: getPrimaryColor('800'),
           },
         ]}>
         {tabs.map((tab, index) => (

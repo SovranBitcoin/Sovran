@@ -47,6 +47,11 @@ export default function TabLayout() {
           <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
           <Label>Explore</Label>
         </NativeTabs.Trigger>
+
+        <NativeTabs.Trigger name="example">
+          <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
+          <Label>Example</Label>
+        </NativeTabs.Trigger>
       </NativeTabs>
     </BackgroundProvider>
   );

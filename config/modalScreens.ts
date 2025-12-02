@@ -108,6 +108,16 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
+    name: 'debugModal',
+    options: {
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackButtonDisplayMode: 'minimal',
+    },
+  },
+  {
     name: 'meltQuote',
     title: 'Send Lightning',
     options: {
@@ -170,6 +180,10 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'settings-pages/theme',
     title: 'Theme',
+  },
+  {
+    name: 'settings-pages/keyring',
+    title: 'P2PK Keys',
   },
   {
     name: 'sendToken',

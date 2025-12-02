@@ -392,6 +392,48 @@ export function CurrencyIcon({
         </Svg>
       </View>
     );
+  } else if (currency === 'p2pk') {
+    return (
+      <View
+        style={{
+          width: width,
+          height: width,
+          position: 'relative',
+        }}>
+        <Svg
+          width={width}
+          height={width}
+          viewBox="0 0 33 33"
+          fill="none"
+          style={{
+            position: 'absolute',
+            zIndex: 1,
+          }}>
+          <Defs>
+            <LinearGradient id="gradient-p2pk" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0%" stopColor={getShadeColor('200')} />
+              <Stop offset="50%" stopColor={getShadeColor('300')} />
+              <Stop offset="100%" stopColor={getShadeColor('400')} />
+            </LinearGradient>
+          </Defs>
+          <Path
+            d="M32.5061 20.4939C30.3021 29.3342 21.3484 34.7143 12.507 32.5098C3.6693 30.3058 -1.71079 21.3515 0.494259 12.5117C2.69724 3.6704 11.651 -1.7102 20.4897 0.493813C29.3306 2.69783 34.7101 11.6531 32.5061 20.4939Z"
+            fill="url(#gradient-p2pk)"
+          />
+        </Svg>
+        <View
+          style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 2,
+          }}>
+          <Icon name="solar:key-bold" size={width * 0.5} color={getPrimaryColor('0')} />
+        </View>
+      </View>
+    );
   } else if (currency === 'nostr') {
     return (
       <View

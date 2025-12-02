@@ -57,10 +57,9 @@ const ProfileButton = () => {
     <Link href="/settings-pages/profile" asChild>
       <TouchableOpacity>
         <View
-          blur
           className="flex-row items-center justify-start bg-transparent p-3"
           style={{
-            backgroundColor: getPrimaryColor('800'),
+            backgroundColor: getPrimaryColor('900'),
           }}>
           <HStack spacing={12} flex={1}>
             <Avatar seed={nostrKeys?.pubkey} variant="person" size={60} />
@@ -104,10 +103,9 @@ export const RowButton: React.FC<{
 
   const content = (
     <View
-      blur
       className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
       style={{
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: getPrimaryColor('900'),
         borderColor: getPrimaryColor('700'),
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
@@ -226,6 +224,7 @@ const ModalScreen = () => {
         </Section>
         <Section title="Security">
           <RowButton label="Passcode" href="/settings-pages/passcode" isFirst />
+          <RowButton label="P2PK Keys" href="/settings-pages/keyring" isLast />
         </Section>
         <Section title="Danger Zone" isDanger>
           <RowButton

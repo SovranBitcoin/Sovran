@@ -184,5 +184,12 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:chevron-down',
     'mdi:minus',
     'mdi:plus',
+
+    // Keyring page icons
+    'mdi:key-plus',
+    'mdi:key-arrow-right',
+    'mdi:trash-can-outline',
+    'mdi:chevron-up',
+    'mdi:key-variant',
   ],
 });

@@ -23,6 +23,7 @@ export interface SettingsState {
   passcode: string;
   experimental: boolean;
   termsAccepted: TermsAccepted | null;
+  quickAccessP2PK: boolean;
 }
 
 interface SettingsActions {
@@ -54,6 +55,10 @@ interface SettingsActions {
   getTermsAccepted: () => TermsAccepted | null;
   isTermsAccepted: () => boolean;
 
+  // P2PK quick access
+  setQuickAccessP2PK: (enabled: boolean) => void;
+  getQuickAccessP2PK: () => boolean;
+
   // Utility methods
   getAllSettings: () => SettingsState;
   resetSettings: () => void;
@@ -73,6 +78,7 @@ export const useSettingsStore = create<SettingsStore>()(
       passcode: '',
       experimental: false,
       termsAccepted: null,
+      quickAccessP2PK: false,
 
       // Theme management
       setTheme: (theme: string) => {
@@ -162,6 +168,15 @@ export const useSettingsStore = create<SettingsStore>()(
         return isAccepted;
       },
 
+      // P2PK quick access
+      setQuickAccessP2PK: (enabled: boolean) => {
+        set({ quickAccessP2PK: enabled });
+      },
+
+      getQuickAccessP2PK: () => {
+        return get().quickAccessP2PK;
+      },
+
       // Utility methods
       getAllSettings: () => {
         const state = get();
@@ -179,6 +194,7 @@ export const useSettingsStore = create<SettingsStore>()(
           passcode: '',
           experimental: false,
           termsAccepted: null,
+          quickAccessP2PK: false,
         });
       },
 
@@ -197,6 +213,7 @@ export const useSettingsStore = create<SettingsStore>()(
             passcode: '',
             experimental: false,
             termsAccepted: null,
+            quickAccessP2PK: false,
           });
           console.log('SettingsStore: All data cleared successfully');
         } catch (error) {
@@ -216,6 +233,7 @@ export const useSettingsStore = create<SettingsStore>()(
         displayCurrency: state.displayCurrency,
         experimental: state.experimental,
         termsAccepted: state.termsAccepted,
+        quickAccessP2PK: state.quickAccessP2PK,
         // Note: passcode is not persisted for security reasons
       }),
       onRehydrateStorage: () => (state, error) => {
