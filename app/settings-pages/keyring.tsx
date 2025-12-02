@@ -10,6 +10,7 @@ import { Stack, router } from 'expo-router';
 import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { Badge } from 'components/ui/Badge';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { useManager } from 'coco-cashu-react';
@@ -19,6 +20,182 @@ import { Section } from './index';
 import type { Keypair } from 'coco-cashu-core';
 import { useSettingsStore } from 'stores/settingsStore';
 import { ModalLayoutWrapper } from 'app/debugModal';
+import { nip19 } from 'nostr-tools';
+import QRCode from 'react-native-qrcode-svg';
+import { Tabs } from 'components/ui/Tabs';
+
+/**
+ * CurrentKeyItem - Featured display for the active/most recent key
+ */
+const CurrentKeyItem: React.FC<{
+  keypair: Keypair;
+  onCopy: (publicKey: string) => void;
+}> = ({ keypair, onCopy }) => {
+  const { getPrimaryColor } = useTheme();
+  const [selectedTab, setSelectedTab] = useState('P2PK');
+
+  const isDerived = !!keypair.derivationIndex;
+
+  // Get the npub value for non-derived keys
+  const npubValue = !isDerived
+    ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+    : undefined;
+
+  // Determine which data to show based on selected tab
+  const isNpubTab = selectedTab === 'NPUB' && !isDerived;
+  const activeData = isNpubTab ? npubValue! : keypair.publicKeyHex;
+
+  // Display key based on tab selection (for derived keys, always show hex)
+  const displayKey = isDerived ? keypair.publicKeyHex : activeData;
+
+  const handleTabPress = useCallback((tab: string) => {
+    setSelectedTab(tab);
+  }, []);
+
+  const handleShowQR = () => {
+    router.push({
+      pathname: '/share',
+      params: {
+        type: 'p2pk',
+        data: keypair.publicKeyHex,
+        ...(npubValue && { npub: npubValue }),
+      },
+    });
+  };
+
+  const handleCopy = useCallback(() => {
+    onCopy(activeData);
+  }, [activeData, onCopy]);
+
+  return (
+    <View
+      style={{
+        backgroundColor: getPrimaryColor('900'),
+        borderRadius: 16,
+        marginBottom: 16,
+        overflow: 'hidden',
+      }}>
+      {/* Elevated key card */}
+      <View
+        style={{
+          backgroundColor: getPrimaryColor('700'),
+          borderRadius: 14,
+          padding: 16,
+        }}>
+        {/* Tabs for npub keys */}
+        {!isDerived && (
+          <View style={{ marginBottom: 16 }}>
+            <Tabs
+              tabs={['P2PK', 'NPUB']}
+              selectedTab={selectedTab}
+              handleTabPress={handleTabPress}
+            />
+          </View>
+        )}
+
+        {/* QR Code Preview */}
+        <TouchableOpacity onPress={handleShowQR}>
+          <View
+            style={{
+              alignItems: 'center',
+              marginBottom: 16,
+              padding: 12,
+              backgroundColor: getPrimaryColor('0'),
+              borderRadius: 12,
+              alignSelf: 'center',
+            }}>
+            <QRCode
+              value={activeData}
+              size={120}
+              color={getPrimaryColor('900')}
+              backgroundColor={getPrimaryColor('0')}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* Badge row */}
+        <HStack
+          align="center"
+          spacing={8}
+          style={{ marginBottom: 14, flexWrap: 'wrap', rowGap: 8 }}>
+          <Badge variant="success" icon="solar:key-bold" size={11}>
+            ACTIVE
+          </Badge>
+          {!isDerived && (
+            <Badge variant="primary" icon={isNpubTab ? 'ph:user-bold' : 'solar:key-bold'} size={11}>
+              {isNpubTab ? 'NPUB' : 'P2PK'}
+            </Badge>
+          )}
+          {isDerived && (
+            <Badge variant="primary" icon="mdi:key-arrow-right" size={11}>
+              DERIVED {keypair.derivationIndex}
+            </Badge>
+          )}
+        </HStack>
+
+        {/* Key content */}
+        <HStack align="center">
+          {/* Public key display */}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: getPrimaryColor('800'),
+              borderRadius: 10,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+            }}>
+            <Text
+              mono
+              size={12}
+              style={{
+                color: getPrimaryColor('0'),
+                flexShrink: 0,
+              }}>
+              {displayKey}
+            </Text>
+          </View>
+        </HStack>
+
+        {/* Action buttons */}
+        <HStack spacing={10} style={{ marginTop: 14 }}>
+          <TouchableOpacity onPress={handleCopy} style={{ flex: 1 }}>
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('600'),
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+              }}>
+              <HStack align="center" spacing={8}>
+                <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('100')} />
+                <Text size={13} weight="500" style={{ color: getPrimaryColor('100') }}>
+                  Copy
+                </Text>
+              </HStack>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleShowQR} style={{ flex: 1 }}>
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('600'),
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+              }}>
+              <HStack align="center" spacing={8}>
+                <Icon name="stash:qr-code" size={16} color={getPrimaryColor('100')} />
+                <Text size={13} weight="500" style={{ color: getPrimaryColor('100') }}>
+                  Show QR
+                </Text>
+              </HStack>
+            </View>
+          </TouchableOpacity>
+        </HStack>
+      </View>
+    </View>
+  );
+};
 
 /**
  * KeyItem - Individual key display component
@@ -29,12 +206,25 @@ const KeyItem: React.FC<{
 }> = ({ keypair, onCopy }) => {
   const { getPrimaryColor } = useTheme();
 
+  const isDerived = !!keypair.derivationIndex;
+
+  // Convert to npub if derived key, otherwise show raw hex
+  const displayKey = !isDerived
+    ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+    : keypair.publicKeyHex;
+
   const handleShowQR = () => {
+    // For non-derived (imported) keys, pass npub to enable tab switching
+    const npubValue = !isDerived
+      ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
+      : undefined;
+
     router.push({
       pathname: '/share',
       params: {
         type: 'p2pk',
         data: keypair.publicKeyHex,
+        ...(npubValue && { npub: npubValue }),
       },
     });
   };
@@ -43,15 +233,46 @@ const KeyItem: React.FC<{
     <HStack
       align="center"
       style={{
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: getPrimaryColor('700'),
         borderRadius: 12,
         marginBottom: 8,
+        padding: 8,
       }}>
+      {/* Type indicator */}
+      <View
+        style={{
+          backgroundColor: getPrimaryColor('600'),
+          padding: 8,
+          borderRadius: 8,
+          marginRight: 10,
+        }}>
+        <Icon
+          name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
+          size={16}
+          color={getPrimaryColor('300')}
+        />
+      </View>
+
+      {/* Public key */}
+      <VStack flex={1}>
+        <Text
+          mono
+          size={11}
+          style={{
+            color: getPrimaryColor('100'),
+          }}>
+          {truncateMiddle(displayKey, 7)}
+        </Text>
+        <Text size={10} style={{ color: getPrimaryColor('400'), marginTop: 2 }}>
+          {isDerived ? `Derived Key ${keypair.derivationIndex}` : `Imported`}
+        </Text>
+      </VStack>
+
       {/* Copy button */}
       <TouchableOpacity onPress={() => onCopy(keypair.publicKeyHex)}>
         <View
           style={{
-            backgroundColor: getPrimaryColor('700'),
+            backgroundColor: getPrimaryColor('600'),
             padding: 8,
             borderRadius: 8,
           }}>
@@ -59,24 +280,11 @@ const KeyItem: React.FC<{
         </View>
       </TouchableOpacity>
 
-      {/* Public key */}
-      <VStack flex={1} style={{ marginLeft: 12 }}>
-        <Text
-          mono
-          size={12}
-          style={{
-            color: getPrimaryColor('100'),
-            flexShrink: 0,
-          }}>
-          {truncateMiddle(keypair.publicKeyHex, 10)}
-        </Text>
-      </VStack>
-
       {/* QR button */}
-      <TouchableOpacity onPress={handleShowQR} style={{ marginLeft: 8 }}>
+      <TouchableOpacity onPress={handleShowQR} style={{ marginLeft: 6 }}>
         <View
           style={{
-            backgroundColor: getPrimaryColor('700'),
+            backgroundColor: getPrimaryColor('600'),
             padding: 8,
             borderRadius: 8,
           }}>
@@ -145,12 +353,55 @@ const KeyringSettings: React.FC = () => {
   };
 
   /**
-   * Imports an existing nsec key
+   * Helper to convert hex string to bytes
+   */
+  const hexToBytes = (hex: string): Uint8Array | null => {
+    if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
+      return null;
+    }
+    const bytes = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    }
+    return bytes;
+  };
+
+  /**
+   * Try to import a key with multiple strategies without manipulating the input
+   */
+  const tryImportKey = async (input: string): Promise<boolean> => {
+    if (!manager) return false;
+
+    // Strategy 1: Try as nsec
+    if (input.startsWith('nsec1')) {
+      try {
+        const decoded = nip19.decode(input);
+        if (decoded.type === 'nsec') {
+          await manager.keyring.addKeyPair(decoded.data as Uint8Array);
+          return true;
+        }
+      } catch {}
+    }
+
+    // Strategy 2: Try as raw 64-char hex
+    const rawBytes = hexToBytes(input);
+    if (rawBytes) {
+      try {
+        await manager.keyring.addKeyPair(rawBytes);
+        return true;
+      } catch {}
+    }
+
+    return false;
+  };
+
+  /**
+   * Imports an existing private key (nsec or hex format)
    */
   const handleImportNsec = () => {
     Alert.prompt(
       'Import Private Key',
-      'Enter your 32-byte hex secret key (64 characters)',
+      'Enter your nsec or hex private key',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -159,24 +410,18 @@ const KeyringSettings: React.FC = () => {
             if (!value || !manager) return;
 
             try {
-              // Convert hex string to Uint8Array
-              const cleanHex = value.replace(/^0x/, '').trim();
-              if (cleanHex.length !== 64) {
+              const trimmedValue = value.trim();
+              const success = await tryImportKey(trimmedValue);
+
+              if (success) {
+                popup({ message: 'Key imported successfully', type: 'success', emoji: '🔑' });
+                await loadKeypairs();
+              } else {
                 popup({
-                  message: 'Invalid key length. Expected 64 hex characters.',
+                  message: 'Invalid key format. Enter nsec or 64-character hex key.',
                   type: 'error',
                 });
-                return;
               }
-
-              const bytes = new Uint8Array(32);
-              for (let i = 0; i < 32; i++) {
-                bytes[i] = parseInt(cleanHex.substr(i * 2, 2), 16);
-              }
-
-              await manager.keyring.addKeyPair(bytes);
-              popup({ message: 'Key imported successfully', type: 'success', emoji: '🔑' });
-              await loadKeypairs();
             } catch (error) {
               console.error('Failed to import key:', error);
               popup({ message: 'Failed to import key', type: 'error' });
@@ -267,25 +512,9 @@ const KeyringSettings: React.FC = () => {
               borderRadius: 12,
               overflow: 'hidden',
             }}>
-            {/* Collapsible Header */}
-            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-              <HStack align="center" justify="space-between" style={{ padding: 16 }}>
-                <Text size={15} style={{ color: getPrimaryColor('0') }}>
-                  {keypairs.length > 0
-                    ? `Click to ${isExpanded ? 'hide' : 'browse'} ${keypairs.length} key${keypairs.length !== 1 ? 's' : ''}`
-                    : 'No keys yet'}
-                </Text>
-                <Icon
-                  name={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-                  size={20}
-                  color={getPrimaryColor('400')}
-                />
-              </HStack>
-            </TouchableOpacity>
-
             {/* Keys List */}
             {isExpanded && (
-              <View style={{ padding: 16, paddingTop: 0 }}>
+              <View style={{ padding: 16 }}>
                 {isLoading ? (
                   <VStack align="center" style={{ padding: 24 }}>
                     <ActivityIndicator size="small" color={getPrimaryColor('400')} />
@@ -307,9 +536,26 @@ const KeyringSettings: React.FC = () => {
                     </Text>
                   </VStack>
                 ) : (
-                  keypairs.map((keypair) => (
-                    <KeyItem key={keypair.publicKeyHex} keypair={keypair} onCopy={handleCopyKey} />
-                  ))
+                  <>
+                    {/* Display keys in reverse order (most recent first) */}
+                    {[...keypairs]
+                      .reverse()
+                      .map((keypair, index) =>
+                        index === 0 ? (
+                          <CurrentKeyItem
+                            key={keypair.publicKeyHex}
+                            keypair={keypair}
+                            onCopy={handleCopyKey}
+                          />
+                        ) : (
+                          <KeyItem
+                            key={keypair.publicKeyHex}
+                            keypair={keypair}
+                            onCopy={handleCopyKey}
+                          />
+                        )
+                      )}
+                  </>
                 )}
               </View>
             )}

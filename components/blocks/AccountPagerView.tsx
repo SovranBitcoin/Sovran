@@ -155,7 +155,7 @@ export function AccountPagerView({
                     frame({ height: buttonHeight, width: buttonWidth }),
                     cornerRadius(24),
                   ]}
-                  onPress={handleSend}>
+                  onPress={handleReceive}>
                   <View
                     style={{
                       position: 'absolute',
