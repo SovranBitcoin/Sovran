@@ -735,8 +735,8 @@ export function UserMessagesScreen({
     getCachedModels,
     setCachedModels,
     setSelectedModel,
+    apiKey,
   } = useRoutstrStore();
-  const apiKey = 'sk-15dbf6b51cd389246da366c26499bde801c04795b372b8c4ff0241e3bbe3120c';
 
   // ===========================
   // NOSTR SUBSCRIPTIONS

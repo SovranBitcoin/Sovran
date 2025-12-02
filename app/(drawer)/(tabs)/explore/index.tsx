@@ -616,12 +616,17 @@ const ExploreScreen = () => {
   const [activeCategory, setActiveCategory] = useState('All');
 
   // Routstr models state
-  const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore();
+  const {
+    getCachedModels,
+    setCachedModels,
+    isCacheStale,
+    apiKey: routstrApiKey,
+  } = useRoutstrStore();
   const [models, setModels] = useState<RoutstrModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
 
   // Use the same hardcoded API key as UserMessagesScreen for now
-  const routstrApiKey = 'sk-15dbf6b51cd389246da366c26499bde801c04795b372b8c4ff0241e3bbe3120c';
+  // const routstrApiKey = 'sk-15dbf6b51cd389246da366c26499bde801c04795b372b8c4ff0241e3bbe3120c';
 
   // Fetch models from Routstr
   useEffect(() => {

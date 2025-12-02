@@ -11,7 +11,6 @@ import { CurrencyScreen } from 'components/screens/CurrencyScreen';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { useTheme } from 'providers/ThemeProvider';
 
 function ModalScreen() {
@@ -74,10 +73,8 @@ function ModalScreen() {
           });
         }}
         onRoutstrSuccess={() => {
-          router.replace({
-            pathname: '/userMessages',
-            params: { pubkey: ROUTSTR_PUBKEY },
-          });
+          // Dismiss the modal to return to the previous screen (UserMessages)
+          router.dismiss();
         }}
         processPaymentStringFn={processPaymentString}
       />

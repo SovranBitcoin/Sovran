@@ -10,7 +10,6 @@ export interface BalanceResponse {
 }
 
 export interface TopUpResponse {
-  new_balance: number; // msats
   added_amount: number; // msats
 }
 
@@ -346,9 +345,9 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
     }
 
     const data = await response.json();
+    console.log('topUpBalance response:', JSON.stringify(data));
     return {
-      new_balance: data.new_balance || 0,
-      added_amount: data.added_amount || 0,
+      added_amount: data.msats || 0,
     };
   } catch (error: any) {
     if (error.status) {
@@ -381,7 +380,7 @@ async function* parseSSEStream(
 
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) {
           // Process any remaining data in buffer
           if (buffer.trim()) {
@@ -420,14 +419,14 @@ async function* parseSSEStream(
         // Process each complete line immediately
         for (const line of lines) {
           const trimmedLine = line.trim();
-          
+
           // Skip empty lines and non-data lines
           if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
             continue;
           }
 
           const data = trimmedLine.slice(6).trim();
-          
+
           // Check for end marker
           if (data === '[DONE]') {
             reader.releaseLock();
@@ -458,14 +457,18 @@ async function* parseSSEStream(
       // If streaming fails, log error but don't fall back to full response
       // This ensures we fail fast rather than silently degrading to non-streaming
       console.error('Streaming error:', error);
-      throw new Error('Failed to stream response: ' + (error instanceof Error ? error.message : String(error)));
+      throw new Error(
+        'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
+      );
     }
   }
 
   // Fallback: If ReadableStream is not available, we need to read in chunks
   // This is a last resort and will still try to process incrementally
-  console.warn('ReadableStream not available, using fallback method - this may cause delayed updates');
-  
+  console.warn(
+    'ReadableStream not available, using fallback method - this may cause delayed updates'
+  );
+
   try {
     // Try to read response as text stream if possible
     const text = await response.text();
@@ -485,7 +488,7 @@ async function* parseSSEStream(
         console.log('Fallback: Received [DONE] marker after', chunkCount, 'chunks');
         return;
       }
-      
+
       if (data) {
         try {
           const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;

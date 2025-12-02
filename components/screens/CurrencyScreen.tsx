@@ -198,7 +198,7 @@ export function CurrencyScreen({
   const { send } = useSend();
   const { requestLightningInvoice } = useLightningOperations();
   const { createMeltQuote } = useMelt();
-  const { apiKey, setApiKey, setBalance } = useRoutstrStore();
+  const { setApiKey, setBalance, balance } = useRoutstrStore();
 
   // Get user's preferred fiat currency and BTC price
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -304,13 +304,34 @@ export function CurrencyScreen({
     if (params.routstrTopUp === 'true') {
       try {
         const encodedToken = getEncodedTokenV4(result);
-        let currentApiKey = apiKey;
 
-        if (!currentApiKey) {
+        // Get the latest apiKey directly from the store to avoid stale closure
+        const currentApiKey = useRoutstrStore.getState().apiKey;
+        console.log('Routstr top-up: Current API key exists:', !!currentApiKey);
+
+        if (currentApiKey) {
+          // We have an existing API key - use top-up endpoint
+          console.log('Routstr top-up: Using existing wallet, calling topUpBalance');
+          const topUpResult = await topUpBalance(currentApiKey, encodedToken);
+          setBalance(balance ? balance + topUpResult.added_amount : topUpResult.added_amount);
+          popup({
+            message: `Balance topped up! New balance: ${(balance ? balance + topUpResult.added_amount : topUpResult.added_amount / 1000).toFixed(0)} sats`,
+            emoji: '🎉',
+            type: 'success',
+          });
+          onRoutstrSuccess?.();
+          return;
+        } else {
+          // No API key - create a new wallet
+          console.log('Routstr top-up: No existing wallet, creating new one');
+
+          // Try the /wallet/create endpoint first (may not exist yet per docs)
           const walletResponse = await createWalletFromToken(encodedToken);
-          if (walletResponse) {
-            currentApiKey = walletResponse.api_key;
-            setApiKey(currentApiKey);
+
+          if (walletResponse && walletResponse.api_key) {
+            // Wallet created successfully via /wallet/create
+            console.log('Routstr top-up: Wallet created via /wallet/create');
+            setApiKey(walletResponse.api_key);
             setBalance(walletResponse.balance);
             popup({
               message: `Wallet created! Balance: ${(walletResponse.balance / 1000).toFixed(0)} sats`,
@@ -319,40 +340,39 @@ export function CurrencyScreen({
             });
             onRoutstrSuccess?.();
             return;
-          } else {
-            currentApiKey = encodedToken;
-            setApiKey(currentApiKey);
-            try {
-              const balanceData = await checkBalance(currentApiKey);
-              if (balanceData.api_key && balanceData.api_key !== currentApiKey) {
-                currentApiKey = balanceData.api_key;
-                setApiKey(currentApiKey);
-              }
-              setBalance(balanceData.balance);
-              popup({
-                message: `Routstr wallet initialized! Balance: ${(balanceData.balance / 1000).toFixed(0)} sats`,
-                emoji: '🎉',
-                type: 'success',
-              });
-            } catch (balanceError) {
-              console.error('Failed to check balance:', balanceError);
-              popup({
-                message: 'Routstr wallet initialized! You can now use Routstr AI.',
-                emoji: '🎉',
-                type: 'success',
-              });
-            }
-            onRoutstrSuccess?.();
-            return;
           }
-        } else {
-          const topUpResult = await topUpBalance(currentApiKey, encodedToken);
-          setBalance(topUpResult.new_balance);
-          popup({
-            message: `Balance topped up! New balance: ${(topUpResult.new_balance / 1000).toFixed(0)} sats`,
-            emoji: '🎉',
-            type: 'success',
-          });
+
+          // Fallback: Use the Cashu token directly as API key (per Routstr docs)
+          // "Currently, you can use Cashu tokens directly as API keys"
+          console.log('Routstr top-up: Falling back to using token directly');
+          try {
+            const balanceData = await checkBalance(encodedToken);
+
+            // If server returns a persistent API key, use that for future requests
+            const persistentKey = balanceData.api_key || encodedToken;
+            setApiKey(persistentKey);
+            setBalance(balanceData.balance);
+
+            console.log(
+              'Routstr top-up: Stored API key:',
+              persistentKey !== encodedToken ? 'persistent key from server' : 'token as key'
+            );
+
+            popup({
+              message: `Routstr wallet initialized! Balance: ${(balanceData.balance / 1000).toFixed(0)} sats`,
+              emoji: '🎉',
+              type: 'success',
+            });
+          } catch (balanceError) {
+            console.error('Failed to check balance:', balanceError);
+            // Still store the token as API key - it may work for subsequent requests
+            setApiKey(encodedToken);
+            popup({
+              message: 'Routstr wallet initialized! You can now use Routstr AI.',
+              emoji: '🎉',
+              type: 'success',
+            });
+          }
           onRoutstrSuccess?.();
           return;
         }
