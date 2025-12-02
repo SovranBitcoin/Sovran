@@ -8,9 +8,6 @@ export interface ModalConfig {
 
 export const MODAL_SCREENS: ModalConfig[] = [
   {
-    name: 'contacts',
-  },
-  {
     name: 'userMessages',
     options: {
       presentation: 'card',
@@ -75,17 +72,6 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'currency',
     title: 'Select Amount',
-    options: {
-      presentation: 'formSheet',
-      headerShown: true,
-      headerBlurEffect: 'systemMaterial',
-      headerTransparent: true,
-      headerBackButtonDisplayMode: 'minimal',
-    },
-  },
-  // Standalone receive screen (for deep linking)
-  {
-    name: 'receive',
     options: {
       presentation: 'formSheet',
       headerShown: true,

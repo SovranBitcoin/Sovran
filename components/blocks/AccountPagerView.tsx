@@ -140,30 +140,33 @@ export function AccountPagerView({
   const ReceiveButton = () => {
     if (supportsLiquidGlass()) {
       return (
-        <View>
+        <View style={{ marginLeft: 0 }}>
           <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
             <ContextMenu activationMethod="longPress">
               <ContextMenu.Items>
-                <SwiftUIButton systemImage="arrow.down.circle" onPress={handleReceive}>
+                <SwiftUIButton systemImage="arrow.up.circle" onPress={handleReceive}>
                   Receive
                 </SwiftUIButton>
               </ContextMenu.Items>
               <ContextMenu.Trigger>
                 <SwiftUIButton
                   variant="glass"
-                  modifiers={[frame({ height: 48, width: buttonWidth }), cornerRadius(24)]}
-                  onPress={handleReceive}>
+                  modifiers={[
+                    frame({ height: buttonHeight, width: buttonWidth }),
+                    cornerRadius(24),
+                  ]}
+                  onPress={handleSend}>
                   <View
                     style={{
                       position: 'absolute',
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 6,
-                      width: buttonWidth - 32 - 16,
+                      gap: 12,
+                      width: buttonWidth - 32,
                       height: buttonHeight - 16,
                     }}>
-                    <ArrowIcon size={20} color={primaryColor0} rotate={180} />
+                    <Icon name="lucide:arrow-down-left" size={20} color={primaryColor0} />
                     <Text>Receive</Text>
                   </View>
                 </SwiftUIButton>
@@ -306,11 +309,11 @@ export function AccountPagerView({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 6,
+                      gap: 12,
                       width: buttonWidth - 32,
                       height: buttonHeight - 16,
                     }}>
-                    <ArrowIcon size={20} color={primaryColor0} rotate={0} />
+                    <Icon name="lucide:arrow-up-right" size={20} color={primaryColor0} />
                     <Text>Send</Text>
                   </View>
                 </SwiftUIButton>
