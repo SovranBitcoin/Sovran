@@ -914,12 +914,15 @@ export function UserMessagesScreen({
   // Track processed event IDs
   const processedEventIds = useRef<Set<string>>(new Set());
 
-  // Reset processed events when conversation changes
+  // Reset processed events when conversation changes (only for Nostr DM mode)
   useEffect(() => {
+    // Skip reset for routstr mode - it manages its own state
+    if (isRoutstrMode) return;
+
     processedEventIds.current.clear();
     setMessages([]);
     setIsLoading(true);
-  }, [pubkey]);
+  }, [pubkey, isRoutstrMode]);
 
   // Process DM events - deferred to avoid blocking navigation
   useEffect(() => {
