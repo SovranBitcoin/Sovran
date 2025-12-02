@@ -20,7 +20,7 @@ import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
 import { frame, cornerRadius } from '@expo/ui/swift-ui/modifiers';
-import { withSheetProvider } from 'hocs/withSheetProvider';
+import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -31,7 +31,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { SheetManager } from 'react-native-actions-sheet';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from 'utils/mapClustering';
 
@@ -222,7 +221,6 @@ function MapScreen() {
     isLoading: storeLoading,
     error,
     fetchPlaces,
-    fetchPlaceDetails,
     setError,
   } = useBTCMapStore();
   const places = useMemo(() => placesCache?.data ?? [], [placesCache]);
@@ -368,17 +366,14 @@ function MapScreen() {
           updateMarkersForCamera(clusterMarker.latitude, clusterMarker.longitude, newZoom);
         }
       } else if (clusterMarker.placeId) {
-        try {
-          const details = await fetchPlaceDetails(clusterMarker.placeId);
-          await SheetManager.show('merchant-detail', {
-            payload: { place: details, isLoading: false },
-          });
-        } catch (err) {
-          console.error('Failed to fetch place details:', err);
-        }
+        // Navigate to the detail screen within the flow
+        router.push({
+          pathname: '/(map-flow)/detail',
+          params: { placeId: clusterMarker.placeId.toString() },
+        });
       }
     },
-    [fetchPlaceDetails, updateMarkersForCamera]
+    [updateMarkersForCamera]
   );
 
   // Get user location on mount - DEFERRED and non-blocking
@@ -602,4 +597,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withSheetProvider(MapScreen);
+export default MapScreen;

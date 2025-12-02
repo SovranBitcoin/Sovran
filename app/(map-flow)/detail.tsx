@@ -1,0 +1,410 @@
+/**
+ * @fileoverview Merchant Detail Screen
+ *
+ * Displays detailed information about a Bitcoin-accepting merchant.
+ * Navigated to from the map screen when a marker is tapped.
+ */
+
+import Icon from 'assets/icons';
+import { Badge } from 'components/ui/Badge';
+import { Text } from 'components/ui/Text';
+import { HStack, VStack, View } from 'components/ui/View';
+import { RowButton, Section } from 'app/settings-pages';
+import * as Linking from 'expo-linking';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useTheme } from 'providers/ThemeProvider';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBTCMapStore, BTCMapPlaceDetails } from 'stores/btcMapStore';
+
+// Category definitions for marker colors
+const CATEGORIES = {
+  food: {
+    icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'],
+  },
+  retail: {
+    icons: ['storefront', 'local_grocery_store', 'computer', 'diamond'],
+  },
+  atm: {
+    icons: ['local_atm', 'currency_exchange'],
+  },
+  accommodation: {
+    icons: ['hotel', 'spa'],
+  },
+  services: {
+    icons: [
+      'medical_services',
+      'local_pharmacy',
+      'content_cut',
+      'car_repair',
+      'fitness_center',
+      'business',
+    ],
+  },
+};
+
+// Icon to color mapping
+const getMarkerColor = (icon: string): string => {
+  if (CATEGORIES.food.icons.includes(icon)) return '#FF6B6B';
+  if (CATEGORIES.retail.icons.includes(icon)) return '#4ECDC4';
+  if (CATEGORIES.atm.icons.includes(icon)) return '#F7931A';
+  if (CATEGORIES.accommodation.icons.includes(icon)) return '#9B59B6';
+  if (CATEGORIES.services.icons.includes(icon)) return '#3498DB';
+  return '#6366f1';
+};
+
+export default function MerchantDetailScreen() {
+  const { getPrimaryColor } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { placeId } = useLocalSearchParams<{ placeId: string }>();
+  const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore();
+
+  const [place, setPlace] = useState<BTCMapPlaceDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch place details on mount
+  useEffect(() => {
+    const loadDetails = async () => {
+      if (!placeId) {
+        setIsLoading(false);
+        return;
+      }
+
+      const id = parseInt(placeId, 10);
+      if (isNaN(id)) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Check cache first
+      const cached = getCachedPlaceDetails(id);
+      if (cached) {
+        setPlace(cached);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch from API
+      try {
+        const details = await fetchPlaceDetails(id);
+        setPlace(details);
+      } catch (err) {
+        console.error('Failed to fetch place details:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDetails();
+  }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
+
+  const handleOpenURL = useCallback((url: string) => {
+    Linking.openURL(url);
+  }, []);
+
+  const handleCall = useCallback((phone: string) => {
+    Linking.openURL(`tel:${phone}`);
+  }, []);
+
+  const handleEmail = useCallback((email: string) => {
+    Linking.openURL(`mailto:${email}`);
+  }, []);
+
+  const handleOpenMaps = useCallback((lat: number, lon: number, name?: string) => {
+    const label = encodeURIComponent(name || 'Merchant');
+    const url =
+      Platform.OS === 'ios'
+        ? `maps:0,0?q=${label}@${lat},${lon}`
+        : `geo:${lat},${lon}?q=${lat},${lon}(${label})`;
+    Linking.openURL(url);
+  }, []);
+
+  // Parse payment info
+  const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
+  const supportsLightning = place?.['osm:payment:lightning'] === 'yes';
+  const supportsContactless = place?.['osm:payment:lightning_contactless'] === 'yes';
+
+  // Get contact info (prefer osm:contact over direct fields)
+  const phone = place?.['osm:contact:phone'] || place?.phone;
+  const website = place?.['osm:contact:website'] || place?.website;
+  const email = place?.['osm:contact:email'] || place?.email;
+  const instagram = place?.['osm:contact:instagram'] || place?.instagram;
+  const twitter = place?.['osm:contact:twitter'] || place?.twitter;
+
+  // Format verified date
+  const verifiedDate = place?.verified_at
+    ? new Date(place.verified_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null;
+
+  // Build contact items for the Section
+  const contactItems = useMemo(() => {
+    const items: { method: string; info: string; icon: string; fullInfo?: string }[] = [];
+
+    if (phone) {
+      items.push({ method: 'phone', info: phone, icon: 'mdi:phone' });
+    }
+    if (website) {
+      items.push({ method: 'website', info: 'Website', icon: 'mdi:web', fullInfo: website });
+    }
+    if (email) {
+      items.push({ method: 'email', info: email, icon: 'mdi:email' });
+    }
+    if (instagram) {
+      items.push({ method: 'instagram', info: `@${instagram}`, icon: 'mdi:instagram' });
+    }
+    if (twitter) {
+      items.push({ method: 'twitter', info: `@${twitter}`, icon: 'hugeicons:new-twitter' });
+    }
+
+    return items;
+  }, [phone, website, email, instagram, twitter]);
+
+  const handleContactPress = useCallback(
+    (method: string, info: string, fullInfo?: string) => {
+      switch (method) {
+        case 'phone':
+          handleCall(info);
+          break;
+        case 'website':
+          const url = fullInfo || info;
+          handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
+          break;
+        case 'email':
+          handleEmail(info);
+          break;
+        case 'instagram':
+          handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
+          break;
+        case 'twitter':
+          handleOpenURL(`https://x.com/${info.replace('@', '')}`);
+          break;
+      }
+    },
+    [handleCall, handleOpenURL, handleEmail]
+  );
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F7931A" />
+          <Text size={14} style={{ color: getPrimaryColor('300'), marginTop: 12 }}>
+            Loading merchant details...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!place) {
+    return (
+      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+        <View style={styles.loadingContainer}>
+          <Icon name="mdi:alert-circle" size={48} color={getPrimaryColor('400')} />
+          <Text size={14} style={{ color: getPrimaryColor('300'), marginTop: 12 }}>
+            No merchant data available
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+      <Stack.Screen
+        options={{
+          title: place.name || 'Merchant Details',
+        }}
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{
+          paddingTop: insets.top + 56, // Account for header
+          paddingHorizontal: 16,
+          paddingBottom: 120,
+        }}
+        showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={[styles.merchantIcon, { backgroundColor: getMarkerColor(place.icon) }]}>
+            <Icon name="mdi:store" size={28} color="#fff" />
+          </View>
+          <VStack style={{ flex: 1, marginLeft: 16 }}>
+            <Text size={20} heavy style={{ color: getPrimaryColor('50') }}>
+              {place.name || 'Unknown Merchant'}
+            </Text>
+            {place.address && (
+              <Text size={13} style={{ color: getPrimaryColor('400'), marginTop: 4 }}>
+                {place.address}
+              </Text>
+            )}
+            {verifiedDate && (
+              <HStack align="center" style={{ marginTop: 6 }}>
+                <Badge variant="success" icon="material-symbols:verified" size={12}>
+                  Verified {verifiedDate}
+                </Badge>
+              </HStack>
+            )}
+          </VStack>
+        </View>
+
+        {/* Payment Methods - only show accepted methods */}
+        {(supportsOnchain || supportsLightning || supportsContactless) && (
+          <Section title="Payment Methods">
+            {supportsOnchain && (
+              <RowButton
+                isFirst
+                isLast={!supportsLightning && !supportsContactless}
+                label={
+                  <HStack align="center" gap={8}>
+                    <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
+                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                      On-chain
+                    </Text>
+                  </HStack>
+                }
+                rightIcon={
+                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                }
+              />
+            )}
+            {supportsLightning && (
+              <RowButton
+                isFirst={!supportsOnchain}
+                isLast={!supportsContactless}
+                label={
+                  <HStack align="center" gap={8}>
+                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
+                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                      Lightning
+                    </Text>
+                  </HStack>
+                }
+                rightIcon={
+                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                }
+              />
+            )}
+            {supportsContactless && (
+              <RowButton
+                isFirst={!supportsOnchain && !supportsLightning}
+                isLast
+                label={
+                  <HStack align="center" gap={8}>
+                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
+                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                      Contactless
+                    </Text>
+                  </HStack>
+                }
+                rightIcon={
+                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                }
+              />
+            )}
+          </Section>
+        )}
+
+        {/* Contact Section - using RowButton like in info.tsx */}
+        {contactItems.length > 0 && (
+          <Section title="Contact">
+            {contactItems.map((contact, index) => (
+              <RowButton
+                key={contact.method}
+                isFirst={index === 0}
+                isLast={index === contactItems.length - 1}
+                label={
+                  <HStack align="center" gap={8}>
+                    <Icon name={contact.icon} size={20} color={getPrimaryColor('400')} />
+                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                      {contact.info}
+                    </Text>
+                  </HStack>
+                }
+                onPress={() => handleContactPress(contact.method, contact.info, contact.fullInfo)}
+              />
+            ))}
+          </Section>
+        )}
+
+        {/* Opening Hours */}
+        {place.opening_hours && (
+          <Section title="Opening Hours">
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('800'),
+                padding: 16,
+                borderRadius: 12,
+              }}>
+              <Text size={14} style={{ color: getPrimaryColor('200'), lineHeight: 22 }}>
+                {place.opening_hours}
+              </Text>
+            </View>
+          </Section>
+        )}
+
+        {/* Description */}
+        {place.description && (
+          <Section title="About">
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('800'),
+                padding: 16,
+                borderRadius: 12,
+              }}>
+              <Text size={14} style={{ color: getPrimaryColor('200'), lineHeight: 22 }}>
+                {place.description}
+              </Text>
+            </View>
+          </Section>
+        )}
+
+        {/* Source Info */}
+        <View style={styles.sourceInfo}>
+          <Text size={11} style={{ color: getPrimaryColor('600'), textAlign: 'center' }}>
+            Data from BTCMap.org • Last updated {new Date(place.updated_at).toLocaleDateString()}
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  merchantIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceInfo: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+});

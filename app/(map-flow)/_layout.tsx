@@ -1,45 +1,24 @@
 /**
  * @fileoverview Map Flow Modal Layout
  *
- * This layout creates a fullscreen map experience for discovering
- * Bitcoin-accepting merchants from BTCMap.
+ * This layout creates a nested stack navigator inside a modal presentation.
+ * The parent root Stack presents this group as a modal (slides up from bottom).
+ * Screens within this group push horizontally:
+ * - index: Entry point, shows the Bitcoin merchant map
+ * - detail: Merchant details (horizontal push)
  */
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { Text } from 'components/ui/Text';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
-import { Pressable } from 'react-native';
+import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 export default function MapFlowLayout() {
-  const iconColor = useThemeColor({}, 'text');
   const { getPrimaryColor } = useTheme();
 
   return (
-    <Stack
-      screenOptions={{
-        contentStyle: {
-          backgroundColor: 'transparent',
-        },
-      }}>
-      <Stack.Screen
-        name="index"
-        options={{
-          headerTransparent: true,
-          headerBlurEffect: 'systemMaterial',
-          headerTitle: () => (
-            <Text size={17} heavy style={{ color: getPrimaryColor('0') }}>
-              Bitcoin Map
-            </Text>
-          ),
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-              <IconSymbol name="xmark" size={24} color={iconColor} />
-            </Pressable>
-          ),
-        }}
-      />
+    <Stack screenOptions={createFlowLayoutScreenOptions(getPrimaryColor)}>
+      <Stack.Screen name="index" options={{ title: 'Bitcoin Map' }} />
+      <Stack.Screen name="detail" options={{ title: 'Merchant Details' }} />
     </Stack>
   );
 }
