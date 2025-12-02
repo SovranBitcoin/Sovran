@@ -1,15 +1,16 @@
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { Transactions } from 'components/blocks/Transactions';
-import { AnimatedBackgroundView, ScrollableGradientOverlay } from 'components/ui/BackgroundView';
+import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { View } from 'components/ui/View';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { useVersionCheck } from 'hooks/useVersionCheck';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, useWindowDimensions } from 'react-native';
+import { RefreshControl, useWindowDimensions } from 'react-native';
 import 'react-native-get-random-values';
 import 'shim';
+import { LayoutDebugWrapper } from '../example';
 
 function TabOneScreen() {
   // Register this tab's background configuration - animates on focus
@@ -52,27 +53,23 @@ function TabOneScreen() {
   useVersionCheck();
 
   return (
-    <AnimatedBackgroundView>
-      <View className="flex-1">
-        <ScrollView
-          style={{ flex: 1 }}
-          onContentSizeChange={onContentSizeChange}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}>
-          {/* Scrollable gradient overlay - must be first child inside ScrollView */}
-          <ScrollableGradientOverlay contentHeight={contentHeight} />
+    <LayoutDebugWrapper
+      onContentSizeChange={onContentSizeChange}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}
+      contentContainerStyle={{ padding: 0 }}>
+      {/* Scrollable gradient overlay - must be first child */}
+      <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-          <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
-          <View
-            className="p-4 pt-0"
-            style={{
-              // Account for the AccountPagerView height (50% of screen) plus button area (~88px)
-              minHeight: windowHeight - windowHeight * 0.5 - 88,
-            }}>
-            <Transactions account={account} showMore={true} history={history} hideExpired={true} />
-          </View>
-        </ScrollView>
+      <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
+      <View
+        className="p-4 pt-0"
+        style={{
+          // Account for the AccountPagerView height (50% of screen) plus button area (~88px)
+          minHeight: windowHeight - windowHeight * 0.5 - 88,
+        }}>
+        <Transactions account={account} showMore={true} history={history} hideExpired={true} />
       </View>
-    </AnimatedBackgroundView>
+    </LayoutDebugWrapper>
   );
 }
 

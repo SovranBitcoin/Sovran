@@ -47,7 +47,7 @@ export function AccountPagerView({
   const shadeColor300 = useMemo(() => getShadeColor('300'), [getShadeColor]);
 
   // Calculate 50% of screen height for the pager view
-  const pagerHeight = windowHeight * 0.5;
+  const pagerHeight = Math.max(windowHeight * 0.4, 250);
 
   const { handlePermission } = useHandleCameraPermission();
   const { getBalances } = useMintManagement();

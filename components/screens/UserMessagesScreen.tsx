@@ -736,6 +736,7 @@ export function UserMessagesScreen({
     setCachedModels,
     setSelectedModel,
     apiKey,
+    selectedModel, // Subscribe directly to selectedModel for reactivity
   } = useRoutstrStore();
 
   // ===========================
@@ -807,15 +808,15 @@ export function UserMessagesScreen({
     });
   }, [availableModels, selectedProvider]);
 
-  // Get selected model name
+  // Get selected model name - uses selectedModel directly for reactivity when model changes externally
   const selectedModelName = useMemo(() => {
     if (!isRoutstrMode) return null;
-    const selectedModelId = getSelectedModel();
+    const selectedModelId = selectedModel || 'gpt-3.5-turbo';
     const model = availableModels.find((m) => m.id === selectedModelId);
     if (!model) return selectedModelId;
     const { modelName } = extractModelName(model);
     return modelName;
-  }, [isRoutstrMode, availableModels, getSelectedModel]);
+  }, [isRoutstrMode, availableModels, selectedModel]);
 
   // ===========================
   // EFFECTS
@@ -850,10 +851,11 @@ export function UserMessagesScreen({
 
     // Defer expensive API calls until after navigation animation completes
     const interactionHandle = InteractionManager.runAfterInteractions(() => {
-      if (!apiKey) return;
+      // Load models (doesn't require API key - public endpoint)
+      loadModels();
 
-      // Run balance check and models loading in parallel
-      Promise.all([
+      // Check balance only if API key is available
+      if (apiKey) {
         checkBalance(apiKey)
           .then((balanceData) => {
             if (balanceData.api_key && balanceData.api_key !== apiKey) {
@@ -863,11 +865,8 @@ export function UserMessagesScreen({
           })
           .catch((error) => {
             console.error('Failed to check balance:', error);
-          }),
-        loadModels(),
-      ]).catch((error) => {
-        console.error('Error during deferred initialization:', error);
-      });
+          });
+      }
     });
 
     return () => {
@@ -875,9 +874,9 @@ export function UserMessagesScreen({
     };
   }, [isRoutstrMode, apiKey, nostrKeys?.pubkey]);
 
-  // Load models when API key becomes available - deferred
+  // Load models - doesn't require API key (public endpoint)
   useEffect(() => {
-    if (!isRoutstrMode || !apiKey || availableModels.length > 0) return;
+    if (!isRoutstrMode || availableModels.length > 0) return;
 
     // Use cached models immediately if available
     const cached = getCachedModels();
@@ -892,7 +891,7 @@ export function UserMessagesScreen({
     });
 
     return () => handle.cancel();
-  }, [isRoutstrMode, apiKey, availableModels.length, getCachedModels]);
+  }, [isRoutstrMode, availableModels.length, getCachedModels]);
 
   // Listen for session changes
   useEffect(() => {
@@ -1011,8 +1010,6 @@ export function UserMessagesScreen({
   // ===========================
 
   const loadModels = async () => {
-    if (!apiKey) return;
-
     try {
       const cached = getCachedModels();
       if (cached && cached.length > 0) {
@@ -1020,7 +1017,7 @@ export function UserMessagesScreen({
         setAvailableModels(cached);
       } else {
         console.log('Fetching models from API...');
-        const models = await getModels(apiKey);
+        const models = await getModels();
         console.log('Loaded models:', models.length);
         if (models && models.length > 0) {
           setCachedModels(models);
@@ -1512,10 +1509,11 @@ export function UserMessagesScreen({
 
   const renderModelItem = useCallback(
     ({ item }: { item: RoutstrModel }) => {
-      const isSelected = getSelectedModel() === item.id;
+      const currentSelectedModel = selectedModel || 'gpt-3.5-turbo';
+      const isSelected = currentSelectedModel === item.id;
       return <ModelListItem model={item} isSelected={isSelected} onSelect={handleModelSelect} />;
     },
-    [getSelectedModel, handleModelSelect]
+    [selectedModel, handleModelSelect]
   );
 
   const toggleAnonymousMode = () => {
@@ -1659,7 +1657,7 @@ export function UserMessagesScreen({
                                 size={12}
                                 style={{ color: getShadeColor('400') }}
                                 numberOfLines={1}>
-                                {selectedModelName || getSelectedModel()}
+                                {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
                               </Text>
                             </HStack>
                           ) : (
@@ -1727,7 +1725,7 @@ export function UserMessagesScreen({
                         </Text>
                         <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
                         <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
-                          {selectedModelName || getSelectedModel()}
+                          {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
                         </Text>
                       </HStack>
                     ) : (
@@ -1941,21 +1939,19 @@ export function UserMessagesScreen({
                     <Text size={14} style={{ color: getShadeColor('400') }}>
                       {apiKey ? 'Loading models...' : 'No API key configured'}
                     </Text>
-                    {apiKey && (
-                      <Pressable
-                        onPress={loadModels}
-                        style={{
-                          marginTop: 12,
-                          backgroundColor: getPrimaryColor('600'),
-                          borderRadius: 8,
-                          paddingVertical: 8,
-                          paddingHorizontal: 16,
-                        }}>
-                        <Text size={14} bold style={{ color: getPrimaryColor('0') }}>
-                          Retry
-                        </Text>
-                      </Pressable>
-                    )}
+                    <Pressable
+                      onPress={loadModels}
+                      style={{
+                        marginTop: 12,
+                        backgroundColor: getPrimaryColor('600'),
+                        borderRadius: 8,
+                        paddingVertical: 8,
+                        paddingHorizontal: 16,
+                      }}>
+                      <Text size={14} bold style={{ color: getPrimaryColor('0') }}>
+                        Retry
+                      </Text>
+                    </Pressable>
                   </VStack>
                 )}
               </VStack>

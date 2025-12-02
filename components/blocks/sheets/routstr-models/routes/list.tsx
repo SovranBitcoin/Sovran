@@ -46,7 +46,7 @@ const ModelItem: React.FC<ModelItemProps> = ({ model, selected, onPress }) => {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="bg-primary-800 rounded-lg p-4 mb-3"
+      className="mb-3 rounded-lg bg-primary-800 p-4"
       style={{
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? getPrimaryColor('400') : getPrimaryColor('700'),
@@ -57,9 +57,7 @@ const ModelItem: React.FC<ModelItemProps> = ({ model, selected, onPress }) => {
             <Text weight="heavy" size={16} className="text-primary-0">
               {model.name}
             </Text>
-            {selected && (
-              <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
-            )}
+            {selected && <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />}
           </HStack>
           <Text size={12} className="text-primary-300" numberOfLines={2}>
             {model.description}
@@ -166,7 +164,7 @@ const ListRoute = () => {
       }
       setError(null);
 
-      const availableModels = await getModels(apiKey);
+      const availableModels = await getModels();
       // Sort by name initially
       availableModels.sort((a, b) => a.name.localeCompare(b.name));
       setModels(availableModels);
@@ -308,10 +306,7 @@ const ListRoute = () => {
           })}
 
           {/* Separator */}
-          <View
-            className="mr-2 h-4 w-px"
-            style={{ backgroundColor: getPrimaryColor('700') }}
-          />
+          <View className="mr-2 h-4 w-px" style={{ backgroundColor: getPrimaryColor('700') }} />
 
           {/* Sort buttons */}
           {renderFilterButton({
@@ -336,8 +331,7 @@ const ListRoute = () => {
               sortBy === 'context-desc'
                 ? 'mdi:sort-numeric-descending'
                 : 'mdi:sort-numeric-ascending',
-            onPress: () =>
-              setSortBy(sortBy === 'context-asc' ? 'context-desc' : 'context-asc'),
+            onPress: () => setSortBy(sortBy === 'context-asc' ? 'context-desc' : 'context-asc'),
             isActive: sortBy === 'context-asc' || sortBy === 'context-desc',
           })}
         </HStack>

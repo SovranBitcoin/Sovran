@@ -1,7 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import 'react-native-get-random-values';
-import { Animated, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -12,7 +10,6 @@ import { useSettingsStore, isBackgroundImageTheme } from 'stores/settingsStore';
 import { useTheme } from 'providers/ThemeProvider';
 import { NonGestureView } from './NonGestureView';
 
-// Define proper interfaces for our data types
 interface AccountData {
   unit: string;
 }
@@ -26,46 +23,8 @@ interface AccountProps {
 
 export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
-
-  // Animation values
-  const spinValue = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // Start spin animation on mount
-  useEffect(() => {
-    const spin = Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 1250,
-        useNativeDriver: true,
-      })
-    );
-    spin.start();
-
-    return () => spin.stop();
-  }, [spinValue]);
-
-  // Start pulse animation on mount
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.9,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-
-    return () => pulse.stop();
-  }, [pulseAnim]);
+  const theme = useSettingsStore((state) => state.getTheme());
+  const hasBackgroundImage = isBackgroundImageTheme(theme);
 
   // Function to render currency icon based on unit
   const renderCurrencyIcon = () => {
@@ -84,14 +43,13 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
   };
 
   // Function to render account dot indicators
-  const renderDotIndicators = (accountsToRender: AccountData[], startIndex: number) => {
-    return accountsToRender.map((_, index) => {
-      const actualIndex = startIndex + index;
-      const isActive = actualIndex === accounts.findIndex((a) => a.unit === account.unit);
+  const renderDotIndicators = () => {
+    return accounts.map((acc, index) => {
+      const isActive = acc.unit === account.unit;
 
       return (
         <Text
-          key={actualIndex}
+          key={index}
           weight={isActive ? 'bold' : 'regular'}
           size={16}
           style={{
@@ -104,12 +62,6 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
     });
   };
 
-  const theme = useSettingsStore((state) => state.getTheme());
-  const image = isBackgroundImageTheme(theme) ? theme : null;
-
-  // Account for safe area at top (status bar + navigation header)
-  const topInset = Platform.OS === 'web' ? 64 : insets.top + 56;
-
   return (
     <NonGestureView
       key={account.unit}
@@ -120,24 +72,23 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
         height: pagerHeight,
         width: '100%',
       }}>
-      {/* Main content area with flexbox centering */}
-      <VStack
-        align="center"
-        justify="center"
-        style={{
-          flex: 1,
-          paddingTop: topInset,
-        }}>
-        <PrimaryBalance account={account} />
+      {/* Centered content area using flex spacers */}
+      <VStack style={{ flex: 1 }}>
+        {/* Top spacer - pushes content down */}
+        <View style={{ flex: 1 }} />
 
-        <HStack spacing={2} style={{ marginTop: 8 }}>
-          {/* Onchain account indicators */}
-          {renderDotIndicators(accounts, 0)}
-        </HStack>
+        {/* Content: fiat, sats, dots */}
+        <VStack align="center" gap={8}>
+          <PrimaryBalance account={account} />
+          <HStack spacing={2}>{renderDotIndicators()}</HStack>
+        </VStack>
+
+        {/* Bottom spacer - pushes content up (equal to top spacer) */}
+        <View style={{ flex: 1 }} />
       </VStack>
 
       {/* Background currency icon - decorative only */}
-      {!image && (
+      {!hasBackgroundImage && (
         <View
           pointerEvents="none"
           style={{

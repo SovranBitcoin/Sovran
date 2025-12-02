@@ -175,12 +175,12 @@ function createRoutstrClient(apiKey: string): OpenAI {
 /**
  * Get available models from Routstr API
  */
-export async function getModels(apiKey: string): Promise<RoutstrModel[]> {
+export async function getModels(): Promise<RoutstrModel[]> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        // Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
     });

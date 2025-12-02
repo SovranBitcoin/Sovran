@@ -1,5 +1,5 @@
 import Icon from 'assets/icons';
-import { AnimatedBackgroundView, ScrollableGradientOverlay } from 'components/ui/BackgroundView';
+import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, Spacer, View, VStack } from 'components/ui/View';
@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useRoutstrStore } from 'stores/routstrStore';
+import { LayoutDebugWrapper } from '../example';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -640,7 +641,7 @@ const ExploreScreen = () => {
         // Refresh in background if stale
         if (isCacheStale()) {
           try {
-            const freshModels = await getModels(routstrApiKey);
+            const freshModels = await getModels();
             setModels(freshModels);
             setCachedModels(freshModels);
           } catch (error) {
@@ -650,9 +651,8 @@ const ExploreScreen = () => {
         return;
       }
 
-      // No cache, fetch fresh
       try {
-        const fetchedModels = await getModels(routstrApiKey);
+        const fetchedModels = await getModels();
         setModels(fetchedModels);
         setCachedModels(fetchedModels);
       } catch (error) {
@@ -704,143 +704,136 @@ const ExploreScreen = () => {
   }, []);
 
   return (
-    <AnimatedBackgroundView>
-      <View className="flex-1">
+    <LayoutDebugWrapper
+      onContentSizeChange={onContentSizeChange}
+      contentContainerStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}>
+      <ScrollableGradientOverlay contentHeight={contentHeight} />
+
+      <VStack style={{ paddingBottom: 96 }}>
+        {/* AI Chat Section */}
+        <SectionHeader
+          title="AI Assistants"
+          subtitle="Chat with leading AI models, pay with sats"
+        />
         <ScrollView
-          style={{ flex: 1 }}
-          onContentSizeChange={onContentSizeChange}
-          showsVerticalScrollIndicator={false}>
-          <ScrollableGradientOverlay contentHeight={contentHeight} />
-
-          <VStack style={{ paddingBottom: 96 }}>
-            <Spacer size={110} />
-
-            {/* AI Chat Section */}
-            <SectionHeader
-              title="AI Assistants"
-              subtitle="Chat with leading AI models, pay with sats"
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
-              {modelsLoading ? (
-                <View style={styles.modelsLoadingContainer}>
-                  <ActivityIndicator size="small" color={getPrimaryColor('300')} />
-                  <Text size={12} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
-                    Loading models...
-                  </Text>
-                </View>
-              ) : displayModels.length > 0 ? (
-                displayModels.map((model) => <AIModelCard key={model.id} model={model} />)
-              ) : (
-                <View style={styles.modelsEmptyContainer}>
-                  <Icon name="mdi:robot" size={32} color={getPrimaryColor('500')} />
-                  <Text size={13} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
-                    No models available
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-
-            <Spacer size={32} />
-
-            {/* Map Section */}
-            <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />
-            <View style={{ paddingHorizontal: 20 }}>
-              <MapTeaserCard />
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
+          {modelsLoading ? (
+            <View style={styles.modelsLoadingContainer}>
+              <ActivityIndicator size="small" color={getPrimaryColor('300')} />
+              <Text size={12} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+                Loading models...
+              </Text>
             </View>
-
-            <Spacer size={32} />
-
-            {/* Shop with Bitcoin */}
-            <SectionHeader
-              title="Shop with Bitcoin"
-              subtitle="Gift cards & vouchers"
-              action="See all"
-              onAction={() => popup('not_implemented')}
-            />
-
-            {/* Category Pills */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-              {PRODUCT_CATEGORIES.map((cat) => (
-                <CategoryPill
-                  key={cat.id}
-                  name={cat.name}
-                  icon={cat.icon}
-                  isActive={activeCategory === cat.name}
-                  onPress={() => setActiveCategory(cat.name)}
-                />
-              ))}
-            </ScrollView>
-
-            {/* Product Cards - 2 column grid */}
-            <View style={styles.productGrid}>
-              {BITREFILL_PRODUCTS.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+          ) : displayModels.length > 0 ? (
+            displayModels.map((model) => <AIModelCard key={model.id} model={model} />)
+          ) : (
+            <View style={styles.modelsEmptyContainer}>
+              <Icon name="mdi:robot" size={32} color={getPrimaryColor('500')} />
+              <Text size={13} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+                No models available
+              </Text>
             </View>
-
-            <Spacer size={32} />
-
-            {/* Bitcoin Conferences */}
-            <SectionHeader
-              title="Bitcoin Events"
-              subtitle="Upcoming conferences & meetups"
-              action="View all"
-              onAction={() => popup('not_implemented')}
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
-              {BITCOIN_CONFERENCES.map((conf) => (
-                <ConferenceCard key={conf.id} conference={conf} />
-              ))}
-            </ScrollView>
-
-            <Spacer size={32} />
-
-            {/* eSIM Promo */}
-            <View style={{ paddingHorizontal: 20 }}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={styles.esimPromo}
-                onPress={() => Linking.openURL('https://sovran.money/esims')}>
-                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
-                <LinearGradient
-                  colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <HStack align="center" style={{ padding: 20 }}>
-                  <View style={styles.esimPromoIcon}>
-                    <Icon name="mdi:sim" size={28} color="#fff" />
-                  </View>
-                  <VStack style={{ flex: 1, marginLeft: 16 }}>
-                    <Text size={16} heavy style={{ color: '#fff' }}>
-                      Travel with Bitcoin
-                    </Text>
-                    <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                      Get eSIMs for 190+ countries, pay with sats
-                    </Text>
-                  </VStack>
-                  <View style={styles.esimPromoArrow}>
-                    <Icon name="mdi:arrow-right" size={20} color="#fff" />
-                  </View>
-                </HStack>
-              </TouchableOpacity>
-            </View>
-
-            <Spacer size={20} />
-          </VStack>
+          )}
         </ScrollView>
-      </View>
-    </AnimatedBackgroundView>
+
+        <Spacer size={32} />
+
+        {/* Map Section */}
+        <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />
+        <View style={{ paddingHorizontal: 20 }}>
+          <MapTeaserCard />
+        </View>
+
+        <Spacer size={32} />
+
+        {/* Shop with Bitcoin */}
+        <SectionHeader
+          title="Shop with Bitcoin"
+          subtitle="Gift cards & vouchers"
+          action="See all"
+          onAction={() => popup('not_implemented')}
+        />
+
+        {/* Category Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
+          {PRODUCT_CATEGORIES.map((cat) => (
+            <CategoryPill
+              key={cat.id}
+              name={cat.name}
+              icon={cat.icon}
+              isActive={activeCategory === cat.name}
+              onPress={() => setActiveCategory(cat.name)}
+            />
+          ))}
+        </ScrollView>
+
+        {/* Product Cards - 2 column grid */}
+        <View style={styles.productGrid}>
+          {BITREFILL_PRODUCTS.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </View>
+
+        <Spacer size={32} />
+
+        {/* Bitcoin Conferences */}
+        <SectionHeader
+          title="Bitcoin Events"
+          subtitle="Upcoming conferences & meetups"
+          action="View all"
+          onAction={() => popup('not_implemented')}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
+          {BITCOIN_CONFERENCES.map((conf) => (
+            <ConferenceCard key={conf.id} conference={conf} />
+          ))}
+        </ScrollView>
+
+        <Spacer size={32} />
+
+        {/* eSIM Promo */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.esimPromo}
+            onPress={() => Linking.openURL('https://sovran.money/esims')}>
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <LinearGradient
+              colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <HStack align="center" style={{ padding: 20 }}>
+              <View style={styles.esimPromoIcon}>
+                <Icon name="mdi:sim" size={28} color="#fff" />
+              </View>
+              <VStack style={{ flex: 1, marginLeft: 16 }}>
+                <Text size={16} heavy style={{ color: '#fff' }}>
+                  Travel with Bitcoin
+                </Text>
+                <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                  Get eSIMs for 190+ countries, pay with sats
+                </Text>
+              </VStack>
+              <View style={styles.esimPromoArrow}>
+                <Icon name="mdi:arrow-right" size={20} color="#fff" />
+              </View>
+            </HStack>
+          </TouchableOpacity>
+        </View>
+
+        <Spacer size={20} />
+      </VStack>
+    </LayoutDebugWrapper>
   );
 };
 

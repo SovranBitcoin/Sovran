@@ -6,7 +6,7 @@ import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
 import { npubToPubkey } from 'components/blocks/Transaction';
-import { AnimatedBackgroundView, ScrollableGradientOverlay } from 'components/ui/BackgroundView';
+import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Tabs } from 'components/ui/Tabs';
 import { Text } from 'components/ui/Text';
 import { View, VStack } from 'components/ui/View';
@@ -25,6 +25,7 @@ import { SkeletonContainer } from 'react-native-skeleton-component';
 import { setSearch } from 'redux/nostr';
 import { store } from 'redux/store';
 import { usePaymentsSearch } from './_layout';
+import { LayoutDebugWrapper } from '../example';
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
@@ -702,7 +703,7 @@ const PaymentsContent = () => {
   const HEADER_HEIGHT = 56 + insets.top;
 
   return (
-    <AnimatedBackgroundView>
+    <LayoutDebugWrapper scrollable={false}>
       {/* Gradient overlay for the entire page */}
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
@@ -734,7 +735,8 @@ const PaymentsContent = () => {
               <ScrollView
                 style={{ flex: 1, paddingHorizontal: 16 }}
                 keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="none">
+                keyboardDismissMode="none"
+                contentInsetAdjustmentBehavior="automatic">
                 {/* Recommended Users */}
                 <RecommendedUsers
                   users={recommendedUsers}
@@ -820,7 +822,7 @@ const PaymentsContent = () => {
           </View>
         </SkeletonContainer>
       </SafeAreaView>
-    </AnimatedBackgroundView>
+    </LayoutDebugWrapper>
   );
 };
 
