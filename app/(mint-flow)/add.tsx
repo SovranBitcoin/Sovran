@@ -9,13 +9,14 @@
  * - Batch loads audit data for all mints at once
  */
 
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
   TextInput,
   useWindowDimensions,
+  InteractionManager,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
@@ -73,22 +74,52 @@ const adaptDiscoveredMint = (mint: any): SearchableDiscoveredMint => ({
 });
 
 // Native search header for iOS with liquid glass effect
+// Uses internal state with debouncing to prevent parent re-renders during typing
+// which would cause the SwiftUI TextField to lose focus
 const NativeSearchHeader = memo(function NativeSearchHeader({
   width,
   onSearchChange,
-  validationState,
   clearKey,
 }: {
   width: number;
   onSearchChange: (text: string) => void;
-  validationState: {
-    isValid: boolean | null;
-    isLoading: boolean;
-    error: string | null;
-  };
   clearKey: number;
 }) {
   const { getPrimaryColor } = useTheme();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const onSearchChangeRef = useRef(onSearchChange);
+  const latestTextRef = useRef('');
+
+  // Keep ref updated without causing re-renders
+  useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
+
+  // Debounced change handler - waits for interaction to complete before updating parent
+  // This prevents parent re-renders from stealing focus during typing
+  const handleTextChange = useCallback((text: string) => {
+    latestTextRef.current = text;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Use a longer debounce (500ms) and wait for interactions to complete
+    debounceRef.current = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => {
+        onSearchChangeRef.current(latestTextRef.current);
+      });
+    }, 500);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View style={{ alignItems: 'center' }}>
@@ -103,7 +134,7 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
             key={clearKey}
             defaultValue=""
             placeholder="Search mints or enter URL..."
-            onChangeText={onSearchChange}
+            onChangeText={handleTextChange}
             keyboardType="url"
             autocorrection={false}
             modifiers={[
@@ -113,11 +144,6 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
           />
         </SwiftUIVStack>
       </Host>
-      {validationState.isLoading && (
-        <View style={{ position: 'absolute', right: 24, top: 12 }}>
-          <ActivityIndicator size="small" color={getPrimaryColor('400')} />
-        </View>
-      )}
     </View>
   );
 });
@@ -127,6 +153,8 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   searchQuery,
   onSearchChange,
   validationState,
+  onFocus,
+  onBlur,
 }: {
   searchQuery: string;
   onSearchChange: (text: string) => void;
@@ -135,6 +163,8 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
     isLoading: boolean;
     error: string | null;
   };
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
 
@@ -162,6 +192,8 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
       <TextInput
         value={searchQuery}
         onChangeText={onSearchChange}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder="Search mints or enter URL..."
         placeholderTextColor={getPrimaryColor('500')}
         style={{
@@ -375,6 +407,7 @@ function AddMintsScreen() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
   const [clearKey, setClearKey] = useState(0);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   const {
     url,
@@ -563,6 +596,14 @@ function AddMintsScreen() {
     setClearKey((prev) => prev + 1);
   }, [setUrl]);
 
+  const handleInputFocus = useCallback(() => {
+    setIsInputFocused(true);
+  }, []);
+
+  const handleInputBlur = useCallback(() => {
+    setIsInputFocused(false);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (selectedMints.size === 0) {
       popup({ message: 'Please select at least one mint to add', type: 'warning' });
@@ -656,6 +697,7 @@ function AddMintsScreen() {
   // Show content as soon as discovery completes, don't wait for audit/kym
   const showContent = !discoveryLoading || discoveredMints.length > 0;
   const isSearching = url.trim().length > 0;
+  const showCancelButton = isInputFocused || isSearching;
 
   // Calculate header width for search input
   const headerWidth = windowWidth - 124 - 24;
@@ -722,6 +764,52 @@ function AddMintsScreen() {
     [url, selectedCurrency, primaryColor0]
   );
 
+  // Memoize iOS header to prevent re-renders that cause focus loss
+  // Only depends on stable references (headerWidth, handleSearchChange, clearKey)
+  const iosHeaderTitle = useMemo(
+    () => (
+      <NativeSearchHeader
+        width={headerWidth}
+        onSearchChange={handleSearchChange}
+        clearKey={clearKey}
+      />
+    ),
+    [headerWidth, handleSearchChange, clearKey]
+  );
+
+  // Android header needs url for controlled input
+  const androidHeaderTitle = useMemo(
+    () => (
+      <FallbackSearchHeader
+        searchQuery={url}
+        onSearchChange={handleSearchChange}
+        validationState={validationState}
+        onFocus={handleInputFocus}
+        onBlur={handleInputBlur}
+      />
+    ),
+    [url, handleSearchChange, validationState, handleInputFocus, handleInputBlur]
+  );
+
+  // Memoize header right button
+  const headerRightButton = useMemo(
+    () =>
+      showCancelButton ? (
+        <TouchableOpacity onPress={handleClearSearch} style={{ padding: 8 }}>
+          <IconSymbol name="xmark" size={20} color={getPrimaryColor('0')} />
+        </TouchableOpacity>
+      ) : null,
+    [showCancelButton, handleClearSearch, getPrimaryColor]
+  );
+
+  // Memoize header callbacks to prevent React Navigation from re-rendering
+  const renderHeaderTitle = useCallback(
+    () => (Platform.OS === 'ios' ? iosHeaderTitle : androidHeaderTitle),
+    [iosHeaderTitle, androidHeaderTitle]
+  );
+
+  const renderHeaderRight = useCallback(() => headerRightButton, [headerRightButton]);
+
   return (
     <>
       <Stack.Screen
@@ -729,27 +817,8 @@ function AddMintsScreen() {
           title: 'Add Mints',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
-          headerTitle: () =>
-            Platform.OS === 'ios' ? (
-              <NativeSearchHeader
-                width={headerWidth}
-                onSearchChange={handleSearchChange}
-                validationState={validationState}
-                clearKey={clearKey}
-              />
-            ) : (
-              <FallbackSearchHeader
-                searchQuery={url}
-                onSearchChange={handleSearchChange}
-                validationState={validationState}
-              />
-            ),
-          headerRight: () =>
-            isSearching ? (
-              <TouchableOpacity onPress={handleClearSearch} style={{ padding: 8 }}>
-                <IconSymbol name="xmark" size={20} color={getPrimaryColor('0')} />
-              </TouchableOpacity>
-            ) : null,
+          headerTitle: renderHeaderTitle,
+          headerRight: renderHeaderRight,
         }}
       />
 

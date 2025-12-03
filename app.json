@@ -14,7 +14,7 @@
       "backgroundColor": "#000000",
       "resizeMode": "contain"
     },
-    "icon": "./assets/images/sovran_black.png",
+    "icon": "./assets/images/production.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -59,7 +59,7 @@
     "android": {
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/sovran_black.png",
+        "foregroundImage": "./assets/images/production.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
