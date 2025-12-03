@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { looksLikeMintUrl } from 'helper/fuzzySearch';
 import { fetchMintInfo } from '@/helper/apiClient';
 
 interface ValidationState {
@@ -23,13 +22,22 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Normalize URL for API calls by ensuring https:// prefix
+  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
   const normalizeUrlForApi = useCallback((rawUrl: string): string => {
-    let normalized = rawUrl.trim().toLowerCase();
-    // Remove www. prefix if present (after removing protocol)
-    const withoutProtocol = normalized.replace(/^https?:\/\//, '');
-    const withoutWww = withoutProtocol.replace(/^www\./, '');
-    // Add https:// back for API call
-    return `https://${withoutWww}`;
+    const trimmed = rawUrl.trim();
+    const withoutProtocol = trimmed.replace(/^https?:\/\//, '');
+    const slashIndex = withoutProtocol.indexOf('/');
+    if (slashIndex === -1) {
+      // No path, just domain
+      const domain = withoutProtocol.toLowerCase().replace(/^www\./, '');
+      return `https://${domain}`;
+    }
+    const domain = withoutProtocol
+      .slice(0, slashIndex)
+      .toLowerCase()
+      .replace(/^www\./, '');
+    const path = withoutProtocol.slice(slashIndex);
+    return `https://${domain}${path}`;
   }, []);
 
   const validateUrl = useCallback(async (mintUrl: string) => {

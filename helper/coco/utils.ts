@@ -346,13 +346,22 @@ export const parseLightningAddress = (address: string): LightningAddress | null 
 
 /**
  * Parses an lnurlp URL and returns a proper HTTP(S) URL
+ * Only lowercases the domain, preserves path case
  */
 export const parseLnurlp = (url: string): string | null => {
   if (!url) return null;
-  const parsedUrl = url.toLowerCase();
-  if (!LNURLP_REGEX.test(parsedUrl)) return null;
-  const protocol = parsedUrl.includes('.onion') ? 'http://' : 'https://';
-  return parsedUrl.replace('lnurlp://', protocol);
+  // Test with lowercase for regex, but preserve original case for path
+  if (!LNURLP_REGEX.test(url.toLowerCase())) return null;
+  const withoutProtocol = url.replace(/^lnurlp:\/\//i, '');
+  const slashIndex = withoutProtocol.indexOf('/');
+  const protocol = withoutProtocol.toLowerCase().includes('.onion') ? 'http://' : 'https://';
+  if (slashIndex === -1) {
+    // No path, just domain
+    return `${protocol}${withoutProtocol.toLowerCase()}`;
+  }
+  const domain = withoutProtocol.slice(0, slashIndex).toLowerCase();
+  const path = withoutProtocol.slice(slashIndex);
+  return `${protocol}${domain}${path}`;
 };
 
 /**

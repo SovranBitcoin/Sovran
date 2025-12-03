@@ -4,6 +4,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AuditMintResponse } from 'helper/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
+// Consistent URL normalization across the app
+// Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
+const normalizeUrl = (url: string): string => {
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  const slashIndex = withoutProtocol.indexOf('/');
+  if (slashIndex === -1) {
+    // No path, just domain
+    return withoutProtocol
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .replace(/\/$/, '');
+  }
+  const domain = withoutProtocol
+    .slice(0, slashIndex)
+    .toLowerCase()
+    .replace(/^www\./, '');
+  const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+  return domain + path;
+};
+
 interface CachedMintData {
   auditData: AuditMintResponse;
   mintInfo: GetInfoResponse;
@@ -33,17 +53,17 @@ export const useAuditMintStore = create<AuditMintStore>()(
 
       // Actions
       getCached: (mintUrl: string) => {
-        const normalizedUrl = mintUrl.endsWith('/') ? mintUrl.slice(0, -1) : mintUrl;
+        const normalized = normalizeUrl(mintUrl);
         const currentState = get();
-        return currentState.cache[normalizedUrl];
+        return currentState.cache[normalized];
       },
 
       setCached: (mintUrl: string, auditData: AuditMintResponse, mintInfo: GetInfoResponse) => {
-        const normalizedUrl = mintUrl.endsWith('/') ? mintUrl.slice(0, -1) : mintUrl;
+        const normalized = normalizeUrl(mintUrl);
         set((state) => ({
           cache: {
             ...state.cache,
-            [normalizedUrl]: {
+            [normalized]: {
               auditData,
               mintInfo,
               timestamp: Date.now(),
@@ -57,18 +77,18 @@ export const useAuditMintStore = create<AuditMintStore>()(
       },
 
       clearMintCache: (mintUrl: string) => {
-        const normalizedUrl = mintUrl.endsWith('/') ? mintUrl.slice(0, -1) : mintUrl;
+        const normalized = normalizeUrl(mintUrl);
         set((state) => {
           const newCache = { ...state.cache };
-          delete newCache[normalizedUrl];
+          delete newCache[normalized];
           return { cache: newCache };
         });
       },
 
       isStale: (mintUrl: string, maxAgeMinutes: number = 5) => {
-        const normalizedUrl = mintUrl.endsWith('/') ? mintUrl.slice(0, -1) : mintUrl;
+        const normalized = normalizeUrl(mintUrl);
         const currentState = get();
-        const cached = currentState.cache[normalizedUrl];
+        const cached = currentState.cache[normalized];
         if (!cached) return true;
 
         const ageMinutes = (Date.now() - cached.timestamp) / (1000 * 60);

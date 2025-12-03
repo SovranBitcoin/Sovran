@@ -360,20 +360,20 @@ const MintItem = memo(function MintItem({
 
         {/* Bottom section: Score and Success Rate badges */}
         <HStack gap={8}>
-          {/* Score badge */}
-          {!kymLoading && displayScore ? (
+          {/* Score badge - show when available, skeleton when loading without value */}
+          {displayScore ? (
             <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
               {displayScore}
             </Badge>
-          ) : (
+          ) : kymLoading ? (
             <Skeleton
               className="h-[24px] w-[56px] rounded-full"
               style={{ backgroundColor: opacityColor(getYellowColor('300'), 0.2) }}
             />
-          )}
+          ) : null}
 
-          {/* Success rate badge */}
-          {!auditLoading && successRate !== undefined ? (
+          {/* Success rate badge - show when available, skeleton when loading without value */}
+          {successRate !== undefined ? (
             <Badge
               className="h-[24px] w-[60px]"
               variant={activityBadgeVariant}
@@ -381,12 +381,12 @@ const MintItem = memo(function MintItem({
               size={14}>
               {`${successRate}%`}
             </Badge>
-          ) : (
+          ) : auditLoading ? (
             <Skeleton
               className="h-[24px] w-[60px] rounded-full"
               style={{ backgroundColor: opacityColor(getGreenColor('300'), 0.2) }}
             />
-          )}
+          ) : null}
         </HStack>
       </VStack>
     </TouchableOpacity>
@@ -416,13 +416,24 @@ function AddMintsScreen() {
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  // Normalize URL by removing protocol, www, trailing slash, and lowercasing for consistent comparison
+  // Normalize URL by removing protocol, www, trailing slash
+  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
   const normalizeUrl = useCallback((u: string): string => {
-    return u
-      .toLowerCase() // Force lowercase
-      .replace(/^https?:\/\//, '') // Remove http:// or https://
-      .replace(/^www\./, '') // Remove www.
-      .replace(/\/$/, ''); // Remove trailing slash
+    const withoutProtocol = u.replace(/^https?:\/\//, '');
+    const slashIndex = withoutProtocol.indexOf('/');
+    if (slashIndex === -1) {
+      // No path, just domain
+      return withoutProtocol
+        .toLowerCase()
+        .replace(/^www\./, '')
+        .replace(/\/$/, '');
+    }
+    const domain = withoutProtocol
+      .slice(0, slashIndex)
+      .toLowerCase()
+      .replace(/^www\./, '');
+    const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+    return domain + path;
   }, []);
 
   // Normalize URL for API calls by ensuring https:// prefix
@@ -433,6 +444,8 @@ function AddMintsScreen() {
     },
     [normalizeUrl]
   );
+
+  console.log({ normalizeUrlForApi });
 
   const { mints: nostrDiscoveredMints, loading: nostrLoading } = useNostrDiscoveredMints();
   const { mints: sovranDiscoveredMints, loading: sovranLoading } = useSovranDiscoveredMints();
@@ -573,8 +586,11 @@ function AddMintsScreen() {
   const handleToggleMint = useCallback((mintUrl: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
-      if (next.has(mintUrl)) next.delete(mintUrl);
-      else next.add(mintUrl);
+      if (next.has(mintUrl)) {
+        next.delete(mintUrl);
+      } else {
+        next.add(mintUrl);
+      }
       return next;
     });
   }, []);
@@ -622,6 +638,7 @@ function AddMintsScreen() {
       const manager = CocoManager.getInstance();
       const results: string[] = [];
       const errors: { mintUrl: string; error: string }[] = [];
+
       // Normalize all URLs to ensure https:// prefix before adding
       const mintUrlsToAdd = Array.from(selectedMints).map((u) =>
         u.startsWith('https://') || u.startsWith('http://') ? u : normalizeUrlForApi(u)
@@ -630,14 +647,19 @@ function AddMintsScreen() {
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
         try {
-          await manager.mint.trustMint(mintUrl);
+          await manager.mint.addMint(mintUrl, { trusted: true });
           results.push(mintUrl);
+
+          // Pre-fetch mint info (non-critical)
           try {
             await manager.mint.getMintInfo(mintUrl);
           } catch {
             // Non-critical
           }
-          if (i < mintUrlsToAdd.length - 1) await new Promise((r) => setTimeout(r, 100));
+
+          if (i < mintUrlsToAdd.length - 1) {
+            await new Promise((r) => setTimeout(r, 100));
+          }
         } catch (err) {
           errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
         }

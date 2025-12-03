@@ -37,7 +37,7 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { View, HStack, VStack } from 'components/ui/View';
+import { View, HStack, VStack, Spacer } from 'components/ui/View';
 import { getMintDisplayName, extractDomain } from 'helper/url';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
@@ -48,6 +48,7 @@ import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Skeleton } from '@/components/ui/Skeleton';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { AmountFormatter } from '@/components/ui/AmountFormatter';
 
 interface MintItemProps {
   mint: Mint & { amount?: number; unit?: string };
@@ -110,6 +111,8 @@ const MintItem: React.FC<MintItemProps> = ({
     return undefined;
   }, [auditInfo]);
 
+  const { getPrimaryColor } = useTheme();
+
   // Format score (round to 1 decimal or whole number)
   // Note: score of 0 is a valid value, so we check typeof === 'number' not just truthiness
   const displayScore = useMemo(() => {
@@ -146,7 +149,7 @@ const MintItem: React.FC<MintItemProps> = ({
       }}
       onPress={onPress}
       disabled={globalLoading}>
-      <VStack gap={12}>
+      <VStack gap={0}>
         {/* Top section: Logo, name, balance/URL, checkbox/dots */}
         <HStack align="center" gap={12}>
           <View style={{ position: 'relative' }}>
@@ -169,9 +172,14 @@ const MintItem: React.FC<MintItemProps> = ({
 
             <View style={{ alignSelf: 'flex-start' }}>
               {balance ? (
-                <Badge variant="primary" icon={'material-symbols:currency-bitcoin'} size={14}>
-                  {balance.amount}
-                </Badge>
+                <AmountFormatter
+                  amount={balance.amount}
+                  unit={'sat'}
+                  size={14}
+                  weight="heavy"
+                  color={getPrimaryColor('0')}
+                  className="ml-[2px]"
+                />
               ) : displayMintUrl ? (
                 <Text heavy className="text-primary-300" size={14}>
                   {extractDomain(displayMintUrl)}
@@ -212,40 +220,44 @@ const MintItem: React.FC<MintItemProps> = ({
           )}
         </HStack>
 
-        {/* Bottom section: Score and Success Rate badges */}
-        <HStack gap={8}>
-          {/* Score badge (left) - show skeleton when loading, badge when score available */}
-          {!kymLoading && displayScore ? (
-            <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
-              {displayScore}
-            </Badge>
-          ) : (
-            <Skeleton
-              className="h-[24px] w-[56px] rounded-full"
-              style={{
-                backgroundColor: opacity(getYellowColor('300'), 0.2),
-              }}
-            />
-          )}
+        {(displayScore || kymLoading || successRate !== undefined || auditLoading) && (
+          <>
+            <Spacer size={12} />
+            <HStack gap={8}>
+              {/* Score badge (left) - show badge when score available, skeleton when loading without score */}
+              {displayScore ? (
+                <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
+                  {displayScore}
+                </Badge>
+              ) : kymLoading ? (
+                <Skeleton
+                  className="h-[24px] w-[56px] rounded-full"
+                  style={{
+                    backgroundColor: opacity(getYellowColor('300'), 0.2),
+                  }}
+                />
+              ) : null}
 
-          {/* Success rate badge (right) - show skeleton when loading, badge when data available */}
-          {!auditLoading && successRate !== undefined ? (
-            <Badge
-              className="h-[24px] w-[60px]"
-              variant={activityBadgeVariant}
-              icon="lucide:activity"
-              size={14}>
-              {`${successRate}%`}
-            </Badge>
-          ) : (
-            <Skeleton
-              className="h-[24px] w-[60px] rounded-full"
-              style={{
-                backgroundColor: opacity(getGreenColor('300'), 0.2),
-              }}
-            />
-          )}
-        </HStack>
+              {/* Success rate badge (right) - show badge when available, skeleton only when loading */}
+              {successRate !== undefined ? (
+                <Badge
+                  className="h-[24px] w-[60px]"
+                  variant={activityBadgeVariant}
+                  icon="lucide:activity"
+                  size={14}>
+                  {`${successRate}%`}
+                </Badge>
+              ) : auditLoading ? (
+                <Skeleton
+                  className="h-[24px] w-[60px] rounded-full"
+                  style={{
+                    backgroundColor: opacity(getGreenColor('300'), 0.2),
+                  }}
+                />
+              ) : null}
+            </HStack>
+          </>
+        )}
       </VStack>
     </TouchableOpacity>
   );
@@ -336,8 +348,23 @@ const ListRoute = () => {
   const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
 
   // Helper to normalize URLs for lookup (same as in useKYMMints)
+  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
   const normalizeUrl = useCallback((url: string): string => {
-    return url.replace(/\/$/, '');
+    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    const slashIndex = withoutProtocol.indexOf('/');
+    if (slashIndex === -1) {
+      // No path, just domain
+      return withoutProtocol
+        .toLowerCase()
+        .replace(/^www\./, '')
+        .replace(/\/$/, '');
+    }
+    const domain = withoutProtocol
+      .slice(0, slashIndex)
+      .toLowerCase()
+      .replace(/^www\./, '');
+    const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+    return domain + path;
   }, []);
 
   // Debug logging (only in dev)

@@ -16,7 +16,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { useMintManagement } from 'hooks/coco';
+import { useMintManagement, useMints } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { MintItem } from 'components/blocks/sheets/mint-balance/routes/list';
@@ -69,7 +69,10 @@ export function MintListScreen({
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
 
-  const { getBalances, mints } = useMintManagement();
+  // Use useMints() for live-updating trusted mints list (listens to mint:added/mint:updated events)
+  const { trustedMints } = useMints();
+  // Use useMintManagement() only for operations like getBalances
+  const { getBalances } = useMintManagement();
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -105,18 +108,18 @@ export function MintListScreen({
     };
   }, [getBalances]);
 
-  // Process mints with balances
+  // Process mints with balances - use trustedMints from useMints() for live updates
   const processedMints = useMemo(() => {
-    if (mints.length === 0) return [];
+    if (trustedMints.length === 0) return [];
 
-    const mintsWithBalances = mints.map((mint) => ({
+    const mintsWithBalances = trustedMints.map((mint) => ({
       unit: 'SAT',
       amount: balances[mint.mintUrl] || 0,
       ...mint,
     }));
 
     return _.orderBy(mintsWithBalances, ['amount'], ['desc']);
-  }, [mints, balances]);
+  }, [trustedMints, balances]);
 
   // Extract available currencies from mints
   const availableCurrencies = useMemo(() => {
@@ -157,8 +160,23 @@ export function MintListScreen({
   const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
   const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
 
+  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
   const normalizeUrl = useCallback((url: string): string => {
-    return url.replace(/\/$/, '');
+    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    const slashIndex = withoutProtocol.indexOf('/');
+    if (slashIndex === -1) {
+      // No path, just domain
+      return withoutProtocol
+        .toLowerCase()
+        .replace(/^www\./, '')
+        .replace(/\/$/, '');
+    }
+    const domain = withoutProtocol
+      .slice(0, slashIndex)
+      .toLowerCase()
+      .replace(/^www\./, '');
+    const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+    return domain + path;
   }, []);
 
   // Handle currency change
@@ -268,6 +286,7 @@ export function MintListScreen({
               const normalizedUrl = normalizeUrl(mint.mintUrl);
               const kymData = kymScores[normalizedUrl];
               const kymScore = kymData?.score;
+
               return (
                 <MintItem
                   key={mint.mintUrl}

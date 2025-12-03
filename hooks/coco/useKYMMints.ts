@@ -34,10 +34,26 @@ interface UseKYMMintsResult {
 }
 
 /**
- * Helper function to normalize URLs for comparison (remove trailing slash)
+ * Helper function to normalize URLs for comparison
+ * Removes protocol (http/https), www prefix, trailing slash
+ * Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
  */
 const normalizeUrl = (url: string): string => {
-  return url.replace(/\/$/, '');
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  const slashIndex = withoutProtocol.indexOf('/');
+  if (slashIndex === -1) {
+    // No path, just domain
+    return withoutProtocol
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .replace(/\/$/, '');
+  }
+  const domain = withoutProtocol
+    .slice(0, slashIndex)
+    .toLowerCase()
+    .replace(/^www\./, '');
+  const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+  return domain + path;
 };
 
 /**
@@ -54,6 +70,17 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
   const getCached = useKYMMintStore((state) => state.getCached);
   const setCached = useKYMMintStore((state) => state.setCached);
   const isStale = useKYMMintStore((state) => state.isStale);
+
+  // Timeout fallback - if eose never fires, stop loading after 5 seconds
+  useEffect(() => {
+    if (!loading) return;
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   // Normalize mint URLs for comparison
   const normalizedMintUrls = useMemo(() => {
@@ -189,7 +216,7 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
 
       // Merge with existing cached scores for mints that didn't get new events
       setScores((prevScores) => ({ ...prevScores, ...newScores }));
-    } catch {
+    } catch (err) {
       setError('Failed to process mint recommendations. Please try again.');
     } finally {
       if (eose) {

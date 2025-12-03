@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { auditMint, fetchMintInfo, type AuditMintResponse } from 'helper/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useAuditMintStore } from 'stores/auditMintStore';
@@ -60,12 +60,30 @@ const transformAuditData = (auditData: AuditMintResponse): AuditInfo => {
   };
 };
 
-const normalizeUrl = (url: string): string => url.replace(/\/$/, '');
+// Consistent URL normalization across the app
+// Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
+const normalizeUrl = (url: string): string => {
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  const slashIndex = withoutProtocol.indexOf('/');
+  if (slashIndex === -1) {
+    // No path, just domain
+    return withoutProtocol
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .replace(/\/$/, '');
+  }
+  const domain = withoutProtocol
+    .slice(0, slashIndex)
+    .toLowerCase()
+    .replace(/^www\./, '');
+  const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
+  return domain + path;
+};
 
 /**
  * Batch hook for loading audit data for multiple mints at once.
  * Much more efficient than calling useAuditedMint for each individual mint.
- * 
+ *
  * Features:
  * - Loads from cache first for instant display
  * - Fetches missing/stale data in batches with concurrency limit
@@ -82,21 +100,42 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
   const setCached = useAuditMintStore((state) => state.setCached);
   const isStale = useAuditMintStore((state) => state.isStale);
 
+  // Memoize the joined URL string to use as dependency
+  const mintUrlsKey = useMemo(() => mintUrls.join(','), [mintUrls]);
+
+  console.log('[AUDIT_DEBUG] useAuditedMints called with:', {
+    mintUrlsCount: mintUrls.length,
+    firstFew: mintUrls.slice(0, 3),
+  });
+
   // Load cached data immediately on mount/url change
   useEffect(() => {
+    console.log('[AUDIT_DEBUG] useEffect triggered, mintUrls.length:', mintUrls.length);
+
     if (mintUrls.length === 0) {
+      console.log('[AUDIT_DEBUG] No mint URLs, clearing data');
       setData({});
       setLoading(false);
       return;
     }
 
     const initialData: Record<string, AuditedMintData> = {};
-    const urlsToFetch: string[] = [];
+    // Store both normalized key and original URL for API calls
+    const urlsToFetch: { normalized: string; original: string }[] = [];
 
-    mintUrls.forEach((url) => {
+    mintUrls.forEach((url, index) => {
       const normalizedUrl = normalizeUrl(url);
       const cached = getCached(normalizedUrl);
       const stale = isStale(normalizedUrl);
+
+      if (index < 3) {
+        console.log(`[AUDIT_DEBUG] Processing URL ${index}:`, {
+          original: url,
+          normalized: normalizedUrl,
+          hasCached: !!cached,
+          isStale: stale,
+        });
+      }
 
       if (cached && !stale) {
         // Use cached data
@@ -106,16 +145,23 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           loading: false,
         };
       } else {
-        // Mark for fetching
+        // Mark for fetching - keep both normalized key and original URL
         initialData[normalizedUrl] = { loading: true };
-        urlsToFetch.push(normalizedUrl);
+        urlsToFetch.push({ normalized: normalizedUrl, original: url });
       }
+    });
+
+    console.log('[AUDIT_DEBUG] Initial processing complete:', {
+      cachedCount: Object.keys(initialData).filter((k) => !initialData[k].loading).length,
+      toFetchCount: urlsToFetch.length,
+      firstFewToFetch: urlsToFetch.slice(0, 3),
     });
 
     setData(initialData);
 
     // If everything was cached, we're done
     if (urlsToFetch.length === 0) {
+      console.log('[AUDIT_DEBUG] Everything cached, done loading');
       setLoading(false);
       return;
     }
@@ -126,80 +172,134 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
     let queueIndex = 0;
 
     const fetchNext = async () => {
-      if (!mountedRef.current) return;
+      // Check if we've processed all URLs
       if (queueIndex >= urlsToFetch.length) {
-        if (activeCount === 0) {
+        if (activeCount === 0 && mountedRef.current) {
+          console.log('[AUDIT_DEBUG] All fetches complete, setting loading false');
           setLoading(false);
         }
         return;
       }
 
-      const url = urlsToFetch[queueIndex++];
-      
+      const { normalized, original } = urlsToFetch[queueIndex++];
+
       // Skip if already fetching
-      if (fetchingRef.current.has(url)) {
+      if (fetchingRef.current.has(normalized)) {
+        console.log('[AUDIT_DEBUG] Already fetching:', normalized);
         fetchNext();
         return;
       }
 
-      fetchingRef.current.add(url);
+      fetchingRef.current.add(normalized);
       activeCount++;
+
+      console.log(`[AUDIT_DEBUG] Starting fetch for:`, {
+        normalized,
+        original,
+        queueIndex,
+        activeCount,
+        mounted: mountedRef.current,
+      });
 
       try {
         let auditInfo: AuditInfo | undefined;
         let mintInfo: GetInfoResponse | undefined;
 
-        // Fetch audit data
-        const auditResult = await auditMint({ mintUrl: url });
+        // Use original URL for API calls (preserves case and protocol)
+        const apiUrl = original.startsWith('http') ? original : `https://${original}`;
+        console.log(`[AUDIT_DEBUG] Calling auditMint with apiUrl:`, apiUrl);
+
+        const auditResult = await auditMint({ mintUrl: apiUrl });
+        console.log(`[AUDIT_DEBUG] auditMint result for ${normalized}:`, {
+          isOk: auditResult.isOk(),
+          hasValue: auditResult.isOk() ? !!auditResult.value : false,
+          error: auditResult.isErr() ? auditResult.error : null,
+          mounted: mountedRef.current,
+        });
+
         if (auditResult.isOk()) {
           auditInfo = transformAuditData(auditResult.value);
+          console.log(`[AUDIT_DEBUG] Transformed auditInfo for ${normalized}:`, {
+            score: auditInfo.score,
+            state: auditInfo.state,
+            mints: auditInfo.auditorData.mints,
+            melts: auditInfo.auditorData.melts,
+            errors: auditInfo.auditorData.errors,
+          });
         }
 
         // Fetch mint info
-        const mintInfoResult = await fetchMintInfo(url);
+        console.log(`[AUDIT_DEBUG] Calling fetchMintInfo with apiUrl:`, apiUrl);
+        const mintInfoResult = await fetchMintInfo(apiUrl);
+        console.log(`[AUDIT_DEBUG] fetchMintInfo result for ${normalized}:`, {
+          isOk: mintInfoResult.isOk(),
+          hasValue: mintInfoResult.isOk() ? !!mintInfoResult.value : false,
+          mounted: mountedRef.current,
+        });
+
         if (mintInfoResult.isOk()) {
           mintInfo = mintInfoResult.value;
-          
-          // Cache if both succeeded
-          if (auditResult.isOk()) {
-            setCached(url, auditResult.value, mintInfo);
-          }
         }
 
+        // ALWAYS cache the result in the store (even if component unmounted)
+        // This way the next mount will have the data immediately
+        if (auditResult.isOk() && mintInfo) {
+          console.log(
+            `[AUDIT_DEBUG] Caching data for ${normalized} (mounted: ${mountedRef.current})`
+          );
+          setCached(normalized, auditResult.value, mintInfo);
+        }
+
+        // Only update React state if still mounted
         if (mountedRef.current) {
+          console.log(`[AUDIT_DEBUG] Setting data for ${normalized}:`, {
+            hasAuditInfo: !!auditInfo,
+            hasMintInfo: !!mintInfo,
+          });
           setData((prev) => ({
             ...prev,
-            [url]: { auditInfo, mintInfo, loading: false },
+            [normalized]: { auditInfo, mintInfo, loading: false },
           }));
+        } else {
+          console.log(`[AUDIT_DEBUG] Unmounted, skip state for ${normalized} (cached)`);
         }
       } catch (err) {
+        console.log(`[AUDIT_DEBUG] Exception fetching ${normalized}:`, err);
         if (mountedRef.current) {
           setData((prev) => ({
             ...prev,
-            [url]: { loading: false, error: 'Failed to load' },
+            [normalized]: { loading: false, error: 'Failed to load' },
           }));
         }
       } finally {
-        fetchingRef.current.delete(url);
+        fetchingRef.current.delete(normalized);
         activeCount--;
+        console.log(`[AUDIT_DEBUG] Fetch complete for ${normalized}, activeCount:`, activeCount);
+        // Continue fetching next items even if unmounted (they'll be cached)
         fetchNext();
       }
     };
 
     // Start concurrent fetches
+    console.log(
+      '[AUDIT_DEBUG] Starting concurrent fetches, limit:',
+      Math.min(CONCURRENT_LIMIT, urlsToFetch.length)
+    );
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, urlsToFetch.length); i++) {
       fetchNext();
     }
 
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [mintUrls.join(','), getCached, setCached, isStale]);
+    // Note: We intentionally don't set mountedRef.current = false here
+    // because we want fetches to continue and cache results even if the
+    // effect re-runs due to mintUrlsKey changes
+  }, [mintUrlsKey, mintUrls, getCached, setCached, isStale]);
 
-  // Reset mounted ref on re-mount
+  // Track actual component mount/unmount separately
   useEffect(() => {
+    console.log('[AUDIT_DEBUG] Component mounted');
     mountedRef.current = true;
     return () => {
+      console.log('[AUDIT_DEBUG] Component unmounting');
       mountedRef.current = false;
     };
   }, []);
@@ -207,11 +307,31 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
   const getAuditData = useCallback(
     (mintUrl: string): AuditedMintData => {
       const normalizedUrl = normalizeUrl(mintUrl);
-      return data[normalizedUrl] || { loading: true };
+      const result = data[normalizedUrl] || { loading: true };
+      console.log(`[AUDIT_DEBUG] getAuditData called:`, {
+        mintUrl,
+        normalizedUrl,
+        found: !!data[normalizedUrl],
+        hasAuditInfo: !!result.auditInfo,
+        loading: result.loading,
+        dataKeys: Object.keys(data).slice(0, 5),
+      });
+      return result;
     },
     [data]
   );
 
+  console.log('[AUDIT_DEBUG] Hook returning:', {
+    dataKeysCount: Object.keys(data).length,
+    loading,
+    sampleData: Object.entries(data)
+      .slice(0, 2)
+      .map(([k, v]) => ({
+        key: k,
+        hasAuditInfo: !!v.auditInfo,
+        loading: v.loading,
+      })),
+  });
+
   return { data, loading, getAuditData };
 };
-
