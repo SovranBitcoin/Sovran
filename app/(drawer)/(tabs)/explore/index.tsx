@@ -6,12 +6,14 @@ import { HStack, Spacer, View, VStack } from 'components/ui/View';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { popup } from 'helper/popup';
+import { truncateMiddle } from 'helper/strings';
 import { getModels, RoutstrModel } from 'helper/routstr/api';
 import opacity from 'hex-color-opacity';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from 'react-native';
@@ -606,6 +608,162 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
   );
 };
 
+// Lightning Address Card - Custom username purchase
+const LightningAddressCard = () => {
+  const { getPrimaryColor } = useTheme();
+  const { keys: nostrKeys } = useNostrKeysContext();
+
+  const currentAddress = nostrKeys?.npub
+    ? `${truncateMiddle(nostrKeys.npub, 6)}@npubx.cash`
+    : 'npub...@npubx.cash';
+
+  const handlePress = useCallback(() => {
+    router.push('/claimUsername');
+  }, []);
+
+  // Theme-based accent color
+  const accentColor = getPrimaryColor('400');
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={[styles.lightningAddressCard, { borderColor: opacity(getPrimaryColor('500'), 0.3) }]}
+      onPress={handlePress}>
+      {/* Gradient background using theme colors */}
+      <LinearGradient
+        colors={[getPrimaryColor('900'), getPrimaryColor('800'), getPrimaryColor('900')]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Decorative lightning bolts */}
+      <View style={styles.lightningDecorationLeft}>
+        <Icon name="mingcute:lightning-fill" size={80} color={opacity(accentColor, 0.08)} />
+      </View>
+      <View style={styles.lightningDecorationRight}>
+        <Icon name="mingcute:lightning-fill" size={120} color={opacity(accentColor, 0.05)} />
+      </View>
+
+      <VStack style={{ padding: 20, zIndex: 1 }}>
+        {/* Header */}
+        <HStack align="center" style={{ marginBottom: 16 }}>
+          <View
+            style={[styles.lightningAddressIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+            <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+          </View>
+          <VStack style={{ flex: 1, marginLeft: 12 }}>
+            <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+              Claim Your Address
+            </Text>
+            <Text size={12} style={{ color: getPrimaryColor('400') }}>
+              Get a memorable Lightning URL
+            </Text>
+          </VStack>
+          <View
+            style={[
+              styles.lightningAddressBadge,
+              {
+                backgroundColor: opacity(accentColor, 0.15),
+                borderColor: opacity(accentColor, 0.3),
+              },
+            ]}>
+            <Text size={10} heavy style={{ color: accentColor }}>
+              PREMIUM
+            </Text>
+          </View>
+        </HStack>
+
+        {/* Address comparison */}
+        <VStack style={{ gap: 12 }}>
+          {/* Current address (before) */}
+          <VStack>
+            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
+              YOUR CURRENT ADDRESS
+            </Text>
+            <View
+              style={[styles.addressBox, { borderColor: opacity(getPrimaryColor('500'), 0.2) }]}>
+              <Icon name="mdi:close-circle" size={16} color="#ef4444" style={{ marginRight: 8 }} />
+              <Text
+                size={13}
+                style={{ color: getPrimaryColor('400'), fontFamily: 'monospace' }}
+                numberOfLines={1}>
+                {currentAddress}
+              </Text>
+            </View>
+          </VStack>
+
+          {/* Arrow */}
+          <HStack align="center" justify="center">
+            <View style={[styles.addressArrowLine, { backgroundColor: getPrimaryColor('700') }]} />
+            <View
+              style={[styles.addressArrowIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+              <Icon name="mdi:arrow-down" size={16} color={accentColor} />
+            </View>
+            <View style={[styles.addressArrowLine, { backgroundColor: getPrimaryColor('700') }]} />
+          </HStack>
+
+          {/* Custom address (after) */}
+          <VStack>
+            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
+              YOUR CUSTOM ADDRESS
+            </Text>
+            <View
+              style={[
+                styles.addressBox,
+                {
+                  backgroundColor: opacity(accentColor, 0.1),
+                  borderColor: opacity(accentColor, 0.3),
+                },
+              ]}>
+              <Icon name="mdi:check-circle" size={16} color="#22c55e" style={{ marginRight: 8 }} />
+              <Text
+                size={14}
+                heavy
+                style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
+                satoshi
+              </Text>
+              <Text size={14} style={{ color: getPrimaryColor('400'), fontFamily: 'monospace' }}>
+                @npubx.cash
+              </Text>
+            </View>
+          </VStack>
+        </VStack>
+
+        {/* Benefits */}
+        <HStack style={{ marginTop: 16, gap: 16 }}>
+          <HStack align="center">
+            <Icon name="mdi:share-variant" size={14} color={getPrimaryColor('500')} />
+            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+              Easy to share
+            </Text>
+          </HStack>
+          <HStack align="center">
+            <Icon name="mdi:qrcode" size={14} color={getPrimaryColor('500')} />
+            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+              Scannable QR
+            </Text>
+          </HStack>
+          <HStack align="center">
+            <Icon name="mdi:account-check" size={14} color={getPrimaryColor('500')} />
+            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+              Memorable
+            </Text>
+          </HStack>
+        </HStack>
+
+        {/* CTA Button */}
+        <View style={[styles.lightningAddressCTA, { backgroundColor: getPrimaryColor('500') }]}>
+          <Text size={14} heavy style={{ color: '#fff' }}>
+            Get Your Username
+          </Text>
+          <Icon name="mdi:arrow-right" size={18} color="#fff" style={{ marginLeft: 8 }} />
+        </View>
+      </VStack>
+    </TouchableOpacity>
+  );
+};
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -737,6 +895,17 @@ const ExploreScreen = () => {
             </View>
           )}
         </ScrollView>
+
+        <Spacer size={32} />
+
+        {/* Lightning Address Section */}
+        <SectionHeader
+          title="Your Lightning Address"
+          subtitle="Receive Bitcoin with a memorable URL"
+        />
+        <View style={{ paddingHorizontal: 20 }}>
+          <LightningAddressCard />
+        </View>
 
         <Spacer size={32} />
 
@@ -1001,6 +1170,66 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Lightning Address Card styles
+  lightningAddressCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  lightningDecorationLeft: {
+    position: 'absolute',
+    top: -20,
+    left: -20,
+    transform: [{ rotate: '-15deg' }],
+  },
+  lightningDecorationRight: {
+    position: 'absolute',
+    bottom: -30,
+    right: -30,
+    transform: [{ rotate: '15deg' }],
+  },
+  lightningAddressIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightningAddressBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  addressBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  addressArrowLine: {
+    flex: 1,
+    height: 1,
+  },
+  addressArrowIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 12,
+  },
+  lightningAddressCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
   },
 });
 

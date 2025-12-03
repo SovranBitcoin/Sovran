@@ -183,4 +183,15 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
+  {
+    name: 'claimUsername',
+    options: {
+      presentation: 'formSheet',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackButtonDisplayMode: 'minimal',
+      gestureDirection: 'vertical',
+    },
+  },
 ];

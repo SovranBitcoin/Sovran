@@ -192,5 +192,14 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:trash-can-outline',
     'mdi:chevron-up',
     'mdi:key-variant',
+
+    // Lightning Address card icons
+    'mdi:arrow-down',
+    'mdi:share-variant',
+    'mdi:qrcode',
+    'mdi:account-check',
+
+    // Claim username modal icons
+    'mdi:check',
   ],
 });
