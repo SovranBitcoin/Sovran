@@ -10,7 +10,14 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { TouchableOpacity, TextInput, ActivityIndicator, Keyboard, StyleSheet } from 'react-native';
+import {
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Keyboard,
+  StyleSheet,
+  Alert,
+} from 'react-native';
 import { Stack, router } from 'expo-router';
 import { View, VStack, HStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
@@ -299,7 +306,7 @@ function ClaimUsernameScreen() {
 
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();
-    // TODO: Implement continue logic
+    Alert.alert('Not Implemented', 'This feature is not implemented yet.');
   }, []);
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)?.value || '';
