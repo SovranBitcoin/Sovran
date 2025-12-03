@@ -8,7 +8,7 @@ module.exports = ({ config }) => {
     process.env.APP_VARIANT ||
     process.env.EXPO_PUBLIC_ENV ||
     'production';
-  const isDevelopment = buildProfile === 'development';
+  const isDevelopment = buildProfile === 'development' || buildProfile === 'preview';
 
   // Debug logging to verify bundle identifier selection
   if (process.env.EAS_BUILD_PROFILE || process.env.APP_VARIANT) {
@@ -18,9 +18,15 @@ module.exports = ({ config }) => {
     );
   }
 
+  // Use development icon for TestFlight (preview) and local development builds
+  const appIcon = isDevelopment
+    ? './assets/images/development.png'
+    : './assets/images/production.png';
+
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
+    icon: appIcon,
     plugins: [...(config.plugins || []), 'expo-maps'],
     ios: {
       ...config.ios,
@@ -28,6 +34,10 @@ module.exports = ({ config }) => {
     },
     android: {
       ...config.android,
+      adaptiveIcon: {
+        ...config.android?.adaptiveIcon,
+        foregroundImage: appIcon,
+      },
       package: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
     },
   };
