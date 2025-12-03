@@ -58,6 +58,8 @@ interface MintItemProps {
   isLoading?: boolean;
   globalLoading?: boolean;
   requireBalance?: boolean;
+  /** Minimum balance required - mints below this show at reduced opacity */
+  minAmount?: number;
   selectedCurrency?: string;
   showDetailsButton?: boolean;
   onInspectPress?: () => void;
@@ -76,6 +78,7 @@ const MintItem: React.FC<MintItemProps> = ({
   isLoading = false,
   globalLoading = false,
   requireBalance: _requireBalance = false,
+  minAmount,
   showDetailsButton = false,
   onInspectPress,
   selectedCurrency: _selectedCurrency,
@@ -135,8 +138,19 @@ const MintItem: React.FC<MintItemProps> = ({
   const itemOpacity = useMemo(() => {
     if (globalLoading) return 0.5;
     if (balance && balance.amount === 0 && _requireBalance) return 0.5;
+    // Show at reduced opacity if balance is below minimum required amount
+    if (minAmount !== undefined && minAmount > 0 && balance && balance.amount < minAmount)
+      return 0.5;
     return 1;
-  }, [globalLoading, balance, _requireBalance]);
+  }, [globalLoading, balance, _requireBalance, minAmount]);
+
+  // Check if this mint has insufficient balance for selection
+  const hasInsufficientBalance = useMemo(() => {
+    if (minAmount !== undefined && minAmount > 0 && balance) {
+      return balance.amount < minAmount;
+    }
+    return false;
+  }, [minAmount, balance]);
 
   return (
     <TouchableOpacity
@@ -148,7 +162,7 @@ const MintItem: React.FC<MintItemProps> = ({
         opacity: itemOpacity,
       }}
       onPress={onPress}
-      disabled={globalLoading}>
+      disabled={globalLoading || hasInsufficientBalance}>
       <VStack gap={0}>
         {/* Top section: Logo, name, balance/URL, checkbox/dots */}
         <HStack align="center" gap={12}>

@@ -20,6 +20,10 @@ interface WalletHeaderTitleProps {
   requireBalance?: boolean;
   /** Callback when a mint is selected */
   onMintSelected?: (mint: { id: string; unit: string }) => void;
+  /** Whether to show the add mints button in the mint list (default: true) */
+  showAddMintsButton?: boolean;
+  /** Whether to show the details/inspect button on each mint (default: true) */
+  showDetailsButton?: boolean;
 }
 
 /**
@@ -31,6 +35,8 @@ export default function WalletHeaderTitle({
   unit = 'sat',
   requireBalance = false,
   onMintSelected,
+  showAddMintsButton = true,
+  showDetailsButton = true,
   style,
 }: WalletHeaderTitleProps & { style?: ViewStyle }) {
   const { keys } = useNostrKeysContext();
@@ -124,8 +130,8 @@ export default function WalletHeaderTitle({
           onMintSelected={handleMintSelectedInternal}
           requireBalance={requireBalance}
           updateSelectedMint={true}
-          showAddMintsButton={true}
-          showDetailsButton={true}
+          showAddMintsButton={showAddMintsButton}
+          showDetailsButton={showDetailsButton}
           style={{ width: '100%' }}
         />
       </View>
@@ -159,9 +165,11 @@ export default function WalletHeaderTitle({
             </SwiftUIButton>
 
             {/* Actions */}
-            <SwiftUIButton systemImage="plus.circle" onPress={handleAddMint}>
-              Add Mint
-            </SwiftUIButton>
+            {showAddMintsButton && (
+              <SwiftUIButton systemImage="plus.circle" onPress={handleAddMint}>
+                Add Mint
+              </SwiftUIButton>
+            )}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
             <HStack modifiers={[padding({ horizontal: 64 })]}>
@@ -173,8 +181,8 @@ export default function WalletHeaderTitle({
                   onMintSelected={handleMintSelectedInternal}
                   requireBalance={requireBalance}
                   updateSelectedMint={true}
-                  showAddMintsButton={true}
-                  showDetailsButton={true}
+                  showAddMintsButton={showAddMintsButton}
+                  showDetailsButton={showDetailsButton}
                   style={{ width: '100%' }}
                 />
               </SwiftUIButton>

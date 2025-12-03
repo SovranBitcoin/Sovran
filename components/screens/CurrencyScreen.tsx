@@ -65,7 +65,13 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HStack, View, VStack } from 'components/ui/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
-import { useLightningOperations, useManager, useMelt, useSend } from 'hooks/coco';
+import {
+  useLightningOperations,
+  useManager,
+  useMelt,
+  useSend,
+  useBalanceContext,
+} from 'hooks/coco';
 import { requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
@@ -181,6 +187,8 @@ export interface CurrencyScreenProps {
   onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
   onRoutstrSuccess?: () => void;
   processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<void>;
+  /** Called when user tries to send more than current mint's balance */
+  onInsufficientBalance?: (amount: number, unit: string) => void;
 }
 
 export function CurrencyScreen({
@@ -191,6 +199,7 @@ export function CurrencyScreen({
   onCameraPress,
   onRoutstrSuccess,
   processPaymentStringFn,
+  onInsufficientBalance,
 }: CurrencyScreenProps) {
   const { getPrimaryColor, getGreenColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
@@ -217,6 +226,10 @@ export function CurrencyScreen({
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
+
+  // Get live balance for the selected mint
+  const { balance: liveBalances } = useBalanceContext();
+  const mintBalance = selectedMint ? liveBalances[selectedMint] || 0 : 0;
 
   // Convert input amount to sats (for API calls)
   const satsAmount = useMemo(() => {
@@ -399,6 +412,16 @@ export function CurrencyScreen({
 
   const handleNext = async () => {
     if (!isValidAmount) return;
+
+    // Check for insufficient balance on send operations
+    const isSendOperation = params.to === 'sendToken' || params.to === 'meltQuote';
+    if (isSendOperation && amount > mintBalance) {
+      // Redirect to mint selection with minimum amount filter
+      if (onInsufficientBalance) {
+        onInsufficientBalance(amount, unit);
+        return;
+      }
+    }
 
     setLoading(true);
 
@@ -594,6 +617,8 @@ export function CurrencyScreen({
             width={200}
             unit={unit}
             requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
+            showAddMintsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
+            showDetailsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
             onMintSelected={handleMintSelected}
           />
         </View>

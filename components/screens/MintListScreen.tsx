@@ -35,6 +35,8 @@ const CURRENCY_TABS_HEIGHT = 48;
 export interface MintListScreenProps {
   /** Whether to require balance for selection (default: false) */
   requireBalance?: boolean;
+  /** Minimum balance required for mint selection (filters out mints below this amount) */
+  minAmount?: number;
   /** Whether to show the details/inspect button on each mint (default: true) */
   showDetailsButton?: boolean;
   /** Label for currency selector (default: "Currency") */
@@ -55,6 +57,7 @@ export interface MintListScreenProps {
 
 export function MintListScreen({
   requireBalance = false,
+  minAmount,
   showDetailsButton = true,
   currencyLabel: _currencyLabel = 'Currency',
   mintsLabel: _mintsLabel = 'Your mints',
@@ -140,7 +143,7 @@ export function MintListScreen({
     return ['ALL', ...filtered];
   }, [processedMints, allowedCurrencies]);
 
-  // Filter mints by selected currency
+  // Filter mints by selected currency (minAmount is handled by MintItem opacity)
   const filteredMints = useMemo(() => {
     if (selectedCurrency === 'ALL') {
       return processedMints;
@@ -192,7 +195,21 @@ export function MintListScreen({
       const mint = processedMints.find((m) => m.mintUrl === mintUrl);
       if (!mint) return;
 
+      // Check if balance is required and mint has no balance
       if (requireBalance && mint.amount === 0) {
+        popup({
+          message: 'insufficient_balance',
+          params: {
+            amount: mint.amount,
+            unit: mint.unit,
+            fee: 0,
+          },
+        });
+        return;
+      }
+
+      // Check if mint has sufficient balance for minAmount
+      if (minAmount !== undefined && minAmount > 0 && mint.amount < minAmount) {
         popup({
           message: 'insufficient_balance',
           params: {
@@ -219,7 +236,7 @@ export function MintListScreen({
         setLoadingId(null);
       }
     },
-    [processedMints, pubkey, setSelectedMint, requireBalance, onMintSelect, loadingId]
+    [processedMints, pubkey, setSelectedMint, requireBalance, minAmount, onMintSelect, loadingId]
   );
 
   // Handle inspect mint
@@ -295,6 +312,7 @@ export function MintListScreen({
                   isLoading={loadingId === mint.mintUrl}
                   globalLoading={loadingId !== null}
                   requireBalance={requireBalance}
+                  minAmount={minAmount}
                   showDetailsButton={showDetailsButton}
                   onInspectPress={onInspectMint ? () => handleInspectMint(mint.mintUrl) : undefined}
                   selectedCurrency={selectedCurrency}

@@ -75,6 +75,20 @@ function ModalScreen() {
           // Dismiss the modal to return to the previous screen (UserMessages)
           router.dismiss();
         }}
+        onInsufficientBalance={(amount, unit) => {
+          // Navigate to mint selection with minimum amount filter
+          // This will hide mints that don't have sufficient balance
+          router.navigate({
+            pathname: '/(mint-flow)/list',
+            params: {
+              to: params.to || 'sendToken',
+              minAmount: String(amount),
+              amount: String(amount),
+              showDetailsButton: 'false',
+              showAddMintsButton: 'false',
+            },
+          });
+        }}
         processPaymentStringFn={processPaymentString}
       />
     </>

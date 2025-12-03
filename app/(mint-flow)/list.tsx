@@ -24,12 +24,18 @@ function MintListRoute() {
     onSelectAction?: string;
     continuePathname?: string;
     continueParams?: string;
+    // Send flow params for insufficient balance redirect
+    minAmount?: string;
+    amount?: string;
+    to?: string;
   }>();
 
   const requireBalance = params.requireBalance === 'true';
   const showAddMintsButton = params.showAddMintsButton !== 'false';
   const showDetailsButton = params.showDetailsButton !== 'false';
   const onSelectAction = params.onSelectAction || 'goBack';
+  // Parse minAmount for filtering mints with insufficient balance
+  const minAmount = params.minAmount ? parseInt(params.minAmount, 10) : undefined;
 
   return (
     <>
@@ -51,7 +57,8 @@ function MintListRoute() {
       />
 
       <MintListScreen
-        requireBalance={requireBalance}
+        requireBalance={requireBalance || !!minAmount}
+        minAmount={minAmount}
         showDetailsButton={showDetailsButton}
         currencyLabel="Currency"
         mintsLabel="Your mints"
