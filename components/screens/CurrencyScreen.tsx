@@ -50,7 +50,7 @@
  */
 
 import { popup } from '@/helper/popup';
-import { getEncodedToken, getEncodedTokenV4, MeltQuoteResponse } from '@cashu/cashu-ts';
+import { getEncodedTokenV4, MeltQuoteResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
@@ -69,7 +69,7 @@ import {
   useLightningOperations,
   useManager,
   useMelt,
-  useSend,
+  useSendWithHistory,
   useBalanceContext,
 } from 'hooks/coco';
 import { requestInvoiceFromLnurl } from '@/helper/coco/utils';
@@ -77,7 +77,6 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { SheetManager } from 'react-native-actions-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintStore } from 'stores/mintStore';
 import { useRoutstrStore } from 'stores/routstrStore';
@@ -204,7 +203,7 @@ export function CurrencyScreen({
   const { getPrimaryColor, getGreenColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const { send } = useSend();
+  const { send } = useSendWithHistory();
   const { requestLightningInvoice } = useLightningOperations();
   const { createMeltQuote } = useMelt();
   const { setApiKey, setBalance, balance } = useRoutstrStore();
@@ -288,7 +287,7 @@ export function CurrencyScreen({
     setUnit(newUnit);
   };
 
-  const handleLightningReceive = async ({ memo: _memo }: { memo?: string }) => {
+  const handleLightningReceive = async () => {
     if (!selectedMint) {
       popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
@@ -305,18 +304,20 @@ export function CurrencyScreen({
     }
   };
 
-  const handleEcashSend = async ({ message: _message }: { message?: string }) => {
+  const handleEcashSend = async () => {
     if (!selectedMint) {
       popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
       return;
     }
 
-    const result = await send(selectedMint, amount);
+    // useSendWithHistory returns both the token and the history entry
+    // This is the coco-idiomatic way - no need to search paginated history
+    const { token, historyEntry } = await send(selectedMint, amount);
 
     // Handle Routstr top-up flow
     if (params.routstrTopUp === 'true') {
       try {
-        const encodedToken = getEncodedTokenV4(result);
+        const encodedToken = getEncodedTokenV4(token);
 
         // Get the latest apiKey directly from the store to avoid stale closure
         const currentApiKey = useRoutstrStore.getState().apiKey;
@@ -399,15 +400,8 @@ export function CurrencyScreen({
       }
     }
 
-    const sendHistoryEntry = await manager.history
-      .getPaginatedHistory()
-      .then((h) =>
-        h.find((h) => h.type === 'send' && getEncodedToken(h.token) === getEncodedToken(result))
-      );
-
-    if (sendHistoryEntry) {
-      onSendTokenCreated(sendHistoryEntry as SendHistoryEntry);
-    }
+    // Pass the history entry directly - no need to search through history
+    onSendTokenCreated(historyEntry);
   };
 
   const handleNext = async () => {
@@ -427,26 +421,18 @@ export function CurrencyScreen({
 
     switch (params.to) {
       case 'mintQuote':
-        SheetManager.show('transaction-message', {
-          onClose: async (data) => {
-            if (data?.action && ['confirm', 'skip'].includes(data.action)) {
-              await handleLightningReceive({
-                memo: data?.action === 'confirm' ? data.message : undefined,
-              });
-            }
-            setLoading(false);
-          },
-        });
+        try {
+          await handleLightningReceive();
+        } finally {
+          setLoading(false);
+        }
         break;
       case 'sendToken':
-        SheetManager.show('transaction-message', {
-          onClose: async (data) => {
-            await handleEcashSend({
-              message: data?.action === 'confirm' ? data.message : undefined,
-            });
-            setLoading(false);
-          },
-        });
+        try {
+          await handleEcashSend();
+        } finally {
+          setLoading(false);
+        }
         break;
       case 'meltQuote':
         console.log('[LIGHTNING-FLOW] CurrencyScreen handleNext meltQuote case', {

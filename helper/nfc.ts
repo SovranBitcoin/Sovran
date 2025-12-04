@@ -402,6 +402,98 @@ export function selectBestMint(
 // ============================================================================
 
 /**
+ * Write a Cashu token to an NFC tag for sharing
+ *
+ * This is a standalone function for writing tokens to NFC tags,
+ * separate from the POS payment flow. Useful for P2P token sharing.
+ *
+ * @param token - The encoded Cashu token string to write
+ * @returns true if successful, false otherwise
+ */
+export async function writeTokenToNFC(token: string): Promise<boolean> {
+  log('Starting NFC token write...');
+
+  // Pre-flight checks
+  const supported = await NfcPayment.isSupported();
+  if (!supported) {
+    logError('NFC is not supported on this device');
+    return false;
+  }
+
+  const enabled = await NfcPayment.isEnabled();
+  if (!enabled) {
+    logError('NFC is disabled');
+    return false;
+  }
+
+  try {
+    await NfcManager.requestTechnology(NfcTech.IsoDep);
+    log('IsoDep technology acquired');
+
+    // SELECT NDEF Tag Application AID
+    let r = await sendApdu(SELECT_AID, 'SELECT AID');
+    if (!r.ok) {
+      throw new NfcError(`AID not accepted (${getStatusMessage(r.sw)})`, 'AID_SELECT_FAILED', r.sw);
+    }
+
+    // SELECT NDEF File
+    r = await sendApdu(SELECT_NDEF, 'SELECT NDEF');
+    if (!r.ok) {
+      throw new NfcError(
+        `NDEF file not accessible (${getStatusMessage(r.sw)})`,
+        'NDEF_SELECT_FAILED',
+        r.sw
+      );
+    }
+
+    // Build NDEF message
+    const ndef = buildTextNdef(token);
+    const writeNlen = (ndef[0] << 8) | ndef[1];
+    logDebug(`NDEF message: NLEN=${writeNlen}, total=${ndef.length} bytes`);
+
+    // Write NLEN first
+    r = await sendApdu(UPDATE_BINARY(0, [ndef[0], ndef[1]]), 'WRITE NLEN');
+    if (!r.ok) {
+      throw new NfcError(`Failed writing NLEN (${getStatusMessage(r.sw)})`, 'WRITE_NLEN_FAILED', r.sw);
+    }
+
+    // Write body in chunks
+    let offset = 2;
+    const body = ndef.slice(2);
+    const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
+    let chunkNum = 0;
+
+    while (offset - 2 < body.length) {
+      const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
+      chunkNum++;
+      logDebug(`Writing chunk ${chunkNum}/${totalChunks}: ${chunk.length} bytes`);
+
+      r = await sendApdu(UPDATE_BINARY(offset, chunk), `WRITE chunk ${chunkNum}`);
+      if (!r.ok) {
+        throw new NfcError(
+          `Failed writing chunk ${chunkNum} (${getStatusMessage(r.sw)})`,
+          'WRITE_CHUNK_FAILED',
+          r.sw
+        );
+      }
+      offset += chunk.length;
+    }
+
+    log('Token written to NFC successfully!');
+    return true;
+  } catch (error) {
+    logError('NFC token write failed:', error);
+    return false;
+  } finally {
+    try {
+      await NfcManager.cancelTechnologyRequest();
+    } catch (cleanupError) {
+      logWarn('Failed to release NFC technology:', cleanupError);
+    }
+  }
+}
+
+/**
  * NFC Payment Service for contactless Cashu payments
  *
  * Handles the complete payment flow:

@@ -18,8 +18,8 @@ import { HStack, View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
-import { useMintManagement } from 'hooks/coco';
-import { usePaginatedHistory, useReceive } from 'coco-cashu-react';
+import { useMintManagement, useManager } from 'hooks/coco';
+import { useReceive } from 'coco-cashu-react';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -29,7 +29,7 @@ import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import type { SendHistoryEntry } from 'coco-cashu-core';
+import type { SendHistoryEntry, HistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { useTheme } from 'providers/ThemeProvider';
@@ -72,13 +72,14 @@ export function SendTokenScreen({
 }: SendTokenScreenProps) {
   const { receive } = useReceive();
   const { getMintInfo } = useMintManagement();
+  const manager = useManager();
   const { getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
-  const [_uri, setUri] = useState('');
+  const [, setUri] = useState('');
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
 
   // Parse sendHistoryEntry - handles both string (from params) and object
-  const { sendHistoryEntry, parseError } = useMemo(() => {
+  const { sendHistoryEntry: initialEntry, parseError } = useMemo(() => {
     if (!sendHistoryEntryProp) {
       return { sendHistoryEntry: null, parseError: 'Missing transaction data. Please try again.' };
     }
@@ -100,15 +101,39 @@ export function SendTokenScreen({
     return { sendHistoryEntry: sendHistoryEntryProp, parseError: null };
   }, [sendHistoryEntryProp]);
 
-  const { history } = usePaginatedHistory();
+  // State for the current transaction - starts with initial entry and updates via events
+  const [currentTransaction, setCurrentTransaction] = useState<SendHistoryEntry | null>(
+    initialEntry
+  );
 
-  const currentTransaction = history.find((tx) => {
-    return (
-      tx.type === 'send' &&
-      getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry?.token)
-    );
-  });
+  // Update currentTransaction when initialEntry changes (e.g., navigation params change)
+  useEffect(() => {
+    if (initialEntry) {
+      setCurrentTransaction(initialEntry);
+    }
+  }, [initialEntry]);
 
+  // Listen to history:updated events to keep the transaction state in sync
+  // This is the coco way - subscribe to events for real-time updates
+  useEffect(() => {
+    if (!initialEntry?.id) return;
+
+    const handleHistoryUpdated = ({ entry }: { mintUrl: string; entry: HistoryEntry }) => {
+      // Check if this update is for our transaction
+      if (entry.type === 'send' && entry.id === initialEntry.id) {
+        console.log('[SendTokenScreen] History updated for our transaction:', entry);
+        setCurrentTransaction(entry as SendHistoryEntry);
+      }
+    };
+
+    const unsubscribe = manager.on('history:updated', handleHistoryUpdated);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [initialEntry?.id, manager]);
+
+  // Load mint info when entry changes (hook must be before early returns)
   useEffect(() => {
     const loadMintInfo = async () => {
       if (currentTransaction?.mintUrl) {
@@ -125,7 +150,7 @@ export function SendTokenScreen({
   }, [currentTransaction?.mintUrl, getMintInfo]);
 
   // Show error state if parsing failed
-  if (parseError || !sendHistoryEntry) {
+  if (parseError || !currentTransaction) {
     return (
       <ErrorState
         message={parseError || 'Missing transaction data. Please try again.'}
@@ -134,28 +159,35 @@ export function SendTokenScreen({
     );
   }
 
+  // Token is only available after execute (state >= pending)
+  const token = currentTransaction.token;
+
   const handleNFCSend = async (close: (event: any) => void): Promise<void> => {
-    const success = await writeTokenToNFC(getEncodedTokenV4(sendHistoryEntry.token));
+    if (!token) return;
+    const success = await writeTokenToNFC(getEncodedTokenV4(token));
     if (success) {
       popup({ message: 'ecash_token_shared_via_nfc', type: 'success', onClose: () => close({}) });
     }
   };
 
   const handleCopy = async (onClose: (event: any) => void) => {
-    await Clipboard.setStringAsync(getEncodedTokenV4(sendHistoryEntry.token));
+    if (!token) return;
+    await Clipboard.setStringAsync(getEncodedTokenV4(token));
     popup({ message: 'ecash_token_copied', type: 'success', onClose: () => onClose({}) });
   };
 
   const handleShare = async (onClose: (event: any) => void) => {
+    if (!token) return;
     await Share.share({
-      message: 'cashu://' + getEncodedTokenV4(sendHistoryEntry.token),
+      message: 'cashu://' + getEncodedTokenV4(token),
     });
     onClose({});
   };
 
   const handleCancelSend = async (onClose: (event: any) => void) => {
+    if (!token) return;
     try {
-      await receive(getEncodedTokenV4(sendHistoryEntry.token));
+      await receive(getEncodedTokenV4(token));
       popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
     } catch (error) {
       popup({
@@ -166,11 +198,12 @@ export function SendTokenScreen({
   };
 
   const getFormattedToken = (): string => {
+    if (!token) return '';
     try {
-      return getEncodedTokenV4(sendHistoryEntry.token);
+      return getEncodedTokenV4(token);
     } catch (error) {
       console.warn('Failed to encode token, using original:', error);
-      return JSON.stringify(sendHistoryEntry.token);
+      return JSON.stringify(token);
     }
   };
 
@@ -180,23 +213,15 @@ export function SendTokenScreen({
   const handleCopyEmoji = async (onClose: (event: any) => void) => {
     SheetManager.show('emoji-picker', {
       payload: {
-        token: getEncodedTokenV4(sendHistoryEntry.token),
+        token: currentTransaction.token ? getEncodedTokenV4(currentTransaction.token) : '',
       },
       onClose,
     });
   };
 
-  if (!currentTransaction) {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>Loading transaction...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  const isPaid = 'state' in currentTransaction && currentTransaction.state === 'PAID';
+  // SendHistoryEntry has a state field: 'prepared' | 'pending' | 'completed' | 'rolledBack'
+  // The transaction is "paid/completed" when state is 'completed'
+  const isPaid = currentTransaction.state === 'completed';
 
   return (
     <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
@@ -210,11 +235,11 @@ export function SendTokenScreen({
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={currentTransaction} />
 
-          {!isPaid && (
+          {!isPaid && token && (
             <PaymentInfo
               setUri={setUri}
               popupMessage="ecash_token_copied"
-              unit={sendHistoryEntry.unit}
+              unit={currentTransaction.unit}
               data={formattedToken}
               animated={isLongToken}
             />
@@ -248,11 +273,11 @@ export function SendTokenScreen({
               },
               {
                 title: 'Token',
-                value: truncateMiddle(getEncodedTokenV4(sendHistoryEntry.token), 6),
+                value: token ? truncateMiddle(getEncodedTokenV4(token), 6) : 'N/A',
               },
               {
                 title: 'Amount',
-                value: `${currentTransaction.amount} ${sendHistoryEntry.unit.toUpperCase()}`,
+                value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
               },
             ]}
           />
@@ -289,35 +314,35 @@ export function SendTokenScreen({
                 icon: 'lets-icons:copy',
                 variant: 'primary',
                 onPress: handleCopy,
-                condition: !isPaid,
+                condition: !isPaid && !!token,
               },
               {
                 text: 'Share',
                 icon: 'ri:share-fill',
                 variant: 'secondary',
                 onPress: handleShare,
-                condition: !isPaid,
+                condition: !isPaid && !!token,
               },
               {
                 text: 'NFC',
                 icon: 'ph:contactless-payment-fill',
                 variant: 'secondary',
                 onPress: handleNFCSend,
-                condition: !isPaid,
+                condition: !isPaid && !!token,
               },
               {
                 text: 'Copy as Emoji',
                 icon: 'fluent:emoji-24-filled',
                 variant: 'primary',
                 onPress: handleCopyEmoji,
-                condition: !isPaid,
+                condition: !isPaid && !!token,
               },
               {
                 text: 'Cancel Transaction',
                 icon: 'mdi:cancel',
                 variant: 'dangerous',
                 onPress: handleCancelSend,
-                condition: !isPaid,
+                condition: !isPaid && !!token,
               },
             ]}
           />

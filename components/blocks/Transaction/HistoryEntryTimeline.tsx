@@ -4,7 +4,13 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { convertTime } from 'helper/time';
-import type { HistoryEntry, MintHistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
+import type {
+  HistoryEntry,
+  MintHistoryEntry,
+  MeltHistoryEntry,
+  SendHistoryEntry,
+  ReceiveHistoryEntry,
+} from 'coco-cashu-core';
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { MintQuoteState, MeltQuoteState, MeltQuoteResponse } from '@cashu/cashu-ts';
 
@@ -13,9 +19,20 @@ interface HistoryEntryTimelineProps {
   meltQuote?: MeltQuoteResponse;
 }
 
-// Define the state progressions
+// Define the state progressions for each transaction type
 const MINT_STATES = [MintQuoteState.UNPAID, MintQuoteState.PAID, MintQuoteState.ISSUED] as const;
 const MELT_STATES = [MeltQuoteState.UNPAID, MeltQuoteState.PENDING, MeltQuoteState.PAID] as const;
+
+// Send states from coco: 'prepared' | 'pending' | 'completed' | 'rolledBack'
+// For timeline display, we show: PREPARED → PENDING → COMPLETED (or ROLLED_BACK as terminal)
+const SEND_STATES = ['prepared', 'pending', 'completed'] as const;
+const SEND_STATE_LABELS: Record<string, string> = {
+  prepared: 'PREPARED',
+  pending: 'PENDING',
+  completed: 'COMPLETED',
+  rolledBack: 'ROLLED BACK',
+};
+
 const EXPIRED_STATE = 'EXPIRED';
 
 interface TimelineItem {
@@ -54,7 +71,7 @@ const getTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): 
 };
 
 export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTimelineProps) {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -69,59 +86,104 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
     }
   }, [meltQuote, historyEntry.type]);
 
-  const isMintTransaction = historyEntry.type === 'mint';
-
   const getTimeline = (): TimelineItem[] => {
-    if (isMintTransaction) {
-      const mintTx = historyEntry as MintHistoryEntry;
-      const isExpired = mintTx.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(mintTx);
+    switch (historyEntry.type) {
+      case 'mint': {
+        const mintTx = historyEntry as MintHistoryEntry;
+        const isExpired = mintTx.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(mintTx);
 
-      if (isExpired) {
-        // Show expired timeline
+        if (isExpired) {
+          return [
+            {
+              state: MintQuoteState.UNPAID,
+              complete: true,
+              isCurrent: false,
+              timestamp: mintTx.createdAt,
+            },
+            { state: EXPIRED_STATE, complete: true, isCurrent: true },
+          ];
+        }
+
+        const currentIndex = MINT_STATES.indexOf(mintTx.state);
+        return MINT_STATES.map((state, index) => ({
+          state,
+          complete: index <= currentIndex,
+          isCurrent: index === currentIndex,
+          timestamp: index === 0 ? mintTx.createdAt : undefined,
+        }));
+      }
+
+      case 'melt': {
+        const meltTx = historyEntry as MeltHistoryEntry;
+        const isExpired = meltQuote && isMeltQuoteExpired(meltQuote, currentTime);
+
+        if (isExpired) {
+          return [
+            {
+              state: MeltQuoteState.UNPAID,
+              complete: true,
+              isCurrent: false,
+              timestamp: meltTx.createdAt,
+            },
+            { state: EXPIRED_STATE, complete: true, isCurrent: true },
+          ];
+        }
+
+        const currentIndex = MELT_STATES.indexOf(meltTx.state);
+        return MELT_STATES.map((state, index) => ({
+          state,
+          complete: index <= currentIndex,
+          isCurrent: index === currentIndex,
+          timestamp: index === 0 ? meltTx.createdAt : undefined,
+        }));
+      }
+
+      case 'send': {
+        const sendTx = historyEntry as SendHistoryEntry;
+        const txState = sendTx.state;
+
+        // Handle rolled back as a special terminal state
+        if (txState === 'rolledBack') {
+          return [
+            {
+              state: SEND_STATE_LABELS.prepared,
+              complete: true,
+              isCurrent: false,
+              timestamp: sendTx.createdAt,
+            },
+            {
+              state: SEND_STATE_LABELS.rolledBack,
+              complete: true,
+              isCurrent: true,
+            },
+          ];
+        }
+
+        // Normal send progression: prepared → pending → completed
+        const currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
+        return SEND_STATES.map((state, index) => ({
+          state: SEND_STATE_LABELS[state],
+          complete: index <= currentIndex,
+          isCurrent: index === currentIndex,
+          timestamp: index === 0 ? sendTx.createdAt : undefined,
+        }));
+      }
+
+      case 'receive': {
+        const receiveTx = historyEntry as ReceiveHistoryEntry;
+        // Receive is instant - just show completed
         return [
           {
-            state: MintQuoteState.UNPAID,
+            state: 'RECEIVED',
             complete: true,
-            isCurrent: false,
-            timestamp: mintTx.createdAt,
+            isCurrent: true,
+            timestamp: receiveTx.createdAt,
           },
-          { state: EXPIRED_STATE, complete: true, isCurrent: true },
         ];
       }
 
-      // Normal mint progression
-      const currentIndex = MINT_STATES.indexOf(mintTx.state);
-      return MINT_STATES.map((state, index) => ({
-        state,
-        complete: index <= currentIndex,
-        isCurrent: index === currentIndex,
-        timestamp: index === 0 ? mintTx.createdAt : undefined,
-      }));
-    } else {
-      // Melt transaction
-      const meltTx = historyEntry as MeltHistoryEntry;
-      const isExpired = meltQuote && isMeltQuoteExpired(meltQuote, currentTime);
-
-      if (isExpired) {
-        // Show expired timeline for melt
-        return [
-          {
-            state: MeltQuoteState.UNPAID,
-            complete: true,
-            isCurrent: false,
-            timestamp: meltTx.createdAt,
-          },
-          { state: EXPIRED_STATE, complete: true, isCurrent: true },
-        ];
-      }
-
-      const currentIndex = MELT_STATES.indexOf(meltTx.state);
-      return MELT_STATES.map((state, index) => ({
-        state,
-        complete: index <= currentIndex,
-        isCurrent: index === currentIndex,
-        timestamp: index === 0 ? meltTx.createdAt : undefined,
-      }));
+      default:
+        return [];
     }
   };
 
@@ -146,7 +208,10 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
     collapsed && canCollapse ? [timeline[0], timeline[timeline.length - 1]] : timeline;
 
   const getBarColor = (item: TimelineItem) => {
-    if (item.state === EXPIRED_STATE) return '#ef4444';
+    // Red for expired or rolled back states
+    if (item.state === EXPIRED_STATE || item.state === SEND_STATE_LABELS.rolledBack) {
+      return getRedColor('400');
+    }
     return item.complete ? getGreenColor('300') : getPrimaryColor('200');
   };
 
