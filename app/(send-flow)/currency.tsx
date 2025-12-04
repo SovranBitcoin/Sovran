@@ -26,6 +26,14 @@ function ModalScreen() {
     lnUrlOrAddress?: string;
     routstrTopUp?: string;
   }>();
+
+  console.log('[LIGHTNING-FLOW] currency.tsx received params', {
+    to: params.to,
+    lnUrlOrAddress: params.lnUrlOrAddress,
+    lud16: params.lud16,
+    amount: params.amount,
+  });
+
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;

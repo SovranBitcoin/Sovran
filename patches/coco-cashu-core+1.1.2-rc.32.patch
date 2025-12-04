@@ -1,9 +1,18 @@
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
-index 209a67b..1e2c92b 100644
+index 39ff868..4b9d00b 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
 +++ b/node_modules/coco-cashu-core/dist/index.d.cts
-@@ -1279,7 +1279,7 @@ declare class Manager {
-   readonly history: HistoryApi;
+@@ -1425,7 +1425,7 @@ declare class PaymentRequestService {
+ declare class WalletApi {
+   private mintService;
+   private walletService;
+-  private proofService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private transactionService;
+   private paymentRequestService;
+@@ -1797,7 +1797,7 @@ declare class Manager {
+   readonly send: SendApi;
    private mintService;
    private walletService;
 -  private proofService;
@@ -11,7 +20,7 @@ index 209a67b..1e2c92b 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1293,7 +1293,7 @@ declare class Manager {
+@@ -1811,7 +1811,7 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -19,13 +28,22 @@ index 209a67b..1e2c92b 100644
 +  counterService: CounterService;
    private transactionService;
    private paymentRequestService;
-   private readonly pluginHost;
+   private sendOperationService;
 diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
-index 209a67b..1e2c92b 100644
+index 39ff868..4b9d00b 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.ts
 +++ b/node_modules/coco-cashu-core/dist/index.d.ts
-@@ -1279,7 +1279,7 @@ declare class Manager {
-   readonly history: HistoryApi;
+@@ -1425,7 +1425,7 @@ declare class PaymentRequestService {
+ declare class WalletApi {
+   private mintService;
+   private walletService;
+-  private proofService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private transactionService;
+   private paymentRequestService;
+@@ -1797,7 +1797,7 @@ declare class Manager {
+   readonly send: SendApi;
    private mintService;
    private walletService;
 -  private proofService;
@@ -33,7 +51,7 @@ index 209a67b..1e2c92b 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1293,7 +1293,7 @@ declare class Manager {
+@@ -1811,7 +1811,7 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -41,4 +59,4 @@ index 209a67b..1e2c92b 100644
 +  counterService: CounterService;
    private transactionService;
    private paymentRequestService;
-   private readonly pluginHost;
+   private sendOperationService;

@@ -16,6 +16,12 @@ function ModalScreen() {
     meltHistoryEntry?: string;
   }>();
 
+  console.log('[LIGHTNING-FLOW] meltQuote.tsx received params', {
+    meltQuoteReceived: !!meltQuote,
+    meltHistoryEntryReceived: !!meltHistoryEntry,
+    meltQuoteParsed: meltQuote ? JSON.parse(meltQuote) : null,
+  });
+
   return (
     <>
       <Stack.Screen options={{ title: 'Send Lightning' }} />

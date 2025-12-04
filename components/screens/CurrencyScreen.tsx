@@ -449,6 +449,12 @@ export function CurrencyScreen({
         });
         break;
       case 'meltQuote':
+        console.log('[LIGHTNING-FLOW] CurrencyScreen handleNext meltQuote case', {
+          lnUrlOrAddress: params.lnUrlOrAddress,
+          amount,
+          selectedMint,
+        });
+
         if (!params.lnUrlOrAddress) {
           popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
           setLoading(false);
@@ -462,7 +468,17 @@ export function CurrencyScreen({
             return;
           }
 
+          console.log('[LIGHTNING-FLOW] Requesting invoice from LNURL', {
+            lnUrlOrAddress: params.lnUrlOrAddress,
+            amount,
+          });
+
           const invoice = await requestInvoiceFromLnurl(params.lnUrlOrAddress, amount);
+
+          console.log('[LIGHTNING-FLOW] Invoice received', {
+            invoiceReceived: !!invoice,
+            invoiceLength: invoice?.length,
+          });
 
           if (!invoice) {
             popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
@@ -471,6 +487,10 @@ export function CurrencyScreen({
           }
 
           const meltQuote = await createMeltQuote(selectedMint, invoice);
+          console.log('[LIGHTNING-FLOW] Melt quote created, navigating to meltQuote screen', {
+            meltQuoteId: meltQuote?.quote,
+            amount: meltQuote?.amount,
+          });
           onMeltQuoteCreated(meltQuote);
         } catch (err) {
           console.error('Failed to create melt quote:', err);

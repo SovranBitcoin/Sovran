@@ -248,8 +248,31 @@ export function MeltQuoteScreen({
     (h): h is MeltHistoryEntry => h.type === 'melt' && h.quoteId === displayQuote?.quote
   );
 
+  console.log('[LIGHTNING-FLOW] MeltQuoteScreen render check', {
+    displayQuoteExists: !!displayQuote,
+    displayQuoteId: displayQuote?.quote,
+    historyLength: history.length,
+    displayMeltHistoryEntryFound: !!displayMeltHistoryEntry,
+    isCreatingQuote,
+  });
+
   if (!displayMeltHistoryEntry || isCreatingQuote) {
-    return null;
+    // Show loading state while waiting for history entry to be created
+    return (
+      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+        <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Spinner size={32} />
+          <Text
+            size={16}
+            style={{
+              color: getPrimaryColor('300'),
+              marginTop: 16,
+            }}>
+            Preparing payment...
+          </Text>
+        </VStack>
+      </View>
+    );
   }
 
   return (

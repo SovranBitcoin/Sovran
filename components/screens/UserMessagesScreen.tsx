@@ -1451,6 +1451,7 @@ export function UserMessagesScreen({
   };
 
   const handleSendMoney = () => {
+    console.log('[LIGHTNING-FLOW] handleSendMoney called', { lud16, userInfo: userInfo?.name });
     if (!lud16 || !userInfo) return;
 
     SheetManager.show('button-handler', {
@@ -1477,6 +1478,10 @@ export function UserMessagesScreen({
             icon: 'mingcute:lightning-fill',
             variant: 'primary' as const,
             onPress: async (close) => {
+              console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
+                lnUrlOrAddress: lud16,
+                to: 'meltQuote',
+              });
               router.navigate({
                 pathname: '/(send-flow)/currency',
                 params: {

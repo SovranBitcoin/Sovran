@@ -43,13 +43,7 @@ export interface SendTokenScreenProps {
 }
 
 /** Error screen shown when transaction data is missing or invalid */
-function ErrorState({
-  message,
-  onNavigateBack,
-}: {
-  message: string;
-  onNavigateBack: () => void;
-}) {
+function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
   const { getPrimaryColor } = useTheme();
 
   return (
@@ -108,20 +102,10 @@ export function SendTokenScreen({
 
   const { history } = usePaginatedHistory();
 
-  // Show error state if parsing failed
-  if (parseError || !sendHistoryEntry) {
-    return (
-      <ErrorState
-        message={parseError || 'Missing transaction data. Please try again.'}
-        onNavigateBack={onNavigateBack}
-      />
-    );
-  }
-
   const currentTransaction = history.find((tx) => {
     return (
       tx.type === 'send' &&
-      getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry.token)
+      getEncodedTokenV4(tx.token) === getEncodedTokenV4(sendHistoryEntry?.token)
     );
   });
 
@@ -139,6 +123,16 @@ export function SendTokenScreen({
     };
     loadMintInfo();
   }, [currentTransaction?.mintUrl, getMintInfo]);
+
+  // Show error state if parsing failed
+  if (parseError || !sendHistoryEntry) {
+    return (
+      <ErrorState
+        message={parseError || 'Missing transaction data. Please try again.'}
+        onNavigateBack={onNavigateBack}
+      />
+    );
+  }
 
   const handleNFCSend = async (close: (event: any) => void): Promise<void> => {
     const success = await writeTokenToNFC(getEncodedTokenV4(sendHistoryEntry.token));
@@ -332,4 +326,3 @@ export function SendTokenScreen({
     </View>
   );
 }
-
