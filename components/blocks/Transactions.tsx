@@ -90,6 +90,11 @@ export const Transactions = React.memo(
               historyEntry.state === 'UNPAID' &&
               mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
             if (isExpired) return false;
+
+            // Filter out unpaid melt quotes
+            if (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') {
+              return false;
+            }
           }
 
           // Filter by selected month if provided
