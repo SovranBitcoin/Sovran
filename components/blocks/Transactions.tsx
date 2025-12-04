@@ -123,7 +123,9 @@ export const Transactions = React.memo(
         _.groupBy(sortedHistory, (historyEntry: HistoryEntry) => {
           const isPending =
             (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-            (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID');
+            (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
+            (historyEntry.type === 'send' &&
+              (historyEntry.state === 'pending' || historyEntry.state === 'prepared'));
 
           // Check if it's an expired mint transaction
           const isExpired =

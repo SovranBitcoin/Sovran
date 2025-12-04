@@ -58,6 +58,18 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
+  {
+    name: 'pendingEcash',
+    title: 'Pending Ecash',
+    options: {
+      presentation: 'modal',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackButtonDisplayMode: 'minimal',
+      gestureDirection: 'vertical',
+    },
+  },
   // Map flow modal group - Bitcoin merchant map
   // Using 'modal' instead of 'fullScreenModal' for faster animation
   {

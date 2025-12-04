@@ -20,6 +20,11 @@ import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from '
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
+import { usePaginatedHistory, useMints } from 'hooks/coco';
+import { SendHistoryEntry, Mint } from 'coco-cashu-core';
+import { Avatar } from 'components/ui/Avatar';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { extractDomain } from 'helper/url';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -764,6 +769,151 @@ const LightningAddressCard = () => {
   );
 };
 
+// Pending Ecash Card
+const PendingEcashCard = () => {
+  const { getPrimaryColor } = useTheme();
+  const { history } = usePaginatedHistory();
+  const { trustedMints: mints } = useMints();
+
+  // Filter pending send transactions
+  const pendingSends = useMemo(() => {
+    return history.filter(
+      (entry): entry is SendHistoryEntry =>
+        entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
+    );
+  }, [history]);
+
+  // Get unique mints with pending transactions (up to 3 for display)
+  const pendingMints = useMemo(() => {
+    const mintUrls = [...new Set(pendingSends.map((tx) => tx.mintUrl))];
+    return mintUrls
+      .map((url) => mints.find((m: Mint) => m.mintUrl === url))
+      .filter((m): m is Mint => m !== undefined)
+      .slice(0, 3);
+  }, [pendingSends, mints]);
+
+  // Calculate totals
+  const totalAmount = useMemo(() => {
+    return pendingSends.reduce((sum, tx) => sum + tx.amount, 0);
+  }, [pendingSends]);
+
+  const unit = pendingSends[0]?.unit || 'sat';
+
+  const handlePress = useCallback(() => {
+    router.push('/pendingEcash');
+  }, []);
+
+  // Don't show card if no pending transactions
+  if (pendingSends.length === 0) {
+    return null;
+  }
+
+  const accentColor = '#f59e0b'; // Amber/orange for pending state
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={[styles.pendingEcashCard, { borderColor: opacity(accentColor, 0.3) }]}
+      onPress={handlePress}>
+      {/* Gradient background */}
+      <LinearGradient
+        colors={[getPrimaryColor('900'), opacity(accentColor, 0.1), getPrimaryColor('900')]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Decorative clock icon */}
+      <View style={styles.pendingDecorationRight}>
+        <Icon name="mdi:clock-outline" size={100} color={opacity(accentColor, 0.06)} />
+      </View>
+
+      <VStack style={{ padding: 20, zIndex: 1 }}>
+        {/* Header */}
+        <HStack align="center" style={{ marginBottom: 16 }}>
+          <View style={[styles.pendingEcashIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+            <Icon name="mdi:clock-alert-outline" size={20} color={accentColor} />
+          </View>
+          <VStack style={{ flex: 1, marginLeft: 12 }}>
+            <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+              Pending Ecash
+            </Text>
+            <Text size={12} style={{ color: getPrimaryColor('400') }}>
+              Unclaimed sent tokens
+            </Text>
+          </VStack>
+          <View
+            style={[
+              styles.pendingCountBadge,
+              {
+                backgroundColor: opacity(accentColor, 0.15),
+                borderColor: opacity(accentColor, 0.3),
+              },
+            ]}>
+            <Text size={12} heavy style={{ color: accentColor }}>
+              {pendingSends.length}
+            </Text>
+          </View>
+        </HStack>
+
+        {/* Amount display */}
+        <View style={[styles.pendingAmountBox, { borderColor: opacity(accentColor, 0.2) }]}>
+          <VStack>
+            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
+              TOTAL UNCLAIMED
+            </Text>
+            <AmountFormatter
+              amount={totalAmount}
+              unit={unit}
+              size={24}
+              weight="heavy"
+              color={getPrimaryColor('50')}
+            />
+          </VStack>
+        </View>
+
+        {/* Mint avatars */}
+        {pendingMints.length > 0 && (
+          <HStack align="center" style={{ marginTop: 16 }}>
+            <HStack style={{ marginRight: 8 }}>
+              {pendingMints.map((mint, index) => (
+                <View
+                  key={mint.mintUrl}
+                  style={{
+                    marginLeft: index > 0 ? -8 : 0,
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: getPrimaryColor('900'),
+                  }}>
+                  <Avatar
+                    picture={mint.mintInfo?.icon_url || undefined}
+                    size={28}
+                    variant="mint"
+                    name={mint.mintInfo?.name || extractDomain(mint.mintUrl)}
+                  />
+                </View>
+              ))}
+            </HStack>
+            <Text size={12} style={{ color: getPrimaryColor('400') }}>
+              {pendingMints.length === 1
+                ? `from ${pendingMints[0].mintInfo?.name || extractDomain(pendingMints[0].mintUrl)}`
+                : `from ${pendingMints.length} mints`}
+            </Text>
+          </HStack>
+        )}
+
+        {/* CTA */}
+        <View style={[styles.pendingEcashCTA, { backgroundColor: accentColor }]}>
+          <Text size={14} heavy style={{ color: '#fff' }}>
+            View & Reclaim
+          </Text>
+          <Icon name="mdi:arrow-right" size={18} color="#fff" style={{ marginLeft: 8 }} />
+        </View>
+      </VStack>
+    </TouchableOpacity>
+  );
+};
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -895,6 +1045,13 @@ const ExploreScreen = () => {
             </View>
           )}
         </ScrollView>
+
+        <Spacer size={32} />
+
+        {/* Pending Ecash Section - only shows when there are pending transactions */}
+        {/* <View style={{ paddingHorizontal: 20 }}>
+          <PendingEcashCard />
+        </View> */}
 
         <Spacer size={32} />
 
@@ -1224,6 +1381,48 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   lightningAddressCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  // Pending Ecash Card styles
+  pendingEcashCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  pendingDecorationRight: {
+    position: 'absolute',
+    bottom: -20,
+    right: -20,
+    transform: [{ rotate: '15deg' }],
+  },
+  pendingEcashIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingCountBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  pendingAmountBox: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  pendingEcashCTA: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

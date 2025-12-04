@@ -201,5 +201,12 @@ module.exports = withMonicon(nativeWindConfig, {
 
     // Claim username modal icons
     'mdi:check',
+
+    // Pending Ecash icons
+    'mdi:clock-outline',
+    'mdi:clock-alert-outline',
+    'mdi:broom',
+    'mdi:check-circle-outline',
+    'fluent:wallet-24-filled',
   ],
 });
