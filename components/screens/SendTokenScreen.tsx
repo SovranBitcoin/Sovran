@@ -227,7 +227,7 @@ export function SendTokenScreen({
   );
 
   return (
-    <ModalLayoutWrapper bottomContent={bottomButtons}>
+    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={currentTransaction} />
 
