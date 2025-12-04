@@ -1,6 +1,6 @@
 {
   "name": "Sovran",
-  "main": "expo-router/entry",
+  "main": "./index.js",
   "version": "1.0.0",
   "expo": {
     "doctor": {

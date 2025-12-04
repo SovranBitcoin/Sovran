@@ -4,29 +4,27 @@
  * This module provides the core UI and logic for Lightning melt quotes (sending).
  * It is used by both standalone and flow-based route wrappers.
  *
- * The Screen component handles:
- * - Parsing meltQuote and meltHistoryEntry from string params
- * - Loading and error states
- * - All UI and business logic
+ * The Screen supports two flows:
+ * 1. Viewing existing transaction: meltHistoryEntry prop provided
+ * 2. Creating new quote: invoice or lnUrlOrAddress + amount provided
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { formatAmount } from 'helper/currency';
-import { useMintManagement, useMelt, useManager } from 'hooks/coco';
+import { popup } from '@/helper/popup';
+import { useMintManagement, useHistoryEntry, useMeltWithHistory } from 'hooks/coco';
 import { VStack, HStack, View } from 'components/ui/View';
-import { router } from 'expo-router';
 import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { useMintStore } from '@/stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import { HistoryEntry, MeltHistoryEntry } from 'coco-cashu-core';
-import { getLightningTimestamp } from '@/helper/coco/utils';
+import { MeltHistoryEntry } from 'coco-cashu-core';
+import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Spinner } from 'components/ui/Spinner';
@@ -34,129 +32,136 @@ import { convertTime } from 'helper/time';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { meltQuoteExpired } from 'helper/utils';
 import { BottomButtons } from 'components/ui/BottomButtons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalLayoutWrapper } from 'app/debugModal';
+import type { MeltQuoteResponse } from '@cashu/cashu-ts';
 
 export interface MeltQuoteScreenProps {
-  /** Either the parsed quote or a JSON string to be parsed internally */
-  meltQuote?: MeltQuoteResponse | string;
-  /** Either the parsed entry or a JSON string to be parsed internally */
+  /** For viewing existing transaction - either parsed entry or JSON string */
   meltHistoryEntry?: MeltHistoryEntry | string;
+  /** Direct Lightning invoice for creating new quote */
+  invoice?: string;
+  /** Lightning address or LNURL for creating new quote (requires amount) */
+  lnUrlOrAddress?: string;
+  /** Amount in sats (required when using lnUrlOrAddress) */
+  amount?: number;
   onCancel: () => void;
+  /** Callback when send is successful (after popup closes) */
+  onSendSuccess?: () => void;
+}
+
+/** Error screen shown when transaction data is missing or invalid */
+function ErrorState({ message, onCancel }: { message: string; onCancel: () => void }) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <ModalLayoutWrapper>
+      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+        <Text
+          size={18}
+          bold
+          style={{ color: getPrimaryColor('0'), marginBottom: 16, textAlign: 'center' }}>
+          Error
+        </Text>
+        <Text
+          size={14}
+          style={{ color: getPrimaryColor('300'), marginBottom: 24, textAlign: 'center' }}>
+          {message}
+        </Text>
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Go Back',
+              icon: 'ri:arrow-left-line',
+              variant: 'primary',
+              onPress: async () => onCancel(),
+            },
+          ]}
+        />
+      </View>
+    </ModalLayoutWrapper>
+  );
+}
+
+/** Loading screen shown while creating quote */
+function LoadingState({ message }: { message: string }) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <ModalLayoutWrapper>
+      <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Spinner size={32} />
+        <Text size={16} style={{ color: getPrimaryColor('300'), marginTop: 16 }}>
+          {message}
+        </Text>
+      </VStack>
+    </ModalLayoutWrapper>
+  );
 }
 
 export function MeltQuoteScreen({
-  meltQuote: meltQuoteProp,
   meltHistoryEntry: meltHistoryEntryProp,
+  invoice: invoiceProp,
+  lnUrlOrAddress: lnUrlOrAddressProp,
+  amount: amountProp,
   onCancel,
+  onSendSuccess,
 }: MeltQuoteScreenProps) {
-  // Parse props - handles both string (from params) and object
-  const { meltQuote, meltHistoryEntry } = useMemo(() => {
-    let parsedQuote: MeltQuoteResponse | undefined;
-    let parsedHistoryEntry: MeltHistoryEntry | undefined;
-
-    if (meltQuoteProp) {
-      if (typeof meltQuoteProp === 'string') {
-        try {
-          parsedQuote = JSON.parse(meltQuoteProp) as MeltQuoteResponse;
-        } catch {
-          parsedQuote = undefined;
-        }
-      } else {
-        parsedQuote = meltQuoteProp;
-      }
-    }
-
-    if (meltHistoryEntryProp) {
-      if (typeof meltHistoryEntryProp === 'string') {
-        try {
-          parsedHistoryEntry = JSON.parse(meltHistoryEntryProp) as MeltHistoryEntry;
-        } catch {
-          parsedHistoryEntry = undefined;
-        }
-      } else {
-        parsedHistoryEntry = meltHistoryEntryProp;
-      }
-    }
-
-    return { meltQuote: parsedQuote, meltHistoryEntry: parsedHistoryEntry };
-  }, [meltQuoteProp, meltHistoryEntryProp]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const { getMintInfo } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-  const { payMeltQuote, currentQuote, createMeltQuote, isCreatingQuote, getMeltQuote } = useMelt();
-  const { getMintInfo } = useMintManagement();
-  const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
 
+  // For viewing existing transaction
+  const { entry: trackedHistoryEntry, error: parseError } =
+    useHistoryEntry<MeltHistoryEntry>(meltHistoryEntryProp);
+
+  // For creating new quote
+  const {
+    createMeltQuote,
+    payMeltQuote,
+    historyEntry: createdHistoryEntry,
+    quote: createdQuote,
+    isCreating,
+    isPaying,
+    error: meltError,
+  } = useMeltWithHistory();
+
+  // Local state for quote creation flow
+  const [resolvedInvoice, setResolvedInvoice] = useState<string | null>(null);
+  const [isResolvingLnurl, setIsResolvingLnurl] = useState(false);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>({});
-  const [fetchedMeltQuote, setFetchedMeltQuote] = useState<MeltQuoteResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const hasStartedCreation = useRef(false);
 
-  useEffect(() => {
-    const fetchMeltQuote = async () => {
-      if (meltHistoryEntry && !meltQuote) {
-        setLoading(true);
-        setError(null);
+  // The history entry to display - either from prop or created
+  const currentTransaction = trackedHistoryEntry || createdHistoryEntry;
 
-        try {
-          if (!meltHistoryEntry.quoteId) {
-            throw new Error('No quote ID found in melt history entry');
-          }
-
-          const mintInfoResult = await getMintInfo(meltHistoryEntry.mintUrl);
-          if (!mintInfoResult) {
-            throw new Error('Mint not found');
-          }
-
-          const quote = await getMeltQuote(meltHistoryEntry.mintUrl, meltHistoryEntry.quoteId);
-          if (!quote) {
-            throw new Error('Melt quote not found');
-          }
-
-          setFetchedMeltQuote(quote);
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Failed to load melt quote';
-          setError(errorMessage);
-          console.error('Failed to fetch melt quote:', err);
-        } finally {
-          setLoading(false);
+  // The quote to display - either derived from history entry or created
+  const displayQuote: MeltQuoteResponse | null =
+    createdQuote ||
+    (currentTransaction
+      ? {
+          quote: currentTransaction.quoteId,
+          amount: currentTransaction.amount,
+          fee_reserve: 0, // Not stored in history entry
+          state: currentTransaction.state,
+          expiry: 0, // Not stored in history entry
+          payment_preimage: null,
+          change: undefined,
+          request: '', // Not stored in history entry
+          unit: currentTransaction.unit,
         }
-      }
-    };
+      : null);
 
-    fetchMeltQuote();
-  }, [meltHistoryEntry, meltQuote, getMeltQuote, getMintInfo]);
+  const [unit, setUnit] = useState(currentTransaction?.unit || 'sat');
 
-  const displayQuote = currentQuote || meltQuote || fetchedMeltQuote;
-  const manager = useManager();
-
-  useEffect(() => {
-    manager.history.getPaginatedHistory().then(setHistory);
-  }, [manager, displayQuote]);
-
-  // Subscribe to history:updated events to refresh when melt quote state changes
-  useEffect(() => {
-    const handler = () => {
-      manager.history.getPaginatedHistory().then(setHistory);
-    };
-    manager.on('history:updated', handler);
-    return () => {
-      manager.off('history:updated', handler);
-    };
-  }, [manager]);
-
-  const [unit, setUnit] = useState(meltQuote?.unit || meltHistoryEntry?.unit || 'sat');
-  const amount = displayQuote?.amount || 0;
-  const feeReserve = displayQuote?.fee_reserve || 0;
-  const quoteId = displayQuote?.quote || '';
-
+  // Load mint info
   useEffect(() => {
     const loadMintInfo = async () => {
-      if (selectedMint) {
+      const mintUrl = currentTransaction?.mintUrl || selectedMint;
+      if (mintUrl) {
         try {
-          const info = await getMintInfo(selectedMint);
+          const info = await getMintInfo(mintUrl);
           setMintInfo(info);
         } catch (err) {
           console.error('Failed to load mint info:', err);
@@ -165,210 +170,207 @@ export function MeltQuoteScreen({
       }
     };
     loadMintInfo();
-  }, [selectedMint, getMintInfo]);
+  }, [currentTransaction?.mintUrl, selectedMint, getMintInfo]);
 
-  const handleMintSelected = async (mint: any) => {
-    try {
-      await createMeltQuote(mint.id, meltQuote?.request || '');
-      setUnit(mint.unit.toLowerCase());
-    } catch (err) {
-      console.error('Failed to create quote with new mint:', err);
-      Alert.alert('Error', 'Failed to create quote with selected mint');
+  // Resolve LNURL to invoice if needed
+  useEffect(() => {
+    const resolveLnurl = async () => {
+      if (lnUrlOrAddressProp && amountProp && !resolvedInvoice && !hasStartedCreation.current) {
+        setIsResolvingLnurl(true);
+        setResolutionError(null);
+        try {
+          const invoice = await requestInvoiceFromLnurl(lnUrlOrAddressProp, amountProp);
+          setResolvedInvoice(invoice);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to resolve LNURL';
+          setResolutionError(errorMessage);
+          console.error('Failed to resolve LNURL:', err);
+        } finally {
+          setIsResolvingLnurl(false);
+        }
+      }
+    };
+    resolveLnurl();
+  }, [lnUrlOrAddressProp, amountProp, resolvedInvoice]);
+
+  // Create melt quote when we have an invoice
+  useEffect(() => {
+    const createQuote = async () => {
+      const invoice = invoiceProp || resolvedInvoice;
+      if (
+        invoice &&
+        selectedMint &&
+        !currentTransaction &&
+        !isCreating &&
+        !hasStartedCreation.current
+      ) {
+        hasStartedCreation.current = true;
+        try {
+          await createMeltQuote(selectedMint, invoice);
+        } catch (err) {
+          console.error('Failed to create melt quote:', err);
+        }
+      }
+    };
+    createQuote();
+  }, [invoiceProp, resolvedInvoice, selectedMint, currentTransaction, isCreating, createMeltQuote]);
+
+  // Handle mint selection change
+  const handleMintSelected = async (mint: { id: string; unit: string }) => {
+    setUnit(mint.unit.toLowerCase());
+    // Re-create quote with new mint if we have an invoice
+    const invoice = invoiceProp || resolvedInvoice;
+    if (invoice && mint.id !== selectedMint) {
+      hasStartedCreation.current = false;
+      try {
+        await createMeltQuote(mint.id, invoice);
+      } catch (err) {
+        console.error('Failed to create quote with new mint:', err);
+        Alert.alert('Error', 'Failed to create quote with selected mint');
+      }
     }
   };
 
+  // Handle pay action
   const handleMelt = async () => {
-    if (!selectedMint) {
-      throw new Error('No mint selected');
+    if (!currentTransaction || !selectedMint) {
+      throw new Error('No transaction or mint selected');
     }
 
-    await payMeltQuote(selectedMint, displayQuote?.quote || '');
+    await payMeltQuote(selectedMint, currentTransaction.quoteId);
+
+    // Show success popup and close modal after
+    popup({
+      message: 'funds_sent',
+      params: { amount: currentTransaction.amount, unit: currentTransaction.unit },
+      emoji: '🎉',
+      onClose: onSendSuccess,
+    });
   };
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Spinner size={32} />
-          <Text
-            size={16}
-            style={{
-              color: getPrimaryColor('300'),
-              marginTop: 16,
-            }}>
-            Loading melt quote...
-          </Text>
-        </VStack>
-      </View>
-    );
+  // Error states
+  if (parseError && meltHistoryEntryProp) {
+    return <ErrorState message={parseError} onCancel={onCancel} />;
   }
 
-  if (error) {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text
-            size={18}
-            bold
-            style={{
-              color: getPrimaryColor('0'),
-              marginBottom: 16,
-              textAlign: 'center',
-            }}>
-            Error Loading Melt Quote
-          </Text>
-          <Text
-            size={14}
-            style={{
-              color: getPrimaryColor('300'),
-              marginBottom: 24,
-              textAlign: 'center',
-            }}>
-            {error}
-          </Text>
-          <Text
-            size={14}
-            style={{
-              color: getPrimaryColor('400'),
-              textAlign: 'center',
-            }}
-            onPress={() => router.back()}>
-            Tap to go back
-          </Text>
-        </VStack>
-      </View>
-    );
+  if (resolutionError) {
+    return <ErrorState message={resolutionError} onCancel={onCancel} />;
   }
 
-  if (!displayQuote) {
-    return null;
+  if (meltError) {
+    return <ErrorState message={meltError.message} onCancel={onCancel} />;
   }
 
-  const displayMeltHistoryEntry = history.find(
-    (h): h is MeltHistoryEntry => h.type === 'melt' && h.quoteId === displayQuote?.quote
+  // Loading states
+  if (isResolvingLnurl) {
+    return <LoadingState message="Resolving lightning address..." />;
+  }
+
+  if (isCreating || (!currentTransaction && (invoiceProp || lnUrlOrAddressProp))) {
+    return <LoadingState message="Creating payment quote..." />;
+  }
+
+  // No data state
+  if (!currentTransaction || !displayQuote) {
+    return <ErrorState message="Missing transaction data. Please try again." onCancel={onCancel} />;
+  }
+
+  const isPaid = currentTransaction.state === 'PAID';
+  const isExpired = displayQuote ? meltQuoteExpired(displayQuote) : false;
+  const amount = displayQuote?.amount || 0;
+  const feeReserve = displayQuote?.fee_reserve || 0;
+  const quoteId = displayQuote?.quote || '';
+
+  const bottomButtons = (
+    <BottomButtons>
+      <HStack justify="center" align="center">
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Close',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => onCancel(),
+              condition: isPaid,
+            },
+            {
+              text: 'Cancel',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => onCancel(),
+              condition: currentTransaction.state === 'UNPAID' && !isExpired,
+            },
+            {
+              text: 'Close',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => onCancel(),
+              condition: isExpired,
+            },
+            {
+              text: isPaying ? 'Sending...' : 'Send',
+              icon: isPaying ? 'ri:loader-line' : 'ri:send-plane-2-fill',
+              variant: 'primary',
+              onPress: async () => handleMelt(),
+              condition: currentTransaction.state === 'UNPAID' && !isExpired,
+              disabled: isPaying,
+            },
+          ]}
+        />
+      </HStack>
+    </BottomButtons>
   );
 
-  console.log('[LIGHTNING-FLOW] MeltQuoteScreen render check', {
-    displayQuoteExists: !!displayQuote,
-    displayQuoteId: displayQuote?.quote,
-    historyLength: history.length,
-    displayMeltHistoryEntryFound: !!displayMeltHistoryEntry,
-    isCreatingQuote,
-  });
-
-  if (!displayMeltHistoryEntry || isCreatingQuote) {
-    // Show loading state while waiting for history entry to be created
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Spinner size={32} />
-          <Text
-            size={16}
-            style={{
-              color: getPrimaryColor('300'),
-              marginTop: 16,
-            }}>
-            Preparing payment...
-          </Text>
-        </VStack>
-      </View>
-    );
-  }
-
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-          paddingBottom: 120,
-        }}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={displayMeltHistoryEntry} />
+    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
+      <VStack gap={12}>
+        <HistoryEntryHeader historyEntry={currentTransaction} />
 
-          {displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote) ? (
-            <WalletHeaderTitle width={280} unit={unit} onMintSelected={handleMintSelected} />
-          ) : (
-            <HistoryEntryRefresh
-              mintInfo={mintInfo}
-              historyEntry={displayMeltHistoryEntry}
-              handleCheckStatus={async () => {}}
-            />
-          )}
-
-          <HistoryEntryTimeline historyEntry={displayMeltHistoryEntry} meltQuote={displayQuote} />
-
-          <Section
-            items={[
-              {
-                title: 'Date',
-                value: convertTime(
-                  new Date(getLightningTimestamp(displayQuote?.request || '') * 1000)
-                ),
-              },
-              { title: 'Type', value: 'Send • Lightning' },
-              {
-                title: 'Request',
-                value: truncateMiddle(displayQuote?.request || '', 5),
-              },
-              { title: 'Quote', value: truncateMiddle(quoteId, 7) },
-              {
-                title: `Fee`,
-                value: formatAmount({ amount: feeReserve, unit }),
-              },
-              {
-                title: 'Amount',
-                value: `${amount} ${unit.toUpperCase()}`,
-              },
-              {
-                title: 'State',
-                value: displayMeltHistoryEntry.state,
-              },
-            ]}
+        {currentTransaction.state === 'UNPAID' && !isExpired ? (
+          <WalletHeaderTitle width={280} unit={unit} onMintSelected={handleMintSelected} />
+        ) : (
+          <HistoryEntryRefresh
+            mintInfo={mintInfo}
+            historyEntry={currentTransaction}
+            handleCheckStatus={async () => {}}
           />
-        </VStack>
-      </ScrollView>
+        )}
 
-      <BottomButtons>
-        <HStack className="pb-2" justify="center" align="center">
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Close',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
-                onPress: async () => onCancel(),
-                condition: displayMeltHistoryEntry.state === 'PAID',
-              },
-              {
-                text: 'Cancel',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
-                onPress: async () => onCancel(),
-                condition:
-                  displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
-              },
-              {
-                text: 'Close',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
-                onPress: async () => onCancel(),
-                condition: meltQuoteExpired(displayQuote),
-              },
-              {
-                text: isCreatingQuote ? 'Sending...' : 'Send',
-                icon: isCreatingQuote ? 'ri:loader-line' : 'ri:send-plane-2-fill',
-                variant: 'primary',
-                onPress: async () => handleMelt(),
-                condition:
-                  displayMeltHistoryEntry.state === 'UNPAID' && !meltQuoteExpired(displayQuote),
-                disabled: isCreatingQuote,
-              },
-            ]}
-          />
-        </HStack>
-      </BottomButtons>
-    </View>
+        <HistoryEntryTimeline historyEntry={currentTransaction} meltQuote={displayQuote} />
+
+        <Section
+          items={[
+            {
+              title: 'Date',
+              value: displayQuote?.request
+                ? convertTime(new Date(getLightningTimestamp(displayQuote.request) * 1000))
+                : convertTime(new Date(currentTransaction.createdAt)),
+            },
+            { title: 'Type', value: 'Send • Lightning' },
+            ...(displayQuote?.request
+              ? [
+                  {
+                    title: 'Request',
+                    value: truncateMiddle(displayQuote.request, 5),
+                  },
+                ]
+              : []),
+            { title: 'Quote', value: truncateMiddle(quoteId, 7) },
+            {
+              title: 'Fee',
+              value: formatAmount({ amount: feeReserve, unit }),
+            },
+            {
+              title: 'Amount',
+              value: `${amount} ${unit.toUpperCase()}`,
+            },
+            {
+              title: 'State',
+              value: currentTransaction.state,
+            },
+          ]}
+        />
+      </VStack>
+    </ModalLayoutWrapper>
   );
 }

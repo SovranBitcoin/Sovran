@@ -58,11 +58,12 @@ function ModalScreen() {
             },
           });
         }}
-        onMeltQuoteCreated={(meltQuote) => {
+        onMeltQuoteReady={(lnUrlOrAddress, amount) => {
           router.navigate({
             pathname: `/${params.to}` as any,
             params: {
-              meltQuote: JSON.stringify(meltQuote),
+              lnUrlOrAddress,
+              amount: String(amount),
             },
           });
         }}

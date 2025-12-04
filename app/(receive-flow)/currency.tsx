@@ -58,12 +58,13 @@ function ModalScreen() {
             },
           });
         }}
-        onMeltQuoteCreated={(meltQuote) => {
+        onMeltQuoteReady={(lnUrlOrAddress, amount) => {
           // meltQuote is a separate flow, navigate to root-level screen
           router.push({
             pathname: `/${params.to}` as any,
             params: {
-              meltQuote: JSON.stringify(meltQuote),
+              lnUrlOrAddress,
+              amount: String(amount),
             },
           });
         }}

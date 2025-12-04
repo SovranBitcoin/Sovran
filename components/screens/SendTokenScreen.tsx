@@ -3,22 +3,17 @@
  *
  * This module provides the core UI and logic for sending ecash tokens.
  * It is used by both standalone and flow-based route wrappers.
- *
- * The Screen component handles:
- * - Parsing sendHistoryEntry from string params
- * - Error states for missing/invalid data
- * - All UI and business logic
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Share, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack, View, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
-import { useMintManagement, useManager } from 'hooks/coco';
+import { useMintManagement, useHistoryEntry } from 'hooks/coco';
 import { useReceive } from 'coco-cashu-react';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
@@ -29,11 +24,10 @@ import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import type { SendHistoryEntry, HistoryEntry } from 'coco-cashu-core';
+import type { SendHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
-import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalLayoutWrapper } from 'app/debugModal';
 
 export interface SendTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -44,10 +38,8 @@ export interface SendTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
-  const { getPrimaryColor } = useTheme();
-
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
         <Text>{message}</Text>
         <ButtonHandler
@@ -61,7 +53,7 @@ function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBa
           ]}
         />
       </View>
-    </View>
+    </ModalLayoutWrapper>
   );
 }
 
@@ -72,68 +64,14 @@ export function SendTokenScreen({
 }: SendTokenScreenProps) {
   const { receive } = useReceive();
   const { getMintInfo } = useMintManagement();
-  const manager = useManager();
-  const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
   const [, setUri] = useState('');
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
 
-  // Parse sendHistoryEntry - handles both string (from params) and object
-  const { sendHistoryEntry: initialEntry, parseError } = useMemo(() => {
-    if (!sendHistoryEntryProp) {
-      return { sendHistoryEntry: null, parseError: 'Missing transaction data. Please try again.' };
-    }
+  // Use the generic history entry hook for parsing, state, and event subscription
+  const { entry: currentTransaction, error: parseError } =
+    useHistoryEntry<SendHistoryEntry>(sendHistoryEntryProp);
 
-    if (typeof sendHistoryEntryProp === 'string') {
-      try {
-        return {
-          sendHistoryEntry: JSON.parse(sendHistoryEntryProp) as SendHistoryEntry,
-          parseError: null,
-        };
-      } catch {
-        return {
-          sendHistoryEntry: null,
-          parseError: 'Invalid transaction data. Please try again.',
-        };
-      }
-    }
-
-    return { sendHistoryEntry: sendHistoryEntryProp, parseError: null };
-  }, [sendHistoryEntryProp]);
-
-  // State for the current transaction - starts with initial entry and updates via events
-  const [currentTransaction, setCurrentTransaction] = useState<SendHistoryEntry | null>(
-    initialEntry
-  );
-
-  // Update currentTransaction when initialEntry changes (e.g., navigation params change)
-  useEffect(() => {
-    if (initialEntry) {
-      setCurrentTransaction(initialEntry);
-    }
-  }, [initialEntry]);
-
-  // Listen to history:updated events to keep the transaction state in sync
-  // This is the coco way - subscribe to events for real-time updates
-  useEffect(() => {
-    if (!initialEntry?.id) return;
-
-    const handleHistoryUpdated = ({ entry }: { mintUrl: string; entry: HistoryEntry }) => {
-      // Check if this update is for our transaction
-      if (entry.type === 'send' && entry.id === initialEntry.id) {
-        console.log('[SendTokenScreen] History updated for our transaction:', entry);
-        setCurrentTransaction(entry as SendHistoryEntry);
-      }
-    };
-
-    const unsubscribe = manager.on('history:updated', handleHistoryUpdated);
-
-    return () => {
-      unsubscribe();
-    };
-  }, [initialEntry?.id, manager]);
-
-  // Load mint info when entry changes (hook must be before early returns)
+  // Load mint info when entry changes
   useEffect(() => {
     const loadMintInfo = async () => {
       if (currentTransaction?.mintUrl) {
@@ -223,131 +161,123 @@ export function SendTokenScreen({
   // The transaction is "paid/completed" when state is 'completed'
   const isPaid = currentTransaction.state === 'completed';
 
+  const bottomButtons = (
+    <BottomButtons>
+      <HStack justify="center" align="center">
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Close',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => onNavigateBack(),
+              condition: isPaid,
+            },
+            {
+              text: 'View Messages',
+              icon: 'mdi:message-reply',
+              variant: 'primary',
+              onPress: async () => {
+                if (onNavigateToMessages && currentTransaction.metadata?.nostr) {
+                  onNavigateToMessages(currentTransaction.metadata.nostr as string);
+                }
+                onNavigateBack();
+              },
+              condition: false,
+            },
+            {
+              text: 'Copy',
+              icon: 'lets-icons:copy',
+              variant: 'primary',
+              onPress: handleCopy,
+              condition: !isPaid && !!token,
+            },
+            {
+              text: 'Share',
+              icon: 'ri:share-fill',
+              variant: 'secondary',
+              onPress: handleShare,
+              condition: !isPaid && !!token,
+            },
+            {
+              text: 'NFC',
+              icon: 'ph:contactless-payment-fill',
+              variant: 'secondary',
+              onPress: handleNFCSend,
+              condition: !isPaid && !!token,
+            },
+            {
+              text: 'Copy as Emoji',
+              icon: 'fluent:emoji-24-filled',
+              variant: 'primary',
+              onPress: handleCopyEmoji,
+              condition: !isPaid && !!token,
+            },
+            {
+              text: 'Cancel Transaction',
+              icon: 'mdi:cancel',
+              variant: 'dangerous',
+              onPress: handleCancelSend,
+              condition: !isPaid && !!token,
+            },
+          ]}
+        />
+      </HStack>
+    </BottomButtons>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-          paddingBottom: 120,
-        }}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={currentTransaction} />
+    <ModalLayoutWrapper bottomContent={bottomButtons}>
+      <VStack gap={12}>
+        <HistoryEntryHeader historyEntry={currentTransaction} />
 
-          {!isPaid && token && (
-            <PaymentInfo
-              setUri={setUri}
-              popupMessage="ecash_token_copied"
-              unit={currentTransaction.unit}
-              data={formattedToken}
-              animated={isLongToken}
-            />
-          )}
-
-          {mintInfo && (
-            <HistoryEntryRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />
-          )}
-
-          <HistoryEntryTimeline historyEntry={currentTransaction} />
-
-          <Section
-            items={[
-              {
-                title: 'Date',
-                value: convertTime(new Date(currentTransaction.createdAt)),
-              },
-              {
-                title: 'Type',
-                value: 'Ecash • Send',
-              },
-              {
-                title: 'Status',
-                value: (
-                  <HStack align="center">
-                    <Text className="text-primary-0" size={16} overpass bold>
-                      {isPaid ? 'Completed' : 'Pending'}
-                    </Text>
-                  </HStack>
-                ),
-              },
-              {
-                title: 'Token',
-                value: token ? truncateMiddle(getEncodedTokenV4(token), 6) : 'N/A',
-              },
-              {
-                title: 'Amount',
-                value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
-              },
-            ]}
+        {!isPaid && token && (
+          <PaymentInfo
+            setUri={setUri}
+            popupMessage="ecash_token_copied"
+            unit={currentTransaction.unit}
+            data={formattedToken}
+            animated={isLongToken}
           />
+        )}
 
-          <TransactionDebugCode historyEntry={currentTransaction} />
-        </VStack>
-      </ScrollView>
+        {mintInfo && <HistoryEntryRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />}
 
-      <BottomButtons>
-        <HStack justify="center" align="center">
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Close',
-                icon: 'ri:close-circle-line',
-                variant: 'secondary',
-                onPress: async () => onNavigateBack(),
-                condition: isPaid,
-              },
-              {
-                text: 'View Messages',
-                icon: 'mdi:message-reply',
-                variant: 'primary',
-                onPress: async () => {
-                  if (onNavigateToMessages && currentTransaction.metadata?.nostr) {
-                    onNavigateToMessages(currentTransaction.metadata.nostr as string);
-                  }
-                  onNavigateBack();
-                },
-                condition: false,
-              },
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-                condition: !isPaid && !!token,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
-                variant: 'secondary',
-                onPress: handleShare,
-                condition: !isPaid && !!token,
-              },
-              {
-                text: 'NFC',
-                icon: 'ph:contactless-payment-fill',
-                variant: 'secondary',
-                onPress: handleNFCSend,
-                condition: !isPaid && !!token,
-              },
-              {
-                text: 'Copy as Emoji',
-                icon: 'fluent:emoji-24-filled',
-                variant: 'primary',
-                onPress: handleCopyEmoji,
-                condition: !isPaid && !!token,
-              },
-              {
-                text: 'Cancel Transaction',
-                icon: 'mdi:cancel',
-                variant: 'dangerous',
-                onPress: handleCancelSend,
-                condition: !isPaid && !!token,
-              },
-            ]}
-          />
-        </HStack>
-      </BottomButtons>
-    </View>
+        <HistoryEntryTimeline historyEntry={currentTransaction} />
+
+        <Section
+          items={[
+            {
+              title: 'Date',
+              value: convertTime(new Date(currentTransaction.createdAt)),
+            },
+            {
+              title: 'Type',
+              value: 'Ecash • Send',
+            },
+            {
+              title: 'Status',
+              value: (
+                <HStack align="center">
+                  <Text className="text-primary-0" size={16} overpass bold>
+                    {isPaid ? 'Completed' : 'Pending'}
+                  </Text>
+                </HStack>
+              ),
+            },
+            {
+              title: 'Token',
+              value: token ? truncateMiddle(getEncodedTokenV4(token), 6) : 'N/A',
+            },
+            {
+              title: 'Amount',
+              value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
+            },
+          ]}
+        />
+
+        <TransactionDebugCode historyEntry={currentTransaction} />
+      </VStack>
+    </ModalLayoutWrapper>
   );
 }

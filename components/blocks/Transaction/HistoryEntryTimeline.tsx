@@ -33,6 +33,13 @@ const SEND_STATE_LABELS: Record<string, string> = {
   rolledBack: 'ROLLED BACK',
 };
 
+// Receive states: pending (in memory, not yet redeemed) → redeemed (claimed to wallet)
+const RECEIVE_STATES = ['pending', 'redeemed'] as const;
+const RECEIVE_STATE_LABELS: Record<string, string> = {
+  pending: 'PENDING',
+  redeemed: 'REDEEMED',
+};
+
 const EXPIRED_STATE = 'EXPIRED';
 
 interface TimelineItem {
@@ -170,16 +177,21 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
       }
 
       case 'receive': {
-        const receiveTx = historyEntry as ReceiveHistoryEntry;
-        // Receive is instant - just show completed
-        return [
-          {
-            state: 'RECEIVED',
-            complete: true,
-            isCurrent: true,
-            timestamp: receiveTx.createdAt,
-          },
-        ];
+        const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
+        // Receive states: pending (not yet redeemed) → redeemed
+        // If state is not set, assume redeemed (for backward compatibility with existing history)
+        const txState = receiveTx.state || 'redeemed';
+
+        const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
+        // If state not found in RECEIVE_STATES, assume redeemed
+        const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
+
+        return RECEIVE_STATES.map((state, index) => ({
+          state: RECEIVE_STATE_LABELS[state],
+          complete: index <= effectiveIndex,
+          isCurrent: index === effectiveIndex,
+          timestamp: index === 0 ? receiveTx.createdAt : undefined,
+        }));
       }
 
       default:

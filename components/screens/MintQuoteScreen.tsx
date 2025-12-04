@@ -6,14 +6,15 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Share, ScrollView } from 'react-native';
+import { Share } from 'react-native';
 import { View, HStack, VStack } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { useManager, usePaginatedHistory } from 'coco-cashu-react';
+import { useManager } from 'coco-cashu-react';
+import { useHistoryEntry } from 'hooks/coco';
 import { Section } from 'components/ui/Section';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
@@ -21,31 +22,28 @@ import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import type { MintHistoryEntry, HistoryEntry } from 'coco-cashu-core';
+import type { MintHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
-import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalLayoutWrapper } from 'app/debugModal';
 
 export interface MintQuoteScreenProps {
-  mintHistoryEntry: MintHistoryEntry;
+  /** Either the parsed entry or a JSON string to be parsed internally */
+  mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
 }
 
-export function MintQuoteScreen({ mintHistoryEntry, extraButtons = [] }: MintQuoteScreenProps) {
+export function MintQuoteScreen({
+  mintHistoryEntry: mintHistoryEntryProp,
+  extraButtons = [],
+}: MintQuoteScreenProps) {
   const manager = useManager();
-  const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
 
-  const { history } = usePaginatedHistory();
-
-  const currentTransaction = history.find(
-    (historyEntry: HistoryEntry) =>
-      historyEntry.type === 'mint' &&
-      historyEntry.paymentRequest === mintHistoryEntry.paymentRequest
-  );
+  // Use the generic history entry hook for parsing, state, and event subscription
+  const { entry: currentTransaction, error: parseError } =
+    useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
 
   useEffect(() => {
     if (currentTransaction?.mintUrl) {
@@ -56,123 +54,115 @@ export function MintQuoteScreen({ mintHistoryEntry, extraButtons = [] }: MintQuo
     }
   }, [currentTransaction?.mintUrl, manager]);
 
+  // Show loading/error state if entry not available
+  if (parseError || !currentTransaction) {
+    return (
+      <ModalLayoutWrapper>
+        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+          <Text>{parseError || 'Loading transaction...'}</Text>
+        </View>
+      </ModalLayoutWrapper>
+    );
+  }
+
   const handleCopy = async (close: (event: any) => void) => {
-    await Clipboard.setStringAsync(mintHistoryEntry.paymentRequest);
+    await Clipboard.setStringAsync(currentTransaction.paymentRequest);
     popup({ message: 'lightning_address_copied', type: 'success', onClose: () => close({}) });
   };
 
   const handleShare = async (close: (event: any) => void) => {
     if (uri) {
-      await Share.share({ url: uri, message: mintHistoryEntry.paymentRequest });
+      await Share.share({ url: uri, message: currentTransaction.paymentRequest });
     }
     close({});
   };
-
-  const isBitcoin = mintHistoryEntry.unit === 'sat';
-  const _formattedTitle = `Receive ${isBitcoin ? 'Bitcoin' : mintHistoryEntry.unit.toUpperCase()}`;
-
-  if (!currentTransaction) {
-    return (
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>Loading transaction...</Text>
-        </View>
-      </View>
-    );
-  }
 
   const isPaid =
     (currentTransaction as any)?.state === 'ISSUED' ||
     (currentTransaction as any)?.state === 'PAID';
 
+  const bottomButtons = (
+    <BottomButtons>
+      <HStack justify="center" align="center">
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Copy',
+              icon: 'lets-icons:copy',
+              variant: 'primary',
+              onPress: handleCopy,
+              condition: !isPaid,
+            },
+            {
+              text: 'Share',
+              icon: 'ri:share-fill',
+              variant: 'secondary',
+              onPress: handleShare,
+              condition: !isPaid,
+            },
+            ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
+          ]}
+        />
+      </HStack>
+    </BottomButtons>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-          paddingBottom: 120,
-        }}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={currentTransaction} />
-          {!isPaid && (
-            <PaymentInfo
-              setUri={setUri}
-              data={[{ name: 'Lightning', value: mintHistoryEntry.paymentRequest }]}
-              unit={mintHistoryEntry.unit}
-              popupMessage={[{ name: 'lightning_address_copied' }]}
-            />
-          )}
-
-          {currentTransaction.metadata?.memo && (
-            <Card message={currentTransaction.metadata.memo} variant="info" />
-          )}
-
-          <HistoryEntryRefresh
-            mintInfo={mintInfo}
-            historyEntry={currentTransaction}
-            handleCheckStatus={async () => {}}
+    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
+      <VStack gap={12}>
+        <HistoryEntryHeader historyEntry={currentTransaction} />
+        {!isPaid && (
+          <PaymentInfo
+            setUri={setUri}
+            data={[{ name: 'Lightning', value: currentTransaction.paymentRequest }]}
+            unit={currentTransaction.unit}
+            popupMessage={[{ name: 'lightning_address_copied' }]}
           />
+        )}
 
-          <HistoryEntryTimeline historyEntry={currentTransaction} />
+        {currentTransaction.metadata?.memo && (
+          <Card message={currentTransaction.metadata.memo} variant="info" />
+        )}
 
-          <Section
-            special={false}
-            items={[
-              {
-                title: 'Request',
-                value: truncateMiddle(mintHistoryEntry.paymentRequest, 10),
-              },
-              {
-                title: 'Type',
-                value: 'Lightning • Receive',
-              },
-              {
-                title: 'Status',
-                value: (
-                  <HStack align="center">
-                    <Text className="text-primary-0" size={16} overpass bold>
-                      {isPaid ? 'Completed' : 'Pending'}
-                    </Text>
-                  </HStack>
-                ),
-              },
-              {
-                title: 'Amount',
-                value: `${currentTransaction.amount} ${mintHistoryEntry.unit.toUpperCase()}`,
-              },
-            ]}
-          />
+        <HistoryEntryRefresh
+          mintInfo={mintInfo}
+          historyEntry={currentTransaction}
+          handleCheckStatus={async () => {}}
+        />
 
-          <TransactionDebugCode historyEntry={currentTransaction} />
-        </VStack>
-      </ScrollView>
+        <HistoryEntryTimeline historyEntry={currentTransaction} />
 
-      <BottomButtons>
-        <HStack justify="center" align="center">
-          <ButtonHandler
-            buttons={[
-              {
-                text: 'Copy',
-                icon: 'lets-icons:copy',
-                variant: 'primary',
-                onPress: handleCopy,
-                condition: !isPaid,
-              },
-              {
-                text: 'Share',
-                icon: 'ri:share-fill',
-                variant: 'secondary',
-                onPress: handleShare,
-                condition: !isPaid,
-              },
-              ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
-            ]}
-          />
-        </HStack>
-      </BottomButtons>
-    </View>
+        <Section
+          special={false}
+          items={[
+            {
+              title: 'Request',
+              value: truncateMiddle(currentTransaction.paymentRequest, 10),
+            },
+            {
+              title: 'Type',
+              value: 'Lightning • Receive',
+            },
+            {
+              title: 'Status',
+              value: (
+                <HStack align="center">
+                  <Text className="text-primary-0" size={16} overpass bold>
+                    {isPaid ? 'Completed' : 'Pending'}
+                  </Text>
+                </HStack>
+              ),
+            },
+            {
+              title: 'Amount',
+              value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
+            },
+          ]}
+        />
+
+        <TransactionDebugCode historyEntry={currentTransaction} />
+      </VStack>
+    </ModalLayoutWrapper>
   );
 }
 
@@ -180,4 +170,3 @@ export function getFormattedMintQuoteTitle(unit: string): string {
   const isBitcoin = unit === 'sat';
   return `Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`;
 }
-

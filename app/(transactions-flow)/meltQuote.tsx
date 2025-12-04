@@ -2,7 +2,7 @@
  * @fileoverview Transactions flow meltQuote route wrapper
  *
  * Part of the (transactions-flow) modal group - displays with back button.
- * Param parsing is done by MeltQuoteScreen.
+ * Primarily used for viewing existing transactions.
  */
 
 import React from 'react';
@@ -11,18 +11,25 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MeltQuoteScreen } from 'components/screens/MeltQuoteScreen';
 
 function ModalScreen() {
-  const { meltQuote, meltHistoryEntry } = useLocalSearchParams<{
-    meltQuote?: string;
+  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{
     meltHistoryEntry?: string;
+    invoice?: string;
+    lnUrlOrAddress?: string;
+    amount?: string;
   }>();
 
   return (
     <>
       <Stack.Screen options={{ title: 'Send Lightning' }} />
       <MeltQuoteScreen
-        meltQuote={meltQuote}
         meltHistoryEntry={meltHistoryEntry}
+        invoice={invoice}
+        lnUrlOrAddress={lnUrlOrAddress}
+        amount={amount ? parseInt(amount, 10) : undefined}
         onCancel={() => {
+          router.dismissAll();
+        }}
+        onSendSuccess={() => {
           router.dismissAll();
         }}
       />

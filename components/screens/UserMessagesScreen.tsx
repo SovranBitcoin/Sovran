@@ -1457,22 +1457,22 @@ export function UserMessagesScreen({
     SheetManager.show('button-handler', {
       payload: {
         buttons: [
-          {
-            text: 'Send Ecash',
-            icon: 'ph:coins',
-            variant: 'primary' as const,
-            onPress: async (close) => {
-              router.navigate({
-                pathname: '/(send-flow)/currency',
-                params: {
-                  to: 'sendToken',
-                  lud16: lud16,
-                  profile: JSON.stringify(userInfo),
-                },
-              });
-              close({} as any);
-            },
-          },
+          // {
+          //   text: 'Send Ecash',
+          //   icon: 'ph:coins',
+          //   variant: 'primary' as const,
+          //   onPress: async (close) => {
+          //     router.navigate({
+          //       pathname: '/(send-flow)/currency',
+          //       params: {
+          //         to: 'sendToken',
+          //         lud16: lud16,
+          //         profile: JSON.stringify(userInfo),
+          //       },
+          //     });
+          //     close({} as any);
+          //   },
+          // },
           {
             text: 'Send Lightning',
             icon: 'mingcute:lightning-fill',

@@ -50,7 +50,7 @@
  */
 
 import { popup } from '@/helper/popup';
-import { getEncodedTokenV4, MeltQuoteResponse } from '@cashu/cashu-ts';
+import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
@@ -68,11 +68,9 @@ import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routst
 import {
   useLightningOperations,
   useManager,
-  useMelt,
   useSendWithHistory,
   useBalanceContext,
 } from 'hooks/coco';
-import { requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -181,11 +179,12 @@ export interface CurrencyScreenProps {
   params: CurrencyScreenParams;
   onMintQuoteCreated: (mintHistoryEntry: MintHistoryEntry) => void;
   onSendTokenCreated: (sendHistoryEntry: SendHistoryEntry) => void;
-  onMeltQuoteCreated: (meltQuote: MeltQuoteResponse) => void;
+  /** Navigate to MeltQuoteScreen with lnUrlOrAddress and amount - screen handles quote creation */
+  onMeltQuoteReady: (lnUrlOrAddress: string, amount: number) => void;
   onCameraPress: (unit: string) => void;
   onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
   onRoutstrSuccess?: () => void;
-  processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<void>;
+  processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<unknown>;
   /** Called when user tries to send more than current mint's balance */
   onInsufficientBalance?: (amount: number, unit: string) => void;
 }
@@ -194,7 +193,7 @@ export function CurrencyScreen({
   params,
   onMintQuoteCreated,
   onSendTokenCreated,
-  onMeltQuoteCreated,
+  onMeltQuoteReady,
   onCameraPress,
   onRoutstrSuccess,
   processPaymentStringFn,
@@ -205,7 +204,6 @@ export function CurrencyScreen({
 
   const { send } = useSendWithHistory();
   const { requestLightningInvoice } = useLightningOperations();
-  const { createMeltQuote } = useMelt();
   const { setApiKey, setBalance, balance } = useRoutstrStore();
 
   // Get user's preferred fiat currency and BTC price
@@ -435,54 +433,15 @@ export function CurrencyScreen({
         }
         break;
       case 'meltQuote':
-        console.log('[LIGHTNING-FLOW] CurrencyScreen handleNext meltQuote case', {
-          lnUrlOrAddress: params.lnUrlOrAddress,
-          amount,
-          selectedMint,
-        });
-
+        // Navigate to MeltQuoteScreen with lnUrlOrAddress and amount
+        // The screen will handle LNURL resolution and quote creation
         if (!params.lnUrlOrAddress) {
-          popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
+          popup({ message: 'No lightning address provided', emoji: '🚨', type: 'error' });
           setLoading(false);
           return;
         }
 
-        try {
-          if (!selectedMint) {
-            popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
-            setLoading(false);
-            return;
-          }
-
-          console.log('[LIGHTNING-FLOW] Requesting invoice from LNURL', {
-            lnUrlOrAddress: params.lnUrlOrAddress,
-            amount,
-          });
-
-          const invoice = await requestInvoiceFromLnurl(params.lnUrlOrAddress, amount);
-
-          console.log('[LIGHTNING-FLOW] Invoice received', {
-            invoiceReceived: !!invoice,
-            invoiceLength: invoice?.length,
-          });
-
-          if (!invoice) {
-            popup({ message: 'No invoice provided', emoji: '🚨', type: 'error' });
-            setLoading(false);
-            return;
-          }
-
-          const meltQuote = await createMeltQuote(selectedMint, invoice);
-          console.log('[LIGHTNING-FLOW] Melt quote created, navigating to meltQuote screen', {
-            meltQuoteId: meltQuote?.quote,
-            amount: meltQuote?.amount,
-          });
-          onMeltQuoteCreated(meltQuote);
-        } catch (err) {
-          console.error('Failed to create melt quote:', err);
-          popup({ message: 'Failed to create melt quote', emoji: '🚨', type: 'error' });
-        }
-
+        onMeltQuoteReady(params.lnUrlOrAddress, amount);
         setLoading(false);
         break;
       default:

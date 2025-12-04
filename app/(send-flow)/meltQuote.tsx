@@ -2,7 +2,9 @@
  * @fileoverview Send flow meltQuote route wrapper
  *
  * Part of the (send-flow) modal group - displays with back button.
- * Param parsing is done by MeltQuoteScreen.
+ * Supports two flows:
+ * 1. Creating new quote: invoice or lnUrlOrAddress + amount params
+ * 2. Viewing existing: meltHistoryEntry param
  */
 
 import React from 'react';
@@ -11,24 +13,25 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MeltQuoteScreen } from 'components/screens/MeltQuoteScreen';
 
 function ModalScreen() {
-  const { meltQuote, meltHistoryEntry } = useLocalSearchParams<{
-    meltQuote?: string;
+  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{
     meltHistoryEntry?: string;
+    invoice?: string;
+    lnUrlOrAddress?: string;
+    amount?: string;
   }>();
-
-  console.log('[LIGHTNING-FLOW] meltQuote.tsx received params', {
-    meltQuoteReceived: !!meltQuote,
-    meltHistoryEntryReceived: !!meltHistoryEntry,
-    meltQuoteParsed: meltQuote ? JSON.parse(meltQuote) : null,
-  });
 
   return (
     <>
       <Stack.Screen options={{ title: 'Send Lightning' }} />
       <MeltQuoteScreen
-        meltQuote={meltQuote}
         meltHistoryEntry={meltHistoryEntry}
+        invoice={invoice}
+        lnUrlOrAddress={lnUrlOrAddress}
+        amount={amount ? parseInt(amount, 10) : undefined}
         onCancel={() => {
+          router.dismissAll();
+        }}
+        onSendSuccess={() => {
           router.dismissAll();
         }}
       />

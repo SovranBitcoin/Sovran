@@ -3,16 +3,10 @@
  *
  * This module provides the core UI and logic for receiving ecash tokens.
  * It is used by both standalone and flow-based route wrappers.
- *
- * The Screen component handles:
- * - Parsing receiveHistoryEntry from string params
- * - Error states for missing/invalid data
- * - All UI and business logic
  */
 
-import { Alert, ScrollView } from 'react-native';
-import React, { useState, useEffect, useMemo } from 'react';
-import { useMintManagement, useReceive } from 'hooks/coco';
+import React, { useState, useEffect } from 'react';
+import { useMintManagement, useReceive, useHistoryEntry } from 'hooks/coco';
 import { popup } from '@/helper/popup';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -20,15 +14,18 @@ import { Section } from 'components/ui/Section';
 import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import { VStack, View } from 'components/ui/View';
 import { Text } from 'components/ui/Text';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
-import { useTheme } from 'providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalLayoutWrapper } from 'app/debugModal';
 
-type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & { token?: string };
+type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & {
+  token?: string;
+  state?: 'pending' | 'redeemed';
+};
 
 export interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -38,17 +35,9 @@ export interface ReceiveTokenScreenProps {
 }
 
 /** Error screen shown when transaction data is missing or invalid */
-function ErrorState({
-  message,
-  onNavigateBack,
-}: {
-  message: string;
-  onNavigateBack: () => void;
-}) {
-  const { getPrimaryColor } = useTheme();
-
+function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
         <Text>{message}</Text>
         <ButtonHandler
@@ -62,7 +51,7 @@ function ErrorState({
           ]}
         />
       </View>
-    </View>
+    </ModalLayoutWrapper>
   );
 }
 
@@ -73,50 +62,22 @@ export function ReceiveTokenScreen({
 }: ReceiveTokenScreenProps) {
   const { receive } = useReceive();
   const { isKnownMint, getMintInfo } = useMintManagement();
-  const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+  const [mintInfo, setMintInfo] = useState<any>({});
+  const [isRedeemed, setIsRedeemed] = useState(false);
 
-  // Parse receiveHistoryEntry - handles both string (from params) and object
-  const { receiveHistoryEntry, parseError } = useMemo(() => {
-    if (!receiveHistoryEntryProp) {
-      return { receiveHistoryEntry: null, parseError: 'Missing transaction data. Please try again.' };
-    }
-
-    if (typeof receiveHistoryEntryProp === 'string') {
-      try {
-        return {
-          receiveHistoryEntry: JSON.parse(receiveHistoryEntryProp) as ReceiveHistoryEntryWithToken,
-          parseError: null,
-        };
-      } catch {
-        return {
-          receiveHistoryEntry: null,
-          parseError: 'Invalid transaction data. Please try again.',
-        };
-      }
-    }
-
-    return { receiveHistoryEntry: receiveHistoryEntryProp, parseError: null };
-  }, [receiveHistoryEntryProp]);
-
-  // Show error state if parsing failed
-  if (parseError || !receiveHistoryEntry) {
-    return (
-      <ErrorState
-        message={parseError || 'Missing transaction data. Please try again.'}
-        onNavigateBack={onNavigateBack}
-      />
-    );
-  }
+  // Use the generic history entry hook for parsing, state, and event subscription
+  const { entry: receiveHistoryEntry, error: parseError } =
+    useHistoryEntry<ReceiveHistoryEntryWithToken>(receiveHistoryEntryProp);
 
   const token = receiveHistoryEntry?.token;
 
-  const [loading, setLoading] = useState(false);
-  const [mintInfo, setMintInfo] = useState<any>({});
+  // Determine the state: pending until redeemed locally
+  const receiveState = isRedeemed ? 'redeemed' : 'pending';
 
   useEffect(() => {
     const loadMintInfo = async () => {
-      if (receiveHistoryEntry.mintUrl) {
+      if (receiveHistoryEntry?.mintUrl) {
         try {
           const info = await getMintInfo(receiveHistoryEntry.mintUrl);
           setMintInfo(info);
@@ -129,7 +90,17 @@ export function ReceiveTokenScreen({
       }
     };
     loadMintInfo();
-  }, [receiveHistoryEntry.mintUrl, getMintInfo]);
+  }, [receiveHistoryEntry?.mintUrl, getMintInfo]);
+
+  // Show error state if parsing failed
+  if (parseError || !receiveHistoryEntry) {
+    return (
+      <ErrorState
+        message={parseError || 'Missing transaction data. Please try again.'}
+        onNavigateBack={onNavigateBack}
+      />
+    );
+  }
 
   const handleCancel = () => {
     onNavigateBack();
@@ -138,8 +109,8 @@ export function ReceiveTokenScreen({
   const handleRedeem = async () => {
     setLoading(true);
     try {
-      Alert.alert('Redeeming token', 'Redeeming token...');
       await receive(token as string);
+      setIsRedeemed(true);
       popup({
         message: 'funds_received',
         params: { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
@@ -172,52 +143,56 @@ export function ReceiveTokenScreen({
     }
   };
 
+  const bottomButtons = (
+    <BottomButtons>
+      <ButtonHandler
+        buttons={[
+          {
+            text: 'Close',
+            icon: 'ri:close-circle-line',
+            variant: 'secondary',
+            onPress: async () => onNavigateBack(),
+            condition: isRedeemed,
+          },
+          {
+            text: 'Cancel',
+            variant: 'secondary',
+            onPress: async () => handleCancel(),
+            condition: !isRedeemed,
+          },
+          {
+            text: 'Redeem Ecash',
+            variant: 'primary',
+            onPress: handleRedeemPress,
+            loading: loading,
+            condition: !!token && !isRedeemed,
+          },
+        ]}
+      />
+    </BottomButtons>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-          paddingBottom: 120,
-        }}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
+    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
+      <VStack gap={12}>
+        <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
 
-          <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
+        <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
 
-          <Section
-            items={[
-              { title: 'Type', value: 'Ecash • Receive' },
-              ...(token ? [{ title: 'Token', value: truncateMiddle(token, 6) }] : []),
-            ]}
-            camera={false}
-          />
-
-          <TransactionDebugCode historyEntry={receiveHistoryEntry} />
-        </VStack>
-      </ScrollView>
-
-      <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Cancel',
-              variant: 'secondary',
-              onPress: async () => handleCancel(),
-              condition: !('state' in receiveHistoryEntry && receiveHistoryEntry.state === 'PAID'),
-            },
-            {
-              text: 'Redeem Ecash',
-              variant: 'primary',
-              onPress: handleRedeemPress,
-              loading: loading,
-              condition: !!token,
-            },
-          ]}
+        <HistoryEntryTimeline
+          historyEntry={{ ...receiveHistoryEntry, state: receiveState } as ReceiveHistoryEntry}
         />
-      </BottomButtons>
-    </View>
+
+        <Section
+          items={[
+            { title: 'Type', value: 'Ecash • Receive' },
+            ...(token ? [{ title: 'Token', value: truncateMiddle(token, 6) }] : []),
+          ]}
+          camera={false}
+        />
+
+        <TransactionDebugCode historyEntry={receiveHistoryEntry} />
+      </VStack>
+    </ModalLayoutWrapper>
   );
 }
-

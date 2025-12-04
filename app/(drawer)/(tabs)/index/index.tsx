@@ -8,8 +8,6 @@ import { useVersionCheck } from 'hooks/useVersionCheck';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
-import 'react-native-get-random-values';
-import 'shim';
 import { LayoutDebugWrapper } from '../example';
 
 function TabOneScreen() {

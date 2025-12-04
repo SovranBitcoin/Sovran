@@ -6,7 +6,6 @@ import {
   isLightningAddress,
   isLnurlp,
 } from '@/helper/coco/utils';
-import { useMelt } from '@/hooks/coco';
 import { Proof } from '@cashu/cashu-ts';
 import { URDecoder } from '@gandlaf21/bc-ur';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
@@ -40,7 +39,6 @@ export const useProcessPaymentString = ({
   const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const [scanned, setScanned] = useState<boolean>(false);
   const appStateRef = useRef<string>(AppState.currentState);
-  const { createMeltQuote } = useMelt();
 
   const processPaymentString = useCallback(
     async (scanning: ScanningData): Promise<{ urInProgress: boolean }> => {
@@ -148,24 +146,29 @@ export const useProcessPaymentString = ({
             isLightningInvoice(lnTrim(scanning.data))) &&
           selectedMint
         ) {
-          const amount = getLightningAmount(lnTrim(scanning.data));
-          if (!amount) {
+          const trimmedData = lnTrim(scanning.data);
+          const amount = getLightningAmount(trimmedData);
+          const isInvoice = isLightningInvoice(trimmedData);
+
+          if (isInvoice && amount) {
+            // Direct Lightning invoice with amount - navigate to MeltQuoteScreen
+            // The screen will create the quote internally
             router.navigate({
-              pathname: '/(send-flow)/currency' as any,
+              pathname: '/(send-flow)/meltQuote' as any,
               params: {
-                to: 'meltQuote',
-                lnUrlOrAddress: lnTrim(scanning.data),
-                unit,
+                invoice: trimmedData,
               },
             });
             return { urInProgress: false };
           }
 
-          const quote = await createMeltQuote(selectedMint, lnTrim(scanning.data));
+          // Lightning address/LNURL without amount - go to currency screen to get amount
           router.navigate({
-            pathname: '/(send-flow)/meltQuote' as any,
+            pathname: '/(send-flow)/currency' as any,
             params: {
-              meltQuote: JSON.stringify(quote),
+              to: 'meltQuote',
+              lnUrlOrAddress: trimmedData,
+              unit,
             },
           });
           return { urInProgress: false };
@@ -174,17 +177,7 @@ export const useProcessPaymentString = ({
       
       return { urInProgress: false };
     },
-    [
-      scanned,
-      urDecoder,
-      unit,
-      selectedMint,
-      createMeltQuote,
-      isFocused,
-      onProgress,
-      onLoading,
-      onScanned,
-    ]
+    [scanned, urDecoder, unit, selectedMint, isFocused, onProgress, onLoading, onScanned]
   );
 
   const reset = useCallback(() => {

@@ -14,8 +14,10 @@ export { useAuditedMint } from './useAuditedMint';
 export { useAuditedMints } from './useAuditedMints';
 export { useNostrDiscoveredMints } from './useNostrDiscoveredMints';
 export { useMelt } from './useMelt';
+export { useMeltWithHistory } from './useMeltWithHistory';
 export { useSendWithHistory } from './useSendWithHistory';
 export { useSendProofState } from './useSendProofState';
+export { useHistoryEntry, type UseHistoryEntryResult } from './useHistoryEntry';
 
 // Re-export coco-cashu-react hooks for direct use when needed
 export {
