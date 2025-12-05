@@ -15,7 +15,8 @@ import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
-import { useReceive } from 'coco-cashu-react';
+import { useReceive, useManager } from 'coco-cashu-react';
+import type { PendingSendOperation, SendHistoryEntry } from 'coco-cashu-core';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -25,7 +26,6 @@ import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import type { SendHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
@@ -67,8 +67,10 @@ export function SendTokenScreen({
 }: SendTokenScreenProps) {
   const { receive } = useReceive();
   const { getMintInfo } = useMintManagement();
+  const manager = useManager();
   const [, setUri] = useState('');
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: currentTransaction, error: parseError } =
@@ -135,6 +137,71 @@ export function SendTokenScreen({
         message: error instanceof Error ? error.message : 'Failed to cancel transaction',
         onClose: () => onClose({}),
       });
+    }
+  };
+
+  const handleCheckStatus = async (onClose: (event: any) => void) => {
+    if (!currentTransaction?.operationId) return;
+    setIsCheckingStatus(true);
+    try {
+      // Get the operation from the send operation service
+      const operation = await manager.send.getOperation(currentTransaction.operationId);
+      if (!operation) {
+        popup({ message: 'Operation not found', onClose: () => onClose({}) });
+        return;
+      }
+
+      if (operation.state === 'completed') {
+        popup({
+          message: 'Token was already redeemed by recipient',
+          type: 'success',
+          onClose: () => onClose({}),
+        });
+        return;
+      }
+
+      if (operation.state === 'rolled_back') {
+        popup({
+          message: 'Transaction was already cancelled',
+          type: 'info',
+          onClose: () => onClose({}),
+        });
+        return;
+      }
+
+      if (operation.state !== 'pending') {
+        popup({
+          message: `Cannot check status for operation in state: ${operation.state}`,
+          onClose: () => onClose({}),
+        });
+        return;
+      }
+
+      // Check the operation status with the mint (this will finalize if proofs are spent)
+      await manager.sendOperationService.checkPendingOperation(operation as PendingSendOperation);
+
+      // Re-fetch to see if state changed
+      const updatedOperation = await manager.send.getOperation(currentTransaction.operationId);
+      if (updatedOperation?.state === 'completed') {
+        popup({
+          message: 'Token was redeemed by recipient',
+          type: 'success',
+          onClose: () => onClose({}),
+        });
+      } else {
+        popup({
+          message: 'Token is still pending - not yet redeemed',
+          type: 'info',
+          onClose: () => onClose({}),
+        });
+      }
+    } catch (error) {
+      popup({
+        message: error instanceof Error ? error.message : 'Failed to check status',
+        onClose: () => onClose({}),
+      });
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -215,6 +282,13 @@ export function SendTokenScreen({
               variant: 'primary',
               onPress: handleCopyEmoji,
               condition: !isPaid && !!token,
+            },
+            {
+              text: isCheckingStatus ? 'Checking...' : 'Check Status',
+              icon: 'mdi:refresh',
+              variant: 'secondary',
+              onPress: handleCheckStatus,
+              condition: !isPaid && !!token && currentTransaction?.state === 'pending',
             },
             {
               text: 'Cancel Transaction',

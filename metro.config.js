@@ -25,6 +25,7 @@ module.exports = withMonicon(nativeWindConfig, {
   collections: ['circle-flags'],
   icons: [
     // Your existing icons array...
+    'mdi:refresh',
     'fluent:apps-16-filled',
     'ri:openai-fill', // Using robot as OpenAI icon
     'ri:anthropic-fill',

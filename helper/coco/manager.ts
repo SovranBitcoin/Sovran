@@ -150,7 +150,7 @@ export class CocoManager {
       this.instance = new Manager(
         repositories,
         seedGetter,
-        new ConsoleLogger('sovran', { level: 'info' }),
+        new ConsoleLogger('CocoManager', { level: 'debug' }),
         undefined,
         plugins
       );

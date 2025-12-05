@@ -1,8 +1,17 @@
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
-index 39ff868..4b9d00b 100644
+index 39ff868..d0f0d89 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
 +++ b/node_modules/coco-cashu-core/dist/index.d.cts
-@@ -1425,7 +1425,7 @@ declare class PaymentRequestService {
+@@ -1243,7 +1243,7 @@ declare class SendOperationService {
+   /**
+    * Check a pending operation to see if it should be finalized.
+    */
+-  private checkPendingOperation;
++  checkPendingOperation(op: PendingSendOperation): Promise<void>;
+   /**
+    * Check proof states with the mint.
+    */
+@@ -1425,11 +1425,11 @@ declare class PaymentRequestService {
  declare class WalletApi {
    private mintService;
    private walletService;
@@ -11,6 +20,11 @@ index 39ff868..4b9d00b 100644
    private walletRestoreService;
    private transactionService;
    private paymentRequestService;
+-  private sendOperationService;
++  sendOperationService: SendOperationService;
+   private readonly logger?;
+   constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
+   receive(token: Token | string): Promise<void>;
 @@ -1797,7 +1797,7 @@ declare class Manager {
    readonly send: SendApi;
    private mintService;
@@ -20,7 +34,7 @@ index 39ff868..4b9d00b 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1811,7 +1811,7 @@ declare class Manager {
+@@ -1811,10 +1811,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -28,12 +42,25 @@ index 39ff868..4b9d00b 100644
 +  counterService: CounterService;
    private transactionService;
    private paymentRequestService;
-   private sendOperationService;
+-  private sendOperationService;
++  sendOperationService: SendOperationService;
+   private sendOperationRepository;
+   private proofRepository;
+   private readonly pluginHost;
 diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
-index 39ff868..4b9d00b 100644
+index 39ff868..d0f0d89 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.ts
 +++ b/node_modules/coco-cashu-core/dist/index.d.ts
-@@ -1425,7 +1425,7 @@ declare class PaymentRequestService {
+@@ -1243,7 +1243,7 @@ declare class SendOperationService {
+   /**
+    * Check a pending operation to see if it should be finalized.
+    */
+-  private checkPendingOperation;
++  checkPendingOperation(op: PendingSendOperation): Promise<void>;
+   /**
+    * Check proof states with the mint.
+    */
+@@ -1425,11 +1425,11 @@ declare class PaymentRequestService {
  declare class WalletApi {
    private mintService;
    private walletService;
@@ -42,6 +69,11 @@ index 39ff868..4b9d00b 100644
    private walletRestoreService;
    private transactionService;
    private paymentRequestService;
+-  private sendOperationService;
++  sendOperationService: SendOperationService;
+   private readonly logger?;
+   constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
+   receive(token: Token | string): Promise<void>;
 @@ -1797,7 +1797,7 @@ declare class Manager {
    readonly send: SendApi;
    private mintService;
@@ -51,7 +83,7 @@ index 39ff868..4b9d00b 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1811,7 +1811,7 @@ declare class Manager {
+@@ -1811,10 +1811,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -59,4 +91,8 @@ index 39ff868..4b9d00b 100644
 +  counterService: CounterService;
    private transactionService;
    private paymentRequestService;
-   private sendOperationService;
+-  private sendOperationService;
++  sendOperationService: SendOperationService;
+   private sendOperationRepository;
+   private proofRepository;
+   private readonly pluginHost;
