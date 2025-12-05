@@ -1,4 +1,5 @@
 import React from 'react';
+import { ActivityIndicator } from 'react-native';
 import { View } from 'components/ui/View/View';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
@@ -6,9 +7,14 @@ import { HistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 
 interface TransactionIconProps {
   historyEntry: HistoryEntry;
+  /** Show a loading spinner instead of the icon */
+  isLoading?: boolean;
 }
 
-export default function TransactionIcon({ historyEntry }: TransactionIconProps): React.ReactNode {
+export default function TransactionIcon({
+  historyEntry,
+  isLoading,
+}: TransactionIconProps): React.ReactNode {
   const { getPrimaryColor } = useTheme();
 
   const getIconName = () => {
@@ -35,8 +41,12 @@ export default function TransactionIcon({ historyEntry }: TransactionIconProps):
   };
 
   return (
-    <View className="relative h-7 w-7 bg-transparent">
-      <Icon name={getIconName()} color={getPrimaryColor('50')} size={28} />
+    <View className="relative h-7 w-7 items-center justify-center bg-transparent">
+      {isLoading ? (
+        <ActivityIndicator size="small" color={getPrimaryColor('50')} />
+      ) : (
+        <Icon name={getIconName()} color={getPrimaryColor('50')} size={28} />
+      )}
     </View>
   );
 }

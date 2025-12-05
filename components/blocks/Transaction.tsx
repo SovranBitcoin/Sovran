@@ -104,9 +104,11 @@ interface TransactionProps {
   historyEntry: HistoryEntry;
   /** Optional custom press handler - if provided, overrides default navigation */
   onPress?: (historyEntry: HistoryEntry) => void;
+  /** Show a loading spinner on the icon */
+  isLoading?: boolean;
 }
 
-export const Transaction = React.memo(({ historyEntry, onPress }: TransactionProps) => {
+export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: TransactionProps) => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
   const {
@@ -135,7 +137,7 @@ export const Transaction = React.memo(({ historyEntry, onPress }: TransactionPro
       }}
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
-        <TransactionIcon historyEntry={historyEntry} />
+        <TransactionIcon historyEntry={historyEntry} isLoading={isLoading} />
 
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">

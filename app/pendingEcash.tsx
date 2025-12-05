@@ -25,9 +25,8 @@ import Animated, {
   SharedValue,
   useSharedValue,
 } from 'react-native-reanimated';
-import { getEncodedTokenV4, Proof } from '@cashu/cashu-ts';
 import { popup } from 'helper/popup';
-import { useMints, usePaginatedHistory, useReceive } from 'coco-cashu-react';
+import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
 
 // ============================================================================
 // Header Components
@@ -301,77 +300,21 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
 // ============================================================================
 
 interface SweepButtonProps {
-  mintUrl: string;
   pendingTransactions: SendHistoryEntry[];
-  unit: string;
   totalAmount: number;
-  onSweepComplete: () => void;
+  unit: string;
+  isLoading: boolean;
+  onSweep: () => void;
 }
 
 const SweepButton = ({
-  mintUrl,
   pendingTransactions,
-  unit,
   totalAmount,
-  onSweepComplete,
+  unit,
+  isLoading,
+  onSweep,
 }: SweepButtonProps) => {
   const { getPrimaryColor } = useTheme();
-  const { receive } = useReceive();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSweep = useCallback(async () => {
-    if (isLoading || pendingTransactions.length === 0) return;
-
-    setIsLoading(true);
-    try {
-      // Extract all proofs from pending transactions
-      const allProofs: Proof[] = [];
-
-      for (const tx of pendingTransactions) {
-        if (tx.token && tx.token.proofs) {
-          allProofs.push(...tx.token.proofs);
-        }
-      }
-
-      if (allProofs.length === 0) {
-        popup({
-          message: 'No proofs found in pending transactions',
-          type: 'error',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Create a combined token with all proofs
-      const combinedToken = getEncodedTokenV4({
-        mint: mintUrl,
-        proofs: allProofs,
-        unit: unit,
-      });
-
-      // Redeem the combined token
-      await receive(combinedToken);
-
-      // Show success popup
-      popup({
-        message: 'funds_received',
-        params: { amount: totalAmount, unit },
-        emoji: '🎉',
-        onClose: () => {
-          onSweepComplete();
-          router.back();
-        },
-      });
-    } catch (error) {
-      console.error('Sweep failed:', error);
-      popup({
-        message: error instanceof Error ? error.message : 'Failed to sweep pending ecash',
-        type: 'error',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, pendingTransactions, mintUrl, unit, totalAmount, receive, onSweepComplete]);
 
   return (
     <View style={styles.bottomContainer}>
@@ -382,7 +325,7 @@ const SweepButton = ({
       />
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={handleSweep}
+        onPress={onSweep}
         disabled={isLoading || pendingTransactions.length === 0}
         style={[
           styles.sweepButton,
@@ -397,7 +340,9 @@ const SweepButton = ({
           <Icon name="mdi:broom" size={20} color="#fff" />
         )}
         <Text size={16} heavy style={{ color: '#fff', marginLeft: 8 }}>
-          {isLoading ? 'Sweeping...' : `Sweep ${pendingTransactions.length} Pending`}
+          {isLoading
+            ? 'Rolling back...'
+            : `Rollback ${pendingTransactions.length} Pending (${totalAmount} ${unit.toUpperCase()})`}
         </Text>
       </TouchableOpacity>
     </View>
@@ -412,11 +357,15 @@ export default function PendingEcashScreen() {
   const { getPrimaryColor } = useTheme();
   const { history } = usePaginatedHistory();
   const { trustedMints: mints } = useMints();
+  const manager = useManager();
 
   // Scroll tracking for animated tabs
   const scrollY = useSharedValue(0);
 
   const [selectedMintUrl, setSelectedMintUrl] = useState<string | null>(null);
+  // Track which operation IDs are currently being rolled back
+  const [rollingBackIds, setRollingBackIds] = useState<Set<string>>(new Set());
+  const [isSweeping, setIsSweeping] = useState(false);
 
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
@@ -466,10 +415,52 @@ export default function PendingEcashScreen() {
     return mints.find((m) => m.mintUrl === effectiveSelectedMint);
   }, [mints, effectiveSelectedMint]);
 
-  // Callback when sweep is complete - could trigger a refresh
-  const handleSweepComplete = useCallback(() => {
-    // History will auto-update via coco events
-  }, []);
+  // Rollback all pending transactions for the selected mint
+  const handleSweep = useCallback(async () => {
+    if (isSweeping || displayedTransactions.length === 0) return;
+
+    setIsSweeping(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const tx of displayedTransactions) {
+      // Add to rolling back set to show spinner
+      setRollingBackIds((prev) => new Set(prev).add(tx.operationId));
+
+      try {
+        await manager.send.rollback(tx.operationId);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to rollback ${tx.operationId}:`, error);
+        failCount++;
+      } finally {
+        // Remove from rolling back set
+        setRollingBackIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(tx.operationId);
+          return newSet;
+        });
+      }
+    }
+
+    setIsSweeping(false);
+
+    if (failCount === 0) {
+      popup({
+        message: `Successfully rolled back ${successCount} transaction${successCount !== 1 ? 's' : ''}`,
+        type: 'success',
+        emoji: '🎉',
+        onClose: () => {
+          router.back();
+        },
+      });
+    } else {
+      popup({
+        message: `Rolled back ${successCount}, failed ${failCount}`,
+        type: failCount === displayedTransactions.length ? 'error' : 'warning',
+      });
+    }
+  }, [isSweeping, displayedTransactions, manager]);
 
   // Render sweep button only if there's a selected mint with pending transactions
   const sweepButton = useMemo(() => {
@@ -478,19 +469,20 @@ export default function PendingEcashScreen() {
     }
     return (
       <SweepButton
-        mintUrl={effectiveSelectedMint}
         pendingTransactions={displayedTransactions}
-        unit={totalUnit}
         totalAmount={totalPendingAmount}
-        onSweepComplete={handleSweepComplete}
+        unit={totalUnit}
+        isLoading={isSweeping}
+        onSweep={handleSweep}
       />
     );
   }, [
     effectiveSelectedMint,
     displayedTransactions,
-    totalUnit,
     totalPendingAmount,
-    handleSweepComplete,
+    totalUnit,
+    isSweeping,
+    handleSweep,
   ]);
 
   return (
@@ -588,7 +580,11 @@ export default function PendingEcashScreen() {
               { backgroundColor: opacity(getPrimaryColor('800'), 0.3) },
             ]}>
             {displayedTransactions.map((tx) => (
-              <Transaction key={tx.id} historyEntry={tx as HistoryEntry} />
+              <Transaction
+                key={tx.id}
+                historyEntry={tx as HistoryEntry}
+                isLoading={rollingBackIds.has(tx.operationId)}
+              />
             ))}
           </View>
         )}
