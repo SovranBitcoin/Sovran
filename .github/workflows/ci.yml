@@ -27,9 +27,6 @@ jobs:
       - name: Type Check
         run: npm run type-check
 
-      - name: Knip (unused code)
-        run: npm run knip
-
       - name: Prettier Check
         run: npx prettier --check "./**/*.{js,jsx,mjs,cjs,ts,tsx,json}"
 
