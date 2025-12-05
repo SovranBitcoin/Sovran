@@ -130,7 +130,8 @@ export function SendTokenScreen({
   const handleCancelSend = async (onClose: (event: any) => void) => {
     if (!token) return;
     try {
-      await receive(getEncodedTokenV4(token));
+      // await receive(getEncodedTokenV4(token));
+      await manager.send.rollback(currentTransaction.operationId);
       popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
     } catch (error) {
       popup({
@@ -337,7 +338,11 @@ export function SendTokenScreen({
               value: (
                 <HStack align="center">
                   <Text className="text-primary-0" size={16} overpass bold>
-                    {isPaid ? 'Completed' : 'Pending'}
+                    {currentTransaction.state === 'completed'
+                      ? 'Completed'
+                      : currentTransaction.state === 'rolledBack'
+                        ? 'Rolled Back'
+                        : 'Pending'}
                   </Text>
                 </HStack>
               ),

@@ -9,7 +9,7 @@ import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import React, { useCallback } from 'react';
-import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import { router } from 'expo-router';
 
 export function npubToPubkey(npub: string): string {
@@ -27,6 +27,10 @@ export function npubToPubkey(npub: string): string {
 const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const isSend = historyEntry.type === 'send' || historyEntry.type === 'melt';
   const isReceive = historyEntry.type === 'mint' || historyEntry.type === 'receive';
+
+  // Check if this is a rolled back send transaction
+  const isRolledBack =
+    historyEntry.type === 'send' && (historyEntry as SendHistoryEntry).state === 'rolledBack';
 
   const fiatAmount = formatAmount(
     { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
@@ -81,11 +85,18 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
     }
   }, [historyEntry]);
 
+  // Get display label - show "Rolled Back" for rolled back sends
+  const getDisplayLabel = () => {
+    return historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1);
+  };
+
   return {
     isSend,
     isReceive,
+    isRolledBack,
     fiatAmount,
     handlePress,
+    displayLabel: getDisplayLabel(),
   };
 };
 
@@ -101,8 +112,10 @@ export const Transaction = React.memo(({ historyEntry, onPress }: TransactionPro
   const {
     isSend,
     isReceive,
+    isRolledBack,
     fiatAmount,
     handlePress: defaultHandlePress,
+    displayLabel,
   } = useHistoryEntry(historyEntry);
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
@@ -118,6 +131,7 @@ export const Transaction = React.memo(({ historyEntry, onPress }: TransactionPro
         padding: 20,
         paddingLeft: 16,
         paddingRight: 16,
+        opacity: isRolledBack ? 0.33 : 1,
       }}
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
@@ -126,7 +140,7 @@ export const Transaction = React.memo(({ historyEntry, onPress }: TransactionPro
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
             <UntranslatedText color={getPrimaryColor('0')} bold size={14}>
-              {historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1)}
+              {displayLabel}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
               <UntranslatedText
