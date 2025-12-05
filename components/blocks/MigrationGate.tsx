@@ -14,7 +14,6 @@ interface MigrationGateProps {
 export default function MigrationGate({ children }: MigrationGateProps) {
   const stage = useInitializationStage('migrations', { message: 'Running migrations...' });
   const [migrationsComplete, setMigrationsComplete] = useState(false);
-  const [migrationError, setMigrationError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const hasStarted = useRef(false);
 
@@ -26,7 +25,6 @@ export default function MigrationGate({ children }: MigrationGateProps) {
     const checkMigrationsComplete = async () => {
       try {
         setIsChecking(true);
-        setMigrationError(null);
         stage.log('Running migrations...');
 
         console.log('MigrationGate: Starting migration check...');
@@ -98,7 +96,6 @@ export default function MigrationGate({ children }: MigrationGateProps) {
       } catch (error) {
         console.error('MigrationGate: Migration check failed:', error);
         const errorMessage = error instanceof Error ? error.message : 'Migration check failed';
-        setMigrationError(errorMessage);
         stage.error(errorMessage);
         // Still allow the app to continue - don't block on migration errors
         setMigrationsComplete(true);

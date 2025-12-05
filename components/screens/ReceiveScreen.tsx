@@ -7,14 +7,13 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { useMintManagement } from 'hooks/coco';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useCameraPermissions } from 'expo-camera';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
@@ -29,8 +28,9 @@ import { Tabs } from 'components/ui/Tabs';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useManager } from 'coco-cashu-react';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
-export interface ReceiveScreenProps {
+interface ReceiveScreenProps {
   unit: string;
   onReceiveToken: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
   onCamera: (unit: string) => void;

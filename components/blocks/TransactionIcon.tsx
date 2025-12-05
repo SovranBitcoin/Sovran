@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { HistoryEntry } from 'coco-cashu-core';

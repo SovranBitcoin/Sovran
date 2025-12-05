@@ -7,7 +7,7 @@ import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { createContext, useContext, useState, useCallback } from 'react';
 import { useTheme } from 'providers/ThemeProvider';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 
 // Search context for sharing state between layout and index
 interface PaymentsSearchContextValue {
@@ -97,8 +97,6 @@ function FallbackSearchHeader({ searchQuery }: { searchQuery: string }) {
 export default function PaymentsLayout() {
   const iconColor = useThemeColor({}, 'text');
   const navigation = useNavigation();
-  const { getPrimaryColor } = useTheme();
-
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   // Key to force TextField re-render only when clearing (not on each keystroke)
@@ -122,7 +120,7 @@ export default function PaymentsLayout() {
 
   // Use responsive window dimensions for proper layout across device sizes
   const { width: windowWidth } = useWindowDimensions();
-  
+
   // Calculate width for header - match WalletHeaderTitle calculation
   // 124px for left/right button areas + 24px padding
   const headerWidth = windowWidth - 124 - 24;

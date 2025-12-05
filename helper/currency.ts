@@ -24,7 +24,7 @@ import { useSettingsStore } from 'stores/settingsStore';
  * const amount: AmountWithUnit = { amount: 1000, unit: 'sats' };
  * const usdAmount: AmountWithUnit = { amount: 25.50, unit: 'usd' };
  */
-export interface AmountWithUnit {
+interface AmountWithUnit {
   amount: number;
   unit: string;
 }
@@ -47,7 +47,7 @@ export interface AmountWithUnit {
  *   useUserPreference: true
  * };
  */
-export interface FormatAmountOptions {
+interface FormatAmountOptions {
   displayAs?: string;
   currencyDisplay?: 'symbol' | 'name' | 'none';
   useUserPreference?: boolean;

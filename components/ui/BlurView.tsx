@@ -30,7 +30,7 @@ import { supportsBlur } from 'helper/version';
 /**
  * Props for the BlurView component - same as expo-blur's BlurViewProps
  */
-export type BlurViewProps = ExpoBlurViewProps;
+type BlurViewProps = ExpoBlurViewProps;
 
 /**
  * Platform-aware BlurView that only renders on supported devices
@@ -49,6 +49,3 @@ export function BlurView(props: BlurViewProps): React.ReactElement | null {
 
   return <ExpoBlurView {...props} />;
 }
-
-export default BlurView;
-

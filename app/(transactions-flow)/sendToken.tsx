@@ -31,4 +31,3 @@ function ModalScreen() {
 }
 
 export default withSheetProvider(ModalScreen);
-

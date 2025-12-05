@@ -7,14 +7,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { Share } from 'react-native';
-import { View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import * as Clipboard from 'expo-clipboard';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager } from 'coco-cashu-react';
-import { useHistoryEntry } from 'hooks/coco';
 import { Section } from 'components/ui/Section';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
@@ -26,8 +27,9 @@ import type { MintHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
+import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 
-export interface MintQuoteScreenProps {
+interface MintQuoteScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];

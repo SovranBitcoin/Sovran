@@ -2,10 +2,12 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
-import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
@@ -14,6 +16,8 @@ import { Skeleton } from 'components/ui/Skeleton';
 import { extractDomain } from '@/helper/url';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { supportsLiquidGlass } from '@/helper/version';
+import { useBalanceContext } from 'coco-cashu-react';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface MintBalanceDisplayProps {
   unit: string;
@@ -33,11 +37,11 @@ interface MintBalanceDisplayProps {
 
 const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   unit,
-  onMintSelected,
+  onMintSelected: _onMintSelected,
   requireBalance = true,
-  updateSelectedMint = true,
+  updateSelectedMint: _updateSelectedMint = true,
   allowedMints,
-  allowedUnits,
+  allowedUnits: _allowedUnits,
   requireValidMint = false,
   showAddMintsButton = false,
   showDetailsButton = false,

@@ -10,7 +10,7 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 
-export interface Signer {
+interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
 }
 

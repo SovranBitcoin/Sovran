@@ -1,7 +1,7 @@
 import { CashuState } from './types';
 import { Reducer } from 'redux';
 import { CashuAction } from './actions';
-import { typedSet, typedUpdate } from 'helper/typedUpdate';
+import { typedUpdate } from 'helper/typedUpdate';
 import { cashuState } from 'redux/store/migrationTest';
 
 const initialState: CashuState = {
@@ -57,19 +57,6 @@ export const cashuReducer: Reducer<CashuState, CashuAction> = (state = initialSt
         () => action.payload.mintUrl,
         state
       );
-
-    case 'SET_ALLOCATION':
-      return typedSet(['allocation'] as const, action.payload.allocation, state);
-
-    case 'UPDATE_CURRENCY_ALLOCATION':
-      return typedUpdate(
-        ['allocation', action.payload.currency] as const,
-        () => action.payload.allocation,
-        state
-      );
-
-    case 'RESET_ALLOCATION':
-      return typedSet(['allocation'] as const, {}, state);
 
     default:
       return state;

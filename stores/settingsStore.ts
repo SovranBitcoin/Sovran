@@ -1,20 +1,16 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  BACKGROUND_THEME_NAMES,
-  isBackgroundImageTheme,
-  getBackgroundImage,
-} from 'config/backgroundImageThemes';
+import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
 
-export interface TermsAccepted {
+interface TermsAccepted {
   termsAccepted: boolean;
   date: string;
 }
 
 export type DisplayCurrency = 'usd' | 'eur' | 'gbp';
 
-export interface SettingsState {
+interface SettingsState {
   // Core settings
   theme: string;
   language: string;
@@ -249,9 +245,4 @@ export const useSettingsStore = create<SettingsStore>()(
 );
 
 // Re-export background image helpers from the config file
-export { BACKGROUND_THEME_NAMES, isBackgroundImageTheme, getBackgroundImage };
-
-// Legacy helper for backwards compatibility
-export const getBackgroundImageForTheme = (theme: string): string | null => {
-  return isBackgroundImageTheme(theme) ? theme : null;
-};
+export { isBackgroundImageTheme };

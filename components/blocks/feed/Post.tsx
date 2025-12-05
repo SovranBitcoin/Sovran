@@ -1,13 +1,15 @@
 import React from 'react';
-import { View, VStack, HStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Avatar } from 'components/ui/Avatar';
-import { PostTop } from './PostTop';
-import { TextContent, extractUrls } from './TextContent';
+import { extractUrls, TextContent } from './TextContent';
 import { ActionItems, usePostReactions } from './ActionItems';
-import { RepostText } from './RepostText';
-import { UrlProcessor } from './UrlProcessor';
 import { useNostrProfile } from './useNostrProfile';
 import { Repost } from 'nostr-tools/kinds';
+import { PostTop } from './PostTop';
+import { RepostText } from './RepostText';
+import { UrlProcessor } from './UrlProcessor';
 
 interface PostProps {
   post: any;

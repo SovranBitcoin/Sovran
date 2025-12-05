@@ -61,24 +61,10 @@ export async function retrieveMnemonic(): Promise<string | null> {
 }
 
 /**
- * Checks if a mnemonic is stored in secure storage
- * @returns Promise<boolean> True if mnemonic exists, false otherwise
- */
-export async function hasMnemonic(): Promise<boolean> {
-  try {
-    const mnemonic = await retrieveMnemonic();
-    return mnemonic !== null && mnemonic.trim().length > 0;
-  } catch (error) {
-    console.error('Failed to check for mnemonic:', error);
-    return false;
-  }
-}
-
-/**
  * Generates a new 12-word mnemonic phrase
  * @returns Promise<string> The generated mnemonic phrase
  */
-export async function generateMnemonic(): Promise<string> {
+async function generateMnemonic(): Promise<string> {
   try {
     // Generate 128 bits of entropy (16 bytes) for a 12-word mnemonic
     const entropy = new Uint8Array(16);

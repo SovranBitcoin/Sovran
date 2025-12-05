@@ -25,24 +25,6 @@ export interface GeoPoint {
   icon: string;
 }
 
-export interface ClusterFeature {
-  type: 'Feature';
-  id: number;
-  properties: {
-    cluster: boolean;
-    cluster_id?: number;
-    point_count?: number;
-    point_count_abbreviated?: string | number;
-    // Single point properties
-    pointId?: number;
-    icon?: string;
-  };
-  geometry: {
-    type: 'Point';
-    coordinates: [number, number]; // [lon, lat]
-  };
-}
-
 export interface MapMarker {
   id: string;
   type: 'single' | 'cluster';
@@ -145,7 +127,7 @@ export class ClusterManager {
 
     return clusters.map((feature): MapMarker => {
       const [lon, lat] = feature.geometry.coordinates;
-      const props = feature.properties;
+      const props = feature.properties as any;
 
       if (props.cluster) {
         // Cluster marker
@@ -166,7 +148,7 @@ export class ClusterManager {
           type: 'single',
           latitude: lat,
           longitude: lon,
-          tintColor: COLORS[props.icon] || DEFAULT_COLOR,
+          tintColor: COLORS[props.icon as string] || DEFAULT_COLOR,
           title: 'Merchant',
           count: 1,
           placeId: props.pointId,
@@ -194,12 +176,15 @@ export class ClusterManager {
     if (!this.loaded) return [];
     try {
       const leaves = this.cluster.getLeaves(clusterId, limit);
-      return leaves.map((f) => ({
-        id: f.properties.pointId,
-        lat: f.geometry.coordinates[1],
-        lon: f.geometry.coordinates[0],
-        icon: f.properties.icon,
-      }));
+      return leaves.map((f) => {
+        const props = f.properties as any;
+        return {
+          id: props.pointId || 0,
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+          icon: props.icon || '',
+        };
+      });
     } catch {
       return [];
     }

@@ -1,5 +1,3 @@
-import NDK from '@nostr-dev-kit/ndk';
-
 export const relays = [
   'wss://purplepag.es',
   'wss://relay.primal.net',
@@ -30,11 +28,3 @@ export const relays = [
   'wss://relay1.nostrchat.io',
   'wss://relay2.nostrchat.io',
 ];
-
-const ndk = new NDK({
-  explicitRelayUrls: relays,
-});
-
-ndk.connect();
-
-export default ndk;

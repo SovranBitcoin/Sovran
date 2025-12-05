@@ -13,8 +13,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { formatAmount } from 'helper/currency';
 import { popup } from '@/helper/popup';
-import { useMintManagement, useHistoryEntry, useMeltWithHistory } from 'hooks/coco';
-import { VStack, HStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -34,8 +35,11 @@ import { meltQuoteExpired } from 'helper/utils';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import type { MeltQuoteResponse } from '@cashu/cashu-ts';
+import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
+import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
-export interface MeltQuoteScreenProps {
+interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
   meltHistoryEntry?: MeltHistoryEntry | string;
   /** Direct Lightning invoice for creating new quote */

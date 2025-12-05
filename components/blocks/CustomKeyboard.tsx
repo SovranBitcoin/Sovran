@@ -60,7 +60,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
           newValue = prevInputValue.slice(0, -1);
         } else {
           EnhancedHaptics.buttonHaptic();
-          
+
           // In fiat mode: if current value is exactly "0" and user types a digit (not decimal),
           // replace the 0 instead of appending (so typing "5" gives "5", not "05")
           if (unit !== 'sat' && prevInputValue === '0' && stringValue !== '.') {

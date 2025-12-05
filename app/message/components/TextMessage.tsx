@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from 'components/ui/Text';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import { convertTime } from 'helper/time';
 import { Message } from 'redux/nostr';

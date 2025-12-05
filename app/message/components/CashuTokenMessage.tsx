@@ -1,9 +1,11 @@
 import React from 'react';
 import { Pressable, ColorValue } from 'react-native';
-import { View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getDecodedToken } from '@cashu/cashu-ts';
+import { getDecodedToken, type Proof } from '@cashu/cashu-ts';
 import { useTheme } from 'providers/ThemeProvider';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
@@ -20,7 +22,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
   const { receive } = useReceive();
 
   const decoded = getDecodedToken(token);
-  const amount = decoded.proofs.reduce((a, p) => a + p.amount, 0);
+  const amount = decoded.proofs.reduce((a: number, p: Proof) => a + p.amount, 0);
   const unit = decoded.unit;
 
   const handleRedeem = async () => {

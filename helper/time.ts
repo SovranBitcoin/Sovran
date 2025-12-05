@@ -21,6 +21,7 @@
  */
 
 import { store } from 'redux/store';
+import type { RootState } from 'redux/store/reducer';
 
 /**
  * Converts a Date object to a formatted date-time string
@@ -88,7 +89,8 @@ export function formatCustomDate(date: Date): string {
  * formatDate(new Date()) // Current date in long format
  */
 export function formatDate(date: string | number): string {
-  const language = store.getState().settings?.settings.lang || 'en';
+  const state = store.getState() as unknown as RootState;
+  const language = state.settings?.settings.lang || 'en';
   return new Intl.DateTimeFormat(language, {
     year: 'numeric',
     month: 'long',

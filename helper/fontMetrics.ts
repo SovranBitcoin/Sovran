@@ -4,7 +4,7 @@
  * and are used to calculate precise text sizing by cap height.
  */
 
-export interface FontMetrics {
+interface FontMetrics {
   capHeight: number;
   ascent: number;
   descent: number;
@@ -17,7 +17,7 @@ export interface FontMetrics {
  * These metrics are used for all Overpass font weights initially.
  * Individual weight metrics can be added later if needed for more precision.
  */
-export const overpassMetrics: FontMetrics = {
+const overpassMetrics: FontMetrics = {
   capHeight: 1456,
   ascent: 2100,
   descent: -500,

@@ -1,7 +1,9 @@
 import React from 'react';
 import { TouchableOpacity } from './TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
-import { View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 
 interface CardProps {

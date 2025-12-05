@@ -67,4 +67,3 @@ export default ({ context }: { context?: 'global' }) =>
   context
     ? registerSheet(sheetName, RoutstrModelsSheet, context)
     : registerSheet(sheetName, RoutstrModelsSheet);
-

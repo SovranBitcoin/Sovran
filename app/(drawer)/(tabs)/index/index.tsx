@@ -2,7 +2,7 @@ import { usePaginatedHistory } from 'coco-cashu-react';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { Transactions } from 'components/blocks/Transactions';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { useDeeplink } from 'hooks/useDeeplink';
 import { useVersionCheck } from 'hooks/useVersionCheck';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';

@@ -46,10 +46,12 @@ import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 
 import Icon from 'assets/icons';
+// eslint-disable-next-line import/namespace
 import * as AvatarPrimitive from '@rn-primitives/avatar';
 import { useTheme } from 'providers/ThemeProvider';
 import { rgba } from 'polished';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { Badge } from './Badge';
 import { Skeleton } from './Skeleton';
@@ -96,7 +98,7 @@ interface AvatarProps {
 /**
  * Alea PRNG implementation for deterministic random generation
  */
-function Alea(seed: string) {
+function Alea(this: any, seed: string) {
   let me: any = this;
   let mash = Mash();
 
@@ -123,7 +125,7 @@ function Alea(seed: string) {
   if (me.s2 < 0) {
     me.s2 += 1;
   }
-  mash = null;
+  // mash is no longer needed after initialization
 }
 
 function Mash() {
@@ -146,7 +148,7 @@ function Mash() {
 }
 
 function rand(seed: string) {
-  let xg = new Alea(seed);
+  let xg = new (Alea as any)(seed);
   let prng = xg.next.bind(xg);
   prng.double = function () {
     return prng() + ((prng() * 0x200000) | 0) * 1.1102230246251565e-16;
@@ -171,7 +173,7 @@ function generateHSLColor(random: () => number, alpha: number = 1): string {
  * @param {number} size - Size of the avatar in pixels
  * @returns {JSX.Element} SVG avatar component
  */
-function generateWavesAvatar(seed: string, size: number): JSX.Element {
+function generateWavesAvatar(seed: string, size: number): React.ReactElement {
   const random = rand(seed || 'default').double;
 
   // Generate gradient colors
@@ -453,9 +455,11 @@ export const Avatar = ({
   return (
     <VStack style={{ position: 'relative' }}>
       {/* Main avatar container using AvatarPrimitive for accessibility */}
+      {/* eslint-disable-next-line import/namespace */}
       <AvatarPrimitive.Root alt={alt || defaultAlt} style={avatarStyles}>
         {/* Avatar image if available and not errored */}
         {shouldShowImage && (
+          /* eslint-disable-next-line import/namespace */
           <AvatarPrimitive.Image
             source={{ uri: picture }}
             style={avatarStyles}
@@ -482,6 +486,7 @@ export const Avatar = ({
 
         {/* Fallback content - show if not loading or if error occurred */}
         {showFallback && (
+          /* eslint-disable-next-line import/namespace */
           <AvatarPrimitive.Fallback style={avatarStyles}>
             <VStack align="center" justify="center" flex={1}>
               {/* Only show blur background if not using generated avatar */}
@@ -496,8 +501,10 @@ export const Avatar = ({
               {/* Fallback content (generated avatar, initial, or icon) */}
               {getFallbackContent()}
             </VStack>
+            {/* eslint-disable-next-line import/namespace */}
           </AvatarPrimitive.Fallback>
         )}
+        {/* eslint-disable-next-line import/namespace */}
       </AvatarPrimitive.Root>
 
       {/* Status badge positioned in bottom right corner */}

@@ -1,4 +1,4 @@
-import React, { useEffect, createContext, useContext } from 'react';
+import React, { useEffect, createContext } from 'react';
 import { usePricelistStore, BitcoinPrices } from 'stores/pricelistStore';
 import { PRICELIST_URL } from 'helper/apiClient';
 
@@ -10,14 +10,6 @@ interface PricelistContextType {
 }
 
 const PricelistContext = createContext<PricelistContextType | null>(null);
-
-export const usePricelistContext = () => {
-  const context = useContext(PricelistContext);
-  if (!context) {
-    throw new Error('usePricelistContext must be used within a PricelistProvider');
-  }
-  return context;
-};
 
 export const PricelistProvider = ({ children }: { children: React.ReactNode }) => {
   const {

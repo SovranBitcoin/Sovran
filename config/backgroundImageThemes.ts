@@ -13,7 +13,7 @@ import { ImageSource } from 'expo-image';
 /**
  * Dominant color extracted from an image
  */
-export interface DominantColor {
+interface DominantColor {
   hex: string;
   hue: number;
   saturation: number;
@@ -23,7 +23,7 @@ export interface DominantColor {
 /**
  * HSB (Hue, Saturation, Brightness) values
  */
-export interface HSB {
+interface HSB {
   hue: number;
   saturation: number;
   brightness: number;
@@ -32,7 +32,7 @@ export interface HSB {
 /**
  * Gradient color for creating CSS gradients
  */
-export interface GradientColor {
+interface GradientColor {
   hex: string;
   position: 'light' | 'mid' | 'dark';
   hsb: HSB;
@@ -170,149 +170,9 @@ export const isBackgroundImageTheme = (themeName: string): boolean => {
 };
 
 /**
- * Get the background image for a theme, or null if not a background theme.
- */
-export const getBackgroundImage = (themeName: string): ImageSource | null => {
-  return backgroundImageThemes[themeName] ?? null;
-};
-
-/**
- * Get the display name for a background theme.
- */
-export const getBackgroundThemeDisplayName = (themeName: string): string | undefined => {
-  return backgroundThemeDisplayNames[themeName];
-};
-
-/**
- * Get the dominant colors for a background theme.
- * Returns an array of 5 visually distinct colors extracted from the image.
- */
-export const getBackgroundThemeDominantColors = (
-  themeName: string
-): DominantColor[] | undefined => {
-  return backgroundThemeDominantColors[themeName];
-};
-
-/**
- * Get just the hex values of dominant colors for a theme.
- * Convenience function for when you just need the color strings.
- */
-export const getBackgroundThemeDominantHexColors = (themeName: string): string[] | undefined => {
-  return backgroundThemeDominantColors[themeName]?.map((c) => c.hex);
-};
-
-/**
- * Get the gradient colors for a background theme.
- * Returns an array of 3 colors (light → mid → dark) for CSS gradients.
- */
-export const getBackgroundThemeGradientColors = (
-  themeName: string
-): GradientColor[] | undefined => {
-  return backgroundThemeGradientColors[themeName];
-};
-
-/**
- * Get a CSS linear-gradient string for a theme.
- * Direction defaults to 'to bottom' (light at top, dark at bottom).
- */
-export const getBackgroundThemeGradientCSS = (
-  themeName: string,
-  direction: string = 'to bottom'
-): string | undefined => {
-  const gradient = backgroundThemeGradientColors[themeName];
-  if (!gradient || gradient.length === 0) return undefined;
-  const colors = gradient.map((c) => c.hex).join(', ');
-  return `linear-gradient(${direction}, ${colors})`;
-};
-
-/**
- * Dominant color scale type (100-500)
- */
-export type DominantScale = '100' | '200' | '300' | '400' | '500';
-
-/**
  * Gradient color scale type (100-300)
  */
-export type GradientScale = '100' | '200' | '300';
-
-/**
- * Scale to index mapping for dominant colors
- */
-const dominantScaleToIndex: Record<DominantScale, number> = {
-  '100': 0,
-  '200': 1,
-  '300': 2,
-  '400': 3,
-  '500': 4,
-};
-
-/**
- * Scale to position mapping for gradient colors
- */
-const gradientScaleToPosition: Record<GradientScale, 'light' | 'mid' | 'dark'> = {
-  '100': 'light',
-  '200': 'mid',
-  '300': 'dark',
-};
-
-/**
- * Get a specific dominant color by scale (100-500) for a theme.
- * Returns the hex color string.
- *
- * @example
- * getDominantColorByScale('cosmicpurple', '100') // '#68194A'
- * getDominantColorByScale('cosmicpurple', '300') // '#14BA73'
- */
-export const getDominantColorByScale = (
-  themeName: string,
-  scale: DominantScale
-): string | undefined => {
-  const colors = backgroundThemeDominantColors[themeName];
-  if (!colors) return undefined;
-  const index = dominantScaleToIndex[scale];
-  return colors[index]?.hex;
-};
-
-/**
- * Get a specific gradient color by scale (100-300) for a theme.
- * 100 = light, 200 = mid, 300 = dark
- * Returns the hex color string.
- *
- * @example
- * getGradientColorByScale('cosmicpurple', '100') // '#3D95B3' (light)
- * getGradientColorByScale('cosmicpurple', '300') // '#13092F' (dark)
- */
-export const getGradientColorByScale = (
-  themeName: string,
-  scale: GradientScale
-): string | undefined => {
-  const colors = backgroundThemeGradientColors[themeName];
-  if (!colors) return undefined;
-  const position = gradientScaleToPosition[scale];
-  return colors.find((c) => c.position === position)?.hex;
-};
-
-/**
- * Get all dominant colors as a scale object for a theme.
- * Useful for creating inline styles or passing to components.
- *
- * @example
- * getDominantColorScale('cosmicpurple')
- * // { 100: '#68194A', 200: '#322B84', 300: '#14BA73', 400: '#3D95B3', 500: '#C64555' }
- */
-export const getDominantColorScale = (
-  themeName: string
-): Record<DominantScale, string> | undefined => {
-  const colors = backgroundThemeDominantColors[themeName];
-  if (!colors) return undefined;
-  return {
-    '100': colors[0]?.hex || '',
-    '200': colors[1]?.hex || '',
-    '300': colors[2]?.hex || '',
-    '400': colors[3]?.hex || '',
-    '500': colors[4]?.hex || '',
-  };
-};
+type GradientScale = '100' | '200' | '300';
 
 /**
  * Get all gradient colors as a scale object for a theme.

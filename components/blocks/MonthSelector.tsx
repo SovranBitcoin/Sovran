@@ -8,7 +8,8 @@
 import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { ScrollView, LayoutChangeEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HistoryEntry } from 'coco-cashu-core';
@@ -203,5 +204,3 @@ export function MonthSelector({
     </View>
   );
 }
-
-export default MonthSelector;

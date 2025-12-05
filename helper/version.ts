@@ -183,7 +183,7 @@ class DeviceChecker {
  *   // iOS 12+ specific code
  * }
  */
-export const device = new DeviceChecker();
+const device = new DeviceChecker();
 
 /**
  * Checks if the current device supports blur effects well

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoutstrModel } from 'helper/routstr/api';
 
-export interface RoutstrMessage {
+interface RoutstrMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -183,9 +183,9 @@ export const useRoutstrStore = create<RoutstrStore>()(
           const updatedHistory = state.conversationHistory.map((msg) =>
             msg.id === id
               ? {
-                ...msg,
-                content,
-              }
+                  ...msg,
+                  content,
+                }
               : msg
           );
           // Skip saving to sessions if in anonymous mode

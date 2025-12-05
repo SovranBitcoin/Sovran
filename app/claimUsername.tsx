@@ -19,7 +19,9 @@ import {
   Alert,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { View, VStack, HStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -300,9 +302,6 @@ function ClaimUsernameScreen() {
     const result = availabilityResults.find((r) => r.domain === selectedDomainValue);
     return result?.available === true;
   }, [availabilityResults, selectedDomain]);
-
-  // Can continue if username is valid and selected domain is available
-  const canContinue = username.length >= 3 && selectedDomainAvailable && !isChecking;
 
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();

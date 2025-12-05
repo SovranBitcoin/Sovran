@@ -4,7 +4,8 @@ import { Linking, ScrollView } from 'react-native';
 import Icon from 'assets/icons';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
-import { VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 
 type ChangelogItem = {

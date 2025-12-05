@@ -1,7 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Button } from 'components/ui/Button';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 
 interface Props {

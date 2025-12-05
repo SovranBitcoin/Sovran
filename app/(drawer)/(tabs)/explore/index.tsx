@@ -2,7 +2,10 @@ import Icon from 'assets/icons';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, Spacer, View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,11 +23,11 @@ import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from '
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
-import { usePaginatedHistory, useMints } from 'hooks/coco';
-import { SendHistoryEntry, Mint } from 'coco-cashu-core';
-import { Avatar } from 'components/ui/Avatar';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { extractDomain } from 'helper/url';
+import { extractDomain } from '@/helper/url';
+import { Avatar } from '@/components/ui/Avatar';
+import { AmountFormatter } from '@/components/ui/AmountFormatter';
+import { Mint, SendHistoryEntry } from 'coco-cashu-core';
+import { useMints, usePaginatedHistory } from 'coco-cashu-react';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -925,12 +928,7 @@ const ExploreScreen = () => {
   const [activeCategory, setActiveCategory] = useState('All');
 
   // Routstr models state
-  const {
-    getCachedModels,
-    setCachedModels,
-    isCacheStale,
-    apiKey: routstrApiKey,
-  } = useRoutstrStore();
+  const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore();
   const [models, setModels] = useState<RoutstrModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
 
@@ -1049,9 +1047,9 @@ const ExploreScreen = () => {
         <Spacer size={32} />
 
         {/* Pending Ecash Section - only shows when there are pending transactions */}
-        {/* <View style={{ paddingHorizontal: 20 }}>
+        <View style={{ paddingHorizontal: 20 }}>
           <PendingEcashCard />
-        </View> */}
+        </View>
 
         <Spacer size={32} />
 

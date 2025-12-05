@@ -23,9 +23,11 @@
  */
 
 import React, { useState } from 'react';
-import { View, GestureResponderEvent } from 'react-native';
+import { GestureResponderEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';

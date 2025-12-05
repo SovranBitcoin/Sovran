@@ -1,10 +1,12 @@
 import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, VStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { ProfileImage } from './ProfileImage';
 import { UserProfile } from 'helper/apiClient';
+import { ProfileImage } from './ProfileImage';
 interface SearchResultProps {
   result: {
     pubkey: string;

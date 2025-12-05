@@ -112,7 +112,7 @@ interface ApduResponse {
 }
 
 /** Options for performing an NFC payment */
-export interface PaymentOptions {
+interface PaymentOptions {
   /** Function to create a Cashu token from mint URL and amount */
   createToken: (mintUrl: string, amount: number) => Promise<string>;
   /** Function to recover/reclaim a token if write fails */
@@ -124,7 +124,7 @@ export interface PaymentOptions {
 }
 
 /** Result of a successful payment */
-export interface PaymentResult {
+interface PaymentResult {
   /** The original payment request string */
   paymentRequest: string;
   /** The mint URL that was used */
@@ -373,7 +373,7 @@ function decodeTextRecord(ndef: number[]): string {
  * @param fallbackMint - Default mint to use if no other option is available
  * @returns The selected mint URL
  */
-export function selectBestMint(
+function selectBestMint(
   allowedMints: string[] | undefined,
   preferredMint?: string,
   fallbackMint = DEFAULT_MINT
@@ -454,7 +454,11 @@ export async function writeTokenToNFC(token: string): Promise<boolean> {
     // Write NLEN first
     r = await sendApdu(UPDATE_BINARY(0, [ndef[0], ndef[1]]), 'WRITE NLEN');
     if (!r.ok) {
-      throw new NfcError(`Failed writing NLEN (${getStatusMessage(r.sw)})`, 'WRITE_NLEN_FAILED', r.sw);
+      throw new NfcError(
+        `Failed writing NLEN (${getStatusMessage(r.sw)})`,
+        'WRITE_NLEN_FAILED',
+        r.sw
+      );
     }
 
     // Write body in chunks

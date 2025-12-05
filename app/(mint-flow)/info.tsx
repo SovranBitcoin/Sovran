@@ -24,9 +24,11 @@ import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { VStack, Spacer, HStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { npubToPubkey } from 'components/blocks/Transaction';
-import { useMintManagement } from 'hooks/coco';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useKYMMint } from 'hooks/coco/useKYMMint';
 import { Card } from 'components/ui/Card';
@@ -41,6 +43,7 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import Svg, { Circle } from 'react-native-svg';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 // ============================================================================
 // Simple Progress Ring using SVG - Static (no animation for better performance)
@@ -338,58 +341,6 @@ function StatsGridComponent({
 const StatsGrid = React.memo(StatsGridComponent);
 
 // ============================================================================
-// Star Rating Display - Simplified
-// ============================================================================
-function StarRatingComponent({
-  score,
-  size = 14,
-  animated = false,
-}: {
-  score: number;
-  size?: number;
-  animated?: boolean;
-}) {
-  const { getPrimaryColor, getYellowColor } = useTheme();
-  const filledStars = Math.round(score);
-  const starAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(animated ? 0 : 1))).current;
-
-  useEffect(() => {
-    if (animated && score > 0) {
-      const animations = starAnims.slice(0, filledStars).map((anim, i) =>
-        Animated.spring(anim, {
-          toValue: 1,
-          friction: 4,
-          tension: 200,
-          useNativeDriver: true,
-          delay: i * 80,
-        })
-      );
-      Animated.parallel(animations).start();
-    }
-  }, [score, animated, filledStars, starAnims]);
-
-  return (
-    <HStack gap={2}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Animated.View
-          key={i}
-          style={{
-            transform: [{ scale: animated ? starAnims[i] : 1 }],
-            opacity: animated ? starAnims[i] : 1,
-          }}>
-          <Icon
-            name="ic:round-star"
-            size={size}
-            color={i < filledStars ? getYellowColor('300') : getPrimaryColor('600')}
-          />
-        </Animated.View>
-      ))}
-    </HStack>
-  );
-}
-const _StarRating = React.memo(StarRatingComponent);
-
-// ============================================================================
 // Rating Display - Optimized with native driver (scaleX instead of width)
 // ============================================================================
 function RatingDisplayComponent({
@@ -582,7 +533,6 @@ function MintInfoModal() {
 
   const [mintInfo, setMintInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
 
   const {
     auditInfo,
@@ -630,7 +580,6 @@ function MintInfoModal() {
   useEffect(() => {
     const fetchMintInfo = async () => {
       if (!mintUrl) {
-        setError('No mint URL provided');
         setLoading(false);
         return;
       }
@@ -638,8 +587,7 @@ function MintInfoModal() {
         setLoading(true);
         const data = await getMintInfo(mintUrl);
         setMintInfo(data);
-      } catch (_err) {
-        setError('Failed to load mint information');
+      } catch {
       } finally {
         setLoading(false);
       }

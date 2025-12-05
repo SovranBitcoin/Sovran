@@ -59,7 +59,8 @@ import React, { useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from 'components/ui/Button';
 import { SheetManager } from 'react-native-actions-sheet';
-import { HStack, View } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
@@ -144,7 +145,7 @@ interface ButtonHandlerProps {
  * />
  */
 export function ButtonHandler({
-  context,
+  context: _context,
   buttons,
   style,
   gradientColor,

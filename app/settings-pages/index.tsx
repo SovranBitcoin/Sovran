@@ -4,18 +4,17 @@ import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Avatar } from 'components/ui/Avatar';
 
-import {
-  ActionSheetProvider,
-  connectActionSheet,
-  useActionSheet,
-} from '@expo/react-native-action-sheet';
+import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-action-sheet';
 import { Link } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
 import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -163,40 +162,6 @@ export const RowButton: React.FC<{
 
 const ModalScreen = () => {
   const { getPrimaryColor } = useTheme();
-
-  const { showActionSheetWithOptions } = useActionSheet();
-
-  const handleBTCFormatPress = () => {
-    const options = ['Bitcoin (BTC)', 'Satoshi (short-Sats)', 'Satoshis (Sats)', 'Cancel'];
-    const cancelButtonIndex = 3;
-
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-      },
-      (buttonIndex) => {
-        if (buttonIndex !== cancelButtonIndex) {
-        }
-      }
-    );
-  };
-
-  const handleFiatCurrencyPress = () => {
-    const options = ['USD', 'EUR', 'GBP', 'Cancel'];
-    const cancelButtonIndex = 3;
-
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-      },
-      (buttonIndex) => {
-        if (buttonIndex !== cancelButtonIndex) {
-        }
-      }
-    );
-  };
 
   return (
     <Container>

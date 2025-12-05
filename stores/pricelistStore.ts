@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export interface PricelistData {
+interface PricelistData {
   usd: {
     btc: number;
   };
@@ -14,7 +14,7 @@ export interface PricelistData {
   };
 }
 
-export interface PricelistState {
+interface PricelistState {
   pricelist: PricelistData | null;
   isLoading: boolean;
   lastUpdated: number | null;
@@ -165,9 +165,4 @@ export const usePricelistStore = create<PricelistStore>()(
 // Helper hook for easy access to BTC price
 export const useBtcPrice = (currency: string = 'usd') => {
   return usePricelistStore((state) => state.getBtcPrice(currency));
-};
-
-// Helper hook for checking if data is stale
-export const useIsPricelistStale = (maxAgeMinutes: number = 5) => {
-  return usePricelistStore((state) => state.isStale(maxAgeMinutes));
 };

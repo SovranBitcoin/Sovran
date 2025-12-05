@@ -23,7 +23,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Animated } from 'react-native';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';

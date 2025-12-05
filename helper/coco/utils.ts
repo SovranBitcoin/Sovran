@@ -29,78 +29,9 @@
  * @see {@link https://github.com/gandlaf21/bolt11-decode} BOLT11 Decode
  */
 
-import { Manager } from 'coco-cashu-core';
 import { getDecodedToken } from '@cashu/cashu-ts';
 import { decode } from '@gandlaf21/bolt11-decode';
-import { nip19 } from 'nostr-tools';
 import _ from 'lodash';
-
-/**
- * Retrieves mint information using the Coco Manager
- *
- * @async
- * @description Fetches comprehensive mint information including supported currencies, fees, and capabilities
- *
- * **Process:** manager.mint.getMintInfo() → return mint data
- * **Effects:** Network request to mint server
- *
- * @param {Manager} manager - The Coco Manager instance
- * @param {string} mintUrl - The URL of the mint to query
- * @returns {Promise<any>} Mint information object containing supported currencies, fees, and capabilities
- * @throws {Error} When mint URL is invalid or mint server is unreachable
- *
- * @example
- * const manager = new Manager();
- * const mintInfo = await getMintInfo(manager, 'https://mint.example.com');
- * console.log(mintInfo.currencies); // ['USD', 'EUR', 'BTC']
- */
-export async function getMintInfo(manager: Manager, mintUrl: string) {
-  try {
-    return await manager.mint.getMintInfo(mintUrl);
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Checks if an ecash token is spendable by validating mint availability and token structure
- *
- * @async
- * @description Validates token structure, checks if mint is known, and determines spendability
- *
- * **Process:** decode token → extract mint URL → check if mint is known → return spendability
- * **Effects:** Network request to check mint availability
- *
- * @param {Manager} manager - The Coco Manager instance
- * @param {string} token - The ecash token string to validate
- * @returns {Promise<boolean>} True if token is spendable, false otherwise
- * @throws {Error} When token decoding fails or manager is not initialized
- *
- * @example
- * const manager = new Manager();
- * const isSpendable = await isTokenSpendable(manager, 'cashuAeyJ0b2tlbiI6...');
- * if (isSpendable) {
- *   // Token can be spent
- * }
- */
-export async function isTokenSpendable(manager: Manager, token: string): Promise<boolean> {
-  try {
-    const decoded = getDecodedToken(token);
-    const mintUrl = decoded.mint;
-
-    // Check if mint is known
-    const isKnown = await manager.mint.isKnownMint(mintUrl);
-    if (!isKnown) {
-      return false;
-    }
-
-    // For now, assume token is spendable if it's valid
-    // In a real implementation, you'd check proof states
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
@@ -156,32 +87,6 @@ export function getLightningAmount(invoice: string): number {
 }
 
 /**
- * Extracts the description from a Lightning Network invoice
- *
- * @description Decodes a BOLT11 invoice and extracts the payment description
- *
- * **Process:** decode invoice → find description section → return description
- * **Effects:** None (pure parsing function)
- *
- * @param {string} invoice - The Lightning Network invoice string
- * @returns {string} Payment description, or empty string if parsing fails or no description
- *
- * @example
- * const invoice = 'lnbc100n1p...';
- * const description = getLightningDescription(invoice);
- * console.log(`Description: ${description}`); // Description: Coffee payment
- */
-export function getLightningDescription(invoice: string): string {
-  try {
-    const decoded = decode(invoice);
-    const description = decoded?.sections?.find((route) => route?.name === 'description')?.value;
-    return description || '';
-  } catch {
-    return '';
-  }
-}
-
-/**
  * Extracts the timestamp from a Lightning Network invoice
  *
  * @description Decodes a BOLT11 invoice and extracts the creation timestamp
@@ -206,33 +111,6 @@ export function getLightningTimestamp(invoice: string): number {
   } catch {
     return 0;
   }
-}
-
-/**
- * Converts a Nostr npub key to P2PK format if it's in npub format
- *
- * @description Checks if the key starts with 'npub1' and converts it to the P2PK format used by Lightning Network
- *
- * **Process:** check npub prefix → decode with nip19 → convert to P2PK format
- * **Effects:** None (pure conversion function)
- *
- * @param {string} key - The key string to potentially convert
- * @returns {string} The converted key in P2PK format, or original key if not npub format
- *
- * @example
- * const npubKey = 'npub1abc123...';
- * const p2pkKey = maybeConvertNpub(npubKey);
- * console.log(p2pkKey); // '02abc123...'
- */
-export function maybeConvertNpub(key: string) {
-  // Check and convert npub to P2PK
-  if (key && key.startsWith('npub1')) {
-    const { type, data } = nip19.decode(key);
-    if (type === 'npub' && data.length === 64) {
-      key = '02' + data;
-    }
-  }
-  return key;
 }
 
 /**
@@ -314,7 +192,7 @@ const LN_ADDRESS_REGEX =
 
 const LNURLP_REGEX = /^lnurlp:\/\/([\w-]+\.)+[\w-]+(:\d{1,5})?(\/[\w-./?%&=]*)?$/;
 
-export interface LightningAddress {
+interface LightningAddress {
   username: string;
   domain: string;
 }
@@ -338,7 +216,7 @@ export const isLnurlp = (url: string): boolean => {
 /**
  * Parses a lightning address into username and domain
  */
-export const parseLightningAddress = (address: string): LightningAddress | null => {
+const parseLightningAddress = (address: string): LightningAddress | null => {
   if (!address) return null;
   const result = LN_ADDRESS_REGEX.exec(address);
   return result ? { username: result[1], domain: result[2] } : null;
@@ -348,7 +226,7 @@ export const parseLightningAddress = (address: string): LightningAddress | null 
  * Parses an lnurlp URL and returns a proper HTTP(S) URL
  * Only lowercases the domain, preserves path case
  */
-export const parseLnurlp = (url: string): string | null => {
+const parseLnurlp = (url: string): string | null => {
   if (!url) return null;
   // Test with lowercase for regex, but preserve original case for path
   if (!LNURLP_REGEX.test(url.toLowerCase())) return null;
@@ -367,7 +245,7 @@ export const parseLnurlp = (url: string): string | null => {
 /**
  * Decodes a lightning address or lnurlp URL to a callback URL
  */
-export const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
+const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
   const address = parseLightningAddress(lnUrlOrAddress);
   if (address) {
     const { username, domain } = address;
@@ -377,7 +255,7 @@ export const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
   return parseLnurlp(lnUrlOrAddress);
 };
 
-export interface LnUrlPayParams {
+interface LnUrlPayParams {
   callback: string;
   minSendable: number;
   maxSendable: number;
@@ -387,7 +265,7 @@ export interface LnUrlPayParams {
 /**
  * Fetches LNURL pay parameters from a lightning address or lnurlp URL
  */
-export const getLnurlPayParams = async (lnUrlOrAddress: string): Promise<LnUrlPayParams | null> => {
+const getLnurlPayParams = async (lnUrlOrAddress: string): Promise<LnUrlPayParams | null> => {
   const url = decodeUrlOrAddress(lnUrlOrAddress);
   if (!url) return null;
 

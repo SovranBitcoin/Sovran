@@ -41,7 +41,7 @@ export const useProcessPaymentString = ({
   const appStateRef = useRef<string>(AppState.currentState);
 
   const processPaymentString = useCallback(
-    async (scanning: ScanningData): Promise<{ urInProgress: boolean }> => {
+    async (scanning: ScanningData): Promise<{ urInProgress: boolean; progress?: number }> => {
       // Don't process scans if app is backgrounded or screen is not focused
       if (appStateRef.current !== 'active' || !isFocused) {
         return { urInProgress: false };
@@ -111,7 +111,7 @@ export const useProcessPaymentString = ({
             setUrDecoder(new URDecoder());
             return { urInProgress: false };
           }
-          
+
           // UR is in progress but not complete - keep loading state
           return { urInProgress: true, progress: nextPer };
         }
@@ -174,7 +174,7 @@ export const useProcessPaymentString = ({
           return { urInProgress: false };
         }
       }
-      
+
       return { urInProgress: false };
     },
     [scanned, urDecoder, unit, selectedMint, isFocused, onProgress, onLoading, onScanned]

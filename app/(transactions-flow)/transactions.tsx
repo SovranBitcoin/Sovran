@@ -13,7 +13,7 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionsScreen } from 'components/screens/TransactionsScreen';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
@@ -66,7 +66,6 @@ function TransactionsRoute() {
       filterDirection?: string;
       filterStatus?: string;
     }>();
-  const { getPrimaryColor } = useTheme();
   const {
     currency,
     paymentType,

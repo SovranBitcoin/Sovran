@@ -29,7 +29,9 @@ import { Text } from 'components/ui/Text';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { popup } from '@/helper/popup';
-import { HStack, View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { MintSearchInput } from 'components/ui/MintSearchInput';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { filterMints } from 'helper/fuzzySearch';
@@ -39,19 +41,17 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useNostrDiscoveredMints } from '@/hooks/coco/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from '@/hooks/coco/useSovranDiscoveredMints';
 import type { SovranDiscoveredMintData } from '@/hooks/coco/useSovranDiscoveredMints';
-import { useMintManagement } from 'hooks/coco';
 import type { NostrDiscoveredMintData } from '@/hooks/coco/useNostrDiscoveredMints';
-import { MintItem } from './list';
 import { useKYMMints } from 'hooks/coco/useKYMMints';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useAuditMintStore } from 'stores/auditMintStore';
-import { Mint } from 'coco-cashu-core';
 import { MintCurrencySelector } from '../MintCurrencySelector';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { TouchableOpacity } from 'react-native';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import Icon from '@/assets/icons';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface PseudoMint {
   url: string;
@@ -78,10 +78,6 @@ interface SearchableDiscoveredMint {
 }
 
 type SearchableMint = SearchableDiscoveredMint | PseudoMint;
-
-const isPseudoMint = (mint: SearchableMint): mint is PseudoMint => {
-  return 'isPseudoMint' in mint && mint.isPseudoMint === true;
-};
 
 // Convert discovered mint data to SearchableDiscoveredMint
 const adaptDiscoveredMint = (
@@ -443,41 +439,6 @@ const AddRoute = () => {
       setIsAdding(false);
     }
   };
-
-  // Render item callback for MintCurrencySelector (kept for reference during migration)
-  const _renderMintItem = useCallback(
-    (mint: SearchableMint, _selectedCurrency: string) => {
-      const pseudo = isPseudoMint(mint);
-      const normalizedUrl = normalizeUrl(mint.url);
-      const kymData = kymScores[normalizedUrl];
-      const kymScore = kymData?.score;
-
-      // Create a compatible mint object for MintItem
-      const mintObject: Mint = {
-        mintUrl: mint.url,
-        mintInfo: pseudo ? mint.mintInfo : mint.mintInfo ? mint.mintInfo : undefined,
-      } as Mint;
-
-      return (
-        <MintItem
-          key={mint.url}
-          mint={mintObject}
-          mintUrl={mint.url}
-          balance={undefined}
-          showCheckbox={true}
-          selected={selectedMints.has(mint.url)}
-          onToggle={() => handleToggleMint(mint.url)}
-          onPress={() => handleToggleMint(mint.url)}
-          isLoading={false}
-          globalLoading={isAdding}
-          kymScore={kymScore}
-          kymLoading={kymLoading}
-          showDetailsButton={false}
-        />
-      );
-    },
-    [selectedMints, handleToggleMint, isAdding, kymScores, kymLoading, normalizeUrl]
-  );
 
   // Memoized render function for mint items
   const renderMintItemCallback = useCallback(

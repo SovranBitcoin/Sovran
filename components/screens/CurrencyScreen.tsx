@@ -62,15 +62,11 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
-import {
-  useLightningOperations,
-  useManager,
-  useSendWithHistory,
-  useBalanceContext,
-} from 'hooks/coco';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -81,6 +77,9 @@ import { useRoutstrStore } from 'stores/routstrStore';
 import { useSettingsStore, DisplayCurrency } from 'stores/settingsStore';
 import { useBtcPrice } from 'stores/pricelistStore';
 import opacity from 'hex-color-opacity';
+import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
+import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
+import { useBalanceContext, useManager } from 'coco-cashu-react';
 
 // Currency display configuration
 const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
@@ -162,7 +161,7 @@ function FiatAmountDisplay({
   );
 }
 
-export interface CurrencyScreenParams {
+interface CurrencyScreenParams {
   amount?: string;
   unit: string;
   to: string;
@@ -175,7 +174,7 @@ export interface CurrencyScreenParams {
   routstrTopUp?: string;
 }
 
-export interface CurrencyScreenProps {
+interface CurrencyScreenProps {
   params: CurrencyScreenParams;
   onMintQuoteCreated: (mintHistoryEntry: MintHistoryEntry) => void;
   onSendTokenCreated: (sendHistoryEntry: SendHistoryEntry) => void;

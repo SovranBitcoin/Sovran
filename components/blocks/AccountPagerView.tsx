@@ -9,19 +9,21 @@ import * as Clipboard from 'expo-clipboard';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
 import { frame, cornerRadius, background } from '@expo/ui/swift-ui/modifiers';
 
-import { View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import Icon, { ArrowIcon } from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 
 import { useMintStore } from 'stores/mintStore';
-import { useMintManagement, useReceive } from 'hooks/coco';
 import { useProcessPaymentString } from 'hooks/coco/useProcessPaymentString';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
 import { router } from 'expo-router';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface AccountType {
   unit: string;
@@ -81,8 +83,6 @@ export function AccountPagerView({
   useEffect(() => {
     goToIndex(accounts.findIndex((a) => a.unit === account.unit));
   }, [accounts, account]);
-
-  useReceive();
 
   // Handlers
   const handleReceive = useCallback(() => {

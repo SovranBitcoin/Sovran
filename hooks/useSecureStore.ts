@@ -31,7 +31,7 @@ interface UseSecureStoreReturn {
  * @param autoLoad Whether to automatically load the value on mount (default: true)
  * @returns Object containing value, loading state, error, and methods to manage the value
  */
-export const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSecureStoreReturn => {
+const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSecureStoreReturn => {
   const [value, setValueState] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(autoLoad);
   const [error, setError] = useState<string | null>(null);

@@ -8,14 +8,14 @@
 
 import React, { ReactNode } from 'react';
 import { ScrollView, StyleProp, ViewStyle } from 'react-native';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-export interface ModalScreenLayoutProps {
+interface ModalScreenLayoutProps {
   children: ReactNode;
   /** Content to render in the bottom buttons area */
   bottomButtons?: ReactNode;

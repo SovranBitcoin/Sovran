@@ -20,7 +20,6 @@ import { LogBox, TouchableOpacity } from 'react-native';
 
 import AppGate from '@/components/blocks/AppGate';
 import MigrationGate from '@/components/blocks/MigrationGate';
-import { CocoProvider } from '@/helper/coco';
 import { InitializationProvider } from '@/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
@@ -37,6 +36,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from 'redux/store';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
+import { CocoProvider } from '@/helper/coco/CocoProvider';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();

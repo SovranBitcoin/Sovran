@@ -9,14 +9,14 @@ import React, {
   memo,
 } from 'react';
 import { Animated, Easing, Dimensions } from 'react-native';
-import { View } from '@/components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Text } from '@/components/ui/Text';
 import Icon from '@/assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
+type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
 
-export interface Stage {
+interface Stage {
   id: string;
   message: string;
   status: StageStatus;
@@ -53,9 +53,7 @@ const InitializationContext = createContext<InitializationContextValue>({
   startTestAnimation: () => {},
 });
 
-export { InitializationContext };
-
-export const useInitializationContext = () => {
+const useInitializationContext = () => {
   return useContext(InitializationContext);
 };
 

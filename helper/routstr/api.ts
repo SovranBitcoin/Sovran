@@ -2,25 +2,25 @@ import OpenAI from 'openai';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 
-export interface BalanceResponse {
+interface BalanceResponse {
   balance: number; // msats
   total_spent?: number; // msats (optional, may not be in response)
   api_key?: string; // API key (returned when using Cashu token directly)
   reserved?: number; // Reserved balance
 }
 
-export interface TopUpResponse {
+interface TopUpResponse {
   added_amount: number; // msats
 }
 
-export interface CreateWalletResponse {
+interface CreateWalletResponse {
   api_key: string;
   balance: number; // msats
   created_at: string;
   key_id: string;
 }
 
-export interface RoutstrError {
+interface RoutstrError {
   status: number;
   error: {
     message: string;
@@ -156,7 +156,7 @@ export interface RoutstrModel {
   alias_ids: string[] | null;
 }
 
-export interface ModelsResponse {
+interface ModelsResponse {
   data: RoutstrModel[];
 }
 
@@ -609,35 +609,4 @@ export async function sendMessage(
       },
     } as RoutstrError;
   }
-}
-
-/**
- * Retry helper with exponential backoff
- */
-export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 1000
-): Promise<T> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      if (attempt === maxRetries - 1) {
-        throw error;
-      }
-
-      // Don't retry on 402 (insufficient balance) or 401 (auth error)
-      if (error.status === 402 || error.status === 401) {
-        throw error;
-      }
-
-      // Calculate delay with exponential backoff
-      const delay = Math.min(baseDelay * Math.pow(2, attempt), 60000);
-      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  throw new Error('Max retries exceeded');
 }

@@ -288,5 +288,3 @@ const styles = StyleSheet.create({
     fontFamily: 'OverpassBold',
   },
 });
-
-export default MintCurrencyTabs;

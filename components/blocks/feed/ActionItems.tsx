@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Assuming you're using AsyncStorage as backend for cache

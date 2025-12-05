@@ -1,5 +1,5 @@
 import React from 'react';
-import { HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from '@/providers/ThemeProvider';

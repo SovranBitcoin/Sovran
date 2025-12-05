@@ -1,9 +1,9 @@
 import React from 'react';
-import { VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
 import { Text } from 'components/ui/Text';
-import { SearchTip } from './SearchTip';
 import { useTheme } from 'providers/ThemeProvider';
 import Icon from '@/assets/icons';
+import { SearchTip } from './SearchTip';
 
 export function NoResultsFound() {
   const { getPrimaryColor } = useTheme();

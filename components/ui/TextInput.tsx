@@ -10,7 +10,7 @@ import { useTheme } from 'providers/ThemeProvider';
 /**
  * Custom TextInput component with default styling based on the current theme.
  */
-export interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextColor'> {
+interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextColor'> {
   style?: StyleProp<TextStyle>;
   placeholderTextColor?: string;
 }

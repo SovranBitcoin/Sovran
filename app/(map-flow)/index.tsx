@@ -15,7 +15,9 @@
 import Icon from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, VStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
@@ -216,19 +218,12 @@ function MapScreen() {
   const { getPrimaryColor } = useTheme();
 
   // BTCMap store
-  const {
-    placesCache,
-    isLoading: storeLoading,
-    error,
-    fetchPlaces,
-    setError,
-  } = useBTCMapStore();
+  const { placesCache, isLoading: storeLoading, error, fetchPlaces, setError } = useBTCMapStore();
   const places = useMemo(() => placesCache?.data ?? [], [placesCache]);
 
   // Track initialization stages for progressive loading
   const [isMapReady, setIsMapReady] = useState(false);
   const [isClusteringReady, setIsClusteringReady] = useState(false);
-  const [isLocationFetching, setIsLocationFetching] = useState(false);
 
   // Combined loading state
   const loading = storeLoading || !isClusteringReady;
@@ -381,10 +376,8 @@ function MapScreen() {
     // Defer location request until after interactions complete
     const task = InteractionManager.runAfterInteractions(async () => {
       try {
-        setIsLocationFetching(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setIsLocationFetching(false);
           return;
         }
 
@@ -393,10 +386,8 @@ function MapScreen() {
         setCamLon(loc.coords.longitude);
         setZoom(12);
         updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 12);
-        setIsLocationFetching(false);
       } catch (err) {
         console.error('Location error:', err);
-        setIsLocationFetching(false);
       }
     });
 
@@ -506,7 +497,10 @@ function MapScreen() {
 
       {/* Show loading overlay while fetching data (after map is visible) */}
       {isMapReady && loading && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.loadingOverlay}>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(200)}
+          style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" color="#F7931A" />
             <Text size={14} style={{ color: '#fff', marginTop: 12 }}>

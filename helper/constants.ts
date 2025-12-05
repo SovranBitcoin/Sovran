@@ -58,4 +58,5 @@ export const PUBLIC_KEYS = {
  *   params: { pubkey: ROUTSTR_PUBKEY }
  * });
  */
-export const ROUTSTR_PUBKEY = '8bf629b3d519a0f8a8390137a445c0eb2f5f2b4a8ed71151de898051e8006f13' as const;
+export const ROUTSTR_PUBKEY =
+  '8bf629b3d519a0f8a8390137a445c0eb2f5f2b4a8ed71151de898051e8006f13' as const;

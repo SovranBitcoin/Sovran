@@ -80,25 +80,3 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
     console.error('SettingsMigration: Error during migration:', error);
   }
 };
-
-/**
- * Clean up old Redux settings after successful migration
- * This should be called after confirming the migration worked
- */
-export const cleanupReduxSettings = async () => {
-  try {
-    console.log('SettingsMigration: Cleaning up old Redux settings...');
-
-    // Remove the settings part from Redux persist data
-    const reduxData = await AsyncStorage.getItem('persist:root');
-    if (reduxData) {
-      const parsed = JSON.parse(reduxData);
-      delete parsed.settings;
-      await AsyncStorage.setItem('persist:root', JSON.stringify(parsed));
-    }
-
-    console.log('SettingsMigration: Redux settings cleanup completed');
-  } catch (error) {
-    console.error('SettingsMigration: Error during cleanup:', error);
-  }
-};

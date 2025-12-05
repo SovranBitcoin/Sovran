@@ -38,7 +38,10 @@ import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 // Components
-import { View, VStack, HStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import TextInput from 'components/ui/TextInput';
@@ -56,7 +59,7 @@ import {
 import { Button } from 'components/ui/Button';
 
 // Utilities
-import { maybeConvertNpub, isValidEcashToken } from '@/helper/coco/utils';
+import { isValidEcashToken } from '@/helper/coco/utils';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from 'helper/routstr/api';
@@ -79,20 +82,6 @@ import { truncateMiddle } from '@/helper/strings';
 
 export type TimelineItemType = Message;
 
-// ===========================
-// UTILITY FUNCTIONS
-// ===========================
-
-export function convertNpub(pubkey: string) {
-  try {
-    const npub = nip19.decode(pubkey);
-    if (npub?.type === 'npub') return maybeConvertNpub(pubkey)?.slice(2);
-  } catch {
-    return pubkey;
-  }
-  return maybeConvertNpub(pubkey)?.slice(2);
-}
-
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp * 1000);
   const now = new Date();
@@ -113,13 +102,6 @@ function formatBalance(msats: number | null): string {
     return `${(msats / 1000).toFixed(0)} sats`;
   }
   return `${msats} msats`;
-}
-
-function formatModelPrice(model: RoutstrModel): string {
-  const maxCost = model.sats_pricing.max_cost;
-  if (maxCost === 0) return 'Free';
-  const sats = Math.round(maxCost / 1000);
-  return `${sats} sats`;
 }
 
 function extractProviderFromSlug(canonicalSlug: string): string {
@@ -662,7 +644,7 @@ ModelListItem.displayName = 'ModelListItem';
 // ===========================
 // PROPS INTERFACE
 // ===========================
-export interface UserMessagesScreenProps {
+interface UserMessagesScreenProps {
   pubkey: string;
   /** Optional callback for back navigation - if not provided, uses router.back() */
   onBack?: () => void;
@@ -819,6 +801,30 @@ export function UserMessagesScreen({
   }, [isRoutstrMode, availableModels, selectedModel]);
 
   // ===========================
+  // HANDLERS
+  // ===========================
+
+  const loadModels = useCallback(async () => {
+    try {
+      const cached = getCachedModels();
+      if (cached && cached.length > 0) {
+        console.log('Using cached models:', cached);
+        setAvailableModels(cached);
+      } else {
+        console.log('Fetching models from API...');
+        const models = await getModels();
+        console.log('Loaded models:', models.length);
+        if (models && models.length > 0) {
+          setCachedModels(models);
+          setAvailableModels(models);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load models:', error);
+    }
+  }, [getCachedModels, setCachedModels]);
+
+  // ===========================
   // EFFECTS
   // ===========================
 
@@ -872,7 +878,19 @@ export function UserMessagesScreen({
     return () => {
       interactionHandle.cancel();
     };
-  }, [isRoutstrMode, apiKey, nostrKeys?.pubkey]);
+  }, [
+    isRoutstrMode,
+    apiKey,
+    nostrKeys?.pubkey,
+    createSession,
+    getAllSessions,
+    getConversationHistory,
+    getCurrentSessionId,
+    loadModels,
+    setApiKey,
+    setBalance,
+    switchSession,
+  ]);
 
   // Load models - doesn't require API key (public endpoint)
   useEffect(() => {
@@ -891,9 +909,11 @@ export function UserMessagesScreen({
     });
 
     return () => handle.cancel();
-  }, [isRoutstrMode, availableModels.length, getCachedModels]);
+  }, [isRoutstrMode, availableModels.length, getCachedModels, loadModels]);
 
   // Listen for session changes
+  const currentSessionId = getCurrentSessionId();
+  const nostrPubkey = nostrKeys?.pubkey;
   useEffect(() => {
     if (!isRoutstrMode) return;
 
@@ -905,10 +925,10 @@ export function UserMessagesScreen({
       timestamp: formatTimestamp(msg.timestamp),
       isRead: true,
       created_at: msg.timestamp,
-      pubkey: msg.role === 'user' ? nostrKeys?.pubkey || 'me' : ROUTSTR_PUBKEY,
+      pubkey: msg.role === 'user' ? nostrPubkey || 'me' : ROUTSTR_PUBKEY,
     }));
     setMessages(formattedMessages);
-  }, [isRoutstrMode, getCurrentSessionId(), nostrKeys?.pubkey]);
+  }, [isRoutstrMode, currentSessionId, nostrPubkey, getConversationHistory]);
 
   // Track processed event IDs
   const processedEventIds = useRef<Set<string>>(new Set());
@@ -1004,30 +1024,6 @@ export function UserMessagesScreen({
 
     return () => handle.cancel();
   }, [dmEvents, nostrKeys?.pubkey, nostrKeys?.privateKey, pubkey, isRoutstrMode]);
-
-  // ===========================
-  // HANDLERS
-  // ===========================
-
-  const loadModels = async () => {
-    try {
-      const cached = getCachedModels();
-      if (cached && cached.length > 0) {
-        console.log('Using cached models:', cached);
-        setAvailableModels(cached);
-      } else {
-        console.log('Fetching models from API...');
-        const models = await getModels();
-        console.log('Loaded models:', models.length);
-        if (models && models.length > 0) {
-          setCachedModels(models);
-          setAvailableModels(models);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load models:', error);
-    }
-  };
 
   const handleRefreshBalance = async () => {
     if (!apiKey || isRefreshingBalance) return;
@@ -1771,7 +1767,7 @@ export function UserMessagesScreen({
                 <Pressable
                   onPress={() =>
                     router.navigate({
-                      pathname: 'share',
+                      pathname: '/share',
                       params: {
                         type: 'profile',
                         data: nip19.npubEncode(pubkey),

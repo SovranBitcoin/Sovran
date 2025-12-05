@@ -6,9 +6,9 @@ import { Monicon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 
-export type IconProps = {
+type IconProps = {
   name: string;
   color?: string;
   size?: number;
@@ -63,37 +63,193 @@ function Icon({ name, color, size = 24, spin, style = {}, className }: IconProps
 
 export default Icon;
 
-export function SovranTextIcon({ size = 300 }: { size?: number }) {
-  return (
-    <Svg width={size} height={(size * 254) / 1204} viewBox="0 0 1204 254" fill="none">
-      <Defs>
-        <LinearGradient
-          id="paint0_linear_84_4"
-          x1="1435.5"
-          y1="338"
-          x2="-19.4058"
-          y2="619.663"
-          gradientUnits="userSpaceOnUse">
-          <Stop stopColor="#850054" />
-          <Stop offset="0.48" stopColor="#E2054B" />
-          <Stop offset="1" stopColor="#FF7A50" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M101.3 253.5C86.1333 253.5 72.25 251.633 59.65 247.9C47.2833 244.167 36.2 238.683 26.4 231.45C16.8333 224.217 8.2 215.467 0.5 205.2L33.4 167.75C44.8333 183.617 56.15 194.467 67.35 200.3C78.7833 205.9 91.15 208.7 104.45 208.7C111.683 208.7 118.1 207.767 123.7 205.9C129.533 203.8 134.083 200.883 137.35 197.15C140.617 193.417 142.25 188.983 142.25 183.85C142.25 180.117 141.433 176.733 139.8 173.7C138.167 170.433 135.833 167.633 132.8 165.3C129.767 162.733 126.15 160.517 121.95 158.65C117.75 156.55 113.083 154.8 107.95 153.4C102.817 151.767 97.2167 150.483 91.15 149.55C78.0833 146.517 66.65 142.9 56.85 138.7C47.05 134.267 38.8833 128.9 32.35 122.6C25.8167 116.067 20.9167 108.717 17.65 100.55C14.6167 92.3833 13.1 83.1667 13.1 72.9C13.1 62.4 15.4333 52.7167 20.1 43.85C24.7667 34.75 31.1833 26.9333 39.35 20.4C47.75 13.8667 57.3167 8.84999 68.05 5.34998C79.0167 1.84998 90.5667 0.0999838 102.7 0.0999838C117.633 0.0999838 130.7 1.84998 141.9 5.34998C153.1 8.61665 162.783 13.4 170.95 19.7C179.35 26 186.35 33.7 191.95 42.8L158.7 75C153.8 68.4667 148.433 62.9833 142.6 58.55C137 54.1167 130.817 50.85 124.05 48.75C117.517 46.4167 110.75 45.25 103.75 45.25C96.05 45.25 89.4 46.3 83.8 48.4C78.2 50.2667 73.7667 53.0667 70.5 56.8C67.4667 60.5333 65.95 65.0833 65.95 70.45C65.95 74.65 67 78.3833 69.1 81.65C71.2 84.9167 74.2333 87.8333 78.2 90.4C82.1667 92.7333 86.95 94.8333 92.55 96.7C98.15 98.5667 104.333 100.2 111.1 101.6C123.933 104.167 135.483 107.55 145.75 111.75C156.017 115.95 164.767 121.083 172 127.15C179.467 132.983 185.183 139.983 189.15 148.15C193.117 156.083 195.1 165.067 195.1 175.1C195.1 191.667 191.133 205.783 183.2 217.45C175.267 229.117 164.3 238.1 150.3 244.4C136.3 250.467 119.967 253.5 101.3 253.5ZM321.751 253.5C302.851 253.5 285.934 249.417 271.001 241.25C256.301 232.85 244.634 221.417 236.001 206.95C227.601 192.483 223.401 175.917 223.401 157.25C223.401 138.583 227.601 122.133 236.001 107.9C244.634 93.4333 256.301 82 271.001 73.6C285.934 65.2 302.851 61 321.751 61C340.417 61 357.101 65.2 371.801 73.6C386.734 82 398.401 93.4333 406.801 107.9C415.201 122.133 419.401 138.583 419.401 157.25C419.401 175.917 415.201 192.483 406.801 206.95C398.401 221.417 386.734 232.85 371.801 241.25C357.101 249.417 340.417 253.5 321.751 253.5ZM321.751 210.1C330.851 210.1 339.017 207.883 346.251 203.45C353.484 198.783 359.084 192.483 363.051 184.55C367.251 176.383 369.351 167.283 369.351 157.25C369.351 146.983 367.251 137.883 363.051 129.95C359.084 121.783 353.484 115.483 346.251 111.05C339.017 106.383 330.851 104.05 321.751 104.05C312.417 104.05 304.134 106.383 296.901 111.05C289.667 115.717 283.951 122.017 279.751 129.95C275.551 137.883 273.567 146.983 273.801 157.25C273.567 167.283 275.551 176.383 279.751 184.55C283.951 192.483 289.667 198.783 296.901 203.45C304.134 207.883 312.417 210.1 321.751 210.1ZM509.766 250L432.066 64.85H486.666L536.016 203.1L524.466 205.2L576.266 64.85H629.466L547.916 250H509.766ZM659.821 250V64.85H707.771L709.521 124.35L701.121 112.1C703.921 102.533 708.471 93.9 714.771 86.2C721.071 78.2667 728.421 72.0833 736.821 67.65C745.454 63.2167 754.437 61 763.771 61C767.737 61 771.587 61.35 775.321 62.05C779.054 62.75 782.204 63.5667 784.771 64.5L771.471 119.1C768.671 117.7 765.287 116.533 761.321 115.6C757.354 114.433 753.271 113.85 749.071 113.85C743.471 113.85 738.221 114.9 733.321 117C728.654 118.867 724.571 121.667 721.071 125.4C717.571 128.9 714.771 133.1 712.671 138C710.804 142.9 709.871 148.267 709.871 154.1V250H659.821ZM874.726 253.5C859.326 253.5 845.443 249.3 833.076 240.9C820.71 232.5 810.91 221.067 803.676 206.6C796.443 192.133 792.826 175.567 792.826 156.9C792.826 138.233 796.443 121.783 803.676 107.55C811.143 93.0833 821.176 81.7667 833.776 73.6C846.376 65.2 860.726 61 876.826 61C885.926 61 894.21 62.4 901.676 65.2C909.376 67.7667 916.026 71.3833 921.626 76.05C927.46 80.7167 932.36 86.0833 936.326 92.15C940.293 98.2167 943.093 104.75 944.726 111.75L934.226 110V64.85H983.576V250H933.526V205.55L944.726 204.5C942.86 211.033 939.826 217.217 935.626 223.05C931.426 228.883 926.176 234.133 919.876 238.8C913.81 243.233 906.926 246.85 899.226 249.65C891.526 252.217 883.36 253.5 874.726 253.5ZM888.376 210.45C897.71 210.45 905.876 208.233 912.876 203.8C919.876 199.367 925.243 193.183 928.976 185.25C932.943 177.083 934.926 167.633 934.926 156.9C934.926 146.4 932.943 137.183 928.976 129.25C925.243 121.317 919.876 115.133 912.876 110.7C905.876 106.033 897.71 103.7 888.376 103.7C879.276 103.7 871.226 106.033 864.226 110.7C857.46 115.133 852.093 121.317 848.126 129.25C844.16 137.183 842.176 146.4 842.176 156.9C842.176 167.633 844.16 177.083 848.126 185.25C852.093 193.183 857.46 199.367 864.226 203.8C871.226 208.233 879.276 210.45 888.376 210.45ZM1033.4 250V64.85H1081L1082.4 102.65L1072.6 106.85C1075.17 98.45 1079.72 90.8667 1086.25 84.1C1093.02 77.1 1101.07 71.5 1110.4 67.3C1119.74 63.1 1129.54 61 1139.8 61C1153.8 61 1165.47 63.8 1174.8 69.4C1184.37 75 1191.49 83.5167 1196.15 94.95C1201.05 106.15 1203.5 120.033 1203.5 136.6V250H1153.8V140.45C1153.8 132.05 1152.64 125.05 1150.3 119.45C1147.97 113.85 1144.35 109.767 1139.45 107.2C1134.79 104.4 1128.95 103.233 1121.95 103.7C1116.35 103.7 1111.1 104.633 1106.2 106.5C1101.54 108.133 1097.45 110.583 1093.95 113.85C1090.69 117.117 1088 120.85 1085.9 125.05C1084.04 129.25 1083.1 133.8 1083.1 138.7V250H1058.6C1053.24 250 1048.45 250 1044.25 250C1040.05 250 1036.44 250 1033.4 250Z"
-        fill="url(#paint0_linear_84_4)"
-      />
-    </Svg>
-  );
-}
+// Common icon names for design showcase
+export const icons: string[] = [
+  // Your existing icons array...
+  'fluent:apps-16-filled',
+  'ri:openai-fill', // Using robot as OpenAI icon
+  'ri:anthropic-fill',
+  'ri:google-fill',
+  'ri:meta-fill',
+  'simple-icons:mistralai',
+  'ri:perplexity-line',
+  'bi:nvidia',
+  'hugeicons:qwen',
+  'ri:deepseek-fill',
+  'ant-design:alibaba-outlined',
+  'ri:twitter-x-fill',
+  'material-symbols:account-balance-wallet',
+  'solar:tag-price-bold',
+  'ri:amazon-fill',
+  'cib:ibm',
+  'simple-icons:microsoft',
+  'simple-icons:baidu',
+  'simple-icons:tencentqq',
+  'simple-icons:tiktok',
+  'mdi:brain',
+  'mdi:help-circle',
+  'mdi:check-circle',
+  'mdi-light:check',
+  'lucide:arrow-down-left',
+  'fluent:filter-16-filled',
+  'lucide:activity',
+  'fa6-solid:chevron-left',
+  'fa6-solid:chevron-right',
+  'fluent:chevron-down-12-filled',
+  'lucide:arrow-right',
+  'lucide:arrow-up-right',
+  'fluent:add-24-filled',
+  'fluent:arrow-upload-16-filled',
+  'fluent:arrow-download-16-filled',
+  'fluent:arrow-swap-16-filled',
+  'iconamoon:send-fill',
+  'ri:share-fill',
+  'lets-icons:copy',
+  'lucide:pencil-line',
+  'lucide:delete',
+  'simple-line-icons:check',
+  'material-symbols:check-rounded',
+  'lucide:nfc',
+  'fluent:checkmark-16-filled',
+  'fluent:checkmark-circle-16-filled',
+  'fluent:list-16-filled',
+  'fluent:clock-16-filled',
+  'fluent:dismiss-circle-16-filled',
+  'ion:checkmark-done',
+  'material-symbols:close-rounded',
+  'simple-line-icons:close',
+  'nonicons:error-16',
+  'mdi:cancel',
+  'ph:user-bold',
+  'fa6-solid:user',
+  'la:user-plus',
+  'la:user-minus',
+  'la:user-slash',
+  'mdi:contact',
+  'ant-design:loading-outlined',
+  'humbleicons:refresh',
+  'ic:round-refresh',
+  'majesticons:eye',
+  'majesticons:eye-off',
+  'material-symbols:currency-bitcoin',
+  'material-symbols-light:currency-bitcoin',
+  'fluent:wallet-20-filled',
+  'majesticons:coins',
+  'solar:card-bold',
+  'material-symbols:arrow-back-rounded',
+  'material-symbols:close-rounded',
+  'material-symbols:verified-rounded',
+  'material-symbols:verified',
+  'ph:contactless-payment-fill',
+  'majesticons:percent',
+  'majesticons:text',
+  'mdi:decimal',
+  'fluent:emoji-24-filled',
+  'mdi:lightbulb-on-outline',
+  'mdi:lightbulb-on',
+  'proicons:photo',
+  'majesticons:search-line',
+  'solar:key-bold',
+  'garden:arrow-retweet-fill-16',
+  'garden:speech-bubble-typing-fill-12',
+  'garden:heart-fill-16',
+  'hugeicons:new-twitter',
+  'mdi:at',
+  'mingcute:lightning-fill',
+  'material-symbols:info-rounded',
+  'material-symbols:report-rounded',
+  'material-symbols:settings-rounded',
+  'mdi:robot',
+  'mdi:help-circle',
+  'feather:wifi',
+  'clarity:internet-of-things-solid',
+  'bx:dots-vertical-rounded',
+  'tabler:dots',
+  'fluent:clock-12-filled',
+  'stash:qr-code',
+  'ic:round-star',
+  'humbleicons:url',
+  'lucide:activity',
+  'lucide:square-pen',
+  'mdi:menu',
+  'mdi:anonymous-off',
+  'mdi:anonymous',
+  'ph:coins',
 
-export function ThemeIcon({ color }: { color: string }) {
-  return (
-    <Svg width="24" height="24" viewBox="0 0 20 20">
-      <Path fill={color} d="M10 3.5a6.5 6.5 0 1 1 0 13zM10 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16" />
-    </Svg>
-  );
-}
+  // Explore page icons
+  'mdi:chevron-right',
+  'mdi:map-marker',
+  'mdi:sim',
+  'mdi:calendar',
+  'mdi:account-group',
+  'mdi:arrow-right',
+  'mdi:gamepad-variant',
+  'mdi:food',
+  'mdi:airplane',
+  'mdi:shopping',
+  'mdi:movie-open',
+
+  // Map page icons
+  'mdi:bitcoin',
+  'mdi:crosshairs-gps',
+  'mdi:phone',
+  'mdi:web',
+  'mdi:email',
+  'mdi:instagram',
+  'mdi:close-circle',
+  'mdi:coffee',
+  'mdi:silverware-fork-knife',
+  'mdi:cart',
+  'mdi:store',
+  'mdi:cash-multiple',
+  'mdi:bed',
+  'mdi:pill',
+  'mdi:laptop',
+  'mdi:camera',
+  'mdi:hospital-box',
+  'mdi:bread-slice',
+  'mdi:spa',
+  'mdi:office-building',
+  'mdi:grass',
+  'mdi:dumbbell',
+  'mdi:chair-rolling',
+  'mdi:hammer-wrench',
+  'mdi:music',
+  'mdi:tree',
+  'mdi:car',
+  'mdi:currency-usd',
+  'mdi:content-cut',
+  'mdi:palette',
+  'mdi:car-wrench',
+  'mdi:diamond',
+  'mdi:alert-circle',
+  'mdi:chevron-down',
+  'mdi:minus',
+  'mdi:plus',
+
+  // Keyring page icons
+  'mdi:key-plus',
+  'mdi:key-arrow-right',
+  'mdi:trash-can-outline',
+  'mdi:chevron-up',
+  'mdi:key-variant',
+
+  // Lightning Address card icons
+  'mdi:arrow-down',
+  'mdi:share-variant',
+  'mdi:qrcode',
+  'mdi:account-check',
+
+  // Claim username modal icons
+  'mdi:check',
+
+  // Pending Ecash icons
+  'mdi:clock-outline',
+  'mdi:clock-alert-outline',
+  'mdi:broom',
+  'mdi:check-circle-outline',
+  'fluent:wallet-24-filled',
+];
 
 export function ArrowIcon({
   color,

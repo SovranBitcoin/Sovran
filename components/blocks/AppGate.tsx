@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSettingsStore } from 'stores/settingsStore';
 import TermsConditionsScreen from 'app/settings-pages/terms';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -12,10 +12,9 @@ interface AppGateProps {
  * This prevents unnecessary hook execution in child components when these checks fail
  */
 const AppGate: React.FC<AppGateProps> = ({ children }) => {
-  const { keys, isReady, isLoading } = useNostrKeysContext();
+  const { isReady, isLoading } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
   const acceptTerms = useSettingsStore((state) => state.acceptTerms);
-  const [currentOnboardingStep, setCurrentOnboardingStep] = useState(0);
 
   // Check if terms have been accepted
   if (!isTermsAccepted) {

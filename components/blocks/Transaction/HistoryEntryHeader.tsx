@@ -1,6 +1,9 @@
 import React from 'react';
 import { Text } from 'components/ui/Text';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { useTheme } from 'providers/ThemeProvider';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { formatAmount } from 'helper/currency';

@@ -8,13 +8,15 @@
 import Icon from 'assets/icons';
 import { Badge } from 'components/ui/Badge';
 import { Text } from 'components/ui/Text';
-import { HStack, VStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { RowButton, Section } from 'app/settings-pages';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBTCMapStore, BTCMapPlaceDetails } from 'stores/btcMapStore';
 
@@ -109,15 +111,6 @@ export default function MerchantDetailScreen() {
 
   const handleEmail = useCallback((email: string) => {
     Linking.openURL(`mailto:${email}`);
-  }, []);
-
-  const handleOpenMaps = useCallback((lat: number, lon: number, name?: string) => {
-    const label = encodeURIComponent(name || 'Merchant');
-    const url =
-      Platform.OS === 'ios'
-        ? `maps:0,0?q=${label}@${lat},${lon}`
-        : `geo:${lat},${lon}?q=${lat},${lon}(${label})`;
-    Linking.openURL(url);
   }, []);
 
   // Parse payment info

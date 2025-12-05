@@ -1,7 +1,6 @@
 import React, { ReactNode } from 'react';
 import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 
 interface BottomButtonsProps {
   children: ReactNode;
@@ -16,8 +15,6 @@ interface BottomButtonsProps {
  * Handles safe area insets and absolute positioning automatically.
  */
 export function BottomButtons({ children, paddingBottom = 0, style }: BottomButtonsProps) {
-  const insets = useSafeAreaInsets();
-
   return (
     <View
       style={[

@@ -7,7 +7,10 @@ import {
   TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Badge } from 'components/ui/Badge';
@@ -305,7 +308,6 @@ const KeyringSettings: React.FC = () => {
   const [keypairs, setKeypairs] = useState<Keypair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
 
   // Quick access setting from settings store
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
@@ -513,52 +515,50 @@ const KeyringSettings: React.FC = () => {
               overflow: 'hidden',
             }}>
             {/* Keys List */}
-            {isExpanded && (
-              <View style={{ padding: 16 }}>
-                {isLoading ? (
-                  <VStack align="center" style={{ padding: 24 }}>
-                    <ActivityIndicator size="small" color={getPrimaryColor('400')} />
-                    <Text size={14} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
-                      Loading keys...
-                    </Text>
-                  </VStack>
-                ) : keypairs.length === 0 ? (
-                  <VStack align="center" style={{ padding: 24 }}>
-                    <Icon name="mdi:key-variant" size={40} color={getPrimaryColor('600')} />
-                    <Text
-                      size={14}
-                      style={{
-                        color: getPrimaryColor('400'),
-                        marginTop: 12,
-                        textAlign: 'center',
-                      }}>
-                      Generate or import a key to get started with P2PK-locked ecash
-                    </Text>
-                  </VStack>
-                ) : (
-                  <>
-                    {/* Display keys in reverse order (most recent first) */}
-                    {[...keypairs]
-                      .reverse()
-                      .map((keypair, index) =>
-                        index === 0 ? (
-                          <CurrentKeyItem
-                            key={keypair.publicKeyHex}
-                            keypair={keypair}
-                            onCopy={handleCopyKey}
-                          />
-                        ) : (
-                          <KeyItem
-                            key={keypair.publicKeyHex}
-                            keypair={keypair}
-                            onCopy={handleCopyKey}
-                          />
-                        )
-                      )}
-                  </>
-                )}
-              </View>
-            )}
+            <View style={{ padding: 16 }}>
+              {isLoading ? (
+                <VStack align="center" style={{ padding: 24 }}>
+                  <ActivityIndicator size="small" color={getPrimaryColor('400')} />
+                  <Text size={14} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+                    Loading keys...
+                  </Text>
+                </VStack>
+              ) : keypairs.length === 0 ? (
+                <VStack align="center" style={{ padding: 24 }}>
+                  <Icon name="mdi:key-variant" size={40} color={getPrimaryColor('600')} />
+                  <Text
+                    size={14}
+                    style={{
+                      color: getPrimaryColor('400'),
+                      marginTop: 12,
+                      textAlign: 'center',
+                    }}>
+                    Generate or import a key to get started with P2PK-locked ecash
+                  </Text>
+                </VStack>
+              ) : (
+                <>
+                  {/* Display keys in reverse order (most recent first) */}
+                  {[...keypairs]
+                    .reverse()
+                    .map((keypair, index) =>
+                      index === 0 ? (
+                        <CurrentKeyItem
+                          key={keypair.publicKeyHex}
+                          keypair={keypair}
+                          onCopy={handleCopyKey}
+                        />
+                      ) : (
+                        <KeyItem
+                          key={keypair.publicKeyHex}
+                          keypair={keypair}
+                          onCopy={handleCopyKey}
+                        />
+                      )
+                    )}
+                </>
+              )}
+            </View>
           </View>
         </Section>
 

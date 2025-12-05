@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
+// eslint-disable-next-line import/namespace
 import * as CheckboxPrimitive from '@rn-primitives/checkbox';
 
 interface CheckboxProps {
@@ -57,6 +58,7 @@ export const Checkbox = ({
   const iconSize = size * 0.6; // 60% of checkbox size
 
   return (
+    /* eslint-disable-next-line import/namespace */
     <CheckboxPrimitive.Root
       checked={checked}
       onCheckedChange={onCheckedChange}
@@ -72,9 +74,12 @@ export const Checkbox = ({
         alignItems: 'center',
         opacity: disabled ? 0.5 : 1,
       }}>
+      {/* eslint-disable-next-line import/namespace */}
       <CheckboxPrimitive.Indicator>
         <Icon name="fluent:checkmark-16-filled" color={colors.checkmark} size={iconSize} />
+        {/* eslint-disable-next-line import/namespace */}
       </CheckboxPrimitive.Indicator>
+      {/* eslint-disable-next-line import/namespace */}
     </CheckboxPrimitive.Root>
   );
 };

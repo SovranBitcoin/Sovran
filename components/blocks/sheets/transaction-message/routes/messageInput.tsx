@@ -26,7 +26,8 @@ import React, { useState } from 'react';
 import { TextInput } from 'react-native';
 import { RouteScreenProps, useSheetRef } from 'react-native-actions-sheet';
 import { useTheme } from 'providers/ThemeProvider';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 
 /**
@@ -36,7 +37,7 @@ import { Text } from 'components/ui/Text';
  * @param {RouteScreenProps<'transaction-message', 'message-input'>} props
  * @returns {JSX.Element}
  */
-const MessageInput = ({}: RouteScreenProps<'transaction-message', 'message-input'>) => {
+const MessageInput = (_props: RouteScreenProps<'transaction-message', 'message-input'>) => {
   const [message, setMessage] = useState('');
   const sheetRef = useSheetRef('transaction-message');
   const { getPrimaryColor } = useTheme();

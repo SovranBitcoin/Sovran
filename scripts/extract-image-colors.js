@@ -1,6 +1,6 @@
 /**
  * Image Color Extraction Script
- * 
+ *
  * Extracts colors from background images and compares them
  * to the existing theme palettes.
  */
@@ -41,7 +41,7 @@ const LIGHTNESS_TARGETS = {
 async function extractColors(imagePath) {
   try {
     const colors = await getColors(imagePath, { count: 10, type: 'image/png' });
-    return colors.map(color => ({
+    return colors.map((color) => ({
       hex: color.hex(),
       rgb: color.rgb(),
       hsl: [color.hsl()[0] * 360, color.hsl()[1], color.hsl()[2]],
@@ -58,7 +58,7 @@ async function extractColors(imagePath) {
  */
 function findDominantHue(colors) {
   // Filter out very light/dark colors and those with low saturation
-  const validColors = colors.filter(c => {
+  const validColors = colors.filter((c) => {
     const [h, s, l] = c.hsl;
     return s > 0.05 && l > 0.1 && l < 0.9;
   });
@@ -68,13 +68,14 @@ function findDominantHue(colors) {
   // Average the hues (handling the circular nature of hue)
   let sinSum = 0;
   let cosSum = 0;
-  validColors.forEach(c => {
+  validColors.forEach((c) => {
     const hueRad = (c.hsl[0] * Math.PI) / 180;
     sinSum += Math.sin(hueRad);
     cosSum += Math.cos(hueRad);
   });
 
-  const avgHue = (Math.atan2(sinSum / validColors.length, cosSum / validColors.length) * 180) / Math.PI;
+  const avgHue =
+    (Math.atan2(sinSum / validColors.length, cosSum / validColors.length) * 180) / Math.PI;
   return avgHue < 0 ? avgHue + 360 : avgHue;
 }
 
@@ -82,7 +83,7 @@ function findDominantHue(colors) {
  * Find the average saturation from extracted colors
  */
 function findAverageSaturation(colors) {
-  const validColors = colors.filter(c => {
+  const validColors = colors.filter((c) => {
     const [h, s, l] = c.hsl;
     return l > 0.1 && l < 0.9;
   });
@@ -140,18 +141,20 @@ function analyzeSaturationPattern(themeName) {
   if (!theme) return null;
 
   console.log(`\n--- Saturation pattern for ${themeName} ---`);
-  
+
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
   const saturations = [];
-  
-  shades.forEach(shade => {
+
+  shades.forEach((shade) => {
     const color = theme[shade];
     if (color) {
       try {
         const c = chroma(color);
         const [h, s, l] = c.hsl();
         saturations.push({ shade, saturation: s, hue: h });
-        console.log(`  ${shade.toString().padStart(3)}: H=${(h || 0).toFixed(0).padStart(3)}° S=${(s * 100).toFixed(1).padStart(5)}%`);
+        console.log(
+          `  ${shade.toString().padStart(3)}: H=${(h || 0).toFixed(0).padStart(3)}° S=${(s * 100).toFixed(1).padStart(5)}%`
+        );
       } catch (e) {
         console.log(`  ${shade}: Error parsing color`);
       }
@@ -174,7 +177,7 @@ async function main() {
   // Extract colors from each image
   for (const [themeName, imageName] of Object.entries(BACKGROUND_THEMES)) {
     const imagePath = path.join(imagesDir, imageName);
-    
+
     console.log(`\n${'='.repeat(60)}`);
     console.log(`ANALYZING: ${themeName} (${imageName})`);
     console.log('='.repeat(60));
@@ -186,10 +189,12 @@ async function main() {
 
     // Extract colors
     const extractedColors = await extractColors(imagePath);
-    
+
     console.log('\nExtracted colors from image:');
     extractedColors.forEach((c, i) => {
-      console.log(`  ${i + 1}. ${c.hex} | HSL(${c.hsl[0].toFixed(0)}°, ${(c.hsl[1] * 100).toFixed(1)}%, ${(c.hsl[2] * 100).toFixed(1)}%)`);
+      console.log(
+        `  ${i + 1}. ${c.hex} | HSL(${c.hsl[0].toFixed(0)}°, ${(c.hsl[1] * 100).toFixed(1)}%, ${(c.hsl[2] * 100).toFixed(1)}%)`
+      );
     });
 
     // Compare to existing theme
@@ -213,10 +218,10 @@ async function main() {
   // Check if saturation follows a pattern
   console.log('\nSaturation at key anchor points across all background themes:');
   console.log('Shade | ' + Object.keys(BACKGROUND_THEMES).join(' | '));
-  
+
   const keyShades = [950, 500, 400, 200, 50];
-  keyShades.forEach(shade => {
-    const row = Object.keys(BACKGROUND_THEMES).map(themeName => {
+  keyShades.forEach((shade) => {
+    const row = Object.keys(BACKGROUND_THEMES).map((themeName) => {
       const theme = THEMES[themeName];
       if (!theme || !theme[shade]) return 'N/A';
       try {
@@ -233,7 +238,7 @@ async function main() {
   console.log('\n' + '='.repeat(60));
   console.log('DISCOVERED FORMULA');
   console.log('='.repeat(60));
-  
+
   console.log(`
 Based on analysis, the background themes appear to follow this pattern:
 
@@ -262,4 +267,3 @@ Based on analysis, the background themes appear to follow this pattern:
 }
 
 main().catch(console.error);
-

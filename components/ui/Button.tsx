@@ -69,7 +69,8 @@ import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { EnhancedHaptics } from './Haptics';
 
 /**
@@ -129,7 +130,7 @@ interface UseRippleOptions {
  *   config: { color: 'blue', duration: 600, centered: false }
  * });
  */
-export const useRipple = ({ enabled, config }: UseRippleOptions) => {
+const useRipple = ({ enabled, config }: UseRippleOptions) => {
   const [rippleSize, setRippleSize] = useState(0);
   const [buttonSize, setButtonSize] = useState({ width: 0, height: 0 });
   const [ripplePosition, setRipplePosition] = useState({ x: 0, y: 0 });
@@ -259,7 +260,7 @@ interface HapticConfig {
  * Comprehensive props interface supporting multiple button modes,
  * visual effects, and interaction states.
  */
-export interface ButtonProps {
+interface ButtonProps {
   /** Test identifier for automated testing */
   testID?: string;
   /** Whether the button is disabled */

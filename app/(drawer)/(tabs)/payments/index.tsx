@@ -1,7 +1,6 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult } from 'components/blocks/contacts';
-import { NoResultsFound } from 'components/blocks/contacts/NoResultsFound';
 import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
@@ -9,10 +8,10 @@ import { npubToPubkey } from 'components/blocks/Transaction';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Tabs } from 'components/ui/Tabs';
 import { Text } from 'components/ui/Text';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { router } from 'expo-router';
 import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
-import { useMintManagement } from 'hooks/coco';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -26,6 +25,8 @@ import { setSearch } from 'redux/nostr';
 import { store } from 'redux/store';
 import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
+import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {

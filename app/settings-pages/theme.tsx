@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import Image from 'components/ui/Image';
 import TextInput from 'components/ui/TextInput';

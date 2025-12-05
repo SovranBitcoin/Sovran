@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from 'components/ndk';
 import { useInitializationStage } from './InitializationProvider';
@@ -14,8 +14,6 @@ interface NostrNDKContextValue {
 const NostrNDKContext = createContext<NostrNDKContextValue>({
   isInitialized: false,
 });
-
-export const useNostrNDK = () => useContext(NostrNDKContext);
 
 interface NostrNDKProviderProps {
   children: ReactNode;
@@ -57,5 +55,3 @@ export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
 
   return <NostrNDKContext.Provider value={{ isInitialized }}>{children}</NostrNDKContext.Provider>;
 }
-
-export default NostrNDKProvider;

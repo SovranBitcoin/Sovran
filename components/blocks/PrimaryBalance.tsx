@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react';
 import { Platform } from 'react-native';
-import { VStack, HStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
 import { useSettingsStore, DisplayCurrency } from 'stores/settingsStore';
-import { useBalanceContext, useMints } from 'hooks/coco';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useBtcPrice } from 'stores/pricelistStore';
@@ -12,6 +12,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { ContextMenu, Host, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
 import { frame, background, cornerRadius } from '@expo/ui/swift-ui/modifiers';
+import { useBalanceContext, useMints } from 'coco-cashu-react';
 
 interface Account {
   unit: CurrencyUnit;

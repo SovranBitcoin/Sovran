@@ -12,7 +12,7 @@ import { Pressable } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import { AnimatedQRCode } from 'components/ui/QRCode';
-import { HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { popup } from '@/helper/popup';
 import { EnhancedHaptics } from 'components/ui/Haptics';

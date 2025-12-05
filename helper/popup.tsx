@@ -411,15 +411,3 @@ export const popup = (config: popupConfig | string) => {
     onClose: options.onClose,
   });
 };
-
-/**
- * Exports the message system constants for use in other files
- *
- * These exports allow other parts of the application to access the
- * message types, emojis, and configurations for consistency.
- *
- * @exports MESSAGE_TYPES - Available message type constants
- * @exports MESSAGE_EMOJIS - Emoji mappings for message types
- * @exports MESSAGE_CONFIGS - Predefined message configurations
- */
-export { MESSAGE_TYPES, MESSAGE_EMOJIS, MESSAGE_CONFIGS };

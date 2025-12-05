@@ -94,7 +94,7 @@ export const StyledText = ({
   );
 };
 
-export type TextProps = DefaultText['props'] & { id?: string };
+type TextProps = DefaultText['props'] & { id?: string };
 
 export interface CustomTextProps extends TextProps {
   // Weight props

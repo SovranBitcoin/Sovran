@@ -17,20 +17,33 @@ export const nostrState = {
 };
 
 const mintAToken = undefined; //'';
-const decodedMintAToken = undefined; //getDecodedToken(mintAToken);
+type DecodedToken = { mint: string; proofs: Proof[] };
+const decodedMintAToken: DecodedToken | undefined = undefined; //getDecodedToken(mintAToken);
+
+// Extract values to avoid TypeScript narrowing issues
+// Use explicit type guard to help TypeScript
+let mintUrl: string | undefined = undefined;
+let proofs: Proof[] | undefined = undefined;
+if (decodedMintAToken !== undefined && decodedMintAToken !== null) {
+  const token: DecodedToken = decodedMintAToken;
+  mintUrl = token.mint;
+  proofs = token.proofs;
+}
 
 export const cashuState = {
-  selectedMint: decodedMintAToken?.mint,
+  selectedMint: mintUrl,
   profiles: {
-    counters: {
-      [decodedMintAToken?.mint]: decodedMintAToken
+    counters:
+      mintUrl && proofs
         ? {
-          ...Object.fromEntries(decodedMintAToken?.proofs.map((proof: Proof) => [proof.id, 100])),
-        }
+            [mintUrl]: Object.fromEntries(proofs.map((proof: Proof) => [proof.id, 100])),
+          }
         : {},
-    },
-    proofs: {
-      [decodedMintAToken?.mint]: decodedMintAToken ? decodedMintAToken?.proofs : {},
-    },
+    proofs:
+      mintUrl && proofs
+        ? {
+            [mintUrl]: proofs,
+          }
+        : {},
   },
 };

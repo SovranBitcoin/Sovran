@@ -1,6 +1,6 @@
 import React from 'react';
 import { ColorValue } from 'react-native';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatAmount } from 'helper/currency';

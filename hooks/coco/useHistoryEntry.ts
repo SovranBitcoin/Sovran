@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { HistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
-export type UseHistoryEntryResult<T extends HistoryEntry> = {
+type UseHistoryEntryResult<T extends HistoryEntry> = {
   /** The current history entry (updated via events) */
   entry: T | null;
   /** Parse error message if initial entry was invalid */

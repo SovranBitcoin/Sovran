@@ -3,8 +3,6 @@
  * Matches against both URL and name fields
  */
 
-import { extractDomain } from 'helper/url';
-
 interface SearchableMint {
   url: string;
   name: string;
@@ -62,47 +60,4 @@ export function filterMints<T extends SearchableMint>(mints: T[], query: string)
 
     return false;
   });
-}
-
-/**
- * Create a pseudo mint item for invalid URLs
- * This allows users to see their input even if it's not a valid mint
- */
-export function createPseudoMint(url: string): SearchableMint {
-  return {
-    url,
-    name: extractDomain(url) || url,
-    mintUrl: url,
-    auditorData: undefined, // No auditor data for pseudo mints
-  };
-}
-
-/**
- * Check if a URL looks like a mint URL
- * Basic heuristics to determine if a URL might be a mint
- */
-export function looksLikeMintUrl(url: string): boolean {
-  if (!url) return false;
-
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-
-    // Common mint URL patterns
-    const mintPatterns = [
-      'mint',
-      'cashu',
-      'ecash',
-      'bitcoin',
-      'btc',
-      'sat',
-      'sats',
-      'lightning',
-      'ln',
-    ];
-
-    return mintPatterns.some((pattern) => hostname.includes(pattern));
-  } catch {
-    return false;
-  }
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
 import { CocoCashuProvider } from 'coco-cashu-react';
 import { Manager } from 'coco-cashu-core';
 import { CocoManager } from './manager';
@@ -19,14 +19,6 @@ const CocoContext = createContext<CocoContextValue>({
   isMigrating: false,
   migrationError: null,
 });
-
-export const useCocoContext = () => {
-  const context = useContext(CocoContext);
-  if (!context) {
-    throw new Error('useCocoContext must be used within a CocoProvider');
-  }
-  return context;
-};
 
 interface CocoProviderProps {
   children: ReactNode;

@@ -11,7 +11,6 @@ import { CurrencyScreen } from 'components/screens/CurrencyScreen';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -27,7 +26,6 @@ function ModalScreen() {
     routstrTopUp?: string;
   }>();
   const { keys } = useNostrKeysContext();
-  const { getPrimaryColor } = useTheme();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 

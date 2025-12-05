@@ -9,11 +9,12 @@ import React, { useState, useEffect } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SheetManager } from 'react-native-actions-sheet';
-import { HStack, View, VStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
-import { useMintManagement, useHistoryEntry } from 'hooks/coco';
 import { useReceive } from 'coco-cashu-react';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
@@ -28,8 +29,10 @@ import type { SendHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
+import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
-export interface SendTokenScreenProps {
+interface SendTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   sendHistoryEntry: SendHistoryEntry | string | undefined;
   onNavigateBack: () => void;

@@ -197,4 +197,4 @@ export const useTheme = () => {
 };
 
 // Export the THEMES for direct access if needed
-export { THEMES, THEME_NAMES };
+export { THEMES };

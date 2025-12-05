@@ -1,14 +1,14 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { HistoryEntry } from 'coco-cashu-core';
 
 interface HistoryEntryDebugCodeProps {
   historyEntry: HistoryEntry;
 }
 
-export function HistoryEntryDebugCode({ historyEntry }: HistoryEntryDebugCodeProps) {
+function HistoryEntryDebugCode({ historyEntry }: HistoryEntryDebugCodeProps) {
   return null;
   // eslint-disable-next-line no-unreachable
   return (

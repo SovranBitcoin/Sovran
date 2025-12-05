@@ -1,13 +1,2 @@
-import { createSelector } from 'reselect';
-import { RootState } from 'redux/store/reducer';
-
-// Only keep selectors that are still needed for migration
-export const memoizedGetSelectedMint = createSelector(
-  [
-    (state: RootState) => state.cashu.profiles,
-    (state: RootState) => state.nostr.currentProfile?.id,
-  ],
-  (profiles, profileId) => {
-    return profiles[profileId].selectedMint;
-  }
-);
+// Cashu selectors have been migrated to Coco/Zustand stores
+// This file is kept for compatibility but no selectors are currently needed

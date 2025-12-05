@@ -44,7 +44,7 @@
 import * as React from 'react';
 import { ViewStyle } from 'react-native';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { HStack } from './View';
+import { HStack } from 'components/ui/View/HStack';
 import { Text } from './Text';
 import { cn } from 'helper/utils';
 import Icon from 'assets/icons';
@@ -93,7 +93,7 @@ const badgeVariants = cva(
  * Comprehensive props interface supporting both icon and text content
  * with theme integration and custom styling options.
  */
-export interface BadgeProps extends VariantProps<typeof badgeVariants> {
+interface BadgeProps extends VariantProps<typeof badgeVariants> {
   /** Icon name for the badge (optional) */
   icon?: string;
   /** Size of the badge content in pixels (default: 12) */
@@ -268,4 +268,4 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
  * @exports Badge - Main Badge component
  * @exports badgeVariants - CVA variant configuration for external use
  */
-export { Badge, badgeVariants };
+export { Badge };

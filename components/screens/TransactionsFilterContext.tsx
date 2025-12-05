@@ -8,9 +8,9 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { router } from 'expo-router';
 
-export type PaymentType = 'all' | 'lightning' | 'ecash';
-export type Direction = 'all' | 'incoming' | 'outgoing';
-export type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
+type PaymentType = 'all' | 'lightning' | 'ecash';
+type Direction = 'all' | 'incoming' | 'outgoing';
+type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 interface TransactionsFilterState {
   currency: string;
@@ -120,13 +120,3 @@ export function useTransactionsFilter() {
   }
   return context;
 }
-
-/**
- * Optional hook that returns null if outside provider (for conditional usage)
- */
-export function useTransactionsFilterOptional() {
-  return useContext(TransactionsFilterContext);
-}
-
-export default TransactionsFilterContext;
-

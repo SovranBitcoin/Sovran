@@ -4,7 +4,8 @@ import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { RowButton, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
@@ -116,7 +117,11 @@ function ShareModal() {
           </View>
         )}
 
-        <PaymentInfo popupMessage={config.popupMessage} data={activeData} unit={config.iconCurrency} />
+        <PaymentInfo
+          popupMessage={config.popupMessage}
+          data={activeData}
+          unit={config.iconCurrency}
+        />
 
         <Section title={config.sectionTitle}>
           <RowButton

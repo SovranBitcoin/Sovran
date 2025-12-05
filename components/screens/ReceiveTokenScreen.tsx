@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useMintManagement, useReceive, useHistoryEntry } from 'hooks/coco';
 import { popup } from '@/helper/popup';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -15,19 +14,23 @@ import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import { VStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
+import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useReceive } from 'coco-cashu-react';
 
 type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & {
   token?: string;
   state?: 'pending' | 'redeemed';
 };
 
-export interface ReceiveTokenScreenProps {
+interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   receiveHistoryEntry: ReceiveHistoryEntryWithToken | string | undefined;
   onNavigateBack: () => void;

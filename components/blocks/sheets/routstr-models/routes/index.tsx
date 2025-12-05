@@ -36,7 +36,7 @@ declare module 'react-native-actions-sheet' {
       returnValue: {
         modelId: string;
       };
-      payload: {};
+      payload: Record<string, never>;
     }>;
   }
 }

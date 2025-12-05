@@ -1,14 +1,5 @@
 import { Reducer } from 'react';
-import {
-  SET_CURRENT_PROFILE,
-  SET_SEARCH,
-  SET_PROFILES,
-  ADD_MESSAGE,
-  MUTE_USER,
-  REPORT_USER,
-  ADD_CONTACT,
-  REMOVE_CONTACT,
-} from './actionTypes';
+import { SET_SEARCH } from './actionTypes';
 import { NostrAction } from './actions';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { nostrState } from 'redux/store/migrationTest';
@@ -40,19 +31,6 @@ type NostrSearchProfile = {
   hasNip05Conflict?: boolean;
 };
 
-export type NostrContactProfile = {
-  pubkey: string;
-  name: string;
-  about: string;
-  lud16: string;
-  nip05: string;
-  picture: string;
-  displayName: string;
-  display_name: string;
-  website: string;
-  banner: string;
-};
-
 export type Message = {
   sender: string;
   receiver: string;
@@ -63,7 +41,7 @@ export type Message = {
   sig: string;
 };
 
-export type Profile = {
+type Profile = {
   id: number;
   pubkey: string;
   profile: NostrProfile;
@@ -91,10 +69,6 @@ type NostrState = {
     [key: string]: Message[];
   };
   follows: Record<string, any>;
-  contacts: {
-    pubkey: string;
-    profile: NostrContactProfile;
-  }[];
 };
 
 const initialState: NostrState = {
@@ -169,14 +143,30 @@ const initialState: NostrState = {
   profiles: [
     {
       id: nostrState.profiles[0].id,
-      mnemonic: nostrState.profiles[0].mnemonic,
+      mnemonic: nostrState.profiles[0].mnemonic || '',
+      pubkey: '',
+      profile: {
+        created_at: 0,
+        profileEvent: '',
+        name: '',
+        picture: '',
+        image: '',
+      },
+      npub: '',
+      nsec: '',
+      mints: [],
+      picture: '',
+      root: {
+        xpub: '',
+        xpriv: '',
+      },
+      nut13: '',
     },
   ],
   messages: {
     loaded_messages: [],
   },
   follows: {},
-  contacts: [],
 };
 
 export const nostrReducer: Reducer<NostrState, NostrAction> = (
@@ -184,10 +174,6 @@ export const nostrReducer: Reducer<NostrState, NostrAction> = (
   action
 ): NostrState => {
   switch (action.type) {
-    case SET_CURRENT_PROFILE: {
-      return { ...state, currentProfile: action.payload };
-    }
-
     case SET_SEARCH: {
       const uniqueSearch = [];
       const pubkeyMap = new Map();
@@ -198,65 +184,6 @@ export const nostrReducer: Reducer<NostrState, NostrAction> = (
       }
       uniqueSearch.push(...pubkeyMap.values());
       return { ...state, search: uniqueSearch };
-    }
-
-    case SET_PROFILES: {
-      return { ...state, profiles: action.payload };
-    }
-
-    case ADD_MESSAGE: {
-      const { pubkey: newPubkey, message } = action.payload;
-      return {
-        ...state,
-        messages: {
-          ...state.messages,
-          [newPubkey]: [...(state.messages?.[newPubkey] ?? []), message],
-        },
-      };
-    }
-
-    case MUTE_USER: {
-      return {
-        ...state,
-        search: state.search.map((s) => {
-          if (s.pubkey === action.payload) {
-            return { ...s, profile: { ...s.profile, muted: true } };
-          }
-          return s;
-        }),
-      };
-    }
-
-    case REPORT_USER: {
-      return {
-        ...state,
-        search: state.search.map((s) => {
-          if (s.pubkey === action.payload) {
-            return { ...s, profile: { ...s.profile, report: true } };
-          }
-          return s;
-        }),
-      };
-    }
-
-    case ADD_CONTACT: {
-      const existing = state.contacts.find((c) => c.pubkey === action.payload.pubkey);
-      if (existing) {
-        return {
-          ...state,
-          contacts: state.contacts.map((c) =>
-            c.pubkey === action.payload.pubkey ? action.payload : c
-          ),
-        };
-      }
-      return { ...state, contacts: [...state.contacts, action.payload] };
-    }
-
-    case REMOVE_CONTACT: {
-      return {
-        ...state,
-        contacts: state.contacts.filter((c) => c.pubkey !== action.payload),
-      };
     }
 
     default: {

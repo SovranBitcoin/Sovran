@@ -4,10 +4,7 @@
     "slug": "sovran",
     "version": "0.0.51",
     "orientation": "portrait",
-    "scheme": [
-      "sovran",
-      "cashu"
-    ],
+    "scheme": ["sovran", "cashu"],
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -15,9 +12,7 @@
       "resizeMode": "contain"
     },
     "icon": "./assets/images/production.png",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "newArchEnabled": true,
     "ios": {
       "buildNumber": "9",
@@ -30,14 +25,8 @@
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
         ],
-        "UIBackgroundModes": [
-          "fetch",
-          "bluetooth-central",
-          "bluetooth-peripheral"
-        ],
-        "UIDeviceFamily": [
-          1
-        ],
+        "UIBackgroundModes": ["fetch", "bluetooth-central", "bluetooth-peripheral"],
+        "UIDeviceFamily": [1],
         "NSMotionUsageDescription": "Allow motion access to use the motion sensor to rotate the screen",
         "NSPhotoLibraryAddUsageDescription": "Allow access to your photos to save them to your library",
         "NSPhotoLibraryUsageDescription": "Allow access to your photos to use them in the app",
@@ -49,9 +38,7 @@
         "NFCReaderUsageDescription": "Sovran uses NFC to send and receive contactless payments."
       },
       "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": [
-          "TAG"
-        ]
+        "com.apple.developer.nfc.readersession.formats": ["TAG"]
       },
       "bundleIdentifier": "com.sovranbitcoin",
       "supportsTablet": false
@@ -85,11 +72,7 @@
         "react-native-nfc-manager",
         {
           "includeNdefEntitlement": false,
-          "selectIdentifiers": [
-            "D2760000850100",
-            "D2760000850101",
-            "5361746f63617368"
-          ]
+          "selectIdentifiers": ["D2760000850100", "D2760000850101", "5361746f63617368"]
         }
       ],
       "expo-build-properties",

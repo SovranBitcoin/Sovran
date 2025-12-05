@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { MonthSelector } from 'components/blocks/MonthSelector';
 import { HistoryEntry } from 'coco-cashu-core';
@@ -26,7 +26,7 @@ type Direction = 'all' | 'incoming' | 'outgoing';
 // Height constant for month selector (sticky content)
 const MONTH_SELECTOR_HEIGHT = 48;
 
-export interface TransactionsScreenProps {
+interface TransactionsScreenProps {
   initialAccount?: { unit: string };
   initialTab?: StatusTab;
   /** Called when a transaction is tapped - used for flow-aware navigation */

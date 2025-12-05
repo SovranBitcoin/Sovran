@@ -2,7 +2,7 @@ import React, { ReactNode, useMemo } from 'react';
 import 'react-native-get-random-values';
 import { PanResponder, StyleProp, ViewStyle } from 'react-native';
 
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 
 interface NonGestureViewProps {
   index?: number;

@@ -36,8 +36,7 @@ declare module 'react-native-actions-sheet' {
       returnValue: {
         sessionId: string | null;
       };
-      payload: {};
+      payload: Record<string, never>;
     }>;
   }
 }
-

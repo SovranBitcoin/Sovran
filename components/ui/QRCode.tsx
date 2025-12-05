@@ -2,7 +2,7 @@ import React, { memo, useEffect, useState } from 'react';
 import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';

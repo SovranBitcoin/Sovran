@@ -67,4 +67,3 @@ export default ({ context }: { context?: 'global' }) =>
   context
     ? registerSheet(sheetName, RoutstrSessionsSheet, context)
     : registerSheet(sheetName, RoutstrSessionsSheet);
-

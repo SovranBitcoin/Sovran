@@ -7,13 +7,14 @@ import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
 import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { NfcPayment, NfcError } from '@/helper/nfc';
-import { useSend, useReceive } from 'hooks/coco';
+// import { useSend, useReceive } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useCallback } from 'react';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { useReceive, useSend } from 'coco-cashu-react';
 
 // Payment limit tiers in USD
 const PAYMENT_TIERS = [

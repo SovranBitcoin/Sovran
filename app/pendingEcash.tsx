@@ -3,13 +3,15 @@ import { StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { ModalLayoutWrapper } from './debugModal';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Avatar } from 'components/ui/Avatar';
 import { Transaction } from 'components/blocks/Transaction';
 import Icon from 'assets/icons';
-import { usePaginatedHistory, useMints, useReceive } from 'hooks/coco';
 import { SendHistoryEntry, HistoryEntry, Mint } from 'coco-cashu-core';
 import { extractDomain } from 'helper/url';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { getEncodedTokenV4, Proof } from '@cashu/cashu-ts';
 import { popup } from 'helper/popup';
+import { useMints, usePaginatedHistory, useReceive } from 'coco-cashu-react';
 
 // ============================================================================
 // Header Components

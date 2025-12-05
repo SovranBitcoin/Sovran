@@ -1,6 +1,7 @@
 import React from 'react';
-import { View } from 'react-native';
-import { HStack } from 'components/ui/View';
+
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import 'react-native-gesture-handler';
 import { useNostrEvents } from 'nostr-react';
@@ -13,7 +14,7 @@ interface PostQuoteProps {
   id: string;
 }
 
-export const PostQuote = React.memo(({ id }: PostQuoteProps) => {
+const PostQuote = React.memo(({ id }: PostQuoteProps) => {
   const { getPrimaryColor } = useTheme();
 
   const { events } = useNostrEvents({ filter: { ids: [id] } });

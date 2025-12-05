@@ -85,7 +85,9 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   if (isDecrypting) {
     return (
       <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>Decrypting messages...</Text>
+        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
+          Decrypting messages...
+        </Text>
       </View>
     );
   }

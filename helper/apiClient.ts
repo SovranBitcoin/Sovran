@@ -5,7 +5,7 @@ const BASE_URL = 'https://api.sovran.money/api';
 
 export const PRICELIST_URL = `wss://ws.sovran.money`;
 
-export interface UserStats {
+interface UserStats {
   pubkey: string;
   follows_count: number;
   followers_count: number;
@@ -41,17 +41,12 @@ export interface UserProfile {
   userStats?: UserStats;
 }
 
-export interface SearchUsersResponse {
+interface SearchUsersResponse {
   query: string;
   limit: number;
   sort: string;
   results: UserProfile[];
   fromCache: boolean;
-}
-
-export interface SearchResult {
-  profileEvent: string;
-  [key: string]: any;
 }
 
 const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
@@ -91,7 +86,7 @@ export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: numb
   return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
-export interface RecommendedUsersResponse {
+interface RecommendedUsersResponse {
   source: string;
   limit: number;
   sort: string;

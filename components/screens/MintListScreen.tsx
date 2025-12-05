@@ -13,10 +13,10 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { useMintManagement, useMints } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { MintItem } from 'components/blocks/sheets/mint-balance/routes/list';
@@ -28,11 +28,13 @@ import { popup } from 'helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
+import { useMints } from 'coco-cashu-react';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 // Height constant for currency tabs
 const CURRENCY_TABS_HEIGHT = 48;
 
-export interface MintListScreenProps {
+interface MintListScreenProps {
   /** Whether to require balance for selection (default: false) */
   requireBalance?: boolean;
   /** Minimum balance required for mint selection (filters out mints below this amount) */

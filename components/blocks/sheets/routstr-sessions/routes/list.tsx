@@ -25,7 +25,9 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import Wrapper from '../../wrapper';
-import { HStack, VStack, Spacer, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { Spacer } from 'components/ui/View/Spacer';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRoutstrStore, RoutstrSession } from 'stores/routstrStore';
 
@@ -36,7 +38,7 @@ interface SessionItemProps {
 }
 
 const SessionItem: React.FC<SessionItemProps> = ({ session, isCurrent, onPress }) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
 
   // Format date/time
   const formatDate = (timestamp: number): string => {
@@ -58,7 +60,7 @@ const SessionItem: React.FC<SessionItemProps> = ({ session, isCurrent, onPress }
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="bg-primary-800 rounded-lg p-4 mb-3"
+      className="mb-3 rounded-lg bg-primary-800 p-4"
       style={{
         borderWidth: isCurrent ? 2 : 1,
         borderColor: isCurrent ? getPrimaryColor('400') : getPrimaryColor('700'),
@@ -69,9 +71,7 @@ const SessionItem: React.FC<SessionItemProps> = ({ session, isCurrent, onPress }
             <Text weight="heavy" size={16} className="text-primary-0" numberOfLines={1}>
               {session.title}
             </Text>
-            {isCurrent && (
-              <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
-            )}
+            {isCurrent && <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />}
           </HStack>
           <Text size={12} className="text-primary-300" numberOfLines={2}>
             {session.messages.length > 0
@@ -90,8 +90,7 @@ const SessionItem: React.FC<SessionItemProps> = ({ session, isCurrent, onPress }
 const ListRoute: React.FC = () => {
   const { getPrimaryColor } = useTheme();
   const sheetRef = useSheetRef();
-  const { getAllSessions, getCurrentSessionId, createSession, switchSession } =
-    useRoutstrStore();
+  const { getAllSessions, getCurrentSessionId, createSession, switchSession } = useRoutstrStore();
 
   const sessions = getAllSessions();
   const currentSessionId = getCurrentSessionId();
@@ -99,14 +98,16 @@ const ListRoute: React.FC = () => {
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
       switchSession(sessionId);
-      sheetRef.current?.hide({ payload: { sessionId } });
+      // @ts-expect-error - sheetRef.hide accepts object but types are incorrect
+      sheetRef.current?.hide({ sessionId });
     },
     [switchSession, sheetRef]
   );
 
   const handleNewSession = useCallback(() => {
     const newSessionId = createSession();
-    sheetRef.current?.hide({ payload: { sessionId: newSessionId } });
+    // @ts-expect-error - sheetRef.hide accepts object but types are incorrect
+    sheetRef.current?.hide({ sessionId: newSessionId });
   }, [createSession, sheetRef]);
 
   const renderItem: ListRenderItem<RoutstrSession> = useCallback(
@@ -147,7 +148,7 @@ const ListRoute: React.FC = () => {
           </VStack>
           <TouchableOpacity
             onPress={handleNewSession}
-            className="bg-primary-700 rounded-lg p-3"
+            className="rounded-lg bg-primary-700 p-3"
             style={{ borderWidth: 1, borderColor: getPrimaryColor('600') }}>
             <HStack align="center" spacing={8}>
               <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
@@ -163,13 +164,13 @@ const ListRoute: React.FC = () => {
           <VStack align="center" justify="center" flex={1}>
             <Icon name="lucide:square-pen" size={48} color={getPrimaryColor('500')} />
             <Spacer size={16} />
-            <Text className="text-primary-400" textAlign="center">
+            <Text className="text-center text-primary-400">
               No sessions yet. Create your first session to get started!
             </Text>
             <Spacer size={24} />
             <TouchableOpacity
               onPress={handleNewSession}
-              className="bg-primary-700 rounded-lg px-6 py-3"
+              className="rounded-lg bg-primary-700 px-6 py-3"
               style={{ borderWidth: 1, borderColor: getPrimaryColor('600') }}>
               <HStack align="center" spacing={8}>
                 <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
@@ -198,4 +199,3 @@ const ListRoute: React.FC = () => {
 };
 
 export default ListRoute;
-

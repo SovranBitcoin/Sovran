@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Types
 // ============================================================================
 
-export interface BTCMapPlace {
+interface BTCMapPlace {
   id: number;
   lat: number;
   lon: number;
@@ -363,28 +363,3 @@ export const useBTCMapStore = create<BTCMapStore>()(
     }
   )
 );
-
-// ============================================================================
-// Helper Hooks
-// ============================================================================
-
-// Hook to get places count
-export const useBTCMapPlacesCount = () => {
-  return useBTCMapStore((state) => state.placesCache?.data.length ?? 0);
-};
-
-// Hook to check if cache is stale
-export const useIsBTCMapCacheStale = () => {
-  return useBTCMapStore((state) => state.isCacheStale());
-};
-
-// Hook to get loading state
-export const useBTCMapLoading = () => {
-  return useBTCMapStore((state) => state.isLoading);
-};
-
-// Hook to get error state
-export const useBTCMapError = () => {
-  return useBTCMapStore((state) => state.error);
-};
-

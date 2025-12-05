@@ -1,5 +1,6 @@
 // In reducer.ts
-import { ThunkAction, combineReducers } from 'redux';
+import { combineReducers, type Action as ReduxAction } from 'redux';
+import type { ThunkAction } from 'redux-thunk';
 import { settingsReducer } from '../settings/reducer';
 import { cashuReducer } from '../cashu/reducer';
 import { nostrReducer } from '../nostr/reducer';
@@ -9,6 +10,15 @@ import { NostrAction } from '../nostr';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
+export const MIGRATION_250_COMPLETE = 'MIGRATION_250_COMPLETE' as const;
+
+interface ResetAppAction {
+  type: typeof RESET_APP;
+}
+
+interface Migration250CompleteAction {
+  type: typeof MIGRATION_250_COMPLETE;
+}
 
 // Define the app reducer with proper typing
 const appReducer = combineReducers({
@@ -24,8 +34,8 @@ type Action =
   | SettingsAction
   | CashuAction
   | NostrAction
-  | typeof RESET_APP
-  | typeof MIGRATION_250_COMPLETE;
+  | ResetAppAction
+  | Migration250CompleteAction;
 
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<
@@ -36,10 +46,10 @@ export type AppThunk<ReturnType = void> = ThunkAction<
 >;
 
 // Root reducer with reset functionality and proper typing
-const rootReducer = (state: RootState | undefined, action: Action): RootState => {
+const rootReducer = (state: RootState | undefined, action: Action | ReduxAction): RootState => {
   // If the reset action is fired, return undefined state
   // This will cause each reducer to return their initial state
-  if (action.type === RESET_APP) {
+  if ('type' in action && action.type === RESET_APP) {
     // You can selectively preserve some state if needed
     // const { settings } = state as RootState;
     state = undefined;
@@ -48,7 +58,9 @@ const rootReducer = (state: RootState | undefined, action: Action): RootState =>
     // state = { settings } as unknown as RootState;
   }
 
-  return appReducer(state, action);
+  // Type assertion needed because Action includes ResetAppAction and Migration250CompleteAction
+  // which are handled above, but appReducer only accepts SettingsAction | CashuAction | NostrAction
+  return appReducer(state, action as SettingsAction | CashuAction | NostrAction);
 };
 
 export default rootReducer;

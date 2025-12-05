@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
@@ -109,40 +110,40 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
   );
 
   const content = (
-      <HStack align="center" justify="space-between" style={styles.row}>
-        <HStack align="center">
-          <VStack style={{ marginRight: 8 }}>
-            <Avatar
-              picture={displayInfo.picture}
-              seed={item.pubkey}
-              variant={displayInfo.isMint ? 'mint' : 'person'}
-              status={
-                item.pubkey && Object.values(PUBLIC_KEYS).includes(item.pubkey as any)
-                  ? 'VERIFIED'
-                  : undefined
-              }
-              size={48}
-              name={displayInfo.name}
-              loading={isLoadingProfile}
-            />
-          </VStack>
-          <VStack style={styles.textContainer}>
-            <Text style={styles.profileName} className="text-primary-0">
-              {displayInfo.name}
-            </Text>
-            <Text style={styles.previewText} className="text-primary-100">
-              {displayInfo.subtitle.length > 50
-                ? `${displayInfo.subtitle.slice(0, 50)}...`
-                : displayInfo.subtitle}
-            </Text>
-          </VStack>
-        </HStack>
-        {formattedDate && (
-          <Text style={styles.date} className="text-primary-200">
-            {formattedDate}
+    <HStack align="center" justify="space-between" style={styles.row}>
+      <HStack align="center">
+        <VStack style={{ marginRight: 8 }}>
+          <Avatar
+            picture={displayInfo.picture}
+            seed={item.pubkey}
+            variant={displayInfo.isMint ? 'mint' : 'person'}
+            status={
+              item.pubkey && Object.values(PUBLIC_KEYS).includes(item.pubkey as any)
+                ? 'VERIFIED'
+                : undefined
+            }
+            size={48}
+            name={displayInfo.name}
+            loading={isLoadingProfile}
+          />
+        </VStack>
+        <VStack style={styles.textContainer}>
+          <Text style={styles.profileName} className="text-primary-0">
+            {displayInfo.name}
           </Text>
-        )}
+          <Text style={styles.previewText} className="text-primary-100">
+            {displayInfo.subtitle.length > 50
+              ? `${displayInfo.subtitle.slice(0, 50)}...`
+              : displayInfo.subtitle}
+          </Text>
+        </VStack>
       </HStack>
+      {formattedDate && (
+        <Text style={styles.date} className="text-primary-200">
+          {formattedDate}
+        </Text>
+      )}
+    </HStack>
   );
 
   if (linkHref) {

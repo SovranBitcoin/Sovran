@@ -2,7 +2,8 @@ import React from 'react';
 import { TextInput as RNTextInput, ActivityIndicator } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from './Text';
-import { HStack, VStack } from './View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
 
 interface MintSearchInputProps {
   value: string;

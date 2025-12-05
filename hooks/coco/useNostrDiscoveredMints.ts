@@ -13,7 +13,7 @@ import { useMintManagement } from './useMintManagement';
 /**
  * Individual recommendation for a mint
  */
-export interface MintRecommendation {
+interface MintRecommendation {
   score: number;
   comment: string;
   pubkey: string;

@@ -1,6 +1,6 @@
 import { TextMessage, CashuTokenMessage } from './components';
 import { isValidEcashToken } from '@/helper/coco/utils';
-import { TimelineItemType } from 'app/userMessages';
+import { TimelineItemType } from 'components/screens/UserMessagesScreen';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 interface TimelineItemProps {

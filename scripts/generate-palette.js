@@ -1,8 +1,8 @@
 /**
  * Palette Generation Script
- * 
+ *
  * Generates color palettes following the discovered patterns from existing themes.
- * 
+ *
  * Key Findings:
  * - Background image themes use IDENTICAL lightness values at each shade
  * - Hue is relatively constant across all shades
@@ -34,7 +34,7 @@ const BACKGROUND_THEME_LIGHTNESS = {
 // Saturation pattern for background themes
 // At shade 950, saturation is high; it drops for other shades
 const SATURATION_PATTERN = {
-  950: 0.7,  // ~70% saturation at darkest
+  950: 0.7, // ~70% saturation at darkest
   // All other shades use the base saturation
 };
 
@@ -46,28 +46,28 @@ function generateBackgroundThemePalette(baseHue, baseSaturation, name = 'generat
   const palette = {};
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
 
-  shades.forEach(shade => {
+  shades.forEach((shade) => {
     const lightness = BACKGROUND_THEME_LIGHTNESS[shade] / 100;
-    
+
     // Special handling for shade 0 - always white
     if (shade === 0) {
       palette[shade] = '#FFFFFF';
       return;
     }
-    
+
     // Special handling for shade 950 - higher saturation
     let saturation = baseSaturation;
     if (shade === 950) {
       saturation = Math.min(0.9, baseSaturation * 2.5); // Boost saturation for darkest
     }
-    
+
     // As lightness increases, reduce saturation towards 0 (white)
     // This creates a natural fade to white
     if (lightness > 0.5) {
       const fadeRatio = (lightness - 0.5) / 0.5;
       saturation = saturation * (1 - fadeRatio * 0.7);
     }
-    
+
     try {
       const color = chroma.hsl(baseHue, saturation, lightness);
       palette[shade] = color.hex();
@@ -87,21 +87,21 @@ function generateConstantSaturationPalette(baseHue, baseSaturation, name = 'gene
   const palette = {};
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
 
-  shades.forEach(shade => {
+  shades.forEach((shade) => {
     const lightness = BACKGROUND_THEME_LIGHTNESS[shade] / 100;
-    
+
     // Shade 0 is always white
     if (shade === 0) {
       palette[shade] = '#FFFFFF';
       return;
     }
-    
+
     // Shade 950 has boosted saturation
     let saturation = baseSaturation;
     if (shade === 950) {
       saturation = Math.min(0.9, baseSaturation * 2.5);
     }
-    
+
     try {
       const color = chroma.hsl(baseHue, saturation, lightness);
       palette[shade] = color.hex();
@@ -119,25 +119,27 @@ function generateConstantSaturationPalette(baseHue, baseSaturation, name = 'gene
 function validatePalette(palette) {
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
   const issues = [];
-  
+
   // Check shade 0 is white
   if (palette[0]?.toUpperCase() !== '#FFFFFF') {
     issues.push(`Shade 0 should be white, got: ${palette[0]}`);
   }
-  
+
   // Check lightness progression
   let prevLightness = 0;
-  shades.forEach(shade => {
+  shades.forEach((shade) => {
     const color = palette[shade];
     if (color) {
       const [h, s, l] = chroma(color).hsl();
       if (l < prevLightness) {
-        issues.push(`Lightness should increase: shade ${shade} (${(l*100).toFixed(1)}%) < previous (${(prevLightness*100).toFixed(1)}%)`);
+        issues.push(
+          `Lightness should increase: shade ${shade} (${(l * 100).toFixed(1)}%) < previous (${(prevLightness * 100).toFixed(1)}%)`
+        );
       }
       prevLightness = l;
     }
   });
-  
+
   return {
     valid: issues.length === 0,
     issues,
@@ -151,26 +153,28 @@ function formatPalette(name, palette) {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Generated Palette: ${name}`);
   console.log('='.repeat(60));
-  
+
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
-  
-  shades.forEach(shade => {
+
+  shades.forEach((shade) => {
     const hex = palette[shade];
     if (hex) {
       try {
         const [h, s, l] = chroma(hex).hsl();
-        console.log(`  ${shade.toString().padStart(3)}: ${hex.padEnd(9)} | HSL(${(h || 0).toFixed(0).padStart(3)}°, ${(s * 100).toFixed(1).padStart(5)}%, ${(l * 100).toFixed(1).padStart(5)}%)`);
+        console.log(
+          `  ${shade.toString().padStart(3)}: ${hex.padEnd(9)} | HSL(${(h || 0).toFixed(0).padStart(3)}°, ${(s * 100).toFixed(1).padStart(5)}%, ${(l * 100).toFixed(1).padStart(5)}%)`
+        );
       } catch (e) {
         console.log(`  ${shade}: ${hex}`);
       }
     }
   });
-  
+
   // Validation
   const validation = validatePalette(palette);
   if (!validation.valid) {
     console.log('\n⚠️  Validation issues:');
-    validation.issues.forEach(issue => console.log(`  - ${issue}`));
+    validation.issues.forEach((issue) => console.log(`  - ${issue}`));
   } else {
     console.log('\n✓ Palette validation passed');
   }
@@ -181,14 +185,14 @@ function formatPalette(name, palette) {
  */
 function exportAsThemeJS(name, palette) {
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
-  
+
   let output = `  '${name}': {\n`;
   shades.forEach((shade, i) => {
     const comma = i < shades.length - 1 ? ',' : '';
     output += `    ${shade}: '${palette[shade]}'${comma}\n`;
   });
   output += '  },';
-  
+
   return output;
 }
 
@@ -197,15 +201,15 @@ function exportAsThemeJS(name, palette) {
  */
 function exportAsColorThemeTS(name, palette) {
   const shades = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];
-  
+
   let output = `  // ${name} theme\n`;
   output += `  ${name}: vars({\n`;
-  shades.forEach(shade => {
+  shades.forEach((shade) => {
     output += `    '--color-primary-${shade}': '${palette[shade]}',\n`;
   });
   output += `    ...shadeColors,\n`;
   output += `  }),\n`;
-  
+
   return output;
 }
 
@@ -218,13 +222,13 @@ console.log('=================\n');
 
 // Example: Generate palettes for different hues
 const testPalettes = [
-  { hue: 225, saturation: 0.25, name: 'test-blue' },       // Similar to deepocean
-  { hue: 257, saturation: 0.27, name: 'test-purple' },     // Similar to cosmicpurple
-  { hue: 246, saturation: 0.22, name: 'test-indigo' },     // Similar to mysticblue
-  { hue: 249, saturation: 0.32, name: 'test-violet' },     // Similar to royalpurple
-  { hue: 180, saturation: 0.30, name: 'test-teal' },       // New teal theme
-  { hue: 320, saturation: 0.25, name: 'test-magenta' },    // New magenta theme
-  { hue: 30, saturation: 0.35, name: 'test-warm' },        // New warm theme
+  { hue: 225, saturation: 0.25, name: 'test-blue' }, // Similar to deepocean
+  { hue: 257, saturation: 0.27, name: 'test-purple' }, // Similar to cosmicpurple
+  { hue: 246, saturation: 0.22, name: 'test-indigo' }, // Similar to mysticblue
+  { hue: 249, saturation: 0.32, name: 'test-violet' }, // Similar to royalpurple
+  { hue: 180, saturation: 0.3, name: 'test-teal' }, // New teal theme
+  { hue: 320, saturation: 0.25, name: 'test-magenta' }, // New magenta theme
+  { hue: 30, saturation: 0.35, name: 'test-warm' }, // New warm theme
 ];
 
 const generatedPalettes = [];
@@ -251,29 +255,31 @@ const comparisons = [
 
 comparisons.forEach(({ generated, existing }) => {
   console.log(`\n--- ${generated} vs ${existing} ---`);
-  
-  const genPalette = generatedPalettes.find(p => p.name === generated)?.palette;
+
+  const genPalette = generatedPalettes.find((p) => p.name === generated)?.palette;
   const existingPalette = THEMES[existing];
-  
+
   if (!genPalette || !existingPalette) {
     console.log('  Could not compare');
     return;
   }
-  
+
   const shades = [950, 500, 400, 200, 50, 0];
-  shades.forEach(shade => {
+  shades.forEach((shade) => {
     const genColor = genPalette[shade];
     const existColor = existingPalette[shade];
-    
+
     if (genColor && existColor) {
       const [gh, gs, gl] = chroma(genColor).hsl();
       const [eh, es, el] = chroma(existColor).hsl();
-      
+
       const hueDiff = Math.abs((gh || 0) - (eh || 0));
       const satDiff = Math.abs(gs - es) * 100;
       const lightDiff = Math.abs(gl - el) * 100;
-      
-      console.log(`  ${shade.toString().padStart(3)}: Gen=${genColor} Exist=${existColor} | ΔH=${hueDiff.toFixed(0)}° ΔS=${satDiff.toFixed(1)}% ΔL=${lightDiff.toFixed(1)}%`);
+
+      console.log(
+        `  ${shade.toString().padStart(3)}: Gen=${genColor} Exist=${existColor} | ΔH=${hueDiff.toFixed(0)}° ΔS=${satDiff.toFixed(1)}% ΔL=${lightDiff.toFixed(1)}%`
+      );
     }
   });
 });
@@ -297,11 +303,18 @@ generatedPalettes.forEach(({ name, palette }) => {
 
 // Save results
 const outputPath = path.join(__dirname, 'generated-palettes.json');
-fs.writeFileSync(outputPath, JSON.stringify({
-  palettes: generatedPalettes,
-  lightnessTargets: BACKGROUND_THEME_LIGHTNESS,
-  generatedAt: new Date().toISOString(),
-}, null, 2));
+fs.writeFileSync(
+  outputPath,
+  JSON.stringify(
+    {
+      palettes: generatedPalettes,
+      lightnessTargets: BACKGROUND_THEME_LIGHTNESS,
+      generatedAt: new Date().toISOString(),
+    },
+    null,
+    2
+  )
+);
 
 console.log(`\n✓ Results saved to: ${outputPath}`);
 
@@ -318,4 +331,3 @@ module.exports = {
   exportAsColorThemeTS,
   BACKGROUND_THEME_LIGHTNESS,
 };
-

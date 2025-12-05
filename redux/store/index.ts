@@ -1,5 +1,5 @@
 import { applyMiddleware, createStore, Dispatch } from 'redux';
-import { createMigrate, persistStore, persistReducer } from 'redux-persist';
+import { createMigrate, persistStore, persistReducer, type PersistedState } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PUBLIC_KEYS } from 'helper/constants';
@@ -15,7 +15,8 @@ const thunkMiddleware = require('redux-thunk').thunk;
 // WARNING: never use _.set, it will obviously delete the users storage...
 // Also, don't delete them, obviously...
 const migrations = {
-  0: (state: RootState) => {
+  0: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
@@ -33,10 +34,11 @@ const migrations = {
             mints: profile.mints || allMints,
           };
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  5: (state: RootState) => {
+  5: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
@@ -46,19 +48,21 @@ const migrations = {
             counters: {},
           };
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  23: (state: RootState) => {
+  23: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['settings', 'settings', 'theme'],
       (theme = 'dark') => {
         return 'dark';
       },
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  25: (state: RootState) => {
+  25: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['nostr', 'profiles'],
       (profiles = []) =>
@@ -83,10 +87,11 @@ const migrations = {
             return profile;
           }
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  37: (state: RootState) => {
+  37: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     const newState = _.update(
       ['nostr', 'search'],
       (search = []) => {
@@ -110,23 +115,35 @@ const migrations = {
           },
         ];
       },
-      state
+      state as unknown as RootState
     );
-    return newState;
+    return newState as PersistedState;
   },
-  40: (state: RootState) => {
+  40: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['cashu', 'profiles'],
       (profiles = []) =>
         profiles.map((profile: any) => {
           return {
             ...profile,
-            transactions: profile.transactions.map((oldTx) => {
+            transactions: profile.transactions.map((oldTx: any) => {
               // Convert amount to number for consistency
               const amount =
                 typeof oldTx.amount === 'string' ? parseFloat(oldTx.amount) : oldTx.amount;
               // Define base transaction properties common to all transaction types
-              const baseTx = {
+              const baseTx: {
+                amount: any;
+                date: any;
+                type: any;
+                transactionType: any;
+                unit: any;
+                mintUrl: any;
+                paid: any;
+                counter: any;
+                nostr?: any;
+                memo?: string;
+              } = {
                 amount,
                 date: oldTx.date,
                 type: oldTx.type,
@@ -156,10 +173,10 @@ const migrations = {
                   },
                   ...(oldTx.privkey
                     ? {
-                      p2pk: {
-                        privkey: oldTx.privkey,
-                      },
-                    }
+                        p2pk: {
+                          privkey: oldTx.privkey,
+                        },
+                      }
                     : null),
                 };
                 return ecashReceiveTx;
@@ -219,10 +236,11 @@ const migrations = {
             }),
           };
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  72: (state: RootState) => {
+  72: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['nostr', 'profiles'],
       (profiles = []) =>
@@ -247,13 +265,19 @@ const migrations = {
             return profile;
           }
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  74: (state: RootState) => {
-    return _.update(['nostr', 'contacts'], (contacts = []) => contacts, state);
+  74: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
+    return _.update(
+      ['nostr', 'contacts'],
+      (contacts = []) => contacts,
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  101: (state: RootState) => {
+  101: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     return _.update(
       ['nostr', 'profiles'],
       (profiles = []) =>
@@ -288,10 +312,11 @@ const migrations = {
             return profile;
           }
         }),
-      state
-    );
+      state as unknown as RootState
+    ) as PersistedState;
   },
-  120: (state: RootState) => {
+  120: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     const newState = _.update(
       ['cashu', 'profiles'],
       (profiles = []) => {
@@ -317,23 +342,25 @@ const migrations = {
           };
         });
       },
-      state
+      state as unknown as RootState
     );
-    return newState;
+    return newState as PersistedState;
   },
-  150: (state: RootState) => {
+  150: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     console.log('=== MIGRATION 123 DEBUG START ===');
+    const rootState = state as unknown as RootState;
 
     // Generate allocation config based on highest balance mints
     // Use EXACT same logic as memoizedGetAllBalancesMultipleCurrencies
-    const currentProfileId = state.nostr?.currentProfile?.id;
+    const currentProfileId = rootState.nostr?.currentProfile?.id;
     console.log('Current Profile ID:', currentProfileId);
 
     // Get data using same selectors logic
-    const mints = state.cashu.profiles[currentProfileId]?.mints || [];
-    const proofsByMint = state.cashu.profiles[currentProfileId]?.proofs || {};
-    const keysets = state.cashu?.keysets || {};
-    const info = state.cashu?.info || {};
+    const mints = rootState.cashu.profiles[currentProfileId]?.mints || [];
+    const proofsByMint = rootState.cashu.profiles[currentProfileId]?.proofs || {};
+    const keysets = rootState.cashu?.keysets || {};
+    const info = rootState.cashu?.info || {};
 
     console.log('Raw data extracted:');
     console.log('- Mints array:', mints);
@@ -474,14 +501,16 @@ const migrations = {
 
     console.log('\n=== MIGRATION 123 DEBUG END ===');
 
-    return _.update('cashu.allocation', () => allocation, state);
+    return _.update('cashu.allocation', () => allocation, rootState) as PersistedState;
   },
-  151: (state: RootState) => {
+  151: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     console.log('=== MIGRATION 151: Moving mnemonic to secure storage ===');
+    const rootState = state as unknown as RootState;
 
     try {
       // Get profile 0 from nostr profiles
-      const profiles = state.nostr?.profiles || [];
+      const profiles = rootState.nostr?.profiles || [];
       const profile0 = profiles[0];
 
       if (!profile0) {
@@ -528,14 +557,16 @@ const migrations = {
     console.log('=== MIGRATION 151 COMPLETE ===');
     return state;
   },
-  152: (state: RootState) => {
+  152: (state: PersistedState): PersistedState => {
+    if (!state || typeof state !== 'object') return state;
     console.log('=== MIGRATION 152: Migrating settings from Redux to Zustand ===');
+    const rootState = state as unknown as RootState;
 
     try {
       // Import the migration function dynamically to avoid circular dependencies
       import('stores/migrateSettings')
         .then(({ migrateSettingsFromRedux }) => {
-          migrateSettingsFromRedux(state)
+          migrateSettingsFromRedux(rootState)
             .then(() => {
               console.log('✅ Settings migration to Zustand completed');
             })
@@ -558,18 +589,18 @@ const migrations = {
 const persistConfig = {
   key: 'SOVRAN',
   storage: AsyncStorage,
-  timeout: null,
+  timeout: undefined,
   version: 251,
-  migrate: createMigrate(migrations, { debug: true }),
+  migrate: createMigrate(migrations as any, { debug: true }),
   // Ensure migrations complete before rehydration finishes
   transforms: [],
 };
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer(persistConfig, rootReducer as any);
 
 export const store = createStore(persistedReducer, applyMiddleware(thunkMiddleware));
 
-store.subscribe(() => { });
+store.subscribe(() => {});
 
 export const persistor = persistStore(store);
 

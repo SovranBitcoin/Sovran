@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
-import { View } from './View';
+import { View } from 'components/ui/View/View';
 import Image from './Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/providers/ThemeProvider';

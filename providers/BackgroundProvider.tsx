@@ -5,12 +5,12 @@ import { useFocusEffect } from 'expo-router';
 /**
  * Blur mode options for background configuration
  */
-export type BlurMode = 'none' | 'partial' | 'full' | 'gradient';
+type BlurMode = 'none' | 'partial' | 'full' | 'gradient';
 
 /**
  * Configuration for background blur effects
  */
-export interface BackgroundConfig {
+interface BackgroundConfig {
   blurMode: BlurMode;
   blurIntensity?: number;
   blurGradientStart?: number;
@@ -167,27 +167,6 @@ export function useBackgroundContext() {
  * Automatically updates when the screen gains focus
  */
 export function useBackgroundConfig(config: BackgroundConfig) {
-  const context = useContext(BackgroundContext);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (context) {
-        context.setConfig(config);
-      }
-    }, [
-      context,
-      config.blurMode,
-      config.blurIntensity,
-      config.blurGradientStart,
-      config.blurGradientEnd,
-    ])
-  );
-}
-
-/**
- * Optional hook for screens outside the provider (returns no-op if not in provider)
- */
-export function useOptionalBackgroundConfig(config: BackgroundConfig) {
   const context = useContext(BackgroundContext);
 
   useFocusEffect(

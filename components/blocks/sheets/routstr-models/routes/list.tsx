@@ -25,7 +25,10 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import Wrapper from '../../wrapper';
-import { HStack, VStack, Spacer, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { getModels, RoutstrModel } from 'helper/routstr/api';
@@ -123,6 +126,43 @@ const ListRoute = () => {
   const [affordableFilter, setAffordableFilter] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>('name');
 
+  // Refresh models function
+  const refreshModels = useCallback(
+    async (background = false) => {
+      if (!apiKey) return;
+
+      try {
+        if (!background) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
+        }
+        setError(null);
+
+        const availableModels = await getModels();
+        // Sort by name initially
+        availableModels.sort((a, b) => a.name.localeCompare(b.name));
+        setModels(availableModels);
+        setCachedModels(availableModels);
+      } catch (err: any) {
+        console.error('Failed to load models:', err);
+        setError(err.error?.message || 'Failed to load models');
+        // If we have cached data, keep showing it
+        if (models.length === 0) {
+          popup({
+            message: err.error?.message || 'Failed to load models',
+            emoji: '🚨',
+            type: 'error',
+          });
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [apiKey, setCachedModels, models.length]
+  );
+
   // Check cache first and load models
   useEffect(() => {
     const loadModels = async () => {
@@ -151,45 +191,12 @@ const ListRoute = () => {
     };
 
     loadModels();
-  }, [apiKey]);
-
-  const refreshModels = async (background = false) => {
-    if (!apiKey) return;
-
-    try {
-      if (!background) {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
-      setError(null);
-
-      const availableModels = await getModels();
-      // Sort by name initially
-      availableModels.sort((a, b) => a.name.localeCompare(b.name));
-      setModels(availableModels);
-      setCachedModels(availableModels);
-    } catch (err: any) {
-      console.error('Failed to load models:', err);
-      setError(err.error?.message || 'Failed to load models');
-      // If we have cached data, keep showing it
-      if (models.length === 0) {
-        popup({
-          message: err.error?.message || 'Failed to load models',
-          emoji: '🚨',
-          type: 'error',
-        });
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  }, [apiKey, getCachedModels, isCacheStale, refreshModels]);
 
   const handleRefresh = useCallback(() => {
     clearModelsCache();
     refreshModels(false);
-  }, [apiKey, clearModelsCache]);
+  }, [clearModelsCache, refreshModels]);
 
   // Filter and sort models
   const filteredAndSortedModels = useMemo(() => {
@@ -226,10 +233,14 @@ const ListRoute = () => {
     return filtered;
   }, [models, affordableFilter, balance, sortBy]);
 
-  const handleModelSelect = (modelId: string) => {
-    setSelectedModel(modelId);
-    sheetRef.current?.hide({ payload: { modelId } });
-  };
+  const handleModelSelect = useCallback(
+    (modelId: string) => {
+      setSelectedModel(modelId);
+      // @ts-expect-error - sheetRef.hide expects returnValue but types are incorrect
+      sheetRef.current?.hide({ returnValue: { modelId } });
+    },
+    [setSelectedModel, sheetRef]
+  );
 
   const renderFilterButton = useCallback(
     ({
@@ -268,7 +279,7 @@ const ListRoute = () => {
         onPress={() => handleModelSelect(item.id)}
       />
     ),
-    [selectedModel]
+    [selectedModel, handleModelSelect]
   );
 
   const keyExtractor = useCallback((item: RoutstrModel) => item.id, []);
@@ -348,15 +359,13 @@ const ListRoute = () => {
           <VStack align="center" justify="center" flex={1}>
             <Icon name="mdi:alert-circle" size={48} color={getPrimaryColor('500')} />
             <Spacer size={16} />
-            <Text className="text-primary-400" textAlign="center">
-              {error}
-            </Text>
+            <Text className="text-center text-primary-400">{error}</Text>
           </VStack>
         ) : filteredAndSortedModels.length === 0 ? (
           <VStack align="center" justify="center" flex={1}>
             <Icon name="mdi:filter-off" size={48} color={getPrimaryColor('500')} />
             <Spacer size={16} />
-            <Text className="text-primary-400" textAlign="center">
+            <Text className="text-center text-primary-400">
               {affordableFilter
                 ? 'No affordable models found. Try adjusting your filters.'
                 : 'No models available'}

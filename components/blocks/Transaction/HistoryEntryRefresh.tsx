@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { HistoryEntry } from 'coco-cashu-core';
@@ -36,12 +39,16 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefr
         <VStack>
           <Text heavy size={16}>
             {historyEntry.type === 'send'
-              ? 'state' in historyEntry && historyEntry.state === 'PAID'
+              ? 'state' in historyEntry && historyEntry.state === 'completed'
                 ? 'Sent with'
                 : 'Sending with'
-              : 'state' in historyEntry && historyEntry.state === 'PAID'
-                ? 'Received with'
-                : 'Receiving with'}
+              : historyEntry.type === 'receive'
+                ? 'state' in historyEntry &&
+                  typeof (historyEntry as any).state === 'string' &&
+                  (historyEntry as any).state === 'redeemed'
+                  ? 'Received with'
+                  : 'Receiving with'
+                : 'Processing with'}
           </Text>
           <Text regular size={16} className="text-primary-50">
             {mintInfo?.name}

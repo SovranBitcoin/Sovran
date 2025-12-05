@@ -4,7 +4,7 @@ import { Text, CustomTextProps } from './Text';
 import { Skeleton } from './Skeleton';
 import { useTheme } from 'providers/ThemeProvider';
 
-export interface AnimatedTextProps extends CustomTextProps {
+interface AnimatedTextProps extends CustomTextProps {
   /**
    * Controls skeleton visibility. When true, shows skeleton. When false, animates to text.
    */

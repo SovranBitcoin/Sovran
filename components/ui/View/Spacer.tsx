@@ -26,14 +26,14 @@
  */
 
 import React from 'react';
-import { View } from './View';
+import { View } from 'components/ui/View/View';
 
 /**
  * Props for the Spacer component
  *
  * @interface SpacerProps
  */
-export interface SpacerProps {
+interface SpacerProps {
   /** Height of the spacer in pixels */
   size: number;
 }

@@ -1,7 +1,9 @@
 import React from 'react';
 import 'react-native-get-random-values';
 
-import { View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from 'components/blocks/PrimaryBalance';

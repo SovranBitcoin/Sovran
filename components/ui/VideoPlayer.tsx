@@ -5,7 +5,7 @@ import { useTheme } from 'providers/ThemeProvider';
 
 interface VideoScreenProps {
   videoSource: any; // Accept the require() result directly
-  style?: string;
+  style?: Record<string, any>;
   muted?: boolean;
 }
 
@@ -37,7 +37,7 @@ export function VideoScreen({ videoSource, style, muted = false }: VideoScreenPr
         borderRadius: 16,
         marginVertical: 8,
         backgroundColor: getPrimaryColor('700'),
-        ...style,
+        ...(style || {}),
       }}
       ref={ref}
       player={player}

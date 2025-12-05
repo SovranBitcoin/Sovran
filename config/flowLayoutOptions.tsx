@@ -17,7 +17,7 @@ type GetPrimaryColor = (shade: string) => string;
  * Shared header button component for flow layouts.
  * Shows close button on first screen, back button on subsequent screens.
  */
-export const FlowHeaderButton = ({
+const FlowHeaderButton = ({
   isFirstScreen,
   getPrimaryColor,
 }: {
@@ -39,7 +39,7 @@ export const FlowHeaderButton = ({
  * Get the base screen options for flow layouts (used inside modal stacks).
  * These options ensure consistent styling across all flow layouts.
  */
-export const getBaseFlowScreenOptions = (
+const getBaseFlowScreenOptions = (
   getPrimaryColor: GetPrimaryColor
 ): NativeStackNavigationOptions => ({
   headerShown: true,

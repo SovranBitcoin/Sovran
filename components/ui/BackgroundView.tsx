@@ -9,20 +9,11 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSettingsStore } from 'stores/settingsStore';
 import { isBackgroundImageTheme, getGradientColorScale } from 'config/backgroundImageThemes';
 import AnimatedSpriteBackground from './SpriteView';
-import { View } from './View';
+import { View } from 'components/ui/View/View';
 import { BlurView } from './BlurView';
 import { supportsBlur } from 'helper/version';
 
-/**
- * Blur mode options:
- * - 'none': No blur effect, just the background image/color
- * - 'partial': Fixed blur on bottom half of screen (like the home screen)
- * - 'full': Entire background is blurred
- * - 'gradient': Custom gradient-based blur with configurable start/end positions
- */
-export type BlurMode = 'none' | 'partial' | 'full' | 'gradient';
-
-export type BlurTint =
+type BlurTint =
   | 'light'
   | 'dark'
   | 'default'
@@ -32,217 +23,6 @@ export type BlurTint =
   | 'systemUltraThinMaterial'
   | 'systemThickMaterial'
   | 'systemChromeMaterial';
-
-export interface BackgroundViewProps {
-  children?: ReactNode;
-  /**
-   * Controls how the blur is applied to the background
-   * @default 'partial'
-   */
-  blurMode?: BlurMode;
-  /**
-   * Blur intensity (0-100)
-   * @default 200
-   */
-  blurIntensity?: number;
-  /**
-   * Blur tint style
-   * @default 'prominent'
-   */
-  blurTint?: BlurTint;
-  /**
-   * For gradient blur mode: where the blur starts (0-1, percentage of screen height)
-   * @default 0.3
-   */
-  blurGradientStart?: number;
-  /**
-   * For gradient blur mode: where the blur reaches full opacity (0-1)
-   * @default 0.6
-   */
-  blurGradientEnd?: number;
-  /**
-   * Show the theme-based gradient color overlay
-   * @default true
-   */
-  showGradientOverlay?: boolean;
-  /**
-   * Opacity of the gradient overlay (0-1)
-   * @default 0.33
-   */
-  gradientOverlayOpacity?: number;
-  /**
-   * Additional style for the container
-   */
-  style?: ViewStyle;
-}
-
-/**
- * A reusable background component that handles:
- * - Animated sprite backgrounds (for image themes) or solid colors
- * - Fixed blur effects with customizable intensity and positioning
- * - Gradient overlays that match the theme
- *
- * For scrollable content with scroll-synced blur, use ScrollableGradientOverlay
- * inside your ScrollView.
- *
- * @example
- * // Full blur (good for content-heavy pages)
- * <BackgroundView blurMode="full">
- *   <YourContent />
- * </BackgroundView>
- *
- * @example
- * // Partial blur with scrollable content
- * <BackgroundView blurMode="partial">
- *   <ScrollView onContentSizeChange={(_, h) => setContentHeight(h)}>
- *     <ScrollableGradientOverlay contentHeight={contentHeight} />
- *     <YourContent />
- *   </ScrollView>
- * </BackgroundView>
- *
- * @example
- * // No blur (just the background)
- * <BackgroundView blurMode="none">
- *   <YourContent />
- * </BackgroundView>
- */
-function BackgroundViewComponent({
-  children,
-  blurMode = 'partial',
-  blurIntensity = 200,
-  blurTint = 'prominent',
-  blurGradientStart = 0.3,
-  blurGradientEnd = 0.6,
-  showGradientOverlay = true,
-  gradientOverlayOpacity = 0.33,
-  style,
-}: BackgroundViewProps) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
-  const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-
-  // Get gradient colors for background image themes
-  const currentTheme = useSettingsStore((state) => state.getTheme());
-  const gradientColors = useMemo(() => {
-    if (isBackgroundImageTheme(currentTheme)) {
-      return getGradientColorScale(currentTheme);
-    }
-    return null;
-  }, [currentTheme]);
-
-  // Render the fixed blur overlay (for partial mode - bottom half blur)
-  const renderFixedBlurOverlay = () => {
-    if (blurMode !== 'partial') return null;
-
-    return (
-      <MaskedView
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            top: 'auto',
-            height: '50%',
-          },
-        ]}
-        maskElement={
-          <LinearGradient
-            colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
-            locations={[0, 1]}
-            style={StyleSheet.absoluteFillObject}
-          />
-        }>
-        <BlurView intensity={blurIntensity} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-      </MaskedView>
-    );
-  };
-
-  // Render the full blur overlay
-  const renderFullBlurOverlay = () => {
-    if (blurMode !== 'full') return null;
-
-    return (
-      <BlurView intensity={blurIntensity} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-    );
-  };
-
-  // Render gradient-mode blur (non-scrollable with gradient blur)
-  const renderGradientBlurOverlay = () => {
-    if (blurMode !== 'gradient') return null;
-
-    return (
-      <>
-        <MaskedView
-          style={StyleSheet.absoluteFillObject}
-          maskElement={
-            <LinearGradient
-              colors={['transparent', 'transparent', 'black', 'black']}
-              locations={[0, blurGradientStart, blurGradientEnd, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
-          }>
-          <BlurView
-            intensity={blurIntensity}
-            tint={blurTint}
-            style={StyleSheet.absoluteFillObject}
-          />
-        </MaskedView>
-        {showGradientOverlay && gradientColors && (
-          <LinearGradient
-            colors={['transparent', opacity(gradientColors?.['300'], gradientOverlayOpacity)]}
-            locations={[blurGradientStart, blurGradientEnd]}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-        )}
-        <LinearGradient
-          colors={['transparent', opacity(primaryColor950, gradientOverlayOpacity)]}
-          locations={[blurGradientStart, blurGradientEnd]}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
-      </>
-    );
-  };
-
-  // Render gradient overlays for non-blur modes
-  const renderSimpleGradientOverlay = () => {
-    if (blurMode !== 'none' || !showGradientOverlay) return null;
-
-    return (
-      <>
-        {gradientColors && (
-          <LinearGradient
-            colors={['transparent', opacity(gradientColors?.['300'], gradientOverlayOpacity)]}
-            locations={[blurGradientStart, blurGradientEnd]}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-        )}
-        <LinearGradient
-          colors={['transparent', opacity(primaryColor950, gradientOverlayOpacity)]}
-          locations={[blurGradientStart, blurGradientEnd]}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
-      </>
-    );
-  };
-
-  return (
-    <View style={[styles.container, style]}>
-      {/* Animated background image or solid color */}
-      <AnimatedSpriteBackground backgroundColor={primaryColor900} />
-
-      {/* Fixed blur overlays */}
-      {renderFixedBlurOverlay()}
-      {renderFullBlurOverlay()}
-      {renderGradientBlurOverlay()}
-      {renderSimpleGradientOverlay()}
-
-      {/* Content */}
-      <View style={styles.content}>{children}</View>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -255,13 +35,11 @@ const styles = StyleSheet.create({
   },
 });
 
-export const BackgroundView = memo(BackgroundViewComponent);
-
 // ============================================================================
 // ScrollableGradientOverlay - Place inside ScrollView for scroll-synced blur
 // ============================================================================
 
-export interface ScrollableGradientOverlayProps {
+interface ScrollableGradientOverlayProps {
   /**
    * The total height of the scroll content
    * Get this from ScrollView's onContentSizeChange callback
@@ -402,7 +180,7 @@ export const ScrollableGradientOverlay = memo(ScrollableGradientOverlayComponent
 // AnimatedBackgroundView - Layout-level background with animated blur transitions
 // ============================================================================
 
-export interface AnimatedBackgroundViewProps {
+interface AnimatedBackgroundViewProps {
   children?: ReactNode;
   /**
    * Blur tint style
@@ -515,5 +293,3 @@ function AnimatedBackgroundViewComponent({
 }
 
 export const AnimatedBackgroundView = memo(AnimatedBackgroundViewComponent);
-
-export default BackgroundView;

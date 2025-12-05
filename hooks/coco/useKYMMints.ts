@@ -22,7 +22,7 @@ export interface MintRecommendation {
 /**
  * KYM score data for a single mint
  */
-export interface KYMMintData {
+interface KYMMintData {
   score: number;
   recommendations: MintRecommendation[];
 }

@@ -10,12 +10,13 @@ import {
 import { SettingsAction } from './actions';
 import { Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
-export interface TermsAccepted {
+
+interface TermsAccepted {
   termsAccepted: boolean;
   date: string;
 }
 
-export interface Settings {
+interface Settings {
   lang: string;
   theme: string;
   display_btc: number;
@@ -25,7 +26,7 @@ export interface Settings {
   termsAccepted: TermsAccepted | null;
 }
 
-export interface SettingsState {
+interface SettingsState {
   settings: Settings;
 }
 

@@ -54,7 +54,7 @@ import { supportsBlur } from 'helper/version';
  * @interface VStackProps
  * @extends ViewProps
  */
-export type VStackProps = ViewProps & {
+type VStackProps = ViewProps & {
   /** Spacing between child components (deprecated, use gap) */
   spacing?: number;
   /** Gap between child components (preferred over spacing) */

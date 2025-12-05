@@ -3,7 +3,9 @@ import { ScrollView } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { Spacer } from 'components/ui/View/Spacer';
 import { useTheme } from '@/providers/ThemeProvider';
 import { LegendList } from '@legendapp/list';
 

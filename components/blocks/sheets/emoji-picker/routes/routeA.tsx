@@ -22,7 +22,10 @@
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
-import { Spacer, View, HStack, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';

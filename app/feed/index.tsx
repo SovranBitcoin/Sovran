@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { FlashList } from '@shopify/flash-list';
 import PagerView from 'react-native-pager-view';
 import { Post } from 'components/blocks/feed';
-import { View, VStack } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { Tabs } from 'components/ui/Tabs';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useLocalSearchParams } from 'expo-router';
@@ -33,7 +33,6 @@ const Feed = ({ filters }: { filters: any }) => {
 
 const TabTwoScreen = () => {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
-  const { getPrimaryColor } = useTheme();
   const pagerRef = useRef(null);
   const [selectedTab, setSelectedTab] = useState('Feed');
   const tabs = useMemo(() => ['Feed'], []);

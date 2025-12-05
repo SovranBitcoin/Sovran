@@ -1,7 +1,10 @@
 import React from 'react';
 import { ViewStyle } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';

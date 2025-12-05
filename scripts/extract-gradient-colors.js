@@ -304,4 +304,4 @@ async function main() {
 
 main().catch(console.error);
 
-module.exports = { extractGradientColors, getHSB, formatGradientCSS };
+module.exports = { extractGradientColors };

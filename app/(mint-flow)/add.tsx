@@ -21,10 +21,12 @@ import {
 import { useSharedValue } from 'react-native-reanimated';
 import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { View, VStack, HStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { useMintManagement, useAuditedMints } from 'hooks/coco';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { useNostrDiscoveredMints } from 'hooks/coco/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from 'hooks/coco/useSovranDiscoveredMints';
@@ -46,7 +48,8 @@ import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurr
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { AuditedMintData } from 'hooks/coco/useAuditedMints';
+import { useAuditedMints, type AuditedMintData } from 'hooks/coco/useAuditedMints';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;

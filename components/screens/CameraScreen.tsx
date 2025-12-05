@@ -14,7 +14,8 @@ import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { popup } from '@/helper/popup';
 import Icon from 'assets/icons';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +27,7 @@ export interface ScanningData {
   type?: string;
 }
 
-export interface CameraScreenProps {
+interface CameraScreenProps {
   onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number }>;
   onReset?: () => void;
   showCustomCloseButton?: boolean;
@@ -78,11 +79,11 @@ export function CameraScreen({
       // For UR codes, allow processing even when isProcessingRef is true
       // to accumulate multiple parts
       const isUrCode = data.data.toLowerCase().startsWith('ur:');
-      
+
       if (appStateRef.current !== 'active' || !isFocused) {
         return;
       }
-      
+
       // For non-UR codes, skip if already processing
       if (!isUrCode && isProcessingRef.current) {
         return;
@@ -94,15 +95,21 @@ export function CameraScreen({
         const result = await onScan(data);
         // Only reset loading state if UR is not in progress
         // result may be undefined for older implementations
-        const urInProgress = result && typeof result === 'object' && 'urInProgress' in result 
-          ? result.urInProgress 
-          : false;
-        
+        const urInProgress =
+          result && typeof result === 'object' && 'urInProgress' in result
+            ? result.urInProgress
+            : false;
+
         // Update progress if available
-        if (result && typeof result === 'object' && 'progress' in result && typeof result.progress === 'number') {
+        if (
+          result &&
+          typeof result === 'object' &&
+          'progress' in result &&
+          typeof result.progress === 'number'
+        ) {
           setProgress(result.progress);
         }
-        
+
         if (!urInProgress) {
           setLoading(false);
           setProgress(0);

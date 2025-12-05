@@ -16,7 +16,7 @@ export class DataMigration {
    * This should be run once during the migration phase
    */
   async migrateFromRedux(): Promise<MigrationResult> {
-    const state = store.getState() as RootState;
+    const state = store.getState() as unknown as RootState;
     const cashuState = state.cashu;
 
     console.log('Starting Redux to Coco migration...');
@@ -175,7 +175,7 @@ export class DataMigration {
    * Check if migration is needed by comparing Redux state with Coco state
    */
   async isMigrationNeeded(): Promise<boolean> {
-    const state = store.getState() as RootState;
+    const state = store.getState() as unknown as RootState;
     const cashuState = state.cashu;
 
     // Check if there's any data in Redux that needs migration
@@ -200,14 +200,14 @@ export class DataMigration {
   }
 }
 
-export interface MigrationResult {
+interface MigrationResult {
   mintsMigrated: number;
   proofsMigrated: number;
   countersMigrated: number;
   errors: MigrationError[];
 }
 
-export interface MigrationError {
+interface MigrationError {
   type: string;
   message: string;
 }

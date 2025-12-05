@@ -64,7 +64,7 @@ function filterDistinctColors(colors, minDistance = 15) {
 /**
  * Extract dominant colors from an image
  * Returns array of hex colors sorted by visual prominence
- * 
+ *
  * Strategy: Extract many colors, then select a diverse set that:
  * 1. Covers the main hue ranges present in the image
  * 2. Includes both mid-tones and accent colors
@@ -99,26 +99,27 @@ async function extractDominantColors(imagePath, options = {}) {
 
     // Filter out very dark (near black) and very light (near white) colors
     const filtered = colors.filter((c) => {
-      return c.lightness > 0.10 && c.lightness < 0.80;
+      return c.lightness > 0.1 && c.lightness < 0.8;
     });
 
     // Score each color for selection
     // We want colors that are: prevalent, saturated, and mid-lightness
-    const scored = filtered.map(c => {
+    const scored = filtered.map((c) => {
       // Base score from prevalence (first colors are most common)
-      const prevalenceScore = 1 - (c.prevalence / extractCount);
-      
+      const prevalenceScore = 1 - c.prevalence / extractCount;
+
       // Saturation boost - highly saturated colors are accent colors we want
       let saturationBoost = 0;
-      if (c.saturation >= 0.8) saturationBoost = 0.4; // Very saturated accent
+      if (c.saturation >= 0.8)
+        saturationBoost = 0.4; // Very saturated accent
       else if (c.saturation >= 0.5) saturationBoost = 0.25;
       else if (c.saturation >= 0.35) saturationBoost = 0.15;
-      
+
       // Lightness boost - prefer mid-tones (20-55% lightness)
       let lightnessBoost = 0;
-      if (c.lightness >= 0.20 && c.lightness <= 0.55) lightnessBoost = 0.2;
+      if (c.lightness >= 0.2 && c.lightness <= 0.55) lightnessBoost = 0.2;
       else if (c.lightness >= 0.15 && c.lightness <= 0.65) lightnessBoost = 0.1;
-      
+
       return {
         ...c,
         score: prevalenceScore + saturationBoost + lightnessBoost,
@@ -266,5 +267,4 @@ async function main() {
 
 main().catch(console.error);
 
-module.exports = { extractDominantColors, filterDistinctColors, colorDistance };
-
+module.exports = { extractDominantColors };

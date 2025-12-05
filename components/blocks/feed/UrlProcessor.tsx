@@ -1,8 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
-import { ImageContainer } from './ImageContainer';
-import { VideoScreen } from '../../ui/VideoPlayer';
 import { ExternalLink } from './ExternalLink';
+import { ImageContainer } from './ImageContainer';
+import { VideoScreen } from '@/components/ui/VideoPlayer';
 
 interface UrlProcessorProps {
   urls: string[];

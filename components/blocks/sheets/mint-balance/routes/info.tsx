@@ -31,9 +31,11 @@ import { Text } from 'components/ui/Text';
 import { AnimatedText } from 'components/ui/AnimatedText';
 import Wrapper from '../../wrapper';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { VStack, Spacer, HStack, View } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { npubToPubkey } from 'components/blocks/Transaction';
-import { useMintManagement } from 'hooks/coco';
 import { extractDomain } from '@/helper/url';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useKYMMint } from 'hooks/coco/useKYMMint';
@@ -47,6 +49,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import { getUsername } from '@/helper/username';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 // AnimatedAvatar component with badge pulse animation
 const AnimatedAvatar = ({

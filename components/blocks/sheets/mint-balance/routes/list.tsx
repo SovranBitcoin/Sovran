@@ -24,7 +24,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSheetRef, useSheetPayload } from 'react-native-actions-sheet';
-import { useMintManagement } from 'hooks/coco';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
@@ -37,7 +36,10 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { router as expoRouter } from 'expo-router';
 import { useSheetRouter } from 'react-native-actions-sheet/dist/src/hooks/use-router';
-import { View, HStack, VStack, Spacer } from 'components/ui/View';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Spacer } from 'components/ui/View/Spacer';
 import { getMintDisplayName, extractDomain } from 'helper/url';
 import _ from 'lodash';
 import { Mint } from 'coco-cashu-core';
@@ -49,6 +51,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface MintItemProps {
   mint: Mint & { amount?: number; unit?: string };

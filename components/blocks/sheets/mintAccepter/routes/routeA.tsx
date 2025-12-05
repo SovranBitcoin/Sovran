@@ -2,7 +2,7 @@ import React from 'react';
 
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { StyledText, Text } from 'components/ui/Text';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { RouteScreenProps, useSheetPayload, useSheetRef } from 'react-native-actions-sheet';
 import { useMintManagement } from 'hooks/coco/useMintManagement';

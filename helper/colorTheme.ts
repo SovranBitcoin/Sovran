@@ -135,22 +135,3 @@ export const colorThemes: Record<string, ReturnType<typeof vars>> = {};
 for (const [themeName, palette] of Object.entries(THEMES)) {
   colorThemes[themeName] = createThemeVars(themeName, palette as Record<number, string>);
 }
-
-/**
- * Get dominant color by scale (100-500)
- * @param scale - '100' | '200' | '300' | '400' | '500'
- * @returns CSS variable reference
- */
-export function getDominantColor(scale: '100' | '200' | '300' | '400' | '500'): string {
-  return `var(--color-dominant-${scale})`;
-}
-
-/**
- * Get gradient color by scale (100-300)
- * 100 = light, 200 = mid, 300 = dark
- * @param scale - '100' | '200' | '300'
- * @returns CSS variable reference
- */
-export function getGradientColor(scale: '100' | '200' | '300'): string {
-  return `var(--color-gradient-${scale})`;
-}

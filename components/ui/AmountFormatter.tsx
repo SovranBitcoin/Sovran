@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleProp, ViewStyle, Animated } from 'react-native';
 import { StyledText, Text } from 'components/ui/Text';
-import { View, HStack } from 'components/ui/View';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';

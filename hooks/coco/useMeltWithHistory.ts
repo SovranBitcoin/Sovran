@@ -68,7 +68,12 @@ export function useMeltWithHistory() {
       });
 
       // Set up listener for history:updated events (not 'once' - keep listening until we match)
-      const handler = ({ entry }: { mintUrl: string; entry: { type: string; quoteId?: string } }) => {
+      const handler = ({
+        entry,
+      }: {
+        mintUrl: string;
+        entry: { type: string; quoteId?: string };
+      }) => {
         if (entry.type === 'melt') {
           const meltEntry = entry as MeltHistoryEntry;
           capturedMeltEntries.push(meltEntry);
@@ -233,4 +238,3 @@ export function useMeltWithHistory() {
     reset,
   };
 }
-

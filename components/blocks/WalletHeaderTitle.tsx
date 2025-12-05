@@ -4,12 +4,13 @@ import { router } from 'expo-router';
 import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useMintManagement, useBalanceContext } from 'hooks/coco';
 import { Host, Button as SwiftUIButton, ContextMenu, HStack } from '@expo/ui/swift-ui';
 import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { getMintDisplayName } from 'helper/url';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { supportsLiquidGlass } from '@/helper/version';
+import { useBalanceContext } from 'coco-cashu-react';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface WalletHeaderTitleProps {
   /** Custom width (defaults to header width calculation) */
@@ -31,7 +32,7 @@ interface WalletHeaderTitleProps {
  * Can be used as a header title or standalone in other screens.
  */
 export default function WalletHeaderTitle({
-  width,
+  width: _width,
   unit = 'sat',
   requireBalance = false,
   onMintSelected,

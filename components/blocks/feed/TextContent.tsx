@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View } from 'components/ui/View';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import HighlightText from '@sanar/react-native-highlight-text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';

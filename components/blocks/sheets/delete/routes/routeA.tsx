@@ -23,11 +23,13 @@
 
 import { Button } from 'components/ui/Button';
 import { Card } from 'components/ui/Card';
-import { Spacer, View } from 'components/ui/View';
+import { Spacer } from 'components/ui/View/Spacer';
+import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import React from 'react';
 import { RouteScreenProps } from 'react-native-actions-sheet';
 import { useDispatch } from 'react-redux';
+import type { AppThunk } from 'redux/store/reducer';
 import { resetApp } from '@/redux/store';
 import * as Updates from 'expo-updates';
 
@@ -38,7 +40,7 @@ import * as Updates from 'expo-updates';
  * @param {RouteScreenProps<'delete-router', 'route-a'>} props
  * @returns {JSX.Element}
  */
-const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
+const RouteA = (_props: RouteScreenProps<'delete-router', 'route-a'>) => {
   const dispatch = useDispatch();
 
   /**
@@ -51,7 +53,7 @@ const RouteA = ({}: RouteScreenProps<'delete-router', 'route-a'>) => {
    * **Effects:** Complete app reset, data loss, app reload
    */
   const handleDeleteProfile = async () => {
-    await dispatch(resetApp());
+    await (dispatch as (thunk: AppThunk) => Promise<void>)(resetApp());
     await Updates.reloadAsync();
   };
 
