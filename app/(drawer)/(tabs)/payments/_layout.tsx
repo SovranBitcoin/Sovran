@@ -155,15 +155,16 @@ export default function PaymentsLayout() {
                 <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
               </Pressable>
             ),
-            // Always render headerRight to prevent layout shift when clearing
-            headerRight: () => (
-              <Pressable
-                onPress={isSearching ? handleClearSearch : undefined}
-                style={{ padding: 8, opacity: isSearching ? 1 : 0 }}
-                disabled={!isSearching}>
-                <IconSymbol name="xmark" size={20} color={iconColor} />
-              </Pressable>
-            ),
+            headerRight: () =>
+              isSearching ? (
+                <Pressable onPress={handleClearSearch} style={{ padding: 8 }}>
+                  <IconSymbol name="xmark" size={20} color={iconColor} />
+                </Pressable>
+              ) : (
+                <Pressable onPress={handleClearSearch} style={{ padding: 8 }}>
+                  <IconSymbol name="xmark" size={20} color={iconColor} />
+                </Pressable>
+              ),
           }}
         />
       </Stack>

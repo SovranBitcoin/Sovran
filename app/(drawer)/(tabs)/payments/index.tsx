@@ -1,14 +1,12 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult } from 'components/blocks/contacts';
-import { RecommendedUsers } from 'components/blocks/contacts/RecommendedUsers';
 import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Tabs } from 'components/ui/Tabs';
 import { Text } from 'components/ui/Text';
-import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { router } from 'expo-router';
 import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
@@ -17,7 +15,7 @@ import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { FlatList, Keyboard, Pressable, useWindowDimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonContainer } from 'react-native-skeleton-component';
@@ -27,14 +25,6 @@ import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
-
-// Memoized ContactItem to prevent unnecessary re-renders
-const RenderItem = React.memo(({ item }: { item: any }) => {
-  console.log(`[PERF] Rendering ContactItem for ${item.type}:${item.pubkey || item.mint?.mintUrl}`);
-  return <ContactItem item={item} />;
-});
-
-RenderItem.displayName = 'RenderItem';
 
 // Define proper types
 interface SearchResultData {
@@ -48,6 +38,34 @@ interface PlaceholderResult {
 }
 
 type DisplayResult = SearchResultData | PlaceholderResult;
+
+// Memoized ContactItem to prevent unnecessary re-renders
+const RenderItem = React.memo(({ item }: { item: any }) => {
+  return <ContactItem item={item} />;
+});
+
+RenderItem.displayName = 'RenderItem';
+
+// Memoized SearchResultItem to prevent unnecessary re-renders
+const SearchResultItem = React.memo(
+  ({
+    result,
+    loading,
+    onPress,
+  }: {
+    result: DisplayResult;
+    loading: boolean;
+    onPress: (result: DisplayResult) => void;
+  }) => {
+    const handlePress = useCallback(() => {
+      onPress(result);
+    }, [result, onPress]);
+
+    return <SearchResult loading={loading} result={result} onPress={handlePress} />;
+  }
+);
+
+SearchResultItem.displayName = 'SearchResultItem';
 
 // Default contacts that should always appear in Recent activity
 const DEFAULT_CONTACTS = [
@@ -120,11 +138,7 @@ const PaymentsContent = () => {
 
   // Extract unique pubkeys from DM events and create contact list
   const recentActivityContacts = useMemo(() => {
-    console.log('[PERF] Computing recentActivityContacts...');
-    const startTime = performance.now();
-
     if (!dmEvents || !nostrKeys?.pubkey) {
-      console.log('[PERF] No dmEvents or nostrKeys, returning empty array');
       return [];
     }
 
@@ -148,7 +162,7 @@ const PaymentsContent = () => {
     });
 
     // Convert map to array and sort by most recent
-    const result = Array.from(contactMap.entries())
+    return Array.from(contactMap.entries())
       .map(([pubkey, event]) => ({
         type: 'contact',
         pubkey,
@@ -156,12 +170,6 @@ const PaymentsContent = () => {
         timestamp: event.created_at || 0,
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
-
-    const endTime = performance.now();
-    console.log(
-      `[PERF] recentActivityContacts computed in ${endTime - startTime}ms, found ${result.length} contacts`
-    );
-    return result;
   }, [dmEvents, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
@@ -194,8 +202,6 @@ const PaymentsContent = () => {
 
       try {
         setIsDecrypting(true);
-        console.log('[PERF] Starting contact decryption...');
-        const startTime = performance.now();
 
         // Create a single signer instance to reuse
         const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
@@ -226,8 +232,7 @@ const PaymentsContent = () => {
             } else {
               decryptedResults.push(contact);
             }
-          } catch (error) {
-            console.warn(`Failed to decrypt message for contact ${contact.pubkey}:`, error);
+          } catch {
             decryptedResults.push({
               ...contact,
               dmEvent: {
@@ -238,11 +243,9 @@ const PaymentsContent = () => {
           }
         }
 
-        const endTime = performance.now();
-        console.log(`[PERF] Contact decryption completed in ${endTime - startTime}ms`);
         setDecryptedContacts(decryptedResults);
-      } catch (error) {
-        console.error('Error decrypting contacts:', error);
+      } catch (err) {
+        console.error('Error decrypting contacts:', err);
         setDecryptedContacts(contactsWithDefaults);
       } finally {
         setIsDecrypting(false);
@@ -314,11 +317,7 @@ const PaymentsContent = () => {
 
   // Build mints with most recent DM
   const mintsWithMetadata = useMemo(() => {
-    console.log('[PERF] Computing mintsWithMetadata...');
-    const startTime = performance.now();
-
     if (!dmEvents) {
-      console.log('[PERF] No dmEvents, returning empty array');
       return [];
     }
 
@@ -338,15 +337,15 @@ const PaymentsContent = () => {
       }
     });
 
-    const result = mintsWithInfo.map(({ mint, mintInfo }) => {
+    return mintsWithInfo.map(({ mint, mintInfo }) => {
       // Get pubkey from mint's nostr contact
       let mintPubkey = null;
       const nostrContact = mintInfo.contact?.find((contact: any) => contact.method === 'nostr');
       if (nostrContact?.info) {
         try {
           mintPubkey = npubToPubkey(nostrContact.info);
-        } catch (error) {
-          console.warn('Failed to decode nostr contact from mint:', error);
+        } catch {
+          // Failed to decode nostr contact from mint
         }
       }
 
@@ -359,12 +358,6 @@ const PaymentsContent = () => {
         timestamp: mintPubkey ? dmMap.get(mintPubkey)?.created_at || 0 : 0,
       };
     });
-
-    const endTime = performance.now();
-    console.log(
-      `[PERF] mintsWithMetadata computed in ${endTime - startTime}ms, found ${result.length} mints`
-    );
-    return result;
   }, [mintsWithInfo, dmEvents, nostrKeys?.pubkey]);
 
   // Decrypt DM events for mints
@@ -377,8 +370,6 @@ const PaymentsContent = () => {
 
       try {
         setIsDecryptingMints(true);
-        console.log('[PERF] Starting mint decryption...');
-        const startTime = performance.now();
 
         // Create a single signer instance to reuse
         const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
@@ -403,8 +394,7 @@ const PaymentsContent = () => {
             } else {
               decryptedResults.push(mint);
             }
-          } catch (error) {
-            console.warn(`Failed to decrypt message for mint ${mint.mint?.mintUrl}:`, error);
+          } catch {
             decryptedResults.push({
               ...mint,
               dmEvent: {
@@ -415,8 +405,6 @@ const PaymentsContent = () => {
           }
         }
 
-        const endTime = performance.now();
-        console.log(`[PERF] Mint decryption completed in ${endTime - startTime}ms`);
         setDecryptedMints(decryptedResults);
       } catch (error) {
         console.error('Error decrypting mints:', error);
@@ -536,10 +524,10 @@ const PaymentsContent = () => {
     fetchRecommendedUsers();
   }, [fetchRecommendedUsers]);
 
-  // Generate placeholder results for the loading state
+  // Generate placeholder results for the loading state (reduced from 20 to 6 for performance)
   const placeholderResults = useMemo<PlaceholderResult[]>(
     () =>
-      Array(20)
+      Array(6)
         .fill(null)
         .map((_, index) => ({
           pubkey: `placeholder-${index}`,
@@ -592,19 +580,23 @@ const PaymentsContent = () => {
     [navigateToUserMessages]
   );
 
-  // Debug logging
-  console.log('PaymentsContent render:', {
-    decryptedContactsLength: decryptedContacts?.length || 0,
-    decryptedMintsLength: decryptedMints?.length || 0,
-    isDecrypting,
-    mintsLoadingInfo,
-    isDecryptingMints,
-    selectedTab,
-    searchQuery,
-    searchLoading,
-    searchResultsLength: searchResults.length,
-    isSearching,
-  });
+  // Memoized handler for search result press
+  const handleSearchResultPress = useCallback(
+    (result: DisplayResult) => {
+      if (!searchLoading && result.profile) {
+        navigateToUserMessages({
+          pubkey: result.pubkey,
+          profile: result.profile,
+        });
+      }
+    },
+    [searchLoading, navigateToUserMessages]
+  );
+
+  // Dismiss keyboard when tapping outside
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
   const onPageSelected = useCallback((event: any) => {
     const pageIndex = event.nativeEvent.position;
@@ -636,12 +628,6 @@ const PaymentsContent = () => {
     // Deduplicate pubkeys
     const uniquePubkeys = [...new Set(allPubkeys)];
 
-    console.log('[DEBUG payments.tsx] Requesting profiles for pubkeys:', uniquePubkeys.length);
-    console.log(
-      '[DEBUG payments.tsx] First 5 pubkeys:',
-      uniquePubkeys.slice(0, 5).map((p) => p.slice(0, 8))
-    );
-
     if (uniquePubkeys.length === 0) return null;
 
     return [
@@ -659,17 +645,6 @@ const PaymentsContent = () => {
   // Loading state for profiles: true until we receive EOSE
   const isLoadingProfiles = !profilesEose;
 
-  // DEBUG: Log raw profile events
-  console.log('[DEBUG payments.tsx] profileEvents count:', profileEvents?.length || 0);
-  console.log(
-    '[DEBUG payments.tsx] First 3 profile events:',
-    profileEvents?.slice(0, 3).map((e) => ({
-      pubkey: e.pubkey,
-      content: e.content,
-      kind: e.kind,
-    }))
-  );
-
   // Parse and map profile events to a more usable format
   const profilesMap = useMemo(() => {
     const map = new Map();
@@ -677,19 +652,10 @@ const PaymentsContent = () => {
       try {
         const profile = JSON.parse(event.content);
         map.set(event.pubkey, profile);
-        console.log(
-          `[DEBUG payments.tsx] Parsed profile for ${event.pubkey.slice(0, 8)}:`,
-          profile
-        );
-      } catch (error) {
-        console.warn(`Failed to parse profile for ${event.pubkey}:`, error);
+      } catch {
+        // Failed to parse profile
       }
     });
-    console.log('[DEBUG payments.tsx] profilesMap size:', map.size);
-    console.log(
-      '[DEBUG payments.tsx] profilesMap keys:',
-      Array.from(map.keys()).map((k) => k.slice(0, 8))
-    );
     return map;
   }, [profileEvents]);
 
@@ -733,55 +699,54 @@ const PaymentsContent = () => {
 
             {/* Search results overlay - positioned absolutely to avoid layout shifts */}
             {isSearching && (
-              <ScrollView
-                style={{ flex: 1, paddingHorizontal: 16 }}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="none"
-                contentInsetAdjustmentBehavior="automatic">
-                {/* Recommended Users */}
-                <RecommendedUsers
-                  users={recommendedUsers}
-                  onUserPress={handleRecommendedUserPress}
-                  loading={recommendedLoading}
-                  isSearching={searchLoading}
-                />
+              <Pressable style={{ flex: 1, paddingHorizontal: 16 }} onPress={dismissKeyboard}>
+                <FlatList
+                  data={showSearchResults ? displayResults : []}
+                  keyExtractor={(item) => item.pubkey}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  showsVerticalScrollIndicator={false}
+                  initialNumToRender={6}
+                  maxToRenderPerBatch={6}
+                  windowSize={5}
+                  removeClippedSubviews={true}
+                  ListHeaderComponent={
+                    <>
+                      {/* Recommended Users */}
+                      {/* <RecommendedUsers
+                        users={recommendedUsers}
+                        onUserPress={handleRecommendedUserPress}
+                        loading={recommendedLoading}
+                        isSearching={searchLoading}
+                      /> */}
 
-                {/* Search Results */}
-                {showSearchResults && (
-                  <View
-                    style={{
-                      flex: 1,
-                      borderRadius: 12,
-                      marginTop: 16,
-                    }}>
-                    <View className="mb-4">
-                      <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
-                        Search results
-                      </Text>
+                      {/* Search Results Header */}
+                      {showSearchResults && (
+                        <View
+                          style={{
+                            marginTop: 16,
+                            marginBottom: 12,
+                          }}>
+                          <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
+                            Search results
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  }
+                  renderItem={({ item }) => (
+                    <View style={{ marginBottom: 12 }}>
+                      <SearchResultItem
+                        result={item}
+                        loading={searchLoading}
+                        onPress={handleSearchResultPress}
+                      />
                     </View>
-                    <VStack spacing={12}>
-                      {displayResults.map((result) => (
-                        <SearchResult
-                          key={result.pubkey}
-                          loading={searchLoading}
-                          result={result}
-                          onPress={() => {
-                            if (!searchLoading && result.profile) {
-                              navigateToUserMessages({
-                                pubkey: result.pubkey,
-                                profile: result.profile,
-                              });
-                            }
-                          }}
-                        />
-                      ))}
-                    </VStack>
-                  </View>
-                )}
-
-                {/* No Results Found */}
-                {showNoResults && <NoResultsFound />}
-              </ScrollView>
+                  )}
+                  ListEmptyComponent={showNoResults ? <NoResultsFound /> : null}
+                  contentContainerStyle={{ paddingBottom: 24 }}
+                />
+              </Pressable>
             )}
 
             {/* Main content - PagerView for tabs - always rendered but hidden when searching */}

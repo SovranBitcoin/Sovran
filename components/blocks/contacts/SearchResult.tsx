@@ -20,7 +20,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   const { getGreenColor, getRedColor } = useTheme();
 
   return (
-    <View blur className="mx-4 flex-row items-center rounded-lg p-4">
+    <View blur className="flex-row items-center rounded-lg p-4">
       <TouchableOpacity onPress={onPress} disabled={loading || !result.profile}>
         <HStack spacing={8}>
           <ProfileImage loading={loading} profile={result.profile} />
