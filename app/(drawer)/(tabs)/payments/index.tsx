@@ -110,9 +110,9 @@ const PaymentsContent = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Recommended users state
-  const [recommendedUsers, setRecommendedUsers] = useState<UserProfile[]>([]);
-  const [recommendedLoading, setRecommendedLoading] = useState(false);
+  // Recommended users state (currently unused, kept for future RecommendedUsers component)
+  const [_recommendedUsers, setRecommendedUsers] = useState<UserProfile[]>([]);
+  const [_recommendedLoading, setRecommendedLoading] = useState(false);
 
   // Get all DM events for the current user (single subscription)
   const dmFilters = useMemo(() => {
@@ -570,7 +570,8 @@ const PaymentsContent = () => {
     []
   );
 
-  const handleRecommendedUserPress = useCallback(
+  // Handler for recommended user press (currently unused, kept for future RecommendedUsers component)
+  const _handleRecommendedUserPress = useCallback(
     (user: UserProfile) => {
       navigateToUserMessages({
         pubkey: user.pubkey,

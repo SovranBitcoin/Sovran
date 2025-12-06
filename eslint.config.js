@@ -33,6 +33,16 @@ module.exports = defineConfig([
           argsIgnorePattern: '^_',
         },
       ],
+      // Configure @typescript-eslint/no-unused-vars to also ignore underscore-prefixed variables
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+        },
+      ],
       // Disable import/no-unresolved since TypeScript handles this
       'import/no-unresolved': 'off',
     },

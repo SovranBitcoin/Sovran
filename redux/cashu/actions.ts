@@ -8,6 +8,3 @@ export const setSelectedMint = ({ profileId, mintUrl }: { profileId: number; min
     type: SET_SELECTED_MINT,
     payload: { profileId, mintUrl },
   }) as const;
-
-// DEPRECATED: These actions are no longer used with Coco migration
-// All other actions have been removed as they are now handled by Coco

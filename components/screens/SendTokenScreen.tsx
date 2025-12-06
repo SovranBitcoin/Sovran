@@ -65,7 +65,7 @@ export function SendTokenScreen({
   onNavigateBack,
   onNavigateToMessages,
 }: SendTokenScreenProps) {
-  const { receive } = useReceive();
+  const { receive: _receive } = useReceive();
   const { getMintInfo } = useMintManagement();
   const manager = useManager();
   const [, setUri] = useState('');

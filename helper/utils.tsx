@@ -17,35 +17,6 @@ import { twMerge } from 'tailwind-merge';
 import React from 'react';
 
 /**
- * Formats a number with appropriate suffixes (k, m, b) for large numbers
- *
- * This function converts large numbers into more readable format by adding
- * appropriate suffixes: 'k' for thousands, 'm' for millions, and 'b' for billions.
- * Numbers less than 1000 are returned as-is.
- *
- * @param num - The number to format (must be a positive number)
- * @returns A formatted string with appropriate suffix, removing trailing '.0' if present
- *
- * @example
- * formatNumber(1500) // '1.5k'
- * formatNumber(2500000) // '2.5m'
- * formatNumber(1000000000) // '1b'
- * formatNumber(500) // '500'
- * formatNumber(1000) // '1k' (removes trailing .0)
- */
-export function formatNumber(num: number): string {
-  if (num >= 1000000000) {
-    return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'b';
-  } else if (num >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'm';
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  } else {
-    return num.toString();
-  }
-}
-
-/**
  * Checks if a mint history entry has expired based on its payment request
  *
  * This function decodes the Lightning Network payment request from the history entry
