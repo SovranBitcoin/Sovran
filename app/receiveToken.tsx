@@ -18,7 +18,7 @@ function ModalScreen() {
       receiveHistoryEntry={receiveHistoryEntry}
       onNavigateBack={() => router.back()}
       onRedeemSuccess={() => {
-        router.dismissAll();
+        router.dismissTo('/');
       }}
     />
   );

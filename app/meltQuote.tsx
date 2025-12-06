@@ -27,10 +27,10 @@ function ModalScreen() {
       lnUrlOrAddress={lnUrlOrAddress}
       amount={amount ? parseInt(amount, 10) : undefined}
       onCancel={() => {
-        router.dismissAll();
+        router.dismissTo('/');
       }}
       onSendSuccess={() => {
-        router.dismissAll();
+        router.dismissTo('/');
       }}
     />
   );

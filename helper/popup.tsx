@@ -117,6 +117,11 @@ type MessageConfig = {
  * @constant {Record<string, MessageConfig>}
  */
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
+  funds_sent: {
+    title: 'Funds Sent',
+    text: 'Funds have been sent successfully.',
+    type: MESSAGE_TYPES.SUCCESS,
+  },
   ecash_token_shared_via_nfc: {
     title: 'Ecash Token Shared via NFC',
     text: 'Ecash token has been shared via NFC.',
