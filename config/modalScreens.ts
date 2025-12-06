@@ -184,6 +184,18 @@ export const MODAL_SCREENS: ModalConfig[] = [
     title: 'P2PK Keys',
   },
   {
+    name: 'settings-pages/recovery',
+    title: 'Recover Wallet',
+    options: {
+      presentation: 'modal',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackButtonDisplayMode: 'minimal',
+      gestureDirection: 'vertical',
+    },
+  },
+  {
     name: 'sendToken',
     title: 'Send Ecash',
     options: {

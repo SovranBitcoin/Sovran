@@ -39,7 +39,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefr
         <VStack>
           <Text heavy size={16}>
             {historyEntry.type === 'send'
-              ? 'state' in historyEntry && historyEntry.state === 'completed'
+              ? 'state' in historyEntry && historyEntry.state === 'finalized'
                 ? 'Sent with'
                 : 'Sending with'
               : historyEntry.type === 'receive'

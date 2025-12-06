@@ -16,7 +16,7 @@ import { Text } from 'components/ui/Text';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { getEncodedTokenV4, GetInfoResponse } from '@cashu/cashu-ts';
 import { useReceive, useManager } from 'coco-cashu-react';
-import type { PendingSendOperation, SendHistoryEntry } from 'coco-cashu-core';
+import type { SendHistoryEntry } from 'coco-cashu-core';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -152,7 +152,7 @@ export function SendTokenScreen({
         return;
       }
 
-      if (operation.state === 'completed') {
+      if (operation.state === 'finalized') {
         popup({
           message: 'Token was already redeemed by recipient',
           type: 'success',
@@ -179,11 +179,11 @@ export function SendTokenScreen({
       }
 
       // Check the operation status with the mint (this will finalize if proofs are spent)
-      await manager.sendOperationService.checkPendingOperation(operation as PendingSendOperation);
+      await manager.send.checkPendingOperation(currentTransaction.operationId);
 
       // Re-fetch to see if state changed
       const updatedOperation = await manager.send.getOperation(currentTransaction.operationId);
-      if (updatedOperation?.state === 'completed') {
+      if (updatedOperation?.state === 'finalized') {
         popup({
           message: 'Token was redeemed by recipient',
           type: 'success',
@@ -228,9 +228,9 @@ export function SendTokenScreen({
     });
   };
 
-  // SendHistoryEntry has a state field: 'prepared' | 'pending' | 'completed' | 'rolledBack'
-  // The transaction is "paid/completed" when state is 'completed'
-  const isPaid = currentTransaction.state === 'completed';
+  // SendHistoryEntry has a state field: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
+  // The transaction is "paid/completed" when state is 'finalized'
+  const isPaid = currentTransaction.state === 'finalized';
 
   const bottomButtons = (
     <BottomButtons>
@@ -338,7 +338,7 @@ export function SendTokenScreen({
               value: (
                 <HStack align="center">
                   <Text className="text-primary-0" size={16} overpass bold>
-                    {currentTransaction.state === 'completed'
+                    {currentTransaction.state === 'finalized'
                       ? 'Completed'
                       : currentTransaction.state === 'rolledBack'
                         ? 'Rolled Back'

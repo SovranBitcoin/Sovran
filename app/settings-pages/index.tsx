@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Linking } from 'react-native';
+import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Avatar } from 'components/ui/Avatar';
@@ -19,6 +19,7 @@ import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getUsername } from '@/helper/username';
+import { CocoManager } from 'helper/coco/manager';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -163,6 +164,14 @@ export const RowButton: React.FC<{
 const ModalScreen = () => {
   const { getPrimaryColor } = useTheme();
 
+  const handleExportDatabase = async () => {
+    try {
+      await CocoManager.exportDatabase();
+    } catch (error) {
+      Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
   return (
     <Container>
       <ScrollView className="px-4">
@@ -191,6 +200,15 @@ const ModalScreen = () => {
           <RowButton label="Passcode" href="/settings-pages/passcode" isFirst />
           <RowButton label="P2PK Keys" href="/settings-pages/keyring" isLast />
         </Section>
+
+        <Section title="Recovery">
+          <RowButton label="Recover Wallet" href="/settings-pages/recovery" isFirst isLast />
+        </Section>
+
+        <Section title="Developer">
+          <RowButton label="Export Database" onPress={handleExportDatabase} isFirst isLast />
+        </Section>
+
         <Section title="Danger Zone" isDanger>
           <RowButton
             label="Delete Account"

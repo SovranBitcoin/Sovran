@@ -9,6 +9,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
+import * as Sharing from 'expo-sharing';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -432,6 +433,53 @@ export class CocoManager {
       console.log('CocoManager complete reset finished');
     } catch (error) {
       console.error('Failed to complete reset CocoManager:', error);
+      throw error;
+    }
+  }
+
+  static async exportDatabase(): Promise<string> {
+    const dbName = 'coco.db';
+    const dbDirectory = FileSystem.documentDirectory;
+    const dbPath = `${dbDirectory}SQLite/${dbName}`;
+
+    // Copy to a shareable location
+    const exportPath = `${dbDirectory}coco-export.db`;
+
+    // Also copy WAL file if it exists (contains uncommitted transactions)
+    const walPath = `${dbPath}-wal`;
+
+    try {
+      await FileSystem.copyAsync({
+        from: dbPath,
+        to: exportPath,
+      });
+
+      // Try to copy WAL file too
+      try {
+        const walInfo = await FileSystem.getInfoAsync(walPath);
+        if (walInfo.exists) {
+          await FileSystem.copyAsync({
+            from: walPath,
+            to: `${exportPath}-wal`,
+          });
+        }
+      } catch {
+        // WAL might not exist, that's okay
+      }
+
+      console.log('Database exported to:', exportPath);
+
+      // Share the file
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(exportPath, {
+          mimeType: 'application/x-sqlite3',
+          dialogTitle: 'Export Coco Database',
+        });
+      }
+
+      return exportPath;
+    } catch (error) {
+      console.error('Failed to export database:', error);
       throw error;
     }
   }

@@ -25,13 +25,13 @@ interface HistoryEntryTimelineProps {
 const MINT_STATES = [MintQuoteState.UNPAID, MintQuoteState.PAID, MintQuoteState.ISSUED] as const;
 const MELT_STATES = [MeltQuoteState.UNPAID, MeltQuoteState.PENDING, MeltQuoteState.PAID] as const;
 
-// Send states from coco: 'prepared' | 'pending' | 'completed' | 'rolledBack'
+// Send states from coco: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
 // For timeline display, we show: PREPARED → PENDING → COMPLETED (or ROLLED_BACK as terminal)
-const SEND_STATES = ['prepared', 'pending', 'completed'] as const;
+const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
 const SEND_STATE_LABELS: Record<string, string> = {
   prepared: 'PREPARED',
   pending: 'PENDING',
-  completed: 'COMPLETED',
+  finalized: 'FINALIZED',
   rolledBack: 'ROLLED BACK',
 };
 
