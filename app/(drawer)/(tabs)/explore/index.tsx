@@ -622,24 +622,24 @@ const LightningAddressCard = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
 
   const currentAddress = nostrKeys?.npub
-    ? `${truncateMiddle(nostrKeys.npub, 6)}@npubx.cash`
+    ? `${truncateMiddle(nostrKeys.npub, 5)}@npubx.cash`
     : 'npub...@npubx.cash';
 
   const handlePress = useCallback(() => {
     router.push('/claimUsername');
   }, []);
 
-  // Theme-based accent color
-  const accentColor = getPrimaryColor('400');
+  // Gold accent color for premium/custom names
+  const accentColor = '#f59e0b';
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={[styles.lightningAddressCard, { borderColor: opacity(getPrimaryColor('500'), 0.3) }]}
+      style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}
       onPress={handlePress}>
-      {/* Gradient background using theme colors */}
+      {/* Gradient background with gold accent */}
       <LinearGradient
-        colors={[getPrimaryColor('900'), getPrimaryColor('800'), getPrimaryColor('900')]}
+        colors={[getPrimaryColor('900'), opacity(accentColor, 0.1), getPrimaryColor('900')]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
@@ -664,7 +664,7 @@ const LightningAddressCard = () => {
             <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
               Claim Your Address
             </Text>
-            <Text size={12} style={{ color: getPrimaryColor('400') }}>
+            <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
               Get a memorable Lightning URL
             </Text>
           </VStack>
@@ -686,16 +686,12 @@ const LightningAddressCard = () => {
         <VStack style={{ gap: 12 }}>
           {/* Current address (before) */}
           <VStack>
-            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
+            <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
               YOUR CURRENT ADDRESS
             </Text>
-            <View
-              style={[styles.addressBox, { borderColor: opacity(getPrimaryColor('500'), 0.2) }]}>
+            <View style={[styles.addressBox, { borderColor: opacity(accentColor, 0.2) }]}>
               <Icon name="mdi:close-circle" size={16} color="#ef4444" style={{ marginRight: 8 }} />
-              <Text
-                size={13}
-                style={{ color: getPrimaryColor('400'), fontFamily: 'monospace' }}
-                numberOfLines={1}>
+              <Text size={13} mono style={{ color: opacity(accentColor, 0.7) }} numberOfLines={1}>
                 {currentAddress}
               </Text>
             </View>
@@ -703,17 +699,21 @@ const LightningAddressCard = () => {
 
           {/* Arrow */}
           <HStack align="center" justify="center">
-            <View style={[styles.addressArrowLine, { backgroundColor: getPrimaryColor('700') }]} />
+            <View
+              style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
+            />
             <View
               style={[styles.addressArrowIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
               <Icon name="mdi:arrow-down" size={16} color={accentColor} />
             </View>
-            <View style={[styles.addressArrowLine, { backgroundColor: getPrimaryColor('700') }]} />
+            <View
+              style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
+            />
           </HStack>
 
           {/* Custom address (after) */}
           <VStack>
-            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
+            <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
               YOUR CUSTOM ADDRESS
             </Text>
             <View
@@ -725,13 +725,10 @@ const LightningAddressCard = () => {
                 },
               ]}>
               <Icon name="mdi:check-circle" size={16} color="#22c55e" style={{ marginRight: 8 }} />
-              <Text
-                size={14}
-                heavy
-                style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
+              <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
                 satoshi
               </Text>
-              <Text size={14} style={{ color: getPrimaryColor('400'), fontFamily: 'monospace' }}>
+              <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
                 @npubx.cash
               </Text>
             </View>
@@ -741,27 +738,27 @@ const LightningAddressCard = () => {
         {/* Benefits */}
         <HStack style={{ marginTop: 16, gap: 16 }}>
           <HStack align="center">
-            <Icon name="mdi:share-variant" size={14} color={getPrimaryColor('500')} />
-            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+            <Icon name="mdi:share-variant" size={14} color={opacity(accentColor, 0.6)} />
+            <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
               Easy to share
             </Text>
           </HStack>
           <HStack align="center">
-            <Icon name="mdi:qrcode" size={14} color={getPrimaryColor('500')} />
-            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+            <Icon name="mdi:qrcode" size={14} color={opacity(accentColor, 0.6)} />
+            <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
               Scannable QR
             </Text>
           </HStack>
           <HStack align="center">
-            <Icon name="mdi:account-check" size={14} color={getPrimaryColor('500')} />
-            <Text size={11} style={{ color: getPrimaryColor('500'), marginLeft: 4 }}>
+            <Icon name="mdi:account-check" size={14} color={opacity(accentColor, 0.6)} />
+            <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
               Memorable
             </Text>
           </HStack>
         </HStack>
 
         {/* CTA Button */}
-        <View style={[styles.lightningAddressCTA, { backgroundColor: getPrimaryColor('500') }]}>
+        <View style={[styles.lightningAddressCTA, { backgroundColor: accentColor }]}>
           <Text size={14} heavy style={{ color: '#fff' }}>
             Get Your Username
           </Text>
@@ -811,16 +808,17 @@ const PendingEcashCard = () => {
     return null;
   }
 
-  const accentColor = '#f59e0b'; // Amber/orange for pending state
+  // Theme-based accent color for matte black style
+  const accentColor = getPrimaryColor('400');
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={[styles.pendingEcashCard, { borderColor: opacity(accentColor, 0.3) }]}
+      style={[styles.pendingEcashCard, { borderColor: opacity(getPrimaryColor('500'), 0.3) }]}
       onPress={handlePress}>
-      {/* Gradient background */}
+      {/* Matte black gradient background */}
       <LinearGradient
-        colors={[getPrimaryColor('900'), opacity(accentColor, 0.1), getPrimaryColor('900')]}
+        colors={[getPrimaryColor('900'), getPrimaryColor('800'), getPrimaryColor('900')]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
@@ -906,7 +904,7 @@ const PendingEcashCard = () => {
         )}
 
         {/* CTA */}
-        <View style={[styles.pendingEcashCTA, { backgroundColor: accentColor }]}>
+        <View style={[styles.pendingEcashCTA, { backgroundColor: getPrimaryColor('500') }]}>
           <Text size={14} heavy style={{ color: '#fff' }}>
             View & Reclaim
           </Text>
@@ -1365,6 +1363,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
+    overflow: 'hidden',
   },
   addressArrowLine: {
     flex: 1,
