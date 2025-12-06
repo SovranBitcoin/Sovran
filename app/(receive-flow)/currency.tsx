@@ -42,7 +42,7 @@ function ModalScreen() {
       <CurrencyScreen
         params={params}
         onMintQuoteCreated={(mintHistoryEntry) => {
-          router.push({
+          router.replace({
             pathname: '/mintQuote',
             params: {
               mintHistoryEntry: JSON.stringify(mintHistoryEntry),

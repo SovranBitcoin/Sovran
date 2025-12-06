@@ -58,7 +58,7 @@ function ModalScreen() {
           });
         }}
         onSendTokenCreated={(sendHistoryEntry) => {
-          router.navigate({
+          router.replace({
             pathname: '/sendToken',
             params: {
               sendHistoryEntry: JSON.stringify(sendHistoryEntry),
