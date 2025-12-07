@@ -528,11 +528,13 @@ const getMintDisplayName = (
 function MintInfoModal() {
   const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
   const insets = useSafeAreaInsets();
-  const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
-  const { getMintInfo } = useMintManagement();
+  const { mintUrl, fromScan } = useLocalSearchParams<{ mintUrl: string; fromScan?: string }>();
+  const { getMintInfo, isKnownMint, addMint, isLoading: mintManagementLoading } = useMintManagement();
 
   const [mintInfo, setMintInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isKnownMintState, setIsKnownMintState] = useState<boolean | null>(null);
+  const [addingMint, setAddingMint] = useState(false);
 
   const {
     auditInfo,
@@ -594,6 +596,40 @@ function MintInfoModal() {
     };
     fetchMintInfo();
   }, [mintUrl, getMintInfo]);
+
+  // Check if mint is already known/trusted
+  useEffect(() => {
+    const checkIfKnown = async () => {
+      if (!mintUrl) {
+        setIsKnownMintState(null);
+        return;
+      }
+      try {
+        const known = await isKnownMint(mintUrl);
+        setIsKnownMintState(known);
+      } catch {
+        // Treat errors as mint not being known
+        setIsKnownMintState(false);
+      }
+    };
+    checkIfKnown();
+  }, [mintUrl, isKnownMint]);
+
+  // Handler to add mint
+  const handleAddMint = useCallback(async () => {
+    if (!mintUrl) return;
+    setAddingMint(true);
+    try {
+      await addMint(mintUrl);
+      Alert.alert('Success', 'Mint added successfully', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add mint');
+    } finally {
+      setAddingMint(false);
+    }
+  }, [mintUrl, addMint]);
 
   const isLoading = loading || auditLoading;
 
@@ -747,15 +783,33 @@ function MintInfoModal() {
 
       <BottomButtons>
         <ButtonHandler
-          buttons={[
-            {
-              text: 'Close',
-              variant: 'secondary',
-              onPress: async () => {
-                router.back();
-              },
-            },
-          ]}
+          buttons={
+            mintUrl && (fromScan === '1' || isKnownMintState === false)
+              ? [
+                  {
+                    text: 'Close',
+                    variant: 'secondary',
+                    onPress: async () => {
+                      router.back();
+                    },
+                  },
+                  {
+                    text: addingMint ? 'Adding...' : 'Add mint',
+                    variant: 'primary',
+                    disabled: addingMint || mintManagementLoading,
+                    onPress: handleAddMint,
+                  },
+                ]
+              : [
+                  {
+                    text: 'Close',
+                    variant: 'secondary',
+                    onPress: async () => {
+                      router.back();
+                    },
+                  },
+                ]
+          }
         />
       </BottomButtons>
     </View>

@@ -173,6 +173,19 @@ export const useProcessPaymentString = ({
           });
           return { urInProgress: false };
         }
+
+        // Handle HTTP/HTTPS URLs - navigate to mint info screen
+        const trimmedUrl = scanning.data.trim();
+        if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+          router.navigate({
+            pathname: '/(mint-flow)/info' as any,
+            params: {
+              mintUrl: trimmedUrl,
+              fromScan: '1',
+            },
+          });
+          return { urInProgress: false };
+        }
       }
 
       return { urInProgress: false };
