@@ -196,7 +196,7 @@ const ModalScreen = () => {
           />
         </Section>
         <Section title="Security">
-          <RowButton label="Passcode" href="/settings-pages/passcode" isFirst />
+          {/* <RowButton label="Passcode" href="/settings-pages/passcode" isFirst /> */}
           <RowButton label="P2PK Keys" href="/settings-pages/keyring" isLast />
         </Section>
 
