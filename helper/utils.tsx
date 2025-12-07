@@ -53,6 +53,44 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
 }
 
 /**
+ * Gets the time remaining until a mint history entry expires
+ *
+ * @param historyEntry - The mint history entry containing the payment request
+ * @returns Formatted string like "expires in 14m 32s" or null if no expiry or already expired
+ */
+export function getMintHistoryEntryTimeUntilExpiry(historyEntry: MintHistoryEntry): string | null {
+  try {
+    if (!historyEntry.paymentRequest) {
+      return null;
+    }
+    const paymentRequest = decode(historyEntry.paymentRequest);
+
+    const expiry = paymentRequest.expiry ?? 3600;
+    const timestamp = _.find(paymentRequest.sections, { name: 'timestamp' })?.value ?? 0;
+    const expiryTime = (timestamp + expiry) * 1000;
+
+    const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);
+
+    if (timeLeft <= 0) return null;
+
+    const hours = Math.floor(timeLeft / 3600);
+    const minutes = Math.floor((timeLeft % 3600) / 60);
+    const seconds = timeLeft % 60;
+
+    if (hours > 0) {
+      return `expires in ${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `expires in ${minutes}m ${seconds}s`;
+    } else {
+      return `expires in ${seconds}s`;
+    }
+  } catch (error) {
+    console.error('Error calculating expiry time:', error);
+    return null;
+  }
+}
+
+/**
  * Checks if a melt quote has expired based on its expiry timestamp
  *
  * This function checks if the current time exceeds the melt quote's expiry time.

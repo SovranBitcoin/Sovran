@@ -3,9 +3,10 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { convertTime } from 'helper/time';
+import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Icon from 'assets/icons';
 import type {
   HistoryEntry,
   MintHistoryEntry,
@@ -13,8 +14,9 @@ import type {
   SendHistoryEntry,
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
-import { mintHistoryEntryExpired } from 'helper/utils';
+import { mintHistoryEntryExpired, getMintHistoryEntryTimeUntilExpiry } from 'helper/utils';
 import { MintQuoteState, MeltQuoteState, MeltQuoteResponse } from '@cashu/cashu-ts';
+import opacity from 'hex-color-opacity';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
@@ -26,30 +28,218 @@ const MINT_STATES = [MintQuoteState.UNPAID, MintQuoteState.PAID, MintQuoteState.
 const MELT_STATES = [MeltQuoteState.UNPAID, MeltQuoteState.PENDING, MeltQuoteState.PAID] as const;
 
 // Send states from coco: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
-// For timeline display, we show: PREPARED → PENDING → COMPLETED (or ROLLED_BACK as terminal)
 const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
 const SEND_STATE_LABELS: Record<string, string> = {
-  prepared: 'PREPARED',
-  pending: 'PENDING',
-  finalized: 'FINALIZED',
-  rolledBack: 'ROLLED BACK',
+  prepared: 'Prepared',
+  pending: 'Pending',
+  finalized: 'Finalized',
+  rolledBack: 'Rolled Back',
 };
 
 // Receive states: pending (in memory, not yet redeemed) → redeemed (claimed to wallet)
 const RECEIVE_STATES = ['pending', 'redeemed'] as const;
 const RECEIVE_STATE_LABELS: Record<string, string> = {
-  pending: 'PENDING',
-  redeemed: 'REDEEMED',
+  pending: 'Pending',
+  redeemed: 'Redeemed',
 };
 
-const EXPIRED_STATE = 'EXPIRED';
+// Mint/Melt state display labels
+const MINT_STATE_LABELS: Record<string, string> = {
+  [MintQuoteState.UNPAID]: 'Unpaid',
+  [MintQuoteState.PAID]: 'Paid',
+  [MintQuoteState.ISSUED]: 'Issued',
+};
+
+const MELT_STATE_LABELS: Record<string, string> = {
+  [MeltQuoteState.UNPAID]: 'Request processed',
+  [MeltQuoteState.PENDING]: 'Pending',
+  [MeltQuoteState.PAID]: 'Paid',
+};
+
+const EXPIRED_STATE = 'expired';
+
+// Timeline step types
+type TimelineStepType =
+  | 'complete'
+  | 'current'
+  | 'next-pending'
+  | 'future-small'
+  | 'expired'
+  | 'rolled-back'
+  | 'success';
 
 interface TimelineItem {
   state: string;
-  complete: boolean;
-  isCurrent: boolean;
+  displayLabel: string;
+  stepType: TimelineStepType;
   timestamp?: number;
+  info?: string;
 }
+
+// ============ Timeline Components ============
+
+interface TimelineDotProps {
+  stepType: TimelineStepType;
+  greenColor: string;
+  redColor: string;
+  orangeColor: string;
+  greyColor: string;
+}
+
+function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }: TimelineDotProps) {
+  const dotSize = 14;
+  const smallDotSize = 6;
+  const iconSize = 14;
+
+  // Future small dot
+  if (stepType === 'future-small') {
+    return (
+      <View
+        style={{
+          width: iconSize / 2,
+          height: iconSize / 2,
+          borderRadius: iconSize / 2,
+          backgroundColor: greyColor,
+          marginHorizontal: iconSize / 2,
+        }}
+      />
+    );
+  }
+
+  // Next pending with clock icon
+  if (stepType === 'next-pending') {
+    return (
+      <View
+        style={[
+          {
+            width: 20,
+            height: 20,
+            borderRadius: dotSize / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: greyColor,
+          },
+          // boxShadow && {
+          //   shadowColor: greenColor,
+          //   shadowOffset: { width: 0, height: 0 },
+          //   shadowOpacity: 0.5,
+          //   shadowRadius: 4,
+          //   elevation: 4,
+          // },
+        ]}>
+        <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.44)} size={iconSize} />
+      </View>
+    );
+  }
+
+  // Get background color and icon based on step type
+  let backgroundColor = greenColor;
+  let iconName = 'fluent:checkmark-16-filled';
+  let boxShadow = false;
+
+  switch (stepType) {
+    case 'complete':
+    case 'success':
+      backgroundColor = greenColor;
+      iconName = 'fluent:checkmark-16-filled';
+      break;
+    case 'current':
+      backgroundColor = greenColor;
+      iconName = 'fluent:checkmark-16-filled';
+      boxShadow = true;
+      break;
+    case 'expired':
+      backgroundColor = redColor;
+      iconName = 'material-symbols:close-rounded';
+      break;
+    case 'rolled-back':
+      backgroundColor = orangeColor;
+      iconName = 'ic:round-refresh';
+      break;
+  }
+
+  return (
+    <View
+      style={[
+        {
+          width: 20,
+          height: 20,
+          borderRadius: dotSize / 2,
+          backgroundColor,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        // boxShadow && {
+        //   shadowColor: greenColor,
+        //   shadowOffset: { width: 0, height: 0 },
+        //   shadowOpacity: 0.5,
+        //   shadowRadius: 4,
+        //   elevation: 4,
+        // },
+      ]}>
+      <Icon name={iconName} color="#FFFFFF" size={iconSize} />
+    </View>
+  );
+}
+
+interface TimelineLineProps {
+  lineType: 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
+  greenColor: string;
+  redColor: string;
+  orangeColor: string;
+  greyColor: string;
+}
+
+function TimelineLine({
+  lineType,
+  greenColor,
+  redColor,
+  orangeColor,
+  greyColor,
+}: TimelineLineProps) {
+  const lineWidth = 3;
+  const lineHeight = 50;
+
+  // Gradient lines for terminal states (using Rect with rounded corners for proper caps)
+  if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
+    const endColor = lineType === 'expired-gradient' ? redColor : orangeColor;
+    return (
+      <Svg width={lineWidth} height={lineHeight} style={{ marginVertical: 4 }}>
+        <Defs>
+          <LinearGradient id={`gradient-${lineType}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={greenColor} />
+            <Stop offset="100%" stopColor={endColor} />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x={0}
+          y={0}
+          width={lineWidth}
+          height={lineHeight}
+          rx={lineWidth / 2}
+          ry={lineWidth / 2}
+          fill={`url(#gradient-${lineType})`}
+        />
+      </Svg>
+    );
+  }
+
+  // Solid color lines
+  const color = lineType === 'complete' ? greenColor : greyColor;
+  return (
+    <View
+      style={{
+        width: lineWidth,
+        height: lineHeight,
+        backgroundColor: color,
+        borderRadius: lineWidth / 2,
+        marginVertical: 4,
+      }}
+    />
+  );
+}
+
+// ============ Helper Functions ============
 
 // Helper function to check if melt quote is expired
 const isMeltQuoteExpired = (meltQuote: MeltQuoteResponse, currentTime: number): boolean => {
@@ -58,13 +248,13 @@ const isMeltQuoteExpired = (meltQuote: MeltQuoteResponse, currentTime: number): 
   return now > meltQuote.expiry;
 };
 
-// Helper function to get time until expiry
-const getTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): string => {
+// Helper function to get time until expiry for melt quotes
+const getMeltQuoteTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): string => {
   if (!meltQuote.expiry) return '';
   const now = Math.floor(currentTime / 1000);
   const timeLeft = meltQuote.expiry - now;
 
-  if (timeLeft <= 0) return 'EXPIRED';
+  if (timeLeft <= 0) return '';
 
   const hours = Math.floor(timeLeft / 3600);
   const minutes = Math.floor((timeLeft % 3600) / 60);
@@ -79,22 +269,130 @@ const getTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): 
   }
 };
 
+// Get card label (e.g., "MINT • AWAITING PAYMENT")
+const getCardLabel = (historyEntry: HistoryEntry, timeline: TimelineItem[]): string => {
+  const isFailed = timeline.some(
+    (item) => item.stepType === 'expired' || item.stepType === 'rolled-back'
+  );
+
+  let status = '';
+
+  switch (historyEntry.type) {
+    case 'mint': {
+      const mintTx = historyEntry as MintHistoryEntry;
+      if (isFailed || timeline.some((item) => item.stepType === 'expired')) {
+        status = 'Failed';
+      } else if (mintTx.state === MintQuoteState.ISSUED) {
+        status = 'Complete';
+      } else if (mintTx.state === MintQuoteState.PAID) {
+        status = 'In Progress';
+      } else {
+        status = 'Awaiting Payment';
+      }
+      return `Mint • ${status}`;
+    }
+    case 'melt': {
+      const meltTx = historyEntry as MeltHistoryEntry;
+      if (isFailed || timeline.some((item) => item.stepType === 'expired')) {
+        status = 'Failed';
+      } else if (meltTx.state === MeltQuoteState.PAID) {
+        status = 'Complete';
+      } else if (meltTx.state === MeltQuoteState.PENDING) {
+        status = 'In Progress';
+      } else {
+        status = 'Ready to Pay';
+      }
+      return `Melt • ${status}`;
+    }
+    case 'send': {
+      const sendTx = historyEntry as SendHistoryEntry;
+      if (sendTx.state === 'rolledBack') {
+        status = 'Rolled Back';
+      } else if (sendTx.state === 'finalized') {
+        status = 'Complete';
+      } else if (sendTx.state === 'pending') {
+        status = 'In Progress';
+      } else {
+        status = 'Prepared';
+      }
+      return `Send • ${status}`;
+    }
+    case 'receive': {
+      const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
+      const txState = receiveTx.state || 'redeemed';
+      if (txState === 'redeemed') {
+        status = 'Complete';
+      } else {
+        status = 'Pending';
+      }
+      return `Receive • ${status}`;
+    }
+    default:
+      return 'Transaction';
+  }
+};
+
+// Get status header (uppercase current state)
+const getStatusHeader = (timeline: TimelineItem[]): string => {
+  const current = timeline.find(
+    (item) =>
+      item.stepType === 'current' ||
+      item.stepType === 'success' ||
+      item.stepType === 'expired' ||
+      item.stepType === 'rolled-back'
+  );
+  if (current) {
+    return current.displayLabel.toUpperCase();
+  }
+  return timeline[timeline.length - 1]?.displayLabel.toUpperCase() || '';
+};
+
+// Get status header color class
+type StatusColorType = 'default' | 'success' | 'error' | 'warning';
+
+const getStatusColorType = (timeline: TimelineItem[]): StatusColorType => {
+  const hasExpired = timeline.some((item) => item.stepType === 'expired');
+  const hasRolledBack = timeline.some((item) => item.stepType === 'rolled-back');
+  const hasSuccess = timeline.some((item) => item.stepType === 'success');
+
+  if (hasExpired) return 'error';
+  if (hasRolledBack) return 'warning';
+  if (hasSuccess) return 'success';
+  return 'default';
+};
+
+// ============ Main Component ============
+
 export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTimelineProps) {
   const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Colors
+  const greenColor = getGreenColor('300');
+  const redColor = getRedColor('300');
+  const orangeColor = '#fb923c'; // accent-orange from spec
+  const greyColor = getPrimaryColor('400');
+  const primaryWhite = getPrimaryColor('0');
+  const primaryGrey200 = getPrimaryColor('200');
+  const primaryGrey300 = getPrimaryColor('300');
 
   // Update time every second for real-time countdown
   useEffect(() => {
-    if (meltQuote && historyEntry.type === 'melt' && meltQuote.expiry) {
+    const shouldUpdate =
+      (historyEntry.type === 'melt' && meltQuote?.expiry) ||
+      (historyEntry.type === 'mint' &&
+        (historyEntry as MintHistoryEntry).state === MintQuoteState.UNPAID);
+
+    if (shouldUpdate) {
       const interval = setInterval(() => {
         setCurrentTime(Date.now());
       }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [meltQuote, historyEntry.type]);
+  }, [meltQuote, historyEntry]);
 
+  // Build timeline based on transaction type
   const getTimeline = (): TimelineItem[] => {
     switch (historyEntry.type) {
       case 'mint': {
@@ -105,46 +403,105 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
           return [
             {
               state: MintQuoteState.UNPAID,
-              complete: true,
-              isCurrent: false,
+              displayLabel: MINT_STATE_LABELS[MintQuoteState.UNPAID],
+              stepType: 'complete',
               timestamp: mintTx.createdAt,
             },
-            { state: EXPIRED_STATE, complete: true, isCurrent: true },
+            {
+              state: EXPIRED_STATE,
+              displayLabel: 'Expired',
+              stepType: 'expired',
+              info: 'Invoice expired without payment',
+            },
           ];
         }
 
         const currentIndex = MINT_STATES.indexOf(mintTx.state);
-        return MINT_STATES.map((state, index) => ({
-          state,
-          complete: index <= currentIndex,
-          isCurrent: index === currentIndex,
-          timestamp: index === 0 ? mintTx.createdAt : undefined,
-        }));
+        return MINT_STATES.map((state, index) => {
+          let stepType: TimelineStepType;
+          if (index < currentIndex) {
+            stepType = 'complete';
+          } else if (index === currentIndex) {
+            stepType = index === MINT_STATES.length - 1 ? 'success' : 'current';
+          } else if (index === currentIndex + 1) {
+            stepType = 'next-pending';
+          } else {
+            stepType = 'future-small';
+          }
+
+          let info: string | undefined;
+          if (stepType === 'current' && state === MintQuoteState.UNPAID) {
+            info = 'Waiting for Lightning payment';
+          } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
+            info = 'Minting tokens...';
+          } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
+            info = `+${mintTx.amount} sats received`;
+          }
+
+          return {
+            state,
+            displayLabel: MINT_STATE_LABELS[state],
+            stepType,
+            timestamp: index <= currentIndex ? mintTx.createdAt : undefined,
+            info,
+          };
+        });
       }
 
       case 'melt': {
         const meltTx = historyEntry as MeltHistoryEntry;
-        const isExpired = meltQuote && isMeltQuoteExpired(meltQuote, currentTime);
+        const isExpired =
+          meltQuote &&
+          meltTx.state === MeltQuoteState.UNPAID &&
+          isMeltQuoteExpired(meltQuote, currentTime);
 
         if (isExpired) {
           return [
             {
               state: MeltQuoteState.UNPAID,
-              complete: true,
-              isCurrent: false,
+              displayLabel: 'Unpaid',
+              stepType: 'complete',
               timestamp: meltTx.createdAt,
             },
-            { state: EXPIRED_STATE, complete: true, isCurrent: true },
+            {
+              state: EXPIRED_STATE,
+              displayLabel: 'Expired',
+              stepType: 'expired',
+              info: 'Quote expired',
+            },
           ];
         }
 
         const currentIndex = MELT_STATES.indexOf(meltTx.state);
-        return MELT_STATES.map((state, index) => ({
-          state,
-          complete: index <= currentIndex,
-          isCurrent: index === currentIndex,
-          timestamp: index === 0 ? meltTx.createdAt : undefined,
-        }));
+        return MELT_STATES.map((state, index) => {
+          let stepType: TimelineStepType;
+          if (index < currentIndex) {
+            stepType = 'complete';
+          } else if (index === currentIndex) {
+            stepType = index === MELT_STATES.length - 1 ? 'success' : 'current';
+          } else if (index === currentIndex + 1) {
+            stepType = 'next-pending';
+          } else {
+            stepType = 'future-small';
+          }
+
+          let info: string | undefined;
+          if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
+            info = 'Quote ready, awaiting execution';
+          } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
+            info = 'Pending blockchain confirmation';
+          } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
+            info = 'Invoice paid successfully';
+          }
+
+          return {
+            state,
+            displayLabel: MELT_STATE_LABELS[state],
+            stepType,
+            timestamp: index <= currentIndex ? meltTx.createdAt : undefined,
+            info,
+          };
+        });
       }
 
       case 'send': {
@@ -155,45 +512,85 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
         if (txState === 'rolledBack') {
           return [
             {
-              state: SEND_STATE_LABELS.prepared,
-              complete: true,
-              isCurrent: false,
+              state: 'prepared',
+              displayLabel: SEND_STATE_LABELS.prepared,
+              stepType: 'complete',
               timestamp: sendTx.createdAt,
             },
             {
-              state: SEND_STATE_LABELS.rolledBack,
-              complete: true,
-              isCurrent: true,
+              state: 'rolledBack',
+              displayLabel: SEND_STATE_LABELS.rolledBack,
+              stepType: 'rolled-back',
+              info: 'Token funds returned to your balance',
             },
           ];
         }
 
-        // Normal send progression: prepared → pending → completed
+        // Normal send progression: prepared → pending → finalized
         const currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
-        return SEND_STATES.map((state, index) => ({
-          state: SEND_STATE_LABELS[state],
-          complete: index <= currentIndex,
-          isCurrent: index === currentIndex,
-          timestamp: index === 0 ? sendTx.createdAt : undefined,
-        }));
+        return SEND_STATES.map((state, index) => {
+          let stepType: TimelineStepType;
+          if (index < currentIndex) {
+            stepType = 'complete';
+          } else if (index === currentIndex) {
+            stepType = index === SEND_STATES.length - 1 ? 'success' : 'current';
+          } else if (index === currentIndex + 1) {
+            stepType = 'next-pending';
+          } else {
+            stepType = 'future-small';
+          }
+
+          let info: string | undefined;
+          if (stepType === 'current' && state === 'prepared') {
+            info = 'Token created, ready to share';
+          } else if (stepType === 'current' && state === 'pending') {
+            info = 'Waiting for recipient to claim';
+          } else if (stepType === 'success' && state === 'finalized') {
+            info = 'Token claimed by recipient';
+          }
+
+          return {
+            state,
+            displayLabel: SEND_STATE_LABELS[state],
+            stepType,
+            timestamp: index <= currentIndex ? sendTx.createdAt : undefined,
+            info,
+          };
+        });
       }
 
       case 'receive': {
         const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
-        // Receive states: pending (not yet redeemed) → redeemed
-        // If state is not set, assume redeemed (for backward compatibility with existing history)
         const txState = receiveTx.state || 'redeemed';
 
         const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
-        // If state not found in RECEIVE_STATES, assume redeemed
         const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
 
-        return RECEIVE_STATES.map((state, index) => ({
-          state: RECEIVE_STATE_LABELS[state],
-          complete: index <= effectiveIndex,
-          isCurrent: index === effectiveIndex,
-          timestamp: index === 0 ? receiveTx.createdAt : undefined,
-        }));
+        return RECEIVE_STATES.map((state, index) => {
+          let stepType: TimelineStepType;
+          if (index < effectiveIndex) {
+            stepType = 'complete';
+          } else if (index === effectiveIndex) {
+            stepType = index === RECEIVE_STATES.length - 1 ? 'success' : 'current';
+          } else {
+            stepType = 'next-pending';
+          }
+
+          let info: string | undefined;
+          if (stepType === 'current' && state === 'pending') {
+            info = 'Ready to redeem token';
+          } else if (stepType === 'success' && state === 'redeemed') {
+            info = `+${receiveTx.amount} sats added to wallet`;
+          }
+
+          return {
+            state,
+            displayLabel: RECEIVE_STATE_LABELS[state],
+            stepType,
+            timestamp: index <= effectiveIndex ? receiveTx.createdAt : undefined,
+            info,
+          };
+        });
       }
 
       default:
@@ -202,129 +599,198 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
   };
 
   const timeline = getTimeline();
-  const currentState = timeline.find((item) => item.isCurrent)?.state || timeline[0].state;
+  const cardLabel = getCardLabel(historyEntry, timeline);
+  const statusHeader = getStatusHeader(timeline);
+  const statusColorType = getStatusColorType(timeline);
 
-  // Get expiry info for melt quotes
-  const getStateWithExpiry = () => {
-    if (meltQuote && historyEntry.type === 'melt') {
-      const expiryInfo = getTimeUntilExpiry(meltQuote, currentTime);
-      if (expiryInfo) {
-        return `${currentState} • ${expiryInfo}`;
+  // Get expiry info
+  const getExpiryBadge = (): string | null => {
+    if (historyEntry.type === 'melt' && meltQuote && !isMeltQuoteExpired(meltQuote, currentTime)) {
+      const expiryInfo = getMeltQuoteTimeUntilExpiry(meltQuote, currentTime);
+      if (expiryInfo) return expiryInfo;
+    }
+
+    if (historyEntry.type === 'mint') {
+      const mintTx = historyEntry as MintHistoryEntry;
+      if (mintTx.state === MintQuoteState.UNPAID && !mintHistoryEntryExpired(mintTx)) {
+        const expiryInfo = getMintHistoryEntryTimeUntilExpiry(mintTx);
+        if (expiryInfo) return expiryInfo;
       }
     }
-    return currentState;
+
+    return null;
   };
 
-  // Determine if we should show collapse/expand
-  const canCollapse =
-    timeline.length > 2 && timeline.every((item) => item.complete || !item.isCurrent);
-  const displayTimeline =
-    collapsed && canCollapse ? [timeline[0], timeline[timeline.length - 1]] : timeline;
+  const expiryBadge = getExpiryBadge();
 
-  const getBarColor = (item: TimelineItem) => {
-    // Red for expired or rolled back states
-    if (item.state === EXPIRED_STATE || item.state === SEND_STATE_LABELS.rolledBack) {
-      return getRedColor('400');
+  // Determine line type between items
+  const getLineType = (
+    currentItem: TimelineItem,
+    nextItem: TimelineItem
+  ): 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient' => {
+    if (nextItem.stepType === 'expired') return 'expired-gradient';
+    if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
+    if (
+      currentItem.stepType === 'complete' ||
+      currentItem.stepType === 'current' ||
+      currentItem.stepType === 'success'
+    ) {
+      if (
+        nextItem.stepType === 'complete' ||
+        nextItem.stepType === 'current' ||
+        nextItem.stepType === 'success'
+      ) {
+        return 'complete';
+      }
     }
-    return item.complete ? getGreenColor('300') : getPrimaryColor('200');
+    return 'future';
   };
 
-  const barWidth = 4.5;
-  const barHeight = 48;
-  const barMarginVertical = 4;
-  const dotSize = barWidth;
-  const dotSpacing = 8;
+  // Status header color
+  const getStatusHeaderColor = () => {
+    switch (statusColorType) {
+      case 'success':
+        return greenColor;
+      case 'error':
+        return redColor;
+      case 'warning':
+        return orangeColor;
+      default:
+        return primaryGrey200;
+    }
+  };
+
+  // Get text color for state label
+  const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
+    if (isFuture) return primaryGrey300;
+    if (stepType === 'expired') return redColor;
+    if (stepType === 'rolled-back') return orangeColor;
+    return primaryWhite;
+  };
 
   return (
     <View
       blur
       className="bg-primary-800"
       style={{
-        padding: 16,
+        padding: 20,
         marginHorizontal: 16,
-        borderRadius: 12,
+        borderRadius: 16,
       }}>
+      {/* Card Label */}
       <Text
-        size={14}
+        size={11}
         bold
-        className="text-primary-200"
         style={{
+          color: primaryGrey300,
           marginBottom: 8,
           textTransform: 'uppercase',
+          letterSpacing: 0.5,
         }}>
-        {getStateWithExpiry()}
+        {cardLabel}
       </Text>
 
-      <View>
-        {displayTimeline.map((item, index) => (
-          <React.Fragment key={`${item.state}-${index}`}>
-            <HStack style={{ marginVertical: 0 }} align="center">
-              <View
-                style={{
-                  flex: 1,
-                  marginVertical: barMarginVertical,
-                }}>
-                <HStack align="center">
-                  <View
-                    style={{
-                      width: barWidth,
-                      height: barHeight,
-                      backgroundColor: getBarColor(item),
-                      borderRadius: barWidth / 2,
-                      opacity: item.isCurrent ? 1 : 0.5,
-                    }}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text size={16} bold className="text-primary-0" style={{ marginStart: 12 }}>
-                      {item.state}
-                    </Text>
-                    {item.timestamp && (
-                      <Text size={12} bold className="text-primary-300" style={{ marginStart: 12 }}>
-                        {convertTime(new Date(item.timestamp))}
-                      </Text>
-                    )}
-                  </View>
-                </HStack>
-              </View>
-            </HStack>
-
-            {/* Show dots when collapsed */}
-            {collapsed && canCollapse && index === 0 && (
-              <VStack style={{ alignItems: 'flex-start', opacity: 0.5 }}>
-                {[...Array(3)].map((_, i) => (
-                  <View
-                    key={i}
-                    style={{
-                      width: dotSize,
-                      height: dotSize,
-                      backgroundColor: getGreenColor('300'),
-                      borderRadius: dotSize / 3,
-                      marginVertical: dotSpacing / 3,
-                    }}
-                  />
-                ))}
-              </VStack>
-            )}
-          </React.Fragment>
-        ))}
-      </View>
-
-      {/* Collapse toggle */}
-      {canCollapse && (
-        <TouchableOpacity onPress={() => setCollapsed(!collapsed)}>
+      {/* Status Header */}
+      <HStack style={{ marginBottom: 16 }} align="center">
+        <Text
+          size={14}
+          heavy
+          style={{
+            color: getStatusHeaderColor(),
+          }}>
+          {statusHeader}
+        </Text>
+        {expiryBadge && (
           <Text
-            size={14}
-            bold
-            className="text-primary-200"
+            size={12}
             style={{
-              marginTop: 8,
-              textTransform: 'uppercase',
-              textAlign: 'right',
+              color: getStatusHeaderColor(),
+              marginLeft: 4,
             }}>
-            {collapsed ? 'EXPAND' : 'COLLAPSE'}
+            •{'  '}
+            {expiryBadge}
           </Text>
-        </TouchableOpacity>
-      )}
+        )}
+      </HStack>
+
+      {/* Timeline */}
+      <View>
+        {timeline.map((item, index) => {
+          const isLast = index === timeline.length - 1;
+          const nextItem = !isLast ? timeline[index + 1] : null;
+          const lineType = nextItem ? getLineType(item, nextItem) : null;
+          const isFutureState =
+            item.stepType === 'next-pending' || item.stepType === 'future-small';
+
+          // Calculate margin to align text with dot center
+          // Normal dots (14px): text needs -3px to align with center
+          // Small dots (6px): text needs more negative margin since dot is smaller
+          const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
+
+          return (
+            <View key={`${item.state}-${index}`}>
+              <HStack align="flex-start">
+                {/* Timeline Indicator Column */}
+                <VStack align="center" style={{ marginRight: 14 }}>
+                  <TimelineDot
+                    stepType={item.stepType}
+                    greenColor={greenColor}
+                    redColor={redColor}
+                    orangeColor={orangeColor}
+                    greyColor={greyColor}
+                  />
+                  {lineType && (
+                    <TimelineLine
+                      lineType={lineType}
+                      greenColor={greenColor}
+                      redColor={redColor}
+                      orangeColor={orangeColor}
+                      greyColor={greyColor}
+                    />
+                  )}
+                </VStack>
+
+                {/* Content Column */}
+                <VStack
+                  style={{
+                    flex: 1,
+                    paddingBottom: isLast ? 0 : 16,
+                    marginTop: contentMarginTop,
+                  }}>
+                  <Text
+                    size={15}
+                    bold
+                    style={{
+                      color: getStateTextColor(item.stepType, isFutureState),
+                      marginBottom: 2,
+                    }}>
+                    {item.displayLabel}
+                  </Text>
+                  {item.timestamp && (
+                    <Text
+                      size={13}
+                      style={{
+                        color: primaryGrey200,
+                      }}>
+                      {convertTime(new Date(item.timestamp))}
+                    </Text>
+                  )}
+                  {item.info && (
+                    <Text
+                      size={12}
+                      style={{
+                        color: primaryGrey200,
+                        marginTop: 2,
+                      }}>
+                      {item.info}
+                    </Text>
+                  )}
+                </VStack>
+              </HStack>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }

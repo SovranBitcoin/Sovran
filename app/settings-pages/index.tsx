@@ -182,7 +182,6 @@ const ModalScreen = () => {
           <RowButton label="Theme" href="/settings-pages/theme" />
         </Section>
         <Section title="App Information">
-          <RowButton isFirst label="About This Release" href="/settings-pages/about" />
           <RowButton
             label="View Source on GitHub"
             onPress={() => {
@@ -206,7 +205,8 @@ const ModalScreen = () => {
         </Section>
 
         <Section title="Developer">
-          <RowButton label="Export Database" onPress={handleExportDatabase} isFirst isLast />
+          <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
+          <RowButton label="Storage Inspector" href="/settings-pages/storage" isLast />
         </Section>
 
         <Section title="Danger Zone" isDanger>

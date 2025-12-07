@@ -230,7 +230,8 @@ export function SendTokenScreen({
 
   // SendHistoryEntry has a state field: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
   // The transaction is "paid/completed" when state is 'finalized'
-  const isPaid = currentTransaction.state === 'finalized';
+  const isPaid =
+    currentTransaction.state === 'finalized' || currentTransaction.state === 'rolledBack';
 
   const bottomButtons = (
     <BottomButtons>
