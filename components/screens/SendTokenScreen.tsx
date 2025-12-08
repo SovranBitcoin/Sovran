@@ -31,6 +31,7 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 
 interface SendTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -319,6 +320,8 @@ export function SendTokenScreen({
             animated={isLongToken}
           />
         )}
+
+        <TransactionLocationSection transactionId={currentTransaction.id} />
 
         {mintInfo && <HistoryEntryRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />}
 

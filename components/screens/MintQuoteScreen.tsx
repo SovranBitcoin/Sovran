@@ -23,6 +23,7 @@ import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import type { MintHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -121,6 +122,8 @@ export function MintQuoteScreen({
             popupMessage={[{ name: 'lightning_address_copied' }]}
           />
         )}
+
+        <TransactionLocationSection transactionId={currentTransaction.id} />
 
         {currentTransaction.metadata?.memo && (
           <Card message={currentTransaction.metadata.memo} variant="info" />

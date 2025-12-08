@@ -42,7 +42,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         ...style,
       }}>
       <VStack
-        blur
+        // blur
         className={`bg-primary-800${camera ? '/75' : ''}`}
         style={{
           borderRadius: 8,

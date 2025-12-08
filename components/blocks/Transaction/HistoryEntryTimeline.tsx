@@ -670,7 +670,7 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
 
   return (
     <View
-      blur
+      // blur
       className="bg-primary-800"
       style={{
         padding: 20,

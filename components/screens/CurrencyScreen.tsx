@@ -80,6 +80,7 @@ import opacity from 'hex-color-opacity';
 import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
+import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 // Currency display configuration
 const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
@@ -297,6 +298,8 @@ export function CurrencyScreen({
       .then((h) => h.find((h) => h.type === 'mint' && h.quoteId === mintQuote.quote));
 
     if (mintHistoryEntry) {
+      // Capture and store location (respects settings toggle and permissions)
+      await captureAndStoreLocation(mintHistoryEntry.id);
       onMintQuoteCreated(mintHistoryEntry as MintHistoryEntry);
     }
   };
@@ -308,8 +311,10 @@ export function CurrencyScreen({
     }
 
     // useSendWithHistory returns both the token and the history entry
-    // This is the coco-idiomatic way - no need to search paginated history
     const { token, historyEntry } = await send(selectedMint, amount);
+
+    // Capture and store location (respects settings toggle and permissions)
+    await captureAndStoreLocation(historyEntry.id);
 
     // Handle Routstr top-up flow
     if (params.routstrTopUp === 'true') {

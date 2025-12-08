@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   Keyboard,
   StyleSheet,
-  Alert,
+  Linking, // <-- add Linking from react-native
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { VStack } from 'components/ui/View/VStack';
@@ -303,9 +303,11 @@ function ClaimUsernameScreen() {
     return result?.available === true;
   }, [availabilityResults, selectedDomain]);
 
+  // Modified handleContinue: Open "https://npub.cash/username" (replace username accordingly)
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();
-    Alert.alert('Not Implemented', 'This feature is not implemented yet.');
+    // Fallback to just username without domain as per prompt
+    Linking.openURL(`https://npub.cash/username`);
   }, []);
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)?.value || '';

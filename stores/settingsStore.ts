@@ -20,6 +20,7 @@ interface SettingsState {
   experimental: boolean;
   termsAccepted: TermsAccepted | null;
   quickAccessP2PK: boolean;
+  sendLocationEnabled: boolean;
 }
 
 interface SettingsActions {
@@ -55,6 +56,10 @@ interface SettingsActions {
   setQuickAccessP2PK: (enabled: boolean) => void;
   getQuickAccessP2PK: () => boolean;
 
+  // Send location stamping
+  setSendLocationEnabled: (enabled: boolean) => void;
+  getSendLocationEnabled: () => boolean;
+
   // Utility methods
   getAllSettings: () => SettingsState;
   resetSettings: () => void;
@@ -75,6 +80,7 @@ export const useSettingsStore = create<SettingsStore>()(
       experimental: false,
       termsAccepted: null,
       quickAccessP2PK: false,
+      sendLocationEnabled: false,
 
       // Theme management
       setTheme: (theme: string) => {
@@ -173,6 +179,15 @@ export const useSettingsStore = create<SettingsStore>()(
         return get().quickAccessP2PK;
       },
 
+      // Send location stamping
+      setSendLocationEnabled: (enabled: boolean) => {
+        set({ sendLocationEnabled: enabled });
+      },
+
+      getSendLocationEnabled: () => {
+        return get().sendLocationEnabled;
+      },
+
       // Utility methods
       getAllSettings: () => {
         const state = get();
@@ -191,6 +206,7 @@ export const useSettingsStore = create<SettingsStore>()(
           experimental: false,
           termsAccepted: null,
           quickAccessP2PK: false,
+          sendLocationEnabled: false,
         });
       },
 
@@ -210,6 +226,7 @@ export const useSettingsStore = create<SettingsStore>()(
             experimental: false,
             termsAccepted: null,
             quickAccessP2PK: false,
+            sendLocationEnabled: false,
           });
           console.log('SettingsStore: All data cleared successfully');
         } catch (error) {
@@ -230,6 +247,7 @@ export const useSettingsStore = create<SettingsStore>()(
         experimental: state.experimental,
         termsAccepted: state.termsAccepted,
         quickAccessP2PK: state.quickAccessP2PK,
+        sendLocationEnabled: state.sendLocationEnabled,
         // Note: passcode is not persisted for security reasons
       }),
       onRehydrateStorage: () => (state, error) => {

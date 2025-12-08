@@ -21,6 +21,7 @@ import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useMintStore } from '@/stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
@@ -38,6 +39,7 @@ import type { MeltQuoteResponse } from '@cashu/cashu-ts';
 import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
@@ -201,6 +203,9 @@ export function MeltQuoteScreen({
     resolveLnurl();
   }, [lnUrlOrAddressProp, amountProp, resolvedInvoice]);
 
+  // Track whether we've already stored location for the current quote
+  const hasStoredLocationRef = useRef(false);
+
   // Create melt quote when we have an invoice (initial creation)
   useEffect(() => {
     const createQuote = async () => {
@@ -213,9 +218,15 @@ export function MeltQuoteScreen({
         !hasStartedCreation.current
       ) {
         hasStartedCreation.current = true;
+        hasStoredLocationRef.current = false; // Reset location flag for new quote
         lastQuoteMintRef.current = selectedMintFromStore;
         try {
-          await createMeltQuote(selectedMintFromStore, invoice);
+          const result = await createMeltQuote(selectedMintFromStore, invoice);
+          // Capture and store location right after quote creation
+          if (result?.historyEntry?.id) {
+            await captureAndStoreLocation(result.historyEntry.id);
+            hasStoredLocationRef.current = true;
+          }
         } catch (err) {
           console.error('Failed to create melt quote:', err);
         }
@@ -403,6 +414,8 @@ export function MeltQuoteScreen({
             handleCheckStatus={async () => {}}
           />
         )}
+
+        <TransactionLocationSection transactionId={currentTransaction.id} />
 
         <HistoryEntryTimeline historyEntry={currentTransaction} meltQuote={displayQuote} />
 

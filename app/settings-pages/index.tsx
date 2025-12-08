@@ -1,8 +1,9 @@
 import React from 'react';
-import { ScrollView, Linking, Alert } from 'react-native';
+import { ScrollView, Linking, Alert, Switch } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { Avatar } from 'components/ui/Avatar';
+import { useSettingsStore } from 'stores/settingsStore';
 
 import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-action-sheet';
 import { Link } from 'expo-router';
@@ -162,7 +163,9 @@ export const RowButton: React.FC<{
 };
 
 const ModalScreen = () => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
+  const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
+  const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
 
   const handleExportDatabase = async () => {
     try {
@@ -198,6 +201,41 @@ const ModalScreen = () => {
         <Section title="Security">
           {/* <RowButton label="Passcode" href="/settings-pages/passcode" isFirst /> */}
           <RowButton label="P2PK Keys" href="/settings-pages/keyring" isLast />
+        </Section>
+
+        <Section title="Privacy">
+          <View
+            style={{
+              backgroundColor: getPrimaryColor('900'),
+              borderRadius: 12,
+              padding: 16,
+            }}>
+            <HStack align="center" justify="space-between">
+              <VStack flex={1} style={{ marginRight: 12 }}>
+                <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                  Location Stamps
+                </Text>
+                <Text
+                  size={13}
+                  style={{
+                    color: getPrimaryColor('400'),
+                    marginTop: 4,
+                  }}>
+                  Attach your approximate location when sending ecash tokens. Stored locally on your
+                  device.
+                </Text>
+              </VStack>
+              <Switch
+                value={sendLocationEnabled ?? false}
+                onValueChange={setSendLocationEnabled}
+                trackColor={{
+                  false: getPrimaryColor('700'),
+                  true: getShadeColor('300'),
+                }}
+                thumbColor={getPrimaryColor('0')}
+              />
+            </HStack>
+          </View>
         </Section>
 
         <Section title="Recovery">

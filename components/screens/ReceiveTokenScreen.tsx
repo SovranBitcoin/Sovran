@@ -14,6 +14,7 @@ import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
@@ -23,7 +24,8 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
-import { useReceive } from 'coco-cashu-react';
+import { useReceive, useManager } from 'coco-cashu-react';
+import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & {
   token?: string;
@@ -64,6 +66,7 @@ export function ReceiveTokenScreen({
   onRedeemSuccess,
 }: ReceiveTokenScreenProps) {
   const { receive } = useReceive();
+  const manager = useManager();
   const { isKnownMint, getMintInfo } = useMintManagement();
   const [loading, setLoading] = useState(false);
   const [mintInfo, setMintInfo] = useState<any>({});
@@ -113,6 +116,21 @@ export function ReceiveTokenScreen({
     setLoading(true);
     try {
       await receive(token as string);
+
+      // Find the real history entry created by coco and store location against it
+      const history = await manager.history.getPaginatedHistory(0, 5);
+      const realEntry = history.find(
+        (h) =>
+          h.type === 'receive' &&
+          h.amount === receiveHistoryEntry.amount &&
+          h.mintUrl === receiveHistoryEntry.mintUrl
+      );
+
+      // Capture and store location at redeem time (respects settings)
+      if (realEntry?.id) {
+        await captureAndStoreLocation(realEntry.id);
+      }
+
       setIsRedeemed(true);
       popup({
         message: 'funds_received',
@@ -179,6 +197,8 @@ export function ReceiveTokenScreen({
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
+
+        <TransactionLocationSection transactionId={receiveHistoryEntry.id} />
 
         <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
 
