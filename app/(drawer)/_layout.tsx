@@ -44,12 +44,12 @@ const MENU_ITEMS: MenuItem[] = [
     route: '(drawer)/(tabs)/payments',
     drawerLabel: 'payments',
   },
-  {
-    icon: 'clarity:internet-of-things-solid',
-    label: 'Explore',
-    route: '(drawer)/(tabs)/explore',
-    drawerLabel: 'explore',
-  },
+  // {
+  //   icon: 'clarity:internet-of-things-solid',
+  //   label: 'Explore',
+  //   route: '(drawer)/(tabs)/explore',
+  //   drawerLabel: 'explore',
+  // },
   {
     icon: 'material-symbols:settings-rounded',
     label: 'Settings',

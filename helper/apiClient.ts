@@ -1,6 +1,5 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ok, err, Result } from 'neverthrow';
-
 const BASE_URL = 'https://api.sovran.money/api';
 
 export const PRICELIST_URL = `wss://ws.sovran.money`;
@@ -82,7 +81,7 @@ const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Erro
 };
 
 export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: number }) => {
-  const params = new URLSearchParams({ query, limit: String(limit) });
+  const params = new URLSearchParams({ query });
   return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
