@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   Keyboard,
   StyleSheet,
-  Linking, // <-- add Linking from react-native
+  Linking,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { VStack } from 'components/ui/View/VStack';
@@ -30,6 +30,8 @@ import { useTheme } from 'providers/ThemeProvider';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { finalizeEvent } from 'nostr-tools';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -215,8 +217,36 @@ function DomainOption({
   );
 }
 
+/**
+ * Generate NIP-98 HTTP Auth string for npub.cash API
+ * @param url - The full URL being accessed
+ * @param method - HTTP method (GET, POST, PUT, etc.)
+ * @param privateKey - Nostr private key as Uint8Array
+ * @returns Base64 encoded signed event with "Nostr " prefix
+ */
+function generateNip98Auth(url: string, method: string, privateKey: Uint8Array): string {
+  // Create the NIP-98 event structure
+  const authEvent = {
+    content: '',
+    kind: 27235,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [
+      ['u', url],
+      ['method', method],
+    ],
+  };
+
+  // Sign the event with the private key
+  const signedEvent = finalizeEvent(authEvent, privateKey);
+
+  // Base64 encode the signed event and prefix with "Nostr "
+  // btoa is available in React Native/Expo environments
+  return `Nostr ${btoa(JSON.stringify(signedEvent))}`;
+}
+
 function ClaimUsernameScreen() {
   const { getPrimaryColor } = useTheme();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const [username, setUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<DomainId>('npubx');
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityResult[]>([]);
@@ -303,12 +333,29 @@ function ClaimUsernameScreen() {
     return result?.available === true;
   }, [availabilityResults, selectedDomain]);
 
-  // Modified handleContinue: Open "https://npub.cash/username" (replace username accordingly)
+  // Generate NIP-98 auth for npub.cash and navigate to local server with auth
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();
-    // Fallback to just username without domain as per prompt
-    Linking.openURL(`https://npub.cash/username`);
-  }, []);
+
+    if (!nostrKeys?.privateKey) {
+      console.error('No Nostr private key available');
+      return;
+    }
+
+    // The URL we're authenticating for (npub.cash API endpoint)
+    const npubCashApiUrl = 'https://npub.cash/api/v1/info/username';
+
+    // Generate NIP-98 auth string for PUT request to npub.cash
+    const nostrAuth = generateNip98Auth(npubCashApiUrl, 'PUT', nostrKeys.privateKey);
+
+    // URL encode the auth string for use as query parameter
+    const encodedAuth = encodeURIComponent(nostrAuth);
+
+    // Navigate to local server with nostr auth as query parameter
+    const localUrl = `http://localhost:8080/api/npubcash-server/username?nostr:authorization=${encodedAuth}`;
+
+    Linking.openURL(localUrl);
+  }, [nostrKeys?.privateKey]);
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)?.value || '';
 
