@@ -493,7 +493,7 @@ export default function StorageScreen() {
         ))}
 
         {/* Clear All Button */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={clearAllStores}
           activeOpacity={0.7}
           style={{
@@ -511,7 +511,7 @@ export default function StorageScreen() {
           <Text size={15} medium style={{ color: getRedColor('400') }}>
             Clear All Stores
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* Bottom Padding */}
         <View style={{ height: 40 }} />
