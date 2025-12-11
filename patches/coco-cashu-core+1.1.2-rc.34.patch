@@ -1,5 +1,5 @@
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
-index 5570165..f9ec150 100644
+index 5570165..0f4705e 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
 +++ b/node_modules/coco-cashu-core/dist/index.d.cts
 @@ -914,6 +914,7 @@ declare class CounterService {
@@ -29,11 +29,13 @@ index 5570165..f9ec150 100644
    deleteMint(mintUrl: string): Promise<void>;
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    getAllMints(): Promise<Mint[]>;
-@@ -1520,11 +1524,11 @@ declare class PaymentRequestService {
+@@ -1519,12 +1523,12 @@ declare class PaymentRequestService {
+ //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
-   private walletService;
+-  private walletService;
 -  private proofService;
++  walletService: WalletService;
 +  proofService: ProofService;
    private walletRestoreService;
    private transactionService;
@@ -51,11 +53,13 @@ index 5570165..f9ec150 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -1933,7 +1938,7 @@ declare class Manager {
+@@ -1932,8 +1937,8 @@ declare class Manager {
+   readonly history: HistoryApi;
    readonly send: SendApi;
    private mintService;
-   private walletService;
+-  private walletService;
 -  private proofService;
++  walletService: WalletService;
 +  proofService: ProofService;
    private walletRestoreService;
    private keyRingService;
@@ -74,7 +78,7 @@ index 5570165..f9ec150 100644
    private proofRepository;
    private readonly pluginHost;
 diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
-index 5570165..f9ec150 100644
+index 5570165..0f4705e 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.ts
 +++ b/node_modules/coco-cashu-core/dist/index.d.ts
 @@ -914,6 +914,7 @@ declare class CounterService {
@@ -104,11 +108,13 @@ index 5570165..f9ec150 100644
    deleteMint(mintUrl: string): Promise<void>;
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    getAllMints(): Promise<Mint[]>;
-@@ -1520,11 +1524,11 @@ declare class PaymentRequestService {
+@@ -1519,12 +1523,12 @@ declare class PaymentRequestService {
+ //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
-   private walletService;
+-  private walletService;
 -  private proofService;
++  walletService: WalletService;
 +  proofService: ProofService;
    private walletRestoreService;
    private transactionService;
@@ -126,11 +132,13 @@ index 5570165..f9ec150 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -1933,7 +1938,7 @@ declare class Manager {
+@@ -1932,8 +1937,8 @@ declare class Manager {
+   readonly history: HistoryApi;
    readonly send: SendApi;
    private mintService;
-   private walletService;
+-  private walletService;
 -  private proofService;
++  walletService: WalletService;
 +  proofService: ProofService;
    private walletRestoreService;
    private keyRingService;

@@ -1,4 +1,5 @@
 import { Manager } from 'coco-cashu-core';
+import { CheckStateEnum } from '@cashu/cashu-ts';
 import { store } from 'redux/store';
 import { RootState } from 'redux/store/reducer';
 import { CashuProfile } from 'redux/cashu/types';
@@ -101,7 +102,7 @@ export class DataMigration {
 
   /**
    * Migrate proofs to Coco repositories
-   * Only migrates proofs with "sat" unit
+   * Only migrates proofs with "sat" unit that are unspent
    */
   private async migrateProofs(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
     for (const profile of profiles) {
@@ -109,21 +110,47 @@ export class DataMigration {
         if (!Array.isArray(proofs) || proofs.length === 0) continue;
 
         try {
-          // Get keysets from mint
+          // Get keysets from mint to filter by unit
           const keysets = await this.manager.mint.getKeysets(mintUrl);
           const keysetUnitMap = new Map(
             keysets.map((k: { id: string; unit: string }) => [k.id, k.unit])
           );
 
-          // Filter and save only sat proofs
-          for (const proof of proofs) {
+          // Filter to only sat proofs first
+          const satProofs = proofs.filter((proof) => {
             const unit = keysetUnitMap.get(proof.id);
             if (unit !== 'sat') {
               console.log(`Skipping non-sat proof (unit: ${unit || 'unknown'}) for ${mintUrl}`);
+              return false;
+            }
+            return true;
+          });
+
+          if (satProofs.length === 0) {
+            console.log(`No sat proofs to migrate for ${mintUrl}`);
+            continue;
+          }
+
+          // Check proof states with the mint to filter out spent proofs
+          const wallet = await this.manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(satProofs);
+
+          // Filter and save only unspent proofs
+          for (let i = 0; i < satProofs.length; i++) {
+            const proof = satProofs[i];
+            const state = proofStates[i];
+
+            if (state.state === CheckStateEnum.SPENT) {
+              console.log(`Skipping spent proof for ${mintUrl}`);
               continue;
             }
 
-            // Save sat proof
+            if (state.state === CheckStateEnum.PENDING) {
+              console.log(`Skipping pending proof for ${mintUrl}`);
+              continue;
+            }
+
+            // Save unspent proof
             await this.manager.proofService.saveProofs(mintUrl, [
               { ...proof, mintUrl, state: 'ready' as const },
             ]);
