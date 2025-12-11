@@ -19,8 +19,6 @@ import { FlatList, Keyboard, Pressable, useWindowDimensions } from 'react-native
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonContainer } from 'react-native-skeleton-component';
-import { setSearch } from 'redux/nostr';
-import { store } from 'redux/store';
 import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
@@ -467,13 +465,6 @@ const PaymentsContent = () => {
               },
             };
           });
-
-          // Store all results in Redux
-          if (formattedResults.length > 0) {
-            formattedResults.forEach((result) => {
-              store.dispatch(setSearch({ pubkey: result.pubkey, profile: result.profile }));
-            });
-          }
 
           setSearchResults(formattedResults);
         } else {
