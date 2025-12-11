@@ -196,6 +196,18 @@ export const MODAL_SCREENS: ModalConfig[] = [
     },
   },
   {
+    name: 'settings-pages/delete',
+    title: 'Delete Account',
+    options: {
+      presentation: 'modal',
+      headerShown: true,
+      headerBlurEffect: 'systemMaterial',
+      headerTransparent: true,
+      headerBackButtonDisplayMode: 'minimal',
+      gestureDirection: 'vertical',
+    },
+  },
+  {
     name: 'sendToken',
     title: 'Send Ecash',
     options: {

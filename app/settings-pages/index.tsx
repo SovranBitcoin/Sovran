@@ -9,7 +9,6 @@ import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-acti
 import { Link } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
-import { SheetManager } from 'react-native-actions-sheet';
 import * as Application from 'expo-application';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { VStack } from 'components/ui/View/VStack';
@@ -248,14 +247,7 @@ const ModalScreen = () => {
         </Section>
 
         <Section title="Danger Zone" isDanger>
-          <RowButton
-            label="Delete Account"
-            onPress={() => {
-              SheetManager.show('delete-router');
-            }}
-            isLast
-            isDanger
-          />
+          <RowButton label="Delete Account" href="/settings-pages/delete" isLast isDanger />
         </Section>
 
         <Link href="/settings-pages/design" asChild>

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Button } from 'components/ui/Button';
-import { ScrollView } from 'react-native';
+import { ScrollView, Switch } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
-import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Text } from 'components/ui/Text';
 
@@ -154,36 +153,45 @@ export default function TermsAndConditions({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsProps) {
-  const { getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const [isChecked, setIsChecked] = useState(false);
 
   const toggleCheckbox = () => setIsChecked(!isChecked);
 
   return (
     <Container className="bg-primary-900">
-      <ScrollView>
-        <VStack spacing={16} className="p-4">
-          <Text overpass bold size={32} className="py-2 text-center text-primary-50">
-            {title}
-          </Text>
+      <VStack spacing={16} flex={1} className="p-4">
+        {/* Header - fixed at top */}
+        <Text overpass bold size={32} className="py-2 text-center text-primary-50">
+          {title}
+        </Text>
+
+        {/* Scrollable terms content */}
+        <ScrollView
+          style={{
+            flex: 1,
+            backgroundColor: getPrimaryColor('800'),
+            borderRadius: 12,
+          }}
+          contentContainerStyle={{ padding: 16 }}>
           <Text overpass size={14} className="leading-[22px] text-primary-0">
             {terms}
           </Text>
+        </ScrollView>
 
-          <Button
-            variant="primary"
-            text={buttonText}
-            onPress={onClose}
-            disabled={showCheckbox ? !isChecked : false}
-          />
-
+        {/* Fixed bottom section */}
+        <VStack spacing={16}>
           {showCheckbox && (
             <TouchableOpacity onPress={toggleCheckbox}>
-              <HStack align="center" spacing={8} className="px-4">
-                <Checkbox
+              <HStack align="center" spacing={12}>
+                <Switch
                   value={isChecked}
                   onValueChange={toggleCheckbox}
-                  color={isChecked ? getShadeColor('300') : undefined}
+                  trackColor={{
+                    false: getPrimaryColor('700'),
+                    true: getShadeColor('300'),
+                  }}
+                  thumbColor={getPrimaryColor('0')}
                 />
                 <Text id="terms-checkbox" overpass size={14} className="flex-1 text-primary-0">
                   {checkboxText}
@@ -191,8 +199,15 @@ export default function TermsAndConditions({
               </HStack>
             </TouchableOpacity>
           )}
+
+          <Button
+            variant="primary"
+            text={buttonText}
+            onPress={onClose}
+            disabled={showCheckbox ? !isChecked : false}
+          />
         </VStack>
-      </ScrollView>
+      </VStack>
     </Container>
   );
 }
