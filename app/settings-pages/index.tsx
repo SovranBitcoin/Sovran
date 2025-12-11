@@ -221,8 +221,8 @@ const ModalScreen = () => {
                     color: getPrimaryColor('400'),
                     marginTop: 4,
                   }}>
-                  Attach your approximate location when sending ecash tokens. Stored locally on your
-                  device.
+                  Attach your approximate location when making transactions. (metadata only stored
+                  on your device)
                 </Text>
               </VStack>
               <Switch
