@@ -864,7 +864,7 @@ function AddMintsScreen() {
           <LegendList
             data={sortedMints}
             renderItem={renderItem}
-            keyExtractor={keyExtractor}
+            // keyExtractor={keyExtractor} // turning this on breaks the scrolling :shrug:
             extraData={selectedMints}
             estimatedItemSize={120}
             recycleItems
