@@ -402,8 +402,8 @@ export function CurrencyScreen({
       }
     }
 
-    // Pass the history entry directly - no need to search through history
-    onSendTokenCreated(historyEntry);
+    // Pass the history entry with token attached - the event-captured entry may not have it yet
+    onSendTokenCreated({ ...historyEntry, token });
   };
 
   const handleNext = async () => {
