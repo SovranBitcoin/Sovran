@@ -1,7 +1,7 @@
 import { Proof } from '@cashu/cashu-ts';
 
 const id = 0;
-const mnemonic = undefined; //'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire';
+const mnemonic = undefined; // 'crumble stamp weapon meadow tilt logic winter mean tooth bracket wool fire';
 
 export const nostrState = {
   profiles: [
@@ -16,9 +16,9 @@ export const nostrState = {
   },
 };
 
-const mintAToken = undefined; //'';
+const mintAToken = undefined; //
 type DecodedToken = { mint: string; proofs: Proof[] };
-const decodedMintAToken: DecodedToken | undefined = undefined; //getDecodedToken(mintAToken);
+const decodedMintAToken: DecodedToken | undefined = undefined; // getDecodedToken(mintAToken);
 
 // Extract values to avoid TypeScript narrowing issues
 // Use explicit type guard to help TypeScript
@@ -33,6 +33,7 @@ if (decodedMintAToken !== undefined && decodedMintAToken !== null) {
 export const cashuState = {
   selectedMint: mintUrl,
   profiles: {
+    mints: mintUrl ? [mintUrl] : [],
     counters:
       mintUrl && proofs
         ? {

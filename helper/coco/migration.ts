@@ -77,7 +77,7 @@ export class DataMigration {
     for (const mintUrl of mintUrls) {
       try {
         console.log(`Adding mint: ${mintUrl}`);
-        await this.manager.mint.addMint(mintUrl);
+        await this.manager.mint.addMint(mintUrl, { trusted: true });
 
         // Try to get mint info to ensure it's loaded
         try {
@@ -101,6 +101,7 @@ export class DataMigration {
 
   /**
    * Migrate proofs to Coco repositories
+   * Only migrates proofs with "sat" unit
    */
   private async migrateProofs(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
     for (const profile of profiles) {
@@ -108,18 +109,28 @@ export class DataMigration {
         if (!Array.isArray(proofs) || proofs.length === 0) continue;
 
         try {
-          // Convert Redux proof format to Coco format
-          const coreProofs = proofs.map((proof) => ({
-            ...proof, // Spread all Proof fields (id, amount, secret, C, dleq, witness)
-            mintUrl, // Add mintUrl
-            state: 'ready' as const, // Set state to 'ready' for existing proofs
-          }));
+          // Get keysets from mint
+          const keysets = await this.manager.mint.getKeysets(mintUrl);
+          const keysetUnitMap = new Map(
+            keysets.map((k: { id: string; unit: string }) => [k.id, k.unit])
+          );
 
-          // Use the ProofService to save proofs
-          await this.manager.proofService.saveProofs(mintUrl, coreProofs);
+          // Filter and save only sat proofs
+          for (const proof of proofs) {
+            const unit = keysetUnitMap.get(proof.id);
+            if (unit !== 'sat') {
+              console.log(`Skipping non-sat proof (unit: ${unit || 'unknown'}) for ${mintUrl}`);
+              continue;
+            }
 
-          result.proofsMigrated += proofs.length;
-          console.log(`Migrated ${proofs.length} proofs for ${mintUrl}`);
+            // Save sat proof
+            await this.manager.proofService.saveProofs(mintUrl, [
+              { ...proof, mintUrl, state: 'ready' as const },
+            ]);
+            result.proofsMigrated++;
+          }
+
+          console.log(`Migrated proofs for ${mintUrl}`);
         } catch (error) {
           console.error(`Failed to migrate proofs for ${mintUrl}:`, error);
           result.errors.push({
