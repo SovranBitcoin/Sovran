@@ -13,6 +13,38 @@ import Haptics from 'components/ui/Haptics';
 import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { nip19 } from 'nostr-tools';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
+
+/**
+ * Check if a string is a valid npub and extract the pubkey
+ * Handles both 'npub1...' and 'nostr:npub1...' formats
+ * @returns The npub string if valid, null otherwise
+ */
+const parseNpub = (data: string): string | null => {
+  const trimmed = data.trim();
+
+  // Remove 'nostr:' prefix if present
+  const npubString = trimmed.startsWith('nostr:') ? trimmed.slice(6) : trimmed;
+
+  // Check if it looks like an npub
+  if (!npubString.startsWith('npub1')) {
+    return null;
+  }
+
+  // Validate by attempting to decode
+  try {
+    const decoded = nip19.decode(npubString);
+    if (decoded.type === 'npub') {
+      return npubString;
+    }
+  } catch {
+    // Invalid npub format
+    return null;
+  }
+
+  return null;
+};
 
 interface ScanningData {
   data: string;
@@ -39,6 +71,7 @@ export const useProcessPaymentString = ({
   const [urDecoder, setUrDecoder] = useState<URDecoder>(new URDecoder());
   const [scanned, setScanned] = useState<boolean>(false);
   const appStateRef = useRef<string>(AppState.currentState);
+  const addScan = useScanHistoryStore((state) => state.addScan);
 
   const processPaymentString = useCallback(
     async (scanning: ScanningData): Promise<{ urInProgress: boolean; progress?: number }> => {
@@ -85,6 +118,9 @@ export const useProcessPaymentString = ({
             const _tokenString = new TextDecoder().decode(decoded);
             onProgress?.(0);
 
+            // Only save to scan history once when UR is fully decoded (not for each frame)
+            addScan(scanning.data, _tokenString, 'ecash');
+
             // Create a receive history entry for ecash receive
             const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
               id: `receive-${Date.now()}`,
@@ -118,6 +154,9 @@ export const useProcessPaymentString = ({
 
         // Handle regular ecash tokens
         if (isValidEcashToken(scanning.data)) {
+          // Save to scan history
+          addScan(scanning.data, scanning.data, 'ecash');
+
           // Create a receive history entry for ecash receive
           const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
             id: `receive-${Date.now()}`,
@@ -150,6 +189,9 @@ export const useProcessPaymentString = ({
           const amount = getLightningAmount(trimmedData);
           const isInvoice = isLightningInvoice(trimmedData);
 
+          // Save to scan history
+          addScan(scanning.data, trimmedData, 'lightning');
+
           if (isInvoice && amount) {
             // Direct Lightning invoice with amount - navigate to MeltQuoteScreen
             // The screen will create the quote internally
@@ -177,6 +219,9 @@ export const useProcessPaymentString = ({
         // Handle HTTP/HTTPS URLs - navigate to mint info screen
         const trimmedUrl = scanning.data.trim();
         if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+          // Save to scan history
+          addScan(scanning.data, trimmedUrl, 'mint');
+
           router.navigate({
             pathname: '/(mint-flow)/info' as any,
             params: {
@@ -186,11 +231,26 @@ export const useProcessPaymentString = ({
           });
           return { urInProgress: false };
         }
+
+        // Handle npub/nostr:npub - navigate to user profile screen
+        const validNpub = parseNpub(scanning.data);
+        if (validNpub) {
+          // Store the scan in history
+          addScan(scanning.data, validNpub, 'npub');
+
+          router.navigate({
+            pathname: '/(user-flow)/profile' as any,
+            params: {
+              npub: validNpub,
+            },
+          });
+          return { urInProgress: false };
+        }
       }
 
       return { urInProgress: false };
     },
-    [scanned, urDecoder, unit, selectedMint, isFocused, onProgress, onLoading, onScanned]
+    [scanned, urDecoder, unit, selectedMint, isFocused, onProgress, onLoading, onScanned, addScan]
   );
 
   const reset = useCallback(() => {

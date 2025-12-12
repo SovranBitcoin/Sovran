@@ -49,6 +49,15 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
+  // User flow modal group - profile, user messages, share
+  {
+    name: '(user-flow)',
+    options: {
+      presentation: 'modal',
+      headerShown: false,
+      gestureDirection: 'vertical',
+    },
+  },
   // Filter flow modal group - transaction filters
   {
     name: '(filter-flow)',

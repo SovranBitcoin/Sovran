@@ -203,6 +203,12 @@ module.exports = withMonicon(nativeWindConfig, {
     // Claim username modal icons
     'mdi:check',
 
+    // User profile icons
+    'mdi:check-decagram',
+    'mdi:message-text',
+    'mdi:lightning-bolt',
+    'mdi:open-in-new',
+
     // Pending Ecash icons
     'mdi:clock-outline',
     'mdi:clock-alert-outline',
