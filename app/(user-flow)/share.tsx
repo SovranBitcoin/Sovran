@@ -37,10 +37,15 @@ function SharePage() {
           headerTitleStyle: { color: getPrimaryColor('0') },
         }}
       />
-      <ShareScreen type={type} data={data} npub={npub} lud16={lud16} onTitleChange={handleTitleChange} />
+      <ShareScreen
+        type={type}
+        data={data}
+        npub={npub}
+        lud16={lud16}
+        onTitleChange={handleTitleChange}
+      />
     </>
   );
 }
 
 export default withSheetProvider(SharePage);
-

@@ -102,7 +102,7 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
     () =>
       item.pubkey
         ? {
-            pathname: '/userMessages' as const,
+            pathname: '/(user-flow)/profile' as const,
             params: { pubkey: item.pubkey },
           }
         : null,

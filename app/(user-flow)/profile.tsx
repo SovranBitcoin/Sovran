@@ -3,7 +3,7 @@
  *
  * Displays Nostr user profile information with:
  * - Banner image with overlapping avatar
- * - Stats grid (Following, Followers, Notes, Joined)
+ * - Stats grid (Following, Followers, Reputation, Joined)
  * - Actions section (Message User)
  * - Profile info section (npub, nip05, lud16, website)
  */
@@ -39,9 +39,16 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata, Contacts, ShortTextNote } from 'nostr-tools/kinds';
+import { Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import { popup } from '@/helper/popup';
+import {
+  useNostrProfile,
+  getFollowersWithProfiles,
+  getFollowerDisplayName,
+  getFollowerPicture,
+  TopFollower,
+} from 'hooks/useNostrProfile';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -54,13 +61,13 @@ const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
 function ProfileStatsGridComponent({
   followingCount,
   followerCount,
-  notesCount,
+  reputationScore,
   joinedDate,
   isLoading,
 }: {
   followingCount?: number;
   followerCount?: number;
-  notesCount?: number;
+  reputationScore?: string;
   joinedDate?: string;
   isLoading: boolean;
 }) {
@@ -70,10 +77,10 @@ function ProfileStatsGridComponent({
     () => ({
       following: followingCount !== undefined ? followingCount.toString() : '0',
       followers: followerCount !== undefined ? followerCount.toString() : '0',
-      notes: notesCount !== undefined ? notesCount.toString() : '0',
+      reputation: reputationScore || 'N/A',
       joined: joinedDate || 'Unknown',
     }),
-    [followingCount, followerCount, notesCount, joinedDate]
+    [followingCount, followerCount, reputationScore, joinedDate]
   );
 
   const fadeAnims = useRef([
@@ -86,7 +93,7 @@ function ProfileStatsGridComponent({
   const hasValidData =
     followingCount !== undefined ||
     followerCount !== undefined ||
-    notesCount !== undefined ||
+    reputationScore !== undefined ||
     joinedDate !== undefined;
 
   const hasAnimatedRef = useRef(false);
@@ -118,14 +125,14 @@ function ProfileStatsGridComponent({
       },
       {
         label: 'Followers',
-        description: 'Approximate count',
+        description: 'Total count',
         value: displayValues.followers,
         accent: true,
       },
       {
-        label: 'Notes',
-        description: 'Posts published',
-        value: displayValues.notes,
+        label: 'Reputation',
+        description: 'Network score',
+        value: displayValues.reputation,
         accent: false,
       },
       {
@@ -200,6 +207,115 @@ function ProfileStatsGridComponent({
   );
 }
 const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
+
+// ============================================================================
+// Top Followers Section
+// ============================================================================
+function TopFollowersComponent({
+  topFollowers,
+  isLoading,
+}: {
+  topFollowers: TopFollower[];
+  isLoading: boolean;
+}) {
+  const { getPrimaryColor } = useTheme();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Filter to only show followers with profile info
+  const followersWithProfiles = useMemo(
+    () => getFollowersWithProfiles(topFollowers).slice(0, 6),
+    [topFollowers]
+  );
+
+  useEffect(() => {
+    if (followersWithProfiles.length > 0) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [followersWithProfiles.length, fadeAnim]);
+
+  // Don't render if no followers with profiles
+  if (!isLoading && followersWithProfiles.length === 0) {
+    return null;
+  }
+
+  const handleFollowerPress = (follower: TopFollower) => {
+    router.push({
+      pathname: '/(user-flow)/profile' as any,
+      params: { npub: follower.npub },
+    });
+  };
+
+  return (
+    <View style={{ paddingHorizontal: 16 }}>
+      <Text
+        bold
+        overpass
+        size={12}
+        style={{ color: getPrimaryColor('400'), marginBottom: 12, marginLeft: 4 }}>
+        TOP FOLLOWERS
+      </Text>
+      {isLoading ? (
+        <HStack gap={12} style={{ flexWrap: 'wrap' }}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.topFollowerItem}>
+              <Skeleton
+                style={[styles.topFollowerAvatar, { backgroundColor: getPrimaryColor('700') }]}
+              />
+              <Skeleton
+                style={{
+                  width: 60,
+                  height: 12,
+                  borderRadius: 4,
+                  marginTop: 6,
+                  backgroundColor: getPrimaryColor('700'),
+                }}
+              />
+            </View>
+          ))}
+        </HStack>
+      ) : (
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <HStack gap={12} style={{ flexWrap: 'wrap' }}>
+            {followersWithProfiles.map((follower) => (
+              <TouchableOpacity
+                key={follower.pubkey}
+                style={styles.topFollowerItem}
+                onPress={() => handleFollowerPress(follower)}
+                activeOpacity={0.7}>
+                <Avatar
+                  picture={getFollowerPicture(follower)}
+                  seed={follower.pubkey}
+                  size={48}
+                  variant="person"
+                  name={getFollowerDisplayName(follower)}
+                />
+                <Text
+                  size={11}
+                  bold
+                  numberOfLines={1}
+                  style={{
+                    color: getPrimaryColor('200'),
+                    marginTop: 6,
+                    textAlign: 'center',
+                    maxWidth: 64,
+                  }}>
+                  {getFollowerDisplayName(follower)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </HStack>
+        </Animated.View>
+      )}
+      <Spacer size={16} />
+    </View>
+  );
+}
+const TopFollowers = React.memo(TopFollowersComponent);
 
 // ============================================================================
 // Banner with Overlapping Avatar
@@ -345,7 +461,7 @@ function UserProfileScreen() {
   }, [npubParam, pubkey]);
 
   // ===========================
-  // NOSTR SUBSCRIPTIONS
+  // NOSTR SUBSCRIPTIONS & API
   // ===========================
 
   // Profile metadata (kind 0) - PRIORITY: Load this first
@@ -366,62 +482,8 @@ function UserProfileScreen() {
     filters: metadataFilters,
   });
 
-  // Only start social stats subscriptions after metadata is loaded
-  const metadataLoaded = metadataEose;
-
-  // Contact list for following count (kind 3)
-  const contactFilters = useMemo(
-    () =>
-      pubkey && metadataLoaded
-        ? [
-            {
-              authors: [pubkey],
-              kinds: [Contacts],
-              limit: 1,
-            },
-          ]
-        : null,
-    [pubkey, metadataLoaded]
-  );
-  const { events: contactEvents, eose: contactsEose } = useSubscribe({
-    filters: contactFilters,
-  });
-
-  // Follower count approximation (kind 3 events where user is tagged)
-  const followerFilters = useMemo(
-    () =>
-      pubkey && metadataLoaded
-        ? [
-            {
-              kinds: [Contacts],
-              '#p': [pubkey],
-              limit: 500,
-            },
-          ]
-        : null,
-    [pubkey, metadataLoaded]
-  );
-  const { events: followerEvents, eose: followersEose } = useSubscribe({
-    filters: followerFilters,
-  });
-
-  // Notes count (kind 1)
-  const notesFilters = useMemo(
-    () =>
-      pubkey && metadataLoaded
-        ? [
-            {
-              authors: [pubkey],
-              kinds: [ShortTextNote],
-              limit: 500,
-            },
-          ]
-        : null,
-    [pubkey, metadataLoaded]
-  );
-  const { events: notesEvents, eose: notesEose } = useSubscribe({
-    filters: notesFilters,
-  });
+  // Fetch profile stats from Sovran API (followers, following, top followers, rank)
+  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
 
   // ===========================
   // DERIVED STATE
@@ -430,23 +492,19 @@ function UserProfileScreen() {
   const displayName = userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
 
-  // Following count from contact list
-  const followingCount = useMemo(() => {
-    if (!contactEvents?.[0]) return undefined;
-    return contactEvents[0].tags.filter((t: string[]) => t[0] === 'p').length;
-  }, [contactEvents]);
+  // Following count from API
+  const followingCount = profileData?.follows;
 
-  // Follower count (approximation from sampled events)
-  const followerCount = useMemo(() => {
-    if (!followerEvents) return undefined;
-    return followerEvents.length;
-  }, [followerEvents]);
+  // Follower count from API
+  const followerCount = profileData?.followers;
 
-  // Notes count
-  const notesCount = useMemo(() => {
-    if (!notesEvents) return undefined;
-    return notesEvents.length;
-  }, [notesEvents]);
+  // Reputation score from API rank (formatted as percentage)
+  const reputationScore = useMemo(() => {
+    if (profileData?.rank === undefined) return undefined;
+    // Convert rank to a more readable format (e.g., percentage or score out of 100)
+    const percentage = (profileData.rank * 100).toFixed(4);
+    return `${percentage}%`;
+  }, [profileData?.rank]);
 
   // Joined date from profile created_at
   const joinedDate = useMemo(() => {
@@ -454,7 +512,7 @@ function UserProfileScreen() {
     return formatJoinedDate(timestamp);
   }, [metadataEvents]);
 
-  const isStatsLoading = !contactsEose && !followersEose && !notesEose;
+  const isStatsLoading = isProfileApiLoading;
 
   // ===========================
   // HANDLERS
@@ -524,13 +582,19 @@ function UserProfileScreen() {
           <ProfileStatsGrid
             followingCount={followingCount}
             followerCount={followerCount}
-            notesCount={notesCount}
+            reputationScore={reputationScore}
             joinedDate={joinedDate}
             isLoading={isStatsLoading}
           />
         </View>
 
         <Spacer size={16} />
+
+        {/* Top Followers */}
+        <TopFollowers
+          topFollowers={profileData?.topFollowers || []}
+          isLoading={isProfileApiLoading}
+        />
 
         {/* About Card */}
         {userInfo?.about && (
@@ -701,6 +765,16 @@ const styles = StyleSheet.create({
     width: 120,
     height: 14,
     borderRadius: 4,
+  },
+  topFollowerItem: {
+    alignItems: 'center',
+    width: 64,
+    marginBottom: 8,
+  },
+  topFollowerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
 });
 

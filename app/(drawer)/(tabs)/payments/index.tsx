@@ -548,41 +548,35 @@ const PaymentsContent = () => {
     [getPrimaryColor, searchLoading]
   );
 
-  const navigateToUserMessages = useCallback(
-    ({ pubkey, profile }: { pubkey: string; profile: UserProfile }) => {
-      router.navigate({
-        pathname: '/userMessages',
-        params: {
-          pubkey: pubkey,
-          profile: JSON.stringify(profile),
-        },
-      });
-    },
-    []
-  );
+  const navigateToProfile = useCallback(({ pubkey }: { pubkey: string }) => {
+    router.navigate({
+      pathname: '/(user-flow)/profile' as any,
+      params: {
+        pubkey: pubkey,
+      },
+    });
+  }, []);
 
   // Handler for recommended user press (currently unused, kept for future RecommendedUsers component)
   const _handleRecommendedUserPress = useCallback(
     (user: UserProfile) => {
-      navigateToUserMessages({
+      navigateToProfile({
         pubkey: user.pubkey,
-        profile: user,
       });
     },
-    [navigateToUserMessages]
+    [navigateToProfile]
   );
 
   // Memoized handler for search result press
   const handleSearchResultPress = useCallback(
     (result: DisplayResult) => {
       if (!searchLoading && result.profile) {
-        navigateToUserMessages({
+        navigateToProfile({
           pubkey: result.pubkey,
-          profile: result.profile,
         });
       }
     },
-    [searchLoading, navigateToUserMessages]
+    [searchLoading, navigateToProfile]
   );
 
   // Dismiss keyboard when tapping outside
