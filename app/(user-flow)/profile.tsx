@@ -181,25 +181,25 @@ function ProfileStatsGridComponent({
         label: 'Following',
         description: 'Users followed',
         value: displayValues.following,
-        accent: true,
+        smallValue: false,
       },
       {
         label: 'Followers',
         description: 'Total count',
         value: displayValues.followers,
-        accent: true,
+        smallValue: false,
       },
       {
         label: 'Reputation',
         description: 'Network score',
         value: displayValues.reputation,
-        accent: false,
+        smallValue: false,
       },
       {
         label: 'Joined',
         description: 'Account created',
         value: displayValues.joined,
-        accent: false,
+        smallValue: true,
       },
     ],
     [displayValues]
@@ -223,12 +223,7 @@ function ProfileStatsGridComponent({
         {showSkeleton ? (
           <>
             <Skeleton style={[styles.skeletonLabel, { backgroundColor: getPrimaryColor('700') }]} />
-            <Skeleton
-              style={[
-                styles.skeletonValue,
-                { backgroundColor: getPrimaryColor('700'), width: stat.accent ? 100 : 60 },
-              ]}
-            />
+            <Skeleton style={[styles.skeletonValue, { backgroundColor: getPrimaryColor('700') }]} />
             <Skeleton style={[styles.skeletonDesc, { backgroundColor: getPrimaryColor('700') }]} />
           </>
         ) : (
@@ -243,7 +238,7 @@ function ProfileStatsGridComponent({
             <Text
               bold
               overpass
-              size={stat.accent ? 24 : 16}
+              size={stat.smallValue ? 16 : 20}
               style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
               {stat.value}
             </Text>
@@ -281,7 +276,15 @@ function TopFollowersComponent({
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Filter to only show followers with profile info
+  // Calculate responsive avatar size for 3-column grid
+  // Available width = screen width - padding (32) - gaps (24 for 2 gaps between 3 items)
+  const GRID_PADDING = 32;
+  const GRID_GAP = 12;
+  const COLUMNS = 3;
+  const itemWidth = (SCREEN_WIDTH - GRID_PADDING - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
+  const avatarSize = Math.min(itemWidth - 16, 64); // Leave some padding, max 64
+
+  // Filter to only show followers with profile info (max 6 for 3x2 grid)
   const followersWithProfiles = useMemo(
     () => getFollowersWithProfiles(topFollowers).slice(0, 6),
     [topFollowers]
@@ -310,6 +313,54 @@ function TopFollowersComponent({
     });
   };
 
+  const renderItem = (follower: TopFollower) => (
+    <TouchableOpacity
+      key={follower.pubkey}
+      style={[styles.topFollowerGridItem, { width: itemWidth }]}
+      onPress={() => handleFollowerPress(follower)}
+      activeOpacity={0.7}>
+      <Avatar
+        picture={getFollowerPicture(follower)}
+        seed={follower.pubkey}
+        size={avatarSize}
+        variant="person"
+        name={getFollowerDisplayName(follower)}
+      />
+      <Text
+        size={11}
+        bold
+        numberOfLines={1}
+        style={{
+          color: getPrimaryColor('200'),
+          marginTop: 6,
+          textAlign: 'center',
+          width: itemWidth - 8,
+        }}>
+        {getFollowerDisplayName(follower)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderSkeleton = (index: number) => (
+    <View key={index} style={[styles.topFollowerGridItem, { width: itemWidth }]}>
+      <Skeleton
+        style={[
+          styles.topFollowerAvatar,
+          { width: avatarSize, height: avatarSize, backgroundColor: getPrimaryColor('700') },
+        ]}
+      />
+      <Skeleton
+        style={{
+          width: itemWidth - 24,
+          height: 12,
+          borderRadius: 4,
+          marginTop: 6,
+          backgroundColor: getPrimaryColor('700'),
+        }}
+      />
+    </View>
+  );
+
   return (
     <View style={{ paddingHorizontal: 16 }}>
       <Text
@@ -320,55 +371,10 @@ function TopFollowersComponent({
         TOP FOLLOWERS
       </Text>
       {isLoading ? (
-        <HStack gap={12} style={{ flexWrap: 'wrap' }}>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.topFollowerItem}>
-              <Skeleton
-                style={[styles.topFollowerAvatar, { backgroundColor: getPrimaryColor('700') }]}
-              />
-              <Skeleton
-                style={{
-                  width: 60,
-                  height: 12,
-                  borderRadius: 4,
-                  marginTop: 6,
-                  backgroundColor: getPrimaryColor('700'),
-                }}
-              />
-            </View>
-          ))}
-        </HStack>
+        <View style={styles.topFollowersGrid}>{[0, 1, 2, 3, 4, 5].map(renderSkeleton)}</View>
       ) : (
         <Animated.View style={{ opacity: fadeAnim }}>
-          <HStack gap={12} style={{ flexWrap: 'wrap' }}>
-            {followersWithProfiles.map((follower) => (
-              <TouchableOpacity
-                key={follower.pubkey}
-                style={styles.topFollowerItem}
-                onPress={() => handleFollowerPress(follower)}
-                activeOpacity={0.7}>
-                <Avatar
-                  picture={getFollowerPicture(follower)}
-                  seed={follower.pubkey}
-                  size={48}
-                  variant="person"
-                  name={getFollowerDisplayName(follower)}
-                />
-                <Text
-                  size={11}
-                  bold
-                  numberOfLines={1}
-                  style={{
-                    color: getPrimaryColor('200'),
-                    marginTop: 6,
-                    textAlign: 'center',
-                    maxWidth: 64,
-                  }}>
-                  {getFollowerDisplayName(follower)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </HStack>
+          <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
         </Animated.View>
       )}
       <Spacer size={16} />
@@ -868,15 +874,17 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 4,
   },
-  topFollowerItem: {
+  topFollowersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  topFollowerGridItem: {
     alignItems: 'center',
-    width: 64,
     marginBottom: 8,
   },
   topFollowerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    borderRadius: 32,
   },
 });
 
