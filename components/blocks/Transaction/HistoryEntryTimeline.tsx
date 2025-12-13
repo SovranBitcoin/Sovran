@@ -88,7 +88,7 @@ interface TimelineDotProps {
 
 function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }: TimelineDotProps) {
   const dotSize = 14;
-  const smallDotSize = 6;
+  const _smallDotSize = 6;
   const iconSize = 14;
 
   // Future small dot
@@ -135,7 +135,7 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
   // Get background color and icon based on step type
   let backgroundColor = greenColor;
   let iconName = 'fluent:checkmark-16-filled';
-  let boxShadow = false;
+  let _boxShadow = false;
 
   switch (stepType) {
     case 'complete':
@@ -146,7 +146,7 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
     case 'current':
       backgroundColor = greenColor;
       iconName = 'fluent:checkmark-16-filled';
-      boxShadow = true;
+      _boxShadow = true;
       break;
     case 'expired':
       backgroundColor = redColor;

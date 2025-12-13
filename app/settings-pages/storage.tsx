@@ -242,7 +242,7 @@ const StoreCard: React.FC<{
 };
 
 export default function StorageScreen() {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const { getPrimaryColor, getRedColor: _getRedColor } = useTheme();
   const [expandedStores, setExpandedStores] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -395,7 +395,7 @@ export default function StorageScreen() {
     setTimeout(() => setRefreshing(false), 500);
   }, []);
 
-  const clearAllStores = () => {
+  const _clearAllStores = () => {
     Alert.alert(
       'Clear All Stores',
       'Are you sure you want to clear ALL store data? This cannot be undone.',

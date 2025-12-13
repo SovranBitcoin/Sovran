@@ -26,7 +26,7 @@ function SharePage() {
   const [headerTitle, setHeaderTitle] = useState(SHARE_CONFIGS[type]?.title || 'Share Profile');
 
   const handleTitleChange = useCallback((title: string) => {
-    setHeaderTitle(title);
+    setHeaderTitle(title as typeof headerTitle);
   }, []);
 
   return (

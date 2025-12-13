@@ -138,7 +138,7 @@ const DeleteScreen: React.FC = () => {
     await Updates.reloadAsync();
   }, [dispatch]);
 
-  const handleCancel = useCallback(() => {
+  const _handleCancel = useCallback(() => {
     router.back();
   }, []);
 

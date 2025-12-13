@@ -13,7 +13,7 @@ const OUTPUT_DIR = path.join(__dirname, 'screenshots-output');
 
 async function resizeScreenshots() {
   // Get all image files from input directory
-  const files = fs.readdirSync(INPUT_DIR).filter(file => {
+  const files = fs.readdirSync(INPUT_DIR).filter((file) => {
     const ext = path.extname(file).toLowerCase();
     return ['.png', '.jpg', '.jpeg'].includes(ext);
   });
@@ -41,10 +41,10 @@ async function resizeScreenshots() {
 
   for (const file of files) {
     const inputPath = path.join(INPUT_DIR, file);
-    
+
     for (const dim of TARGET_DIMENSIONS) {
       const outputPath = path.join(OUTPUT_DIR, dim.name, file);
-      
+
       try {
         await sharp(inputPath)
           .resize(dim.width, dim.height, {
@@ -53,7 +53,7 @@ async function resizeScreenshots() {
           })
           .png({ quality: 100 }) // High quality output
           .toFile(outputPath);
-        
+
         console.log(`✓ ${file} → ${dim.name}/`);
         processed++;
       } catch (err) {
@@ -68,8 +68,7 @@ async function resizeScreenshots() {
   console.log(`Output saved to: scripts/screenshots-output/`);
 }
 
-resizeScreenshots().catch(err => {
+resizeScreenshots().catch((err) => {
   console.error('Fatal error:', err);
   process.exit(1);
 });
-

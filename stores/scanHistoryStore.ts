@@ -160,4 +160,3 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
     }
   )
 );
-

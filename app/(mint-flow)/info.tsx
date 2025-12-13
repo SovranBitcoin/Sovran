@@ -529,7 +529,12 @@ function MintInfoModal() {
   const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
   const insets = useSafeAreaInsets();
   const { mintUrl, fromScan } = useLocalSearchParams<{ mintUrl: string; fromScan?: string }>();
-  const { getMintInfo, isKnownMint, addMint, isLoading: mintManagementLoading } = useMintManagement();
+  const {
+    getMintInfo,
+    isKnownMint,
+    addMint,
+    isLoading: mintManagementLoading,
+  } = useMintManagement();
 
   const [mintInfo, setMintInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);

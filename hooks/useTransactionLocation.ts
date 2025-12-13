@@ -82,4 +82,3 @@ export function useLocationStampingToggle() {
   const setEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   return { enabled, setEnabled };
 }
-
