@@ -1,6 +1,6 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Pressable, Alert, Platform } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
@@ -38,7 +38,9 @@ export default function HomeLayout() {
   const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
 
   // Get available mints and their balances for NFC payments
-  const { balance: availableMints } = useBalanceContext();
+  // Filter out 'total' key - it's the aggregate balance, not a mint URL
+  const { balance: balancesWithTotal } = useBalanceContext();
+  const { total: _total, ...availableMints } = balancesWithTotal;
 
   // Get BTC price for USD to sats conversion
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -117,10 +119,37 @@ export default function HomeLayout() {
             // Log NFC scan to history regardless of payment outcome
             addScan(raw, raw, 'ecash', 'nfc');
           },
+          onLightningInvoice: (invoice, amount) => {
+            // Log to scan history as lightning via NFC
+            addScan(invoice, invoice, 'lightning', 'nfc');
+
+            if (amount) {
+              // Always go through mintSelect for Lightning invoices
+              // This lets the user choose which mint to use and validates fees
+              router.navigate({
+                pathname: '/(send-flow)/mintSelect' as any,
+                params: {
+                  to: 'meltQuote',
+                  unit: 'sat',
+                  minAmount: String(amount),
+                  invoice, // Pass invoice to be forwarded to meltQuote
+                },
+              });
+            } else {
+              // No amount in invoice - go to currency screen to enter amount
+              router.navigate({
+                pathname: '/(send-flow)/currency' as any,
+                params: { to: 'meltQuote', lnUrlOrAddress: invoice, unit: 'sat' },
+              });
+            }
+          },
         });
 
         console.log('[NFC Payment] Success:', result);
-        Alert.alert('Payment Sent', `Successfully sent ${result.amount} sats via NFC!`);
+        // Don't show success alert if Lightning invoice was detected (handled by onLightningInvoice)
+        // if (result.mintUrl) {
+        //   Alert.alert('Payment Sent', `Successfully sent ${result.amount} sats via NFC!`);
+        // }
       } catch (error) {
         console.error('[NFC Payment] Error:', error);
 

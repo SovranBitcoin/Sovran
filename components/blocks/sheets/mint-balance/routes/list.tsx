@@ -37,6 +37,7 @@ import { Mint } from 'coco-cashu-core';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Spinner } from '@/components/ui/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
@@ -167,9 +168,6 @@ const MintItem: React.FC<MintItemProps> = ({
               name={displayName}
               alt={`${displayName} mint`}
             />
-            <View style={{ position: 'absolute', bottom: -2, right: -2 }}>
-              {isLoading && <View className="h-3 w-3 animate-pulse rounded-full bg-primary-600" />}
-            </View>
           </View>
 
           <VStack flex={1}>
@@ -195,7 +193,16 @@ const MintItem: React.FC<MintItemProps> = ({
             </View>
           </VStack>
 
-          {showCheckbox ? (
+          {isLoading ? (
+            <View
+              style={{
+                padding: 8,
+                borderRadius: 1000,
+                backgroundColor: 'transparent',
+              }}>
+              <Spinner size={20} />
+            </View>
+          ) : showCheckbox ? (
             <Checkbox
               checked={selected}
               onCheckedChange={() => {

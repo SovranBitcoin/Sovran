@@ -34,7 +34,7 @@
 
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { Buffer } from 'buffer';
-import { Alert } from 'react-native';
+import { isLightningInvoice, lnTrim, getLightningAmount } from '@/helper/coco/utils';
 
 // ============================================================================
 // CONSTANTS
@@ -142,6 +142,12 @@ interface PaymentOptions {
    * Called regardless of payment success/failure - useful for logging scan history.
    */
   onScanRead?: (raw: string) => void;
+  /**
+   * Callback when a Lightning invoice is detected instead of a Cashu payment request.
+   * If provided, the NFC payment will abort and call this callback.
+   * The caller should navigate to the melt flow.
+   */
+  onLightningInvoice?: (invoice: string, amount: number) => void;
 }
 
 /** Result of a successful payment */
@@ -462,15 +468,15 @@ function selectBestMint(
     logDebug(`Available mint URLs: ${appMintUrls.join(', ')}`);
 
     // Debug Alert to show mint selection info
-    Alert.alert(
-      'Mint Selection Debug',
-      `Preferred (input): ${preferredMint || 'none'}\n` +
-        `Preferred (matched): ${matchedPreferredMint || 'not found'}\n` +
-        `Balance: ${matchedPreferredMint ? availableMints[matchedPreferredMint] : 'N/A'}\n` +
-        `Amount needed: ${amount}\n` +
-        `Available mints: ${appMintUrls.join(', ')}`,
-      [{ text: 'OK' }]
-    );
+    // Alert.alert(
+    //   'Mint Selection Debug',
+    //   `Preferred (input): ${preferredMint || 'none'}\n` +
+    //     `Preferred (matched): ${matchedPreferredMint || 'not found'}\n` +
+    //     `Balance: ${matchedPreferredMint ? availableMints[matchedPreferredMint] : 'N/A'}\n` +
+    //     `Amount needed: ${amount}\n` +
+    //     `Available mints: ${appMintUrls.join(', ')}`,
+    //   [{ text: 'OK' }]
+    // );
 
     // Check preferred mint first (using normalized matching)
     if (matchedPreferredMint) {
@@ -497,10 +503,7 @@ function selectBestMint(
       return { mintUrl: selected, balance: availableMints[selected] };
     }
 
-    throw new NfcError(
-      `Insufficient balance. You need at least ${amount} sats.`,
-      'INSUFFICIENT_BALANCE'
-    );
+    throw new NfcError(`You need at least one mint with ${amount} sats.`, 'INSUFFICIENT_BALANCE');
   }
 
   // POS has specified allowed mints - find intersection with app mints (using normalized URLs)
@@ -557,9 +560,18 @@ function selectBestMint(
   }
 
   // We have compatible mints but none have sufficient balance
-  const maxBalance = Math.max(...compatibleAppMints.map((url) => availableMints[url]));
+  // Extract friendly mint names from URLs for the error message
+  const mintNames = allowedMints.map((url) => {
+    try {
+      const withoutProtocol = url.replace(/^https?:\/\//, '');
+      return withoutProtocol.split('/')[0] || url;
+    } catch {
+      return url;
+    }
+  });
+  const mintList = mintNames.join(', ');
   throw new NfcError(
-    `Insufficient balance at compatible mints. You need ${amount} sats but your highest balance is ${maxBalance} sats.`,
+    `You need at least ${amount} sats in either of these mints: ${mintList}`,
     'INSUFFICIENT_BALANCE_AT_COMPATIBLE_MINT'
   );
 }
@@ -739,8 +751,15 @@ export class NfcPayment {
    * ```
    */
   static async performPayment(options: PaymentOptions): Promise<PaymentResult> {
-    const { createToken, recoverToken, availableMints, preferredMint, maxAmountSats, onScanRead } =
-      options;
+    const {
+      createToken,
+      recoverToken,
+      availableMints,
+      preferredMint,
+      maxAmountSats,
+      onScanRead,
+      onLightningInvoice,
+    } = options;
 
     log('Starting NFC payment flow...');
 
@@ -889,6 +908,38 @@ export class NfcPayment {
 
       logDebug(`Preview: ${paymentRequest.substring(0, 60)}...`);
 
+      // ===== CHECK FOR LIGHTNING INVOICE =====
+      // Sometimes NFC tags contain Lightning invoices instead of Cashu payment requests
+      const trimmedForLightning = lnTrim(paymentRequest);
+      if (isLightningInvoice(trimmedForLightning)) {
+        log('Lightning invoice detected via NFC');
+        const lnAmount = getLightningAmount(trimmedForLightning);
+        log(`Lightning amount: ${lnAmount} sats`);
+
+        if (onLightningInvoice) {
+          // Release NFC connection BEFORE calling callback to close the NFC prompt
+          log('Releasing NFC connection before Lightning navigation...');
+          try {
+            await NfcManager.cancelTechnologyRequest();
+          } catch (releaseError) {
+            logWarn('Failed to release NFC technology:', releaseError);
+          }
+
+          // Now call the callback to navigate to melt flow
+          onLightningInvoice(trimmedForLightning, lnAmount);
+
+          // Return early - don't process as Cashu payment
+          // Note: finally block will try to release again but that's safe
+          return { paymentRequest, mintUrl: '', amount: lnAmount };
+        }
+
+        // No handler provided - throw error
+        throw new NfcError(
+          'Lightning invoice detected. Please use the Lightning payment flow.',
+          'LIGHTNING_INVOICE_DETECTED'
+        );
+      }
+
       // ===== PHASE 2: DECODE AND VALIDATE =====
       log('Phase 2: Decoding payment request...');
 
@@ -896,7 +947,7 @@ export class NfcPayment {
       const decoded = decodePaymentRequest(paymentRequest);
 
       // Debug: Show decoded payment request
-      Alert.alert('Decoded Payment Request', JSON.stringify(decoded, null, 2), [{ text: 'OK' }]);
+      // Alert.alert('Decoded Payment Request', JSON.stringify(decoded, null, 2), [{ text: 'OK' }]);
 
       amount = decoded.amount || 0;
       const unit = decoded.unit || 'sat';

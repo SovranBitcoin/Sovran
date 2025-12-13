@@ -143,6 +143,14 @@ export function MeltQuoteScreen({
   // This ensures we always pay with the mint that created the quote
   const lastQuoteMintRef = useRef<string | null>(null);
 
+  // Initialize lastQuoteMintRef from history entry if provided
+  // This is needed for NFC flow where we pass a pre-created quote
+  useEffect(() => {
+    if (trackedHistoryEntry?.mintUrl && !lastQuoteMintRef.current) {
+      lastQuoteMintRef.current = trackedHistoryEntry.mintUrl;
+    }
+  }, [trackedHistoryEntry?.mintUrl]);
+
   // The history entry to display - either from prop or created
   const currentTransaction = trackedHistoryEntry || createdHistoryEntry;
 
@@ -222,6 +230,7 @@ export function MeltQuoteScreen({
         lastQuoteMintRef.current = selectedMintFromStore;
         try {
           const result = await createMeltQuote(selectedMintFromStore, invoice);
+
           // Capture and store location right after quote creation
           if (result?.historyEntry?.id) {
             await captureAndStoreLocation(result.historyEntry.id);
@@ -252,14 +261,14 @@ export function MeltQuoteScreen({
     // 2. Store mint changed from what we used for the current quote
     // 3. We're not currently creating a quote
     // 4. Current transaction is UNPAID (don't re-create for already paid quotes)
-    // 5. We're not viewing an existing transaction (meltHistoryEntryProp)
+    // Note: We allow re-creation even if we started with a history entry
+    // (e.g., NFC flow passes pre-created quote but user changes mint)
     if (
       invoice &&
       selectedMintFromStore &&
       lastQuoteMintRef.current &&
       selectedMintFromStore !== lastQuoteMintRef.current &&
       !isCreating &&
-      !meltHistoryEntryProp &&
       currentTransaction?.state === 'UNPAID'
     ) {
       console.log(
@@ -279,7 +288,6 @@ export function MeltQuoteScreen({
     invoiceProp,
     resolvedInvoice,
     isCreating,
-    meltHistoryEntryProp,
     currentTransaction?.state,
     createMeltQuote,
     resetMeltState,
