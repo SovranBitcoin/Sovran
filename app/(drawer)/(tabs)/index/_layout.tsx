@@ -11,6 +11,7 @@ import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useCallback } from 'react';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
@@ -29,6 +30,7 @@ export default function HomeLayout() {
   const navigation = useNavigation();
   const { send } = useSendWithHistory();
   const manager = useManager();
+  const addScan = useScanHistoryStore((state) => state.addScan);
 
   // Get user's selected mint for NFC payments
   const { keys } = useNostrKeysContext();
@@ -111,6 +113,10 @@ export default function HomeLayout() {
           availableMints,
           preferredMint: mintToUse,
           maxAmountSats,
+          onScanRead: (raw) => {
+            // Log NFC scan to history regardless of payment outcome
+            addScan(raw, raw, 'ecash', 'nfc');
+          },
         });
 
         console.log('[NFC Payment] Success:', result);
@@ -180,7 +186,7 @@ export default function HomeLayout() {
         }
       }
     },
-    [send, manager, availableMints, selectedMint, usdToSats, getSelectedMint, keys?.pubkey]
+    [send, manager, availableMints, selectedMint, usdToSats, getSelectedMint, keys?.pubkey, addScan]
   );
 
   const renderHeaderRight = () => {

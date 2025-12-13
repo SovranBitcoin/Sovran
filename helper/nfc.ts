@@ -137,6 +137,11 @@ interface PaymentOptions {
   preferredMint?: string;
   /** Maximum amount in sats (rejects if payment request exceeds this) */
   maxAmountSats?: number;
+  /**
+   * Callback when payment request is read from NFC.
+   * Called regardless of payment success/failure - useful for logging scan history.
+   */
+  onScanRead?: (raw: string) => void;
 }
 
 /** Result of a successful payment */
@@ -734,7 +739,8 @@ export class NfcPayment {
    * ```
    */
   static async performPayment(options: PaymentOptions): Promise<PaymentResult> {
-    const { createToken, recoverToken, availableMints, preferredMint, maxAmountSats } = options;
+    const { createToken, recoverToken, availableMints, preferredMint, maxAmountSats, onScanRead } =
+      options;
 
     log('Starting NFC payment flow...');
 
@@ -877,6 +883,9 @@ export class NfcPayment {
           'EMPTY_PAYMENT_REQUEST'
         );
       }
+
+      // Log scan to history regardless of payment outcome
+      onScanRead?.(paymentRequest);
 
       logDebug(`Preview: ${paymentRequest.substring(0, 60)}...`);
 

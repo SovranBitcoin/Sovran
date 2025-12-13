@@ -1,7 +1,7 @@
 /**
  * @fileoverview Scan History Store
  *
- * Keeps track of all QR codes/strings that have been scanned.
+ * Keeps track of all QR codes/strings that have been scanned via QR or NFC.
  * Stores both raw and processed versions for different use cases.
  *
  * This can be used for:
@@ -14,17 +14,23 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/** What type of data was scanned */
 export type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'unknown';
+
+/** How the data was scanned */
+export type ScanSource = 'qr' | 'nfc';
 
 export interface ScanHistoryEntry {
   /** Unique identifier for this scan */
   id: string;
-  /** The raw string as scanned from QR code */
+  /** The raw string as scanned */
   raw: string;
   /** The processed/normalized string (e.g., npub without nostr: prefix) */
   processed: string;
-  /** Type of the scanned data */
+  /** Type of the scanned data (what was scanned) */
   type: ScanType;
+  /** Source of the scan (how it was scanned) */
+  source: ScanSource;
   /** Timestamp when scanned */
   scannedAt: number;
 }
@@ -35,7 +41,7 @@ interface ScanHistoryState {
 
 interface ScanHistoryActions {
   /** Add a scan to history */
-  addScan: (raw: string, processed: string, type: ScanType) => void;
+  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => void;
   /** Get all scan history entries */
   getEntries: () => ScanHistoryEntry[];
   /** Get entries filtered by type */
@@ -69,7 +75,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       entries: [],
 
       // Add a scan to history
-      addScan: (raw: string, processed: string, type: ScanType) => {
+      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => {
         const { entries } = get();
         const now = Date.now();
 
@@ -77,10 +83,11 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         const existingIndex = entries.findIndex((entry) => entry.raw === raw);
 
         if (existingIndex !== -1) {
-          // Update timestamp for existing entry
+          // Update timestamp and source for existing entry
           const updated = [...entries];
           updated[existingIndex] = {
             ...updated[existingIndex],
+            source,
             scannedAt: now,
           };
           set({ entries: updated });
@@ -91,6 +98,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             raw,
             processed,
             type,
+            source,
             scannedAt: now,
           };
           set({ entries: [...entries, newEntry] });

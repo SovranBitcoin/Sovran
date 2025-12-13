@@ -119,7 +119,7 @@ export const useProcessPaymentString = ({
             onProgress?.(0);
 
             // Only save to scan history once when UR is fully decoded (not for each frame)
-            addScan(scanning.data, _tokenString, 'ecash');
+            addScan(scanning.data, _tokenString, 'ecash', 'qr');
 
             // Create a receive history entry for ecash receive
             const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
@@ -155,7 +155,7 @@ export const useProcessPaymentString = ({
         // Handle regular ecash tokens
         if (isValidEcashToken(scanning.data)) {
           // Save to scan history
-          addScan(scanning.data, scanning.data, 'ecash');
+          addScan(scanning.data, scanning.data, 'ecash', 'qr');
 
           // Create a receive history entry for ecash receive
           const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
@@ -190,7 +190,7 @@ export const useProcessPaymentString = ({
           const isInvoice = isLightningInvoice(trimmedData);
 
           // Save to scan history
-          addScan(scanning.data, trimmedData, 'lightning');
+          addScan(scanning.data, trimmedData, 'lightning', 'qr');
 
           if (isInvoice && amount) {
             // Direct Lightning invoice with amount - navigate to MeltQuoteScreen
@@ -220,7 +220,7 @@ export const useProcessPaymentString = ({
         const trimmedUrl = scanning.data.trim();
         if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
           // Save to scan history
-          addScan(scanning.data, trimmedUrl, 'mint');
+          addScan(scanning.data, trimmedUrl, 'mint', 'qr');
 
           router.navigate({
             pathname: '/(mint-flow)/info' as any,
@@ -236,7 +236,7 @@ export const useProcessPaymentString = ({
         const validNpub = parseNpub(scanning.data);
         if (validNpub) {
           // Store the scan in history
-          addScan(scanning.data, validNpub, 'npub');
+          addScan(scanning.data, validNpub, 'npub', 'qr');
 
           router.navigate({
             pathname: '/(user-flow)/profile' as any,
