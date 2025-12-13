@@ -145,6 +145,7 @@ const MintItem: React.FC<MintItemProps> = ({
 
   return (
     <TouchableOpacity
+      key={mint.mintUrl}
       className="bg-primary-900"
       style={{
         padding: 16,
@@ -159,6 +160,7 @@ const MintItem: React.FC<MintItemProps> = ({
         <HStack align="center" gap={12}>
           <View style={{ position: 'relative' }}>
             <Avatar
+              key={mint.mintUrl}
               picture={mint.mintInfo?.icon_url || undefined}
               size={42}
               variant="mint"

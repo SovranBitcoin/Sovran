@@ -320,7 +320,9 @@ export function MintListScreen({
                   selectedCurrency={selectedCurrency}
                   kymScore={kymScore}
                   kymLoading={kymLoading}
-                  onPress={() => handleMintSelect(mint.mintUrl)}
+                  onPress={() => {
+                    handleMintSelect(mint.mintUrl);
+                  }}
                 />
               );
             })}

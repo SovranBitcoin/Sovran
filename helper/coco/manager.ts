@@ -137,7 +137,7 @@ export class CocoManager {
           {
             syncIntervalMs: 30000, // Sync every 30 seconds
             useWebsocket: true, // Enable real-time updates
-            logger: new ConsoleLogger('NPCPlugin', { level: 'debug' }),
+            // logger: new ConsoleLogger('NPCPlugin', { level: 'debug' }),
           }
         );
         plugins.push(npcPlugin);

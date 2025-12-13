@@ -7,14 +7,14 @@ import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
 import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { NfcPayment, NfcError } from '@/helper/nfc';
-// import { useSend, useReceive } from 'hooks/coco';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useCallback } from 'react';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
-import { useReceive, useSend } from 'coco-cashu-react';
+import { useBalanceContext, useManager } from 'coco-cashu-react';
+import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 
 // Payment limit tiers in USD
 const PAYMENT_TIERS = [
@@ -27,13 +27,16 @@ const PAYMENT_TIERS = [
 export default function HomeLayout() {
   const iconColor = useThemeColor({}, 'text');
   const navigation = useNavigation();
-  const { send } = useSend();
-  const { receive } = useReceive();
+  const { send } = useSendWithHistory();
+  const manager = useManager();
 
   // Get user's selected mint for NFC payments
   const { keys } = useNostrKeysContext();
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
+
+  // Get available mints and their balances for NFC payments
+  const { balance: availableMints } = useBalanceContext();
 
   // Get BTC price for USD to sats conversion
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -61,23 +64,52 @@ export default function HomeLayout() {
       console.log('[NFC Payment] Starting...');
       console.log(`[NFC Payment] USD limit: ${usdLimit ?? 'none'}`);
       console.log(`[NFC Payment] Sats limit: ${maxAmountSats ?? 'none'}`);
-      console.log(`[NFC Payment] Preferred mint: ${selectedMint || 'none'}`);
+      console.log(`[NFC Payment] User pubkey: ${keys?.pubkey || 'none'}`);
+      console.log(`[NFC Payment] Selected mint from store: ${selectedMint || 'none'}`);
+      console.log(`[NFC Payment] Available mints:`, Object.keys(availableMints));
+      console.log(`[NFC Payment] Available mints with balances:`, availableMints);
 
-      if (!send || !receive) {
+      // Debug: Get fresh value from store
+      const freshSelectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
+      console.log(`[NFC Payment] Fresh selected mint from store: ${freshSelectedMint || 'none'}`);
+
+      // Debug: Get all selected mints
+      const allSelectedMints = useMintStore.getState().getAllSelectedMints();
+      console.log(`[NFC Payment] All selected mints in store:`, allSelectedMints);
+
+      if (!send || !manager) {
         Alert.alert('Error', 'Wallet not ready. Please try again.');
         return;
       }
 
+      // Use fresh value from store to avoid stale closure issues
+      const mintToUse = freshSelectedMint || selectedMint;
+      console.log(`[NFC Payment] Using mint for payment: ${mintToUse || 'none'}`);
+
+      // Track the operation ID for rollback if needed
+      let lastOperationId: string | null = null;
+
       try {
         const result = await NfcPayment.performPayment({
           createToken: async (mintUrl, amount) => {
-            const token = await send(mintUrl, amount);
+            // useSendWithHistory returns both token and historyEntry with operationId
+            const { token, historyEntry } = await send(mintUrl, amount);
+            lastOperationId = historyEntry.operationId;
+            console.log(`[NFC Payment] Token created, operationId: ${lastOperationId}`);
             return getEncodedTokenV4(token);
           },
-          recoverToken: async (token) => {
-            await receive(token);
+          recoverToken: async () => {
+            // Use rollback instead of receive for proper recovery
+            if (lastOperationId) {
+              console.log(`[NFC Payment] Rolling back operation: ${lastOperationId}`);
+              await manager.send.rollback(lastOperationId);
+              console.log(`[NFC Payment] Rollback successful`);
+            } else {
+              console.warn('[NFC Payment] No operationId available for rollback');
+            }
           },
-          preferredMint: selectedMint,
+          availableMints,
+          preferredMint: mintToUse,
           maxAmountSats,
         });
 
@@ -123,6 +155,22 @@ export default function HomeLayout() {
                 'Could not connect to the terminal. Make sure NFC is enabled and try again.'
               );
               break;
+            case 'NO_AVAILABLE_MINTS':
+              Alert.alert(
+                'No Mints Available',
+                'You need to add a mint to your wallet before making NFC payments.'
+              );
+              break;
+            case 'NO_COMPATIBLE_MINT':
+              Alert.alert(
+                'Incompatible Terminal',
+                "This terminal requires a mint you don't have. Add one of the supported mints to your wallet."
+              );
+              break;
+            case 'INSUFFICIENT_BALANCE':
+            case 'INSUFFICIENT_BALANCE_AT_COMPATIBLE_MINT':
+              Alert.alert('Insufficient Balance', error.message);
+              break;
             default:
               Alert.alert('Payment Failed', error.message);
           }
@@ -132,7 +180,7 @@ export default function HomeLayout() {
         }
       }
     },
-    [send, receive, selectedMint, usdToSats]
+    [send, manager, availableMints, selectedMint, usdToSats, getSelectedMint, keys?.pubkey]
   );
 
   const renderHeaderRight = () => {

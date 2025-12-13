@@ -15,12 +15,17 @@
  * ```typescript
  * import { NfcPayment } from '@/helper/nfc';
  *
+ * let operationId: string | null = null;
  * const result = await NfcPayment.performPayment({
  *   createToken: async (mintUrl, amount) => {
- *     const token = await send(mintUrl, amount);
+ *     const { token, historyEntry } = await send(mintUrl, amount);
+ *     operationId = historyEntry.operationId;
  *     return getEncodedTokenV4(token);
  *   },
- *   recoverToken: async (token) => await receive(token),
+ *   recoverToken: async () => {
+ *     if (operationId) await manager.send.rollback(operationId);
+ *   },
+ *   availableMints: { 'https://mint.example.com': 5000 },
  *   preferredMint: 'https://mint.example.com',
  *   maxAmountSats: 10000,
  * });
@@ -29,6 +34,7 @@
 
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { Buffer } from 'buffer';
+import { Alert } from 'react-native';
 
 // ============================================================================
 // CONSTANTS
@@ -67,9 +73,16 @@ const STATUS_OK = '9000';
 /** Status word descriptions for debugging */
 const STATUS_CODES: Record<string, string> = {
   '9000': 'Success',
+  '6f00': 'No precise diagnosis (command failed)',
+  '6a80': 'Incorrect parameters in data field',
+  '6a81': 'Function not supported',
   '6a82': 'File not found',
+  '6a83': 'Record not found',
+  '6a84': 'Not enough memory space',
   '6a86': 'Incorrect P1-P2 parameters',
   '6a87': 'Lc inconsistent with TLV structure',
+  '6b00': 'Wrong parameters P1-P2',
+  '6c00': 'Wrong length Le',
   '6700': 'Wrong length',
   '6982': 'Security status not satisfied',
   '6985': 'Conditions of use not satisfied',
@@ -82,9 +95,6 @@ const MAX_CHUNK_SIZE = 240;
 
 /** Short record flag in NDEF header */
 const SHORT_RECORD_FLAG = 0x10;
-
-/** Default fallback mint URL */
-const DEFAULT_MINT = 'https://mint.sovran.money';
 
 // ============================================================================
 // TYPES
@@ -115,9 +125,15 @@ interface ApduResponse {
 interface PaymentOptions {
   /** Function to create a Cashu token from mint URL and amount */
   createToken: (mintUrl: string, amount: number) => Promise<string>;
-  /** Function to recover/reclaim a token if write fails */
+  /**
+   * Function to recover/rollback a token if write fails.
+   * Called with the encoded token string for reference/logging.
+   * Implementation should use manager.send.rollback(operationId) for proper recovery.
+   */
   recoverToken: (token: string) => Promise<void>;
-  /** User's preferred mint URL (used if in allowed list) */
+  /** Map of available mint URLs to their balances (required for mint validation) */
+  availableMints: Record<string, number>;
+  /** User's preferred mint URL (used if in allowed list and has sufficient balance) */
   preferredMint?: string;
   /** Maximum amount in sats (rejects if payment request exceeds this) */
   maxAmountSats?: number;
@@ -366,35 +382,181 @@ function decodeTextRecord(ndef: number[]): string {
 // ============================================================================
 
 /**
- * Select the best mint from allowed mints, preferring the user's selected mint
+ * Normalize a mint URL for consistent comparison
+ * - Removes trailing slashes
+ * - Converts to lowercase
+ */
+function normalizeMintUrl(url: string): string {
+  return url.toLowerCase().replace(/\/+$/, '');
+}
+
+/**
+ * Find a mint URL in the available mints, accounting for URL format differences
+ * Returns the original key from availableMints if found, otherwise undefined
+ */
+function findMintInAvailable(
+  mintUrl: string,
+  availableMints: Record<string, number>
+): string | undefined {
+  const normalizedSearch = normalizeMintUrl(mintUrl);
+  for (const key of Object.keys(availableMints)) {
+    if (normalizeMintUrl(key) === normalizedSearch) {
+      return key;
+    }
+  }
+  return undefined;
+}
+
+/** Result of mint selection */
+interface MintSelectionResult {
+  mintUrl: string;
+  balance: number;
+}
+
+/**
+ * Select the best mint for payment based on allowed mints and available balances
  *
- * @param allowedMints - Array of mint URLs allowed by the payment request
+ * Priority:
+ * 1. User's preferred mint (if in allowed list AND has sufficient balance)
+ * 2. Any available mint with sufficient balance (sorted by balance descending)
+ * 3. Throw error if no compatible mint found
+ *
+ * @param allowedMints - Array of mint URLs allowed by the payment request (from POS)
+ * @param availableMints - Map of the app's available mint URLs to their balances
+ * @param amount - Required amount in sats
  * @param preferredMint - The user's preferred/selected mint URL
- * @param fallbackMint - Default mint to use if no other option is available
- * @returns The selected mint URL
+ * @returns The selected mint URL and its balance
+ * @throws {NfcError} If no compatible mint is found
  */
 function selectBestMint(
   allowedMints: string[] | undefined,
-  preferredMint?: string,
-  fallbackMint = DEFAULT_MINT
-): string {
-  // If no allowed mints specified, use preferred or fallback
+  availableMints: Record<string, number>,
+  amount: number,
+  preferredMint?: string
+): MintSelectionResult {
+  const appMintUrls = Object.keys(availableMints);
+
+  log(`Available app mints: ${appMintUrls.length}`);
+  logDebug(`App mints: ${appMintUrls.join(', ')}`);
+
+  // If no allowed mints specified by POS, any app mint with sufficient balance works
   if (!allowedMints || allowedMints.length === 0) {
-    const selected = preferredMint || fallbackMint;
-    log(`No allowed mints specified, using: ${selected}`);
-    return selected;
+    log('No allowed mints specified by POS, using any available mint');
+
+    // Use URL normalization to find the preferred mint
+    const matchedPreferredMint = preferredMint
+      ? findMintInAvailable(preferredMint, availableMints)
+      : undefined;
+
+    // Debug: Log preferred mint info
+    log(`Preferred mint (input): ${preferredMint || 'none'}`);
+    log(`Preferred mint (matched): ${matchedPreferredMint || 'not found'}`);
+    if (matchedPreferredMint) {
+      log(`Preferred mint balance: ${availableMints[matchedPreferredMint]}`);
+    }
+    logDebug(`Available mint URLs: ${appMintUrls.join(', ')}`);
+
+    // Debug Alert to show mint selection info
+    Alert.alert(
+      'Mint Selection Debug',
+      `Preferred (input): ${preferredMint || 'none'}\n` +
+        `Preferred (matched): ${matchedPreferredMint || 'not found'}\n` +
+        `Balance: ${matchedPreferredMint ? availableMints[matchedPreferredMint] : 'N/A'}\n` +
+        `Amount needed: ${amount}\n` +
+        `Available mints: ${appMintUrls.join(', ')}`,
+      [{ text: 'OK' }]
+    );
+
+    // Check preferred mint first (using normalized matching)
+    if (matchedPreferredMint) {
+      const balance = availableMints[matchedPreferredMint];
+      if (balance >= amount) {
+        log(`Using preferred mint (no restrictions): ${matchedPreferredMint}`);
+        return { mintUrl: matchedPreferredMint, balance };
+      }
+      logWarn(`Preferred mint has insufficient balance: ${balance} < ${amount}`);
+    } else if (preferredMint) {
+      logWarn(`Preferred mint not found in available mints: ${preferredMint}`);
+      logWarn(`Normalized preferred: ${normalizeMintUrl(preferredMint)}`);
+      logWarn(`Normalized available: ${appMintUrls.map(normalizeMintUrl).join(', ')}`);
+    }
+
+    // Find any mint with sufficient balance
+    const mintsWithBalance = appMintUrls
+      .filter((url) => availableMints[url] >= amount)
+      .sort((a, b) => availableMints[b] - availableMints[a]);
+
+    if (mintsWithBalance.length > 0) {
+      const selected = mintsWithBalance[0];
+      log(`Using mint with highest balance: ${selected}`);
+      return { mintUrl: selected, balance: availableMints[selected] };
+    }
+
+    throw new NfcError(
+      `Insufficient balance. You need at least ${amount} sats.`,
+      'INSUFFICIENT_BALANCE'
+    );
   }
 
-  // If user has a preferred mint and it's in the allowed list, use it
-  if (preferredMint && allowedMints.includes(preferredMint)) {
-    log(`Using user's preferred mint: ${preferredMint}`);
-    return preferredMint;
+  // POS has specified allowed mints - find intersection with app mints (using normalized URLs)
+  log(`POS allowed mints: ${allowedMints.length}`);
+  logDebug(`Allowed mints: ${allowedMints.join(', ')}`);
+
+  // Find compatible mints by matching normalized URLs
+  // Returns the app's mint URL (key in availableMints) for each match
+  const compatibleMintMatches: { posUrl: string; appUrl: string }[] = [];
+  for (const posMint of allowedMints) {
+    const appMint = findMintInAvailable(posMint, availableMints);
+    if (appMint) {
+      compatibleMintMatches.push({ posUrl: posMint, appUrl: appMint });
+    }
   }
 
-  // Otherwise use the first allowed mint
-  const selected = allowedMints[0];
-  log(`Using first allowed mint: ${selected}`);
-  return selected;
+  if (compatibleMintMatches.length === 0) {
+    // No intersection - the app doesn't have any of the POS's allowed mints
+    logWarn(`No compatible mints found`);
+    logWarn(`POS mints (normalized): ${allowedMints.map(normalizeMintUrl).join(', ')}`);
+    logWarn(`App mints (normalized): ${appMintUrls.map(normalizeMintUrl).join(', ')}`);
+    throw new NfcError(
+      "This terminal requires a mint you don't have. Add one of the supported mints to your wallet.",
+      'NO_COMPATIBLE_MINT'
+    );
+  }
+
+  const compatibleAppMints = compatibleMintMatches.map((m) => m.appUrl);
+  log(`Compatible mints (intersection): ${compatibleAppMints.length}`);
+
+  // Check preferred mint first (must be in compatible list AND have sufficient balance)
+  const matchedPreferredMint = preferredMint
+    ? findMintInAvailable(preferredMint, availableMints)
+    : undefined;
+
+  if (matchedPreferredMint && compatibleAppMints.includes(matchedPreferredMint)) {
+    const balance = availableMints[matchedPreferredMint];
+    if (balance >= amount) {
+      log(`Using preferred mint: ${matchedPreferredMint}`);
+      return { mintUrl: matchedPreferredMint, balance };
+    }
+    logWarn(`Preferred mint has insufficient balance: ${balance} < ${amount}`);
+  }
+
+  // Find a compatible mint with sufficient balance (prefer highest balance)
+  const mintsWithSufficientBalance = compatibleAppMints
+    .filter((url) => availableMints[url] >= amount)
+    .sort((a, b) => availableMints[b] - availableMints[a]);
+
+  if (mintsWithSufficientBalance.length > 0) {
+    const selected = mintsWithSufficientBalance[0];
+    log(`Using compatible mint with sufficient balance: ${selected}`);
+    return { mintUrl: selected, balance: availableMints[selected] };
+  }
+
+  // We have compatible mints but none have sufficient balance
+  const maxBalance = Math.max(...compatibleAppMints.map((url) => availableMints[url]));
+  throw new NfcError(
+    `Insufficient balance at compatible mints. You need ${amount} sats but your highest balance is ${maxBalance} sats.`,
+    'INSUFFICIENT_BALANCE_AT_COMPATIBLE_MINT'
+  );
 }
 
 // ============================================================================
@@ -555,21 +717,37 @@ export class NfcPayment {
    *
    * @example
    * ```typescript
+   * let operationId: string | null = null;
    * const result = await NfcPayment.performPayment({
    *   createToken: async (mintUrl, amount) => {
-   *     const token = await send(mintUrl, amount);
+   *     const { token, historyEntry } = await send(mintUrl, amount);
+   *     operationId = historyEntry.operationId;
    *     return getEncodedTokenV4(token);
    *   },
-   *   recoverToken: async (token) => await receive(token),
+   *   recoverToken: async () => {
+   *     if (operationId) await manager.send.rollback(operationId);
+   *   },
+   *   availableMints: { 'https://mint.example.com': 5000, 'https://other.mint': 10000 },
    *   preferredMint: selectedMint,
    *   maxAmountSats: 10000,
    * });
    * ```
    */
   static async performPayment(options: PaymentOptions): Promise<PaymentResult> {
-    const { createToken, recoverToken, preferredMint, maxAmountSats } = options;
+    const { createToken, recoverToken, availableMints, preferredMint, maxAmountSats } = options;
 
     log('Starting NFC payment flow...');
+
+    // Validate that we have available mints
+    const availableMintUrls = Object.keys(availableMints);
+    if (availableMintUrls.length === 0) {
+      throw new NfcError(
+        'No mints available. Please add a mint to your wallet first.',
+        'NO_AVAILABLE_MINTS'
+      );
+    }
+
+    log(`Available mints: ${availableMintUrls.length}`);
     if (preferredMint) {
       log(`Preferred mint: ${preferredMint}`);
     }
@@ -708,6 +886,9 @@ export class NfcPayment {
       const { decodePaymentRequest } = await import('@cashu/cashu-ts');
       const decoded = decodePaymentRequest(paymentRequest);
 
+      // Debug: Show decoded payment request
+      Alert.alert('Decoded Payment Request', JSON.stringify(decoded, null, 2), [{ text: 'OK' }]);
+
       amount = decoded.amount || 0;
       const unit = decoded.unit || 'sat';
       const allowedMints = decoded.mints || [];
@@ -727,8 +908,10 @@ export class NfcPayment {
         );
       }
 
-      // Select best mint
-      selectedMint = selectBestMint(allowedMints, preferredMint);
+      // Select best mint (validates compatibility with POS and sufficient balance)
+      const mintSelection = selectBestMint(allowedMints, availableMints, amount, preferredMint);
+      selectedMint = mintSelection.mintUrl;
+      log(`Selected mint: ${selectedMint} (balance: ${mintSelection.balance} sats)`);
 
       // ===== PHASE 3: CREATE TOKEN =====
       log('Phase 3: Creating token...');
