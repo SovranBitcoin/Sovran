@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.51",
+    "version": "0.0.52",
     "orientation": "portrait",
     "scheme": ["sovran", "cashu"],
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
     "assetBundlePatterns": ["**/*"],
     "newArchEnabled": true,
     "ios": {
-      "buildNumber": "9",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
         "ITSAppUsesNonExemptEncryption": false,
