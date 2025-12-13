@@ -549,12 +549,12 @@ const PaymentsContent = () => {
   );
 
   const navigateToProfile = useCallback(({ pubkey }: { pubkey: string }) => {
-    router.navigate({
+      router.navigate({
       pathname: '/(user-flow)/profile' as any,
-      params: {
-        pubkey: pubkey,
-      },
-    });
+        params: {
+          pubkey: pubkey,
+        },
+      });
   }, []);
 
   // Handler for recommended user press (currently unused, kept for future RecommendedUsers component)

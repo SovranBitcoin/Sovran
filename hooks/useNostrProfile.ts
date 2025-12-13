@@ -36,8 +36,12 @@ export interface NostrProfileResponse {
   rank: number;
   followers: number;
   follows: number;
+  score: number;
   topFollowers: TopFollower[];
+  created_at: number;
   fromCache: boolean;
+  // Optional mint URL if this profile is associated with a mint
+  mintUrl?: string;
 }
 
 interface UseNostrProfileResult {
@@ -127,4 +131,3 @@ export function getFollowerDisplayName(follower: TopFollower): string {
 export function getFollowerPicture(follower: TopFollower): string | undefined {
   return follower.picture || follower.image;
 }
-

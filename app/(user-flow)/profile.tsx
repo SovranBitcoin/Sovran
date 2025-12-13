@@ -49,9 +49,69 @@ import {
   getFollowerPicture,
   TopFollower,
 } from 'hooks/useNostrProfile';
+import { formatDate } from '@/helper/time';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
+
+// ============================================================================
+// Gradient Generation from Seed (same algorithm as Avatar)
+// ============================================================================
+function Mash() {
+  let n = 0xefc8249d;
+  const mash = function (data: string) {
+    for (let i = 0; i < data.length; i++) {
+      n += data.charCodeAt(i);
+      let h = 0.02519603282416938 * n;
+      n = h >>> 0;
+      h -= n;
+      h *= n;
+      n = h >>> 0;
+      h -= n;
+      n += h * 0x100000000;
+    }
+    return (n >>> 0) * 2.3283064365386963e-10;
+  };
+  return mash;
+}
+
+function Alea(this: any, seed: string) {
+  const me: any = this;
+  const mash = Mash();
+  me.c = 1;
+  me.s0 = mash(' ');
+  me.s1 = mash(' ');
+  me.s2 = mash(' ');
+  me.s0 -= mash(seed);
+  if (me.s0 < 0) me.s0 += 1;
+  me.s1 -= mash(seed);
+  if (me.s1 < 0) me.s1 += 1;
+  me.s2 -= mash(seed);
+  if (me.s2 < 0) me.s2 += 1;
+  me.next = function () {
+    const t = 2091639 * me.s0 + me.c * 2.3283064365386963e-10;
+    me.s0 = me.s1;
+    me.s1 = me.s2;
+    return (me.s2 = t - (me.c = t | 0));
+  };
+}
+
+function generateBannerGradient(seed: string): [string, string] {
+  const xg = new (Alea as any)(seed);
+  const random = () => xg.next();
+
+  // Generate two HSL colors for gradient
+  const h1 = Math.floor(random() * 360);
+  const s1 = 40 + Math.floor(random() * 30); // 40-70% saturation
+  const l1 = 25 + Math.floor(random() * 20); // 25-45% lightness (darker for banner)
+
+  const h2 = (h1 + 30 + Math.floor(random() * 60)) % 360; // Offset hue
+  const s2 = 40 + Math.floor(random() * 30);
+  const l2 = 20 + Math.floor(random() * 20); // Slightly darker
+
+  return [`hsl(${h1}, ${s1}%, ${l1}%)`, `hsl(${h2}, ${s2}%, ${l2}%)`];
+}
 const AVATAR_SIZE = 90;
 const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
 
@@ -67,7 +127,7 @@ function ProfileStatsGridComponent({
 }: {
   followingCount?: number;
   followerCount?: number;
-  reputationScore?: string;
+  reputationScore?: number;
   joinedDate?: string;
   isLoading: boolean;
 }) {
@@ -77,7 +137,7 @@ function ProfileStatsGridComponent({
     () => ({
       following: followingCount !== undefined ? followingCount.toString() : '0',
       followers: followerCount !== undefined ? followerCount.toString() : '0',
-      reputation: reputationScore || 'N/A',
+      reputation: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
       joined: joinedDate || 'Unknown',
     }),
     [followingCount, followerCount, reputationScore, joinedDate]
@@ -338,6 +398,9 @@ function BannerWithAvatarComponent({
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Generate gradient colors from pubkey for fallback banner
+  const gradientColors = useMemo(() => generateBannerGradient(pubkey || 'default'), [pubkey]);
+
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -354,7 +417,12 @@ function BannerWithAvatarComponent({
         {bannerUrl ? (
           <Image source={{ uri: bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
         ) : (
-          <View style={[styles.bannerPlaceholder, { backgroundColor: getPrimaryColor('700') }]} />
+          <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.bannerPlaceholder}
+          />
         )}
       </View>
 
@@ -419,15 +487,6 @@ function BannerWithAvatarComponent({
   );
 }
 const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-const formatJoinedDate = (timestamp?: number): string => {
-  if (!timestamp) return 'Unknown';
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-};
 
 // ============================================================================
 // Main Component
@@ -499,18 +558,10 @@ function UserProfileScreen() {
   const followerCount = profileData?.followers;
 
   // Reputation score from API rank (formatted as percentage)
-  const reputationScore = useMemo(() => {
-    if (profileData?.rank === undefined) return undefined;
-    // Convert rank to a more readable format (e.g., percentage or score out of 100)
-    const percentage = (profileData.rank * 100).toFixed(4);
-    return `${percentage}%`;
-  }, [profileData?.rank]);
+  const reputationScore = profileData?.score;
 
   // Joined date from profile created_at
-  const joinedDate = useMemo(() => {
-    const timestamp = metadataEvents?.[0]?.created_at;
-    return formatJoinedDate(timestamp);
-  }, [metadataEvents]);
+  const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
 
   const isStatsLoading = isProfileApiLoading;
 
@@ -541,20 +592,34 @@ function UserProfileScreen() {
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
           headerRight: () => (
-            <Link
-              href={{
-                pathname: '/(user-flow)/share' as any,
-                params: {
-                  type: 'npub',
-                  data: npub,
-                  ...(userInfo?.lud16 && { lud16: userInfo.lud16 }),
-                },
-              }}
-              asChild>
-              <TouchableOpacity style={{ padding: 8 }}>
-                <Icon name="mdi:qrcode" size={24} color={getPrimaryColor('0')} />
-              </TouchableOpacity>
-            </Link>
+            <HStack gap={4}>
+              {profileData?.mintUrl && (
+                <Link
+                  href={{
+                    pathname: '/(mint-flow)/info' as any,
+                    params: { mintUrl: profileData.mintUrl },
+                  }}
+                  asChild>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Icon name="mdi:bank" size={24} color={getPrimaryColor('0')} />
+                  </TouchableOpacity>
+                </Link>
+              )}
+              <Link
+                href={{
+                  pathname: '/(user-flow)/share' as any,
+                  params: {
+                    type: 'npub',
+                    data: npub,
+                    ...(userInfo?.lud16 && { lud16: userInfo.lud16 }),
+                  },
+                }}
+                asChild>
+                <TouchableOpacity style={{ padding: 8 }}>
+                  <Icon name="mdi:qrcode" size={24} color={getPrimaryColor('0')} />
+                </TouchableOpacity>
+              </Link>
+            </HStack>
           ),
         }}
       />
@@ -696,10 +761,13 @@ function UserProfileScreen() {
         <ButtonHandler
           buttons={[
             {
-              text: 'Close',
-              variant: 'secondary',
+              text: 'Send Message',
+              variant: 'primary',
               onPress: async () => {
-                router.back();
+                router.push({
+                  pathname: '/(user-flow)/userMessages' as any,
+                  params: { pubkey },
+                });
               },
             },
           ]}
@@ -748,7 +816,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   skeletonLabel: {
     width: 80,

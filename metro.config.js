@@ -208,6 +208,7 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:message-text',
     'mdi:lightning-bolt',
     'mdi:open-in-new',
+    'mdi:bank',
 
     // Pending Ecash icons
     'mdi:clock-outline',
