@@ -8,7 +8,7 @@
  * - Profile info section (npub, nip05, lud16, website)
  */
 
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import {
   ScrollView,
   Animated,
@@ -398,8 +398,18 @@ function BannerWithAvatarComponent({
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Banner image loading state
+  const [bannerLoaded, setBannerLoaded] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
+
   // Generate gradient colors from pubkey for fallback banner
   const gradientColors = useMemo(() => generateBannerGradient(pubkey || 'default'), [pubkey]);
+
+  // Reset banner states when URL changes
+  useEffect(() => {
+    setBannerLoaded(false);
+    setBannerError(false);
+  }, [bannerUrl]);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -410,13 +420,37 @@ function BannerWithAvatarComponent({
     }).start();
   }, [fadeAnim]);
 
+  // Determine what to show:
+  // - If still loading API data, show skeleton
+  // - If banner URL exists and not errored, try to load image (show skeleton while loading)
+  // - If no banner URL or image errored, show gradient
+  const showSkeleton = isLoading || (bannerUrl && !bannerLoaded && !bannerError);
+  const showGradient = !isLoading && (!bannerUrl || bannerError);
+
   return (
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: getPrimaryColor('800') }]}>
-        {bannerUrl ? (
-          <Image source={{ uri: bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
-        ) : (
+        {/* Hidden image to trigger load/error callbacks */}
+        {bannerUrl && !bannerError && (
+          <Image
+            source={{ uri: bannerUrl }}
+            style={[styles.bannerImage, !bannerLoaded && { opacity: 0, position: 'absolute' }]}
+            resizeMode="cover"
+            onLoad={() => setBannerLoaded(true)}
+            onError={() => setBannerError(true)}
+          />
+        )}
+
+        {/* Skeleton while loading */}
+        {showSkeleton && (
+          <Skeleton
+            style={[styles.bannerPlaceholder, { backgroundColor: getPrimaryColor('700') }]}
+          />
+        )}
+
+        {/* Gradient fallback */}
+        {showGradient && (
           <LinearGradient
             colors={gradientColors}
             start={{ x: 0, y: 0 }}
