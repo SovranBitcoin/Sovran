@@ -468,7 +468,7 @@ export function CurrencyScreen({
     }
 
     if (processPaymentStringFn) {
-      await processPaymentStringFn({ data: text });
+      await processPaymentStringFn({ data: text, type: 'paste' });
     }
   };
 

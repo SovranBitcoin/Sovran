@@ -34,7 +34,7 @@ export const useDeeplink = () => {
       if (isOurScheme && isValidHost) {
         // TS knows hostname is string here
         try {
-          await processPaymentString({ data: hostname });
+          await processPaymentString({ data: hostname, type: 'deeplink' });
         } catch (error) {
           popup({
             message: error instanceof Error ? error.message : 'Unknown error',

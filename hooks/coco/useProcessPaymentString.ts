@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { nip19 } from 'nostr-tools';
-import { useScanHistoryStore } from 'stores/scanHistoryStore';
+import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
 
 /**
  * Check if a string is a valid npub and extract the pubkey
@@ -46,9 +46,10 @@ const parseNpub = (data: string): string | null => {
   return null;
 };
 
-interface ScanningData {
+export interface ScanningData {
   data: string;
-  type?: string;
+  /** Source of the data: 'paste', 'deeplink', or undefined for QR scan */
+  type?: 'paste' | 'deeplink';
 }
 
 interface UseProcessPaymentStringProps {
@@ -79,6 +80,9 @@ export const useProcessPaymentString = ({
       if (appStateRef.current !== 'active' || !isFocused) {
         return { urInProgress: false };
       }
+
+      // Resolve source: paste/deeplink from type, otherwise default to qr
+      const source: ScanSource = scanning.type ?? 'qr';
 
       if (!scanned || scanning.data.startsWith('ur:')) {
         onLoading?.(true);
@@ -119,7 +123,7 @@ export const useProcessPaymentString = ({
             onProgress?.(0);
 
             // Only save to scan history once when UR is fully decoded (not for each frame)
-            addScan(scanning.data, _tokenString, 'ecash', 'qr');
+            addScan(scanning.data, _tokenString, 'ecash', source);
 
             // Create a receive history entry for ecash receive
             const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
@@ -155,7 +159,7 @@ export const useProcessPaymentString = ({
         // Handle regular ecash tokens
         if (isValidEcashToken(scanning.data)) {
           // Save to scan history
-          addScan(scanning.data, scanning.data, 'ecash', 'qr');
+          addScan(scanning.data, scanning.data, 'ecash', source);
 
           // Create a receive history entry for ecash receive
           const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
@@ -190,7 +194,7 @@ export const useProcessPaymentString = ({
           const isInvoice = isLightningInvoice(trimmedData);
 
           // Save to scan history
-          addScan(scanning.data, trimmedData, 'lightning', 'qr');
+          addScan(scanning.data, trimmedData, 'lightning', source);
 
           if (isInvoice && amount) {
             // Direct Lightning invoice with amount - navigate to MeltQuoteScreen
@@ -220,7 +224,7 @@ export const useProcessPaymentString = ({
         const trimmedUrl = scanning.data.trim();
         if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
           // Save to scan history
-          addScan(scanning.data, trimmedUrl, 'mint', 'qr');
+          addScan(scanning.data, trimmedUrl, 'mint', source);
 
           router.navigate({
             pathname: '/(mint-flow)/info' as any,
@@ -236,7 +240,7 @@ export const useProcessPaymentString = ({
         const validNpub = parseNpub(scanning.data);
         if (validNpub) {
           // Store the scan in history
-          addScan(scanning.data, validNpub, 'npub', 'qr');
+          addScan(scanning.data, validNpub, 'npub', source);
 
           router.navigate({
             pathname: '/(user-flow)/profile' as any,

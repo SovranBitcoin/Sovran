@@ -70,6 +70,8 @@ module.exports = withMonicon(nativeWindConfig, {
     'simple-line-icons:check',
     'material-symbols:check-rounded',
     'lucide:nfc',
+    'lucide:clipboard-paste',
+    'lucide:link',
     'fluent:checkmark-16-filled',
     'fluent:checkmark-circle-16-filled',
     'fluent:list-16-filled',

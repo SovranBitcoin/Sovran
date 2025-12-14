@@ -146,7 +146,7 @@ export function CameraScreen({
     const text = await Clipboard.getStringAsync();
     if (!text) return;
 
-    const scanning: ScanningData = { data: text };
+    const scanning: ScanningData = { data: text, type: 'paste' };
     await handleScan(scanning);
   }, [handleScan]);
 

@@ -17,8 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 /** What type of data was scanned */
 export type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'unknown';
 
-/** How the data was scanned */
-export type ScanSource = 'qr' | 'nfc';
+/** How the data was scanned/entered */
+export type ScanSource = 'qr' | 'nfc' | 'paste' | 'deeplink';
 
 export interface ScanHistoryEntry {
   /** Unique identifier for this scan */

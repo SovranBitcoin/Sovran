@@ -186,7 +186,15 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
               </UntranslatedText>
               {scanSource && (
                 <Icon
-                  name={scanSource === 'nfc' ? 'lucide:nfc' : 'stash:qr-code'}
+                  name={
+                    scanSource === 'nfc'
+                      ? 'lucide:nfc'
+                      : scanSource === 'paste'
+                        ? 'lucide:clipboard-paste'
+                        : scanSource === 'deeplink'
+                          ? 'lucide:link'
+                          : 'stash:qr-code'
+                  }
                   size={10}
                   color={getPrimaryColor('100')}
                 />

@@ -107,7 +107,7 @@ export function AccountPagerView({
       Alert.alert('Clipboard Empty', 'No text found in clipboard.');
       return;
     }
-    await processPaymentString({ data: text });
+    await processPaymentString({ data: text, type: 'paste' });
   }, [processPaymentString]);
 
   const handleSend = useCallback(async () => {

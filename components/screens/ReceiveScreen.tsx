@@ -23,6 +23,7 @@ import { truncateMiddle } from 'helper/strings';
 import { Proof } from '@cashu/cashu-ts';
 import { isValidEcashToken } from '@/helper/coco/utils';
 import { EnhancedHaptics } from 'components/ui/Haptics';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Tabs } from 'components/ui/Tabs';
 import { useSettingsStore } from 'stores/settingsStore';
@@ -131,6 +132,9 @@ export function ReceiveScreen({
       });
       return;
     }
+
+    // Log paste to scan history
+    useScanHistoryStore.getState().addScan(text, decodedText, 'ecash', 'paste');
 
     handleEcashToken({ token: decodedText });
   };
