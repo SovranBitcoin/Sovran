@@ -16,6 +16,8 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MintListScreen } from 'components/screens/MintListScreen';
 import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
+import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 function MintSelectRoute() {
   const { createMeltQuote } = useMeltWithHistory();
@@ -49,6 +51,10 @@ function MintSelectRoute() {
               const totalRequired = quote.amount + quote.fee_reserve;
 
               if (mint.amount >= totalRequired) {
+                // Capture location and link scan to transaction only when proceeding
+                await captureAndStoreLocation(historyEntry.id);
+                useScanHistoryStore.getState().linkTransaction(params.invoice, historyEntry.id);
+
                 // Sufficient balance including fees - navigate to meltQuote with pre-created quote
                 router.navigate({
                   pathname: '/meltQuote',

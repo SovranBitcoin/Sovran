@@ -16,6 +16,7 @@ import { useCallback } from 'react';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
+import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 // Payment limit tiers in USD
 const PAYMENT_TIERS = [
@@ -31,6 +32,7 @@ export default function HomeLayout() {
   const { send } = useSendWithHistory();
   const manager = useManager();
   const addScan = useScanHistoryStore((state) => state.addScan);
+  const linkTransaction = useScanHistoryStore((state) => state.linkTransaction);
 
   // Get user's selected mint for NFC payments
   const { keys } = useNostrKeysContext();
@@ -92,6 +94,8 @@ export default function HomeLayout() {
 
       // Track the operation ID for rollback if needed
       let lastOperationId: string | null = null;
+      // Track the last scanned raw data for linking to transaction
+      let lastScannedRaw: string | null = null;
 
       try {
         const result = await NfcPayment.performPayment({
@@ -99,7 +103,18 @@ export default function HomeLayout() {
             // useSendWithHistory returns both token and historyEntry with operationId
             const { token, historyEntry } = await send(mintUrl, amount);
             lastOperationId = historyEntry.operationId;
-            console.log(`[NFC Payment] Token created, operationId: ${lastOperationId}`);
+
+            // Capture location for the transaction (respects user settings)
+            if (historyEntry.id) {
+              await captureAndStoreLocation(historyEntry.id);
+            }
+
+            // Link the scanned data to the transaction
+            if (lastScannedRaw && historyEntry.id) {
+              linkTransaction(lastScannedRaw, historyEntry.id);
+              lastScannedRaw = null; // Clear after linking
+            }
+
             return getEncodedTokenV4(token);
           },
           recoverToken: async () => {
@@ -118,6 +133,8 @@ export default function HomeLayout() {
           onScanRead: (raw) => {
             // Log NFC scan to history regardless of payment outcome
             addScan(raw, raw, 'ecash', 'nfc');
+            // Track for linking to transaction after send
+            lastScannedRaw = raw;
           },
           onLightningInvoice: (invoice, amount) => {
             // Log to scan history as lightning via NFC
@@ -215,7 +232,17 @@ export default function HomeLayout() {
         }
       }
     },
-    [send, manager, availableMints, selectedMint, usdToSats, getSelectedMint, keys?.pubkey, addScan]
+    [
+      send,
+      manager,
+      availableMints,
+      selectedMint,
+      usdToSats,
+      getSelectedMint,
+      keys?.pubkey,
+      addScan,
+      linkTransaction,
+    ]
   );
 
   const renderHeaderRight = () => {

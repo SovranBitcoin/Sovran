@@ -11,6 +11,8 @@ import { HStack } from 'components/ui/View/HStack';
 import React, { useCallback } from 'react';
 import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import { router } from 'expo-router';
+import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
+import Icon from 'assets/icons';
 
 export function npubToPubkey(npub: string): string {
   if (!npub) return '';
@@ -23,6 +25,17 @@ export function npubToPubkey(npub: string): string {
   }
   return npub;
 }
+
+/**
+ * Hook to get the scan source (NFC or QR) for a transaction.
+ * Subscribes to the store so the component re-renders when the scan entry is linked.
+ */
+const useScanSource = (transactionId: string): ScanSource | null => {
+  return useScanHistoryStore((state) => {
+    const entry = state.entries.find((e) => e.transactionId === transactionId);
+    return entry?.source ?? null;
+  });
+};
 
 const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const isSend = historyEntry.type === 'send' || historyEntry.type === 'melt';
@@ -122,6 +135,9 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 
+  // Get scan source (NFC or QR) - subscribes to store for reactivity
+  const scanSource = useScanSource(historyEntry.id);
+
   return (
     <TouchableOpacity
       key={historyEntry?.id}
@@ -168,6 +184,13 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
               </UntranslatedText>
+              {scanSource && (
+                <Icon
+                  name={scanSource === 'nfc' ? 'lucide:nfc' : 'stash:qr-code'}
+                  size={10}
+                  color={getPrimaryColor('100')}
+                />
+              )}
             </HStack>
             <UntranslatedText
               bold

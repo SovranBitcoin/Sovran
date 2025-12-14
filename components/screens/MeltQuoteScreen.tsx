@@ -40,6 +40,7 @@ import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
@@ -151,8 +152,8 @@ export function MeltQuoteScreen({
     }
   }, [trackedHistoryEntry?.mintUrl]);
 
-  // The history entry to display - either from prop or created
-  const currentTransaction = trackedHistoryEntry || createdHistoryEntry;
+  // The history entry to display - prefer newly created (e.g., after mint change) over initial prop
+  const currentTransaction = createdHistoryEntry || trackedHistoryEntry;
 
   // The quote to display - either derived from history entry or created
   const displayQuote: MeltQuoteResponse | null =
@@ -235,6 +236,9 @@ export function MeltQuoteScreen({
           if (result?.historyEntry?.id) {
             await captureAndStoreLocation(result.historyEntry.id);
             hasStoredLocationRef.current = true;
+
+            // Link the scanned invoice to the transaction
+            useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
           }
         } catch (err) {
           console.error('Failed to create melt quote:', err);
@@ -279,9 +283,18 @@ export function MeltQuoteScreen({
       hasStartedCreation.current = false;
 
       // Create new quote with the newly selected mint
-      createMeltQuote(selectedMintFromStore, invoice).catch((err) => {
-        console.error('Failed to re-create melt quote after mint change:', err);
-      });
+      createMeltQuote(selectedMintFromStore, invoice)
+        .then(async (result) => {
+          if (result?.historyEntry?.id) {
+            // Re-capture location for the new transaction
+            await captureAndStoreLocation(result.historyEntry.id);
+            // Link the new transaction back to the original scan
+            useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to re-create melt quote after mint change:', err);
+        });
     }
   }, [
     selectedMintFromStore,
@@ -303,7 +316,13 @@ export function MeltQuoteScreen({
       resetMeltState();
       hasStartedCreation.current = false;
       try {
-        await createMeltQuote(mint.id, invoice);
+        const result = await createMeltQuote(mint.id, invoice);
+        if (result?.historyEntry?.id) {
+          // Re-capture location for the new transaction
+          await captureAndStoreLocation(result.historyEntry.id);
+          // Link the new transaction back to the original scan
+          useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
+        }
       } catch (err) {
         console.error('Failed to create quote with new mint:', err);
         Alert.alert('Error', 'Failed to create quote with selected mint');

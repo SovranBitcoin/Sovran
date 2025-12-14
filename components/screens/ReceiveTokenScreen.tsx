@@ -26,6 +26,7 @@ import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useReceive, useManager } from 'coco-cashu-react';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
 
 type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & {
   token?: string;
@@ -129,6 +130,11 @@ export function ReceiveTokenScreen({
       // Capture and store location at redeem time (respects settings)
       if (realEntry?.id) {
         await captureAndStoreLocation(realEntry.id);
+
+        // Link the scan history entry to the transaction
+        if (token) {
+          useScanHistoryStore.getState().linkTransaction(token, realEntry.id);
+        }
       }
 
       setIsRedeemed(true);

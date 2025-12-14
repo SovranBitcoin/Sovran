@@ -33,6 +33,8 @@ export interface ScanHistoryEntry {
   source: ScanSource;
   /** Timestamp when scanned */
   scannedAt: number;
+  /** ID of the transaction history entry this scan resulted in */
+  transactionId?: string;
 }
 
 interface ScanHistoryState {
@@ -56,6 +58,10 @@ interface ScanHistoryActions {
   findByRaw: (raw: string) => ScanHistoryEntry | undefined;
   /** Find an entry by processed string */
   findByProcessed: (processed: string) => ScanHistoryEntry | undefined;
+  /** Find an entry by transaction ID */
+  findByTransactionId: (transactionId: string) => ScanHistoryEntry | undefined;
+  /** Link a scan entry to a transaction by matching the processed string */
+  linkTransaction: (processed: string, transactionId: string) => void;
   /** Remove a specific entry by id */
   removeEntry: (id: string) => void;
   /** Clear all history */
@@ -143,6 +149,28 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       // Find by processed string
       findByProcessed: (processed: string) => {
         return get().entries.find((entry) => entry.processed === processed);
+      },
+
+      // Find by transaction ID
+      findByTransactionId: (transactionId: string) => {
+        return get().entries.find((entry) => entry.transactionId === transactionId);
+      },
+
+      // Link a scan entry to a transaction by matching the processed string
+      linkTransaction: (processed: string, transactionId: string) => {
+        if (!processed || !transactionId) return;
+
+        const { entries } = get();
+        const index = entries.findIndex((entry) => entry.processed === processed);
+
+        if (index !== -1) {
+          const updated = [...entries];
+          updated[index] = {
+            ...updated[index],
+            transactionId,
+          };
+          set({ entries: updated });
+        }
       },
 
       // Remove entry by id
