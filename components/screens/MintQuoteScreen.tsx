@@ -123,7 +123,7 @@ export function MintQuoteScreen({
           />
         )}
 
-        <TransactionLocationSection transactionId={currentTransaction.id} />
+        {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
 
         {currentTransaction.metadata?.memo && (
           <Card message={currentTransaction.metadata.memo} variant="info" />

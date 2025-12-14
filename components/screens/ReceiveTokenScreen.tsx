@@ -72,12 +72,19 @@ export function ReceiveTokenScreen({
   const [loading, setLoading] = useState(false);
   const [mintInfo, setMintInfo] = useState<any>({});
   const [isRedeemed, setIsRedeemed] = useState(false);
+  // Holds the real history entry id after redeem (for location lookup)
+  const [finalizedTransactionId, setFinalizedTransactionId] = useState<string | null>(null);
 
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: receiveHistoryEntry, error: parseError } =
     useHistoryEntry<ReceiveHistoryEntryWithToken>(receiveHistoryEntryProp);
 
   const token = receiveHistoryEntry?.token;
+
+  // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem)
+  const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
+  // Entry is finalized if it's a real history entry (not scan placeholder) or has been redeemed
+  const isFinalizedReceive = !isScanPlaceholder || isRedeemed;
 
   // Determine the state: pending until redeemed locally
   const receiveState = isRedeemed ? 'redeemed' : 'pending';
@@ -135,6 +142,9 @@ export function ReceiveTokenScreen({
         if (token) {
           useScanHistoryStore.getState().linkTransaction(token, realEntry.id);
         }
+
+        // Store the real transaction id for location section lookup
+        setFinalizedTransactionId(realEntry.id);
       }
 
       setIsRedeemed(true);
@@ -204,7 +214,11 @@ export function ReceiveTokenScreen({
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={receiveHistoryEntry} />
 
-        <TransactionLocationSection transactionId={receiveHistoryEntry.id} />
+        {isFinalizedReceive && (
+          <TransactionLocationSection
+            transactionId={finalizedTransactionId ?? receiveHistoryEntry.id}
+          />
+        )}
 
         <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
 

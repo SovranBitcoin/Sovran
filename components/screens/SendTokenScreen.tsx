@@ -321,7 +321,7 @@ export function SendTokenScreen({
           />
         )}
 
-        <TransactionLocationSection transactionId={currentTransaction.id} />
+        {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
 
         {mintInfo && <HistoryEntryRefresh historyEntry={currentTransaction} mintInfo={mintInfo} />}
 

@@ -442,7 +442,7 @@ export function MeltQuoteScreen({
           />
         )}
 
-        <TransactionLocationSection transactionId={currentTransaction.id} />
+        {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
 
         <HistoryEntryTimeline historyEntry={currentTransaction} meltQuote={displayQuote} />
 
