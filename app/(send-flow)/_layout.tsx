@@ -6,7 +6,7 @@
  * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
  * - currency: Amount selection (entry point when has balance)
- * - sendToken: Ecash token display after creation
+ * - sendToken: Ecash token display after creation (also handles NUT-18 payment request mode)
  * - meltQuote: Lightning invoice payment
  * - camera: QR code scanning
  *

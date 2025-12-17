@@ -21,6 +21,10 @@ import opacity from 'hex-color-opacity';
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteResponse;
+  /** For NUT-18 payment requests - indicates token was created (prepared step complete) */
+  tokenCreated?: boolean;
+  /** For NUT-18 payment requests - indicates Nostr DM was sent */
+  nostrSent?: boolean;
 }
 
 // Define the state progressions for each transaction type
@@ -29,8 +33,11 @@ const MELT_STATES = [MeltQuoteState.UNPAID, MeltQuoteState.PENDING, MeltQuoteSta
 
 // Send states from coco: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
 const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
+// Payment request states include Nostr Send step
+const PAYMENT_REQUEST_STATES = ['prepared', 'nostrSent', 'pending', 'finalized'] as const;
 const SEND_STATE_LABELS: Record<string, string> = {
   prepared: 'Prepared',
+  nostrSent: 'Nostr Send',
   pending: 'Pending',
   finalized: 'Finalized',
   rolledBack: 'Rolled Back',
@@ -270,7 +277,12 @@ const getMeltQuoteTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: 
 };
 
 // Get card label (e.g., "MINT • AWAITING PAYMENT")
-const getCardLabel = (historyEntry: HistoryEntry, timeline: TimelineItem[]): string => {
+const getCardLabel = (
+  historyEntry: HistoryEntry,
+  timeline: TimelineItem[],
+  tokenCreated?: boolean,
+  nostrSent?: boolean
+): string => {
   const isFailed = timeline.some(
     (item) => item.stepType === 'expired' || item.stepType === 'rolled-back'
   );
@@ -306,16 +318,22 @@ const getCardLabel = (historyEntry: HistoryEntry, timeline: TimelineItem[]): str
     }
     case 'send': {
       const sendTx = historyEntry as SendHistoryEntry;
-      if (sendTx.state === 'rolledBack') {
+      const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+      const label = isPaymentRequestMode ? 'Payment Request' : 'Send';
+      if (!tokenCreated && !nostrSent && isPaymentRequestMode) {
+        status = 'Ready to Send';
+      } else if (tokenCreated && !nostrSent) {
+        status = 'Sending via Nostr';
+      } else if (sendTx.state === 'rolledBack') {
         status = 'Rolled Back';
       } else if (sendTx.state === 'finalized') {
         status = 'Complete';
       } else if (sendTx.state === 'pending') {
         status = 'In Progress';
       } else {
-        status = 'Prepared';
+        status = nostrSent ? 'Sent' : 'Prepared';
       }
-      return `Send • ${status}`;
+      return `${label} • ${status}`;
     }
     case 'receive': {
       const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
@@ -363,7 +381,12 @@ const getStatusColorType = (timeline: TimelineItem[]): StatusColorType => {
 
 // ============ Main Component ============
 
-export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTimelineProps) {
+export function HistoryEntryTimeline({
+  historyEntry,
+  meltQuote,
+  tokenCreated,
+  nostrSent,
+}: HistoryEntryTimelineProps) {
   const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
   const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -510,30 +533,71 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
 
         // Handle rolled back as a special terminal state
         if (txState === 'rolledBack') {
-          return [
+          const rolledBackTimeline: TimelineItem[] = [
             {
               state: 'prepared',
               displayLabel: SEND_STATE_LABELS.prepared,
               stepType: 'complete',
               timestamp: sendTx.createdAt,
             },
-            {
+          ];
+          // Include Nostr Send step if this was a payment request
+          if (nostrSent) {
+            rolledBackTimeline.push({
+              state: 'nostrSent',
+              displayLabel: SEND_STATE_LABELS.nostrSent,
+              stepType: 'complete',
+              timestamp: sendTx.createdAt,
+            });
+          }
+          rolledBackTimeline.push({
               state: 'rolledBack',
               displayLabel: SEND_STATE_LABELS.rolledBack,
               stepType: 'rolled-back',
               info: 'Token funds returned to your balance',
-            },
-          ];
+          });
+          return rolledBackTimeline;
         }
 
-        // Normal send progression: prepared → pending → finalized
-        const currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
-        return SEND_STATES.map((state, index) => {
+        // Determine if this is payment request mode (tokenCreated or nostrSent props indicate PR mode)
+        const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+        const states = isPaymentRequestMode ? PAYMENT_REQUEST_STATES : SEND_STATES;
+
+        // Map coco state to timeline index
+        // For payment request: prepared=0, nostrSent=1, pending=2, finalized=3
+        // For normal: prepared=0, pending=1, finalized=2
+        let currentIndex: number;
+        if (isPaymentRequestMode) {
+          if (!tokenCreated && !nostrSent) {
+            // Awaiting send - nothing is complete yet, prepared is next
+            currentIndex = -1;
+          } else if (tokenCreated && !nostrSent) {
+            // Token created but Nostr not yet sent - prepared complete, nostrSent is next
+            currentIndex = 0;
+          } else if (nostrSent) {
+            // Nostr sent - use txState to determine progress
+            if (txState === 'prepared') {
+              currentIndex = 1; // nostrSent is current/complete
+            } else if (txState === 'pending') {
+              currentIndex = 2; // pending is current
+            } else if (txState === 'finalized') {
+              currentIndex = 3; // finalized is current
+            } else {
+              currentIndex = 1;
+            }
+          } else {
+            currentIndex = 0;
+          }
+        } else {
+          currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
+        }
+
+        return states.map((state, index) => {
           let stepType: TimelineStepType;
           if (index < currentIndex) {
             stepType = 'complete';
           } else if (index === currentIndex) {
-            stepType = index === SEND_STATES.length - 1 ? 'success' : 'current';
+            stepType = index === states.length - 1 ? 'success' : 'current';
           } else if (index === currentIndex + 1) {
             stepType = 'next-pending';
           } else {
@@ -543,6 +607,10 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
           let info: string | undefined;
           if (stepType === 'current' && state === 'prepared') {
             info = 'Token created, ready to share';
+          } else if (stepType === 'complete' && state === 'nostrSent') {
+            info = 'Sent via Nostr DM';
+          } else if (stepType === 'current' && state === 'nostrSent') {
+            info = 'Sending via Nostr...';
           } else if (stepType === 'current' && state === 'pending') {
             info = 'Waiting for recipient to claim';
           } else if (stepType === 'success' && state === 'finalized') {
@@ -599,7 +667,7 @@ export function HistoryEntryTimeline({ historyEntry, meltQuote }: HistoryEntryTi
   };
 
   const timeline = getTimeline();
-  const cardLabel = getCardLabel(historyEntry, timeline);
+  const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
 

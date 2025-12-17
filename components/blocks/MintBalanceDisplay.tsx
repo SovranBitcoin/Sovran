@@ -123,9 +123,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         showAddMintsButton: String(showAddMintsButton),
         showDetailsButton: String(showDetailsButton),
         onSelectAction: 'goBack',
+        ...(allowedMints && { allowedMints: JSON.stringify(allowedMints) }),
       },
     }),
-    [requireBalance, showAddMintsButton, showDetailsButton]
+    [requireBalance, showAddMintsButton, showDetailsButton, allowedMints]
   );
 
   const mintInfoContent = (

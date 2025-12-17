@@ -55,6 +55,8 @@ interface MintListScreenProps {
   onClose: () => void;
   /** Allowed currencies to filter by */
   allowedCurrencies?: string[];
+  /** Allowed mint URLs to show (for payment requests with specified mints) */
+  allowedMints?: string[];
 }
 
 export function MintListScreen({
@@ -68,6 +70,7 @@ export function MintListScreen({
   onInspectMint,
   onClose,
   allowedCurrencies = ['SAT', 'USD', 'EUR', 'GBP'],
+  allowedMints,
 }: MintListScreenProps) {
   const { getPrimaryColor } = useTheme();
 
@@ -145,13 +148,13 @@ export function MintListScreen({
     return ['ALL', ...filtered];
   }, [processedMints, allowedCurrencies]);
 
-  // Filter mints by selected currency (minAmount is handled by MintItem opacity)
+  // Filter mints by selected currency (allowedMints and minAmount are handled by MintItem opacity/disabled)
   const filteredMints = useMemo(() => {
-    if (selectedCurrency === 'ALL') {
-      return processedMints;
-    }
+    let mints = processedMints;
 
-    return processedMints.filter((mint) => {
+    // Filter by currency only - allowedMints is handled by isAllowed prop on MintItem
+    if (selectedCurrency !== 'ALL') {
+      mints = mints.filter((mint) => {
       if (!mint.mintInfo?.nuts?.['4']?.methods) {
         return selectedCurrency === 'SAT';
       }
@@ -159,7 +162,41 @@ export function MintListScreen({
         (method: any) => method.unit?.toUpperCase() === selectedCurrency
       );
     });
-  }, [processedMints, selectedCurrency]);
+    }
+
+    // Sort: visible mints first (by balance desc), then non-visible mints (by balance desc)
+    // A mint is "visible" (selectable) if:
+    // 1. It's in allowedMints (or no allowedMints filter)
+    // 2. Has sufficient balance for minAmount (or no minAmount filter)
+    // 3. Has balance when requireBalance is true
+    return mints.sort((a, b) => {
+      const aAllowed = !allowedMints || allowedMints.length === 0 || allowedMints.includes(a.mintUrl);
+      const bAllowed = !allowedMints || allowedMints.length === 0 || allowedMints.includes(b.mintUrl);
+      const aHasSufficientBalance = minAmount === undefined || minAmount <= 0 || a.amount >= minAmount;
+      const bHasSufficientBalance = minAmount === undefined || minAmount <= 0 || b.amount >= minAmount;
+      const aHasRequiredBalance = !requireBalance || a.amount > 0;
+      const bHasRequiredBalance = !requireBalance || b.amount > 0;
+
+      const aVisible = aAllowed && aHasSufficientBalance && aHasRequiredBalance;
+      const bVisible = bAllowed && bHasSufficientBalance && bHasRequiredBalance;
+
+      // Visible mints come first
+      if (aVisible && !bVisible) return -1;
+      if (!aVisible && bVisible) return 1;
+
+      // Within same visibility group, sort by balance descending
+      return b.amount - a.amount;
+    });
+  }, [processedMints, selectedCurrency, allowedMints, minAmount, requireBalance]);
+
+  // Helper to check if a mint is allowed (for payment requests with specified mints)
+  const isMintAllowed = useCallback(
+    (mintUrl: string) => {
+      if (!allowedMints || allowedMints.length === 0) return true;
+      return allowedMints.includes(mintUrl);
+    },
+    [allowedMints]
+  );
 
   // Fetch KYM scores
   const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
@@ -320,6 +357,7 @@ export function MintListScreen({
                   selectedCurrency={selectedCurrency}
                   kymScore={kymScore}
                   kymLoading={kymLoading}
+                  isAllowed={isMintAllowed(mint.mintUrl)}
                   onPress={() => {
                     handleMintSelect(mint.mintUrl);
                   }}

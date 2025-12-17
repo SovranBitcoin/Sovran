@@ -25,6 +25,8 @@ interface WalletHeaderTitleProps {
   showAddMintsButton?: boolean;
   /** Whether to show the details/inspect button on each mint (default: true) */
   showDetailsButton?: boolean;
+  /** Allowed mint URLs for filtering (payment request mints) */
+  allowedMints?: string[];
 }
 
 /**
@@ -38,6 +40,7 @@ export default function WalletHeaderTitle({
   onMintSelected,
   showAddMintsButton = true,
   showDetailsButton = true,
+  allowedMints,
   style,
 }: WalletHeaderTitleProps & { style?: ViewStyle }) {
   const { keys } = useNostrKeysContext();
@@ -48,18 +51,23 @@ export default function WalletHeaderTitle({
   const { mints } = useMintManagement();
   const { balance: liveBalances } = useBalanceContext();
 
-  // Get top 3 mints sorted by balance
+  // Get top 3 mints sorted by balance (filtered by allowedMints if provided)
   const topMints = useMemo(() => {
     if (!mints || mints.length === 0) return [];
 
-    const mintsWithBalances = mints.map((mint) => ({
+    // Filter by allowed mints if specified
+    const filteredMints = allowedMints?.length
+      ? mints.filter((mint) => allowedMints.includes(mint.mintUrl))
+      : mints;
+
+    const mintsWithBalances = filteredMints.map((mint) => ({
       ...mint,
       balance: liveBalances[mint.mintUrl] || 0,
       displayName: getMintDisplayName(mint.mintUrl, mint.mintInfo),
     }));
 
     return mintsWithBalances.sort((a, b) => b.balance - a.balance).slice(0, 3);
-  }, [mints, liveBalances]);
+  }, [mints, liveBalances, allowedMints]);
 
   const handleMintSelectedInternal = useCallback(
     async (mint: { id: string; unit: string }) => {
@@ -92,9 +100,10 @@ export default function WalletHeaderTitle({
         showAddMintsButton: 'true',
         showDetailsButton: 'true',
         onSelectAction: 'goBack',
+        ...(allowedMints && { allowedMints: JSON.stringify(allowedMints) }),
       },
     });
-  }, []);
+  }, [allowedMints]);
 
   const handleAddMint = useCallback(() => {
     router.push('/add');
@@ -133,6 +142,7 @@ export default function WalletHeaderTitle({
           updateSelectedMint={true}
           showAddMintsButton={showAddMintsButton}
           showDetailsButton={showDetailsButton}
+          allowedMints={allowedMints}
           style={{ width: '100%' }}
         />
       </View>
@@ -184,6 +194,7 @@ export default function WalletHeaderTitle({
                   updateSelectedMint={true}
                   showAddMintsButton={showAddMintsButton}
                   showDetailsButton={showDetailsButton}
+                  allowedMints={allowedMints}
                   style={{ width: '100%' }}
                 />
               </SwiftUIButton>

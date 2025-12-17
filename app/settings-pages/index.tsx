@@ -105,7 +105,7 @@ export const RowButton: React.FC<{
     <View
       className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
       style={{
-        backgroundColor: getPrimaryColor('900'),
+        backgroundColor: getPrimaryColor('800'),
         borderColor: getPrimaryColor('700'),
         borderTopWidth: !isFirst ? 1 : 0,
       }}>

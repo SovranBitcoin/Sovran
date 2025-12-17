@@ -50,7 +50,14 @@
  */
 
 import { popup } from '@/helper/popup';
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+import {
+  getEncodedTokenV4,
+  decodePaymentRequest,
+  PaymentRequestTransportType,
+  PaymentRequestPayload,
+} from '@cashu/cashu-ts';
+import { nip19 } from 'nostr-tools';
+import type { ProfilePointer } from 'nostr-tools/nip19';
 import Icon from 'assets/icons';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
@@ -79,7 +86,8 @@ import { useBtcPrice } from 'stores/pricelistStore';
 import opacity from 'hex-color-opacity';
 import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
-import { useBalanceContext, useManager } from 'coco-cashu-react';
+import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
+import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 // Currency display configuration
@@ -173,12 +181,17 @@ interface CurrencyScreenParams {
   mints?: string;
   lnUrlOrAddress?: string;
   routstrTopUp?: string;
+  selectedMintUrl?: string; // Pre-selected mint URL (for payment requests with single valid mint)
+  allowedMints?: string; // JSON array of allowed mint URLs (for payment requests)
 }
 
 interface CurrencyScreenProps {
   params: CurrencyScreenParams;
   onMintQuoteCreated: (mintHistoryEntry: MintHistoryEntry) => void;
-  onSendTokenCreated: (sendHistoryEntry: SendHistoryEntry) => void;
+  onSendTokenCreated: (
+    sendHistoryEntry: SendHistoryEntry,
+    options?: { nostrSent?: boolean }
+  ) => void;
   /** Navigate to MeltQuoteScreen with lnUrlOrAddress and amount - screen handles quote creation */
   onMeltQuoteReady: (lnUrlOrAddress: string, amount: number) => void;
   onCameraPress: (unit: string) => void;
@@ -204,6 +217,7 @@ export function CurrencyScreen({
 
   const { send } = useSendWithHistory();
   const { requestLightningInvoice } = useLightningOperations();
+  const { sendDirectMessage } = useNostrDirectMessage();
   const { setApiKey, setBalance, balance } = useRoutstrStore();
 
   // Get user's preferred fiat currency and BTC price
@@ -220,12 +234,70 @@ export function CurrencyScreen({
   const [loading, setLoading] = useState(false);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
+  const storeSelectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
   const [isValidAmount, setIsValidAmount] = useState(false);
 
   // Get live balance for the selected mint
   const { balance: liveBalances } = useBalanceContext();
+  const { trustedMints } = useMints();
+
+  // Parse allowed mints from params (for payment requests with specified mints)
+  const allowedMints = useMemo(() => {
+    if (!params.allowedMints) return undefined;
+    try {
+      return JSON.parse(params.allowedMints) as string[];
+    } catch {
+      return undefined;
+    }
+  }, [params.allowedMints]);
+
+  // Determine the effective selected mint
+  // If there are allowed mints, check if the current selection is valid
+  // If not valid, auto-select the best mint from allowed mints (highest balance)
+  const selectedMint = useMemo(() => {
+    // If a specific mint was pre-selected (from routing), use it
+    if (params.selectedMintUrl) {
+      return params.selectedMintUrl;
+    }
+
+    // If no allowed mints filter, use the store selection
+    if (!allowedMints || allowedMints.length === 0) {
+      return storeSelectedMint;
+    }
+
+    // Check if current store selection is in allowed mints
+    if (storeSelectedMint && allowedMints.includes(storeSelectedMint)) {
+      return storeSelectedMint;
+    }
+
+    // Current selection is not valid - find the best mint from allowed list
+    // Filter to mints we have (trusted) that are in allowed list
+    const validMints = trustedMints
+      .filter((mint) => allowedMints.includes(mint.mintUrl))
+      .map((mint) => ({
+        mintUrl: mint.mintUrl,
+        balance: liveBalances[mint.mintUrl] || 0,
+      }))
+      .sort((a, b) => b.balance - a.balance);
+
+    // Return the mint with highest balance, or first available
+    return validMints.length > 0 ? validMints[0].mintUrl : storeSelectedMint;
+  }, [params.selectedMintUrl, allowedMints, storeSelectedMint, trustedMints, liveBalances]);
+
+  // Auto-update store selection when we override due to allowed mints
+  useEffect(() => {
+    if (
+      keys?.pubkey &&
+      selectedMint &&
+      storeSelectedMint !== selectedMint &&
+      allowedMints?.length
+    ) {
+      setSelectedMint(keys.pubkey, selectedMint);
+    }
+  }, [keys?.pubkey, selectedMint, storeSelectedMint, allowedMints, setSelectedMint]);
+
   const mintBalance = selectedMint ? liveBalances[selectedMint] || 0 : 0;
 
   // Convert input amount to sats (for API calls)
@@ -410,7 +482,8 @@ export function CurrencyScreen({
     if (!isValidAmount) return;
 
     // Check for insufficient balance on send operations
-    const isSendOperation = params.to === 'sendToken' || params.to === 'meltQuote';
+    const isSendOperation =
+      params.to === 'sendToken' || params.to === 'meltQuote' || params.to === 'paymentRequest';
     if (isSendOperation && amount > mintBalance) {
       // Redirect to mint selection with minimum amount filter
       if (onInsufficientBalance) {
@@ -448,6 +521,83 @@ export function CurrencyScreen({
         onMeltQuoteReady(params.lnUrlOrAddress, amount);
         setLoading(false);
         break;
+      case 'paymentRequest':
+        // Handle NUT-18 payment request: create token, send via Nostr, navigate to SendTokenScreen
+        if (!params.paymentRequest) {
+          popup({ message: 'No payment request provided', emoji: '🚨', type: 'error' });
+          setLoading(false);
+          return;
+        }
+
+        try {
+          // 1. Decode the payment request
+          const decodedRequest = decodePaymentRequest(params.paymentRequest);
+          const nostrTransport = decodedRequest.transport?.find(
+            (t) => t.type === PaymentRequestTransportType.NOSTR
+          );
+
+          if (!nostrTransport?.target) {
+            popup({ message: 'Invalid payment request - no Nostr transport', type: 'error' });
+            setLoading(false);
+            return;
+          }
+
+          // Decode nprofile to get pubkey and relays
+          const decoded = nip19.decode(nostrTransport.target);
+          if ((decoded.type as string) !== 'nprofile') {
+            popup({ message: 'Invalid recipient in payment request', type: 'error' });
+            setLoading(false);
+            return;
+          }
+          const recipientData = decoded.data as unknown as ProfilePointer;
+
+          // 2. Determine mint to use
+          const mintToUse = params.selectedMintUrl || selectedMint;
+          if (!mintToUse) {
+            popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+            setLoading(false);
+            return;
+          }
+
+          // 3. Create ecash token
+          const { token, historyEntry } = await send(mintToUse, amount);
+
+          // 4. Build PaymentRequestPayload
+          const payload: PaymentRequestPayload = {
+            id: decodedRequest.id,
+            mint: mintToUse,
+            unit: decodedRequest.unit || 'sat',
+            proofs: token.proofs,
+          };
+
+          // 5. Send via NIP-17 direct message
+          await sendDirectMessage(nostrTransport.target, JSON.stringify(payload), {
+            additionalRelays: recipientData.relays || [],
+          });
+
+          // 6. Capture location for the transaction
+          await captureAndStoreLocation(historyEntry.id);
+
+          // 7. Show success and navigate to SendTokenScreen
+          popup({
+            message: 'Payment sent successfully via Nostr',
+            type: 'success',
+            emoji: '🚀',
+          });
+
+          // Navigate to SendTokenScreen with the history entry + token
+          // Pass nostrSent: true so it shows the payment request timeline
+          onSendTokenCreated({ ...historyEntry, token }, { nostrSent: true });
+        } catch (err) {
+          console.error('[CurrencyScreen] Failed to send payment request:', err);
+          popup({
+            message: err instanceof Error ? err.message : 'Failed to send payment',
+            type: 'error',
+          });
+        } finally {
+          setLoading(false);
+        }
+        break;
       default:
         setLoading(false);
         break;
@@ -476,6 +626,29 @@ export function CurrencyScreen({
     const isP2PK = params?.profile && params.to === 'sendToken';
     const isEcashSend = params.to === 'sendToken';
     const hasPaymentRequest = params?.paymentRequest;
+    // NUT-18 payment request flow uses `to: 'paymentRequest'` and `allowedMints`
+    const isNut18PaymentRequest = params.to === 'paymentRequest' && hasPaymentRequest;
+    // Legacy payment request flow uses `mints` and `allowedUnits` params
+    const isLegacyPaymentRequest = hasPaymentRequest && params?.mints && params?.allowedUnits;
+
+    // Determine button disabled state
+    const getNextButtonDisabled = () => {
+      if (isNut18PaymentRequest) {
+        // For NUT-18 payment requests, just check valid amount
+        // Mint validation is handled via auto-selection earlier
+        return !isValidAmount;
+      }
+      if (isLegacyPaymentRequest) {
+        // Legacy flow: check amount, mint, and unit
+        return !(
+          isValidAmount &&
+          (params?.mints as unknown as string[])?.includes(selectedMint || '') &&
+          (params?.allowedUnits as unknown as string[])?.includes(unit.toUpperCase() || '')
+        );
+      }
+      // Default: just check valid amount
+      return !isValidAmount;
+    };
 
     return (
       <HStack className={'pb-2'} justify="center" align="center">
@@ -495,15 +668,7 @@ export function CurrencyScreen({
               variant: 'primary',
               onPress: handleNext,
               loading: loading,
-              disabled: hasPaymentRequest
-                ? !(
-                    isValidAmount &&
-                    (params?.mints as unknown as string[])?.includes(selectedMint || '') &&
-                    (params?.allowedUnits as unknown as string[])?.includes(
-                      unit.toUpperCase() || ''
-                    )
-                  )
-                : !isValidAmount,
+              disabled: getNextButtonDisabled(),
             },
             {
               text: 'Scan QR',
@@ -588,6 +753,7 @@ export function CurrencyScreen({
             requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
             showAddMintsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
             showDetailsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
+            allowedMints={allowedMints}
             onMintSelected={handleMintSelected}
           />
         </View>

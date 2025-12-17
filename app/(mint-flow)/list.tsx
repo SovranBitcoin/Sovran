@@ -28,6 +28,8 @@ function MintListRoute() {
     minAmount?: string;
     amount?: string;
     to?: string;
+    // Payment request params for filtering mints
+    allowedMints?: string; // JSON array of allowed mint URLs
   }>();
 
   const requireBalance = params.requireBalance === 'true';
@@ -36,6 +38,8 @@ function MintListRoute() {
   const onSelectAction = params.onSelectAction || 'goBack';
   // Parse minAmount for filtering mints with insufficient balance
   const minAmount = params.minAmount ? parseInt(params.minAmount, 10) : undefined;
+  // Parse allowedMints for payment request filtering
+  const allowedMints = params.allowedMints ? JSON.parse(params.allowedMints) : undefined;
 
   return (
     <>
@@ -59,6 +63,7 @@ function MintListRoute() {
       <MintListScreen
         requireBalance={requireBalance || !!minAmount}
         minAmount={minAmount}
+        allowedMints={allowedMints}
         showDetailsButton={showDetailsButton}
         currencyLabel="Currency"
         mintsLabel="Your mints"

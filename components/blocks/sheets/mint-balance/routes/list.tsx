@@ -60,6 +60,8 @@ interface MintItemProps {
   showCheckbox?: boolean;
   selected?: boolean;
   onToggle?: () => void;
+  /** Whether this mint is in the allowed list (for payment requests with specified mints) */
+  isAllowed?: boolean;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
@@ -79,6 +81,7 @@ const MintItem: React.FC<MintItemProps> = ({
   showCheckbox = false,
   selected = false,
   onToggle,
+  isAllowed = true,
 }) => {
   const { getGreenColor } = useTheme();
   const displayMintUrl = mintUrlProp || mint.mintUrl;
@@ -128,13 +131,15 @@ const MintItem: React.FC<MintItemProps> = ({
 
   // Determine opacity based on balance and requirements
   const itemOpacity = useMemo(() => {
+    // Not in allowed mints list
+    if (!isAllowed) return 0.5;
     if (globalLoading) return 0.5;
     if (balance && balance.amount === 0 && _requireBalance) return 0.5;
     // Show at reduced opacity if balance is below minimum required amount
     if (minAmount !== undefined && minAmount > 0 && balance && balance.amount < minAmount)
       return 0.5;
     return 1;
-  }, [globalLoading, balance, _requireBalance, minAmount]);
+  }, [isAllowed, globalLoading, balance, _requireBalance, minAmount]);
 
   // Check if this mint has insufficient balance for selection
   const hasInsufficientBalance = useMemo(() => {
@@ -143,6 +148,9 @@ const MintItem: React.FC<MintItemProps> = ({
     }
     return false;
   }, [minAmount, balance]);
+
+  // Check if this mint is disabled (not allowed or insufficient balance)
+  const isDisabled = !isAllowed || globalLoading || hasInsufficientBalance;
 
   return (
     <TouchableOpacity
@@ -155,7 +163,7 @@ const MintItem: React.FC<MintItemProps> = ({
         opacity: itemOpacity,
       }}
       onPress={onPress}
-      disabled={globalLoading || hasInsufficientBalance}>
+      disabled={isDisabled}>
       <VStack gap={0}>
         {/* Top section: Logo, name, balance/URL, checkbox/dots */}
         <HStack align="center" gap={12}>

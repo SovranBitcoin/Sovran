@@ -25,6 +25,8 @@ function ModalScreen() {
     mints?: string;
     lnUrlOrAddress?: string;
     routstrTopUp?: string;
+    selectedMintUrl?: string; // Pre-selected mint URL (for payment requests with single valid mint)
+    allowedMints?: string; // JSON array of allowed mint URLs (for payment requests)
   }>();
 
   console.log('[LIGHTNING-FLOW] currency.tsx received params', {
@@ -57,11 +59,12 @@ function ModalScreen() {
             },
           });
         }}
-        onSendTokenCreated={(sendHistoryEntry) => {
+        onSendTokenCreated={(sendHistoryEntry, options) => {
           router.replace({
             pathname: '/sendToken',
             params: {
               sendHistoryEntry: JSON.stringify(sendHistoryEntry),
+              ...(options?.nostrSent && { nostrSent: 'true' }),
             },
           });
         }}
@@ -84,6 +87,8 @@ function ModalScreen() {
           // Dismiss the modal to return to the previous screen (UserMessages)
           router.dismiss();
         }}
+        // Note: Payment request flow is handled entirely in CurrencyScreen
+        // which calls onSendTokenCreated after successful Nostr send
         onInsufficientBalance={(amount, _unit) => {
           // Navigate to mint selection with minimum amount filter
           // This will hide mints that don't have sufficient balance
