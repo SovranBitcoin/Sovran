@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.54",
+    "version": "0.0.56",
     "orientation": "portrait",
     "scheme": ["sovran", "cashu"],
     "userInterfaceStyle": "automatic",
@@ -65,7 +65,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
+          "cameraPermission": "Sovran uses your camera to scan QR codes for sending and receiving payments."
         }
       ],
       [
