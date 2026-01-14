@@ -1,0 +1,295 @@
+---
+description: End-to-end git + GitHub workflow for Sovran (RN/Expo). Clean commit series + PR text that becomes squash merge commit message.
+globs:
+  - "**/*"
+alwaysApply: false
+---
+
+## Purpose
+
+This rule defines how to produce:
+- A **clean, reviewable commit series** (Conventional Commits, logical ordering, interactive staging).
+- A **high-quality PR title + body** that is written to be used as the **Squash & Merge commit message** (GitHub uses PR title + PR description).
+
+This repo is a **React Native / Expo** app using **Expo Router**, with domain areas including:
+- Cashu / mints / ecash (`app/(mint-flow)`, `redux/cashu`, `stores/*mint*`, `components/blocks/*`)
+- Nostr (`providers/*Nostr*`, `hooks/useNostr*`, `redux/nostr`)
+- Map / discovery (`app/(map-flow)`, `utils/mapClustering.ts`, `stores/btcMapStore.ts`)
+- Multiple flows (`app/(send-flow)`, `app/(receive-flow)`, `app/(transactions-flow)`, `app/(user-flow)`)
+- Tooling patterns: **patch-package** (`patches/`), Expo/Metro config (`app.json`, `app.config.js`, `metro.config.js`, `eas.json`)
+
+---
+
+## Good Examples
+
+### Branch names
+
+- `feat/mint-balance-distribution`
+- `fix/nav-explore-modal-header`
+- `perf/wallet-health-virtualize-list`
+- `refactor/cashu-store-selectors`
+- `chore/metro-monicon-config`
+- `build/eas-noninteractive-android`
+- `chore/patches-coco-cashu-core`
+
+Format:
+- `<type>/<scope>-<short-kebab>[-ticket]`
+
+### Commit / PR titles (Conventional Commits)
+
+- `feat(mint): add balance distribution and rebalance screens`
+- `fix(nav): prevent double-push when opening health modal`
+- `perf(ui): reduce wallet health render cost`
+- `chore(patches): update coco-cashu-core patch for rc.38`
+- `build(expo): update metro config for monicon icons`
+
+### Commit plan ordering (typical)
+
+- `refactor(...)`: mechanical reshapes first (optional)
+- `feat(...)` / `fix(...)`: core behavior
+- `ui(...)`: polish / visuals
+- `test(...)`: tests only
+- `chore(...)` / `build(...)` / `ci(...)`: tooling, configs
+
+### PR body (written as final squash commit body)
+
+Use this structure (copy/paste ready):
+
+**What / Why**
+- …
+
+**What changed**
+- …
+
+**Screenshots / Video**
+- N/A (or attach)
+
+**Test plan**
+1) …
+
+**Notes / Risks**
+- …
+
+---
+
+## Bad Examples
+
+- `wip: stuff` (not Conventional Commits)
+- `fix: fixed it.` (vague + trailing period)
+- `feat: add many things` (no scope, not reviewable)
+- `chore(deps): update everything` (bundles unrelated changes)
+- Branch: `updates` / `new-branch` (no type/scope intent)
+- Mixing package managers without intent (e.g. Yarn repo but accidental `package-lock.json` churn)
+
+---
+
+## Enforced Patterns
+
+### 0) Non-negotiables (do this first, every time)
+
+Run these commands and read the output before planning commits/PR:
+
+```bash
+git status
+git diff
+git diff --staged
+git diff --stat
+git log --oneline --decorate -n 30
+git branch --show-current
+```
+
+Then write a **3–7 bullet change summary**:
+- **2–4 user-facing bullets**
+- **1–3 technical bullets** (architecture/state/data flow/tooling)
+
+Also reconcile:
+- **Intended change** (from the current chat/task context)
+- **Actual change** (from diff)
+- Call out mismatches, unfinished work, risky areas (storage, payments, auth/keys, notifications, migrations)
+
+### 1) Commit/PR message standard
+
+- Subjects must be **Conventional Commits**:
+  - `type(scope): subject`
+  - Imperative present tense (“add”, “fix”, “prevent”, “remove”)
+  - ≤ 72 chars target, **no trailing period**
+- Breaking changes:
+  - `type(scope)!: subject` OR footer `BREAKING CHANGE: …`
+
+Allowed `type`:
+- `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci`, `chore`
+
+### 2) Scope list (tailored to this repo)
+
+Pick **one primary scope** per commit/PR. Prefer the highest-level scope that matches the user-facing area.
+
+**Product / flow scopes**
+- `wallet`, `mint`, `send`, `receive`, `transactions`, `explore`, `map`, `user`, `messages`
+
+**Domain/infra scopes**
+- `cashu`, `nostr`, `sync`, `storage`, `security`, `api`
+
+**UI/navigation scopes**
+- `ui`, `nav`, `theme`
+
+**Platform/tooling scopes**
+- `expo`, `metro`, `eas`, `ios`, `android`, `build`, `deps`, `patches`, `scripts`, `ci`
+
+Heuristics:
+- Changes under `app/(drawer)` / `app/**/_layout.tsx` → likely `nav`
+- Changes under `app/(mint-flow)` + `stores/*mint*` → likely `mint` or `cashu` (choose one primary)
+- Nostr keys / DMs / profile fetch → likely `nostr` or `security`
+- `metro.config.js`, `app.json`, `eas.json`, `app.config.js` → `metro` / `expo` / `eas`
+- `patches/*.patch` → `patches`
+
+### 3) Branch naming
+
+If not already on a suitable branch, create/rename:
+
+```bash
+git checkout -b <type>/<scope>-<short-kebab>
+# or
+git branch -m <type>/<scope>-<short-kebab>
+```
+
+### 4) Build a commit plan (2–6 commits)
+
+Create a commit plan with:
+- **Subject** for each commit (`type(scope): …`)
+- **Exact files/hunks** included
+- Whether it needs a body (and what it should say)
+
+Rules:
+- Keep **formatting-only** in `style(...)` commit(s)
+- Keep **dependency/lockfile** changes separate (`chore(deps): …`)
+- Keep **patch-package** changes separate (`chore(patches): …`)
+- Avoid committing generated build artifacts unless required
+
+### 5) Interactive staging + clean history
+
+For each planned commit:
+- Stage precisely (prefer patch mode):
+
+```bash
+git add -p
+```
+
+- Commit with subject (and body when non-trivial):
+
+```bash
+git commit -m "type(scope): subject"
+# optional:
+git commit -m "type(scope): subject" -m "Body paragraph(s)…"
+```
+
+If there are messy commits already:
+- Rewrite with interactive rebase:
+
+```bash
+git rebase -i <base>
+```
+
+Use:
+- `fixup` for “oops” commits
+- `squash` when body text matters
+- Reorder into a logical narrative
+
+If already pushed:
+- Use `git push --force-with-lease` (and mention it explicitly in the final summary)
+
+### 6) Validation (only claim what you ran)
+
+Prefer repo scripts (this repo defines these):
+
+```bash
+yarn lint
+yarn type-check
+```
+
+Optional / when relevant:
+
+```bash
+npx expo-doctor
+yarn maestro
+```
+
+Rules:
+- **Never invent tests**. If you didn’t run it, say so.
+- If validation fails, fix and amend the relevant commit:
+
+```bash
+git commit --amend
+```
+
+### 7) PR title + body (this becomes the squash merge commit message)
+
+Assume Squash & Merge and GitHub uses:
+- **PR title** = final commit subject
+- **PR body** = final commit body
+
+Therefore:
+- PR title **must** be the final Conventional Commit subject.
+- PR body must read like release notes (clear “why”, “what changed”, test plan, risks).
+
+Use this PR body template:
+
+```text
+What / Why
+- …
+
+What changed
+- …
+
+Screenshots / Video
+- N/A
+
+Test plan
+1) …
+
+Notes / Risks
+- …
+```
+
+RN/Expo decision rules (call these out in PR body when touched):
+- Navigation (`expo-router`): mention back behavior, deep links, modal presentations; test iOS + Android.
+- Storage (`redux-persist`, `stores/*`, migrations): call out backwards compatibility and any migration steps.
+- Keys/security (`NostrKeysProvider`, secure storage): mention risk and error states.
+- Build/config (`app.json`, `eas.json`, `metro.config.js`, patches): call out build impact explicitly.
+
+### 8) Create/edit PR via GitHub CLI
+
+Push branch and create PR:
+
+```bash
+git push -u origin <branch>
+gh pr create --title "<PR_TITLE>" --body "<PR_BODY>"
+```
+
+If PR already exists:
+
+```bash
+gh pr edit --title "<PR_TITLE>"
+gh pr edit --body "<PR_BODY>"
+```
+
+### 9) Final output (what you must report back)
+
+Return:
+- What you did (short summary)
+- Final branch name
+- Final commit list: `git log --oneline -n 10`
+- PR title + PR body used
+- Which validations you ran (and results), or explicitly “not run”
+- Any force-push commands used (if any)
+
+---
+
+## Maintenance Notes
+
+Update scope list when:
+- New flows appear under `app/(...-flow)` or new domains are added under `stores/`, `redux/`, `providers/`, `hooks/`.
+- Tooling changes (switch package manager, add new scripts, add CI checks).
+
+Keep scopes **stable** and **not overly granular**:
+- Prefer `mint` over `distribution` unless it becomes a major separate domain.
+- Prefer `nav` for routing/layout changes even if they affect multiple screens.
