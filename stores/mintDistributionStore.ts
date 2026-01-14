@@ -119,10 +119,7 @@ function redistributeDelta(
     }
 
     // Calculate how much to take from each mint proportionally
-    const takeAmounts = distributeProportionally(
-      eligibleValues,
-      Math.min(delta, eligibleTotal)
-    );
+    const takeAmounts = distributeProportionally(eligibleValues, Math.min(delta, eligibleTotal));
 
     eligibleMints.forEach((url, i) => {
       result[url] = Math.max(0, (result[url] || 0) - takeAmounts[i]);
@@ -256,8 +253,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
              * changed mint exactly where the user set it, and avoids “flicker” when dragging.
              */
             const largestOther = otherMints.reduce(
-              (max, url) =>
-                (newDistribution[url] || 0) > (newDistribution[max] || 0) ? url : max,
+              (max, url) => ((newDistribution[url] || 0) > (newDistribution[max] || 0) ? url : max),
               otherMints[0]
             );
             if (largestOther) {
