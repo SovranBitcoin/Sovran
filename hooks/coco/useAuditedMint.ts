@@ -8,8 +8,16 @@ interface AuditInfo {
   url: string;
   name: string;
   state: string;
-  score?: number; // Calculate from success rate
-  speedIndex?: number; // Average speed from swaps
+  /** Swap success rate in range [0..1], computed from recent swaps (typically last 100) */
+  successRate?: number;
+  /** Recent swap window size used for successRate (e.g. 100) */
+  swapTotal?: number;
+  /** Successful swaps (state === 'OK') in the recent window */
+  swapSuccess?: number;
+  /** Average time_taken (ms) for successful swaps with time_taken > 0 */
+  avgTimeMs?: number;
+  /** 0-5 score derived from successRate (swap-based), used by some UI */
+  score?: number;
   auditorData: {
     name: string;
     state: string;
@@ -28,16 +36,20 @@ interface UseAuditedMintResult {
 
 // Helper function to transform audit data to AuditInfo
 const transformAuditData = (auditData: AuditMintResponse): AuditInfo => {
-  // Calculate success rate (score equivalent)
-  const totalOps = auditData.n_mints + auditData.n_melts;
-  const successRate = totalOps > 0 ? 1 - auditData.n_errors / totalOps : 1;
-  const score = successRate * 5; // Convert to 0-5 scale like KYM
+  // Prefer swap-based metrics to match auditor UI (e.g. "100 of 100 swaps")
+  const swaps = auditData.swaps || [];
+  const swapTotal = swaps.length;
+  const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
+  const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
+  const score = typeof successRate === 'number' ? successRate * 5 : undefined;
 
-  // Calculate average speed from swaps
-  const validSwaps = auditData.swaps.filter((swap) => swap.time_taken > 0);
-  const avgSpeed =
-    validSwaps.length > 0
-      ? validSwaps.reduce((sum, swap) => sum + swap.time_taken, 0) / validSwaps.length / 1000 // Convert to seconds
+  // Average time in ms for successful swaps
+  const successfulTimes = swaps
+    .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
+    .map((s) => s.time_taken);
+  const avgTimeMs =
+    successfulTimes.length > 0
+      ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
       : undefined;
 
   // Transform to expected interface
@@ -45,8 +57,11 @@ const transformAuditData = (auditData: AuditMintResponse): AuditInfo => {
     url: auditData.url,
     name: auditData.name,
     state: auditData.state,
+    successRate,
+    swapTotal,
+    swapSuccess,
+    avgTimeMs,
     score,
-    speedIndex: avgSpeed,
     auditorData: {
       name: auditData.name,
       state: auditData.state,

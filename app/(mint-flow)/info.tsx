@@ -190,13 +190,17 @@ const AnimatedAvatar = React.memo(AnimatedAvatarComponent);
 // ============================================================================
 function StatsGridComponent({
   successRate,
-  mintSpeed,
+  avgTimeMs,
+  swapSuccess,
+  swapTotal,
   totalMints,
   totalMelts,
   isLoading: _isLoading,
 }: {
   successRate?: number;
-  mintSpeed?: number;
+  avgTimeMs?: number;
+  swapSuccess?: number;
+  swapTotal?: number;
   totalMints?: number;
   totalMelts?: number;
   isLoading: boolean;
@@ -207,11 +211,11 @@ function StatsGridComponent({
   const displayValues = useMemo(
     () => ({
       successRate: successRate !== undefined ? (successRate * 100).toFixed(1) : '0.0',
-      mintSpeed: mintSpeed !== undefined ? mintSpeed.toFixed(1) : '0.0',
+      avgTimeMs: avgTimeMs !== undefined ? Math.round(avgTimeMs).toString() : '0',
       totalMints: totalMints !== undefined ? Math.round(totalMints).toString() : '0',
       totalMelts: totalMelts !== undefined ? Math.round(totalMelts).toString() : '0',
     }),
-    [successRate, mintSpeed, totalMints, totalMelts]
+    [successRate, avgTimeMs, totalMints, totalMelts]
   );
 
   // Single staggered fade animation using native driver
@@ -225,7 +229,7 @@ function StatsGridComponent({
   // Check if we have any valid data
   const hasValidData =
     successRate !== undefined ||
-    mintSpeed !== undefined ||
+    avgTimeMs !== undefined ||
     totalMints !== undefined ||
     totalMelts !== undefined;
 
@@ -254,14 +258,17 @@ function StatsGridComponent({
     () => [
       {
         label: 'Success Rate',
-        description: 'Successful rate of transactions',
+        description:
+          typeof swapSuccess === 'number' && typeof swapTotal === 'number'
+            ? `${swapSuccess} of ${swapTotal} swaps`
+            : 'Successful rate of swaps',
         value: `${displayValues.successRate}%`,
         accent: true,
       },
       {
-        label: 'Mint Speed',
-        description: 'Typical processing time',
-        value: `${displayValues.mintSpeed}s`,
+        label: 'Average Time',
+        description: 'For successful swaps',
+        value: `${displayValues.avgTimeMs} ms`,
         accent: true,
       },
       {
@@ -277,7 +284,7 @@ function StatsGridComponent({
         accent: false,
       },
     ],
-    [displayValues]
+    [displayValues, swapSuccess, swapTotal]
   );
 
   // Show skeleton if we don't have valid data yet
@@ -644,11 +651,14 @@ function MintInfoModal() {
     const melts = auditInfo?.auditorData?.melts;
     const errors = auditInfo?.auditorData?.errors;
     const totalOps = (mints || 0) + (melts || 0);
-    const rate = auditInfo?.score
-      ? auditInfo.score / 5
-      : totalOps > 0
-        ? 1 - (errors || 0) / totalOps
-        : undefined;
+    const rate =
+      typeof auditInfo?.successRate === 'number'
+        ? auditInfo.successRate
+        : typeof auditInfo?.score === 'number'
+          ? auditInfo.score / 5
+          : totalOps > 0
+            ? 1 - (errors || 0) / totalOps
+            : undefined;
     return { successRate: rate, totalMints: mints, totalMelts: melts };
   }, [auditInfo]);
 
@@ -715,7 +725,9 @@ function MintInfoModal() {
           {/* Stats Grid */}
           <StatsGrid
             successRate={successRate}
-            mintSpeed={auditInfo?.speedIndex}
+            avgTimeMs={auditInfo?.avgTimeMs}
+            swapSuccess={auditInfo?.swapSuccess}
+            swapTotal={auditInfo?.swapTotal}
             totalMints={totalMints}
             totalMelts={totalMelts}
             isLoading={isLoading}
