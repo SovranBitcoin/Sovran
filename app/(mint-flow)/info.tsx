@@ -292,54 +292,68 @@ function StatsGridComponent({
 
   return (
     <View style={styles.statsGrid}>
-      {stats.map((stat, index) => (
-        <View key={index} style={styles.statItem}>
-          <View
-            style={[
-              styles.statCard,
-              { backgroundColor: getPrimaryColor('800'), borderColor: getPrimaryColor('700') },
-            ]}>
-            {showSkeleton ? (
-              <>
-                <Skeleton
-                  style={[styles.skeletonLabel, { backgroundColor: getPrimaryColor('700') }]}
-                />
-                <Skeleton
+      {[0, 2].map((rowStart) => (
+        <View key={rowStart} style={styles.statsRow}>
+          {stats.slice(rowStart, rowStart + 2).map((stat, i) => {
+            const index = rowStart + i;
+            return (
+              <View key={stat.label} style={styles.statItem}>
+                <View
                   style={[
-                    styles.skeletonValue,
-                    { backgroundColor: getPrimaryColor('700'), width: stat.accent ? 100 : 60 },
-                  ]}
-                />
-                <Skeleton
-                  style={[styles.skeletonDesc, { backgroundColor: getPrimaryColor('700') }]}
-                />
-              </>
-            ) : (
-              <Animated.View style={{ opacity: fadeAnims[index] }}>
-                <Text
-                  bold
-                  overpass
-                  size={12}
-                  style={{ color: getPrimaryColor('200'), marginBottom: 4 }}>
-                  {stat.label.toUpperCase()}
-                </Text>
-                <Text
-                  bold
-                  overpass
-                  size={stat.accent ? 24 : 20}
-                  style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
-                  {stat.value}
-                </Text>
-                <Text
-                  bold
-                  overpass
-                  size={12}
-                  style={{ color: getPrimaryColor('300'), opacity: 0.8 }}>
-                  {stat.description}
-                </Text>
-              </Animated.View>
-            )}
-          </View>
+                    styles.statCard,
+                    styles.statCardStretch,
+                    {
+                      backgroundColor: getPrimaryColor('800'),
+                      borderColor: getPrimaryColor('700'),
+                    },
+                  ]}>
+                  {showSkeleton ? (
+                    <>
+                      <Skeleton
+                        style={[styles.skeletonLabel, { backgroundColor: getPrimaryColor('700') }]}
+                      />
+                      <Skeleton
+                        style={[
+                          styles.skeletonValue,
+                          {
+                            backgroundColor: getPrimaryColor('700'),
+                            width: stat.accent ? 100 : 60,
+                          },
+                        ]}
+                      />
+                      <Skeleton
+                        style={[styles.skeletonDesc, { backgroundColor: getPrimaryColor('700') }]}
+                      />
+                    </>
+                  ) : (
+                    <Animated.View style={{ opacity: fadeAnims[index] }}>
+                      <Text
+                        bold
+                        overpass
+                        size={12}
+                        style={{ color: getPrimaryColor('200'), marginBottom: 4 }}>
+                        {stat.label.toUpperCase()}
+                      </Text>
+                      <Text
+                        bold
+                        overpass
+                        size={stat.accent ? 24 : 20}
+                        style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
+                        {stat.value}
+                      </Text>
+                      <Text
+                        bold
+                        overpass
+                        size={12}
+                        style={{ color: getPrimaryColor('300'), opacity: 0.8 }}>
+                        {stat.description}
+                      </Text>
+                    </Animated.View>
+                  )}
+                </View>
+              </View>
+            );
+          })}
         </View>
       ))}
     </View>
@@ -839,19 +853,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    width: '100%',
+    alignSelf: 'stretch',
     marginTop: 16,
     marginHorizontal: -6,
   },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    width: '100%',
+  },
   statItem: {
-    width: '50%',
+    flex: 1,
     padding: 6,
   },
   statCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  statCardStretch: {
+    flex: 1,
   },
   skeletonLabel: {
     width: 80,
