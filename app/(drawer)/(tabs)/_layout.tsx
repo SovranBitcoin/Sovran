@@ -53,10 +53,10 @@ export default function TabLayout() {
             <Label>Wallet</Label>
           </NativeTabs.Trigger>
 
-          {/* <NativeTabs.Trigger name="explore">
-          <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
-          <Label>Explore</Label>
-        </NativeTabs.Trigger> */}
+          <NativeTabs.Trigger name="explore">
+            <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
+            <Label>Explore</Label>
+          </NativeTabs.Trigger>
 
           {/* <NativeTabs.Trigger name="example">
           <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
