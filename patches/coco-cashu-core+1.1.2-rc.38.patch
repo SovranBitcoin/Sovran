@@ -1,35 +1,8 @@
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
-index 5570165..0f4705e 100644
+index 90aa193..c84eb2f 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
 +++ b/node_modules/coco-cashu-core/dist/index.d.cts
-@@ -914,6 +914,7 @@ declare class CounterService {
-     mintUrl: string;
-     keysetId: string;
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   overwriteCounter(mintUrl: string, keysetId: string, counter: number): Promise<{
-     mintUrl: string;
-     keysetId: string;
-@@ -989,15 +990,18 @@ declare class MintService {
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   updateMintData(mintUrl: string): Promise<{
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   isTrustedMint(mintUrl: string): Promise<boolean>;
-   ensureUpdatedMint(mintUrl: string): Promise<{
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   deleteMint(mintUrl: string): Promise<void>;
-   getMintInfo(mintUrl: string): Promise<MintInfo>;
-   getAllMints(): Promise<Mint[]>;
-@@ -1519,12 +1523,12 @@ declare class PaymentRequestService {
+@@ -1519,12 +1519,12 @@ declare class PaymentRequestService {
  //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
@@ -45,7 +18,7 @@ index 5570165..0f4705e 100644
    private readonly logger?;
    constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
    receive(token: Token | string): Promise<void>;
-@@ -1664,6 +1668,7 @@ declare class MintApi {
+@@ -1664,6 +1664,7 @@ declare class MintApi {
      mint: Mint;
      keysets: Keyset[];
    }>;
@@ -53,9 +26,9 @@ index 5570165..0f4705e 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -1932,8 +1937,8 @@ declare class Manager {
-   readonly history: HistoryApi;
+@@ -1959,8 +1960,8 @@ declare class Manager {
    readonly send: SendApi;
+   readonly ext: PluginExtensions;
    private mintService;
 -  private walletService;
 -  private proofService;
@@ -64,7 +37,7 @@ index 5570165..0f4705e 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1947,10 +1952,10 @@ declare class Manager {
+@@ -1974,10 +1975,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -78,37 +51,10 @@ index 5570165..0f4705e 100644
    private proofRepository;
    private readonly pluginHost;
 diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
-index 5570165..0f4705e 100644
+index 90aa193..c84eb2f 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.ts
 +++ b/node_modules/coco-cashu-core/dist/index.d.ts
-@@ -914,6 +914,7 @@ declare class CounterService {
-     mintUrl: string;
-     keysetId: string;
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   overwriteCounter(mintUrl: string, keysetId: string, counter: number): Promise<{
-     mintUrl: string;
-     keysetId: string;
-@@ -989,15 +990,18 @@ declare class MintService {
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   updateMintData(mintUrl: string): Promise<{
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   isTrustedMint(mintUrl: string): Promise<boolean>;
-   ensureUpdatedMint(mintUrl: string): Promise<{
-     mint: Mint;
-     keysets: Keyset[];
-   }>;
-+  getKeysets(mintUrl: string): Promise<Keyset[]>;
-   deleteMint(mintUrl: string): Promise<void>;
-   getMintInfo(mintUrl: string): Promise<MintInfo>;
-   getAllMints(): Promise<Mint[]>;
-@@ -1519,12 +1523,12 @@ declare class PaymentRequestService {
+@@ -1519,12 +1519,12 @@ declare class PaymentRequestService {
  //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
@@ -124,7 +70,7 @@ index 5570165..0f4705e 100644
    private readonly logger?;
    constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
    receive(token: Token | string): Promise<void>;
-@@ -1664,6 +1668,7 @@ declare class MintApi {
+@@ -1664,6 +1664,7 @@ declare class MintApi {
      mint: Mint;
      keysets: Keyset[];
    }>;
@@ -132,9 +78,9 @@ index 5570165..0f4705e 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -1932,8 +1937,8 @@ declare class Manager {
-   readonly history: HistoryApi;
+@@ -1959,8 +1960,8 @@ declare class Manager {
    readonly send: SendApi;
+   readonly ext: PluginExtensions;
    private mintService;
 -  private walletService;
 -  private proofService;
@@ -143,7 +89,7 @@ index 5570165..0f4705e 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -1947,10 +1952,10 @@ declare class Manager {
+@@ -1974,10 +1975,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -157,7 +103,7 @@ index 5570165..0f4705e 100644
    private proofRepository;
    private readonly pluginHost;
 diff --git a/node_modules/coco-cashu-core/dist/index.js b/node_modules/coco-cashu-core/dist/index.js
-index 3653959..c2e595f 100644
+index a472f1e..f49feaa 100644
 --- a/node_modules/coco-cashu-core/dist/index.js
 +++ b/node_modules/coco-cashu-core/dist/index.js
 @@ -5356,6 +5356,10 @@ var MintApi = class {
