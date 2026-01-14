@@ -340,12 +340,12 @@ export function WalletHealthModalContent({
       {/* Actions (standard rows, like Mint Info / Settings) */}
       <Section title="Actions">
         {(() => {
-          const rows: Array<{
+          const rows: {
             key: string;
             label: React.ReactElement;
             value?: string;
             onPress?: () => void;
-          }> = [];
+          }[] = [];
 
           if (hasDesired && totalBalance > 0) {
             // Show drift inline, similar to the pending count row.

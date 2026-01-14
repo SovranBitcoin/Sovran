@@ -36,9 +36,7 @@ function ModalScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ title: paymentRequestProp ? 'Payment Request' : 'Send Ecash' }}
-      />
+      <Stack.Screen options={{ title: paymentRequestProp ? 'Payment Request' : 'Send Ecash' }} />
       <SendTokenScreen
         sendHistoryEntry={params.sendHistoryEntry}
         paymentRequest={paymentRequestProp}

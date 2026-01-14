@@ -71,8 +71,11 @@ const parseNpub = (data: string): string | null => {
 
 export interface ScanningData {
   data: string;
-  /** Source of the data: 'paste', 'deeplink', or undefined for QR scan */
-  type?: 'paste' | 'deeplink';
+  /**
+   * Optional source hint for scans.
+   * Common values: 'paste', 'deeplink', 'qr'.
+   */
+  type?: string;
 }
 
 interface UseProcessPaymentStringProps {
@@ -131,8 +134,9 @@ export const useProcessPaymentString = ({
         return { urInProgress: false };
       }
 
-      // Resolve source: paste/deeplink from type, otherwise default to qr
-      const source: ScanSource = scanning.type ?? 'qr';
+      // Resolve source: accept known values, otherwise default to 'qr'
+      const source: ScanSource =
+        scanning.type === 'paste' || scanning.type === 'deeplink' ? scanning.type : 'qr';
 
       if (!scanned || scanning.data.startsWith('ur:')) {
         onLoading?.(true);

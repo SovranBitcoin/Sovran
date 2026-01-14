@@ -24,6 +24,10 @@ const scanBoxSize = screenWidth * 0.8;
 
 export interface ScanningData {
   data: string;
+  /**
+   * Optional source hint for scans.
+   * Common values: 'paste', 'deeplink', 'qr'.
+   */
   type?: string;
 }
 
