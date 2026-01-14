@@ -2,7 +2,7 @@
 description: End-to-end git + GitHub workflow for Sovran (RN/Expo). Clean commit series + PR text that becomes squash merge commit message.
 globs:
   - "**/*"
-alwaysApply: false
+alwaysApply: true
 ---
 
 ## Purpose
@@ -11,12 +11,53 @@ This rule defines how to produce:
 - A **clean, reviewable commit series** (Conventional Commits, logical ordering, interactive staging).
 - A **high-quality PR title + body** that is written to be used as the **Squash & Merge commit message** (GitHub uses PR title + PR description).
 
-This repo is a **React Native / Expo** app using **Expo Router**, with domain areas including:
-- Cashu / mints / ecash (`app/(mint-flow)`, `redux/cashu`, `stores/*mint*`, `components/blocks/*`)
-- Nostr (`providers/*Nostr*`, `hooks/useNostr*`, `redux/nostr`)
-- Map / discovery (`app/(map-flow)`, `utils/mapClustering.ts`, `stores/btcMapStore.ts`)
-- Multiple flows (`app/(send-flow)`, `app/(receive-flow)`, `app/(transactions-flow)`, `app/(user-flow)`)
-- Tooling patterns: **patch-package** (`patches/`), Expo/Metro config (`app.json`, `app.config.js`, `metro.config.js`, `eas.json`)
+This repo is a **React Native / Expo** app using **Expo Router**.
+
+Important: the domain/scope mapping in this rule should be treated as **guidance, not an exhaustive list**.
+Prefer to derive scope from the **actual diff + repo structure** instead of relying on a fixed taxonomy that can go stale.
+
+---
+
+## Default behavior (apply to every task)
+
+This rule should run for **every task** by default.
+
+### Never commit to main/master
+
+- **Never commit directly** to `main` / `master` (or any protected default branch).
+- Always work on a **feature branch**.
+- If you detect you’re on `main`/`master`, immediately create a branch before making or committing changes:
+
+```bash
+git checkout -b <type>/<scope>-<short-kebab>
+```
+
+### Automatic “should we commit?” decision (no user confirmation required)
+
+The agent should decide whether to commit without asking, using this rubric:
+
+- **Commit** when any of the following are true:
+  - User-facing behavior or UI changed
+  - Non-trivial bugfix / perf improvement
+  - New file(s) added, significant refactor, or risky logic (payments, keys, storage, networking)
+  - Tooling/config/patches changed (lockfiles, `metro.config.js`, `app.json`, `patches/*`)
+- **Skip committing** only when the change is truly trivial and non-reviewable alone (e.g., comment tweak), or when the user explicitly requests “no commits”.
+
+Cadence:
+- Prefer **small, high-signal commits** after each coherent “unit of work” is complete (a fix/feature/polish step), rather than one giant post-hoc commit.
+- Avoid committing broken states; if mid-flight, keep working until it’s coherent, then commit.
+
+### Branch naming is allowed to change as the task evolves
+
+- If the scope changes materially (e.g., “ui polish” turns into “mint rebalance feature”), rename the branch to match:
+
+```bash
+git branch -m <type>/<scope>-<short-kebab>
+```
+
+If already pushed:
+- Use `git push -u origin <new>` then delete old remote branch if appropriate.
+- If rewrite is required, use `git push --force-with-lease` and report it.
 
 ---
 
@@ -123,17 +164,18 @@ Allowed `type`:
 
 Pick **one primary scope** per commit/PR. Prefer the highest-level scope that matches the user-facing area.
 
-**Product / flow scopes**
-- `wallet`, `mint`, `send`, `receive`, `transactions`, `explore`, `map`, `user`, `messages`
+**Recommended approach (avoid stale scope lists)**
 
-**Domain/infra scopes**
-- `cashu`, `nostr`, `sync`, `storage`, `security`, `api`
+Prefer this order:
+- **(1) Derive from diff paths**: use the top-level area touched (e.g. `app/(mint-flow)` → `mint`, `app/(drawer)` → `nav` or the tab’s feature scope, `components/ui` → `ui`, `patches/*` → `patches`, `metro.config.js` → `metro`).
+- **(2) Derive from feature intent**: choose the scope that best matches what the user experiences.
+- **(3) When a new domain appears**: it’s OK to introduce a new scope if it’s clearly a durable area (keep it short and stable).
 
-**UI/navigation scopes**
-- `ui`, `nav`, `theme`
-
-**Platform/tooling scopes**
-- `expo`, `metro`, `eas`, `ios`, `android`, `build`, `deps`, `patches`, `scripts`, `ci`
+**Common scopes (not exhaustive)**
+- Product/flow: `wallet`, `mint`, `send`, `receive`, `transactions`, `explore`, `map`, `user`, `messages`
+- UI/nav/theme: `ui`, `nav`, `theme`
+- Domain/infra: `cashu`, `nostr`, `sync`, `storage`, `security`, `api`
+- Platform/tooling: `expo`, `metro`, `eas`, `ios`, `android`, `build`, `deps`, `patches`, `scripts`, `ci`
 
 Heuristics:
 - Changes under `app/(drawer)` / `app/**/_layout.tsx` → likely `nav`
