@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Alert } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTheme } from 'providers/ThemeProvider';
@@ -44,6 +44,9 @@ function DistributionScreen() {
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
 
+  // Get params
+  const params = useLocalSearchParams<{ unit?: string }>();
+
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
 
@@ -54,6 +57,16 @@ function DistributionScreen() {
 
   // Mint info state
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
+
+  // Read initial unit from route params (e.g. { unit: 'usd' } from Wallet Health modal)
+  const routeCurrency = useMemo(() => {
+    const raw = params.unit;
+    if (!raw) return null;
+    const norm = String(raw).toLowerCase();
+    // Treat btc as sats in the UI selector
+    if (norm === 'btc' || norm === 'sat') return 'SAT';
+    return norm.toUpperCase();
+  }, [params.unit]);
 
   // Currency selection state
   const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
@@ -91,6 +104,14 @@ function DistributionScreen() {
     const filtered = uniqueUnits.filter((c) => ['SAT', 'USD', 'EUR', 'GBP'].includes(c));
     return filtered.length > 0 ? filtered : ['SAT'];
   }, [trustedMints]);
+
+  // Initialize selected currency from route param exactly once (if valid), otherwise keep default.
+  useEffect(() => {
+    if (!routeCurrency) return;
+    if (!availableCurrencies.includes(routeCurrency)) return;
+    // Only override if we're still at the default; don't clobber user-driven changes.
+    setSelectedCurrency((prev) => (prev === 'SAT' ? routeCurrency : prev));
+  }, [routeCurrency, availableCurrencies]);
 
   // Mints for the selected currency
   const mintsForCurrency = useMemo(() => {
