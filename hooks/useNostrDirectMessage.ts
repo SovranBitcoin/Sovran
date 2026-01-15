@@ -14,7 +14,7 @@
 import { useCallback, useState } from 'react';
 import { NDKEvent, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { nip19, nip44, getPublicKey, generateSecretKey } from 'nostr-tools';
-import { bytesToHex } from '@noble/hashes/utils';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
@@ -136,7 +136,7 @@ export function useNostrDirectMessage(): UseNostrDirectMessageReturn {
         // 2. Create kind 13 seal event (encrypted with NIP-44)
         // The seal encrypts the DM event and is signed by the sender
         const conversationKey = nip44.v2.utils.getConversationKey(
-          senderPrivateKeyHex,
+          hexToBytes(senderPrivateKeyHex),
           recipientPubkey
         );
         const sealedContent = nip44.v2.encrypt(dmEventString, conversationKey);
@@ -162,7 +162,7 @@ export function useNostrDirectMessage(): UseNostrDirectMessageReturn {
 
         // Encrypt the seal with the random key to the recipient
         const wrapConversationKey = nip44.v2.utils.getConversationKey(
-          randomPrivateKeyHex,
+          randomPrivateKey,
           recipientPubkey
         );
         const wrappedContent = nip44.v2.encrypt(sealEventString, wrapConversationKey);
@@ -183,7 +183,9 @@ export function useNostrDirectMessage(): UseNostrDirectMessageReturn {
         // We need to explicitly connect to and publish to the target relays
         for (const relay of targetRelays) {
           try {
-            await ndk.pool.ensureRelay(relay);
+            // Use NDK's helper so we don't depend on a specific NDKRelay class instance/type.
+            const ndkRelay = ndk.addExplicitRelay(relay, undefined, true);
+            await ndkRelay.connect(2500).catch(() => undefined);
           } catch (relayError) {
             console.warn(`Failed to connect to relay ${relay}:`, relayError);
           }

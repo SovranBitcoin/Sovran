@@ -218,5 +218,15 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:broom',
     'mdi:check-circle-outline',
     'fluent:wallet-24-filled',
+
+    // Distribution/Balance split icons
+    'fluent:split-vertical-24-filled',
+    'mdi:arrow-collapse-up',
+    'mdi:arrow-collapse-down',
+
+    // Rebalance plan icons
+    'mdi:skip-next',
+    'mdi:skip-next-circle',
+    'mdi:swap-horizontal',
   ],
 });

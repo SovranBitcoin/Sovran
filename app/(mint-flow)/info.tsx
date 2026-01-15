@@ -810,6 +810,31 @@ function MintInfoModal() {
             ))}
           </Section>
         )}
+
+        {/* Settings: entry point for mint distribution + rebalance tooling.
+            We only show this for known/added mints (not random scanned mints). */}
+        {isKnownMintState && (
+          <Section title="Settings">
+            <RowButton
+              isFirst
+              isLast
+              label={
+                <HStack align="center" gap={8}>
+                  <Icon
+                    name="fluent:split-vertical-24-filled"
+                    size={20}
+                    color={getPrimaryColor('400')}
+                  />
+                  <Text style={{ color: getPrimaryColor('50') }} bold>
+                    Balance split
+                  </Text>
+                </HStack>
+              }
+              // Route into the balance split editor (mint-flow modal).
+              onPress={() => router.navigate('/distribution')}
+            />
+          </Section>
+        )}
       </ScrollView>
 
       <BottomButtons>

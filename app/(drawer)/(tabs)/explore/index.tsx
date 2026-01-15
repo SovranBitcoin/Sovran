@@ -26,8 +26,8 @@ import { LayoutDebugWrapper } from '../example';
 import { extractDomain } from '@/helper/url';
 import { Avatar } from '@/components/ui/Avatar';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
-import { Mint, SendHistoryEntry } from 'coco-cashu-core';
 import { useMints, usePaginatedHistory } from 'coco-cashu-react';
+import { WalletHealthCard } from '@/components/blocks/health/WalletHealthCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -621,6 +621,8 @@ const LightningAddressCard = () => {
   const { getPrimaryColor } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
 
+  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
+
   const currentAddress = nostrKeys?.npub
     ? `${truncateMiddle(nostrKeys.npub, 5)}@npubx.cash`
     : 'npub...@npubx.cash';
@@ -637,11 +639,30 @@ const LightningAddressCard = () => {
       activeOpacity={0.9}
       style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}
       onPress={handlePress}>
-      {/* Gradient background with gold accent */}
+      {/* Same “3-corner blend” technique as Wallet Health (but with gold accent). */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: primary950 }]} />
+      <View
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(accentColor, 0.06) }]}
+      />
       <LinearGradient
-        colors={[getPrimaryColor('900'), opacity(accentColor, 0.1), getPrimaryColor('900')]}
+        colors={[opacity(accentColor, 0.34), opacity(accentColor, 0.12), 'transparent']}
+        locations={[0, 0.55, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <LinearGradient
+        colors={[opacity(accentColor, 0.22), 'transparent', opacity(accentColor, 0.26)]}
+        locations={[0, 0.55, 1]}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <LinearGradient
+        colors={[opacity(getPrimaryColor('50'), 0.06), 'transparent']}
+        locations={[0, 0.7]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -757,12 +778,24 @@ const LightningAddressCard = () => {
           </HStack>
         </HStack>
 
-        {/* CTA Button */}
-        <View style={[styles.lightningAddressCTA, { backgroundColor: accentColor }]}>
-          <Text size={14} heavy style={{ color: '#fff' }}>
-            Get Your Username
-          </Text>
-          <Icon name="mdi:arrow-right" size={18} color="#fff" style={{ marginLeft: 8 }} />
+        {/* CTA row (match Wallet Health “View health details” style) */}
+        <View
+          style={[
+            styles.lightningAddressCTA,
+            {
+              backgroundColor: opacity(accentColor, 0.12),
+              borderColor: opacity(accentColor, 0.22),
+            },
+          ]}>
+          <HStack align="center" justify="space-between">
+            <HStack align="center" gap={8}>
+              <Icon name="mingcute:lightning-fill" size={16} color={opacity(accentColor, 0.9)} />
+              <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
+                Get your username
+              </Text>
+            </HStack>
+            <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
+          </HStack>
         </View>
       </VStack>
     </TouchableOpacity>
@@ -770,6 +803,8 @@ const LightningAddressCard = () => {
 };
 
 // Pending Ecash Card
+// NOTE: Explore currently hides this section, but we keep the component around for easy re-enable.
+// eslint-disable-next-line unused-imports/no-unused-vars, @typescript-eslint/no-unused-vars
 const PendingEcashCard = () => {
   const { getPrimaryColor } = useTheme();
   const { history } = usePaginatedHistory();
@@ -778,8 +813,7 @@ const PendingEcashCard = () => {
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
     return history.filter(
-      (entry): entry is SendHistoryEntry =>
-        entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
+      (entry) => entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
     );
   }, [history]);
 
@@ -787,8 +821,8 @@ const PendingEcashCard = () => {
   const pendingMints = useMemo(() => {
     const mintUrls = [...new Set(pendingSends.map((tx) => tx.mintUrl))];
     return mintUrls
-      .map((url) => mints.find((m: Mint) => m.mintUrl === url))
-      .filter((m): m is Mint => m !== undefined)
+      .map((url) => mints.find((m) => m.mintUrl === url))
+      .flatMap((m) => (m ? [m] : []))
       .slice(0, 3);
   }, [pendingSends, mints]);
 
@@ -896,9 +930,13 @@ const PendingEcashCard = () => {
               ))}
             </HStack>
             <Text size={12} style={{ color: getPrimaryColor('400') }}>
-              {pendingMints.length === 1
-                ? `from ${pendingMints[0].mintInfo?.name || extractDomain(pendingMints[0].mintUrl)}`
-                : `from ${pendingMints.length} mints`}
+              {(() => {
+                const firstMint = pendingMints[0];
+                if (pendingMints.length === 1 && firstMint) {
+                  return `from ${firstMint.mintInfo?.name || extractDomain(firstMint.mintUrl)}`;
+                }
+                return `from ${pendingMints.length} mints`;
+              })()}
             </Text>
           </HStack>
         )}
@@ -1045,11 +1083,11 @@ const ExploreScreen = () => {
         <Spacer size={32} />
 
         {/* Pending Ecash Section - only shows when there are pending transactions */}
-        <View style={{ paddingHorizontal: 20 }}>
+        {/* <View style={{ paddingHorizontal: 20 }}>
           <PendingEcashCard />
         </View>
 
-        <Spacer size={32} />
+        <Spacer size={32} /> */}
 
         {/* Lightning Address Section */}
         <SectionHeader
@@ -1058,6 +1096,17 @@ const ExploreScreen = () => {
         />
         <View style={{ paddingHorizontal: 20 }}>
           <LightningAddressCard />
+        </View>
+
+        <Spacer size={32} />
+
+        {/* Wallet Health */}
+        <SectionHeader
+          title="Wallet Health"
+          subtitle="Check distribution drift, pending outgoing ecash, and more"
+        />
+        <View style={{ paddingHorizontal: 20 }}>
+          <WalletHealthCard defaultUnit="sat" />
         </View>
 
         <Spacer size={32} />
@@ -1378,12 +1427,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   lightningAddressCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   // Pending Ecash Card styles
   pendingEcashCard: {

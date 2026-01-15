@@ -31,6 +31,14 @@ export default function ExploreLayout() {
           ),
         }}
       />
+      <Stack.Screen
+        name="healthModal"
+        options={{
+          presentation: 'modal',
+          headerShown: true,
+          headerTransparent: true,
+        }}
+      />
     </Stack>
   );
 }

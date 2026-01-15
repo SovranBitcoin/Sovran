@@ -155,13 +155,13 @@ export function MintListScreen({
     // Filter by currency only - allowedMints is handled by isAllowed prop on MintItem
     if (selectedCurrency !== 'ALL') {
       mints = mints.filter((mint) => {
-      if (!mint.mintInfo?.nuts?.['4']?.methods) {
-        return selectedCurrency === 'SAT';
-      }
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toUpperCase() === selectedCurrency
-      );
-    });
+        if (!mint.mintInfo?.nuts?.['4']?.methods) {
+          return selectedCurrency === 'SAT';
+        }
+        return mint.mintInfo.nuts['4'].methods.some(
+          (method: any) => method.unit?.toUpperCase() === selectedCurrency
+        );
+      });
     }
 
     // Sort: visible mints first (by balance desc), then non-visible mints (by balance desc)
@@ -170,10 +170,14 @@ export function MintListScreen({
     // 2. Has sufficient balance for minAmount (or no minAmount filter)
     // 3. Has balance when requireBalance is true
     return mints.sort((a, b) => {
-      const aAllowed = !allowedMints || allowedMints.length === 0 || allowedMints.includes(a.mintUrl);
-      const bAllowed = !allowedMints || allowedMints.length === 0 || allowedMints.includes(b.mintUrl);
-      const aHasSufficientBalance = minAmount === undefined || minAmount <= 0 || a.amount >= minAmount;
-      const bHasSufficientBalance = minAmount === undefined || minAmount <= 0 || b.amount >= minAmount;
+      const aAllowed =
+        !allowedMints || allowedMints.length === 0 || allowedMints.includes(a.mintUrl);
+      const bAllowed =
+        !allowedMints || allowedMints.length === 0 || allowedMints.includes(b.mintUrl);
+      const aHasSufficientBalance =
+        minAmount === undefined || minAmount <= 0 || a.amount >= minAmount;
+      const bHasSufficientBalance =
+        minAmount === undefined || minAmount <= 0 || b.amount >= minAmount;
       const aHasRequiredBalance = !requireBalance || a.amount > 0;
       const bHasRequiredBalance = !requireBalance || b.amount > 0;
 

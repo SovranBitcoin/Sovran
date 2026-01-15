@@ -24,6 +24,8 @@ export default function MintFlowLayout() {
       <Stack.Screen name="add" options={{ title: 'Add Mints' }} />
       <Stack.Screen name="info" options={{ title: 'Mint Details' }} />
       <Stack.Screen name="reviews" options={{ title: 'Reviews' }} />
+      <Stack.Screen name="distribution" options={{ title: 'Balance split' }} />
+      <Stack.Screen name="rebalancePlan" options={{ title: 'Rebalance Plan' }} />
       <Stack.Screen name="userMessages" options={{ headerShown: false }} />
     </Stack>
   );

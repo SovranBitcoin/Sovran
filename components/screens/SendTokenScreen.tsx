@@ -128,7 +128,6 @@ export function SendTokenScreen({
   onNavigateBack,
   onNavigateToMessages,
 }: SendTokenScreenProps) {
-  const { getPrimaryColor } = useTheme();
   const { receive: _receive } = useReceive();
   const { getMintInfo, isKnownMint } = useMintManagement();
   const manager = useManager();

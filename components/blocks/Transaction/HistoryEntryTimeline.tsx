@@ -551,10 +551,10 @@ export function HistoryEntryTimeline({
             });
           }
           rolledBackTimeline.push({
-              state: 'rolledBack',
-              displayLabel: SEND_STATE_LABELS.rolledBack,
-              stepType: 'rolled-back',
-              info: 'Token funds returned to your balance',
+            state: 'rolledBack',
+            displayLabel: SEND_STATE_LABELS.rolledBack,
+            stepType: 'rolled-back',
+            info: 'Token funds returned to your balance',
           });
           return rolledBackTimeline;
         }
