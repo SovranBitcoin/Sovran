@@ -26,6 +26,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 
@@ -96,9 +97,10 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   ]);
 
   // Border color: skeleton when loading, custom, or fall back to subtle white
+  const borderAlpha = 0.22; // keep slider borders consistent with CTA/button borders in the mint card
   const progressBorderColor = isLoadingColors
-    ? skeletonColor1
-    : customBorderColor || 'rgba(255,255,255,0.05)';
+    ? 'rgba(255,255,255,0.10)'
+    : opacity(customBorderColor || primaryColor700, borderAlpha);
 
   // Inner shadow - top darker (inset), bottom lighter (subtle lift) - shadcn style
   const innerShadowTop = useMemo(
@@ -281,6 +283,12 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
     // Show markers at 0%, 25%, 50%, 75%, 100%
     const majorSteps = [0, 25, 50, 75, 100];
 
+    // When a mint provides extracted colors, tint the markers so they feel “owned” by that mint.
+    // Keep them subtle via opacity so they don't fight the progress fill.
+    const markerColor = isLoadingColors
+      ? 'rgba(255,255,255,0.10)'
+      : opacity(customBorderColor || primaryColor700, borderAlpha);
+
     for (let i = 0; i <= 100; i += 5) {
       const isMajor = majorSteps.includes(i);
       markers.push(
@@ -291,7 +299,8 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
             {
               left: (i / 100) * width - 1,
               height: isMajor ? '100%' : '50%',
-              backgroundColor: primaryColor700,
+              backgroundColor: markerColor,
+              // Major ticks match the slider border style; minor ticks are the same style, just quieter.
               opacity: isMajor ? 1 : 0.5,
             },
           ]}
@@ -299,7 +308,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
       );
     }
     return markers;
-  }, [width, primaryColor700]);
+  }, [width, primaryColor700, customBorderColor, isLoadingColors]);
 
   return (
     <View style={[styles.wrapper, { width, height: SLIDER_HEIGHT }]}>
@@ -315,7 +324,9 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
               styles.container,
               {
                 backgroundColor: Platform.OS === 'android' ? primaryColor800 : 'transparent',
-                borderColor: primaryColor700,
+                borderColor: isLoadingColors
+                  ? 'rgba(255,255,255,0.10)'
+                  : opacity(customBorderColor || primaryColor700, borderAlpha),
               },
             ]}>
             {/* iOS blur background */}
@@ -332,7 +343,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
                 styles.progressFill,
                 progressStyle,
                 {
-                  borderWidth: 1,
+                  borderWidth: StyleSheet.hairlineWidth,
                   borderColor: progressBorderColor,
                 },
               ]}>

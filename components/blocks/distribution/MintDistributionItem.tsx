@@ -19,14 +19,21 @@ import { VStack } from 'components/ui/View/VStack';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import Icon from 'assets/icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { DistributionSlider } from './DistributionSlider';
-import { useExtractedColors } from './colorUtils';
+import { hexToRgb, useExtractedColors } from './colorUtils';
 import { bpToPercent, TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 import { extractDomain } from '@/helper/url';
 
 interface MintInfo {
   name?: string;
   icon_url?: string;
+}
+
+function hexToRgba(hex: string, alpha: number): string | null {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return null;
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 interface MintDistributionItemProps {
@@ -63,6 +70,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
 }) => {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primaryColor50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const primaryColor600 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
@@ -82,6 +90,48 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
     }
     return extractedColors;
   }, [extractedColors, primaryColor600, primaryColor700]);
+
+  const accent = useMemo(() => {
+    if (extractedColors.isLoading || !extractedColors.hasExtractedColors) return null;
+    return {
+      base: extractedColors.baseColor,
+      max: extractedColors.gradientColors[0],
+      min: extractedColors.gradientColors[1],
+      border: extractedColors.borderColor,
+    };
+  }, [extractedColors]);
+
+  const cardTint = useMemo(() => {
+    if (!accent) return null;
+    return {
+      overlay: hexToRgba(accent.base, 0.1),
+      // Match the Explore-card feel: accent border is present but subtle.
+      border: hexToRgba(accent.border, 0.25) || hexToRgba(accent.base, 0.25),
+    };
+  }, [accent]);
+
+  const onAccentSubtleText = useMemo(() => {
+    // Grey-on-color reads muddy; use "on-accent" white with opacity for secondary text.
+    return accent ? 'rgba(255,255,255,0.7)' : primaryColor300;
+  }, [accent, primaryColor300]);
+
+  const maxButtonTint = useMemo(() => {
+    if (!accent) return null;
+    return {
+      background: hexToRgba(accent.base, 0.12),
+      border: hexToRgba(accent.border, 0.22) || hexToRgba(accent.base, 0.22),
+      icon: hexToRgba(accent.base, 0.9),
+    };
+  }, [accent]);
+
+  const minButtonTint = useMemo(() => {
+    if (!accent) return null;
+    return {
+      background: hexToRgba(accent.base, 0.12),
+      border: hexToRgba(accent.border, 0.22) || hexToRgba(accent.base, 0.22),
+      icon: hexToRgba(accent.base, 0.9),
+    };
+  }, [accent]);
 
   // Shared value for slider
   const sliderValue = useSharedValue(distributionBp);
@@ -142,7 +192,61 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
   const isAtMin = distributionBp === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: primaryColor800 }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: primaryColor800,
+          borderColor: cardTint?.border || 'rgba(255,255,255,0.05)',
+        },
+      ]}>
+      {/* Explore-card style “lighting” layers, but derived per-mint from its icon colors. */}
+      {!!accent?.base && (
+        <>
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: hexToRgba(accent.base, 0.05) }]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[hexToRgba(accent.max, 0.28) || 'transparent', 'transparent']}
+            locations={[0, 0.8]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              hexToRgba(accent.min, 0.2) || 'transparent',
+              'transparent',
+              hexToRgba(accent.max, 0.18) || 'transparent',
+            ]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.06)', 'transparent']}
+            locations={[0, 0.7]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </>
+      )}
+      {/* Subtle per-mint tint derived from the icon colors (keeps the base “card” look consistent). */}
+      {!!cardTint?.overlay && (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: cardTint.overlay, borderRadius: styles.container.borderRadius },
+          ]}
+        />
+      )}
       {/* Header row: Avatar, Name, Balance, Percentage */}
       <HStack align="center" justify="space-between" style={styles.headerRow}>
         <HStack align="center" gap={12} style={styles.mintInfo}>
@@ -162,7 +266,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
               unit={unit}
               size={12}
               weight="medium"
-              color={primaryColor300}
+              color={onAccentSubtleText}
             />
           </VStack>
         </HStack>
@@ -199,15 +303,20 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
           disabled={disabled || isAtMax}
           haptics
           style={[
-            styles.actionButton,
+            styles.ctaButton,
             {
-              backgroundColor: primaryColor700,
+              backgroundColor: maxButtonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: maxButtonTint?.border || 'rgba(255,255,255,0.10)',
               opacity: disabled || isAtMax ? 0.5 : 1,
             },
           ]}>
-          <HStack align="center" gap={4}>
-            <Icon name="mdi:arrow-collapse-up" size={14} color={primaryColor0} />
-            <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+          <HStack align="center" gap={8}>
+            <Icon
+              name="mdi:arrow-collapse-up"
+              size={16}
+              color={maxButtonTint?.icon || primaryColor50}
+            />
+            <Text size={12} heavy style={{ color: primaryColor50 }}>
               Max
             </Text>
           </HStack>
@@ -218,15 +327,20 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
           disabled={disabled || isAtMin}
           haptics
           style={[
-            styles.actionButton,
+            styles.ctaButton,
             {
-              backgroundColor: primaryColor700,
+              backgroundColor: minButtonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: minButtonTint?.border || 'rgba(255,255,255,0.10)',
               opacity: disabled || isAtMin ? 0.5 : 1,
             },
           ]}>
-          <HStack align="center" gap={4}>
-            <Icon name="mdi:arrow-collapse-down" size={14} color={primaryColor0} />
-            <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+          <HStack align="center" gap={8}>
+            <Icon
+              name="mdi:arrow-collapse-down"
+              size={16}
+              color={minButtonTint?.icon || primaryColor50}
+            />
+            <Text size={12} heavy style={{ color: primaryColor50 }}>
               Min
             </Text>
           </HStack>
@@ -242,6 +356,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 16,
     marginVertical: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
   },
   headerRow: {
     marginBottom: 12,
@@ -260,10 +376,12 @@ const styles = StyleSheet.create({
   buttonRow: {
     justifyContent: 'flex-start',
   },
-  actionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+  ctaButton: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
 });
 
