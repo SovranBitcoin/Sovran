@@ -706,15 +706,12 @@ function RebalancePlanScreen() {
       <Stack.Screen
         options={{
           title: 'Rebalance Plan',
-          headerRight: () => (
-            <HStack align="center" gap={4}>
-              <Icon name="mdi:swap-horizontal" size={20} color={primaryColor300} />
-            </HStack>
-          ),
+          // Explicitly clear any previously-set headerRight (React Navigation sometimes keeps prior options while hot-reloading).
+          headerRight: () => null,
         }}
       />
 
-      <ModalLayoutWrapper headerGradient bottomContent={bottomButtons} contentPadding={0}>
+      <ModalLayoutWrapper bottomContent={bottomButtons} contentPadding={0}>
         {/* Summary header */}
         <View style={[styles.summaryContainer, { backgroundColor: primaryColor800 }]}>
           <VStack gap={8}>
