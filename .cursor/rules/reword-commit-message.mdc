@@ -1,0 +1,68 @@
+---
+description: How to edit an existing commit title/body (reword) safely in this repo
+globs:
+  - "**/*"
+alwaysApply: false
+---
+
+## Goal
+
+Edit **only** a commit’s title/description (no code changes), while following Conventional Commits and repo safety rules.
+
+## Before you rewrite anything
+
+```bash
+git status
+git branch --show-current
+git log --oneline --decorate -n 30
+```
+
+- **Never rewrite `main` directly**: create a branch first.
+
+```bash
+git checkout -b chore/git-reword-<short-kebab>
+```
+
+## Case A: commit is `HEAD` (latest)
+
+```bash
+git commit --amend
+```
+
+## Case B: older commit, *linear* history (no merges to preserve)
+
+```bash
+git rebase -i <sha>^
+```
+
+- Change `pick` → `reword` for the target commit, save, then edit the message when prompted.
+
+## Case C: older commit, merge-heavy history (or rebase is risky)
+
+Prefer `git filter-repo` (if installed). If not available, use `git filter-branch` to rewrite **only** the target commit message:
+
+```bash
+FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter '
+if [ "$GIT_COMMIT" = "<target_sha>" ]; then
+  cat << "EOF"
+type(scope): subject
+
+- Bullet 1 describing user-facing change
+- Bullet 2 describing user-facing change
+EOF
+else
+  cat
+fi
+' HEAD
+```
+
+## Publishing after rewriting history
+
+- If the branch is already pushed, use **force-with-lease**:
+
+```bash
+git push --force-with-lease -u origin HEAD
+```
+
+- If you truly must update `origin/main`, coordinate first (this rewrites shared history).
+
