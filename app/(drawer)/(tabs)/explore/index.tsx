@@ -21,6 +21,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
 import { extractDomain } from '@/helper/url';
@@ -426,7 +427,9 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
 // Map Teaser Card
 const MapTeaserCard = () => {
   const { getPrimaryColor } = useTheme();
-  const { placesCache, fetchPlaces } = useBTCMapStore();
+  const { placesCache, fetchPlaces } = useBTCMapStore(
+    useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
+  );
 
   // Pre-fetch places when component mounts (will use cache if available)
   useEffect(() => {
