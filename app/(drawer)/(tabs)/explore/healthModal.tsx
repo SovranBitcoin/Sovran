@@ -9,9 +9,8 @@ import { WalletHealthModalContent } from 'components/blocks/health/WalletHealthM
 import type { HealthCta } from 'components/blocks/health/walletHealth';
 import { useMints } from 'coco-cashu-react';
 import { useSharedValue } from 'react-native-reanimated';
-import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 
-const STICKY_HEIGHT = 56;
+const DEFAULT_CURRENCIES = ['SAT'];
 
 const CloseButton = () => {
   const { getPrimaryColor } = useTheme();
@@ -49,9 +48,11 @@ function HealthModalScreen() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     initialUnit.toUpperCase() === 'BTC' ? 'SAT' : initialUnit.toUpperCase()
   );
+  const availableCurrencies = currencies.length > 0 ? currencies : DEFAULT_CURRENCIES;
   const unit = selectedCurrency.toLowerCase() === 'sat' ? 'sat' : selectedCurrency.toLowerCase();
 
   const scrollY = useSharedValue(0);
+  const [topOffset, setTopOffset] = useState(0);
 
   const handleAction = useCallback((action: HealthCta) => {
     if (action.type === 'openPendingEcash') {
@@ -80,20 +81,20 @@ function HealthModalScreen() {
       />
 
       <ModalLayoutWrapper
-        headerGradient
-        stickyContent={
-          <MintCurrencyTabs
-            currencies={currencies.length > 0 ? currencies : ['SAT']}
-            selectedCurrency={selectedCurrency}
-            onCurrencyChange={setSelectedCurrency}
-            scrollY={scrollY}
-          />
-        }
-        stickyContentHeight={STICKY_HEIGHT}
+        contentPadding={0}
         useAnimatedScroll
         scrollY={scrollY}
-        bottomPadding={32}>
-        <WalletHealthModalContent unit={unit} onAction={handleAction} />
+        bottomPadding={32}
+        onHeaderHeightChange={setTopOffset}>
+        <WalletHealthModalContent
+          unit={unit}
+          onAction={handleAction}
+          topOffset={topOffset}
+          currencies={availableCurrencies}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+          scrollY={scrollY}
+        />
       </ModalLayoutWrapper>
     </>
   );
