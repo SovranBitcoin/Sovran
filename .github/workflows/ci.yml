@@ -28,5 +28,8 @@ jobs:
         run: npm run type-check
 
       - name: Prettier Check
-        run: npx prettier --check "./**/*.{js,jsx,mjs,cjs,ts,tsx,json}"
+        run: npm run pretty:check
+
+      - name: Knip
+        run: npm run knip
 
