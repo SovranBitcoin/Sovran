@@ -19,8 +19,16 @@ import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, Linking, ScrollView, StyleSheet } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  InteractionManager,
+  Linking,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
 import { extractDomain } from '@/helper/url';
@@ -426,7 +434,9 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
 // Map Teaser Card
 const MapTeaserCard = () => {
   const { getPrimaryColor } = useTheme();
-  const { placesCache, fetchPlaces } = useBTCMapStore();
+  const { placesCache, fetchPlaces } = useBTCMapStore(
+    useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
+  );
 
   // Pre-fetch places when component mounts (will use cache if available)
   useEffect(() => {
@@ -434,6 +444,35 @@ const MapTeaserCard = () => {
       // Silently fail - we'll show fallback count
     });
   }, [fetchPlaces]);
+
+  // Prewarm the clustering index off the critical path so opening the modal is faster.
+  useEffect(() => {
+    if (!placesCache?.data?.length || !placesCache.timestamp) return;
+
+    let task: { cancel: () => void } | null = null;
+    const timer = setTimeout(() => {
+      task = InteractionManager.runAfterInteractions(async () => {
+        // Lazy import to avoid pulling clustering code into initial Explore render
+        const { prewarmBTCMapClusterManager } = await import('@/utils/btcMapClusterCache');
+        const points = placesCache.data.map((p) => ({
+          id: p.id,
+          lat: p.lat,
+          lon: p.lon,
+          icon: p.icon,
+        }));
+        prewarmBTCMapClusterManager(`btcmap:${placesCache.timestamp}:all`, points, {
+          radius: 50,
+          maxZoom: 17,
+          minPoints: 2,
+        });
+      });
+    }, 800);
+
+    return () => {
+      clearTimeout(timer);
+      task?.cancel();
+    };
+  }, [placesCache?.timestamp, placesCache?.data]);
 
   const placesCount = placesCache?.data.length ?? 0;
   const displayCount =
