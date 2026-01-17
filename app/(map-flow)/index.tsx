@@ -386,7 +386,7 @@ function MapScreen() {
     });
 
     return () => task.cancel();
-  }, [filteredPoints, clusterCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredPoints, clusterCacheKey, updateMarkersForCamera]);
 
   // Fetch places on mount - DEFERRED
   useEffect(() => {
@@ -448,7 +448,7 @@ function MapScreen() {
     });
 
     return () => task.cancel();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [setMapCamera, updateMarkersForCamera]);
 
   // My location button
   const handleMyLocation = useCallback(async () => {

@@ -157,17 +157,17 @@ export const useBTCMapStore = create<BTCMapStore>()(
         // Check if cache is stale
         const isStale = Date.now() - cache.timestamp > PLACES_CACHE_TTL;
         if (isStale) {
-          console.log('BTCMapStore: Cache is stale');
+          if (__DEV__) console.log('BTCMapStore: Cache is stale');
           return null;
         }
 
-        console.log('BTCMapStore: Returning cached places, count:', cache.data.length);
+        if (__DEV__) console.log('BTCMapStore: Returning cached places, count:', cache.data.length);
         return cache.data;
       },
 
       // Set cached places
       setCachedPlaces: (places: BTCMapPlace[]) => {
-        console.log('BTCMapStore: Caching places, count:', places.length);
+        if (__DEV__) console.log('BTCMapStore: Caching places, count:', places.length);
         set({
           placesCache: {
             data: places,
@@ -187,7 +187,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
       // Clear cache
       clearCache: () => {
-        console.log('BTCMapStore: Clearing cache');
+        if (__DEV__) console.log('BTCMapStore: Clearing cache');
         set({ placesCache: null, placeDetailsCache: {} });
       },
 
@@ -199,13 +199,13 @@ export const useBTCMapStore = create<BTCMapStore>()(
         if (!forceRefresh) {
           const cachedPlaces = state.getCachedPlaces();
           if (cachedPlaces && cachedPlaces.length > 0) {
-            console.log('BTCMapStore: Using cached data');
+            if (__DEV__) console.log('BTCMapStore: Using cached data');
             return cachedPlaces;
           }
         }
 
         // Fetch fresh data
-        console.log('BTCMapStore: Fetching fresh data from API');
+        if (__DEV__) console.log('BTCMapStore: Fetching fresh data from API');
         set({ isLoading: true, error: null });
 
         try {
@@ -216,7 +216,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
 
           const data: BTCMapPlace[] = await response.json();
-          console.log('BTCMapStore: Fetched', data.length, 'places');
+          if (__DEV__) console.log('BTCMapStore: Fetched', data.length, 'places');
 
           // Cache the results
           state.setCachedPlaces(data);
@@ -231,7 +231,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           // Return cached data as fallback if available
           const cache = get().placesCache;
           if (cache && cache.data.length > 0) {
-            console.log('BTCMapStore: Returning stale cache as fallback');
+            if (__DEV__) console.log('BTCMapStore: Returning stale cache as fallback');
             return cache.data;
           }
 
@@ -247,7 +247,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
         // Check if cache is stale
         const isStale = Date.now() - cache.timestamp > PLACE_DETAILS_CACHE_TTL;
         if (isStale) {
-          console.log('BTCMapStore: Place details cache is stale for id:', id);
+          if (__DEV__) console.log('BTCMapStore: Place details cache is stale for id:', id);
           return null;
         }
 
@@ -262,14 +262,14 @@ export const useBTCMapStore = create<BTCMapStore>()(
         if (!forceRefresh) {
           const cached = state.getCachedPlaceDetails(id);
           if (cached) {
-            console.log('BTCMapStore: Using cached place details for id:', id);
+            if (__DEV__) console.log('BTCMapStore: Using cached place details for id:', id);
             set({ selectedPlace: cached });
             return cached;
           }
         }
 
         // Fetch fresh data
-        console.log('BTCMapStore: Fetching place details for id:', id);
+        if (__DEV__) console.log('BTCMapStore: Fetching place details for id:', id);
         set({ isLoadingDetails: true });
 
         try {
@@ -280,7 +280,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
 
           const data: BTCMapPlaceDetails = await response.json();
-          console.log('BTCMapStore: Fetched place details:', data.name || id);
+          if (__DEV__) console.log('BTCMapStore: Fetched place details:', data.name || id);
 
           // Cache the results
           set((s) => ({
@@ -326,7 +326,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
       // Clear all data
       clearAllData: async () => {
         try {
-          console.log('BTCMapStore: Clearing all data');
+          if (__DEV__) console.log('BTCMapStore: Clearing all data');
           await AsyncStorage.removeItem('btcmap-store');
           set({
             placesCache: null,
@@ -354,10 +354,12 @@ export const useBTCMapStore = create<BTCMapStore>()(
         if (error) {
           console.warn('BTCMapStore: Failed to rehydrate from storage:', error);
         } else if (state?.placesCache) {
-          console.log(
-            'BTCMapStore: Rehydrated from storage, places count:',
-            state.placesCache.data.length
-          );
+          if (__DEV__) {
+            console.log(
+              'BTCMapStore: Rehydrated from storage, places count:',
+              state.placesCache.data.length
+            );
+          }
         }
       },
     }
