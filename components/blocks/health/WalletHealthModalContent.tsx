@@ -11,7 +11,13 @@ import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
 import { RowButton, Section } from 'app/settings-pages';
+import type { SharedValue } from 'react-native-reanimated';
+import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 import type { HealthCta } from './walletHealth';
+
+const HERO_PADDING = 18;
+const HEART_RING_SIZE = 72;
+const HEART_RING_RADIUS = HEART_RING_SIZE / 2;
 
 function getMintsForUnit(trustedMints: any[], unit: string) {
   const u = unit.toLowerCase();
@@ -83,17 +89,32 @@ function statLabelText(key: 'drift' | 'pending' | 'split'): string {
 export function WalletHealthModalContent({
   unit,
   onAction,
+  topOffset = 0,
+  currencies,
+  selectedCurrency,
+  onCurrencyChange,
+  scrollY,
 }: {
   unit: string;
   onAction: (action: HealthCta) => void;
+  topOffset?: number;
+  currencies: string[];
+  selectedCurrency: string;
+  onCurrencyChange: (currency: string) => void;
+  scrollY?: SharedValue<number>;
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const primary300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const primary400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
-  const primary900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
   const red = useMemo(() => getRedColor('300'), [getRedColor]);
+
+  // Wallet Health hero: keep the background gradient consistently "red-warm" (like the Needs rebalance state),
+  // even when the wallet is Balanced (where hero.accent is intentionally white for text/icon tones).
+  const gradientAccent = red;
+
+  const statPillBg = useMemo(() => opacity(gradientAccent, 0.1), [gradientAccent]);
 
   const { trustedMints } = useMints();
   const { balance } = useBalanceContext();
@@ -227,10 +248,131 @@ export function WalletHealthModalContent({
     return opacity(primary50, 0.16);
   }, [totalBalance, hasDesired, needsRebalance, red, primary50]);
 
+  const handleRebalancePress = useMemo(() => {
+    return () => onAction({ type: 'openRebalancePlan', unit: normalizedUnit });
+  }, [onAction, normalizedUnit]);
+
+  const handleSplitPress = useMemo(() => {
+    return () => onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
+  }, [onAction, normalizedUnit]);
+
+  const handlePendingPress = useMemo(() => {
+    return () => onAction({ type: 'openPendingEcash' });
+  }, [onAction]);
+
+  const heroStats = useMemo(() => {
+    return [
+      {
+        key: 'drift' as const,
+        value: driftStat,
+        tone: needsRebalance ? hero.accent : opacity(primary50, 0.9),
+      },
+      {
+        key: 'pending' as const,
+        value: pendingStat,
+        tone: pendingOutgoingCount > 0 ? hero.accent : opacity(primary50, 0.9),
+      },
+      {
+        key: 'split' as const,
+        value: splitStat,
+        tone: hasDesired ? opacity(primary50, 0.9) : hero.accent,
+      },
+    ] as const;
+  }, [
+    driftStat,
+    pendingStat,
+    splitStat,
+    needsRebalance,
+    pendingOutgoingCount,
+    hasDesired,
+    hero.accent,
+    primary50,
+  ]);
+
+  const actionRows = useMemo(() => {
+    const rows: {
+      key: string;
+      label: React.ReactElement;
+      value?: string;
+      onPress?: () => void;
+    }[] = [];
+
+    if (hasDesired && totalBalance > 0) {
+      // Show drift inline, similar to the pending count row.
+      const driftValue = needsRebalance ? `~${formatPctFromBp(maxDriftBp)}` : 'OK';
+      rows.push({
+        key: 'rebalance',
+        label: (
+          <HStack align="center" gap={10}>
+            <Icon name="mdi:swap-horizontal" size={18} color={primary400} />
+            <Text style={{ color: primary50 }} bold>
+              Rebalance now
+            </Text>
+          </HStack>
+        ),
+        value: driftValue,
+        onPress: handleRebalancePress,
+      });
+    }
+
+    rows.push({
+      key: 'split',
+      label: (
+        <HStack align="center" gap={10}>
+          <Icon name="fluent:split-vertical-24-filled" size={18} color={primary400} />
+          <Text style={{ color: primary50 }} bold>
+            {hasDesired ? 'Edit balance split' : 'Set balance split'}
+          </Text>
+        </HStack>
+      ),
+      value: !hasDesired ? 'Not set' : undefined,
+      onPress: handleSplitPress,
+    });
+
+    if (pendingOutgoingCount > 0) {
+      rows.push({
+        key: 'pending',
+        label: (
+          <HStack align="center" gap={10}>
+            <Icon name="mdi:clock-alert-outline" size={18} color={primary400} />
+            <Text style={{ color: primary50 }} bold>
+              View & reclaim pending ecash
+            </Text>
+          </HStack>
+        ),
+        value: `${pendingOutgoingCount}`,
+        onPress: handlePendingPress,
+      });
+    }
+
+    return rows;
+  }, [
+    hasDesired,
+    totalBalance,
+    needsRebalance,
+    maxDriftBp,
+    pendingOutgoingCount,
+    primary50,
+    primary400,
+    handleRebalancePress,
+    handleSplitPress,
+    handlePendingPress,
+  ]);
+
   return (
     <VStack gap={10}>
       {/* Overview (hero): centered heart + scannable stats */}
-      <View style={[styles.heroWrap, { borderColor: heroBorderColor }]}>
+      <View
+        style={[
+          styles.heroWrap,
+          {
+            borderColor: heroBorderColor,
+            // Pull the hero background up behind the transparent header.
+            // Then compensate with padding so inner content stays in the same place.
+            marginTop: -topOffset,
+            paddingTop: HERO_PADDING + topOffset,
+          },
+        ]}>
         {/* Base fill: keep it warm (near-black) instead of muddy grey */}
         <View
           style={[StyleSheet.absoluteFillObject, { backgroundColor: getPrimaryColor('950') }]}
@@ -238,6 +380,14 @@ export function WalletHealthModalContent({
 
         {/* Global warm wash so the hero always feels “red-tinted”, not grey */}
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(red, 0.06) }]} />
+
+        {/* Decorative hearts (match Explore WalletHealthCard) */}
+        <View style={styles.decorationLeft} pointerEvents="none">
+          <Icon name="garden:heart-fill-16" size={90} color={opacity(gradientAccent, 0.08)} />
+        </View>
+        <View style={styles.decorationRight} pointerEvents="none">
+          <Icon name="garden:heart-fill-16" size={140} color={opacity(gradientAccent, 0.05)} />
+        </View>
 
         {/**
          * 3-corner blend:
@@ -248,14 +398,14 @@ export function WalletHealthModalContent({
          * expo-linear-gradient is 1D, so we layer 2 gradients to approximate a 2D corner blend.
          */}
         <LinearGradient
-          colors={[opacity(hero.accent, 0.34), opacity(hero.accent, 0.12), 'transparent']}
+          colors={[opacity(gradientAccent, 0.34), opacity(gradientAccent, 0.12), 'transparent']}
           locations={[0, 0.55, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
         <LinearGradient
-          colors={[opacity(hero.accent, 0.22), 'transparent', opacity(hero.accent, 0.26)]}
+          colors={[opacity(gradientAccent, 0.22), 'transparent', opacity(gradientAccent, 0.26)]}
           locations={[0, 0.55, 1]}
           start={{ x: 1, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -275,11 +425,11 @@ export function WalletHealthModalContent({
           <View style={[styles.heartRing, { borderColor: heartBorderColor }]}>
             <LinearGradient
               // Important: clip this gradient to the circle (see styles.heartRing overflow + radius).
-              colors={[opacity(hero.accent, 0.18), opacity(hero.accent, 0.06), 'transparent']}
+              colors={[opacity(gradientAccent, 0.18), opacity(gradientAccent, 0.06), 'transparent']}
               locations={[0, 0.6, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFillObject, { borderRadius: 36 }]}
+              style={[StyleSheet.absoluteFillObject, { borderRadius: HEART_RING_RADIUS }]}
             />
             <Icon name="garden:heart-fill-16" size={30} color={hero.accent} />
           </View>
@@ -297,32 +447,15 @@ export function WalletHealthModalContent({
           </VStack>
 
           <HStack gap={10} style={{ width: '100%' }}>
-            {(
-              [
-                {
-                  key: 'drift' as const,
-                  value: driftStat,
-                  tone: needsRebalance ? hero.accent : opacity(primary50, 0.9),
-                },
-                {
-                  key: 'pending' as const,
-                  value: pendingStat,
-                  tone: pendingOutgoingCount > 0 ? hero.accent : opacity(primary50, 0.9),
-                },
-                {
-                  key: 'split' as const,
-                  value: splitStat,
-                  tone: hasDesired ? opacity(primary50, 0.9) : hero.accent,
-                },
-              ] as const
-            ).map((s) => (
+            {heroStats.map((s) => (
               <View
                 key={s.key}
                 style={[
                   styles.statPill,
                   {
-                    backgroundColor: opacity(primary900, 0.55),
-                    borderColor: opacity(primary400, 0.16),
+                    // Match the heart icon container treatment (tinted fill + subtle ring border)
+                    backgroundColor: statPillBg,
+                    borderColor: heartBorderColor,
                   },
                 ]}>
                 <Text size={10} style={{ color: statLabelColor }}>
@@ -337,95 +470,58 @@ export function WalletHealthModalContent({
         </VStack>
       </View>
 
+      {/* Currency selector (non-sticky) */}
+      <MintCurrencyTabs
+        currencies={currencies}
+        selectedCurrency={selectedCurrency}
+        onCurrencyChange={onCurrencyChange}
+        scrollY={scrollY}
+      />
+
       {/* Actions (standard rows, like Mint Info / Settings) */}
-      <Section title="Actions">
-        {(() => {
-          const rows: {
-            key: string;
-            label: React.ReactElement;
-            value?: string;
-            onPress?: () => void;
-          }[] = [];
-
-          if (hasDesired && totalBalance > 0) {
-            // Show drift inline, similar to the pending count row.
-            const driftValue = needsRebalance ? `~${formatPctFromBp(maxDriftBp)}` : 'OK';
-            rows.push({
-              key: 'rebalance',
-              label: (
-                <HStack align="center" gap={10}>
-                  <Icon name="mdi:swap-horizontal" size={18} color={getPrimaryColor('400')} />
-                  <Text style={{ color: getPrimaryColor('50') }} bold>
-                    Rebalance now
-                  </Text>
-                </HStack>
-              ),
-              value: driftValue,
-              onPress: () => onAction({ type: 'openRebalancePlan', unit: normalizedUnit }),
-            });
-          }
-
-          rows.push({
-            key: 'split',
-            label: (
-              <HStack align="center" gap={10}>
-                <Icon
-                  name="fluent:split-vertical-24-filled"
-                  size={18}
-                  color={getPrimaryColor('400')}
-                />
-                <Text style={{ color: getPrimaryColor('50') }} bold>
-                  {hasDesired ? 'Edit balance split' : 'Set balance split'}
-                </Text>
-              </HStack>
-            ),
-            value: !hasDesired ? 'Not set' : undefined,
-            onPress: () => onAction({ type: 'openBalanceSplit', unit: normalizedUnit }),
-          });
-
-          if (pendingOutgoingCount > 0) {
-            rows.push({
-              key: 'pending',
-              label: (
-                <HStack align="center" gap={10}>
-                  <Icon name="mdi:clock-alert-outline" size={18} color={getPrimaryColor('400')} />
-                  <Text style={{ color: getPrimaryColor('50') }} bold>
-                    View & reclaim pending ecash
-                  </Text>
-                </HStack>
-              ),
-              value: `${pendingOutgoingCount}`,
-              onPress: () => onAction({ type: 'openPendingEcash' }),
-            });
-          }
-
-          return rows.map((r, i) => (
+      <View style={{ paddingHorizontal: 16 }}>
+        <Section title="Actions">
+          {actionRows.map((r, i) => (
             <RowButton
               key={r.key}
               isFirst={i === 0}
-              isLast={i === rows.length - 1}
+              isLast={i === actionRows.length - 1}
               label={r.label}
               value={r.value}
               onPress={r.onPress}
             />
-          ));
-        })()}
-      </Section>
+          ))}
+        </Section>
+      </View>
     </VStack>
   );
 }
 
 const styles = StyleSheet.create({
   heroWrap: {
+    width: '100%',
+    alignSelf: 'stretch',
     borderRadius: 16,
     borderWidth: 1,
-    padding: 18,
+    padding: HERO_PADDING,
     overflow: 'hidden',
   },
+  decorationLeft: {
+    position: 'absolute',
+    top: -18,
+    left: -18,
+    transform: [{ rotate: '-12deg' }],
+  },
+  decorationRight: {
+    position: 'absolute',
+    bottom: -34,
+    right: -34,
+    transform: [{ rotate: '14deg' }],
+  },
   heartRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: HEART_RING_SIZE,
+    height: HEART_RING_SIZE,
+    borderRadius: HEART_RING_RADIUS,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
