@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { Platform } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Host, ContextMenu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
-import { frame, background, cornerRadius } from '@expo/ui/swift-ui/modifiers';
+import { frame, background, cornerRadius, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
@@ -77,13 +77,17 @@ export function FiatCurrencyPill({
                 frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
                 background(opacity(getGreenColor('500'), 0.15)),
                 cornerRadius(100),
+                // Ensure we keep the liquid glass material even when adding tint/background.
+                glassEffect({ shape: 'capsule' }),
               ]}>
               <SwiftUIText
                 design={'monospaced'}
                 weight="bold"
                 color={getGreenColor('300')}
                 size={textSize}
-                modifiers={[frame({ height: 22, alignment: 'center' })]}>
+                // Important: the "glass" capsule tends to size to the label, while our
+                // background tint sizes to the outer frame. Keep them identical.
+                modifiers={[frame({ height: 22, width: iosWidth, alignment: 'center' })]}>
                 {text}
               </SwiftUIText>
             </SwiftUIButton>
@@ -104,13 +108,17 @@ export function FiatCurrencyPill({
             frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
             background(opacity(getGreenColor('500'), 0.15)),
             cornerRadius(100),
+            // Ensure we keep the liquid glass material even when adding tint/background.
+            glassEffect({ shape: 'capsule' }),
           ]}>
           <SwiftUIText
             design={'monospaced'}
             weight="bold"
             color={getGreenColor('300')}
             size={textSize}
-            modifiers={[frame({ height: 22, alignment: 'center' })]}>
+            // Important: the "glass" capsule tends to size to the label, while our
+            // background tint sizes to the outer frame. Keep them identical.
+            modifiers={[frame({ height: 22, width: iosWidth, alignment: 'center' })]}>
             {text}
           </SwiftUIText>
         </SwiftUIButton>
