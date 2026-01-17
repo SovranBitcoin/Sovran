@@ -65,6 +65,7 @@ Skip commit only if truly trivial or user explicitly says “no commits”.
 ## Commit & scope conventions
 
 - Conventional Commits: `type(scope): subject` (≤72 chars, imperative, no period)
+- If the subject line isn’t enough, it’s valid to add a **commit description/body** (multiple lines) to capture extra context (why, tradeoffs, edge cases). Keep the subject concise; put the longer explanation in the body.
 - Allowed `type`: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci`, `chore`
 - Pick **one primary scope**. Prefer deriving scope from the **diff paths**, then feature intent.
   - Examples: `app/(mint-flow)` → `mint`, `app/(drawer)` → `nav`/tab scope, `components/ui` → `ui`, `patches/*` → `patches`, `metro.config.js` → `metro`
