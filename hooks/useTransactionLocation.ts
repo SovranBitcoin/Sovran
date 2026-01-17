@@ -66,19 +66,3 @@ export async function captureAndStoreLocation(transactionId: string): Promise<bo
   useTransactionLocationStore.getState().setTransactionLocation(transactionId, location);
   return true;
 }
-
-/**
- * Hook to check if location stamping is enabled (for UI components)
- */
-export function useLocationStampingEnabled(): boolean {
-  return useSettingsStore((state) => state.sendLocationEnabled);
-}
-
-/**
- * Hook to toggle location stamping (for settings UI)
- */
-export function useLocationStampingToggle() {
-  const enabled = useSettingsStore((state) => state.sendLocationEnabled);
-  const setEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
-  return { enabled, setEnabled };
-}

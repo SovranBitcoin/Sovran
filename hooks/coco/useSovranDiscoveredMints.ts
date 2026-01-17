@@ -6,7 +6,7 @@ import { useMintManagement } from './useMintManagement';
 /**
  * Data structure for Sovran API-discovered mints
  */
-export interface SovranDiscoveredMintData {
+interface SovranDiscoveredMintData {
   url: string;
   score: number; // Default score of 0 (no recommendations from Sovran API)
   recommendations: []; // Empty array (no recommendations from Sovran API)

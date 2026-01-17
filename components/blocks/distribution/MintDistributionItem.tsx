@@ -387,5 +387,3 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 });
-
-export default MintDistributionItem;

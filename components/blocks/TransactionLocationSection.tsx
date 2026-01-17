@@ -22,16 +22,9 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from 'providers/ThemeProvider';
-import {
-  useTransactionLocationSection,
-  UseTransactionLocationSectionResult,
-} from '@/hooks/useTransactionLocationSection';
+import { useTransactionLocationSection } from '@/hooks/useTransactionLocationSection';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-
-// Re-export hook for convenience
-export { useTransactionLocationSection };
-export type { UseTransactionLocationSectionResult };
 
 interface TransactionLocationSectionProps {
   /** The transaction's history entry ID */

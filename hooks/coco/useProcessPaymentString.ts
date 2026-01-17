@@ -69,7 +69,7 @@ const parseNpub = (data: string): string | null => {
   return null;
 };
 
-export interface ScanningData {
+interface ScanningData {
   data: string;
   /**
    * Optional source hint for scans.

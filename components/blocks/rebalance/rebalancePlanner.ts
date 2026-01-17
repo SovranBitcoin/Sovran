@@ -17,7 +17,7 @@ export const MIN_TRANSFER_THRESHOLD = 10;
  * This is a conservative estimate to ensure we don't over-allocate from surplus mints.
  * Actual fees may be lower, but it's better to under-transfer than fail.
  */
-export const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
+const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
 
 /**
  * Minimum fee reserve in sats (even small amounts have some base fee)
@@ -48,7 +48,7 @@ export interface RebalancePlan {
  *
  * Uses "largest remainder" method for deterministic rounding that preserves total.
  */
-export function computeTargetBalances(
+function computeTargetBalances(
   currentBalances: Record<string, number>,
   distributionBp: Record<string, number>,
   mintUrls: string[]
@@ -107,19 +107,10 @@ interface SurplusDeficit {
 }
 
 /**
- * Estimate the fee for a transfer amount.
- * Returns the estimated fee reserve needed.
- */
-export function estimateFee(amount: number): number {
-  const percentageFee = Math.ceil(amount * ESTIMATED_FEE_PERCENTAGE);
-  return Math.max(percentageFee, MIN_FEE_RESERVE);
-}
-
-/**
  * Calculate the maximum amount we can transfer given an available balance.
  * Accounts for fee reserve.
  */
-export function maxTransferableAmount(availableBalance: number): number {
+function maxTransferableAmount(availableBalance: number): number {
   // We need: transferAmount + fee <= availableBalance
   // fee ≈ max(transferAmount * FEE_PERCENTAGE, MIN_FEE_RESERVE)
   // Solving: transferAmount + transferAmount * FEE_PERCENTAGE <= availableBalance
@@ -148,7 +139,7 @@ export function maxTransferableAmount(availableBalance: number): number {
  *
  * Accounts for estimated Lightning fees when computing surplus amounts.
  */
-export function computeTransferSteps(
+function computeTransferSteps(
   currentBalances: Record<string, number>,
   targetBalances: Record<string, number>,
   threshold: number = MIN_TRANSFER_THRESHOLD

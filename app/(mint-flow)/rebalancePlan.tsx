@@ -254,7 +254,6 @@ function RebalancePlanScreen() {
 
       const audits: AuditMintResponse[] = [];
       for (const url of candidates) {
-        // eslint-disable-next-line no-await-in-loop
         const a = await fetchAudit(url);
         if (a) audits.push(a);
       }
@@ -426,7 +425,14 @@ function RebalancePlanScreen() {
         executionLockRef.current = false;
       }
     },
-    [requestLightningInvoice, melt, updateStepState, waitForBalanceIncrease, manager]
+    [
+      requestLightningInvoice,
+      melt,
+      updateStepState,
+      waitForBalanceIncrease,
+      manager,
+      computeRouteSuggestion,
+    ]
   );
 
   const runStepsSequentially = useCallback(
@@ -439,7 +445,6 @@ function RebalancePlanScreen() {
 
         setCurrentStepId(step.id);
         // Execute; if it fails, we keep going to the next step (error tolerant)
-        // eslint-disable-next-line no-await-in-loop
         await executeStep(step, runId);
       }
 

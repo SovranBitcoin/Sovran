@@ -519,10 +519,5 @@ export function bpToPercent(bp: number): string {
   return (bp / 100).toFixed(bp % 100 === 0 ? 0 : 1);
 }
 
-// Helper to convert percentage to bp
-export function percentToBp(percent: number): number {
-  return Math.round(percent * 100);
-}
-
 // Constants export
 export { TOTAL_BASIS_POINTS };
