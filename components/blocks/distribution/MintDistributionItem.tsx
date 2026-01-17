@@ -205,7 +205,10 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
         <>
           <View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFill, { backgroundColor: hexToRgba(accent.base, 0.05) }]}
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: hexToRgba(accent.base, 0.05) || 'transparent' },
+            ]}
           />
           <LinearGradient
             pointerEvents="none"
