@@ -1,6 +1,5 @@
 import { CashuState } from './types';
-import { Reducer } from 'redux';
-import { CashuAction } from './actions';
+import type { AnyAction, Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
 import { cashuState } from 'redux/store/migrationTest';
 
@@ -22,7 +21,7 @@ const initialState: CashuState = {
   allocation: {},
 };
 
-export const cashuReducer: Reducer<CashuState, CashuAction> = (state = initialState, action) => {
+export const cashuReducer: Reducer<CashuState, AnyAction> = (state = initialState, action) => {
   // Ensure profile exists for actions that need it
   if (
     'payload' in action &&

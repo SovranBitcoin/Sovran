@@ -24,7 +24,7 @@ interface MintRecommendation {
 /**
  * Data structure for Nostr-discovered mints (aggregated)
  */
-export interface NostrDiscoveredMintData {
+interface NostrDiscoveredMintData {
   url: string;
   score: number; // Average score from all recommendations
   recommendations: MintRecommendation[]; // All individual recommendations

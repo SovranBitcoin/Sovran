@@ -77,9 +77,15 @@ Skip commit only if truly trivial or user explicitly says “no commits”.
 
 ## Validation (only claim what you ran)
 
-Prefer:
-- `yarn lint`
-- `yarn type-check`
+Before **any commit**, ensure the full “quality gate” passes locally (match CI):
+- `npm run lint`
+- `npm run type-check`
+- `npm run pretty:check`
+- `npm run knip`
+
+If any fail:
+- Fix, then re-run the same commands.
+- If formatting is the issue, run `npm run pretty` (write), then re-run `npm run pretty:check`.
 
 If validation fails: fix and `git commit --amend` the relevant commit.
 

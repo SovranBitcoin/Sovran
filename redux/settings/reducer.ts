@@ -7,8 +7,7 @@ import {
   SET_PASSCODE,
   SET_BACKGROUND_IMAGE,
 } from './actionTypes';
-import { SettingsAction } from './actions';
-import { Reducer } from 'redux';
+import type { AnyAction, Reducer } from 'redux';
 import { typedUpdate } from 'helper/typedUpdate';
 
 interface TermsAccepted {
@@ -41,9 +40,9 @@ const initialState: SettingsState = {
   },
 };
 
-export const settingsReducer: Reducer<SettingsState, SettingsAction> = (
+export const settingsReducer: Reducer<SettingsState, AnyAction> = (
   state = initialState,
-  action: SettingsAction
+  action: AnyAction
 ): SettingsState => {
   switch (action.type) {
     case SET_DISPLAY_BITCOIN: {

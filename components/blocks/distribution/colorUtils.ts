@@ -10,7 +10,7 @@ import { getColors } from 'react-native-image-colors';
 import { darken, lighten } from 'polished';
 
 // Fallback color palette
-export const FALLBACK_COLORS = [
+const FALLBACK_COLORS = [
   '#6366f1', // Indigo
   '#8b5cf6', // Violet
   '#ec4899', // Pink
@@ -24,7 +24,7 @@ export const FALLBACK_COLORS = [
 /**
  * Get luminance of a hex color (0-1 scale)
  */
-export function getLuminance(hex: string): number {
+function getLuminance(hex: string): number {
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16) / 255;
   const g = parseInt(h.slice(2, 4), 16) / 255;
@@ -36,7 +36,7 @@ export function getLuminance(hex: string): number {
  * Get contrasting colors for gradient and border
  * Returns { contrastColor, borderColor }
  */
-export function getContrastColors(
+function getContrastColors(
   hex: string,
   amount: number = 0.3
 ): { contrastColor: string; borderColor: string } {
@@ -77,66 +77,7 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
 /**
  * Convert RGB to HSL
  */
-export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-        break;
-      case g:
-        h = ((b - r) / d + 2) / 6;
-        break;
-      case b:
-        h = ((r - g) / d + 4) / 6;
-        break;
-    }
-  }
-  return { h, s, l };
-}
-
-/**
- * Check if a color is likely from the image corners (black, near-black, grays)
- */
-export function isCornerColor(hex: string | undefined): boolean {
-  if (!hex) return true;
-
-  const { r, g, b } = hexToRgb(hex);
-  const { s, l } = rgbToHsl(r, g, b);
-
-  // Filter out very dark colors (likely black corners)
-  if (l < 0.12) return true;
-  // Filter out very light colors (nearly white)
-  if (l > 0.95) return true;
-  // Filter out grays (low saturation, mid lightness)
-  if (s < 0.08 && l > 0.1 && l < 0.9) return true;
-
-  return false;
-}
-
-/**
- * Clamp overly bright/saturated colors (Spotify does this)
- */
-export function clampColor(hex: string): string {
-  const { r, g, b } = hexToRgb(hex);
-  const { s, l } = rgbToHsl(r, g, b);
-
-  // If too bright or saturated, darken more
-  if (l > 0.6 || s > 0.85) {
-    return darken(0.25, hex);
-  }
-  return hex;
-}
+// (RGB/HSL helpers removed; kept lean to only what this module actually uses)
 
 export interface ExtractedColors {
   baseColor: string;

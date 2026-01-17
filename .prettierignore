@@ -1,0 +1,4 @@
+.cursor/**
+dist/**
+ios/**
+node_modules/**

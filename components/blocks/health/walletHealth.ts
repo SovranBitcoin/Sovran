@@ -1,6 +1,6 @@
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 
-export type HealthSeverity = 'ok' | 'warn' | 'error' | 'info';
+type HealthSeverity = 'ok' | 'warn' | 'error' | 'info';
 
 export type HealthCta =
   | { type: 'openBalanceSplit'; unit: string }

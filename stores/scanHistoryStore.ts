@@ -15,12 +15,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** What type of data was scanned */
-export type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
+type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
 
 /** How the data was scanned/entered */
 export type ScanSource = 'qr' | 'nfc' | 'paste' | 'deeplink';
 
-export interface ScanHistoryEntry {
+interface ScanHistoryEntry {
   /** Unique identifier for this scan */
   id: string;
   /** The raw string as scanned */

@@ -174,5 +174,3 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
     </ModalLayoutWrapper>
   );
 }
-
-export default ShareScreen;

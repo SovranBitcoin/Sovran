@@ -1,6 +1,6 @@
 # Sovran
 
-[![CI](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml)
+[![CI](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml)
 
 [https://sovran.money](https://sovran.money)
 

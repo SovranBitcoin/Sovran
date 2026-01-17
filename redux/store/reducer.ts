@@ -4,20 +4,12 @@ import type { ThunkAction } from 'redux-thunk';
 import { settingsReducer } from '../settings/reducer';
 import { cashuReducer } from '../cashu/reducer';
 import { nostrReducer } from '../nostr/reducer';
-import { SettingsAction } from '../settings';
-import { CashuAction } from '../cashu';
-import { NostrAction } from '../nostr';
 
 // Action type for reset
 export const RESET_APP = 'RESET_APP' as const;
-export const MIGRATION_250_COMPLETE = 'MIGRATION_250_COMPLETE' as const;
 
 interface ResetAppAction {
   type: typeof RESET_APP;
-}
-
-interface Migration250CompleteAction {
-  type: typeof MIGRATION_250_COMPLETE;
 }
 
 // Define the app reducer with proper typing
@@ -30,12 +22,7 @@ const appReducer = combineReducers({
 // Define RootState from the appReducer
 export type RootState = ReturnType<typeof appReducer>;
 
-type Action =
-  | SettingsAction
-  | CashuAction
-  | NostrAction
-  | ResetAppAction
-  | Migration250CompleteAction;
+type Action = ResetAppAction | ReduxAction;
 
 // Define AppThunk type for typed thunk actions
 export type AppThunk<ReturnType = void> = ThunkAction<
@@ -58,9 +45,7 @@ const rootReducer = (state: RootState | undefined, action: Action | ReduxAction)
     // state = { settings } as unknown as RootState;
   }
 
-  // Type assertion needed because Action includes ResetAppAction and Migration250CompleteAction
-  // which are handled above, but appReducer only accepts SettingsAction | CashuAction | NostrAction
-  return appReducer(state, action as SettingsAction | CashuAction | NostrAction);
+  return appReducer(state, action as any);
 };
 
 export default rootReducer;
