@@ -36,6 +36,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from 'utils/mapClustering';
 import { useShallow } from 'zustand/react/shallow';
+import { getOrBuildBTCMapClusterManager } from 'utils/btcMapClusterCache';
 
 // ============================================================================
 // Types & Constants
@@ -244,19 +245,31 @@ function MapScreen() {
   // Category filter
   const [category, setCategory] = useState<CategoryFilter>('all');
 
-  // Camera state (throttled) + refs for hot-path access
-  const [camera, setCamera] = useState({ lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM });
-  const cameraRef = useRef(camera);
-  useEffect(() => {
-    cameraRef.current = camera;
-  }, [camera]);
+  // Map ref allows "uncontrolled" camera updates (keeps dragging smooth)
+  const mapRef = useRef<any>(null);
 
-  // Throttle camera state updates (prevents React rerender spam while panning)
-  const lastCameraStateUpdateRef = useRef(0);
+  // Camera refs (do not store in React state — avoids rerenders while panning)
+  const cameraRef = useRef({ lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM });
+
+  const setMapCamera = useCallback((next: { lat: number; lon: number; zoom: number }) => {
+    cameraRef.current = next;
+
+    const config: any =
+      Platform.OS === 'android'
+        ? {
+            coordinates: { latitude: next.lat, longitude: next.lon },
+            zoom: next.zoom,
+            duration: 250,
+          }
+        : { coordinates: { latitude: next.lat, longitude: next.lon }, zoom: next.zoom };
+
+    mapRef.current?.setCameraPosition?.(config);
+  }, []);
 
   // Debounce marker updates (markers prop updates are expensive for native maps)
   const markerUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkerQueryRef = useRef<{ lat: number; lon: number; zoomFloor: number } | null>(null);
+  const markerUpdateTaskRef = useRef<{ cancel: () => void } | null>(null);
 
   // Cleanup pending timers on unmount
   useEffect(() => {
@@ -264,6 +277,10 @@ function MapScreen() {
       if (markerUpdateTimerRef.current) {
         clearTimeout(markerUpdateTimerRef.current);
         markerUpdateTimerRef.current = null;
+      }
+      if (markerUpdateTaskRef.current) {
+        markerUpdateTaskRef.current.cancel();
+        markerUpdateTaskRef.current = null;
       }
     };
   }, []);
@@ -282,6 +299,12 @@ function MapScreen() {
   // Cluster manager ref
   const clusterManagerRef = useRef<ClusterManager | null>(null);
   const markersRef = useRef<MapMarker[]>([]);
+
+  const clusterCacheKey = useMemo(() => {
+    // Use the persisted cache timestamp to keep cluster index stable across modal opens.
+    const ts = placesCache?.timestamp ?? 'no-cache';
+    return `btcmap:${ts}:${category}`;
+  }, [placesCache?.timestamp, category]);
 
   // Filter points by category
   const filteredPoints = useMemo((): GeoPoint[] => {
@@ -349,12 +372,11 @@ function MapScreen() {
 
     // Defer clustering work until after interactions complete
     const task = InteractionManager.runAfterInteractions(() => {
-      const manager = new ClusterManager({
+      const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
         radius: 50,
         maxZoom: 17,
         minPoints: 2,
       });
-      manager.load(filteredPoints);
       clusterManagerRef.current = manager;
 
       // Update markers with current camera
@@ -364,7 +386,7 @@ function MapScreen() {
     });
 
     return () => task.cancel();
-  }, [filteredPoints]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredPoints, clusterCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch places on mount - DEFERRED
   useEffect(() => {
@@ -389,7 +411,11 @@ function MapScreen() {
         if (manager) {
           const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
           const newZoom = Math.min(expansionZoom + 1, 18);
-          setCamera({ lat: clusterMarker.latitude, lon: clusterMarker.longitude, zoom: newZoom });
+          setMapCamera({
+            lat: clusterMarker.latitude,
+            lon: clusterMarker.longitude,
+            zoom: newZoom,
+          });
           updateMarkersForCamera(clusterMarker.latitude, clusterMarker.longitude, newZoom);
         }
       } else if (clusterMarker.placeId) {
@@ -400,7 +426,7 @@ function MapScreen() {
         });
       }
     },
-    [updateMarkersForCamera]
+    [setMapCamera, updateMarkersForCamera]
   );
 
   // Get user location on mount - DEFERRED and non-blocking
@@ -414,7 +440,7 @@ function MapScreen() {
         }
 
         const loc = await Location.getCurrentPositionAsync({});
-        setCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 12 });
+        setMapCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 12 });
         updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 12);
       } catch (err) {
         console.error('Location error:', err);
@@ -428,27 +454,27 @@ function MapScreen() {
   const handleMyLocation = useCallback(async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
-      setCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 15 });
+      setMapCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 15 });
       updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 15);
     } catch (err) {
       console.error('Location error:', err);
     }
-  }, [updateMarkersForCamera]);
+  }, [setMapCamera, updateMarkersForCamera]);
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {
     const { lat, lon, zoom } = cameraRef.current;
     const newZoom = Math.min(zoom + 2, 20);
-    setCamera({ lat, lon, zoom: newZoom });
+    setMapCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
-  }, [updateMarkersForCamera]);
+  }, [setMapCamera, updateMarkersForCamera]);
 
   const handleZoomOut = useCallback(() => {
     const { lat, lon, zoom } = cameraRef.current;
     const newZoom = Math.max(zoom - 2, 1);
-    setCamera({ lat, lon, zoom: newZoom });
+    setMapCamera({ lat, lon, zoom: newZoom });
     updateMarkersForCamera(lat, lon, newZoom);
-  }, [updateMarkersForCamera]);
+  }, [setMapCamera, updateMarkersForCamera]);
 
   // Handle camera change from user gestures
   const handleCameraChange = useCallback(
@@ -458,15 +484,8 @@ function MapScreen() {
       const newLon = event.coordinates.longitude ?? prev.lon;
       const newZoom = event.zoom;
 
-      // Throttle React state updates (keeps cameraPosition responsive without over-rendering)
-      const now = Date.now();
-      if (now - lastCameraStateUpdateRef.current > 80) {
-        lastCameraStateUpdateRef.current = now;
-        setCamera({ lat: newLat, lon: newLon, zoom: newZoom });
-      } else {
-        // Still keep refs fresh so programmatic actions use latest values
-        cameraRef.current = { lat: newLat, lon: newLon, zoom: newZoom };
-      }
+      // Track latest camera without triggering React rerenders
+      cameraRef.current = { lat: newLat, lon: newLon, zoom: newZoom };
 
       // Debounce marker queries and skip tiny movements within the current zoom bucket
       const zoomFloor = Math.floor(newZoom);
@@ -488,8 +507,12 @@ function MapScreen() {
 
       markerUpdateTimerRef.current = setTimeout(() => {
         lastMarkerQueryRef.current = { lat: newLat, lon: newLon, zoomFloor };
-        updateMarkersForCamera(newLat, newLon, newZoom);
-      }, 140);
+        // Ensure marker recalculation doesn't compete with gestures/animations
+        if (markerUpdateTaskRef.current) markerUpdateTaskRef.current.cancel();
+        markerUpdateTaskRef.current = InteractionManager.runAfterInteractions(() => {
+          updateMarkersForCamera(newLat, newLon, newZoom);
+        });
+      }, 250);
     },
     [updateMarkersForCamera]
   );
@@ -531,10 +554,11 @@ function MapScreen() {
       {/* Render map only after initial transition */}
       {isMapReady && (
         <MapComponent.View
+          ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           cameraPosition={{
-            coordinates: { latitude: camera.lat, longitude: camera.lon },
-            zoom: camera.zoom,
+            coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
+            zoom: DEFAULT_ZOOM,
           }}
           properties={{ isMyLocationEnabled: true }}
           uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
