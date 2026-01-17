@@ -48,6 +48,10 @@ export function FiatCurrencyPill({
   );
 
   const text = showToggleGlyph ? `${displayText}  ⇄` : displayText;
+  const iosHeight = 34;
+  // Expo SwiftUI wrappers often need an explicit frame to avoid collapsed width.
+  // Approximate monospace character width: ~0.62em + fixed padding.
+  const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
 
   // Use SwiftUI ContextMenu with liquid glass button on iOS
   if (Platform.OS === 'ios' && enableCurrencyMenu) {
@@ -70,7 +74,7 @@ export function FiatCurrencyPill({
               variant="glass"
               onPress={onPress}
               modifiers={[
-                frame({ alignment: 'center' }),
+                frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
                 background(opacity(getGreenColor('500'), 0.15)),
                 cornerRadius(100),
               ]}>
@@ -79,9 +83,7 @@ export function FiatCurrencyPill({
                 weight="bold"
                 color={getGreenColor('300')}
                 size={textSize}
-                modifiers={[
-                  frame({ height: 22, alignment: 'center', width: text.length * 10 + 12 }),
-                ]}>
+                modifiers={[frame({ height: 22, alignment: 'center' })]}>
                 {text}
               </SwiftUIText>
             </SwiftUIButton>
@@ -99,7 +101,7 @@ export function FiatCurrencyPill({
           variant="glass"
           onPress={onPress}
           modifiers={[
-            frame({ alignment: 'center' }),
+            frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
             background(opacity(getGreenColor('500'), 0.15)),
             cornerRadius(100),
           ]}>
@@ -108,7 +110,7 @@ export function FiatCurrencyPill({
             weight="bold"
             color={getGreenColor('300')}
             size={textSize}
-            modifiers={[frame({ height: 22, alignment: 'center', width: text.length * 10 + 12 })]}>
+            modifiers={[frame({ height: 22, alignment: 'center' })]}>
             {text}
           </SwiftUIText>
         </SwiftUIButton>
