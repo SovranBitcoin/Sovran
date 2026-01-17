@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import { convertTime } from 'helper/time';
+import { StyleSheet } from 'react-native';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import Icon from 'assets/icons';
 import type {
@@ -83,6 +84,268 @@ interface TimelineItem {
   info?: string;
 }
 
+function buildTimeline({
+  historyEntry,
+  meltQuote,
+  currentTime,
+  tokenCreated,
+  nostrSent,
+}: {
+  historyEntry: HistoryEntry;
+  meltQuote?: MeltQuoteResponse;
+  currentTime: number;
+  tokenCreated?: boolean;
+  nostrSent?: boolean;
+}): TimelineItem[] {
+  switch (historyEntry.type) {
+    case 'mint': {
+      const mintTx = historyEntry as MintHistoryEntry;
+      const isExpired = mintTx.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(mintTx);
+
+      if (isExpired) {
+        return [
+          {
+            state: MintQuoteState.UNPAID,
+            displayLabel: MINT_STATE_LABELS[MintQuoteState.UNPAID],
+            stepType: 'complete',
+            timestamp: mintTx.createdAt,
+          },
+          {
+            state: EXPIRED_STATE,
+            displayLabel: 'Expired',
+            stepType: 'expired',
+            info: 'Invoice expired without payment',
+          },
+        ];
+      }
+
+      const currentIndex = MINT_STATES.indexOf(mintTx.state);
+      return MINT_STATES.map((state, index) => {
+        let stepType: TimelineStepType;
+        if (index < currentIndex) {
+          stepType = 'complete';
+        } else if (index === currentIndex) {
+          stepType = index === MINT_STATES.length - 1 ? 'success' : 'current';
+        } else if (index === currentIndex + 1) {
+          stepType = 'next-pending';
+        } else {
+          stepType = 'future-small';
+        }
+
+        let info: string | undefined;
+        if (stepType === 'current' && state === MintQuoteState.UNPAID) {
+          info = 'Waiting for Lightning payment';
+        } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
+          info = 'Minting tokens...';
+        } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
+          info = `+${mintTx.amount} sats received`;
+        }
+
+        return {
+          state,
+          displayLabel: MINT_STATE_LABELS[state],
+          stepType,
+          timestamp: index <= currentIndex ? mintTx.createdAt : undefined,
+          info,
+        };
+      });
+    }
+
+    case 'melt': {
+      const meltTx = historyEntry as MeltHistoryEntry;
+      const isExpired =
+        meltQuote &&
+        meltTx.state === MeltQuoteState.UNPAID &&
+        isMeltQuoteExpired(meltQuote, currentTime);
+
+      if (isExpired) {
+        return [
+          {
+            state: MeltQuoteState.UNPAID,
+            displayLabel: 'Unpaid',
+            stepType: 'complete',
+            timestamp: meltTx.createdAt,
+          },
+          {
+            state: EXPIRED_STATE,
+            displayLabel: 'Expired',
+            stepType: 'expired',
+            info: 'Quote expired',
+          },
+        ];
+      }
+
+      const currentIndex = MELT_STATES.indexOf(meltTx.state);
+      return MELT_STATES.map((state, index) => {
+        let stepType: TimelineStepType;
+        if (index < currentIndex) {
+          stepType = 'complete';
+        } else if (index === currentIndex) {
+          stepType = index === MELT_STATES.length - 1 ? 'success' : 'current';
+        } else if (index === currentIndex + 1) {
+          stepType = 'next-pending';
+        } else {
+          stepType = 'future-small';
+        }
+
+        let info: string | undefined;
+        if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
+          info = 'Quote ready, awaiting execution';
+        } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
+          info = 'Pending blockchain confirmation';
+        } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
+          info = 'Invoice paid successfully';
+        }
+
+        return {
+          state,
+          displayLabel: MELT_STATE_LABELS[state],
+          stepType,
+          timestamp: index <= currentIndex ? meltTx.createdAt : undefined,
+          info,
+        };
+      });
+    }
+
+    case 'send': {
+      const sendTx = historyEntry as SendHistoryEntry;
+      const txState = sendTx.state;
+
+      // Handle rolled back as a special terminal state
+      if (txState === 'rolledBack') {
+        const rolledBackTimeline: TimelineItem[] = [
+          {
+            state: 'prepared',
+            displayLabel: SEND_STATE_LABELS.prepared,
+            stepType: 'complete',
+            timestamp: sendTx.createdAt,
+          },
+        ];
+        // Include Nostr Send step if this was a payment request
+        if (nostrSent) {
+          rolledBackTimeline.push({
+            state: 'nostrSent',
+            displayLabel: SEND_STATE_LABELS.nostrSent,
+            stepType: 'complete',
+            timestamp: sendTx.createdAt,
+          });
+        }
+        rolledBackTimeline.push({
+          state: 'rolledBack',
+          displayLabel: SEND_STATE_LABELS.rolledBack,
+          stepType: 'rolled-back',
+          info: 'Token funds returned to your balance',
+        });
+        return rolledBackTimeline;
+      }
+
+      // Determine if this is payment request mode (tokenCreated or nostrSent props indicate PR mode)
+      const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+      const states = isPaymentRequestMode ? PAYMENT_REQUEST_STATES : SEND_STATES;
+
+      // Map coco state to timeline index
+      // For payment request: prepared=0, nostrSent=1, pending=2, finalized=3
+      // For normal: prepared=0, pending=1, finalized=2
+      let currentIndex: number;
+      if (isPaymentRequestMode) {
+        if (!tokenCreated && !nostrSent) {
+          // Awaiting send - nothing is complete yet, prepared is next
+          currentIndex = -1;
+        } else if (tokenCreated && !nostrSent) {
+          // Token created but Nostr not yet sent - prepared complete, nostrSent is next
+          currentIndex = 0;
+        } else if (nostrSent) {
+          // Nostr sent - use txState to determine progress
+          if (txState === 'prepared') {
+            currentIndex = 1; // nostrSent is current/complete
+          } else if (txState === 'pending') {
+            currentIndex = 2; // pending is current
+          } else if (txState === 'finalized') {
+            currentIndex = 3; // finalized is current
+          } else {
+            currentIndex = 1;
+          }
+        } else {
+          currentIndex = 0;
+        }
+      } else {
+        currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
+      }
+
+      return states.map((state, index) => {
+        let stepType: TimelineStepType;
+        if (index < currentIndex) {
+          stepType = 'complete';
+        } else if (index === currentIndex) {
+          stepType = index === states.length - 1 ? 'success' : 'current';
+        } else if (index === currentIndex + 1) {
+          stepType = 'next-pending';
+        } else {
+          stepType = 'future-small';
+        }
+
+        let info: string | undefined;
+        if (stepType === 'current' && state === 'prepared') {
+          info = 'Token created, ready to share';
+        } else if (stepType === 'complete' && state === 'nostrSent') {
+          info = 'Sent via Nostr DM';
+        } else if (stepType === 'current' && state === 'nostrSent') {
+          info = 'Sending via Nostr...';
+        } else if (stepType === 'current' && state === 'pending') {
+          info = 'Waiting for recipient to claim';
+        } else if (stepType === 'success' && state === 'finalized') {
+          info = 'Token claimed by recipient';
+        }
+
+        return {
+          state,
+          displayLabel: SEND_STATE_LABELS[state],
+          stepType,
+          timestamp: index <= currentIndex ? sendTx.createdAt : undefined,
+          info,
+        };
+      });
+    }
+
+    case 'receive': {
+      const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
+      const txState = receiveTx.state || 'redeemed';
+
+      const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
+      const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
+
+      return RECEIVE_STATES.map((state, index) => {
+        let stepType: TimelineStepType;
+        if (index < effectiveIndex) {
+          stepType = 'complete';
+        } else if (index === effectiveIndex) {
+          stepType = index === RECEIVE_STATES.length - 1 ? 'success' : 'current';
+        } else {
+          stepType = 'next-pending';
+        }
+
+        let info: string | undefined;
+        if (stepType === 'current' && state === 'pending') {
+          info = 'Ready to redeem token';
+        } else if (stepType === 'success' && state === 'redeemed') {
+          info = `+${receiveTx.amount} sats added to wallet`;
+        }
+
+        return {
+          state,
+          displayLabel: RECEIVE_STATE_LABELS[state],
+          stepType,
+          timestamp: index <= effectiveIndex ? receiveTx.createdAt : undefined,
+          info,
+        };
+      });
+    }
+
+    default:
+      return [];
+  }
+}
+
 // ============ Timeline Components ============
 
 interface TimelineDotProps {
@@ -115,6 +378,8 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
 
   // Next pending with clock icon
   if (stepType === 'next-pending') {
+    const bg = opacity(greyColor, 0.18);
+    const border = opacity(greyColor, 0.32);
     return (
       <View
         style={[
@@ -124,7 +389,9 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
             borderRadius: dotSize / 2,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: greyColor,
+            backgroundColor: bg,
+            borderWidth: 1,
+            borderColor: border,
           },
           // boxShadow && {
           //   shadowColor: greenColor,
@@ -134,7 +401,7 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
           //   elevation: 4,
           // },
         ]}>
-        <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.44)} size={iconSize} />
+        <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.7)} size={iconSize} />
       </View>
     );
   }
@@ -165,6 +432,11 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
       break;
   }
 
+  // Match the more "polished" icon container treatment used elsewhere (tinted bg + subtle border),
+  // instead of flat solid circles.
+  const bg = opacity(backgroundColor, 0.18);
+  const border = opacity(backgroundColor, 0.32);
+
   return (
     <View
       style={[
@@ -172,9 +444,11 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
           width: 20,
           height: 20,
           borderRadius: dotSize / 2,
-          backgroundColor,
+          backgroundColor: bg,
           alignItems: 'center',
           justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: border,
         },
         // boxShadow && {
         //   shadowColor: greenColor,
@@ -184,7 +458,7 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
         //   elevation: 4,
         // },
       ]}>
-      <Icon name={iconName} color="#FFFFFF" size={iconSize} />
+      <Icon name={iconName} color={backgroundColor} size={iconSize} />
     </View>
   );
 }
@@ -415,258 +689,10 @@ export function HistoryEntryTimeline({
     }
   }, [meltQuote, historyEntry]);
 
-  // Build timeline based on transaction type
-  const getTimeline = (): TimelineItem[] => {
-    switch (historyEntry.type) {
-      case 'mint': {
-        const mintTx = historyEntry as MintHistoryEntry;
-        const isExpired = mintTx.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(mintTx);
+  const timeline = useMemo(() => {
+    return buildTimeline({ historyEntry, meltQuote, currentTime, tokenCreated, nostrSent });
+  }, [historyEntry, meltQuote, currentTime, tokenCreated, nostrSent]);
 
-        if (isExpired) {
-          return [
-            {
-              state: MintQuoteState.UNPAID,
-              displayLabel: MINT_STATE_LABELS[MintQuoteState.UNPAID],
-              stepType: 'complete',
-              timestamp: mintTx.createdAt,
-            },
-            {
-              state: EXPIRED_STATE,
-              displayLabel: 'Expired',
-              stepType: 'expired',
-              info: 'Invoice expired without payment',
-            },
-          ];
-        }
-
-        const currentIndex = MINT_STATES.indexOf(mintTx.state);
-        return MINT_STATES.map((state, index) => {
-          let stepType: TimelineStepType;
-          if (index < currentIndex) {
-            stepType = 'complete';
-          } else if (index === currentIndex) {
-            stepType = index === MINT_STATES.length - 1 ? 'success' : 'current';
-          } else if (index === currentIndex + 1) {
-            stepType = 'next-pending';
-          } else {
-            stepType = 'future-small';
-          }
-
-          let info: string | undefined;
-          if (stepType === 'current' && state === MintQuoteState.UNPAID) {
-            info = 'Waiting for Lightning payment';
-          } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
-            info = 'Minting tokens...';
-          } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
-            info = `+${mintTx.amount} sats received`;
-          }
-
-          return {
-            state,
-            displayLabel: MINT_STATE_LABELS[state],
-            stepType,
-            timestamp: index <= currentIndex ? mintTx.createdAt : undefined,
-            info,
-          };
-        });
-      }
-
-      case 'melt': {
-        const meltTx = historyEntry as MeltHistoryEntry;
-        const isExpired =
-          meltQuote &&
-          meltTx.state === MeltQuoteState.UNPAID &&
-          isMeltQuoteExpired(meltQuote, currentTime);
-
-        if (isExpired) {
-          return [
-            {
-              state: MeltQuoteState.UNPAID,
-              displayLabel: 'Unpaid',
-              stepType: 'complete',
-              timestamp: meltTx.createdAt,
-            },
-            {
-              state: EXPIRED_STATE,
-              displayLabel: 'Expired',
-              stepType: 'expired',
-              info: 'Quote expired',
-            },
-          ];
-        }
-
-        const currentIndex = MELT_STATES.indexOf(meltTx.state);
-        return MELT_STATES.map((state, index) => {
-          let stepType: TimelineStepType;
-          if (index < currentIndex) {
-            stepType = 'complete';
-          } else if (index === currentIndex) {
-            stepType = index === MELT_STATES.length - 1 ? 'success' : 'current';
-          } else if (index === currentIndex + 1) {
-            stepType = 'next-pending';
-          } else {
-            stepType = 'future-small';
-          }
-
-          let info: string | undefined;
-          if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
-            info = 'Quote ready, awaiting execution';
-          } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
-            info = 'Pending blockchain confirmation';
-          } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
-            info = 'Invoice paid successfully';
-          }
-
-          return {
-            state,
-            displayLabel: MELT_STATE_LABELS[state],
-            stepType,
-            timestamp: index <= currentIndex ? meltTx.createdAt : undefined,
-            info,
-          };
-        });
-      }
-
-      case 'send': {
-        const sendTx = historyEntry as SendHistoryEntry;
-        const txState = sendTx.state;
-
-        // Handle rolled back as a special terminal state
-        if (txState === 'rolledBack') {
-          const rolledBackTimeline: TimelineItem[] = [
-            {
-              state: 'prepared',
-              displayLabel: SEND_STATE_LABELS.prepared,
-              stepType: 'complete',
-              timestamp: sendTx.createdAt,
-            },
-          ];
-          // Include Nostr Send step if this was a payment request
-          if (nostrSent) {
-            rolledBackTimeline.push({
-              state: 'nostrSent',
-              displayLabel: SEND_STATE_LABELS.nostrSent,
-              stepType: 'complete',
-              timestamp: sendTx.createdAt,
-            });
-          }
-          rolledBackTimeline.push({
-            state: 'rolledBack',
-            displayLabel: SEND_STATE_LABELS.rolledBack,
-            stepType: 'rolled-back',
-            info: 'Token funds returned to your balance',
-          });
-          return rolledBackTimeline;
-        }
-
-        // Determine if this is payment request mode (tokenCreated or nostrSent props indicate PR mode)
-        const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
-        const states = isPaymentRequestMode ? PAYMENT_REQUEST_STATES : SEND_STATES;
-
-        // Map coco state to timeline index
-        // For payment request: prepared=0, nostrSent=1, pending=2, finalized=3
-        // For normal: prepared=0, pending=1, finalized=2
-        let currentIndex: number;
-        if (isPaymentRequestMode) {
-          if (!tokenCreated && !nostrSent) {
-            // Awaiting send - nothing is complete yet, prepared is next
-            currentIndex = -1;
-          } else if (tokenCreated && !nostrSent) {
-            // Token created but Nostr not yet sent - prepared complete, nostrSent is next
-            currentIndex = 0;
-          } else if (nostrSent) {
-            // Nostr sent - use txState to determine progress
-            if (txState === 'prepared') {
-              currentIndex = 1; // nostrSent is current/complete
-            } else if (txState === 'pending') {
-              currentIndex = 2; // pending is current
-            } else if (txState === 'finalized') {
-              currentIndex = 3; // finalized is current
-            } else {
-              currentIndex = 1;
-            }
-          } else {
-            currentIndex = 0;
-          }
-        } else {
-          currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
-        }
-
-        return states.map((state, index) => {
-          let stepType: TimelineStepType;
-          if (index < currentIndex) {
-            stepType = 'complete';
-          } else if (index === currentIndex) {
-            stepType = index === states.length - 1 ? 'success' : 'current';
-          } else if (index === currentIndex + 1) {
-            stepType = 'next-pending';
-          } else {
-            stepType = 'future-small';
-          }
-
-          let info: string | undefined;
-          if (stepType === 'current' && state === 'prepared') {
-            info = 'Token created, ready to share';
-          } else if (stepType === 'complete' && state === 'nostrSent') {
-            info = 'Sent via Nostr DM';
-          } else if (stepType === 'current' && state === 'nostrSent') {
-            info = 'Sending via Nostr...';
-          } else if (stepType === 'current' && state === 'pending') {
-            info = 'Waiting for recipient to claim';
-          } else if (stepType === 'success' && state === 'finalized') {
-            info = 'Token claimed by recipient';
-          }
-
-          return {
-            state,
-            displayLabel: SEND_STATE_LABELS[state],
-            stepType,
-            timestamp: index <= currentIndex ? sendTx.createdAt : undefined,
-            info,
-          };
-        });
-      }
-
-      case 'receive': {
-        const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
-        const txState = receiveTx.state || 'redeemed';
-
-        const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
-        const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
-
-        return RECEIVE_STATES.map((state, index) => {
-          let stepType: TimelineStepType;
-          if (index < effectiveIndex) {
-            stepType = 'complete';
-          } else if (index === effectiveIndex) {
-            stepType = index === RECEIVE_STATES.length - 1 ? 'success' : 'current';
-          } else {
-            stepType = 'next-pending';
-          }
-
-          let info: string | undefined;
-          if (stepType === 'current' && state === 'pending') {
-            info = 'Ready to redeem token';
-          } else if (stepType === 'success' && state === 'redeemed') {
-            info = `+${receiveTx.amount} sats added to wallet`;
-          }
-
-          return {
-            state,
-            displayLabel: RECEIVE_STATE_LABELS[state],
-            stepType,
-            timestamp: index <= effectiveIndex ? receiveTx.createdAt : undefined,
-            info,
-          };
-        });
-      }
-
-      default:
-        return [];
-    }
-  };
-
-  const timeline = getTimeline();
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
@@ -740,21 +766,9 @@ export function HistoryEntryTimeline({
     <View
       // blur
       className="bg-primary-800"
-      style={{
-        padding: 20,
-        marginHorizontal: 16,
-        borderRadius: 16,
-      }}>
+      style={styles.card}>
       {/* Card Label */}
-      <Text
-        size={11}
-        bold
-        style={{
-          color: primaryGrey300,
-          marginBottom: 8,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-        }}>
+      <Text size={11} bold style={[styles.cardLabel, { color: primaryGrey300 }]}>
         {cardLabel}
       </Text>
 
@@ -862,3 +876,16 @@ export function HistoryEntryTimeline({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    padding: 20,
+    marginHorizontal: 16,
+    borderRadius: 16,
+  },
+  cardLabel: {
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+});
