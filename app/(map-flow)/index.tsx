@@ -295,6 +295,8 @@ function MapScreen() {
     }[]
   >([]);
   const [visibleCount, setVisibleCount] = useState(0);
+  const lastRenderedMarkersRef = useRef<typeof markers>([]);
+  const lastRenderedVisibleCountRef = useRef<number>(0);
 
   // Cluster manager ref
   const clusterManagerRef = useRef<ClusterManager | null>(null);
@@ -323,6 +325,8 @@ function MapScreen() {
     if (!manager || !manager.isLoaded()) {
       setMarkers([]);
       setVisibleCount(0);
+      lastRenderedMarkersRef.current = [];
+      lastRenderedVisibleCountRef.current = 0;
       return;
     }
 
@@ -344,6 +348,31 @@ function MapScreen() {
       title: m.type === 'cluster' ? `📍 ${m.count} merchants` : m.title,
     }));
 
+    // Avoid re-setting state if markers/count didn't actually change (saves JS + native work)
+    const prevMarkers = lastRenderedMarkersRef.current;
+    const sameCount = lastRenderedVisibleCountRef.current === count;
+    let sameMarkers = prevMarkers.length === mapMarkers.length;
+    if (sameMarkers) {
+      for (let i = 0; i < mapMarkers.length; i++) {
+        const a = prevMarkers[i];
+        const b = mapMarkers[i];
+        if (
+          a.id !== b.id ||
+          a.coordinates.latitude !== b.coordinates.latitude ||
+          a.coordinates.longitude !== b.coordinates.longitude ||
+          a.tintColor !== b.tintColor ||
+          a.title !== b.title
+        ) {
+          sameMarkers = false;
+          break;
+        }
+      }
+    }
+
+    if (sameMarkers && sameCount) return;
+
+    lastRenderedMarkersRef.current = mapMarkers;
+    lastRenderedVisibleCountRef.current = count;
     setMarkers(mapMarkers);
     setVisibleCount(count);
   }, []);

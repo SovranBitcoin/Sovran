@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBTCMapStore, BTCMapPlaceDetails } from 'stores/btcMapStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // Category definitions for marker colors
 const CATEGORIES = {
@@ -60,7 +61,12 @@ export default function MerchantDetailScreen() {
   const { getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
   const { placeId } = useLocalSearchParams<{ placeId: string }>();
-  const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore();
+  const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
+    useShallow((s) => ({
+      fetchPlaceDetails: s.fetchPlaceDetails,
+      getCachedPlaceDetails: s.getCachedPlaceDetails,
+    }))
+  );
 
   const [place, setPlace] = useState<BTCMapPlaceDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
