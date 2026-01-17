@@ -89,6 +89,7 @@ import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { FiatCurrencyPill } from 'components/blocks/FiatCurrencyPill';
 
 // Currency display configuration
 const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
@@ -212,7 +213,7 @@ export function CurrencyScreen({
   processPaymentStringFn,
   onInsufficientBalance,
 }: CurrencyScreenProps) {
-  const { getPrimaryColor, getGreenColor, getShadeColor } = useTheme();
+  const { getPrimaryColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { send } = useSendWithHistory();
@@ -759,28 +760,15 @@ export function CurrencyScreen({
         </View>
         <VStack align="center" spacing={4}>
           {/* Secondary converted value with toggle - always visible */}
-          <TouchableOpacity onPress={handleToggleInputMode}>
-            <HStack
-              align="center"
-              justify="center"
-              spacing={6}
-              style={{
-                backgroundColor: opacity(getGreenColor('500'), 0.15),
-                borderRadius: 100,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-              }}>
-              <Text
-                size={14}
-                bold
-                overpass
-                style={{ color: getGreenColor('300'), letterSpacing: 0.3 }}>
-                {secondaryDisplay ||
-                  (inputMode === 'sats' ? `≈ ${currencyConfig.symbol}0.00` : '≈ 0 sats')}
-              </Text>
-              <Icon name="fluent:arrow-swap-16-filled" size={14} color={getGreenColor('300')} />
-            </HStack>
-          </TouchableOpacity>
+          <FiatCurrencyPill
+            displayText={
+              secondaryDisplay ||
+              (inputMode === 'sats' ? `≈ ${currencyConfig.symbol}0.00` : '≈ 0 sats')
+            }
+            onPress={handleToggleInputMode}
+            showToggleGlyph
+            enableCurrencyMenu={false}
+          />
         </VStack>
         {params.to === 'sendToken' && params?.profile && (
           <TouchableOpacity
