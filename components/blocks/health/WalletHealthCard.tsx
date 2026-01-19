@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
 import { StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
@@ -12,6 +11,8 @@ import Icon from 'assets/icons';
 import { router } from 'expo-router';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
+import Animated from 'react-native-reanimated';
+import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { computeWalletHealth } from './walletHealth';
 
 function getMintsForUnit(trustedMints: any[], unit: string) {
@@ -51,6 +52,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   const distributions = useMintDistributionStore((s) => s.distributions);
 
   const unit = defaultUnit.toLowerCase();
+  const sharedTag = useMemo(() => `walletHealthCard-${unit}`, [unit]);
   const mintsForUnit = useMemo(() => getMintsForUnit(trustedMints, unit), [trustedMints, unit]);
   const mintUrlsForUnit = useMemo(() => mintsForUnit.map((m: any) => m.mintUrl), [mintsForUnit]);
 
@@ -78,120 +80,93 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   }, [unit]);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={[styles.card, { borderColor: opacity(accentColor, 0.25) }]}
-      onPress={handlePress}>
-      {/* Same “3-corner” warm red blend used in the Wallet Health modal hero */}
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: primary950 }]} />
-      <View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(accentColor, 0.06) }]}
-      />
-      <LinearGradient
-        colors={[opacity(accentColor, 0.34), opacity(accentColor, 0.12), 'transparent']}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      <LinearGradient
-        colors={[opacity(accentColor, 0.22), 'transparent', opacity(accentColor, 0.26)]}
-        locations={[0, 0.55, 1]}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      <LinearGradient
-        colors={[opacity(primary50, 0.06), 'transparent']}
-        locations={[0, 0.7]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Decorative hearts */}
-      <View style={styles.decorationLeft} pointerEvents="none">
-        <Icon name="garden:heart-fill-16" size={90} color={opacity(accentColor, 0.08)} />
-      </View>
-      <View style={styles.decorationRight} pointerEvents="none">
-        <Icon name="garden:heart-fill-16" size={140} color={opacity(accentColor, 0.05)} />
-      </View>
-
-      <VStack style={{ padding: 18 }}>
-        <HStack align="center" justify="space-between">
-          <HStack align="center" gap={10}>
-            <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
-              <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
-            </View>
-            <VStack>
-              <Text size={16} heavy style={{ color: primary50 }}>
-                Wallet health
-              </Text>
-              <HStack align="center" gap={8} style={{ marginTop: 6 }}>
-                <View
-                  style={[
-                    styles.unitPill,
-                    {
-                      backgroundColor: opacity(accentColor, 0.14),
-                      borderColor: opacity(accentColor, 0.22),
-                    },
-                  ]}>
-                  <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                    {unit.toUpperCase()}
-                  </Text>
+    <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
+      <Animated.View
+        sharedTransitionTag={sharedTag}
+        style={[styles.card, { borderColor: opacity(accentColor, 0.25) }]}>
+        <WalletHealthCardFrame
+          accentColor={accentColor}
+          backgroundColor={primary950}
+          highlightColor={primary50}>
+          <VStack style={{ padding: 18 }}>
+            <HStack align="center" justify="space-between">
+              <HStack align="center" gap={10}>
+                <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
+                  <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
                 </View>
-                <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
-                  Tap for details
-                </Text>
+                <VStack>
+                  <Text size={16} heavy style={{ color: primary50 }}>
+                    Wallet health
+                  </Text>
+                  <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                    <View
+                      style={[
+                        styles.unitPill,
+                        {
+                          backgroundColor: opacity(accentColor, 0.14),
+                          borderColor: opacity(accentColor, 0.22),
+                        },
+                      ]}>
+                      <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                        {unit.toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                      Tap for details
+                    </Text>
+                  </HStack>
+                </VStack>
               </HStack>
-            </VStack>
-          </HStack>
-          <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
-        </HStack>
-
-        {/* Status row - styled like “Easy to share / Scannable QR” */}
-        <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-          {health.chips.map((chip) => {
-            const iconName = chipIconName(chip.label);
-            // On this red/heart card: use white for “Balanced”, and red accent for everything else.
-            const isBalanced = chip.label.toLowerCase().includes('balanced');
-            const displayColor = isBalanced ? opacity(primary50, 0.85) : opacity(accentColor, 0.8);
-            return (
-              <HStack key={chip.label} align="center" gap={6}>
-                <Icon name={iconName} size={14} color={displayColor} />
-                <Text size={11} style={{ color: displayColor }}>
-                  {chip.label}
-                </Text>
-              </HStack>
-            );
-          })}
-        </HStack>
-
-        {/* Subtle CTA row */}
-        <View
-          style={[
-            styles.cta,
-            {
-              backgroundColor: opacity(accentColor, 0.12),
-              borderColor: opacity(accentColor, 0.22),
-            },
-          ]}>
-          <HStack align="center" justify="space-between">
-            <HStack align="center" gap={8}>
-              {/* Use an icon already included in metro.config.js */}
-              <Icon
-                name="material-symbols:info-rounded"
-                size={16}
-                color={opacity(accentColor, 0.9)}
-              />
-              <Text size={12} heavy style={{ color: primary50 }}>
-                View health details
-              </Text>
+              <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
             </HStack>
-            <Icon name="mdi:arrow-right" size={18} color={primary50} />
-          </HStack>
-        </View>
-      </VStack>
+
+            {/* Status row - styled like “Easy to share / Scannable QR” */}
+            <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+              {health.chips.map((chip) => {
+                const iconName = chipIconName(chip.label);
+                // On this red/heart card: use white for “Balanced”, and red accent for everything else.
+                const isBalanced = chip.label.toLowerCase().includes('balanced');
+                const displayColor = isBalanced
+                  ? opacity(primary50, 0.85)
+                  : opacity(accentColor, 0.8);
+                return (
+                  <HStack key={chip.label} align="center" gap={6}>
+                    <Icon name={iconName} size={14} color={displayColor} />
+                    <Text size={11} style={{ color: displayColor }}>
+                      {chip.label}
+                    </Text>
+                  </HStack>
+                );
+              })}
+            </HStack>
+
+            {/* Subtle CTA row */}
+            <View
+              style={[
+                styles.cta,
+                {
+                  backgroundColor: opacity(accentColor, 0.12),
+                  borderColor: opacity(accentColor, 0.22),
+                },
+              ]}>
+              <HStack align="center" justify="space-between">
+                <HStack align="center" gap={8}>
+                  {/* Use an icon already included in metro.config.js */}
+                  <Icon
+                    name="material-symbols:info-rounded"
+                    size={16}
+                    color={opacity(accentColor, 0.9)}
+                  />
+                  <Text size={12} heavy style={{ color: primary50 }}>
+                    View health details
+                  </Text>
+                </HStack>
+                <Icon name="mdi:arrow-right" size={18} color={primary50} />
+              </HStack>
+            </View>
+          </VStack>
+        </WalletHealthCardFrame>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -201,18 +176,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-  },
-  decorationLeft: {
-    position: 'absolute',
-    top: -18,
-    left: -18,
-    transform: [{ rotate: '-12deg' }],
-  },
-  decorationRight: {
-    position: 'absolute',
-    bottom: -34,
-    right: -34,
-    transform: [{ rotate: '14deg' }],
   },
   iconBox: {
     width: 40,
