@@ -12,6 +12,6 @@
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
   "ignore": [".cursor/**", "dist/**", "ios/**", "coco/**", "node_modules/**"],
-  "ignoreDependencies": ["buffer", "process", "cashu-kym"],
+  "ignoreDependencies": ["buffer", "process", "cashu-kym", "@babel/core"],
   "ignoreBinaries": ["eas", "maestro"]
 }
