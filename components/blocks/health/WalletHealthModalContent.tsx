@@ -356,6 +356,10 @@ export function WalletHealthModalContent({
       {/* Overview (hero): centered heart + scannable stats */}
       <Animated.View
         sharedTransitionTag={sharedTag}
+        // Keep a real native view node for shared transitions (avoid RN view-flattening).
+        collapsable={false}
+        shouldRasterizeIOS
+        renderToHardwareTextureAndroid
         style={[
           styles.heroWrap,
           {

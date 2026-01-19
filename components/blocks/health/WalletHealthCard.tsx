@@ -83,6 +83,10 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
     <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
       <Animated.View
         sharedTransitionTag={sharedTag}
+        // Keep a real native view node for shared transitions (avoid RN view-flattening).
+        collapsable={false}
+        shouldRasterizeIOS
+        renderToHardwareTextureAndroid
         style={[styles.card, { borderColor: opacity(accentColor, 0.25) }]}>
         <WalletHealthCardFrame
           accentColor={accentColor}
