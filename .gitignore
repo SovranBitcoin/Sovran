@@ -68,5 +68,7 @@ web-build/
 sovran.money/
 
 # Cursor skills (avoid committing vendored git repos inside skills)
+.cursor/skills/**
+.cursor/skills
 .cursor/skills/**/.git/
 .cursor/skills/**/.git/**

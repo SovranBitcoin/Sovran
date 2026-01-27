@@ -34,7 +34,9 @@ export default function ExploreLayout() {
       <Stack.Screen
         name="healthModal"
         options={{
-          presentation: 'modal',
+          // Shared-element transitions work best on push-style screens (not native modal presentation).
+          presentation: 'card',
+          animation: 'fade',
           headerShown: true,
           headerTransparent: true,
         }}

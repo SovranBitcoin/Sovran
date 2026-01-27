@@ -37,6 +37,7 @@ import { persistor, store } from 'redux/store';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/helper/coco/CocoProvider';
+import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
@@ -51,6 +52,7 @@ const AppProviders = compose([
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
+  HeroTransitionProvider,
   [InitializationProvider, { forceVisible: false }], // Set to true to always show loading screen
   MigrationGate,
   [NostrKeysProvider, { defaultAccountIndex: 0 }],

@@ -8,18 +8,11 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { WalletHealthModalContent } from 'components/blocks/health/WalletHealthModalContent';
 import type { HealthCta } from 'components/blocks/health/walletHealth';
 import { useMints } from 'coco-cashu-react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSharedValue } from 'react-native-reanimated';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 
 const DEFAULT_CURRENCIES = ['SAT'];
-
-const CloseButton = () => {
-  const { getPrimaryColor } = useTheme();
-  return (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
-    </TouchableOpacity>
-  );
-};
 
 function getCurrenciesFromMints(trustedMints: any[]): string[] {
   const units: string[] = [];
@@ -42,6 +35,8 @@ function HealthModalScreen() {
   const initialUnit = (params.unit || 'sat').toLowerCase();
 
   const { getPrimaryColor } = useTheme();
+  const hero = useHeroTransition();
+  const insets = useSafeAreaInsets();
   const { trustedMints } = useMints();
 
   const currencies = useMemo(() => getCurrenciesFromMints(trustedMints), [trustedMints]);
@@ -52,7 +47,10 @@ function HealthModalScreen() {
   const unit = selectedCurrency.toLowerCase() === 'sat' ? 'sat' : selectedCurrency.toLowerCase();
 
   const scrollY = useSharedValue(0);
-  const [topOffset, setTopOffset] = useState(0);
+  // This value affects the destination hero rect (via `marginTop: -topOffset`).
+  // Only pull the hero under the safe-area. If we include custom header height here,
+  // the card ends up “too high” (negative y) and the shared element overshoots.
+  const topOffset = insets.top;
 
   const handleAction = useCallback((action: HealthCta) => {
     if (action.type === 'openPendingEcash') {
@@ -69,14 +67,29 @@ function HealthModalScreen() {
     }
   }, []);
 
+  const handleClose = useCallback(() => {
+    hero.closeWalletHealth(unit);
+  }, [hero, unit]);
+
   return (
     <>
       <Stack.Screen
         options={{
-          headerTitle: 'Wallet Health',
-          headerLeft: () => <CloseButton />,
-          headerTintColor: getPrimaryColor('0'),
+          // Header: close button only (no title, no blur).
+          headerShown: true,
           headerTransparent: true,
+          headerShadowVisible: false,
+          headerTitle: '',
+          headerBackVisible: false,
+          headerTintColor: getPrimaryColor('0'),
+          // Prevent the default dark blur background.
+          headerBlurEffect: 'none',
+          headerBackground: () => null,
+          headerLeft: () => (
+            <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+              <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -85,7 +98,7 @@ function HealthModalScreen() {
         useAnimatedScroll
         scrollY={scrollY}
         bottomPadding={32}
-        onHeaderHeightChange={setTopOffset}>
+        disableHeaderSpacer>
         <WalletHealthModalContent
           unit={unit}
           onAction={handleAction}

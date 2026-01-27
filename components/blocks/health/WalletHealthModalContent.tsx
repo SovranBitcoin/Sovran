@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from 'providers/ThemeProvider';
@@ -11,9 +11,11 @@ import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
 import { RowButton, Section } from 'app/settings-pages';
-import type { SharedValue } from 'react-native-reanimated';
+import Animated, { FadeInUp, type SharedValue } from 'react-native-reanimated';
 import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 import type { HealthCta } from './walletHealth';
+import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -104,10 +106,11 @@ export function WalletHealthModalContent({
   scrollY?: SharedValue<number>;
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
-  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const heroTransition = useHeroTransition();
   const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const primary300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const primary400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
   const red = useMemo(() => getRedColor('300'), [getRedColor]);
 
   // Wallet Health hero: keep the background gradient consistently "red-warm" (like the Needs rebalance state),
@@ -122,6 +125,12 @@ export function WalletHealthModalContent({
   const distributions = useMintDistributionStore((s) => s.distributions);
 
   const normalizedUnit = unit.toLowerCase() === 'sat' ? 'sat' : unit.toLowerCase();
+  const heroRef = useRef<any>(null);
+
+  const handleHeroLayout = useCallback(() => {
+    // Register destination ref for hero transition measurement.
+    heroTransition.registerRef('walletHealth', 'destination', heroRef.current);
+  }, [heroTransition]);
 
   const mintsForUnit = useMemo(
     () => getMintsForUnit(trustedMints, normalizedUnit),
@@ -226,18 +235,8 @@ export function WalletHealthModalContent({
   const heroSubtitleColor = useMemo(() => opacity(primary50, 0.72), [primary50]);
   const statLabelColor = useMemo(() => opacity(primary50, 0.6), [primary50]);
 
-  const heroBorderColor = useMemo(() => {
-    // Match the Explore card’s “accent-tinted” border: red when attention is needed.
-    if (totalBalance > 0 && (!hasDesired || needsRebalance)) {
-      return opacity(red, 0.25);
-    }
-    // Balanced: subtle white border.
-    if (totalBalance > 0 && hasDesired && !needsRebalance) {
-      return opacity(primary50, 0.14);
-    }
-    // No balance / neutral: fall back to a soft theme border.
-    return opacity(primary400, 0.18);
-  }, [totalBalance, hasDesired, needsRebalance, red, primary50, primary400]);
+  // Match the Explore card’s border so the shared element doesn't "snap" on arrival.
+  const heroBorderColor = useMemo(() => opacity(gradientAccent, 0.25), [gradientAccent]);
 
   const heartBorderColor = useMemo(() => {
     // When we’re highlighting an issue, make the ring border a real red shade (not grey).
@@ -362,63 +361,30 @@ export function WalletHealthModalContent({
   return (
     <VStack gap={10}>
       {/* Overview (hero): centered heart + scannable stats */}
-      <View
+      <RNView
+        ref={heroRef}
+        onLayout={handleHeroLayout}
+        // Keep a real native view node for shared transitions (avoid RN view-flattening).
+        collapsable={false}
+        shouldRasterizeIOS
+        renderToHardwareTextureAndroid
         style={[
           styles.heroWrap,
           {
             borderColor: heroBorderColor,
+            opacity: heroTransition.isHidden('walletHealth', 'destination') ? 0 : 1,
             // Pull the hero background up behind the transparent header.
             // Then compensate with padding so inner content stays in the same place.
             marginTop: -topOffset,
-            paddingTop: HERO_PADDING + topOffset,
+            // Important: keep the background under the notch, but push CONTENT below the notch.
+            // With marginTop = -topOffset, we need to add the inset twice so it doesn't cancel out.
+            paddingTop: HERO_PADDING + topOffset * 2,
           },
         ]}>
-        {/* Base fill: keep it warm (near-black) instead of muddy grey */}
-        <View
-          style={[StyleSheet.absoluteFillObject, { backgroundColor: getPrimaryColor('950') }]}
-        />
-
-        {/* Global warm wash so the hero always feels “red-tinted”, not grey */}
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(red, 0.06) }]} />
-
-        {/* Decorative hearts (match Explore WalletHealthCard) */}
-        <View style={styles.decorationLeft} pointerEvents="none">
-          <Icon name="garden:heart-fill-16" size={90} color={opacity(gradientAccent, 0.08)} />
-        </View>
-        <View style={styles.decorationRight} pointerEvents="none">
-          <Icon name="garden:heart-fill-16" size={140} color={opacity(gradientAccent, 0.05)} />
-        </View>
-
-        {/**
-         * 3-corner blend:
-         * - Top-left: strongest accent
-         * - Top-right: slightly different shade
-         * - Bottom-right: deeper accent
-         *
-         * expo-linear-gradient is 1D, so we layer 2 gradients to approximate a 2D corner blend.
-         */}
-        <LinearGradient
-          colors={[opacity(gradientAccent, 0.34), opacity(gradientAccent, 0.12), 'transparent']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <LinearGradient
-          colors={[opacity(gradientAccent, 0.22), 'transparent', opacity(gradientAccent, 0.26)]}
-          locations={[0, 0.55, 1]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-
-        {/* Subtle top highlight (keeps it premium, not flat) */}
-        <LinearGradient
-          colors={[opacity(primary0, 0.06), 'transparent']}
-          locations={[0, 0.7]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
+        <WalletHealthCardFrame
+          accentColor={gradientAccent}
+          backgroundColor={primary950}
+          highlightColor={primary50}
         />
 
         <VStack align="center" gap={10}>
@@ -468,31 +434,39 @@ export function WalletHealthModalContent({
             ))}
           </HStack>
         </VStack>
-      </View>
+      </RNView>
 
       {/* Currency selector (non-sticky) */}
-      <MintCurrencyTabs
-        currencies={currencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={onCurrencyChange}
-        scrollY={scrollY}
-      />
+      {!heroTransition.isTransitioning('walletHealth') && (
+        <Animated.View entering={FadeInUp.duration(220).delay(120)}>
+          <MintCurrencyTabs
+            currencies={currencies}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={onCurrencyChange}
+            scrollY={scrollY}
+          />
+        </Animated.View>
+      )}
 
       {/* Actions (standard rows, like Mint Info / Settings) */}
-      <View style={{ paddingHorizontal: 16 }}>
-        <Section title="Actions">
-          {actionRows.map((r, i) => (
-            <RowButton
-              key={r.key}
-              isFirst={i === 0}
-              isLast={i === actionRows.length - 1}
-              label={r.label}
-              value={r.value}
-              onPress={r.onPress}
-            />
-          ))}
-        </Section>
-      </View>
+      {!heroTransition.isTransitioning('walletHealth') && (
+        <Animated.View entering={FadeInUp.duration(240).delay(160)}>
+          <View style={{ paddingHorizontal: 16 }}>
+            <Section title="Actions">
+              {actionRows.map((r, i) => (
+                <RowButton
+                  key={r.key}
+                  isFirst={i === 0}
+                  isLast={i === actionRows.length - 1}
+                  label={r.label}
+                  value={r.value}
+                  onPress={r.onPress}
+                />
+              ))}
+            </Section>
+          </View>
+        </Animated.View>
+      )}
     </VStack>
   );
 }
@@ -501,22 +475,10 @@ const styles = StyleSheet.create({
   heroWrap: {
     width: '100%',
     alignSelf: 'stretch',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     padding: HERO_PADDING,
     overflow: 'hidden',
-  },
-  decorationLeft: {
-    position: 'absolute',
-    top: -18,
-    left: -18,
-    transform: [{ rotate: '-12deg' }],
-  },
-  decorationRight: {
-    position: 'absolute',
-    bottom: -34,
-    right: -34,
-    transform: [{ rotate: '14deg' }],
   },
   heartRing: {
     width: HEART_RING_SIZE,
