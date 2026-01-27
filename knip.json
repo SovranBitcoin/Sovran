@@ -11,7 +11,7 @@
     "app.config.js"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [".cursor/**", "dist/**", "ios/**", "coco/**", "node_modules/**"],
+  "ignore": [".agents/**", ".cursor/**", "dist/**", "ios/**", "coco/**", "node_modules/**"],
   "ignoreDependencies": ["buffer", "process", "cashu-kym", "@babel/core"],
   "ignoreBinaries": ["eas", "maestro"]
 }
