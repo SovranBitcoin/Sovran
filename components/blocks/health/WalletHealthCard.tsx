@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useMemo, useCallback, useRef } from 'react';
+import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
@@ -8,12 +8,11 @@ import { VStack } from 'components/ui/View/VStack';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
-import { router } from 'expo-router';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
-import Animated from 'react-native-reanimated';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { computeWalletHealth } from './walletHealth';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 
 function getMintsForUnit(trustedMints: any[], unit: string) {
   const u = unit.toLowerCase();
@@ -45,6 +44,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
   const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const accentColor = useMemo(() => getRedColor('300'), [getRedColor]);
+  const hero = useHeroTransition();
 
   const { trustedMints } = useMints();
   const { balance } = useBalanceContext();
@@ -52,7 +52,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   const distributions = useMintDistributionStore((s) => s.distributions);
 
   const unit = defaultUnit.toLowerCase();
-  const sharedTag = useMemo(() => `walletHealthCard-${unit}`, [unit]);
+  const cardRef = useRef<any>(null);
   const mintsForUnit = useMemo(() => getMintsForUnit(trustedMints, unit), [trustedMints, unit]);
   const mintUrlsForUnit = useMemo(() => mintsForUnit.map((m: any) => m.mintUrl), [mintsForUnit]);
 
@@ -76,18 +76,26 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   }, [unit, mintUrlsForUnit, balance, distributions, pendingOutgoingCount]);
 
   const handlePress = useCallback(() => {
-    router.push({ pathname: '/(drawer)/(tabs)/explore/healthModal', params: { unit } });
-  }, [unit]);
+    hero.registerRef('walletHealth', 'source', cardRef.current);
+    hero.startWalletHealth(unit);
+  }, [hero, unit]);
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
-      <Animated.View
-        sharedTransitionTag={sharedTag}
+      <RNView
+        ref={cardRef}
+        onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
         // Keep a real native view node for shared transitions (avoid RN view-flattening).
         collapsable={false}
         shouldRasterizeIOS
         renderToHardwareTextureAndroid
-        style={[styles.card, { borderColor: opacity(accentColor, 0.25) }]}>
+        style={[
+          styles.card,
+          {
+            borderColor: opacity(accentColor, 0.25),
+            opacity: hero.isHidden('walletHealth', 'source') ? 0 : 1,
+          },
+        ]}>
         <WalletHealthCardFrame
           accentColor={accentColor}
           backgroundColor={primary950}
@@ -170,7 +178,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
             </View>
           </VStack>
         </WalletHealthCardFrame>
-      </Animated.View>
+      </RNView>
     </TouchableOpacity>
   );
 }

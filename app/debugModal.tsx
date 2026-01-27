@@ -71,6 +71,11 @@ export interface ModalLayoutWrapperProps {
   /** Bottom padding for scroll content (default: 120) */
   bottomPadding?: number;
   /**
+   * When true, do not insert the automatic header spacer in the scroll content.
+   * Useful when the screen hides the native header (headerShown: false) but still uses Animated.ScrollView.
+   */
+  disableHeaderSpacer?: boolean;
+  /**
    * When true, children are rendered directly without wrapping in ScrollView.
    * Use this when you need to provide your own scrollable component (e.g., FlatList, LegendList).
    * You should add your own header spacer using the totalHeaderHeight value.
@@ -95,6 +100,7 @@ export const ModalLayoutWrapper = ({
   scrollY: externalScrollY,
   bottomContent,
   bottomPadding = 120,
+  disableHeaderSpacer = false,
   useCustomScrollView = false,
   onHeaderHeightChange,
 }: ModalLayoutWrapperProps) => {
@@ -227,8 +233,8 @@ export const ModalLayoutWrapper = ({
           contentContainerStyle={scrollContentStyle}
           onScroll={animatedScrollHandler}
           scrollEventThrottle={16}>
-          {/* Header spacer */}
-          <View style={{ height: totalHeaderHeight }} />
+          {/* Header spacer (optional) */}
+          {!disableHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
           {children}
         </Animated.ScrollView>
       ) : (

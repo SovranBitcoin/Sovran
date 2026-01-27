@@ -9,7 +9,7 @@
  * - Bottom button to continue with claim process
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   TouchableOpacity,
   TextInput,
@@ -17,8 +17,9 @@ import {
   Keyboard,
   StyleSheet,
   Linking,
+  View as RNView,
 } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -32,6 +33,10 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInUp, useSharedValue } from 'react-native-reanimated';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -76,11 +81,13 @@ function UsernameInput({
   onChangeText,
   selectedDomain,
   isChecking,
+  accentColor,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   selectedDomain: string;
   isChecking: boolean;
+  accentColor: string;
 }) {
   const { getPrimaryColor } = useTheme();
 
@@ -98,25 +105,25 @@ function UsernameInput({
       style={[
         styles.inputContainer,
         {
-          backgroundColor: getPrimaryColor('900'),
-          borderColor: value.length > 0 ? getPrimaryColor('500') : getPrimaryColor('700'),
+          backgroundColor: opacity(accentColor, 0.06),
+          borderColor: value.length > 0 ? opacity(accentColor, 0.65) : opacity(accentColor, 0.25),
         },
       ]}>
       <TextInput
         value={value}
         onChangeText={handleChange}
         placeholder="username"
-        placeholderTextColor={getPrimaryColor('600')}
+        placeholderTextColor={opacity(accentColor, 0.45)}
         style={[styles.input, { color: getPrimaryColor('50') }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
       />
-      <Text size={18} style={{ color: getPrimaryColor('500') }}>
+      <Text size={18} style={{ color: opacity(accentColor, 0.9) }}>
         @{selectedDomain}
       </Text>
       {isChecking && (
-        <ActivityIndicator size="small" color={getPrimaryColor('400')} style={{ marginLeft: 12 }} />
+        <ActivityIndicator size="small" color={accentColor} style={{ marginLeft: 12 }} />
       )}
     </View>
   );
@@ -247,20 +254,35 @@ function generateNip98Auth(url: string, method: string, privateKey: Uint8Array):
 function ClaimUsernameScreen() {
   const { getPrimaryColor } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const hero = useHeroTransition();
+  const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
+  const heroRef = useRef<any>(null);
   const [username, setUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<DomainId>('npubx');
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityResult[]>([]);
   const [isChecking, setIsChecking] = useState(false);
 
   // Close button for header
+  const handleClose = useCallback(() => {
+    hero.closeClaimUsername();
+  }, [hero]);
+
   const CloseButton = useCallback(
     () => (
-      <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+      <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
         <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
       </TouchableOpacity>
     ),
-    [getPrimaryColor]
+    [getPrimaryColor, handleClose]
   );
+
+  const handleHeroLayout = useCallback(() => {
+    hero.registerRef('claimUsername', 'destination', heroRef.current);
+  }, [hero]);
+
+  const topOffset = insets.top;
+  const accentColor = '#f59e0b';
 
   // Check availability for all domains
   const checkAvailability = useCallback(async (name: string) => {
@@ -383,105 +405,172 @@ function ClaimUsernameScreen() {
     <>
       <Stack.Screen
         options={{
-          headerTitle: 'Claim Username',
-          headerTitleStyle: { color: getPrimaryColor('0') },
+          presentation: 'card',
+          animation: 'fade',
+          headerShown: true,
+          headerTitle: '',
           headerTintColor: getPrimaryColor('0'),
           headerLeft: CloseButton,
+          headerTransparent: true,
+          headerBlurEffect: 'none',
+          headerBackground: () => null,
+          headerShadowVisible: false,
         }}
       />
-      <ModalLayoutWrapper bottomPadding={120} bottomContent={bottomButtons}>
-        {/* Hero section with input */}
-        <VStack style={{ alignItems: 'center', marginBottom: 32 }}>
-          <View
-            style={[styles.heroIcon, { backgroundColor: opacity(getPrimaryColor('500'), 0.12) }]}>
-            <Icon name="mingcute:lightning-fill" size={32} color={getPrimaryColor('400')} />
-          </View>
-
-          <Text
-            size={14}
-            style={{ color: getPrimaryColor('400'), textAlign: 'center', marginBottom: 24 }}>
-            Choose a memorable username for receiving Bitcoin
-          </Text>
-
-          <UsernameInput
-            value={username}
-            onChangeText={setUsername}
-            selectedDomain={selectedDomainLabel}
-            isChecking={isChecking}
-          />
-        </VStack>
-
-        {/* Domain selection */}
-        <VStack style={{ gap: 8 }}>
-          <Text
-            size={12}
-            heavy
-            style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
-            SELECT DOMAIN
-          </Text>
-          {DOMAINS.map((domain) => (
-            <DomainOption
-              key={domain.id}
-              domain={domain}
-              isSelected={selectedDomain === domain.id}
-              onSelect={() => setSelectedDomain(domain.id)}
-              availabilityResult={
-                username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
-              }
-            />
-          ))}
-        </VStack>
-
-        {/* Guidelines - show when empty */}
-        {username.length === 0 && (
-          <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
-            <Text size={13} heavy style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
-              Username Guidelines
-            </Text>
-            <VStack style={{ gap: 10 }}>
-              {[
-                { text: 'At least 3 characters', icon: 'mdi:check' },
-                { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
-                { text: 'No spaces or special characters', icon: 'mdi:check' },
-              ].map((item, index) => (
-                <HStack key={index} align="center">
-                  <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
-                  <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
-                    {item.text}
-                  </Text>
-                </HStack>
-              ))}
-            </VStack>
-          </View>
-        )}
-
-        {/* Preview - show when valid username */}
-        {username.length >= 3 && selectedDomainAvailable && (
-          <View
+      <ModalLayoutWrapper
+        contentPadding={0}
+        bottomPadding={120}
+        bottomContent={bottomButtons}
+        useAnimatedScroll
+        scrollY={scrollY}
+        disableHeaderSpacer>
+        <VStack style={{ paddingBottom: 24 }}>
+          <RNView
+            ref={heroRef}
+            onLayout={handleHeroLayout}
+            collapsable={false}
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
             style={[
-              styles.previewBox,
+              styles.heroCard,
               {
-                backgroundColor: opacity(getPrimaryColor('500'), 0.08),
-                borderColor: opacity(getPrimaryColor('500'), 0.2),
+                borderColor: opacity(accentColor, 0.3),
+                opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
+                marginTop: -topOffset,
+                paddingTop: 20 + topOffset * 2,
               },
             ]}>
-            <Text
-              size={11}
-              heavy
-              style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
-              YOUR NEW ADDRESS
-            </Text>
-            <Text size={18} heavy style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
-              {username}@{selectedDomainLabel}
-            </Text>
-          </View>
-        )}
+            <ClaimUsernameCardFrame
+              accentColor={accentColor}
+              backgroundColor={getPrimaryColor('950')}
+              highlightColor={getPrimaryColor('50')}>
+              <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
+                <HStack align="center" style={{ marginBottom: 14 }}>
+                  <View
+                    style={[styles.heroSmallIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+                    <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 12 }}>
+                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                      Claim Your Address
+                    </Text>
+                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                      Get a memorable Lightning URL
+                    </Text>
+                  </VStack>
+                </HStack>
+
+                <Text size={14} style={{ color: getPrimaryColor('300'), marginBottom: 14 }}>
+                  Choose a memorable username for receiving Bitcoin.
+                </Text>
+
+                <UsernameInput
+                  value={username}
+                  onChangeText={setUsername}
+                  selectedDomain={selectedDomainLabel}
+                  isChecking={isChecking}
+                  accentColor={accentColor}
+                />
+              </VStack>
+            </ClaimUsernameCardFrame>
+          </RNView>
+
+          {!hero.isTransitioning('claimUsername') ? (
+            <Animated.View entering={FadeInUp.duration(220).delay(120)}>
+              <View style={{ paddingHorizontal: 16 }}>
+                <VStack style={{ gap: 8, marginTop: 18 }}>
+                  <Text
+                    size={12}
+                    heavy
+                    style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
+                    SELECT DOMAIN
+                  </Text>
+                  {DOMAINS.map((domain) => (
+                    <DomainOption
+                      key={domain.id}
+                      domain={domain}
+                      isSelected={selectedDomain === domain.id}
+                      onSelect={() => setSelectedDomain(domain.id)}
+                      availabilityResult={
+                        username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
+                      }
+                    />
+                  ))}
+                </VStack>
+
+                {username.length === 0 && (
+                  <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
+                    <Text
+                      size={13}
+                      heavy
+                      style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
+                      Username Guidelines
+                    </Text>
+                    <VStack style={{ gap: 10 }}>
+                      {[
+                        { text: 'At least 3 characters', icon: 'mdi:check' },
+                        { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
+                        { text: 'No spaces or special characters', icon: 'mdi:check' },
+                      ].map((item, index) => (
+                        <HStack key={index} align="center">
+                          <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
+                          <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
+                            {item.text}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </View>
+                )}
+
+                {/* Preview - show when valid username */}
+                {username.length >= 3 && selectedDomainAvailable && (
+                  <View
+                    style={[
+                      styles.previewBox,
+                      {
+                        backgroundColor: opacity(getPrimaryColor('500'), 0.08),
+                        borderColor: opacity(getPrimaryColor('500'), 0.2),
+                      },
+                    ]}>
+                    <Text
+                      size={11}
+                      heavy
+                      style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
+                      YOUR NEW ADDRESS
+                    </Text>
+                    <Text
+                      size={18}
+                      heavy
+                      style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
+                      {username}@{selectedDomainLabel}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          ) : null}
+        </VStack>
       </ModalLayoutWrapper>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  heroCard: {
+    width: '100%',
+    alignSelf: 'stretch',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  heroSmallIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

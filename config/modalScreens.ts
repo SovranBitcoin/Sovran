@@ -231,12 +231,17 @@ export const MODAL_SCREENS: ModalConfig[] = [
   {
     name: 'claimUsername',
     options: {
-      presentation: 'formSheet',
+      // Match Explore `healthModal` so the hero overlay handles the transition.
+      // NOTE: `presentation` affects the opening animation; it must be correct at the root stack level.
+      presentation: 'card',
+      animation: 'fade',
       headerShown: true,
-      headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
-      headerBackButtonDisplayMode: 'minimal',
-      gestureDirection: 'vertical',
+      headerShadowVisible: false,
+      headerTitle: '',
+      headerBackVisible: false,
+      headerBlurEffect: 'none',
+      headerBackground: () => null,
     },
   },
 ];

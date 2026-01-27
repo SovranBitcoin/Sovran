@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from 'providers/ThemeProvider';
@@ -15,6 +15,7 @@ import Animated, { FadeInUp, type SharedValue } from 'react-native-reanimated';
 import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 import type { HealthCta } from './walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -105,6 +106,7 @@ export function WalletHealthModalContent({
   scrollY?: SharedValue<number>;
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
+  const heroTransition = useHeroTransition();
   const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const primary300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const primary400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
@@ -123,7 +125,12 @@ export function WalletHealthModalContent({
   const distributions = useMintDistributionStore((s) => s.distributions);
 
   const normalizedUnit = unit.toLowerCase() === 'sat' ? 'sat' : unit.toLowerCase();
-  const sharedTag = useMemo(() => `walletHealthCard-${normalizedUnit}`, [normalizedUnit]);
+  const heroRef = useRef<any>(null);
+
+  const handleHeroLayout = useCallback(() => {
+    // Register destination ref for hero transition measurement.
+    heroTransition.registerRef('walletHealth', 'destination', heroRef.current);
+  }, [heroTransition]);
 
   const mintsForUnit = useMemo(
     () => getMintsForUnit(trustedMints, normalizedUnit),
@@ -354,8 +361,9 @@ export function WalletHealthModalContent({
   return (
     <VStack gap={10}>
       {/* Overview (hero): centered heart + scannable stats */}
-      <Animated.View
-        sharedTransitionTag={sharedTag}
+      <RNView
+        ref={heroRef}
+        onLayout={handleHeroLayout}
         // Keep a real native view node for shared transitions (avoid RN view-flattening).
         collapsable={false}
         shouldRasterizeIOS
@@ -364,10 +372,13 @@ export function WalletHealthModalContent({
           styles.heroWrap,
           {
             borderColor: heroBorderColor,
+            opacity: heroTransition.isHidden('walletHealth', 'destination') ? 0 : 1,
             // Pull the hero background up behind the transparent header.
             // Then compensate with padding so inner content stays in the same place.
             marginTop: -topOffset,
-            paddingTop: HERO_PADDING + topOffset,
+            // Important: keep the background under the notch, but push CONTENT below the notch.
+            // With marginTop = -topOffset, we need to add the inset twice so it doesn't cancel out.
+            paddingTop: HERO_PADDING + topOffset * 2,
           },
         ]}>
         <WalletHealthCardFrame
@@ -423,35 +434,39 @@ export function WalletHealthModalContent({
             ))}
           </HStack>
         </VStack>
-      </Animated.View>
+      </RNView>
 
       {/* Currency selector (non-sticky) */}
-      <Animated.View entering={FadeInUp.duration(220).delay(120)}>
-        <MintCurrencyTabs
-          currencies={currencies}
-          selectedCurrency={selectedCurrency}
-          onCurrencyChange={onCurrencyChange}
-          scrollY={scrollY}
-        />
-      </Animated.View>
+      {!heroTransition.isTransitioning('walletHealth') && (
+        <Animated.View entering={FadeInUp.duration(220).delay(120)}>
+          <MintCurrencyTabs
+            currencies={currencies}
+            selectedCurrency={selectedCurrency}
+            onCurrencyChange={onCurrencyChange}
+            scrollY={scrollY}
+          />
+        </Animated.View>
+      )}
 
       {/* Actions (standard rows, like Mint Info / Settings) */}
-      <Animated.View entering={FadeInUp.duration(240).delay(160)}>
-        <View style={{ paddingHorizontal: 16 }}>
-          <Section title="Actions">
-            {actionRows.map((r, i) => (
-              <RowButton
-                key={r.key}
-                isFirst={i === 0}
-                isLast={i === actionRows.length - 1}
-                label={r.label}
-                value={r.value}
-                onPress={r.onPress}
-              />
-            ))}
-          </Section>
-        </View>
-      </Animated.View>
+      {!heroTransition.isTransitioning('walletHealth') && (
+        <Animated.View entering={FadeInUp.duration(240).delay(160)}>
+          <View style={{ paddingHorizontal: 16 }}>
+            <Section title="Actions">
+              {actionRows.map((r, i) => (
+                <RowButton
+                  key={r.key}
+                  isFirst={i === 0}
+                  isLast={i === actionRows.length - 1}
+                  label={r.label}
+                  value={r.value}
+                  onPress={r.onPress}
+                />
+              ))}
+            </Section>
+          </View>
+        </Animated.View>
+      )}
     </VStack>
   );
 }
