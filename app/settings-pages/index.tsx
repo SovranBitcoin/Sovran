@@ -20,6 +20,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getUsername } from '@/helper/username';
 import { CocoManager } from 'helper/coco/manager';
+import { popup } from '@/helper/popup';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -174,6 +175,42 @@ const ModalScreen = () => {
     }
   };
 
+  const handleFreeReservedProofs = () => {
+    Alert.alert(
+      'Free Reserved Proofs',
+      'This will attempt to rollback any operations holding reserved proofs, and release orphaned reservations. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await CocoManager.freeAllReservedProofs();
+
+              popup({
+                message: 'Reserved proofs freed',
+                type: 'success',
+                text:
+                  `Reserved proofs found: ${result.totalReservedProofs}\n` +
+                  `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
+                  `Rolled back melt ops: ${result.rolledBackMeltOperations}\n` +
+                  `Orphaned reservations released: ${result.releasedOrphanedReservations}\n` +
+                  `Errors: ${result.errors.length}`,
+              });
+            } catch (error) {
+              popup({
+                message: 'Failed to free reserved proofs',
+                type: 'error',
+                text: error instanceof Error ? error.message : 'Unknown error',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Container>
       <ScrollView className="px-4">
@@ -243,6 +280,7 @@ const ModalScreen = () => {
 
         <Section title="Developer">
           <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
+          <RowButton label="Free Reserved Proofs" onPress={handleFreeReservedProofs} />
           <RowButton label="Storage Inspector" href="/settings-pages/storage" isLast />
         </Section>
 
