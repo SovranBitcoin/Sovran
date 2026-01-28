@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
-import type { MeltQuoteResponse } from '@cashu/cashu-ts';
+import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
 type MeltStatus = 'idle' | 'creating' | 'paying' | 'success' | 'error';
 
 interface MeltQuoteResult {
-  quote: MeltQuoteResponse;
+  quote: MeltQuoteBolt11Response;
   historyEntry: MeltHistoryEntry;
 }
 

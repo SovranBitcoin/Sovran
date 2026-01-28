@@ -174,6 +174,7 @@ export const useProcessPaymentString = ({
             const ur = urDecoder.resultUR();
             const decoded = ur.decodeCBOR();
             const _tokenString = new TextDecoder().decode(decoded);
+            const decodedToken = getDecodedToken(_tokenString);
             onProgress?.(0);
 
             // Only save to scan history once when UR is fully decoded (not for each frame)
@@ -183,12 +184,12 @@ export const useProcessPaymentString = ({
             const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
               id: `receive-${Date.now()}`,
               type: 'receive',
-              amount: getDecodedToken(_tokenString).proofs.reduce(
+              amount: decodedToken.proofs.reduce(
                 (sum: number, proof: Proof) => sum + proof.amount,
                 0
               ),
-              unit: getDecodedToken(_tokenString).unit,
-              mintUrl: getDecodedToken(_tokenString).mint,
+              unit: decodedToken.unit ?? 'sat',
+              mintUrl: decodedToken.mint,
               createdAt: Date.now(),
               metadata: {},
               token: _tokenString,
@@ -215,16 +216,17 @@ export const useProcessPaymentString = ({
           // Save to scan history
           addScan(scanning.data, scanning.data, 'ecash', source);
 
+          const decodedToken = getDecodedToken(scanning.data);
           // Create a receive history entry for ecash receive
           const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
             id: `receive-${Date.now()}`,
             type: 'receive',
-            amount: getDecodedToken(scanning.data).proofs.reduce(
+            amount: decodedToken.proofs.reduce(
               (sum: number, proof: Proof) => sum + proof.amount,
               0
             ),
-            unit: getDecodedToken(scanning.data).unit,
-            mintUrl: getDecodedToken(scanning.data).mint,
+            unit: decodedToken.unit ?? 'sat',
+            mintUrl: decodedToken.mint,
             createdAt: Date.now(),
             metadata: {},
             token: scanning.data,

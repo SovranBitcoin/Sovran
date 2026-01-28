@@ -35,7 +35,7 @@ import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntry
 import { meltQuoteExpired } from 'helper/utils';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
-import type { MeltQuoteResponse } from '@cashu/cashu-ts';
+import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
@@ -156,7 +156,7 @@ export function MeltQuoteScreen({
   const currentTransaction = createdHistoryEntry || trackedHistoryEntry;
 
   // The quote to display - either derived from history entry or created
-  const displayQuote: MeltQuoteResponse | null =
+  const displayQuote: MeltQuoteBolt11Response | null =
     createdQuote ||
     (currentTransaction
       ? {

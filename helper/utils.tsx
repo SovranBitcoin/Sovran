@@ -10,7 +10,7 @@
 import { MintHistoryEntry } from 'coco-cashu-core';
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
-import { MeltQuoteResponse } from '@cashu/cashu-ts';
+import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -106,7 +106,7 @@ export function getMintHistoryEntryTimeUntilExpiry(historyEntry: MintHistoryEntr
  *   // Handle expired melt quote - show refresh component
  * }
  */
-export function meltQuoteExpired(meltQuote: MeltQuoteResponse): boolean {
+export function meltQuoteExpired(meltQuote: MeltQuoteBolt11Response): boolean {
   if (!meltQuote.expiry) {
     return false;
   }

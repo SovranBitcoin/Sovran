@@ -16,12 +16,12 @@ import type {
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
 import { mintHistoryEntryExpired, getMintHistoryEntryTimeUntilExpiry } from 'helper/utils';
-import { MintQuoteState, MeltQuoteState, MeltQuoteResponse } from '@cashu/cashu-ts';
+import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import opacity from 'hex-color-opacity';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
-  meltQuote?: MeltQuoteResponse;
+  meltQuote?: MeltQuoteBolt11Response;
   /** For NUT-18 payment requests - indicates token was created (prepared step complete) */
   tokenCreated?: boolean;
   /** For NUT-18 payment requests - indicates Nostr DM was sent */
@@ -92,7 +92,7 @@ function buildTimeline({
   nostrSent,
 }: {
   historyEntry: HistoryEntry;
-  meltQuote?: MeltQuoteResponse;
+  meltQuote?: MeltQuoteBolt11Response;
   currentTime: number;
   tokenCreated?: boolean;
   nostrSent?: boolean;
@@ -523,14 +523,17 @@ function TimelineLine({
 // ============ Helper Functions ============
 
 // Helper function to check if melt quote is expired
-const isMeltQuoteExpired = (meltQuote: MeltQuoteResponse, currentTime: number): boolean => {
+const isMeltQuoteExpired = (meltQuote: MeltQuoteBolt11Response, currentTime: number): boolean => {
   if (!meltQuote.expiry) return false;
   const now = Math.floor(currentTime / 1000);
   return now > meltQuote.expiry;
 };
 
 // Helper function to get time until expiry for melt quotes
-const getMeltQuoteTimeUntilExpiry = (meltQuote: MeltQuoteResponse, currentTime: number): string => {
+const getMeltQuoteTimeUntilExpiry = (
+  meltQuote: MeltQuoteBolt11Response,
+  currentTime: number
+): string => {
   if (!meltQuote.expiry) return '';
   const now = Math.floor(currentTime / 1000);
   const timeLeft = meltQuote.expiry - now;
