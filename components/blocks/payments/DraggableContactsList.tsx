@@ -7,23 +7,25 @@ import { View } from 'components/ui/View/View';
 import { ProfilesCardFrame } from './ProfilesCardFrame';
 import opacity from 'hex-color-opacity';
 
-// Wrapper component that looks up profile and passes it to ContactItem
-const RenderItem = ({
-  item,
-  profilesMap,
-  isLoadingProfiles,
-}: {
-  item: any;
-  profilesMap: Map<string, any>;
-  isLoadingProfiles?: boolean;
-}) => {
-  const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+// Memoized wrapper component that receives pre-resolved profile
+const RenderItem = React.memo(
+  ({
+    item,
+    profile,
+    isLoadingProfiles,
+  }: {
+    item: any;
+    profile: any;
+    isLoadingProfiles?: boolean;
+  }) => {
+    // Only show loading if we're still fetching profiles AND this specific contact doesn't have profile data yet
+    const shouldShowLoading = isLoadingProfiles && !profile;
 
-  // Only show loading if we're still fetching profiles AND this specific contact doesn't have profile data yet
-  const shouldShowLoading = isLoadingProfiles && !profile;
+    return <ContactItem item={item} profile={profile} isLoadingProfile={shouldShowLoading} />;
+  }
+);
 
-  return <ContactItem item={item} profile={profile} isLoadingProfile={shouldShowLoading} />;
-};
+RenderItem.displayName = 'RenderItem';
 
 interface DraggableContactsListProps {
   profilesMap: Map<string, any>;
@@ -79,14 +81,18 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
       <RNView style={[styles.card, { borderColor }]}>
         <ProfilesCardFrame accentColor={accentColor} highlightColor={primary50}>
           <View style={styles.content} className="gap-4">
-            {data.map((item) => (
-              <RenderItem
-                key={keyExtractor(item)}
-                item={item}
-                profilesMap={profilesMap}
-                isLoadingProfiles={isLoadingProfiles}
-              />
-            ))}
+            {data.map((item) => {
+              // Look up profile here so re-renders happen when profiles change
+              const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+              return (
+                <RenderItem
+                  key={keyExtractor(item)}
+                  item={item}
+                  profile={profile}
+                  isLoadingProfiles={isLoadingProfiles}
+                />
+              );
+            })}
           </View>
         </ProfilesCardFrame>
       </RNView>

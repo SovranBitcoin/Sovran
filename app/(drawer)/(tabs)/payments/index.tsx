@@ -1,6 +1,6 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Mint } from 'coco-cashu-core';
-import { SearchResult } from 'components/blocks/contacts';
+import { SearchResult, RecentSearches } from 'components/blocks/contacts';
 import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
 import { npubToPubkey } from 'components/blocks/Transaction';
@@ -23,6 +23,7 @@ import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useSearchHistoryStore } from '@/stores/searchHistoryStore';
 
 // Define proper types
 interface SearchResultData {
@@ -93,7 +94,10 @@ const PaymentsContent = () => {
   }, []);
 
   // Get search state from layout context
-  const { searchQuery, isSearching } = usePaymentsSearch();
+  const { searchQuery, isSearching, onSearchChange } = usePaymentsSearch();
+
+  // Search history store
+  const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
 
   const { mints, loadMints, getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -441,46 +445,54 @@ const PaymentsContent = () => {
   }, []);
 
   // Search functionality
-  const searchUsers = useCallback(async (query: string) => {
-    if (!query.trim()) return;
+  const searchUsers = useCallback(
+    async (query: string) => {
+      if (!query.trim()) return;
 
-    setSearchLoading(true);
-    setHasSearched(true);
+      setSearchLoading(true);
+      setHasSearched(true);
 
-    try {
-      const result = await apiSearchUsers({ query, limit: 10 });
+      try {
+        const result = await apiSearchUsers({ query, limit: 10 });
 
-      if (result.isOk()) {
-        const data = result.value;
+        if (result.isOk()) {
+          const data = result.value;
 
-        if (data.results && Array.isArray(data.results)) {
-          const formattedResults: SearchResultData[] = data.results.map((res) => {
-            const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
+          if (data.results && Array.isArray(data.results)) {
+            const formattedResults: SearchResultData[] = data.results.map((res) => {
+              const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
 
-            return {
-              pubkey: res.pubkey,
-              profile: {
-                ...res,
-                pubkey: profileEventPubkey,
-              },
-            };
-          });
+              return {
+                pubkey: res.pubkey,
+                profile: {
+                  ...res,
+                  pubkey: profileEventPubkey,
+                },
+              };
+            });
 
-          setSearchResults(formattedResults);
+            setSearchResults(formattedResults);
+
+            // Save successful searches to history
+            if (formattedResults.length > 0) {
+              addSearchToHistory(query, 'payments');
+            }
+          } else {
+            setSearchResults([]);
+          }
         } else {
+          console.error('Error searching users:', result.error);
           setSearchResults([]);
         }
-      } else {
-        console.error('Error searching users:', result.error);
+      } catch (error) {
+        console.error('Unexpected error during search:', error);
         setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
       }
-    } catch (error) {
-      console.error('Unexpected error during search:', error);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, []);
+    },
+    [addSearchToHistory]
+  );
 
   // Debounced search handler
   useEffect(() => {
@@ -577,6 +589,14 @@ const PaymentsContent = () => {
       }
     },
     [searchLoading, navigateToProfile]
+  );
+
+  // Handler for selecting a recent search
+  const handleRecentSearchSelect = useCallback(
+    (query: string) => {
+      onSearchChange(query);
+    },
+    [onSearchChange]
   );
 
   // Dismiss keyboard when tapping outside
@@ -695,6 +715,17 @@ const PaymentsContent = () => {
                   removeClippedSubviews={true}
                   ListHeaderComponent={
                     <>
+                      {/* Recent Searches - Show when no active search query */}
+                      {!showSearchResults && !searchLoading && (
+                        <View style={{ marginTop: 16 }}>
+                          <RecentSearches
+                            context="payments"
+                            onSearchSelect={handleRecentSearchSelect}
+                            maxItems={5}
+                          />
+                        </View>
+                      )}
+
                       {/* Recommended Users */}
                       {/* <RecommendedUsers
                         users={recommendedUsers}
