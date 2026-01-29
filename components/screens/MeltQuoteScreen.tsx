@@ -36,6 +36,7 @@ import { meltQuoteExpired } from 'helper/utils';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import { useManager } from 'coco-cashu-react';
 import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
@@ -113,6 +114,7 @@ export function MeltQuoteScreen({
   onCancel,
   onSendSuccess,
 }: MeltQuoteScreenProps) {
+  const manager = useManager();
   const { getMintInfo } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -124,14 +126,15 @@ export function MeltQuoteScreen({
 
   // For creating new quote
   const {
-    createMeltQuote,
-    payMeltQuote,
+    prepareMeltQuote,
     historyEntry: createdHistoryEntry,
     quote: createdQuote,
+    operationId: createdOperationId,
     isCreating,
     isPaying,
     error: meltError,
     reset: resetMeltState,
+    executeMeltQuote,
   } = useMeltWithHistory();
 
   // Local state for quote creation flow
@@ -230,7 +233,7 @@ export function MeltQuoteScreen({
         hasStoredLocationRef.current = false; // Reset location flag for new quote
         lastQuoteMintRef.current = selectedMintFromStore;
         try {
-          const result = await createMeltQuote(selectedMintFromStore, invoice);
+          const result = await prepareMeltQuote(selectedMintFromStore, invoice);
 
           // Capture and store location right after quote creation
           if (result?.historyEntry?.id) {
@@ -252,7 +255,7 @@ export function MeltQuoteScreen({
     selectedMintFromStore,
     currentTransaction,
     isCreating,
-    createMeltQuote,
+    prepareMeltQuote,
   ]);
 
   // Watch for mint changes from the store (e.g., user navigated to mint list and selected a different mint)
@@ -283,7 +286,7 @@ export function MeltQuoteScreen({
       hasStartedCreation.current = false;
 
       // Create new quote with the newly selected mint
-      createMeltQuote(selectedMintFromStore, invoice)
+      prepareMeltQuote(selectedMintFromStore, invoice)
         .then(async (result) => {
           if (result?.historyEntry?.id) {
             // Re-capture location for the new transaction
@@ -302,7 +305,7 @@ export function MeltQuoteScreen({
     resolvedInvoice,
     isCreating,
     currentTransaction?.state,
-    createMeltQuote,
+    prepareMeltQuote,
     resetMeltState,
   ]);
 
@@ -316,7 +319,7 @@ export function MeltQuoteScreen({
       resetMeltState();
       hasStartedCreation.current = false;
       try {
-        const result = await createMeltQuote(mint.id, invoice);
+        const result = await prepareMeltQuote(mint.id, invoice);
         if (result?.historyEntry?.id) {
           // Re-capture location for the new transaction
           await captureAndStoreLocation(result.historyEntry.id);
@@ -340,7 +343,14 @@ export function MeltQuoteScreen({
       throw new Error('No transaction or mint selected');
     }
 
-    await payMeltQuote(mintUrlForPayment, currentTransaction.quoteId);
+    // Use v3 two-step flow: if we have an operationId (created the quote ourselves),
+    // use executeMeltQuote. Otherwise (viewing existing transaction), use executeMeltByQuote.
+    if (createdOperationId && createdHistoryEntry?.quoteId === currentTransaction.quoteId) {
+      await executeMeltQuote(createdOperationId, currentTransaction.quoteId);
+    } else {
+      // For existing transactions, use executeMeltByQuote directly
+      await manager.quotes.executeMeltByQuote(mintUrlForPayment, currentTransaction.quoteId);
+    }
 
     // Show success popup and close modal after
     popup({

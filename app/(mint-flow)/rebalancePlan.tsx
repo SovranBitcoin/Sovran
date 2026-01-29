@@ -333,8 +333,8 @@ function RebalancePlanScreen() {
         // Step 2: Get melt quote to check actual fees
         updateStepState(id, { status: 'invoiceReady', invoice });
 
-        // Use createMeltQuote directly to check fees before paying
-        const meltQuoteResult = await manager.quotes.createMeltQuote(fromMintUrl, invoice);
+        // Use prepareMeltBolt11 to check fees before paying (v3 API)
+        const meltQuoteResult = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
         const totalRequired = meltQuoteResult.amount + meltQuoteResult.fee_reserve;
 
         // Check if we have enough balance

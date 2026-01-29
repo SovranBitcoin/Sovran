@@ -21,7 +21,7 @@ import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import type { Mint } from 'coco-cashu-core';
 
 function MintSelectRoute() {
-  const { createMeltQuote } = useMeltWithHistory();
+  const { prepareMeltQuote } = useMeltWithHistory();
   const params = useLocalSearchParams<{
     unit?: string;
     to?: string;
@@ -45,7 +45,7 @@ function MintSelectRoute() {
       if (params.to === 'meltQuote' && params.invoice) {
         try {
           // Create melt quote to get actual fees and history entry
-          const { quote, historyEntry } = await createMeltQuote(mint.mintUrl, params.invoice);
+          const { quote, historyEntry } = await prepareMeltQuote(mint.mintUrl, params.invoice);
           const totalRequired = quote.amount + quote.fee_reserve;
 
           if (mint.amount >= totalRequired) {
@@ -111,7 +111,7 @@ function MintSelectRoute() {
         });
       }
     },
-    [params, createMeltQuote]
+    [params, prepareMeltQuote]
   );
 
   return (
