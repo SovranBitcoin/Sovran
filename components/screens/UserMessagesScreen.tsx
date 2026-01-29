@@ -1462,8 +1462,6 @@ export function UserMessagesScreen({
                 pathname: '/(send-flow)/currency',
                 params: {
                   to: 'sendToken',
-                  profile: JSON.stringify(userInfo),
-                  recipientPubkey: pubkey,
                 },
               });
               close({} as any);
