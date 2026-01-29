@@ -20,6 +20,7 @@ function ModalScreen() {
     to: string;
     paymentRequest?: string;
     profile?: string;
+    recipientPubkey?: string;
     lud16?: string;
     allowedUnits?: string;
     mints?: string;
@@ -85,6 +86,10 @@ function ModalScreen() {
         }}
         onRoutstrSuccess={() => {
           // Dismiss the modal to return to the previous screen (UserMessages)
+          router.dismiss();
+        }}
+        onDone={() => {
+          // Used for flows that should return directly to the prior screen (e.g. P2PK Nostr send)
           router.dismiss();
         }}
         // Note: Payment request flow is handled entirely in CurrencyScreen

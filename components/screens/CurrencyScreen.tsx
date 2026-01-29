@@ -177,6 +177,7 @@ interface CurrencyScreenParams {
   to: string;
   paymentRequest?: string;
   profile?: string;
+  recipientPubkey?: string;
   lud16?: string;
   allowedUnits?: string;
   mints?: string;
@@ -198,6 +199,8 @@ interface CurrencyScreenProps {
   onCameraPress: (unit: string) => void;
   onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
   onRoutstrSuccess?: () => void;
+  /** Called when this modal flow should dismiss back to the previous screen */
+  onDone?: () => void;
   processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<unknown>;
   /** Called when user tries to send more than current mint's balance */
   onInsufficientBalance?: (amount: number, unit: string) => void;
@@ -210,13 +213,14 @@ export function CurrencyScreen({
   onMeltQuoteReady,
   onCameraPress,
   onRoutstrSuccess,
+  onDone,
   processPaymentStringFn,
   onInsufficientBalance,
 }: CurrencyScreenProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const { send } = useSendWithHistory();
+  const { send, sendP2PKToken } = useSendWithHistory();
   const { requestLightningInvoice } = useLightningOperations();
   const { sendDirectMessage } = useNostrDirectMessage();
   const { setApiKey, setBalance, balance } = useRoutstrStore();
@@ -383,8 +387,42 @@ export function CurrencyScreen({
       return;
     }
 
+    const isP2PK = params.to === 'sendToken' && Boolean(params.recipientPubkey);
+
+    if (isP2PK && params.recipientPubkey) {
+      const token = await sendP2PKToken(selectedMint, amount, params.recipientPubkey, {});
+
+      try {
+        const nprofile = nip19.nprofileEncode({ pubkey: params.recipientPubkey, relays: [] });
+        const message = JSON.stringify({
+          type: 'cashu_token_v4',
+          token: getEncodedTokenV4(token),
+          mint: token.mint,
+          unit: token.unit || 'sat',
+          p2pk: true,
+        });
+
+        await sendDirectMessage(nprofile, message);
+
+        popup({
+          message: 'P2PK token sent successfully via Nostr',
+          type: 'success',
+        });
+
+        onDone?.();
+        return;
+      } catch (err) {
+        console.error('[CurrencyScreen] Failed to send P2PK token via Nostr:', err);
+        popup({
+          message: err instanceof Error ? err.message : 'Failed to send token via Nostr',
+          type: 'error',
+        });
+        // Fallback: if Nostr send fails, fall through to normal "SendToken" UI
+      }
+    }
+
     // useSendWithHistory returns both the token and the history entry
-    const { token, historyEntry } = await send(selectedMint, amount);
+    const { token, historyEntry } = await send(selectedMint, amount, {});
 
     // Capture and store location (respects settings toggle and permissions)
     await captureAndStoreLocation(historyEntry.id);
@@ -475,7 +513,6 @@ export function CurrencyScreen({
       }
     }
 
-    // Pass the history entry with token attached - the event-captured entry may not have it yet
     onSendTokenCreated({ ...historyEntry, token });
   };
 

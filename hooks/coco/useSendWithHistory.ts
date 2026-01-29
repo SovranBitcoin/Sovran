@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
-import type { Token } from '@cashu/cashu-ts';
+import { OutputData, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import type { OutputConfig, Token } from '@cashu/cashu-ts';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 
 type SendStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -13,6 +13,12 @@ interface SendResult {
 
 interface SendOptions {
   onSuccess?: (result: SendResult) => void;
+  onError?: (error: Error) => void;
+  onSettled?: () => void;
+}
+
+interface SendP2PKOptions {
+  onSuccess?: (token: Token) => void;
   onError?: (error: Error) => void;
   onSettled?: () => void;
 }
@@ -124,6 +130,137 @@ export function useSendWithHistory() {
     [manager]
   );
 
+  const sendP2PKToken = useCallback(
+    async (
+      mintUrl: string,
+      amount: number,
+      recipientPubkey: string,
+      opts: SendP2PKOptions = {}
+    ): Promise<Token> => {
+      if (isSendingRef.current) {
+        const err = new Error('Send already in progress');
+        opts.onError?.(err);
+        throw err;
+      }
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        const err = new Error('Amount must be a positive number');
+        opts.onError?.(err);
+        throw err;
+      }
+
+      if (!recipientPubkey || recipientPubkey.trim().length === 0) {
+        const err = new Error('Recipient pubkey is required for P2PK send');
+        opts.onError?.(err);
+        throw err;
+      }
+
+      isSendingRef.current = true;
+      setStatus('loading');
+      setError(null);
+      setData(null);
+
+      const splitAmountForKeyset = (value: number, keys: Record<number, string>): number[] => {
+        const split: number[] = [];
+        const sortedKeyAmounts = Object.keys(keys)
+          .map((k) => Number(k))
+          .sort((a, b) => b - a);
+        if (!sortedKeyAmounts.length) {
+          throw new Error('Cannot split amount, keyset is inactive or contains no keys');
+        }
+        let remaining = value;
+        for (const amt of sortedKeyAmounts) {
+          if (amt <= 0) continue;
+          const requireCount = Math.floor(remaining / amt);
+          if (requireCount > 0) {
+            split.push(...Array<number>(requireCount).fill(amt));
+            remaining -= amt * requireCount;
+          }
+          if (remaining === 0) break;
+        }
+        if (remaining !== 0) {
+          throw new Error(`Unable to split remaining amount: ${remaining}`);
+        }
+        return split;
+      };
+
+      const operationId = `p2pk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      let reservedInputSecrets: string[] | null = null;
+
+      try {
+        const { wallet, keys } = await manager.walletService.getWalletWithActiveKeysetId(mintUrl);
+
+        const selectedProofs = await manager.proofService.selectProofsToSend(mintUrl, amount, true);
+        const selectedAmount = selectedProofs.reduce(
+          (acc: number, p: { amount: number }) => acc + p.amount,
+          0
+        );
+        const fees = wallet.getFeesForProofs(selectedProofs);
+        const keepAmount = selectedAmount - amount - fees;
+        if (keepAmount < 0) {
+          throw new Error('Insufficient balance to cover amount + fees');
+        }
+
+        const inputSecrets = selectedProofs.map((p: { secret: string }) => p.secret);
+        reservedInputSecrets = inputSecrets;
+        await manager.proofService.reserveProofs(mintUrl, inputSecrets, operationId);
+
+        const keepOutputsRes = await manager.proofService.createOutputsAndIncrementCounters(
+          mintUrl,
+          { keep: keepAmount, send: 0 },
+          undefined
+        );
+        const keepOutputs = keepOutputsRes?.keep ?? [];
+
+        const denoms = splitAmountForKeyset(amount, keys.keys);
+        const sendOutputs = denoms.map((d) =>
+          OutputData.createSingleP2PKData({ pubkey: recipientPubkey }, d, keys.id)
+        );
+
+        const outputConfig: OutputConfig = {
+          send: { type: 'custom', data: sendOutputs },
+          keep: { type: 'custom', data: keepOutputs },
+        };
+
+        const { send: sendProofs, keep: keepProofs } = await wallet.send(
+          amount,
+          selectedProofs,
+          undefined,
+          outputConfig
+        );
+
+        const coreKeep = keepProofs.map((p: any) => ({ ...p, mintUrl, state: 'ready' }));
+        const coreSend = sendProofs.map((p: any) => ({ ...p, mintUrl, state: 'inflight' }));
+        await manager.proofService.saveProofs(mintUrl, [...coreKeep, ...coreSend]);
+        await manager.proofService.setProofState(mintUrl, inputSecrets, 'spent');
+        await manager.proofService.releaseProofs(mintUrl, inputSecrets);
+        reservedInputSecrets = null;
+
+        const token: Token = { mint: mintUrl, proofs: sendProofs, unit: wallet.unit };
+        setStatus('success');
+        opts.onSuccess?.(token);
+        return token;
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        setError(err);
+        setStatus('error');
+        opts.onError?.(err);
+        if (reservedInputSecrets) {
+          try {
+            await manager.proofService.releaseProofs(mintUrl, reservedInputSecrets);
+          } catch {
+            // ignore cleanup errors
+          }
+        }
+        throw err;
+      } finally {
+        isSendingRef.current = false;
+        opts.onSettled?.();
+      }
+    },
+    [manager]
+  );
+
   const reset = useCallback(() => {
     setStatus('idle');
     setError(null);
@@ -132,6 +269,7 @@ export function useSendWithHistory() {
 
   return {
     send,
+    sendP2PKToken,
     reset,
     status,
     data,
