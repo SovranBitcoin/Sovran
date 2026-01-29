@@ -29,9 +29,7 @@ interface ContactItemProps {
 }
 
 const styles = {
-  contactItem: {
-    marginBottom: 24,
-  },
+  contactItem: {},
   row: {
     flex: 1,
   },
@@ -138,11 +136,11 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
           </Text>
         </VStack>
       </HStack>
-      {formattedDate && (
+      {/* {formattedDate && (
         <Text style={styles.date} className="text-primary-200">
           {formattedDate}
         </Text>
-      )}
+      )} */}
     </HStack>
   );
 

@@ -1,10 +1,12 @@
-import React, { useCallback, useState } from 'react';
-import { ScrollView } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { useTheme } from 'providers/ThemeProvider';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
+import opacity from 'hex-color-opacity';
 
 interface TabProps {
   tab: string;
@@ -25,22 +27,26 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
   return (
     <TouchableOpacity className={isScrollable ? '' : 'flex-1'} key={tab} onPress={handlePress}>
       <View
-        // blur={isSelected}
         className="shrink-0 flex-row items-center justify-center rounded-3xl px-4 py-2.5"
         style={{
-          ...(isSelected && {
-            backgroundColor: getPrimaryColor('600'),
-            borderWidth: 0,
-            borderRadius: 1000,
-            borderColor: getPrimaryColor('600'),
-          }),
+          borderRadius: 1000,
+          overflow: 'hidden',
         }}>
-        <HStack align="center" spacing={4}>
+        {/* Active state - solid background */}
+        {isSelected && (
+          <View
+            blur
+            blurTint="light"
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: getPrimaryColor('400') }]}
+          />
+        )}
+
+        <HStack align="center" spacing={4} style={{ zIndex: 1 }}>
           <Text
             className="text-center text-sm"
             style={{
-              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('300'),
-              fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
+              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('0'),
+              fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassHeavy',
             }}>
             {tab}
           </Text>
@@ -49,7 +55,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
               className="text-xs"
               style={{
                 fontFamily: 'OverpassBold',
-                color: isSelected ? getPrimaryColor('0') : getPrimaryColor('300'),
+                color: isSelected ? getPrimaryColor('0') : getPrimaryColor('100'),
               }}>
               {`(${amount})`}
             </Text>
@@ -73,6 +79,9 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
   const [contentWidth, setContentWidth] = useState(0);
   const isScrollable = contentWidth ? contentWidth > containerWidth && containerWidth > 0 : true;
 
+  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+
   const onTabPress = useCallback(
     (tab: string, index: number) => {
       handleTabPress(tab, index);
@@ -95,32 +104,40 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
       contentContainerStyle={{
         width: isScrollable ? undefined : '100%',
       }}>
-      <HStack
-        className="rounded-3xl p-1.5"
+      <View
         style={[
           {
-            borderWidth: 0.2,
-            borderColor: getPrimaryColor('600'),
+            borderWidth: 1,
+            borderColor,
             marginVertical: 4,
             width: isScrollable ? undefined : '100%',
             minWidth: isScrollable ? undefined : '100%',
             borderRadius: 1000,
-            padding: 1.5,
-            backgroundColor: getPrimaryColor('800'),
+            overflow: 'hidden',
           },
         ]}>
-        {tabs.map((tab, index) => (
-          <Tab
-            key={tab}
-            tab={tab}
-            index={index}
-            isSelected={selectedTab === tab}
-            amount={amounts?.[index]}
-            onPress={onTabPress}
-            isScrollable={isScrollable}
-          />
-        ))}
-      </HStack>
+        <BlurCardFrame accentColor={accentColor}>
+          <HStack
+            className="p-1.5"
+            style={{
+              width: isScrollable ? undefined : '100%',
+              minWidth: isScrollable ? undefined : '100%',
+              zIndex: 1,
+            }}>
+            {tabs.map((tab, index) => (
+              <Tab
+                key={tab}
+                tab={tab}
+                index={index}
+                isSelected={selectedTab === tab}
+                amount={amounts?.[index]}
+                onPress={onTabPress}
+                isScrollable={isScrollable}
+              />
+            ))}
+          </HStack>
+        </BlurCardFrame>
+      </View>
     </ScrollView>
   );
 }

@@ -79,7 +79,7 @@ const DEFAULT_CONTACTS = [
 
 const PaymentsContent = () => {
   // Register this tab's background configuration
-  useBackgroundConfig({ blurMode: 'full' });
+  useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
@@ -597,9 +597,6 @@ const PaymentsContent = () => {
 
   const tabs = ['Recent activity', 'Mints'];
 
-  // Constants for LegendList
-  const ITEM_HEIGHT = 80; // Approximate height of ContactItem
-
   // Fetch kind 0 (profile) events for all contacts including defaults
   const profileFilters = useMemo(() => {
     // Include default contact pubkeys to always fetch their profiles
@@ -740,7 +737,6 @@ const PaymentsContent = () => {
               <View
                 style={{
                   flex: 1,
-                  paddingHorizontal: 16,
                 }}>
                 <PagerView
                   ref={pagerRef}
@@ -755,7 +751,6 @@ const PaymentsContent = () => {
                       isDecrypting={isDecrypting}
                       isLoadingProfiles={isLoadingProfiles}
                       emptyMessage="No recent conversations found"
-                      itemHeight={ITEM_HEIGHT}
                     />
                   </View>
                   <View key="2" style={{ flex: 1 }}>
@@ -765,7 +760,6 @@ const PaymentsContent = () => {
                       isDecrypting={mintsLoadingInfo || isDecryptingMints}
                       isLoadingProfiles={isLoadingProfiles}
                       emptyMessage="No mints with nostr contacts found"
-                      itemHeight={ITEM_HEIGHT}
                     />
                   </View>
                 </PagerView>

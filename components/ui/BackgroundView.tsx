@@ -225,7 +225,8 @@ function AnimatedBackgroundViewComponent({
   }, [currentTheme]);
 
   // Get animated values from context
-  const { partialBlurOpacity, fullBlurOpacity } = useBackgroundContext();
+  const { partialBlurOpacity, fullBlurOpacity, backgroundOpacity, backgroundColor } =
+    useBackgroundContext();
 
   // Check if blur is supported on this device
   const blurSupported = supportsBlur();
@@ -240,20 +241,36 @@ function AnimatedBackgroundViewComponent({
     opacity: fullBlurOpacity.value,
   }));
 
+  // Animated styles for background opacity
+  const backgroundAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: backgroundOpacity.value,
+  }));
+
+  // Animated styles for background color (use theme default if empty)
+  const backgroundColorAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: backgroundColor.value || primaryColor900,
+  }));
+
   return (
     <View style={[styles.container, style]}>
-      {/* Animated background image or solid color */}
-      <AnimatedSpriteBackground backgroundColor={primaryColor900} />
+      {/* Base background color - configurable, defaults to primary-900 */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, backgroundColorAnimatedStyle]} />
 
-      {/* Gradient overlay for image themes */}
-      {gradientColors && (
-        <LinearGradient
-          colors={['transparent', opacity(gradientColors['300'], 1)]}
-          locations={[0, 1]}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
-      )}
+      {/* Animated background image or solid color - with configurable opacity */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
+        <AnimatedSpriteBackground backgroundColor={primaryColor900} />
+
+        {/* Gradient overlay for image themes */}
+        {gradientColors && (
+          <LinearGradient
+            colors={['transparent', opacity(gradientColors['300'], 1)]}
+            locations={[0, 1]}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        )}
+      </Animated.View>
+
       {/* Partial blur overlay (bottom half) - animated opacity */}
       {blurSupported && (
         <Animated.View

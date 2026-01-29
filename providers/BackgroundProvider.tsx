@@ -15,6 +15,10 @@ interface BackgroundConfig {
   blurIntensity?: number;
   blurGradientStart?: number;
   blurGradientEnd?: number;
+  /** Opacity of the background image (0-1). Default is 1 (fully opaque) */
+  backgroundOpacity?: number;
+  /** Background color shown behind the background image. Default is theme primary-900 */
+  backgroundColor?: string;
 }
 
 /**
@@ -33,21 +37,29 @@ const DEFAULT_CONFIGS: Record<BlurMode, Required<Omit<BackgroundConfig, 'blurMod
     blurIntensity: 0,
     blurGradientStart: 0.3,
     blurGradientEnd: 0.6,
+    backgroundOpacity: 1,
+    backgroundColor: '', // Empty string = use theme default (primary-900)
   },
   partial: {
     blurIntensity: 200,
     blurGradientStart: 0.3,
     blurGradientEnd: 0.6,
+    backgroundOpacity: 1,
+    backgroundColor: '',
   },
   full: {
     blurIntensity: 200,
     blurGradientStart: 0,
     blurGradientEnd: 0.1,
+    backgroundOpacity: 1,
+    backgroundColor: '',
   },
   gradient: {
     blurIntensity: 200,
     blurGradientStart: 0.3,
     blurGradientEnd: 0.6,
+    backgroundOpacity: 1,
+    backgroundColor: '',
   },
 };
 
@@ -65,6 +77,10 @@ interface BackgroundContextValue {
   partialBlurOpacity: SharedValue<number>;
   // For full mode: controls opacity of full blur
   fullBlurOpacity: SharedValue<number>;
+  // Background image opacity (0-1)
+  backgroundOpacity: SharedValue<number>;
+  // Background color behind the image (string color value)
+  backgroundColor: SharedValue<string>;
   // Method to update config
   setConfig: (config: BackgroundConfig) => void;
 }
@@ -86,6 +102,8 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
   const blurGradientEnd = useSharedValue(0.6);
   const partialBlurOpacity = useSharedValue(1);
   const fullBlurOpacity = useSharedValue(0);
+  const backgroundOpacity = useSharedValue(1);
+  const backgroundColor = useSharedValue(''); // Empty string means use theme default (primary-900)
 
   const setConfig = useCallback(
     (config: BackgroundConfig) => {
@@ -93,6 +111,8 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
       const intensity = config.blurIntensity ?? defaults.blurIntensity;
       const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;
       const gradientEnd = config.blurGradientEnd ?? defaults.blurGradientEnd;
+      const bgOpacity = config.backgroundOpacity ?? 1;
+      const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
 
       // Map blur mode to number
       const modeMap: Record<BlurMode, number> = {
@@ -107,6 +127,8 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
       blurIntensity.value = withTiming(intensity, ANIMATION_CONFIG);
       blurGradientStart.value = withTiming(gradientStart, ANIMATION_CONFIG);
       blurGradientEnd.value = withTiming(gradientEnd, ANIMATION_CONFIG);
+      backgroundOpacity.value = withTiming(bgOpacity, ANIMATION_CONFIG);
+      backgroundColor.value = bgColor; // Color changes instantly (no animation)
 
       // Animate opacity based on mode
       switch (config.blurMode) {
@@ -135,6 +157,8 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
       blurGradientEnd,
       partialBlurOpacity,
       fullBlurOpacity,
+      backgroundOpacity,
+      backgroundColor,
     ]
   );
 
@@ -145,6 +169,8 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
     blurGradientEnd,
     partialBlurOpacity,
     fullBlurOpacity,
+    backgroundOpacity,
+    backgroundColor,
     setConfig,
   };
 
@@ -180,6 +206,8 @@ export function useBackgroundConfig(config: BackgroundConfig) {
       config.blurIntensity,
       config.blurGradientStart,
       config.blurGradientEnd,
+      config.backgroundOpacity,
+      config.backgroundColor,
     ])
   );
 }

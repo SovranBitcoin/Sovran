@@ -1,10 +1,11 @@
-import React, { FC, useCallback } from 'react';
-import { View } from 'react-native';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list';
+import React, { FC, useCallback, useMemo } from 'react';
+import { View as RNView, ScrollView, StyleSheet } from 'react-native';
 import { ContactItem } from './ContactItem';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
+import { View } from 'components/ui/View/View';
+import { ProfilesCardFrame } from './ProfilesCardFrame';
+import opacity from 'hex-color-opacity';
 
 // Wrapper component that looks up profile and passes it to ContactItem
 const RenderItem = ({
@@ -21,13 +22,6 @@ const RenderItem = ({
   // Only show loading if we're still fetching profiles AND this specific contact doesn't have profile data yet
   const shouldShowLoading = isLoadingProfiles && !profile;
 
-  console.log('[DEBUG RenderItem] Rendering:', {
-    pubkey: item.pubkey?.slice(0, 8),
-    hasProfile: !!profile,
-    profileName: profile?.name || profile?.display_name,
-    shouldShowLoading,
-  });
-
   return <ContactItem item={item} profile={profile} isLoadingProfile={shouldShowLoading} />;
 };
 
@@ -37,7 +31,6 @@ interface DraggableContactsListProps {
   isDecrypting: boolean;
   isLoadingProfiles?: boolean;
   emptyMessage: string;
-  itemHeight?: number;
 }
 
 export const DraggableContactsList: FC<DraggableContactsListProps> = ({
@@ -46,37 +39,15 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   isDecrypting,
   isLoadingProfiles = false,
   emptyMessage,
-  itemHeight = 80,
 }) => {
   const { getPrimaryColor } = useTheme();
 
-  // Debug logging
-  console.log('[DEBUG DraggableContactsList] Render:', {
-    dataLength: data?.length || 0,
-    profilesMapSize: profilesMap.size,
-    isDecrypting,
-    emptyMessage,
-  });
-  console.log(
-    '[DEBUG DraggableContactsList] First 2 items:',
-    data?.slice(0, 2).map((item) => ({
-      type: item.type,
-      pubkey: item.pubkey?.slice(0, 8),
-      hasProfile: profilesMap.has(item.pubkey),
-      profile: profilesMap.get(item.pubkey),
-    }))
-  );
-
-  // Note: LegendList doesn't support onScroll prop the same way as FlatList
-  // We'll handle drag gestures differently if needed
-
-  // Container style for pointer events
-  const rContainerStyle = useAnimatedStyle(() => {
-    return {
-      // Always allow pointer events for now - we'll handle this differently
-      pointerEvents: 'auto',
-    };
-  });
+  // Theme colors for the card frame
+  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  // Primary accent color for neutral look
+  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  // Border color with opacity for accent-style border effect
+  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
   const keyExtractor = useCallback((item: any) => {
     return item.pubkey || item.mint?.mintUrl || item.id || Math.random().toString();
@@ -84,53 +55,54 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
 
   if (isDecrypting) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
+      <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
         <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
           Decrypting messages...
         </Text>
-      </View>
+      </RNView>
     );
   }
 
   if (data.length === 0) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
+      <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
         <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>{emptyMessage}</Text>
-      </View>
+      </RNView>
     );
   }
 
   return (
-    <Animated.View className="mt-3 flex-1" style={rContainerStyle}>
-      <LegendList
-        key={`list-${profilesMap.size}`}
-        data={data}
-        estimatedItemSize={itemHeight}
-        renderItem={({ item }) => (
-          <RenderItem item={item} profilesMap={profilesMap} isLoadingProfiles={isLoadingProfiles} />
-        )}
-        keyExtractor={keyExtractor}
-        style={{
-          flex: 1,
-        }}
-        contentContainerStyle={{}}
-        maintainVisibleContentPosition
-      />
-      {/* Top gradient for visual feedback */}
-      {/* <Animated.View
-        style={[
-          rTopGradientStyle,
-          {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 100,
-            backgroundColor: getPrimaryColor('900'),
-            opacity: 0.8,
-          },
-        ]}
-      /> */}
-    </Animated.View>
+    <ScrollView
+      className="mt-3 flex-1"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ flexGrow: 0 }}>
+      <RNView style={[styles.card, { borderColor }]}>
+        <ProfilesCardFrame accentColor={accentColor} highlightColor={primary50}>
+          <View style={styles.content} className="gap-4">
+            {data.map((item) => (
+              <RenderItem
+                key={keyExtractor(item)}
+                item={item}
+                profilesMap={profilesMap}
+                isLoadingProfiles={isLoadingProfiles}
+              />
+            ))}
+          </View>
+        </ProfilesCardFrame>
+      </RNView>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginHorizontal: 16,
+  },
+  content: {
+    padding: 16,
+    zIndex: 1,
+  },
+});
