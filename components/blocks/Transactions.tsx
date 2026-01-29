@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -14,6 +14,8 @@ import { Transaction } from 'components/blocks/Transaction';
 import _ from 'lodash';
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import opacity from 'hex-color-opacity';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 
 interface Account {
   unit: string;
@@ -72,6 +74,10 @@ export const Transactions = React.memo(
     disableContentInsetAdjustment = false,
   }: Props) => {
     const { getPrimaryColor } = useTheme();
+
+    // Theme colors for the card frame (matching payments style)
+    const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -186,23 +192,12 @@ export const Transactions = React.memo(
       };
     }, [pending, confirmed, expired, showMore, days]);
 
-    const flattenedData = useMemo(() => {
-      let sectionsToDisplay;
-      if (tab === 'Pending') {
-        sectionsToDisplay = sections.pending;
-      } else if (tab === 'Confirmed') {
-        sectionsToDisplay = sections.confirmed;
-      } else if (tab === 'Expired') {
-        sectionsToDisplay = sections.expired;
-      } else {
-        sectionsToDisplay = sections.all;
-      }
-
-      return _.flatMap(sectionsToDisplay, (section) => [
-        { type: 'header', title: section.title },
-        ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
-      ]);
-    }, [sections.all, sections.pending, sections.confirmed, sections.expired, tab]);
+    const sectionsToDisplay = useMemo(() => {
+      if (tab === 'Pending') return sections.pending;
+      if (tab === 'Confirmed') return sections.confirmed;
+      if (tab === 'Expired') return sections.expired;
+      return sections.all;
+    }, [sections, tab]);
 
     if (showMore) {
       if (isFetching) {
@@ -268,46 +263,52 @@ export const Transactions = React.memo(
                     <Text size={14} heavy color={getPrimaryColor('100')}>
                       {section.title}
                     </Text>
-                    <View className="rounded-lg bg-primary-900" blur>
-                      {section.data.map((historyEntry) => {
-                        const key = (() => {
-                          if (historyEntry.id) return historyEntry.id;
-                          if ('token' in historyEntry && historyEntry.token)
-                            return typeof historyEntry.token === 'string'
-                              ? historyEntry.token
-                              : JSON.stringify(historyEntry.token);
-                          return Math.random().toString();
-                        })();
-                        return (
-                          <Transaction
-                            key={key}
-                            historyEntry={historyEntry}
-                            onPress={onTransactionPress}
-                          />
-                        );
-                      })}
-                      {label === 'Confirmed' && (
-                        <Link
-                          href={{
-                            pathname: '/transactions',
-                            params: {
-                              account: JSON.stringify(account),
-                              tab: 'Confirmed',
-                            },
-                          }}
-                          asChild>
-                          <TouchableOpacity>
-                            <View
-                              blur
-                              className="flex items-center rounded-lg border border-primary-700 bg-primary-800 p-3">
-                              <Text size={14} bold>
-                                View all ({filteredHistory.length})
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        </Link>
-                      )}
+                    <View style={[styles.card, { borderColor }]}>
+                      <BlurCardFrame accentColor={accentColor}>
+                        <View style={styles.content}>
+                          {section.data.map((historyEntry) => {
+                            const key = (() => {
+                              if (historyEntry.id) return historyEntry.id;
+                              if ('token' in historyEntry && historyEntry.token)
+                                return typeof historyEntry.token === 'string'
+                                  ? historyEntry.token
+                                  : JSON.stringify(historyEntry.token);
+                              return Math.random().toString();
+                            })();
+                            return (
+                              <Transaction
+                                key={key}
+                                historyEntry={historyEntry}
+                                onPress={onTransactionPress}
+                              />
+                            );
+                          })}
+                        </View>
+                      </BlurCardFrame>
                     </View>
+                    {label === 'Confirmed' && (
+                      <Link
+                        href={{
+                          pathname: '/transactions',
+                          params: {
+                            account: JSON.stringify(account),
+                            tab: 'Confirmed',
+                          },
+                        }}
+                        asChild>
+                        <TouchableOpacity>
+                          <View style={[styles.viewAllButton, { borderColor }]}>
+                            <BlurCardFrame accentColor={accentColor}>
+                              <View style={styles.viewAllContent}>
+                                <Text size={14} bold>
+                                  View all ({filteredHistory.length})
+                                </Text>
+                              </View>
+                            </BlurCardFrame>
+                          </View>
+                        </TouchableOpacity>
+                      </Link>
+                    )}
                   </VStack>
                 </View>
               ))}
@@ -325,55 +326,53 @@ export const Transactions = React.memo(
       );
     }
 
+    // Estimate section height: header + (items * item height)
+    const estimateSectionHeight = (section: Section) =>
+      HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
+
     return (
       <LegendList
         waitForInitialLayout={false}
         key={listKey}
         style={{ flex: 1 }}
-        data={flattenedData}
-        estimatedItemSize={ITEM_HEIGHT}
+        data={sectionsToDisplay}
+        estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
         scrollEnabled
         maintainVisibleContentPosition
         contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
         ListHeaderComponent={header}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item, index }) => {
-          if (item.type === 'header') {
-            return (
-              <Text
-                size={14}
-                heavy
-                color={getPrimaryColor('500')}
-                style={{ height: HEADER_HEIGHT }}>
-                {'title' in item ? item.title : ''}
-              </Text>
-            );
-          }
-
-          const prev = flattenedData[index - 1];
-          const next = flattenedData[index + 1];
-          const isFirst = !prev || prev.type === 'header';
-          const isLast = !next || next.type === 'header';
-
-          return (
-            <View
-              blur
-              className="bg-primary-800"
-              style={{
-                borderRadius: 8,
-                borderTopLeftRadius: isFirst ? 8 : 0,
-                borderTopRightRadius: isFirst ? 8 : 0,
-                borderBottomLeftRadius: isLast ? 8 : 0,
-                borderBottomRightRadius: isLast ? 8 : 0,
-                height: ITEM_HEIGHT,
-              }}>
-              {'historyEntry' in item && (
-                <Transaction historyEntry={item.historyEntry} onPress={onTransactionPress} />
-              )}
+        renderItem={({ item: section }) => (
+          <VStack spacing={4} style={{ marginBottom: 16 }}>
+            <Text size={14} heavy color={getPrimaryColor('500')} style={{ height: HEADER_HEIGHT }}>
+              {section.title}
+            </Text>
+            <View style={[styles.card, { borderColor }]}>
+              <BlurCardFrame accentColor={accentColor}>
+                <View style={styles.content}>
+                  {section.data.map((historyEntry) => {
+                    const key = (() => {
+                      if (historyEntry.id) return historyEntry.id;
+                      if ('token' in historyEntry && historyEntry.token)
+                        return typeof historyEntry.token === 'string'
+                          ? historyEntry.token
+                          : JSON.stringify(historyEntry.token);
+                      return Math.random().toString();
+                    })();
+                    return (
+                      <Transaction
+                        key={key}
+                        historyEntry={historyEntry}
+                        onPress={onTransactionPress}
+                      />
+                    );
+                  })}
+                </View>
+              </BlurCardFrame>
             </View>
-          );
-        }}
+          </VStack>
+        )}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
       />
     );
@@ -381,3 +380,24 @@ export const Transactions = React.memo(
 );
 
 Transactions.displayName = 'Transactions';
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  content: {
+    zIndex: 1,
+  },
+  viewAllButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  viewAllContent: {
+    padding: 12,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+});
