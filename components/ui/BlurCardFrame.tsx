@@ -5,11 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'components/ui/View/View';
 
 /** Size of the gradient container box (pixels) */
-const GLOW_BOX_SIZE = 180;
+const GLOW_BOX_SIZE = 70;
 
 /** Pixel distances for gradient fade stops (diagonal distance from corner) */
-const GLOW_MID_PX = 10; // Where glow transitions to softer
-const GLOW_END_PX = 150; // Where glow fully fades out
+const GLOW_MID_PX = 8; // Where glow transitions to softer
+const GLOW_END_PX = 70; // Where glow fully fades out
 
 /** Convert pixel distance to location (0-1) within the gradient box */
 const pxToLocation = (px: number) => px / (GLOW_BOX_SIZE * Math.SQRT2);
@@ -56,7 +56,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
       {/* Render gradients based on variant - fixed size boxes with pixel-based fade */}
       {(variant === 'topLeft' || variant === 'diagonal') && (
         <LinearGradient
-          colors={[opacity(accentColor, 0.75), opacity(accentColor, 0.18), 'transparent']}
+          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.15), 'transparent']}
           locations={LOCATIONS}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
