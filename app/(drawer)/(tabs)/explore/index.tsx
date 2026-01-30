@@ -32,10 +32,8 @@ import { useBTCMapStore } from 'stores/btcMapStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
-import { extractDomain } from '@/helper/url';
-import { Avatar } from '@/components/ui/Avatar';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
-import { useMints, usePaginatedHistory } from 'coco-cashu-react';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { WalletHealthCard } from '@/components/blocks/health/WalletHealthCard';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
@@ -849,13 +847,15 @@ const LightningAddressCard = () => {
   );
 };
 
-// Pending Ecash Card
-// NOTE: Explore currently hides this section, but we keep the component around for easy re-enable.
-// eslint-disable-next-line unused-imports/no-unused-vars, @typescript-eslint/no-unused-vars
+// Pending Ecash Card - Shows pending send operations that can be reclaimed
+// Styled to match WalletHealthCard with a green color scheme
 const PendingEcashCard = () => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getGreenColor } = useTheme();
   const { history } = usePaginatedHistory();
-  const { trustedMints: mints } = useMints();
+
+  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
+  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
 
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
@@ -863,15 +863,6 @@ const PendingEcashCard = () => {
       (entry) => entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
     );
   }, [history]);
-
-  // Get unique mints with pending transactions (up to 3 for display)
-  const pendingMints = useMemo(() => {
-    const mintUrls = [...new Set(pendingSends.map((tx) => tx.mintUrl))];
-    return mintUrls
-      .map((url) => mints.find((m) => m.mintUrl === url))
-      .flatMap((m) => (m ? [m] : []))
-      .slice(0, 3);
-  }, [pendingSends, mints]);
 
   // Calculate totals
   const totalAmount = useMemo(() => {
@@ -889,111 +880,124 @@ const PendingEcashCard = () => {
     return null;
   }
 
-  // Theme-based accent color for matte black style
-  const accentColor = getPrimaryColor('400');
-
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={[styles.pendingEcashCard, { borderColor: opacity(getPrimaryColor('500'), 0.3) }]}
+      style={[styles.pendingEcashCard, { borderColor: opacity(accentColor, 0.25) }]}
       onPress={handlePress}>
-      {/* Matte black gradient background */}
+      {/* Base fill */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: primary950 }]} />
+
+      {/* Global green wash */}
+      <View
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(accentColor, 0.06) }]}
+      />
+
+      {/* Corner gradients */}
       <LinearGradient
-        colors={[getPrimaryColor('900'), getPrimaryColor('800'), getPrimaryColor('900')]}
+        colors={[opacity(accentColor, 0.34), opacity(accentColor, 0.12), 'transparent']}
+        locations={[0, 0.55, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
+      <LinearGradient
+        colors={[opacity(accentColor, 0.22), 'transparent', opacity(accentColor, 0.26)]}
+        locations={[0, 0.55, 1]}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-      {/* Decorative clock icon */}
-      <View style={styles.pendingDecorationRight}>
-        <Icon name="mdi:clock-outline" size={100} color={opacity(accentColor, 0.06)} />
+      {/* Subtle top highlight */}
+      <LinearGradient
+        colors={[opacity(primary50, 0.06), 'transparent']}
+        locations={[0, 0.7]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Decorative icons */}
+      <View style={styles.pendingDecorationLeft} pointerEvents="none">
+        <Icon name="mdi:clock-outline" size={90} color={opacity(accentColor, 0.08)} />
+      </View>
+      <View style={styles.pendingDecorationRight} pointerEvents="none">
+        <Icon name="mdi:cash-multiple" size={140} color={opacity(accentColor, 0.05)} />
       </View>
 
-      <VStack style={{ padding: 20, zIndex: 1 }}>
-        {/* Header */}
-        <HStack align="center" style={{ marginBottom: 16 }}>
-          <View style={[styles.pendingEcashIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
-            <Icon name="mdi:clock-alert-outline" size={20} color={accentColor} />
-          </View>
-          <VStack style={{ flex: 1, marginLeft: 12 }}>
-            <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
-              Pending Ecash
-            </Text>
-            <Text size={12} style={{ color: getPrimaryColor('400') }}>
-              Unclaimed sent tokens
-            </Text>
-          </VStack>
-          <View
-            style={[
-              styles.pendingCountBadge,
-              {
-                backgroundColor: opacity(accentColor, 0.15),
-                borderColor: opacity(accentColor, 0.3),
-              },
-            ]}>
-            <Text size={12} heavy style={{ color: accentColor }}>
-              {pendingSends.length}
-            </Text>
-          </View>
+      <VStack style={{ padding: 18 }}>
+        <HStack align="center" justify="space-between">
+          <HStack align="center" gap={10}>
+            <View
+              style={[styles.pendingEcashIcon, { backgroundColor: opacity(accentColor, 0.16) }]}>
+              <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
+            </View>
+            <VStack>
+              <Text size={16} heavy style={{ color: primary50 }}>
+                Pending Ecash
+              </Text>
+              <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                <View
+                  style={[
+                    styles.pendingUnitPill,
+                    {
+                      backgroundColor: opacity(accentColor, 0.14),
+                      borderColor: opacity(accentColor, 0.22),
+                    },
+                  ]}>
+                  <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                    {pendingSends.length} {pendingSends.length === 1 ? 'TOKEN' : 'TOKENS'}
+                  </Text>
+                </View>
+                <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                  Tap to reclaim
+                </Text>
+              </HStack>
+            </VStack>
+          </HStack>
+          <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
         </HStack>
 
-        {/* Amount display */}
-        <View style={[styles.pendingAmountBox, { borderColor: opacity(accentColor, 0.2) }]}>
-          <VStack>
-            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
-              TOTAL UNCLAIMED
-            </Text>
+        {/* Amount display row */}
+        <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+          <HStack align="center" gap={6}>
+            <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
             <AmountFormatter
               amount={totalAmount}
               unit={unit}
-              size={24}
-              weight="heavy"
-              color={getPrimaryColor('50')}
+              size={11}
+              weight="medium"
+              color={opacity(accentColor, 0.8)}
             />
-          </VStack>
-        </View>
-
-        {/* Mint avatars */}
-        {pendingMints.length > 0 && (
-          <HStack align="center" style={{ marginTop: 16 }}>
-            <HStack style={{ marginRight: 8 }}>
-              {pendingMints.map((mint, index) => (
-                <View
-                  key={mint.mintUrl}
-                  style={{
-                    marginLeft: index > 0 ? -8 : 0,
-                    borderRadius: 16,
-                    borderWidth: 2,
-                    borderColor: getPrimaryColor('900'),
-                  }}>
-                  <Avatar
-                    picture={mint.mintInfo?.icon_url || undefined}
-                    size={28}
-                    variant="mint"
-                    name={mint.mintInfo?.name || extractDomain(mint.mintUrl)}
-                  />
-                </View>
-              ))}
-            </HStack>
-            <Text size={12} style={{ color: getPrimaryColor('400') }}>
-              {(() => {
-                const firstMint = pendingMints[0];
-                if (pendingMints.length === 1 && firstMint) {
-                  return `from ${firstMint.mintInfo?.name || extractDomain(firstMint.mintUrl)}`;
-                }
-                return `from ${pendingMints.length} mints`;
-              })()}
+            <Text size={11} style={{ color: opacity(accentColor, 0.8) }}>
+              unclaimed
             </Text>
           </HStack>
-        )}
+        </HStack>
 
-        {/* CTA */}
-        <View style={[styles.pendingEcashCTA, { backgroundColor: getPrimaryColor('500') }]}>
-          <Text size={14} heavy style={{ color: '#fff' }}>
-            View & Reclaim
-          </Text>
-          <Icon name="mdi:arrow-right" size={18} color="#fff" style={{ marginLeft: 8 }} />
+        {/* CTA row */}
+        <View
+          style={[
+            styles.pendingEcashCTA,
+            {
+              backgroundColor: opacity(accentColor, 0.12),
+              borderColor: opacity(accentColor, 0.22),
+            },
+          ]}>
+          <HStack align="center" justify="space-between">
+            <HStack align="center" gap={8}>
+              <Icon
+                name="fluent:arrow-download-16-filled"
+                size={16}
+                color={opacity(accentColor, 0.9)}
+              />
+              <Text size={12} heavy style={{ color: primary50 }}>
+                View & Reclaim
+              </Text>
+            </HStack>
+            <Icon name="mdi:arrow-right" size={18} color={primary50} />
+          </HStack>
         </View>
       </VStack>
     </TouchableOpacity>
@@ -1130,11 +1134,11 @@ const ExploreScreen = () => {
         <Spacer size={32} />
 
         {/* Pending Ecash Section - only shows when there are pending transactions */}
-        {/* <View style={{ paddingHorizontal: 20 }}>
+        <View style={{ paddingHorizontal: 20 }}>
           <PendingEcashCard />
         </View>
 
-        <Spacer size={32} /> */}
+        <Spacer size={32} />
 
         {/* Lightning Address Section */}
         <SectionHeader
@@ -1480,17 +1484,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  // Pending Ecash Card styles
+  // Pending Ecash Card styles (matches WalletHealthCard pattern)
   pendingEcashCard: {
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
   },
+  pendingDecorationLeft: {
+    position: 'absolute',
+    top: -18,
+    left: -18,
+    transform: [{ rotate: '-12deg' }],
+  },
   pendingDecorationRight: {
     position: 'absolute',
-    bottom: -20,
-    right: -20,
-    transform: [{ rotate: '15deg' }],
+    bottom: -34,
+    right: -34,
+    transform: [{ rotate: '14deg' }],
   },
   pendingEcashIcon: {
     width: 40,
@@ -1499,28 +1509,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pendingCountBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    minWidth: 36,
-    alignItems: 'center',
-  },
-  pendingAmountBox: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
+  pendingUnitPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
     borderWidth: 1,
   },
   pendingEcashCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
 });
 
