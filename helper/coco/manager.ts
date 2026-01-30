@@ -595,17 +595,61 @@ export class CocoManager {
       for (const [operationId, proofs] of proofsByOperationId.entries()) {
         try {
           // Prefer “proper rollback” (it may need to swap/recover), rather than simply unreserving.
-          const sendOp = await manager.send.getOperation(operationId).catch(() => null);
+          const sendOp = (await manager.send.getOperation(operationId).catch(() => null)) as {
+            state?: string;
+          } | null;
           if (sendOp) {
+            // Skip rollback for terminal states (finalized, rolled_back) - just release proofs
+            const terminalStates = new Set(['finalized', 'rolled_back']);
+            if (terminalStates.has(sendOp.state ?? '')) {
+              const secretsByMint = new Map<string, string[]>();
+              for (const p of proofs) {
+                const list = secretsByMint.get(p.mintUrl) ?? [];
+                list.push(p.secret);
+                secretsByMint.set(p.mintUrl, list);
+              }
+              for (const [mintUrl, secrets] of secretsByMint.entries()) {
+                if (secrets.length === 0) continue;
+                if (proofService?.releaseProofs) {
+                  await proofService.releaseProofs(mintUrl, secrets);
+                } else {
+                  await proofRepository.releaseProofs(mintUrl, secrets);
+                }
+                releasedOrphanedReservations += secrets.length;
+              }
+              continue;
+            }
             await manager.send.rollback(operationId);
             rolledBackSendOperations++;
             continue;
           }
 
           const meltOp = meltOperationService?.getOperation
-            ? await meltOperationService.getOperation(operationId).catch(() => null)
+            ? ((await meltOperationService.getOperation(operationId).catch(() => null)) as {
+                state?: string;
+              } | null)
             : null;
           if (meltOp) {
+            // Skip rollback for terminal states (finalized, rolled_back) - just release proofs
+            const meltTerminalStates = new Set(['finalized', 'rolled_back']);
+            if (meltTerminalStates.has(meltOp.state ?? '')) {
+              const secretsByMint = new Map<string, string[]>();
+              for (const p of proofs) {
+                const list = secretsByMint.get(p.mintUrl) ?? [];
+                list.push(p.secret);
+                secretsByMint.set(p.mintUrl, list);
+              }
+              for (const [mintUrl, secrets] of secretsByMint.entries()) {
+                if (secrets.length === 0) continue;
+                if (proofService?.releaseProofs) {
+                  await proofService.releaseProofs(mintUrl, secrets);
+                } else {
+                  await proofRepository.releaseProofs(mintUrl, secrets);
+                }
+                releasedOrphanedReservations += secrets.length;
+              }
+              continue;
+            }
             if (!meltOperationService?.rollback) {
               throw new Error('Melt rollback is unavailable');
             }

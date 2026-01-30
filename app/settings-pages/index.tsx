@@ -188,6 +188,7 @@ const ModalScreen = () => {
             try {
               const result = await CocoManager.freeAllReservedProofs();
 
+              console.log(result);
               popup({
                 message: 'Reserved proofs freed',
                 type: 'success',

@@ -25,7 +25,6 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useMints, useBalanceContext, useManager } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
-import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { MIN_FEE_RESERVE } from 'components/blocks/rebalance';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
 import {
@@ -75,9 +74,8 @@ function RebalancePlanScreen() {
   const { getMintInfo } = useMintManagement();
   const manager = useManager();
 
-  // Lightning operations for creating invoices and melting
+  // Lightning operations for creating invoices
   const { requestLightningInvoice } = useLightningOperations();
-  const { melt } = useMeltWithHistory();
 
   // Mint info state
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
@@ -150,6 +148,8 @@ function RebalancePlanScreen() {
   const abortRef = useRef(false);
   const executionLockRef = useRef(false);
   const auditCacheRef = useRef<Map<string, AuditMintResponse>>(new Map());
+  // Ref-based guard to prevent concurrent starts (state-based check has race conditions)
+  const isRunningRef = useRef(false);
 
   // Display either the frozen run plan (once started) or the live preview
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -163,6 +163,7 @@ function RebalancePlanScreen() {
     return () => {
       abortRef.current = true;
       runIdRef.current += 1;
+      isRunningRef.current = false;
     };
   }, []);
 
@@ -302,6 +303,21 @@ function RebalancePlanScreen() {
     [manager]
   );
 
+  // Wait for execution lock with timeout
+  const waitForLock = useCallback(async (maxWaitMs: number = 30000): Promise<boolean> => {
+    const startTime = Date.now();
+    const pollInterval = 100;
+
+    while (executionLockRef.current) {
+      if (Date.now() - startTime > maxWaitMs) {
+        console.warn('Timed out waiting for execution lock');
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+    return true;
+  }, []);
+
   // Execute a single step with fee-aware logic (returns true if done, false if failed)
   const executeStep = useCallback(
     async (step: TransferStep, runId: number): Promise<boolean> => {
@@ -310,7 +326,13 @@ function RebalancePlanScreen() {
       // Prevent concurrent melt operations
       // Coco operations are stateful (proof selection, inflight tracking, etc). Running melts in parallel
       // can lead to "melt already in progress" or confusing intermediate states.
-      if (executionLockRef.current) return false;
+      // Wait for any existing operation to complete instead of returning early
+      const gotLock = await waitForLock();
+      if (!gotLock) {
+        console.warn('Failed to acquire execution lock for step:', step.id);
+        return false;
+      }
+      if (abortRef.current || runIdRef.current !== runId) return false;
       executionLockRef.current = true;
 
       const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
@@ -331,16 +353,16 @@ function RebalancePlanScreen() {
         invoice = mintQuote.request;
 
         // Step 2: Get melt quote to check actual fees
+        // Use createMeltQuote (deprecated but doesn't reserve proofs) for fee estimation
         updateStepState(id, { status: 'invoiceReady', invoice });
 
-        // Use prepareMeltBolt11 to check fees before paying (v3 API)
-        const meltQuoteResult = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
-        const totalRequired = meltQuoteResult.amount + meltQuoteResult.fee_reserve;
+        const feeEstimate = await manager.quotes.createMeltQuote(fromMintUrl, invoice);
+        const totalRequired = feeEstimate.amount + feeEstimate.fee_reserve;
 
         // Check if we have enough balance
         if (totalRequired > sourceBalance) {
           // Need to adjust - calculate max we can actually transfer
-          const maxTransferable = sourceBalance - meltQuoteResult.fee_reserve - MIN_FEE_RESERVE;
+          const maxTransferable = sourceBalance - feeEstimate.fee_reserve - MIN_FEE_RESERVE;
 
           if (maxTransferable <= MIN_TRANSFER_THRESHOLD) {
             throw new Error(
@@ -350,7 +372,7 @@ function RebalancePlanScreen() {
 
           // Recreate invoice with adjusted amount
           console.log(
-            `Adjusting transfer: ${transferAmount} -> ${maxTransferable} (balance: ${sourceBalance}, fee: ${meltQuoteResult.fee_reserve})`
+            `Adjusting transfer: ${transferAmount} -> ${maxTransferable} (balance: ${sourceBalance}, fee: ${feeEstimate.fee_reserve})`
           );
           transferAmount = maxTransferable;
           mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
@@ -360,24 +382,29 @@ function RebalancePlanScreen() {
         }
 
         // Step 3: Melt from sender mint by paying the invoice
+        // Use the v3 two-step flow: prepareMeltBolt11 + executeMelt
         updateStepState(id, { status: 'melting' });
 
-        const meltWithRetry = async () => {
+        const executeMeltWithRetry = async () => {
           try {
-            await melt(fromMintUrl, invoice);
+            // Prepare the melt operation (reserves proofs)
+            const preparedOp = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
+            // Execute the prepared operation
+            await manager.quotes.executeMelt(preparedOp.id);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes('Melt operation already in progress')) {
               // Coco internally serializes melts; give it a moment and retry once.
               await new Promise((resolve) => setTimeout(resolve, 900));
-              await melt(fromMintUrl, invoice);
+              const preparedOp = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
+              await manager.quotes.executeMelt(preparedOp.id);
               return;
             }
             throw err;
           }
         };
 
-        await meltWithRetry();
+        await executeMeltWithRetry();
 
         // Step 4: Verify - wait for balance to increase on receiving mint
         // The MintQuoteProcessor runs every 5 seconds to claim paid quotes
@@ -404,11 +431,31 @@ function RebalancePlanScreen() {
         await new Promise((resolve) => setTimeout(resolve, 500));
         return true;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Transfer failed';
+        let errorMessage = error instanceof Error ? error.message : 'Transfer failed';
+
+        // Parse and improve error messages for common Lightning/mint errors
+        if (errorMessage.includes('lnd is not ready') || errorMessage.includes('not ready for')) {
+          errorMessage =
+            'Mint Lightning node is not ready. The mint may be starting up or syncing. Try again in a few minutes.';
+        } else if (
+          errorMessage.includes('FAILURE_REASON_NO_ROUTE') ||
+          errorMessage.includes('no_route')
+        ) {
+          errorMessage =
+            'No Lightning route found between mints. Try routing through an intermediary.';
+        } else if (errorMessage.includes('FAILURE_REASON_TIMEOUT')) {
+          errorMessage = 'Lightning payment timed out. The mint may be slow to respond.';
+        } else if (errorMessage.includes('invoice expired') || errorMessage.includes('EXPIRED')) {
+          errorMessage = 'Invoice expired before payment could complete. Please retry.';
+        } else if (errorMessage.includes('insufficient')) {
+          errorMessage = 'Insufficient balance or liquidity for this transfer.';
+        }
+
         updateStepState(id, { status: 'failed', errorMessage });
 
         // If this is a no_route failure, compute a route suggestion asynchronously and show progress.
-        if (String(errorMessage).includes('no_route')) {
+        const rawError = error instanceof Error ? error.message : String(error);
+        if (rawError.includes('no_route') || rawError.includes('FAILURE_REASON_NO_ROUTE')) {
           updateStepState(id, { routeSuggestion: { status: 'searching' } });
           (async () => {
             const suggestion = await computeRouteSuggestion(fromMintUrl, toMintUrl);
@@ -427,9 +474,9 @@ function RebalancePlanScreen() {
     },
     [
       requestLightningInvoice,
-      melt,
       updateStepState,
       waitForBalanceIncrease,
+      waitForLock,
       manager,
       computeRouteSuggestion,
     ]
@@ -437,28 +484,37 @@ function RebalancePlanScreen() {
 
   const runStepsSequentially = useCallback(
     async (steps: TransferStep[], runId: number) => {
-      for (const step of steps) {
+      try {
+        for (const step of steps) {
+          if (abortRef.current || runIdRef.current !== runId) return;
+
+          const current = stepStatesRef.current[step.id]?.status;
+          if (current === 'done' || current === 'skipped') continue;
+
+          setCurrentStepId(step.id);
+          // Execute; if it fails, we keep going to the next step (error tolerant)
+          await executeStep(step, runId);
+        }
+
         if (abortRef.current || runIdRef.current !== runId) return;
-
-        const current = stepStatesRef.current[step.id]?.status;
-        if (current === 'done' || current === 'skipped') continue;
-
-        setCurrentStepId(step.id);
-        // Execute; if it fails, we keep going to the next step (error tolerant)
-        await executeStep(step, runId);
+        setCurrentStepId(null);
+        setRunStatus('finished');
+      } finally {
+        // Always reset the running ref when done
+        isRunningRef.current = false;
       }
-
-      if (abortRef.current || runIdRef.current !== runId) return;
-      setCurrentStepId(null);
-      setRunStatus('finished');
     },
     [executeStep]
   );
 
   // Handle starting execution (Start once)
   const handleStart = useCallback(() => {
+    // Use ref-based guard to prevent race conditions (state check is async)
+    if (isRunningRef.current) return;
     if (runStatus === 'running') return;
 
+    // Immediately set ref to prevent concurrent starts
+    isRunningRef.current = true;
     abortRef.current = false;
     const runId = (runIdRef.current += 1);
 
@@ -483,7 +539,11 @@ function RebalancePlanScreen() {
   // Handle retry for a failed step
   const handleRetry = useCallback(
     async (step: TransferStep) => {
+      // Use ref-based guard to prevent race conditions
+      if (isRunningRef.current) return;
       if (runStatus === 'running') return;
+
+      isRunningRef.current = true;
       abortRef.current = false;
       const runId = (runIdRef.current += 1);
       setRunStatus('running');
@@ -493,7 +553,11 @@ function RebalancePlanScreen() {
         errorMessage: undefined,
         routeSuggestion: undefined,
       });
-      await executeStep(step, runId);
+      try {
+        await executeStep(step, runId);
+      } finally {
+        isRunningRef.current = false;
+      }
       setCurrentStepId(null);
       setRunStatus('finished');
     },
@@ -521,8 +585,11 @@ function RebalancePlanScreen() {
 
   const handleRetryFailed = useCallback(async () => {
     if (!runPlan) return;
+    // Use ref-based guard to prevent race conditions
+    if (isRunningRef.current) return;
     if (runStatus === 'running') return;
 
+    isRunningRef.current = true;
     abortRef.current = false;
     const runId = (runIdRef.current += 1);
     setRunStatus('running');
@@ -549,11 +616,14 @@ function RebalancePlanScreen() {
   const handleRouteThrough = useCallback(
     async (step: TransferStep) => {
       if (!runPlan) return;
+      // Use ref-based guard to prevent race conditions
+      if (isRunningRef.current) return;
       if (runStatus === 'running') return;
 
       const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
       if (!suggestion || suggestion.status !== 'found' || !suggestion.viaMintUrl) return;
 
+      isRunningRef.current = true;
       const via = suggestion.viaMintUrl;
       const afterId = step.id;
 
@@ -605,6 +675,7 @@ function RebalancePlanScreen() {
     // Best-effort abort: we can't cancel an in-flight melt, but we can stop scheduling new steps.
     abortRef.current = true;
     runIdRef.current += 1;
+    isRunningRef.current = false;
     setRunStatus('cancelled');
     setCurrentStepId(null);
   }, []);
