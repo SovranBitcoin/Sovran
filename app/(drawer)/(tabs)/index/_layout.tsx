@@ -1,11 +1,7 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack, router } from 'expo-router';
-import { Pressable, Alert, Platform } from 'react-native';
+import { Alert, Dimensions } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
-import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
-import { frame, padding } from '@expo/ui/swift-ui/modifiers';
 import { NfcPayment, NfcError } from '@/helper/nfc';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -17,6 +13,40 @@ import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
+
+// Header layout constants for calculating title dimensions
+const HEADER_LAYOUT = {
+  TOOLBAR_BUTTON_WIDTH: 44, // iOS standard touch target
+  HORIZONTAL_PADDING: 16, // Padding on left/right edges
+  BUTTON_SPACING: 12, // Spacing between buttons and title
+  BUTTON_HEIGHT: 54, // Height of the header title button
+  CONTENT_PADDING_HORIZONTAL: 16, // Inner padding (8 left + 8 right)
+  CONTENT_PADDING_VERTICAL: 14, // Inner padding (7 top + 7 bottom) -> 50 - 14 = 36
+} as const;
+
+// Calculate header title available width
+const getHeaderTitleWidth = () => {
+  const windowWidth = Dimensions.get('window').width;
+  const leftSide =
+    HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH +
+    HEADER_LAYOUT.HORIZONTAL_PADDING +
+    HEADER_LAYOUT.BUTTON_SPACING;
+  const rightSide =
+    HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH +
+    HEADER_LAYOUT.HORIZONTAL_PADDING +
+    HEADER_LAYOUT.BUTTON_SPACING;
+  return windowWidth - leftSide - rightSide;
+};
+
+// Calculate header title available height
+const getHeaderTitleHeight = () => HEADER_LAYOUT.BUTTON_HEIGHT;
+
+// Calculate inner content dimensions (after subtracting padding)
+const getHeaderContentWidth = () =>
+  getHeaderTitleWidth() - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL;
+const getHeaderContentHeight = () =>
+  getHeaderTitleHeight() - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
 
 // Payment limit tiers in USD
 const PAYMENT_TIERS = [
@@ -245,54 +275,55 @@ export default function HomeLayout() {
     ]
   );
 
-  const renderHeaderRight = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <Host matchContents>
-          <ContextMenu>
-            <ContextMenu.Items>
+  // Handle NFC payment tier selection for non-iOS (kept for potential Android fallback)
+  const _handleNFCPaymentAlert = useCallback(() => {
+    Alert.alert('NFC Payment Limit', 'Select your payment limit', [
+      ...PAYMENT_TIERS.map((tier) => ({
+        text: tier.label,
+        onPress: () => handleNFCPayment(tier.usdLimit),
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }, [handleNFCPayment]);
+
+  // Use new Stack.Header and Stack.Toolbar API for iOS with Liquid Glass
+  // Note: On iOS 26+, Liquid Glass requires contentStyle: { backgroundColor: 'transparent' }
+  if (false) {
+    return (
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: 'transparent' },
+        }}>
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'Wallet',
+            headerLargeTitle: false,
+          }}>
+          {/* Left toolbar - Menu button */}
+          <Stack.Toolbar placement="left">
+            <Stack.Toolbar.Button icon="line.3.horizontal" onPress={openDrawer} />
+          </Stack.Toolbar>
+
+          {/* Right toolbar - NFC Payment with menu */}
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Menu icon="wave.3.right">
               {PAYMENT_TIERS.map((tier) => (
-                <SwiftUIButton
+                <Stack.Toolbar.MenuAction
                   key={tier.label}
-                  systemImage={tier.icon}
+                  icon={tier.icon}
                   onPress={() => handleNFCPayment(tier.usdLimit)}>
                   {tier.label}
-                </SwiftUIButton>
+                </Stack.Toolbar.MenuAction>
               ))}
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
-              <SwiftUIButton
-                color={iconColor}
-                systemImage="wave.3.right"
-                modifiers={[
-                  frame({ height: 30, alignment: 'center', width: 30 }),
-                  padding({ all: 4 }),
-                ]}
-              />
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>
-      );
-    }
-
-    // Fallback for non-iOS platforms
-    return (
-      <Pressable
-        onPress={() => {
-          Alert.alert('NFC Payment Limit', 'Select your payment limit', [
-            ...PAYMENT_TIERS.map((tier) => ({
-              text: tier.label,
-              onPress: () => handleNFCPayment(tier.usdLimit),
-            })),
-            { text: 'Cancel', style: 'cancel' as const },
-          ]);
-        }}
-        style={{ margin: 2 }}>
-        <IconSymbol name="wave.3.right" size={30} color={iconColor} />
-      </Pressable>
+            </Stack.Toolbar.Menu>
+          </Stack.Toolbar>
+        </Stack.Screen>
+      </Stack>
     );
-  };
+  }
 
+  // Fallback for non-Liquid Glass (older iOS, Android, etc.)
   return (
     <Stack
       screenOptions={{
@@ -305,15 +336,38 @@ export default function HomeLayout() {
         options={{
           headerTransparent: true,
           headerTitleAlign: 'center',
-          headerTitle: () => <WalletHeaderTitle style={{ marginLeft: -42 }} />,
-          headerLeft: () => (
-            <Pressable onPress={openDrawer} style={{ margin: 2 }}>
-              <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
-            </Pressable>
+          headerTitle: () => (
+            <WalletHeaderTitle
+              liquidGlass
+              style={{ width: getHeaderTitleWidth(), height: getHeaderTitleHeight() }}
+              contentWidth={getHeaderContentWidth()}
+              contentHeight={getHeaderContentHeight()}
+            />
           ),
-          headerRight: renderHeaderRight,
-        }}
-      />
+        }}>
+        {/* Left toolbar - Menu button */}
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button
+            icon="line.3.horizontal"
+            onPress={openDrawer}
+            tintColor={iconColor}
+          />
+        </Stack.Toolbar>
+
+        {/* Right toolbar - NFC Payment with menu */}
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu icon="wave.3.right" tintColor={iconColor}>
+            {PAYMENT_TIERS.map((tier) => (
+              <Stack.Toolbar.MenuAction
+                key={tier.label}
+                icon={tier.icon}
+                onPress={() => handleNFCPayment(tier.usdLimit)}>
+                {tier.label}
+              </Stack.Toolbar.MenuAction>
+            ))}
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      </Stack.Screen>
     </Stack>
   );
 }

@@ -16,7 +16,8 @@ import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
 import Icon from 'assets/icons';
-import { LogBox, TouchableOpacity } from 'react-native';
+import { LogBox, TouchableOpacity, Platform } from 'react-native';
+import { supportsLiquidGlass } from '@/helper/version';
 
 import AppGate from '@/components/blocks/AppGate';
 import MigrationGate from '@/components/blocks/MigrationGate';
@@ -136,6 +137,10 @@ function RootLayoutContent() {
     return {};
   };
 
+  // For iOS 26+ with Liquid Glass, use transparent background to enable glass effects
+  const useLiquidGlass = Platform.OS === 'ios' && supportsLiquidGlass();
+  const contentBackgroundColor = useLiquidGlass ? 'transparent' : getPrimaryColor('950');
+
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <StatusBar
@@ -148,7 +153,7 @@ function RootLayoutContent() {
           headerShown: false,
           gestureEnabled: true,
           contentStyle: {
-            backgroundColor: getPrimaryColor('950'),
+            backgroundColor: contentBackgroundColor,
           },
         }}>
         {/* Main drawer with tabs inside */}
