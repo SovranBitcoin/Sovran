@@ -17,6 +17,12 @@ interface SearchResultProps {
 
 export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   const { getGreenColor, getRedColor } = useTheme();
+  const title =
+    result.profile?.displayName ||
+    result.profile?.name ||
+    (result.profile?.npub
+      ? `${result.profile.npub.slice(0, 12)}…`
+      : `${result.pubkey.slice(0, 12)}…`);
 
   return (
     <TouchableOpacity onPress={onPress} disabled={loading || !result.profile}>
@@ -24,7 +30,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
           <Text loading={loading} overpass bold size={16} className="text-primary-50">
-            {result.profile?.displayName || result.profile?.name || 'Loading...'}
+            {title}
           </Text>
           {result.profile?.nip05 && (
             <Text

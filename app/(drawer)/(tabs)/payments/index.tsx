@@ -469,7 +469,17 @@ const PaymentsContent = () => {
 
           if (data.results && Array.isArray(data.results)) {
             const formattedResults: SearchResultData[] = data.results.map((res) => {
-              const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
+              // Some search rows may not include a `profileEvent`. Treat those as partial profiles.
+              // Also guard against invalid JSON so one bad row doesn't wipe the entire list.
+              let profileEventPubkey = res.pubkey;
+              if (res.profileEvent) {
+                try {
+                  const parsed = JSON.parse(res.profileEvent);
+                  if (parsed?.pubkey) profileEventPubkey = parsed.pubkey;
+                } catch (e) {
+                  console.warn('Invalid profileEvent JSON for pubkey', res.pubkey, e);
+                }
+              }
 
               return {
                 pubkey: res.pubkey,
