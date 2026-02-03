@@ -3,22 +3,33 @@ import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Alert, Dimensions, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { supportsLiquidGlass } from 'helper/version';
-import * as Clipboard from 'expo-clipboard';
-import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
-import { frame, glassEffect, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
+import {
+  Host,
+  Button as SwiftUIButton,
+  HStack as SwiftUIHStack,
+  Image as SwiftUIImage,
+  Text as SwiftUIText,
+} from '@expo/ui/swift-ui';
+import {
+  buttonStyle,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+  padding,
+} from '@expo/ui/swift-ui/modifiers';
 
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
-import Icon, { ArrowIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 
 import { useMintStore } from 'stores/mintStore';
-import { useProcessPaymentString } from 'hooks/coco/useProcessPaymentString';
 import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
@@ -42,7 +53,6 @@ export function AccountPagerView({
 }: AccountPagerViewProps): React.ReactElement {
   const { height: windowHeight } = useWindowDimensions();
   const { getPrimaryColor, getShadeColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
   const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
   const shadeColor100 = useMemo(() => getShadeColor('100'), [getShadeColor]);
@@ -60,13 +70,6 @@ export function AccountPagerView({
 
   const loopedAccounts = accounts;
   const swiperRef = useRef<any>(null);
-
-  // Payment processing hook for clipboard paste
-  const { processPaymentString } = useProcessPaymentString({
-    unit: account.unit,
-    selectedMint: selectedMintUrl,
-    isFocused: true,
-  });
 
   const onPageSelected = useCallback(
     async (index: number): Promise<void> => {
@@ -101,15 +104,6 @@ export function AccountPagerView({
     });
   }, [handlePermission, account.unit]);
 
-  const handleClipboardPaste = useCallback(async () => {
-    const text = await Clipboard.getStringAsync();
-    if (!text) {
-      Alert.alert('Clipboard Empty', 'No text found in clipboard.');
-      return;
-    }
-    await processPaymentString({ data: text, type: 'paste' });
-  }, [processPaymentString]);
-
   const handleSend = useCallback(async () => {
     let balance = 0;
     try {
@@ -133,196 +127,75 @@ export function AccountPagerView({
     });
   }, [getBalances, selectedMintUrl, account.unit]);
 
-  const buttonWidth = Dimensions.get('window').width / 2 - 24;
-  const buttonHeight = 48;
+  // Button components (2-column row + centered overlay)
+  const BUTTON_H = 48;
+  const QR_SIZE = 72;
+  // Keep Send/Receive foreground neutral; reserve accent tint for the QR background only.
+  const liquidGlassForeground = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const qrGlassTint = useMemo(() => getShadeColor('300'), [getShadeColor]);
 
-  // Button components
-  const ReceiveButton = () => {
-    if (supportsLiquidGlass()) {
-      return (
-        <View style={{ marginLeft: 0 }}>
-          <Host style={{ height: 48, width: buttonWidth }} matchContents>
-            <ContextMenu>
-              <ContextMenu.Items>
-                <SwiftUIButton
-                  systemImage="arrow.up.circle"
-                  label="Receive"
-                  onPress={handleReceive}
-                />
-              </ContextMenu.Items>
-              <ContextMenu.Trigger>
-                <SwiftUIButton
-                  systemImage="arrow.down.left"
-                  label="Receive"
-                  modifiers={[
-                    frame({ height: buttonHeight, width: buttonWidth }),
-                    glassEffect({ shape: 'capsule' }),
-                  ]}
-                  onPress={handleReceive}
-                />
-              </ContextMenu.Trigger>
-            </ContextMenu>
-          </Host>
-        </View>
-      );
-    }
-
+  function LiquidCapsuleButton({
+    label,
+    systemIcon,
+    onPress,
+  }: {
+    label: string;
+    systemIcon: React.ComponentProps<typeof SwiftUIImage>['systemName'];
+    onPress: () => void;
+  }) {
     return (
-      <TouchableOpacity
-        className="-mr-3 ml-3 flex-1"
-        style={{ maxWidth: 'auto' }}
-        onPress={handleReceive}>
-        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
-          <VStack align="center" justify="center">
-            <HStack
-              blur
-              align="center"
-              justify="center"
-              className="w-full min-w-[90px] p-3"
-              style={{
-                backgroundColor: primaryColor800,
-                borderColor: primaryColor700,
-                borderBottomLeftRadius: 1000,
-                borderTopLeftRadius: 1000,
-              }}>
-              <ArrowIcon size={24} color={primaryColor0} rotate={180} />
-              <Text weight="bold" size={14} className="text-primary-0">
-                Receive
-              </Text>
-            </HStack>
-          </VStack>
-        </LinearGradient>
-      </TouchableOpacity>
+      <Host style={{ height: BUTTON_H, width: '100%' }} matchContents={false}>
+        <SwiftUIButton
+          modifiers={[
+            buttonStyle('glass'),
+            frame({ height: BUTTON_H, maxWidth: Infinity, alignment: 'center' }),
+          ]}
+          onPress={onPress}>
+          <SwiftUIHStack
+            alignment="center"
+            spacing={8}
+            modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
+            <SwiftUIImage systemName={systemIcon} size={18} color={liquidGlassForeground} />
+            <SwiftUIText
+              modifiers={[
+                font({ size: 14, weight: 'bold' }),
+                foregroundStyle(liquidGlassForeground),
+                padding({ vertical: 8 }),
+              ]}>
+              {label}
+            </SwiftUIText>
+          </SwiftUIHStack>
+        </SwiftUIButton>
+      </Host>
     );
-  };
+  }
 
-  const ScanButton = () => {
-    if (supportsLiquidGlass()) {
-      return (
-        <View style={{ width: 72, marginLeft: -36, zIndex: 1 }}>
-          <Host style={{ height: 72, width: 72 }} matchContents>
-            <ContextMenu>
-              <ContextMenu.Items>
-                <SwiftUIButton
-                  systemImage="qrcode.viewfinder"
-                  label="Scan QR"
-                  onPress={handleScanQR}
-                />
-                <SwiftUIButton
-                  systemImage="doc.on.clipboard"
-                  label="Paste from Clipboard"
-                  onPress={handleClipboardPaste}
-                />
-              </ContextMenu.Items>
-              <ContextMenu.Trigger>
-                <SwiftUIButton
-                  systemImage="qrcode.viewfinder"
-                  modifiers={[
-                    frame({ height: 72, width: 72 }),
-                    glassEffect({ shape: 'circle' }),
-                    foregroundStyle(shadeColor300),
-                  ]}
-                  onPress={handleScanQR}
-                />
-              </ContextMenu.Trigger>
-            </ContextMenu>
-          </Host>
-        </View>
-      );
-    }
-
+  function LiquidQRButton({ onPress }: { onPress: () => void }) {
     return (
-      <TouchableOpacity
-        style={{
-          maxWidth: 64,
-          zIndex: 10000,
-          shadowColor: shadeColor300,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.75,
-          shadowRadius: 8,
-          elevation: 5,
-          borderRadius: 10000,
-          borderColor: shadeColor100,
-          borderWidth: 0.5,
-        }}
-        onPress={() => {
-          Alert.alert('Scan Options', 'Choose how to scan', [
-            { text: 'Scan QR', onPress: handleScanQR },
-            { text: 'Paste from Clipboard', onPress: handleClipboardPaste },
-            { text: 'Cancel', style: 'cancel' },
-          ]);
-        }}>
-        <LinearGradient
-          style={{ padding: 8, borderRadius: 1000 }}
-          colors={[shadeColor100, shadeColor300]}>
-          <VStack align="center" justify="center">
-            <HStack
-              align="center"
-              justify="center"
-              className="w-full min-w-[90px] p-3"
-              style={{ borderRadius: 1000 }}>
-              <Icon name="stash:qr-code" size={24} color={primaryColor0} />
-            </HStack>
-          </VStack>
-        </LinearGradient>
-      </TouchableOpacity>
+      <Host style={{ height: QR_SIZE, width: QR_SIZE }} matchContents={false}>
+        <SwiftUIButton
+          modifiers={[
+            buttonStyle('glass'),
+            frame({ height: QR_SIZE, width: QR_SIZE }),
+            glassEffect({
+              shape: 'circle',
+              glass: {
+                tint: qrGlassTint, // 👈 background tint (only for QR)
+                variant: 'regular', // subtle / material-like
+                interactive: true, // reacts to presses
+              },
+            }),
+          ]}
+          onPress={onPress}>
+          <SwiftUIHStack
+            alignment="center"
+            modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+            <SwiftUIImage systemName="qrcode.viewfinder" size={22} color={liquidGlassForeground} />
+          </SwiftUIHStack>
+        </SwiftUIButton>
+      </Host>
     );
-  };
-
-  const SendButton = () => {
-    if (supportsLiquidGlass()) {
-      return (
-        <View style={{ marginLeft: -36 }}>
-          <Host style={{ height: 48, width: buttonWidth }} matchContents>
-            <ContextMenu>
-              <ContextMenu.Items>
-                <SwiftUIButton systemImage="arrow.up.circle" label="Send" onPress={handleSend} />
-              </ContextMenu.Items>
-              <ContextMenu.Trigger>
-                <SwiftUIButton
-                  systemImage="arrow.up.right"
-                  label="Send"
-                  modifiers={[
-                    frame({ height: buttonHeight, width: buttonWidth }),
-                    glassEffect({ shape: 'capsule' }),
-                  ]}
-                  onPress={handleSend}
-                />
-              </ContextMenu.Trigger>
-            </ContextMenu>
-          </Host>
-        </View>
-      );
-    }
-
-    return (
-      <TouchableOpacity
-        className="-ml-3 mr-3 flex-1"
-        style={{ maxWidth: 'auto' }}
-        onPress={handleSend}>
-        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
-          <VStack align="center" justify="center">
-            <HStack
-              blur
-              align="center"
-              justify="center"
-              className="w-full min-w-[90px] p-3"
-              style={{
-                backgroundColor: primaryColor800,
-                borderColor: primaryColor700,
-                borderBottomRightRadius: 1000,
-                borderTopRightRadius: 1000,
-              }}>
-              <ArrowIcon size={24} color={primaryColor0} rotate={0} />
-              <Text weight="bold" size={14} className="text-primary-0">
-                Send
-              </Text>
-            </HStack>
-          </VStack>
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
+  }
 
   return (
     <>
@@ -350,11 +223,124 @@ export function AccountPagerView({
         </Swiper>
       </View>
 
-      <HStack justify="space-around" align="center">
-        <ReceiveButton />
-        <ScanButton />
-        <SendButton />
-      </HStack>
+      <View
+        style={{
+          width: '100%',
+          paddingHorizontal: 12,
+          marginTop: 8,
+          position: 'relative',
+          height: Math.max(QR_SIZE, BUTTON_H),
+          justifyContent: 'center',
+        }}>
+        {/* Two equal columns (capsules) */}
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            {supportsLiquidGlass() ? (
+              <LiquidCapsuleButton
+                label="Receive"
+                systemIcon="arrow.down.left"
+                onPress={handleReceive}
+              />
+            ) : (
+              <TouchableOpacity style={{ width: '100%' }} onPress={handleReceive}>
+                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
+                  <VStack align="center" justify="center">
+                    <HStack
+                      blur
+                      align="center"
+                      justify="center"
+                      className="w-full min-w-[90px] p-3"
+                      style={{
+                        backgroundColor: primaryColor800,
+                        borderColor: primaryColor700,
+                        borderRadius: 1000,
+                      }}>
+                      <Text weight="bold" size={14} className="text-primary-0">
+                        Receive
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            {supportsLiquidGlass() ? (
+              <LiquidCapsuleButton label="Send" systemIcon="arrow.up.right" onPress={handleSend} />
+            ) : (
+              <TouchableOpacity style={{ width: '100%' }} onPress={handleSend}>
+                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
+                  <VStack align="center" justify="center">
+                    <HStack
+                      blur
+                      align="center"
+                      justify="center"
+                      className="w-full min-w-[90px] p-3"
+                      style={{
+                        backgroundColor: primaryColor800,
+                        borderColor: primaryColor700,
+                        borderRadius: 1000,
+                      }}>
+                      <Text weight="bold" size={14} className="text-primary-0">
+                        Send
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Overlay QR in the center */}
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 1000,
+          }}>
+          {supportsLiquidGlass() ? (
+            <LiquidQRButton onPress={handleScanQR} />
+          ) : (
+            <TouchableOpacity
+              style={{
+                width: QR_SIZE,
+                height: QR_SIZE,
+                shadowColor: shadeColor300,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.75,
+                shadowRadius: 8,
+                elevation: 5,
+                borderRadius: 10000,
+                borderColor: shadeColor100,
+                borderWidth: 0.5,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              haptics={{ type: 'impact', impactStyle: 'light' }}
+              activeOpacity={0.75}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={handleScanQR}>
+              <LinearGradient
+                style={{
+                  padding: 8,
+                  borderRadius: 1000,
+                  width: '100%',
+                  height: '100%',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                colors={[shadeColor100, shadeColor300]}>
+                <Icon name="stash:qr-code" size={24} color={getPrimaryColor('0')} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </>
   );
 }
