@@ -13,7 +13,6 @@
     },
     "icon": "./assets/images/production.png",
     "assetBundlePatterns": ["**/*"],
-    "newArchEnabled": true,
     "ios": {
       "buildNumber": "1",
       "infoPlist": {
@@ -81,7 +80,8 @@
       "expo-localization",
       "expo-video",
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-image"
     ],
     "extra": {
       "router": {
