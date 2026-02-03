@@ -251,28 +251,6 @@ export const icons: string[] = [
   'fluent:wallet-24-filled',
 ];
 
-export function ArrowIcon({
-  color,
-  rotate = 0,
-  size = 24,
-}: {
-  color: string;
-  rotate: number;
-  size: number;
-}) {
-  return (
-    <View
-      style={{
-        transform: Number(rotate) ? [{ rotate: `${rotate}deg` }] : [],
-        marginRight: 8,
-        marginLeft: 8,
-        backgroundColor: 'transparent',
-      }}>
-      <Icon name="lucide:arrow-up-right" color={color} size={size} />
-    </View>
-  );
-}
-
 export function BitcoinMaskIcon() {
   const { getPrimaryColor, getShadeColor } = useTheme();
 
