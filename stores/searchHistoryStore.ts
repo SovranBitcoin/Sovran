@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const MAX_RECENT_SEARCHES = 10;
 
 /** A single search history entry */
-export interface SearchHistoryEntry {
+interface SearchHistoryEntry {
   /** The search query text */
   query: string;
   /** Timestamp when the search was performed */
