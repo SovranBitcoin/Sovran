@@ -238,7 +238,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           className="rounded-2xl"
           style={[
             {
-              flex: 1,
+              // Avoid stretching inside ScrollView/flex containers (e.g. CurrencyScreen)
+              flexGrow: 0,
+              flexShrink: 0,
+              width: '100%',
               padding: 8,
               borderWidth: 0.2,
               borderColor: getPrimaryColor('600'),

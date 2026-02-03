@@ -1,20 +1,15 @@
 import React, { useCallback } from 'react';
-import { Platform } from 'react-native';
+import { ActionSheetIOS, Platform } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Host, Menu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
-import {
-  buttonStyle,
-  font,
-  foregroundStyle,
-  frame,
-  glassEffect,
-} from '@expo/ui/swift-ui/modifiers';
+import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { DisplayCurrency, useSettingsStore } from 'stores/settingsStore';
+import { supportsLiquidGlass } from '@/helper/version';
 
 export interface FiatCurrencyPillProps {
   /** Display string, e.g. "≈ $12.34" */
@@ -58,6 +53,57 @@ export function FiatCurrencyPill({
   // Expo SwiftUI wrappers often need an explicit frame to avoid collapsed width.
   // Approximate monospace character width: ~0.62em + fixed padding.
   const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
+
+  const openCurrencySheet = useCallback(() => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['USD', 'EUR', 'GBP', 'Cancel'],
+        cancelButtonIndex: 3,
+        userInterfaceStyle: 'dark',
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) handleSelectCurrency('usd');
+        if (buttonIndex === 1) handleSelectCurrency('eur');
+        if (buttonIndex === 2) handleSelectCurrency('gbp');
+      }
+    );
+  }, [handleSelectCurrency]);
+
+  // Non-Liquid Glass fallback on iOS: use RN capsule, and ActionSheet for currency selection.
+  if (Platform.OS === 'ios' && !supportsLiquidGlass()) {
+    const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencySheet : onPress;
+    const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
+
+    return (
+      <TouchableOpacity
+        disabled={!primaryHandler && !longPressHandler}
+        onPress={primaryHandler}
+        onLongPress={longPressHandler}>
+        <HStack
+          align="center"
+          justify="center"
+          gap={6}
+          className="overflow-hidden rounded-full"
+          style={{
+            backgroundColor: opacity(getGreenColor('500'), 0.15),
+            borderWidth: 1,
+            borderColor: opacity(getGreenColor('400'), 0.2),
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            minHeight: iosHeight,
+          }}>
+          <Text
+            size={textSize}
+            bold
+            overpass
+            color={getGreenColor('300')}
+            style={{ letterSpacing: 0.3 }}>
+            {text}
+          </Text>
+        </HStack>
+      </TouchableOpacity>
+    );
+  }
 
   // Use SwiftUI ContextMenu with liquid glass button on iOS
   if (Platform.OS === 'ios' && enableCurrencyMenu) {
@@ -117,7 +163,7 @@ export function FiatCurrencyPill({
         <SwiftUIButton
           onPress={onPress}
           modifiers={[
-            buttonStyle('glass'),
+            // buttonStyle('glass'),
             frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
             // Keep tint consistent with the menu-enabled variant.
             glassEffect({

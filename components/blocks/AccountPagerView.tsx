@@ -22,12 +22,11 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 
 import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
+import { Button } from 'components/ui/Button';
 
 import { useMintStore } from 'stores/mintStore';
 import { useTheme } from 'providers/ThemeProvider';
@@ -53,8 +52,6 @@ export function AccountPagerView({
 }: AccountPagerViewProps): React.ReactElement {
   const { height: windowHeight } = useWindowDimensions();
   const { getPrimaryColor, getShadeColor } = useTheme();
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
   const shadeColor100 = useMemo(() => getShadeColor('100'), [getShadeColor]);
   const shadeColor300 = useMemo(() => getShadeColor('300'), [getShadeColor]);
 
@@ -242,26 +239,20 @@ export function AccountPagerView({
                 onPress={handleReceive}
               />
             ) : (
-              <TouchableOpacity style={{ width: '100%' }} onPress={handleReceive}>
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
-                  <VStack align="center" justify="center">
-                    <HStack
-                      blur
-                      align="center"
-                      justify="center"
-                      className="w-full min-w-[90px] p-3"
-                      style={{
-                        backgroundColor: primaryColor800,
-                        borderColor: primaryColor700,
-                        borderRadius: 1000,
-                      }}>
-                      <Text weight="bold" size={14} className="text-primary-0">
-                        Receive
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Button
+                text="Receive"
+                icon={<Icon name="lucide:arrow-down-left" size={16} color={getPrimaryColor('0')} />}
+                onPress={handleReceive}
+                variant="secondary"
+                blur={{ intensity: 70, tint: 'dark' }}
+                haptics
+                style={{
+                  margin: 0,
+                  marginBottom: 0,
+                  width: '100%',
+                  minHeight: BUTTON_H,
+                }}
+              />
             )}
           </View>
 
@@ -269,26 +260,20 @@ export function AccountPagerView({
             {supportsLiquidGlass() ? (
               <LiquidCapsuleButton label="Send" systemIcon="arrow.up.right" onPress={handleSend} />
             ) : (
-              <TouchableOpacity style={{ width: '100%' }} onPress={handleSend}>
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)']}>
-                  <VStack align="center" justify="center">
-                    <HStack
-                      blur
-                      align="center"
-                      justify="center"
-                      className="w-full min-w-[90px] p-3"
-                      style={{
-                        backgroundColor: primaryColor800,
-                        borderColor: primaryColor700,
-                        borderRadius: 1000,
-                      }}>
-                      <Text weight="bold" size={14} className="text-primary-0">
-                        Send
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Button
+                text="Send"
+                icon={<Icon name="lucide:arrow-up-right" size={16} color={getPrimaryColor('0')} />}
+                onPress={handleSend}
+                variant="secondary"
+                blur={{ intensity: 70, tint: 'dark' }}
+                haptics
+                style={{
+                  margin: 0,
+                  marginBottom: 0,
+                  width: '100%',
+                  minHeight: BUTTON_H,
+                }}
+              />
             )}
           </View>
         </View>

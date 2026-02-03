@@ -121,6 +121,28 @@ export default function WalletHeaderTitle({
   // Get window dimensions for width calculations
   const { width: windowWidth } = useWindowDimensions();
 
+  // Extract width/height from style prop for sizing (e.g. when used as headerTitle)
+  const styleWidth =
+    style && typeof style === 'object' && 'width' in style ? style.width : undefined;
+  const styleHeight =
+    style && typeof style === 'object' && 'height' in style ? style.height : undefined;
+
+  // Prefer style width, fallback to explicit prop width
+  const buttonWidth =
+    typeof styleWidth === 'number' ? styleWidth : typeof _width === 'number' ? _width : undefined;
+
+  // If we have an explicit width but no inner content dimensions, derive reasonable defaults.
+  // Matches the header sizing math used on index: 50 height, 14 vertical padding → 36 inner height.
+  const resolvedContentHeight = contentHeight ?? 36;
+  const resolvedContentWidth = useMemo(() => {
+    if (contentWidth !== undefined) return contentWidth;
+    if (typeof buttonWidth === 'number') {
+      // Default inner padding horizontal ~16px total (8 each side) like the index layout constants.
+      return Math.max(0, buttonWidth - 16);
+    }
+    return undefined;
+  }, [contentWidth, buttonWidth]);
+
   // Format balance for display
   const formatBalance = (amount: number) => {
     if (amount >= 1000000) {
@@ -136,32 +158,37 @@ export default function WalletHeaderTitle({
   if (!supportsLiquidGlass()) {
     // Calculate width to fit between header buttons
     const _headerWidth = windowWidth - 124 - 16;
+    const fallbackWidth =
+      typeof buttonWidth === 'number'
+        ? buttonWidth
+        : typeof _width === 'number'
+          ? _width
+          : _headerWidth;
 
     return (
-      // <View
-      //   className="pointer-events-box-none"
-      //   style={{
-      //     width: _headerWidth,
-      //     alignItems: 'center',
-      //   }}>
-      <MintBalanceDisplay
-        unit={unit}
-        onMintSelected={handleMintSelectedInternal}
-        requireBalance={requireBalance}
-        updateSelectedMint={true}
-        showAddMintsButton={showAddMintsButton}
-        showDetailsButton={showDetailsButton}
-        allowedMints={allowedMints}
-        style={{ width: '100%' }}
-      />
-      // </View>
+      <View
+        style={{
+          width: fallbackWidth,
+          alignSelf: 'center',
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...(style || {}),
+        }}>
+        <MintBalanceDisplay
+          unit={unit}
+          onMintSelected={handleMintSelectedInternal}
+          requireBalance={requireBalance}
+          updateSelectedMint={true}
+          showAddMintsButton={showAddMintsButton}
+          showDetailsButton={showDetailsButton}
+          allowedMints={allowedMints}
+          contentWidth={resolvedContentWidth}
+          contentHeight={resolvedContentHeight}
+          style={{ width: '100%' }}
+        />
+      </View>
     );
   }
-
-  // Extract width from style prop for SwiftUI frame
-  const styleWidth =
-    style && typeof style === 'object' && 'width' in style ? style.width : undefined;
-  const buttonWidth = typeof styleWidth === 'number' ? styleWidth : undefined;
 
   // Liquid Glass UI (iOS 26+, iPadOS 26+, macOS 26+)
   // When liquidGlass=true, use glass button with capsule shape for native Liquid Glass effect
@@ -174,16 +201,18 @@ export default function WalletHeaderTitle({
       ]
     : [
         buttonStyle('glass'),
-        frame({ height: 50, alignment: 'center' }),
+        frame({ height: 50, width: buttonWidth, alignment: 'center' }),
         glassEffect({ shape: 'capsule' }),
       ];
 
   return (
     <View
       style={{
+        alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
         width: buttonWidth,
+        height: typeof styleHeight === 'number' ? styleHeight : undefined,
         ...style,
       }}>
       <Host style={{ zIndex: 10, height: 50, width: buttonWidth }} matchContents>
@@ -212,7 +241,15 @@ export default function WalletHeaderTitle({
             )}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <HStack modifiers={liquidGlass ? [] : [padding({ horizontal: 64 })]}>
+            {/* When embedded in a screen with explicit width, avoid extra padding that can squash content */}
+            <HStack
+              modifiers={
+                liquidGlass
+                  ? []
+                  : typeof buttonWidth === 'number'
+                    ? []
+                    : [padding({ horizontal: 64 })]
+              }>
               <SwiftUIButton modifiers={buttonModifiers}>
                 <MintBalanceDisplay
                   unit={unit}
@@ -222,8 +259,8 @@ export default function WalletHeaderTitle({
                   showAddMintsButton={showAddMintsButton}
                   showDetailsButton={showDetailsButton}
                   allowedMints={allowedMints}
-                  contentWidth={contentWidth}
-                  contentHeight={contentHeight}
+                  contentWidth={resolvedContentWidth}
+                  contentHeight={resolvedContentHeight}
                 />
               </SwiftUIButton>
             </HStack>
