@@ -49,6 +49,7 @@ import {
   HStack as SwiftUIHStack,
 } from '@expo/ui/swift-ui';
 import {
+  buttonStyle,
   foregroundStyle,
   frame,
   padding,
@@ -435,7 +436,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                       zIndex: 10,
                       paddingBottom: 8,
                     }}>
-                    <Host matchContents={false} fixedSize={true} style={{ marginBottom: 0 }}>
+                    <Host matchContents={false} style={{ marginBottom: 0 }}>
                       <SwiftUIHStack
                         spacing={12}
                         alignment="center"
@@ -450,13 +451,12 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         {/* <GlassEffectContainer spacing={0}> */}
                         <Host
                           modifiers={[frame({ width: 44, height: 44, alignment: 'center' })]}
-                          matchContents={false}
-                          fixedSize={true}>
+                          matchContents={false}>
                           <Button
-                            variant="plain"
                             systemImage={isSearchFocused ? 'xmark' : 'line.horizontal.3'}
                             onPress={handleMenuButtonPress}
                             modifiers={[
+                              buttonStyle('plain'),
                               frame({
                                 width: 44,
                                 height: 44,
@@ -521,15 +521,12 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           </Pressable>
                         ) : (
                           // <GlassEffectContainer spacing={0}>
-                          <Host
-                            matchContents={false}
-                            fixedSize={true}
-                            style={{ width: 44, height: 44 }}>
+                          <Host matchContents={false} style={{ width: 44, height: 44 }}>
                             <Button
-                              variant="plain"
                               systemImage="square.and.pencil"
                               onPress={handleNewSession}
                               modifiers={[
+                                buttonStyle('plain'),
                                 frame({
                                   width: 44,
                                   height: 44,
@@ -595,10 +592,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           size={20}
                           color={getPrimaryColor('400')}
                         />
-                        <Host
-                          matchContents={false}
-                          fixedSize={true}
-                          style={{ flex: 1, marginLeft: 8 }}>
+                        <Host matchContents={false} style={{ flex: 1, marginLeft: 8 }}>
                           <TextField
                             key={searchQuery}
                             defaultValue={searchQuery}
@@ -660,19 +654,19 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         <Spacer size={24} />
                         {Platform.OS === 'ios' ? (
                           <GlassEffectContainer spacing={0}>
-                            <Host matchContents={false} fixedSize={true}>
+                            <Host matchContents={false}>
                               <Button
-                                variant="glass"
+                                label="New Session"
                                 onPress={handleNewSession}
                                 modifiers={[
+                                  buttonStyle('glass'),
                                   padding({ horizontal: 24, vertical: 12 }),
                                   cornerRadius(12),
                                   glassEffect({
                                     shape: 'capsule',
                                   }),
-                                ]}>
-                                New Session
-                              </Button>
+                                ]}
+                              />
                             </Host>
                           </GlassEffectContainer>
                         ) : (

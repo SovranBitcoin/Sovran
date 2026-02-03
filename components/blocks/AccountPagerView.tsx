@@ -7,7 +7,7 @@ import { Alert, Dimensions, useWindowDimensions } from 'react-native';
 import { supportsLiquidGlass } from 'helper/version';
 import * as Clipboard from 'expo-clipboard';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
-import { frame, cornerRadius, background } from '@expo/ui/swift-ui/modifiers';
+import { frame, glassEffect, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
 
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -141,35 +141,25 @@ export function AccountPagerView({
     if (supportsLiquidGlass()) {
       return (
         <View style={{ marginLeft: 0 }}>
-          <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
-            <ContextMenu activationMethod="longPress">
+          <Host style={{ height: 48, width: buttonWidth }} matchContents>
+            <ContextMenu>
               <ContextMenu.Items>
-                <SwiftUIButton systemImage="arrow.up.circle" onPress={handleReceive}>
-                  Receive
-                </SwiftUIButton>
+                <SwiftUIButton
+                  systemImage="arrow.up.circle"
+                  label="Receive"
+                  onPress={handleReceive}
+                />
               </ContextMenu.Items>
               <ContextMenu.Trigger>
                 <SwiftUIButton
-                  variant="glass"
+                  systemImage="arrow.down.left"
+                  label="Receive"
                   modifiers={[
                     frame({ height: buttonHeight, width: buttonWidth }),
-                    cornerRadius(24),
+                    glassEffect({ shape: 'capsule' }),
                   ]}
-                  onPress={handleReceive}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 12,
-                      width: buttonWidth - 32,
-                      height: buttonHeight - 16,
-                    }}>
-                    <Icon name="lucide:arrow-down-left" size={20} color={primaryColor0} />
-                    <Text>Receive</Text>
-                  </View>
-                </SwiftUIButton>
+                  onPress={handleReceive}
+                />
               </ContextMenu.Trigger>
             </ContextMenu>
           </Host>
@@ -210,35 +200,30 @@ export function AccountPagerView({
     if (supportsLiquidGlass()) {
       return (
         <View style={{ width: 72, marginLeft: -36, zIndex: 1 }}>
-          <Host style={{ height: 72, width: 72 }} matchContents fixedSize>
-            <ContextMenu activationMethod="longPress">
+          <Host style={{ height: 72, width: 72 }} matchContents>
+            <ContextMenu>
               <ContextMenu.Items>
-                <SwiftUIButton systemImage="qrcode.viewfinder" onPress={handleScanQR}>
-                  Scan QR
-                </SwiftUIButton>
-                <SwiftUIButton systemImage="doc.on.clipboard" onPress={handleClipboardPaste}>
-                  Paste from Clipboard
-                </SwiftUIButton>
+                <SwiftUIButton
+                  systemImage="qrcode.viewfinder"
+                  label="Scan QR"
+                  onPress={handleScanQR}
+                />
+                <SwiftUIButton
+                  systemImage="doc.on.clipboard"
+                  label="Paste from Clipboard"
+                  onPress={handleClipboardPaste}
+                />
               </ContextMenu.Items>
               <ContextMenu.Trigger>
                 <SwiftUIButton
-                  variant="glass"
+                  systemImage="qrcode.viewfinder"
                   modifiers={[
                     frame({ height: 72, width: 72 }),
-                    background(getShadeColor('300')),
-                    cornerRadius(36),
+                    glassEffect({ shape: 'circle' }),
+                    foregroundStyle(shadeColor300),
                   ]}
-                  onPress={handleScanQR}>
-                  <View
-                    style={{
-                      width: 48,
-                      height: 56,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Icon name="stash:qr-code" size={28} color={primaryColor0} />
-                  </View>
-                </SwiftUIButton>
+                  onPress={handleScanQR}
+                />
               </ContextMenu.Trigger>
             </ContextMenu>
           </Host>
@@ -288,35 +273,21 @@ export function AccountPagerView({
     if (supportsLiquidGlass()) {
       return (
         <View style={{ marginLeft: -36 }}>
-          <Host style={{ height: 48, width: buttonWidth }} matchContents fixedSize>
-            <ContextMenu activationMethod="longPress">
+          <Host style={{ height: 48, width: buttonWidth }} matchContents>
+            <ContextMenu>
               <ContextMenu.Items>
-                <SwiftUIButton systemImage="arrow.up.circle" onPress={handleSend}>
-                  Send
-                </SwiftUIButton>
+                <SwiftUIButton systemImage="arrow.up.circle" label="Send" onPress={handleSend} />
               </ContextMenu.Items>
               <ContextMenu.Trigger>
                 <SwiftUIButton
-                  variant="glass"
+                  systemImage="arrow.up.right"
+                  label="Send"
                   modifiers={[
                     frame({ height: buttonHeight, width: buttonWidth }),
-                    cornerRadius(24),
+                    glassEffect({ shape: 'capsule' }),
                   ]}
-                  onPress={handleSend}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 12,
-                      width: buttonWidth - 32,
-                      height: buttonHeight - 16,
-                    }}>
-                    <Icon name="lucide:arrow-up-right" size={20} color={primaryColor0} />
-                    <Text>Send</Text>
-                  </View>
-                </SwiftUIButton>
+                  onPress={handleSend}
+                />
               </ContextMenu.Trigger>
             </ContextMenu>
           </Host>

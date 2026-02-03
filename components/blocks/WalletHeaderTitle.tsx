@@ -5,7 +5,7 @@ import MintBalanceDisplay from 'components/blocks/MintBalanceDisplay';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Host, Button as SwiftUIButton, ContextMenu, HStack } from '@expo/ui/swift-ui';
-import { frame, padding } from '@expo/ui/swift-ui/modifiers';
+import { buttonStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { getMintDisplayName } from 'helper/url';
 import { View } from 'components/ui/View/View';
 import { supportsLiquidGlass } from '@/helper/version';
@@ -27,6 +27,12 @@ interface WalletHeaderTitleProps {
   showDetailsButton?: boolean;
   /** Allowed mint URLs for filtering (payment request mints) */
   allowedMints?: string[];
+  /** Whether being used with Liquid Glass Stack.Toolbar (auto width) */
+  liquidGlass?: boolean;
+  /** Inner content width (after subtracting button padding) */
+  contentWidth?: number;
+  /** Inner content height (after subtracting button padding) */
+  contentHeight?: number;
 }
 
 /**
@@ -41,6 +47,9 @@ export default function WalletHeaderTitle({
   showAddMintsButton = true,
   showDetailsButton = true,
   allowedMints,
+  liquidGlass = false,
+  contentWidth,
+  contentHeight,
   style,
 }: WalletHeaderTitleProps & { style?: ViewStyle }) {
   const { keys } = useNostrKeysContext();
@@ -126,67 +135,85 @@ export default function WalletHeaderTitle({
   // Blur fallback for older devices (pre-liquid glass)
   if (!supportsLiquidGlass()) {
     // Calculate width to fit between header buttons
-    const headerWidth = windowWidth - 124 - 16;
+    const _headerWidth = windowWidth - 124 - 16;
 
     return (
-      <View
-        className="pointer-events-box-none"
-        style={{
-          width: headerWidth,
-          alignItems: 'center',
-        }}>
-        <MintBalanceDisplay
-          unit={unit}
-          onMintSelected={handleMintSelectedInternal}
-          requireBalance={requireBalance}
-          updateSelectedMint={true}
-          showAddMintsButton={showAddMintsButton}
-          showDetailsButton={showDetailsButton}
-          allowedMints={allowedMints}
-          style={{ width: '100%' }}
-        />
-      </View>
+      // <View
+      //   className="pointer-events-box-none"
+      //   style={{
+      //     width: _headerWidth,
+      //     alignItems: 'center',
+      //   }}>
+      <MintBalanceDisplay
+        unit={unit}
+        onMintSelected={handleMintSelectedInternal}
+        requireBalance={requireBalance}
+        updateSelectedMint={true}
+        showAddMintsButton={showAddMintsButton}
+        showDetailsButton={showDetailsButton}
+        allowedMints={allowedMints}
+        style={{ width: '100%' }}
+      />
+      // </View>
     );
   }
 
+  // Extract width from style prop for SwiftUI frame
+  const styleWidth =
+    style && typeof style === 'object' && 'width' in style ? style.width : undefined;
+  const buttonWidth = typeof styleWidth === 'number' ? styleWidth : undefined;
+
   // Liquid Glass UI (iOS 26+, iPadOS 26+, macOS 26+)
+  // When liquidGlass=true, use glass button with capsule shape for native Liquid Glass effect
+  // When liquidGlass=false (standard header), use glass button styling with explicit effect
+  const buttonModifiers = liquidGlass
+    ? [
+        buttonStyle('glass'),
+        frame({ height: 50, width: buttonWidth, alignment: 'center' }),
+        glassEffect({ shape: 'capsule' }),
+      ]
+    : [
+        buttonStyle('glass'),
+        frame({ height: 50, alignment: 'center' }),
+        glassEffect({ shape: 'capsule' }),
+      ];
+
   return (
     <View
       style={{
         alignItems: 'center',
-        width: '100%',
+        justifyContent: 'center',
+        width: buttonWidth,
         ...style,
       }}>
-      <Host style={{ zIndex: 10, height: 50, width: '100%' }} matchContents fixedSize={true}>
-        <ContextMenu activationMethod="longPress">
+      <Host style={{ zIndex: 10, height: 50, width: buttonWidth }} matchContents>
+        <ContextMenu>
           <ContextMenu.Items>
             {/* Quick Mint Selection - Top 3 mints */}
             {topMints.map((mint) => (
               <SwiftUIButton
                 key={mint.mintUrl}
                 systemImage="building.columns"
-                onPress={() => handleQuickSelectMint(mint.mintUrl)}>
-                {`${mint.displayName} (${formatBalance(mint.balance)})`}
-              </SwiftUIButton>
+                label={`${mint.displayName} (${formatBalance(mint.balance)})`}
+                onPress={() => handleQuickSelectMint(mint.mintUrl)}
+              />
             ))}
 
             {/* Show All Mints */}
-            <SwiftUIButton systemImage="list.bullet.rectangle" onPress={handleShowAllMints}>
-              Show all mints
-            </SwiftUIButton>
+            <SwiftUIButton
+              systemImage="list.bullet.rectangle"
+              label="Show all mints"
+              onPress={handleShowAllMints}
+            />
 
             {/* Actions */}
             {showAddMintsButton && (
-              <SwiftUIButton systemImage="plus.circle" onPress={handleAddMint}>
-                Add Mint
-              </SwiftUIButton>
+              <SwiftUIButton systemImage="plus.circle" label="Add Mint" onPress={handleAddMint} />
             )}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <HStack modifiers={[padding({ horizontal: 64 })]}>
-              <SwiftUIButton
-                variant="glass"
-                modifiers={[frame({ height: 50, alignment: 'center' })]}>
+            <HStack modifiers={liquidGlass ? [] : [padding({ horizontal: 64 })]}>
+              <SwiftUIButton modifiers={buttonModifiers}>
                 <MintBalanceDisplay
                   unit={unit}
                   onMintSelected={handleMintSelectedInternal}
@@ -195,7 +222,8 @@ export default function WalletHeaderTitle({
                   showAddMintsButton={showAddMintsButton}
                   showDetailsButton={showDetailsButton}
                   allowedMints={allowedMints}
-                  style={{ width: '100%' }}
+                  contentWidth={contentWidth}
+                  contentHeight={contentHeight}
                 />
               </SwiftUIButton>
             </HStack>

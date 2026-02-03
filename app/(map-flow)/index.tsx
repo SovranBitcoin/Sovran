@@ -21,7 +21,7 @@ import { View } from 'components/ui/View/View';
 import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
-import { frame, cornerRadius } from '@expo/ui/swift-ui/modifiers';
+import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -109,18 +109,19 @@ const StatsCard = memo(function StatsCard({
 
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ height: 60, width: '100%' }} matchContents fixedSize={true}>
-        <ContextMenu activationMethod="singlePress">
+      <Host style={{ height: 60, width: '100%' }} matchContents>
+        <ContextMenu>
           <ContextMenu.Items>
             {(Object.keys(CATEGORIES) as CategoryFilter[]).map((cat) => (
-              <SwiftUIButton key={cat} onPress={() => onCategoryChange(cat)}>
-                {CATEGORIES[cat].label}
-                {cat === category ? ' ✓' : ''}
-              </SwiftUIButton>
+              <SwiftUIButton
+                key={cat}
+                label={`${CATEGORIES[cat].label}${cat === category ? ' ✓' : ''}`}
+                onPress={() => onCategoryChange(cat)}
+              />
             ))}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <SwiftUIButton variant="glass" modifiers={[frame({ height: 60 })]}>
+            <SwiftUIButton modifiers={[buttonStyle('glass'), frame({ height: 60 })]}>
               <HStack align="center" style={{ paddingHorizontal: 16, width: '100%' }}>
                 <Icon name="mdi:bitcoin" size={24} color="#F7931A" />
                 <VStack style={{ marginLeft: 12, flex: 1 }}>
@@ -162,39 +163,42 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
     return (
       <VStack style={styles.floatingButtons} spacing={8}>
         {/* Location Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
-            onPress={onMyLocation}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:crosshairs-gps" size={22} color={getPrimaryColor('0')} />
-            </View>
-          </SwiftUIButton>
+            systemImage="location.fill"
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({ shape: 'circle' }),
+            ]}
+            onPress={onMyLocation}
+          />
         </Host>
 
         {/* Zoom In Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
-            onPress={onZoomIn}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:plus" size={22} color={getPrimaryColor('0')} />
-            </View>
-          </SwiftUIButton>
+            systemImage="plus"
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({ shape: 'circle' }),
+            ]}
+            onPress={onZoomIn}
+          />
         </Host>
 
         {/* Zoom Out Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
-            onPress={onZoomOut}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:minus" size={22} color={getPrimaryColor('0')} />
-            </View>
-          </SwiftUIButton>
+            systemImage="minus"
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({ shape: 'circle' }),
+            ]}
+            onPress={onZoomOut}
+          />
         </Host>
       </VStack>
     );

@@ -2,7 +2,15 @@ import React, { useCallback } from 'react';
 import { Platform } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Host, ContextMenu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
-import { frame, background, cornerRadius, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import {
+  buttonStyle,
+  font,
+  foregroundStyle,
+  frame,
+  background,
+  cornerRadius,
+  glassEffect,
+} from '@expo/ui/swift-ui/modifiers';
 
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
@@ -56,24 +64,30 @@ export function FiatCurrencyPill({
   // Use SwiftUI ContextMenu with liquid glass button on iOS
   if (Platform.OS === 'ios' && enableCurrencyMenu) {
     return (
-      <Host style={{ zIndex: 10 }} matchContents fixedSize={true}>
+      <Host style={{ zIndex: 10 }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
-            <SwiftUIButton systemImage="dollarsign" onPress={() => handleSelectCurrency('usd')}>
-              USD
-            </SwiftUIButton>
-            <SwiftUIButton systemImage="eurosign" onPress={() => handleSelectCurrency('eur')}>
-              EUR
-            </SwiftUIButton>
-            <SwiftUIButton systemImage="sterlingsign" onPress={() => handleSelectCurrency('gbp')}>
-              GBP
-            </SwiftUIButton>
+            <SwiftUIButton
+              systemImage="dollarsign"
+              label="USD"
+              onPress={() => handleSelectCurrency('usd')}
+            />
+            <SwiftUIButton
+              systemImage="eurosign"
+              label="EUR"
+              onPress={() => handleSelectCurrency('eur')}
+            />
+            <SwiftUIButton
+              systemImage="sterlingsign"
+              label="GBP"
+              onPress={() => handleSelectCurrency('gbp')}
+            />
           </ContextMenu.Items>
           <ContextMenu.Trigger>
             <SwiftUIButton
-              variant="glass"
               onPress={onPress}
               modifiers={[
+                buttonStyle('glass'),
                 frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
                 background(opacity(getGreenColor('500'), 0.15)),
                 cornerRadius(100),
@@ -81,13 +95,13 @@ export function FiatCurrencyPill({
                 glassEffect({ shape: 'capsule' }),
               ]}>
               <SwiftUIText
-                design={'monospaced'}
-                weight="bold"
-                color={getGreenColor('300')}
-                size={textSize}
                 // Important: the "glass" capsule tends to size to the label, while our
                 // background tint sizes to the outer frame. Keep them identical.
-                modifiers={[frame({ height: 22, width: iosWidth, alignment: 'center' })]}>
+                modifiers={[
+                  font({ size: textSize, design: 'monospaced', weight: 'bold' }),
+                  foregroundStyle(getGreenColor('300')),
+                  frame({ height: 22, width: iosWidth, alignment: 'center' }),
+                ]}>
                 {text}
               </SwiftUIText>
             </SwiftUIButton>
@@ -100,11 +114,11 @@ export function FiatCurrencyPill({
   // iOS, but menu disabled: still use liquid-glass button for consistent look.
   if (Platform.OS === 'ios') {
     return (
-      <Host style={{ zIndex: 10 }} matchContents fixedSize={true}>
+      <Host style={{ zIndex: 10 }} matchContents>
         <SwiftUIButton
-          variant="glass"
           onPress={onPress}
           modifiers={[
+            buttonStyle('glass'),
             frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
             background(opacity(getGreenColor('500'), 0.15)),
             cornerRadius(100),
@@ -112,13 +126,13 @@ export function FiatCurrencyPill({
             glassEffect({ shape: 'capsule' }),
           ]}>
           <SwiftUIText
-            design={'monospaced'}
-            weight="bold"
-            color={getGreenColor('300')}
-            size={textSize}
             // Important: the "glass" capsule tends to size to the label, while our
             // background tint sizes to the outer frame. Keep them identical.
-            modifiers={[frame({ height: 22, width: iosWidth, alignment: 'center' })]}>
+            modifiers={[
+              font({ size: textSize, design: 'monospaced', weight: 'bold' }),
+              foregroundStyle(getGreenColor('300')),
+              frame({ height: 22, width: iosWidth, alignment: 'center' }),
+            ]}>
             {text}
           </SwiftUIText>
         </SwiftUIButton>
