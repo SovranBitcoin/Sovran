@@ -11,25 +11,20 @@ import { Link } from 'expo-router';
 import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
-import { ReallocationTransactionRow } from 'components/blocks/ReallocationTransactionRow';
+import { SwapTransactionRow } from 'components/blocks/SwapTransactionRow';
 import _ from 'lodash';
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import opacity from 'hex-color-opacity';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
-import {
-  useReallocationTransactionsStore,
-  type ReallocationGroup,
-} from 'stores/reallocationTransactionsStore';
+import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
 // live in the same sorted list.
 // ---------------------------------------------------------------------------
 
-type TimelineItem =
-  | { kind: 'transaction'; data: HistoryEntry }
-  | { kind: 'swap'; data: ReallocationGroup };
+type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
 
 function getTimelineCreatedAt(item: TimelineItem): number {
   return item.data.createdAt;
@@ -108,12 +103,12 @@ export const Transactions = React.memo(
     const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
-    const quoteIdToGroup = useReallocationTransactionsStore((state) => state.quoteIdToGroup);
-    const reallocationGroupsById = useReallocationTransactionsStore((state) => state.groups);
+    const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
+    const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
-    const reallocationGroups = useMemo(() => {
-      return Object.values(reallocationGroupsById).filter((g) => g.unit === account.unit);
-    }, [reallocationGroupsById, account.unit]);
+    const swapGroups = useMemo(() => {
+      return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
+    }, [swapGroupsById, account.unit]);
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -123,7 +118,7 @@ export const Transactions = React.memo(
         _.filter(history, (historyEntry: HistoryEntry) => {
           if (historyEntry.unit !== account.unit) return false;
 
-          // Hide underlying child transactions that are part of a reallocation group
+          // Hide underlying child transactions that are part of a swap group
           if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
             const quoteId = (historyEntry as any).quoteId as string | undefined;
             if (quoteId && quoteIdToGroup[quoteId]) return false;
@@ -174,7 +169,7 @@ export const Transactions = React.memo(
       // Only include swap items when showing all filters / types
       if (filter !== 'all' || type !== 'all') return txItems;
 
-      const swapItems: TimelineItem[] = reallocationGroups
+      const swapItems: TimelineItem[] = swapGroups
         .filter((group) => {
           if (!selectedMonth) return true;
           const [yearStr, monthStr] = selectedMonth.split('-');
@@ -189,7 +184,7 @@ export const Transactions = React.memo(
         }));
 
       return [...txItems, ...swapItems];
-    }, [filteredHistory, reallocationGroups, filter, type, selectedMonth]);
+    }, [filteredHistory, swapGroups, filter, type, selectedMonth]);
 
     const sortedTimeline = useMemo(
       () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
@@ -274,7 +269,7 @@ export const Transactions = React.memo(
     const renderTimelineItem = (item: TimelineItem) => {
       const key = getTimelineKey(item);
       if (item.kind === 'swap') {
-        return <ReallocationTransactionRow key={key} group={item.data} />;
+        return <SwapTransactionRow key={key} group={item.data} />;
       }
       return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
     };

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Transactions flow reallocation route wrapper
+ * @fileoverview Transactions flow swap route wrapper
  *
  * Part of the (transactions-flow) modal group - displays with back button.
  */
@@ -7,7 +7,7 @@
 import React from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { ReallocationTransactionScreen } from 'components/screens/ReallocationTransactionScreen';
+import { SwapTransactionScreen } from 'components/screens/SwapTransactionScreen';
 
 function ModalScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
@@ -15,7 +15,7 @@ function ModalScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Swap' }} />
-      <ReallocationTransactionScreen groupId={groupId} />
+      <SwapTransactionScreen groupId={groupId} />
     </>
   );
 }

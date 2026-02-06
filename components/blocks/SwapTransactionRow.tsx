@@ -8,13 +8,13 @@ import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { convertTime } from 'helper/time';
-import type { ReallocationGroup } from 'stores/reallocationTransactionsStore';
+import type { SwapGroup } from 'stores/swapTransactionsStore';
 
 interface Props {
-  group: ReallocationGroup;
+  group: SwapGroup;
 }
 
-export const ReallocationTransactionRow = React.memo(({ group }: Props) => {
+export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
 
   const aggregate = useMemo(() => {
@@ -26,7 +26,7 @@ export const ReallocationTransactionRow = React.memo(({ group }: Props) => {
 
   const handlePress = useCallback(() => {
     router.navigate({
-      pathname: '/reallocation' as any,
+      pathname: '/swap' as any,
       params: { groupId: group.id },
     });
   }, [group.id]);
@@ -72,4 +72,4 @@ export const ReallocationTransactionRow = React.memo(({ group }: Props) => {
   );
 });
 
-ReallocationTransactionRow.displayName = 'ReallocationTransactionRow';
+SwapTransactionRow.displayName = 'SwapTransactionRow';

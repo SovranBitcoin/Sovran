@@ -1,7 +1,7 @@
 /**
  * @fileoverview Swap Transaction Detail Screen
  *
- * Displays a grouped reallocation (rebalance) run composed of multiple steps.
+ * Displays a grouped swap run composed of multiple steps.
  * Each step shows mint avatars with arrow overlays and a colored separator
  * derived from the destination mint's brand color.
  *
@@ -21,7 +21,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
-import { useReallocationTransactionsStore } from 'stores/reallocationTransactionsStore';
+import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import { Section } from 'components/ui/Section';
@@ -161,13 +161,11 @@ StepSeparator.displayName = 'StepSeparator';
 // Main screen
 // -----------------------------------------------------------------------
 
-export function ReallocationTransactionScreen({ groupId }: Props) {
+export function SwapTransactionScreen({ groupId }: Props) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-  const group = useReallocationTransactionsStore((state) =>
-    groupId ? state.groups[groupId] : undefined
-  );
+  const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
   const { history } = usePaginatedHistory();
   const { getMintInfo } = useMintManagement();
 

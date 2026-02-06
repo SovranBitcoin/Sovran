@@ -27,10 +27,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
 import { MIN_FEE_RESERVE } from 'components/blocks/rebalance';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
-import {
-  useReallocationTransactionsStore,
-  type ReallocationLegLocalStatus,
-} from 'stores/reallocationTransactionsStore';
+import { useSwapTransactionsStore, type SwapLegLocalStatus } from 'stores/swapTransactionsStore';
 import {
   RebalanceStepRow,
   computeRebalancePlan,
@@ -155,9 +152,9 @@ function RebalancePlanScreen() {
   // Ref-based guard to prevent concurrent starts (state-based check has race conditions)
   const isRunningRef = useRef(false);
 
-  // Reallocation grouping (store only; Coco remains source of HistoryEntry truth)
-  const reallocationGroupIdRef = useRef<string | null>(null);
-  const reallocationLegIdByStepIdRef = useRef<Record<string, string>>({});
+  // Swap grouping (store only; Coco remains source of HistoryEntry truth)
+  const swapGroupIdRef = useRef<string | null>(null);
+  const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
   // Display either the frozen run plan (once started) or the live preview
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -345,29 +342,26 @@ function RebalancePlanScreen() {
 
       const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
 
-      const groupId = reallocationGroupIdRef.current;
+      const groupId = swapGroupIdRef.current;
       const ensureLegId = () => {
         if (!groupId) return null;
-        const existing = reallocationLegIdByStepIdRef.current[id];
+        const existing = swapLegIdByStepIdRef.current[id];
         if (existing) return existing;
 
-        const legId = useReallocationTransactionsStore
+        const legId = useSwapTransactionsStore
           .getState()
           .addLeg(groupId, { fromMintUrl, toMintUrl, amount: originalAmount });
-        reallocationLegIdByStepIdRef.current[id] = legId;
-        useReallocationTransactionsStore
+        swapLegIdByStepIdRef.current[id] = legId;
+        useSwapTransactionsStore
           .getState()
           .setLegStatus(groupId, legId, { localStatus: 'pending' });
         return legId;
       };
 
-      const setLegLocalStatus = (
-        localStatus: ReallocationLegLocalStatus,
-        errorMessage?: string
-      ) => {
+      const setLegLocalStatus = (localStatus: SwapLegLocalStatus, errorMessage?: string) => {
         const legId = ensureLegId();
         if (!groupId || !legId) return;
-        useReallocationTransactionsStore
+        useSwapTransactionsStore
           .getState()
           .setLegStatus(groupId, legId, { localStatus, errorMessage });
       };
@@ -393,9 +387,7 @@ function RebalancePlanScreen() {
           const mintQuoteId =
             (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
           if (groupId && legId && mintQuoteId) {
-            useReallocationTransactionsStore
-              .getState()
-              .tagMintQuote(groupId, legId, String(mintQuoteId));
+            useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mintQuoteId));
           }
         }
 
@@ -412,7 +404,7 @@ function RebalancePlanScreen() {
             const quoteId =
               (prepared as any)?.quoteId ?? (prepared as any)?.quote ?? (prepared as any)?.id;
             if (groupId && legId && quoteId) {
-              useReallocationTransactionsStore.getState().tagMelt(groupId, legId, {
+              useSwapTransactionsStore.getState().tagMelt(groupId, legId, {
                 quoteId: String(quoteId),
                 operationId: String(prepared.id),
               });
@@ -457,9 +449,7 @@ function RebalancePlanScreen() {
             const mintQuoteId =
               (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
             if (groupId && legId && mintQuoteId) {
-              useReallocationTransactionsStore
-                .getState()
-                .tagMintQuote(groupId, legId, String(mintQuoteId));
+              useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mintQuoteId));
             }
           }
 
@@ -618,10 +608,8 @@ function RebalancePlanScreen() {
         if (abortRef.current || runIdRef.current !== runId) return;
         setCurrentStepId(null);
         setRunStatus('finished');
-        if (reallocationGroupIdRef.current) {
-          useReallocationTransactionsStore
-            .getState()
-            .finalizeGroup(reallocationGroupIdRef.current, 'finished');
+        if (swapGroupIdRef.current) {
+          useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'finished');
         }
       } finally {
         // Always reset the running ref when done
@@ -646,11 +634,11 @@ function RebalancePlanScreen() {
     const snapshot = computedPlan;
     setRunPlan(snapshot);
 
-    // Start a reallocation group for this run (used for Transactions grouping)
-    reallocationLegIdByStepIdRef.current = {};
-    reallocationGroupIdRef.current = useReallocationTransactionsStore
+    // Start a swap group for this run (used for Transactions grouping)
+    swapLegIdByStepIdRef.current = {};
+    swapGroupIdRef.current = useSwapTransactionsStore
       .getState()
-      .startGroup({ unit, title: 'Reallocation' });
+      .startGroup({ unit, title: 'Swap' });
 
     // Initialize states for frozen steps
     const initial: Record<string, StepState> = {};
@@ -809,10 +797,8 @@ function RebalancePlanScreen() {
     setRunStatus('cancelled');
     setCurrentStepId(null);
 
-    if (reallocationGroupIdRef.current) {
-      useReallocationTransactionsStore
-        .getState()
-        .finalizeGroup(reallocationGroupIdRef.current, 'cancelled');
+    if (swapGroupIdRef.current) {
+      useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'cancelled');
     }
   }, []);
 

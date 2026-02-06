@@ -1,13 +1,13 @@
 /**
- * @fileoverview Reallocation Transactions Store
+ * @fileoverview Swap Transactions Store
  *
- * Tracks reallocation groups (e.g. rebalance runs) that consist of multiple legs.
+ * Tracks swap groups (e.g. rebalance runs) that consist of multiple legs.
  * Each leg is correlated to underlying Coco mint/melt history entries via quoteId.
  *
  * Coco remains the source of truth for HistoryEntry creation; this store only
  * keeps enough metadata to:
  * - hide child mint/melt entries in the Transactions list
- * - insert a synthetic grouped “Reallocation” transaction
+ * - insert a synthetic grouped "Swap" transaction
  * - show a detail view with per-leg local status/errors
  */
 
@@ -15,9 +15,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type ReallocationGroupState = 'running' | 'finished' | 'cancelled';
+export type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
-export type ReallocationLegLocalStatus =
+export type SwapLegLocalStatus =
   | 'pending'
   | 'creatingInvoice'
   | 'invoiceReady'
@@ -26,7 +26,7 @@ export type ReallocationLegLocalStatus =
   | 'done'
   | 'failed';
 
-export interface ReallocationLeg {
+export interface SwapLeg {
   id: string;
   fromMintUrl: string;
   toMintUrl: string;
@@ -38,38 +38,35 @@ export interface ReallocationLeg {
   meltOperationId?: string;
 
   // UI state (local)
-  localStatus?: ReallocationLegLocalStatus;
+  localStatus?: SwapLegLocalStatus;
   errorMessage?: string;
 }
 
-export interface ReallocationGroup {
+export interface SwapGroup {
   id: string;
   unit: string;
   createdAt: number;
   title: string;
-  state: ReallocationGroupState;
-  legs: ReallocationLeg[];
+  state: SwapGroupState;
+  legs: SwapLeg[];
 }
 
 type QuoteIdKind = 'mint' | 'melt';
 
-type QuoteIdToGroupIndex = Record<
-  string,
-  { groupId: string; legId: string; kind: QuoteIdKind }
->;
+type QuoteIdToGroupIndex = Record<string, { groupId: string; legId: string; kind: QuoteIdKind }>;
 
-interface ReallocationTransactionsState {
-  groups: Record<string, ReallocationGroup>;
+interface SwapTransactionsState {
+  groups: Record<string, SwapGroup>;
   quoteIdToGroup: QuoteIdToGroupIndex;
 }
 
-interface ReallocationTransactionsActions {
+interface SwapTransactionsActions {
   startGroup: (params: { unit: string; title?: string }) => string;
-  finalizeGroup: (groupId: string, state: Exclude<ReallocationGroupState, 'running'>) => void;
+  finalizeGroup: (groupId: string, state: Exclude<SwapGroupState, 'running'>) => void;
 
   addLeg: (
     groupId: string,
-    leg: Omit<ReallocationLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
+    leg: Omit<SwapLeg, 'id' | 'mintQuoteId' | 'meltQuoteId' | 'meltOperationId'>
   ) => string;
 
   tagMintQuote: (groupId: string, legId: string, quoteId: string) => void;
@@ -82,23 +79,22 @@ interface ReallocationTransactionsActions {
   setLegStatus: (
     groupId: string,
     legId: string,
-    params: { localStatus: ReallocationLegLocalStatus; errorMessage?: string }
+    params: { localStatus: SwapLegLocalStatus; errorMessage?: string }
   ) => void;
 
-  getGroup: (groupId: string) => ReallocationGroup | null;
-  getGroupsForUnit: (unit: string) => ReallocationGroup[];
+  getGroup: (groupId: string) => SwapGroup | null;
+  getGroupsForUnit: (unit: string) => SwapGroup[];
   getIndex: () => QuoteIdToGroupIndex;
 
   clearAllData: () => Promise<void>;
 }
 
-type ReallocationTransactionsStore = ReallocationTransactionsState &
-  ReallocationTransactionsActions;
+type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
 
-const generateGroupId = () => `realloc-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const generateGroupId = () => `swap-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const generateLegId = () => `leg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-export const useReallocationTransactionsStore = create<ReallocationTransactionsStore>()(
+export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
   persist(
     (set, get) => ({
       groups: {},
@@ -106,11 +102,11 @@ export const useReallocationTransactionsStore = create<ReallocationTransactionsS
 
       startGroup: ({ unit, title }) => {
         const id = generateGroupId();
-        const group: ReallocationGroup = {
+        const group: SwapGroup = {
           id,
           unit,
           createdAt: Date.now(),
-          title: title ?? 'Reallocation',
+          title: title ?? 'Swap',
           state: 'running',
           legs: [],
         };
@@ -143,7 +139,7 @@ export const useReallocationTransactionsStore = create<ReallocationTransactionsS
           const group = state.groups[groupId];
           if (!group) return state;
 
-          const nextLeg: ReallocationLeg = { ...leg, id: legId };
+          const nextLeg: SwapLeg = { ...leg, id: legId };
           return {
             ...state,
             groups: {
@@ -244,16 +240,16 @@ export const useReallocationTransactionsStore = create<ReallocationTransactionsS
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('reallocation-transactions-store');
+          await AsyncStorage.removeItem('swap-transactions-store');
           set({ groups: {}, quoteIdToGroup: {} });
         } catch (error) {
-          console.error('ReallocationTransactionsStore: Error clearing data:', error);
+          console.error('SwapTransactionsStore: Error clearing data:', error);
           throw error;
         }
       },
     }),
     {
-      name: 'reallocation-transactions-store',
+      name: 'swap-transactions-store',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         groups: state.groups,
@@ -261,7 +257,7 @@ export const useReallocationTransactionsStore = create<ReallocationTransactionsS
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('ReallocationTransactionsStore: Failed to rehydrate from storage:', error);
+          console.warn('SwapTransactionsStore: Failed to rehydrate from storage:', error);
         }
       },
     }

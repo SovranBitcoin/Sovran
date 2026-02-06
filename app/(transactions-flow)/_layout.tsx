@@ -39,7 +39,7 @@ function TransactionsFlowContent() {
       <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="receiveToken" options={{ title: 'Receive Ecash' }} />
-      <Stack.Screen name="reallocation" options={{ title: 'Swap' }} />
+      <Stack.Screen name="swap" options={{ title: 'Swap' }} />
     </Stack>
   );
 }
