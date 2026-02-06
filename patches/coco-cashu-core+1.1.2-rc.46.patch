@@ -1,8 +1,8 @@
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
-index 709b315..0d6ce8c 100644
+index 364cd31..dd73ed9 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
 +++ b/node_modules/coco-cashu-core/dist/index.d.cts
-@@ -1952,12 +1952,12 @@ declare class PaymentRequestService {
+@@ -1960,12 +1960,12 @@ declare class PaymentRequestService {
  //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
@@ -18,7 +18,7 @@ index 709b315..0d6ce8c 100644
    private readonly logger?;
    constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
    receive(token: Token | string): Promise<void>;
-@@ -2111,6 +2111,7 @@ declare class MintApi {
+@@ -2121,6 +2121,7 @@ declare class MintApi {
      mint: Mint;
      keysets: Keyset[];
    }>;
@@ -26,7 +26,7 @@ index 709b315..0d6ce8c 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -2404,8 +2405,8 @@ declare class Manager {
+@@ -2415,8 +2416,8 @@ declare class Manager {
    readonly send: SendApi;
    readonly ext: PluginExtensions;
    private mintService;
@@ -37,7 +37,7 @@ index 709b315..0d6ce8c 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -2419,10 +2420,10 @@ declare class Manager {
+@@ -2430,10 +2431,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -51,10 +51,10 @@ index 709b315..0d6ce8c 100644
    private meltOperationService;
    private meltOperationRepository;
 diff --git a/node_modules/coco-cashu-core/dist/index.d.ts b/node_modules/coco-cashu-core/dist/index.d.ts
-index 1d300f7..e8ff730 100644
+index be84049..d38766e 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.ts
 +++ b/node_modules/coco-cashu-core/dist/index.d.ts
-@@ -1952,12 +1952,12 @@ declare class PaymentRequestService {
+@@ -1960,12 +1960,12 @@ declare class PaymentRequestService {
  //#region api/WalletApi.d.ts
  declare class WalletApi {
    private mintService;
@@ -70,7 +70,7 @@ index 1d300f7..e8ff730 100644
    private readonly logger?;
    constructor(mintService: MintService, walletService: WalletService, proofService: ProofService, walletRestoreService: WalletRestoreService, transactionService: TransactionService, paymentRequestService: PaymentRequestService, sendOperationService: SendOperationService, logger?: Logger);
    receive(token: Token | string): Promise<void>;
-@@ -2111,6 +2111,7 @@ declare class MintApi {
+@@ -2121,6 +2121,7 @@ declare class MintApi {
      mint: Mint;
      keysets: Keyset[];
    }>;
@@ -78,7 +78,7 @@ index 1d300f7..e8ff730 100644
    getMintInfo(mintUrl: string): Promise<MintInfo>;
    isTrustedMint(mintUrl: string): Promise<boolean>;
    getAllMints(): Promise<Mint[]>;
-@@ -2404,8 +2405,8 @@ declare class Manager {
+@@ -2415,8 +2416,8 @@ declare class Manager {
    readonly send: SendApi;
    readonly ext: PluginExtensions;
    private mintService;
@@ -89,7 +89,7 @@ index 1d300f7..e8ff730 100644
    private walletRestoreService;
    private keyRingService;
    private eventBus;
-@@ -2419,10 +2420,10 @@ declare class Manager {
+@@ -2430,10 +2431,10 @@ declare class Manager {
    private meltQuoteService;
    private historyService;
    private seedService;
@@ -103,10 +103,10 @@ index 1d300f7..e8ff730 100644
    private meltOperationService;
    private meltOperationRepository;
 diff --git a/node_modules/coco-cashu-core/dist/index.js b/node_modules/coco-cashu-core/dist/index.js
-index 6634836..ef52c01 100644
+index 0ca0399..42421ab 100644
 --- a/node_modules/coco-cashu-core/dist/index.js
 +++ b/node_modules/coco-cashu-core/dist/index.js
-@@ -6696,6 +6696,10 @@ var MintApi = class {
+@@ -6792,6 +6792,10 @@ var MintApi = class {
  	async addMint(mintUrl, options) {
  		return this.mintService.addMintByUrl(mintUrl, options);
  	}
