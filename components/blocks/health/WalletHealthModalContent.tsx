@@ -88,6 +88,12 @@ function statLabelText(key: 'drift' | 'pending' | 'split'): string {
   return 'Split';
 }
 
+export interface WalletHealthLayout {
+  heroContent: React.ReactNode;
+  tabsContent: React.ReactNode;
+  bodyContent: React.ReactNode;
+}
+
 export function WalletHealthModalContent({
   unit,
   onAction,
@@ -96,6 +102,7 @@ export function WalletHealthModalContent({
   selectedCurrency,
   onCurrencyChange,
   scrollY,
+  children,
 }: {
   unit: string;
   onAction: (action: HealthCta) => void;
@@ -104,6 +111,7 @@ export function WalletHealthModalContent({
   selectedCurrency: string;
   onCurrencyChange: (currency: string) => void;
   scrollY?: SharedValue<number>;
+  children?: (layout: WalletHealthLayout) => React.ReactNode;
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const heroTransition = useHeroTransition();
@@ -255,10 +263,6 @@ export function WalletHealthModalContent({
     return () => onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
   }, [onAction, normalizedUnit]);
 
-  const handlePendingPress = useMemo(() => {
-    return () => onAction({ type: 'openPendingEcash' });
-  }, [onAction]);
-
   const heroStats = useMemo(() => {
     return [
       {
@@ -328,145 +332,129 @@ export function WalletHealthModalContent({
       onPress: handleSplitPress,
     });
 
-    if (pendingOutgoingCount > 0) {
-      rows.push({
-        key: 'pending',
-        label: (
-          <HStack align="center" gap={10}>
-            <Icon name="mdi:clock-alert-outline" size={18} color={primary400} />
-            <Text style={{ color: primary50 }} bold>
-              View & reclaim pending ecash
-            </Text>
-          </HStack>
-        ),
-        value: `${pendingOutgoingCount}`,
-        onPress: handlePendingPress,
-      });
-    }
-
     return rows;
   }, [
     hasDesired,
     totalBalance,
     needsRebalance,
     maxDriftBp,
-    pendingOutgoingCount,
     primary50,
     primary400,
     handleRebalancePress,
     handleSplitPress,
-    handlePendingPress,
   ]);
 
+  const heroContent = (
+    <RNView
+      ref={heroRef}
+      onLayout={handleHeroLayout}
+      collapsable={false}
+      shouldRasterizeIOS
+      renderToHardwareTextureAndroid
+      style={[
+        styles.heroWrap,
+        {
+          borderColor: heroBorderColor,
+          opacity: heroTransition.isHidden('walletHealth', 'destination') ? 0 : 1,
+          marginTop: -topOffset,
+          paddingTop: HERO_PADDING + topOffset * 2,
+        },
+      ]}>
+      <WalletHealthCardFrame
+        accentColor={gradientAccent}
+        backgroundColor={primary950}
+        highlightColor={primary50}
+      />
+
+      <VStack align="center" gap={10}>
+        <View style={[styles.heartRing, { borderColor: heartBorderColor }]}>
+          <LinearGradient
+            colors={[opacity(gradientAccent, 0.18), opacity(gradientAccent, 0.06), 'transparent']}
+            locations={[0, 0.6, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFillObject, { borderRadius: HEART_RING_RADIUS }]}
+          />
+          <Icon name="garden:heart-fill-16" size={30} color={hero.accent} />
+        </View>
+
+        <VStack align="center" gap={4} style={{ paddingHorizontal: 8 }}>
+          <Text size={18} heavy style={{ color: heroTitleColor }} numberOfLines={1}>
+            {hero.title}
+          </Text>
+          <Text
+            size={13}
+            style={{ color: heroSubtitleColor, textAlign: 'center' }}
+            numberOfLines={2}>
+            {hero.subtitle}
+          </Text>
+        </VStack>
+
+        <HStack gap={10} style={{ width: '100%' }}>
+          {heroStats.map((s) => (
+            <View
+              key={s.key}
+              style={[
+                styles.statPill,
+                {
+                  backgroundColor: statPillBg,
+                  borderColor: heartBorderColor,
+                },
+              ]}>
+              <Text size={10} style={{ color: statLabelColor }}>
+                {statLabelText(s.key)}
+              </Text>
+              <Text bold overpass size={14} style={{ color: s.tone }}>
+                {s.value}
+              </Text>
+            </View>
+          ))}
+        </HStack>
+      </VStack>
+    </RNView>
+  );
+
+  const tabsContent = !heroTransition.isTransitioning('walletHealth') ? (
+    <Animated.View entering={FadeInUp.duration(220).delay(120)}>
+      <MintCurrencyTabs
+        currencies={currencies}
+        selectedCurrency={selectedCurrency}
+        onCurrencyChange={onCurrencyChange}
+        scrollY={scrollY}
+      />
+    </Animated.View>
+  ) : null;
+
+  const bodyContent = !heroTransition.isTransitioning('walletHealth') ? (
+    <Animated.View entering={FadeInUp.duration(240).delay(160)}>
+      <View style={{ paddingHorizontal: 16 }}>
+        <Section title="Actions">
+          {actionRows.map((r, i) => (
+            <RowButton
+              key={r.key}
+              isFirst={i === 0}
+              isLast={i === actionRows.length - 1}
+              label={r.label}
+              value={r.value}
+              onPress={r.onPress}
+            />
+          ))}
+        </Section>
+      </View>
+    </Animated.View>
+  ) : null;
+
+  // Render callback: parent controls the layout (sticky header, scroll, etc.)
+  if (children) {
+    return <>{children({ heroContent, tabsContent, bodyContent })}</>;
+  }
+
+  // Fallback: original inline layout
   return (
     <VStack gap={10}>
-      {/* Overview (hero): centered heart + scannable stats */}
-      <RNView
-        ref={heroRef}
-        onLayout={handleHeroLayout}
-        // Keep a real native view node for shared transitions (avoid RN view-flattening).
-        collapsable={false}
-        shouldRasterizeIOS
-        renderToHardwareTextureAndroid
-        style={[
-          styles.heroWrap,
-          {
-            borderColor: heroBorderColor,
-            opacity: heroTransition.isHidden('walletHealth', 'destination') ? 0 : 1,
-            // Pull the hero background up behind the transparent header.
-            // Then compensate with padding so inner content stays in the same place.
-            marginTop: -topOffset,
-            // Important: keep the background under the notch, but push CONTENT below the notch.
-            // With marginTop = -topOffset, we need to add the inset twice so it doesn't cancel out.
-            paddingTop: HERO_PADDING + topOffset * 2,
-          },
-        ]}>
-        <WalletHealthCardFrame
-          accentColor={gradientAccent}
-          backgroundColor={primary950}
-          highlightColor={primary50}
-        />
-
-        <VStack align="center" gap={10}>
-          <View style={[styles.heartRing, { borderColor: heartBorderColor }]}>
-            <LinearGradient
-              // Important: clip this gradient to the circle (see styles.heartRing overflow + radius).
-              colors={[opacity(gradientAccent, 0.18), opacity(gradientAccent, 0.06), 'transparent']}
-              locations={[0, 0.6, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[StyleSheet.absoluteFillObject, { borderRadius: HEART_RING_RADIUS }]}
-            />
-            <Icon name="garden:heart-fill-16" size={30} color={hero.accent} />
-          </View>
-
-          <VStack align="center" gap={4} style={{ paddingHorizontal: 8 }}>
-            <Text size={18} heavy style={{ color: heroTitleColor }} numberOfLines={1}>
-              {hero.title}
-            </Text>
-            <Text
-              size={13}
-              style={{ color: heroSubtitleColor, textAlign: 'center' }}
-              numberOfLines={2}>
-              {hero.subtitle}
-            </Text>
-          </VStack>
-
-          <HStack gap={10} style={{ width: '100%' }}>
-            {heroStats.map((s) => (
-              <View
-                key={s.key}
-                style={[
-                  styles.statPill,
-                  {
-                    // Match the heart icon container treatment (tinted fill + subtle ring border)
-                    backgroundColor: statPillBg,
-                    borderColor: heartBorderColor,
-                  },
-                ]}>
-                <Text size={10} style={{ color: statLabelColor }}>
-                  {statLabelText(s.key)}
-                </Text>
-                <Text bold overpass size={14} style={{ color: s.tone }}>
-                  {s.value}
-                </Text>
-              </View>
-            ))}
-          </HStack>
-        </VStack>
-      </RNView>
-
-      {/* Currency selector (non-sticky) */}
-      {!heroTransition.isTransitioning('walletHealth') && (
-        <Animated.View entering={FadeInUp.duration(220).delay(120)}>
-          <MintCurrencyTabs
-            currencies={currencies}
-            selectedCurrency={selectedCurrency}
-            onCurrencyChange={onCurrencyChange}
-            scrollY={scrollY}
-          />
-        </Animated.View>
-      )}
-
-      {/* Actions (standard rows, like Mint Info / Settings) */}
-      {!heroTransition.isTransitioning('walletHealth') && (
-        <Animated.View entering={FadeInUp.duration(240).delay(160)}>
-          <View style={{ paddingHorizontal: 16 }}>
-            <Section title="Actions">
-              {actionRows.map((r, i) => (
-                <RowButton
-                  key={r.key}
-                  isFirst={i === 0}
-                  isLast={i === actionRows.length - 1}
-                  label={r.label}
-                  value={r.value}
-                  onPress={r.onPress}
-                />
-              ))}
-            </Section>
-          </View>
-        </Animated.View>
-      )}
+      {heroContent}
+      {tabsContent}
+      {bodyContent}
     </VStack>
   );
 }
