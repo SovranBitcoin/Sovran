@@ -219,7 +219,8 @@ const ModalScreen = () => {
           <ProfileButton />
         </Section>
         <Section title="Preferences">
-          <RowButton label="Theme" href="/settings-pages/theme" />
+          <RowButton label="Theme" href="/settings-pages/theme" isFirst />
+          <RowButton label="Swap Routing" href="/settings-pages/routing" isLast />
         </Section>
         <Section title="App Information">
           <RowButton

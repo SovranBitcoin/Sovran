@@ -32,14 +32,14 @@ import {
   RebalanceStepRow,
   computeRebalancePlan,
   isAlreadyBalanced,
-  MIN_TRANSFER_THRESHOLD,
   buildSwapGraph,
-  pickIntermediary,
+  pickIntermediaryPath,
   type TransferStep,
   type RebalancePlan,
   type StepStatus,
 } from 'components/blocks/rebalance';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { useSettingsStore } from 'stores/settingsStore';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from 'helper/apiClient';
 
@@ -50,8 +50,10 @@ interface StepState {
   operationId?: string;
   routeSuggestion?: {
     status: 'searching' | 'found' | 'none';
-    viaMintUrl?: string;
-    viaMintName?: string;
+    /** Full path including source and destination: [A, via1, ..., B]. */
+    path?: string[];
+    /** Human-readable names for each mint in the path (parallel array). */
+    pathNames?: string[];
   };
 }
 
@@ -77,6 +79,10 @@ function RebalancePlanScreen() {
 
   // Lightning operations for creating invoices
   const { requestLightningInvoice } = useLightningOperations();
+
+  // Settings
+  const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
+  const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
 
   // Mint info state
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
@@ -126,8 +132,8 @@ function RebalancePlanScreen() {
       mintUrl,
       balance: liveBalances[mintUrl] || 0,
     }));
-    return computeRebalancePlan(mintBalances, distribution, MIN_TRANSFER_THRESHOLD);
-  }, [mintUrls, liveBalances, distribution]);
+    return computeRebalancePlan(mintBalances, distribution, minTransferThreshold);
+  }, [mintUrls, liveBalances, distribution, minTransferThreshold]);
 
   /**
    * Freeze the plan snapshot on Start so that:
@@ -174,8 +180,8 @@ function RebalancePlanScreen() {
 
   // Check if already balanced
   const alreadyBalanced = useMemo(() => {
-    return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, MIN_TRANSFER_THRESHOLD);
-  }, [plan]);
+    return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, minTransferThreshold);
+  }, [plan, minTransferThreshold]);
 
   // Check if all steps are done or skipped
   const allComplete = useMemo(() => {
@@ -248,14 +254,14 @@ function RebalancePlanScreen() {
       // Start with mints in the run plan (fast), then optionally widen to a small set of trusted mints.
       // This improves the chance of finding an intermediary without exploding API calls.
       const planMints = runPlan.steps.flatMap((s) => [s.fromMintUrl, s.toMintUrl]);
-      const trustedMintUrls = trustedMints.map((m) => m.mintUrl);
+      const trustedUrls = trustedMints.map((m) => m.mintUrl);
       /**
        * Keep this bounded:
        * - Each mint candidate can require an auditor call.
        * - This runs after a failure, so we want a quick suggestion, not a full graph crawl.
        */
       const candidates = Array.from(
-        new Set([...planMints, ...trustedMintUrls, fromMintUrl, toMintUrl])
+        new Set([...planMints, ...trustedUrls, fromMintUrl, toMintUrl])
       ).slice(0, 12);
 
       const audits: AuditMintResponse[] = [];
@@ -265,13 +271,20 @@ function RebalancePlanScreen() {
       }
 
       const graph = buildSwapGraph(audits);
-      const picked = pickIntermediary({ from: fromMintUrl, to: toMintUrl, graph });
-      if (!picked.viaMintUrl) return null;
+      const trustedMintUrls = new Set(trustedUrls);
+      const result = pickIntermediaryPath({
+        from: fromMintUrl,
+        to: toMintUrl,
+        graph,
+        settings: middlemanRouting,
+        trustedMintUrls,
+      });
+      if (!result.path) return null;
 
-      const viaMintName = mintInfoMap[picked.viaMintUrl]?.name;
-      return { viaMintUrl: picked.viaMintUrl, viaMintName };
+      const pathNames = result.path.map((url) => mintInfoMap[url]?.name || url);
+      return { path: result.path, pathNames };
     },
-    [runPlan, fetchAudit, mintInfoMap, trustedMints]
+    [runPlan, fetchAudit, mintInfoMap, trustedMints, middlemanRouting]
   );
 
   // Poll for balance increase with timeout
@@ -348,9 +361,16 @@ function RebalancePlanScreen() {
         const existing = swapLegIdByStepIdRef.current[id];
         if (existing) return existing;
 
-        const legId = useSwapTransactionsStore
-          .getState()
-          .addLeg(groupId, { fromMintUrl, toMintUrl, amount: originalAmount });
+        const legId = useSwapTransactionsStore.getState().addLeg(groupId, {
+          fromMintUrl,
+          toMintUrl,
+          amount: originalAmount,
+          ...(step.chainId && {
+            chainId: step.chainId,
+            chainPath: step.chainPath,
+            chainHopIndex: step.chainHopIndex,
+          }),
+        });
         swapLegIdByStepIdRef.current[id] = legId;
         useSwapTransactionsStore
           .getState()
@@ -431,7 +451,7 @@ function RebalancePlanScreen() {
           // Need to adjust - calculate max we can actually transfer
           const maxTransferable = sourceBalance - feeReserve - swapFee - MIN_FEE_RESERVE;
 
-          if (maxTransferable <= MIN_TRANSFER_THRESHOLD) {
+          if (maxTransferable <= minTransferThreshold) {
             throw new Error(
               `Insufficient balance: need ${totalRequired} sats but only have ${sourceBalance} sats`
             );
@@ -588,6 +608,7 @@ function RebalancePlanScreen() {
       waitForLock,
       manager,
       computeRouteSuggestion,
+      minTransferThreshold,
     ]
   );
 
@@ -739,23 +760,56 @@ function RebalancePlanScreen() {
       if (runStatus === 'running') return;
 
       const suggestion = stepStatesRef.current[step.id]?.routeSuggestion;
-      if (!suggestion || suggestion.status !== 'found' || !suggestion.viaMintUrl) return;
+      if (!suggestion || suggestion.status !== 'found' || !suggestion.path) return;
+
+      const chainPath = suggestion.path;
+      if (chainPath.length < 3) return; // Need at least A → via → B
 
       isRunningRef.current = true;
-      const via = suggestion.viaMintUrl;
-      const afterId = step.id;
 
+      // ── Temporary trust for untrusted intermediary mints ──
+      // In `allow_untrusted` mode, coco requires mints to be trusted for wallet
+      // operations.  We temporarily trust any intermediary mint the user hasn't
+      // explicitly trusted, then untrust it after the chain finishes.
+      const trustedUrls = new Set(trustedMints.map((m) => m.mintUrl));
+      const intermediaries = chainPath.slice(1, -1);
+      const temporarilyTrusted: string[] = [];
+
+      for (const url of intermediaries) {
+        if (!trustedUrls.has(url)) {
+          try {
+            // addMint may throw if the mint is already added; that's fine,
+            // we just need it to exist before calling trustMint.
+            try {
+              await manager.mint.addMint(url);
+            } catch {
+              // already added — ignore
+            }
+            await manager.mint.trustMint(url);
+            temporarilyTrusted.push(url);
+          } catch (err) {
+            console.warn('Failed to temporarily trust intermediary mint:', url, err);
+          }
+        }
+      }
+
+      const afterId = step.id;
       const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      const rerouteStep1: TransferStep = {
-        ...step,
-        id: `reroute-${afterId}-a-${uniqueSuffix}`,
-        toMintUrl: via,
-      };
-      const rerouteStep2: TransferStep = {
-        ...step,
-        id: `reroute-${afterId}-b-${uniqueSuffix}`,
-        fromMintUrl: via,
-      };
+      const chainId = `chain-${uniqueSuffix}`;
+
+      // Create one TransferStep per hop in the path
+      const rerouteSteps: TransferStep[] = [];
+      for (let i = 0; i < chainPath.length - 1; i++) {
+        rerouteSteps.push({
+          ...step,
+          id: `reroute-${afterId}-${i}-${uniqueSuffix}`,
+          fromMintUrl: chainPath[i],
+          toMintUrl: chainPath[i + 1],
+          chainId,
+          chainPath,
+          chainHopIndex: i,
+        });
+      }
 
       const insertAfter = (arr: TransferStep[], id: string, toInsert: TransferStep[]) => {
         const idx = arr.findIndex((s) => s.id === id);
@@ -763,19 +817,20 @@ function RebalancePlanScreen() {
         return [...arr.slice(0, idx + 1), ...toInsert, ...arr.slice(idx + 1)];
       };
 
-      const nextSteps = insertAfter(runPlan.steps, afterId, [rerouteStep1, rerouteStep2]);
+      const nextSteps = insertAfter(runPlan.steps, afterId, rerouteSteps);
       setRunPlan((prev) => (prev ? { ...prev, steps: nextSteps } : prev));
 
       /**
        * We keep the original step visible (marked skipped) so the user can see what happened.
-       * New A→via and via→B steps are inserted immediately after it.
+       * New chain steps are inserted immediately after it.
        *
        * Important: update `stepStatesRef` immediately so the runner (which reads the ref) sees the new steps.
        */
       const nextStates = { ...stepStatesRef.current };
       nextStates[afterId] = { ...nextStates[afterId], status: 'skipped' };
-      nextStates[rerouteStep1.id] = { status: 'pending' };
-      nextStates[rerouteStep2.id] = { status: 'pending' };
+      for (const rs of rerouteSteps) {
+        nextStates[rs.id] = { status: 'pending' };
+      }
       stepStatesRef.current = nextStates;
       setStepStates(nextStates);
 
@@ -784,9 +839,32 @@ function RebalancePlanScreen() {
       const runId = (runIdRef.current += 1);
       setRunStatus('running');
       setCurrentStepId(null);
-      await runStepsSequentially(nextSteps, runId);
+
+      try {
+        await runStepsSequentially(nextSteps, runId);
+      } finally {
+        // ── Revoke temporary trust ──
+        // Only untrust intermediary mints whose balance is zero. If a chain
+        // failed mid-way, the user may have ecash stranded on the intermediary;
+        // keeping it trusted lets them recover those funds.
+        const balances = await manager.wallet
+          .getBalances()
+          .catch(() => ({}) as Record<string, number>);
+        for (const url of temporarilyTrusted) {
+          const bal = balances[url] ?? 0;
+          if (bal > 0) {
+            console.warn(`Keeping temporary middleman ${url} trusted — ${bal} sats still on mint`);
+            continue;
+          }
+          try {
+            await manager.mint.untrustMint(url);
+          } catch (err) {
+            console.warn('Failed to untrust temporary middleman mint:', url, err);
+          }
+        }
+      }
     },
-    [runPlan, runStatus, runStepsSequentially]
+    [runPlan, runStatus, runStepsSequentially, trustedMints, manager]
   );
 
   const handleCancelRun = useCallback(() => {
@@ -961,7 +1039,7 @@ function RebalancePlanScreen() {
               </HStack>
             )}
             <Text size={11} style={{ color: primaryColor400 }}>
-              Transfers under {MIN_TRANSFER_THRESHOLD} sats are ignored
+              Transfers under {minTransferThreshold} sats are ignored
             </Text>
           </VStack>
         </View>
@@ -990,7 +1068,7 @@ function RebalancePlanScreen() {
                 No transfers needed
               </Text>
               <Text size={14} style={{ color: primaryColor300, textAlign: 'center' }}>
-                All differences are below the {MIN_TRANSFER_THRESHOLD} sat threshold.
+                All differences are below the {minTransferThreshold} sat threshold.
               </Text>
             </VStack>
           </View>
@@ -1029,6 +1107,16 @@ function RebalancePlanScreen() {
                   onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
                   stepNumber={index + 1}
                   isCurrent={runPlan ? currentStepId === step.id : false}
+                  chainInfo={
+                    step.chainId && step.chainPath
+                      ? {
+                          chainId: step.chainId,
+                          chainPath: step.chainPath,
+                          chainHopIndex: step.chainHopIndex ?? 0,
+                          pathMintInfos: step.chainPath.map((url) => mintInfoMap[url] ?? null),
+                        }
+                      : undefined
+                  }
                 />
               );
             })}

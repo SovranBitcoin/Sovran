@@ -10,6 +10,26 @@ interface TermsAccepted {
 
 export type DisplayCurrency = 'usd' | 'eur' | 'gbp';
 
+export type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted';
+
+export interface MiddlemanRoutingSettings {
+  /** Maximum number of intermediary mints in a route (1 = A→via→B, 2 = A→via1→via2→B). */
+  maxHops: number;
+  /** Maximum total fee (in sats) allowed across all hops of an intermediary route. */
+  maxFee: number;
+  /** Minimum success rate (0–1) required for each edge in the route (e.g. 0.9 = 90%). */
+  minSuccessRate: number;
+  /** When true, the most recent swap on each edge must have been OK. */
+  requireLastOk: boolean;
+  /**
+   * Controls which mints can act as intermediaries:
+   * - `'trusted_only'` (default) — only mints the user already trusts.
+   * - `'allow_untrusted'` — any mint from auditor data; untrusted mints are
+   *   temporarily trusted for the swap and untrusted afterward.
+   */
+  trustMode: MiddlemanTrustMode;
+}
+
 interface SettingsState {
   // Core settings
   theme: string;
@@ -21,6 +41,13 @@ interface SettingsState {
   termsAccepted: TermsAccepted | null;
   quickAccessP2PK: boolean;
   sendLocationEnabled: boolean;
+
+  // Rebalancing settings
+  /** Minimum transfer amount in sats to include in a rebalance plan. */
+  minTransferThreshold: number;
+
+  // Middleman routing settings
+  middlemanRouting: MiddlemanRoutingSettings;
 }
 
 interface SettingsActions {
@@ -60,6 +87,14 @@ interface SettingsActions {
   setSendLocationEnabled: (enabled: boolean) => void;
   getSendLocationEnabled: () => boolean;
 
+  // Rebalancing
+  setMinTransferThreshold: (sats: number) => void;
+  getMinTransferThreshold: () => number;
+
+  // Middleman routing
+  setMiddlemanRouting: (settings: Partial<MiddlemanRoutingSettings>) => void;
+  getMiddlemanRouting: () => MiddlemanRoutingSettings;
+
   // Utility methods
   getAllSettings: () => SettingsState;
   resetSettings: () => void;
@@ -81,6 +116,14 @@ export const useSettingsStore = create<SettingsStore>()(
       termsAccepted: null,
       quickAccessP2PK: false,
       sendLocationEnabled: false,
+      minTransferThreshold: 5,
+      middlemanRouting: {
+        maxHops: 1,
+        maxFee: 5,
+        minSuccessRate: 0.9,
+        requireLastOk: true,
+        trustMode: 'trusted_only',
+      },
 
       // Theme management
       setTheme: (theme: string) => {
@@ -188,6 +231,26 @@ export const useSettingsStore = create<SettingsStore>()(
         return get().sendLocationEnabled;
       },
 
+      // Rebalancing
+      setMinTransferThreshold: (sats: number) => {
+        set({ minTransferThreshold: sats });
+      },
+
+      getMinTransferThreshold: () => {
+        return get().minTransferThreshold;
+      },
+
+      // Middleman routing
+      setMiddlemanRouting: (settings) => {
+        set((state) => ({
+          middlemanRouting: { ...state.middlemanRouting, ...settings },
+        }));
+      },
+
+      getMiddlemanRouting: () => {
+        return get().middlemanRouting;
+      },
+
       // Utility methods
       getAllSettings: () => {
         const state = get();
@@ -207,6 +270,14 @@ export const useSettingsStore = create<SettingsStore>()(
           termsAccepted: null,
           quickAccessP2PK: false,
           sendLocationEnabled: false,
+          minTransferThreshold: 5,
+          middlemanRouting: {
+            maxHops: 1,
+            maxFee: 5,
+            minSuccessRate: 0.9,
+            requireLastOk: true,
+            trustMode: 'trusted_only',
+          },
         });
       },
 
@@ -227,6 +298,14 @@ export const useSettingsStore = create<SettingsStore>()(
             termsAccepted: null,
             quickAccessP2PK: false,
             sendLocationEnabled: false,
+            minTransferThreshold: 5,
+            middlemanRouting: {
+              maxHops: 1,
+              maxFee: 5,
+              minSuccessRate: 0.9,
+              requireLastOk: true,
+              trustMode: 'trusted_only',
+            },
           });
           console.log('SettingsStore: All data cleared successfully');
         } catch (error) {
@@ -248,6 +327,8 @@ export const useSettingsStore = create<SettingsStore>()(
         termsAccepted: state.termsAccepted,
         quickAccessP2PK: state.quickAccessP2PK,
         sendLocationEnabled: state.sendLocationEnabled,
+        minTransferThreshold: state.minTransferThreshold,
+        middlemanRouting: state.middlemanRouting,
         // Note: passcode is not persisted for security reasons
       }),
       onRehydrateStorage: () => (state, error) => {

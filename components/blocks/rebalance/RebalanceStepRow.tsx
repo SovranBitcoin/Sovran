@@ -6,6 +6,9 @@
  * - Amount being transferred
  * - Status indicator (pending, running, done, failed)
  * - Retry/Skip actions on failure
+ *
+ * When a step is part of a middleman chain, shows the full route path
+ * (A → B → C → …) with the active hop highlighted.
  */
 
 import React, { useMemo } from 'react';
@@ -36,6 +39,16 @@ interface MintInfo {
   icon_url?: string;
 }
 
+interface ChainInfo {
+  chainId: string;
+  /** Full ordered path of mint URLs: [source, via1, …, destination]. */
+  chainPath: string[];
+  /** 0-based index of the current hop within the chain. */
+  chainHopIndex: number;
+  /** Mint info for each URL in chainPath (parallel array). */
+  pathMintInfos: (MintInfo | null)[];
+}
+
 interface RebalanceStepRowProps {
   /** Step ID */
   id: string;
@@ -58,8 +71,8 @@ interface RebalanceStepRowProps {
   /** Route suggestion if we can propose an intermediary (no_route helper) */
   routeSuggestion?: {
     status: 'searching' | 'found' | 'none';
-    viaMintUrl?: string;
-    viaMintName?: string;
+    path?: string[];
+    pathNames?: string[];
   };
   /** Called when route-through action is pressed */
   onRouteThrough?: () => void;
@@ -71,6 +84,8 @@ interface RebalanceStepRowProps {
   stepNumber: number;
   /** Whether this is the current step (highlighted) */
   isCurrent?: boolean;
+  /** Chain info when this step is part of a middleman route */
+  chainInfo?: ChainInfo;
 }
 
 function extractDomain(url: string): string {
@@ -80,6 +95,10 @@ function extractDomain(url: string): string {
   } catch {
     return url;
   }
+}
+
+function mintDisplayName(info: MintInfo | null | undefined, url: string): string {
+  return info?.name || extractDomain(url);
 }
 
 export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
@@ -97,6 +116,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   onSkip,
   stepNumber,
   isCurrent,
+  chainInfo,
 }) => {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
@@ -150,6 +170,16 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
     }
   };
 
+  // Build the "via X" subtitle for the retry button
+  const routeViaLabel = useMemo(() => {
+    if (!routeSuggestion?.path || routeSuggestion.path.length < 3) return null;
+    const intermediaries = routeSuggestion.path.slice(1, -1);
+    const names = routeSuggestion.pathNames?.slice(1, -1) ?? intermediaries.map(extractDomain);
+    return names.join(' → ');
+  }, [routeSuggestion]);
+
+  const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
+
   return (
     <View
       style={[
@@ -179,39 +209,100 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 
       {/* Main content */}
       <VStack gap={12} style={styles.content}>
-        {/* From → To row */}
-        <HStack align="center" gap={8}>
-          {/* From mint */}
-          <HStack align="center" gap={8} style={styles.mintSection}>
-            <Avatar
-              picture={fromMintInfo?.icon_url}
-              size={32}
-              variant="mint"
-              name={fromName}
-              alt={`${fromName} icon`}
-            />
-            <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
-              {fromName}
+        {chainInfo ? (
+          /* ── Chain route: A → B → C → … ── */
+          <VStack gap={6}>
+            <Text size={11} bold overpass style={{ color: primaryColor400 }}>
+              Middleman route
             </Text>
-          </HStack>
+            <HStack align="center" gap={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
+              {chainInfo.chainPath.map((url, idx) => {
+                const info = chainInfo.pathMintInfos[idx];
+                const name = mintDisplayName(info, url);
+                // The active hop connects idx === chainHopIndex to idx === chainHopIndex + 1
+                const isActiveNode =
+                  idx === chainInfo.chainHopIndex || idx === chainInfo.chainHopIndex + 1;
+                // Intermediary mints (not first or last) are shown bold
+                const isIntermediary = idx > 0 && idx < chainInfo.chainPath.length - 1;
 
-          {/* Arrow */}
-          <Icon name="mdi:arrow-right" size={20} color={primaryColor400} />
-
-          {/* To mint */}
-          <HStack align="center" gap={8} style={styles.mintSection}>
-            <Avatar
-              picture={toMintInfo?.icon_url}
-              size={32}
-              variant="mint"
-              name={toName}
-              alt={`${toName} icon`}
-            />
-            <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
-              {toName}
+                return (
+                  <React.Fragment key={url + idx}>
+                    {idx > 0 && (
+                      <Icon
+                        name="mdi:chevron-right"
+                        size={14}
+                        color={
+                          idx === chainInfo.chainHopIndex + 1 ? primaryColor0 : primaryColor400
+                        }
+                      />
+                    )}
+                    <HStack
+                      align="center"
+                      gap={3}
+                      style={[
+                        styles.chainMintSection,
+                        !isActiveNode && styles.chainDimmed,
+                        { flexShrink: 1 },
+                      ]}>
+                      <Avatar
+                        picture={info?.icon_url}
+                        size={20}
+                        variant="mint"
+                        name={name}
+                        alt={`${name} icon`}
+                      />
+                      <Text
+                        size={10}
+                        numberOfLines={1}
+                        bold={isIntermediary}
+                        style={[styles.mintName, { color: primaryColor0 }]}>
+                        {name}
+                      </Text>
+                    </HStack>
+                  </React.Fragment>
+                );
+              })}
+            </HStack>
+            {/* Current leg indicator */}
+            <Text size={10} style={{ color: primaryColor400 }}>
+              Leg {chainInfo.chainHopIndex + 1} of {totalHops} — {fromName} → {toName}
             </Text>
+          </VStack>
+        ) : (
+          /* ── Standard route: A → B ── */
+          <HStack align="center" gap={8}>
+            {/* From mint */}
+            <HStack align="center" gap={8} style={styles.mintSection}>
+              <Avatar
+                picture={fromMintInfo?.icon_url}
+                size={32}
+                variant="mint"
+                name={fromName}
+                alt={`${fromName} icon`}
+              />
+              <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
+                {fromName}
+              </Text>
+            </HStack>
+
+            {/* Arrow */}
+            <Icon name="mdi:arrow-right" size={20} color={primaryColor400} />
+
+            {/* To mint */}
+            <HStack align="center" gap={8} style={styles.mintSection}>
+              <Avatar
+                picture={toMintInfo?.icon_url}
+                size={32}
+                variant="mint"
+                name={toName}
+                alt={`${toName} icon`}
+              />
+              <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
+                {toName}
+              </Text>
+            </HStack>
           </HStack>
-        </HStack>
+        )}
 
         {/* Amount and status row */}
         <HStack align="center" justify="space-between">
@@ -245,30 +336,34 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 <HStack align="center" gap={8}>
                   <Spinner size={14} />
                   <Text size={12} style={{ color: primaryColor300 }}>
-                    Finding a route…
+                    Finding a middleman…
                   </Text>
                 </HStack>
               )}
             {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
               <Text size={12} style={{ color: primaryColor300 }}>
-                No route suggestions available right now.
+                No middleman routes available right now.
               </Text>
             )}
             <HStack gap={8}>
-              {routeSuggestion?.status === 'found' &&
-              routeSuggestion?.viaMintUrl &&
-              onRouteThrough ? (
+              {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
                 <TouchableOpacity
                   onPress={onRouteThrough}
                   haptics
                   style={[styles.actionButton, { backgroundColor: primaryColor700 }]}>
-                  <HStack align="center" gap={4}>
-                    <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
-                    <Text bold overpass size={12} style={{ color: primaryColor0 }}>
-                      Route through{' '}
-                      {routeSuggestion.viaMintName || extractDomain(routeSuggestion.viaMintUrl)}
-                    </Text>
-                  </HStack>
+                  <VStack gap={2}>
+                    <HStack align="center" gap={4}>
+                      <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
+                      <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+                        Retry through middleman
+                      </Text>
+                    </HStack>
+                    {routeViaLabel && (
+                      <Text size={10} style={{ color: primaryColor400, paddingLeft: 18 }}>
+                        via {routeViaLabel}
+                      </Text>
+                    )}
+                  </VStack>
                 </TouchableOpacity>
               ) : onRetry ? (
                 <TouchableOpacity
@@ -332,6 +427,12 @@ const styles = StyleSheet.create({
   },
   mintName: {
     flex: 1,
+  },
+  chainMintSection: {
+    minWidth: 0,
+  },
+  chainDimmed: {
+    opacity: 0.4,
   },
   actionButton: {
     paddingHorizontal: 12,

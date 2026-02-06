@@ -37,6 +37,13 @@ export interface SwapLeg {
   meltQuoteId?: string;
   meltOperationId?: string;
 
+  // Middleman chain metadata (set when routing through intermediary)
+  chainId?: string;
+  /** Full ordered path of mint URLs: [source, via1, via2, ..., destination]. */
+  chainPath?: string[];
+  /** 0-based index of this leg's hop within the chain. */
+  chainHopIndex?: number;
+
   // UI state (local)
   localStatus?: SwapLegLocalStatus;
   errorMessage?: string;

@@ -9,8 +9,8 @@
 
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 
-/** Minimum transfer amount in sats to include in plan (avoids noisy/fee-inefficient steps) */
-export const MIN_TRANSFER_THRESHOLD = 10;
+/** Default minimum transfer amount in sats (used as fallback when no setting is provided). */
+const MIN_TRANSFER_THRESHOLD = 5;
 
 /**
  * Estimated fee percentage for Lightning transfers (as a decimal, e.g., 0.02 = 2%)
@@ -34,6 +34,12 @@ export interface TransferStep {
   fromMintUrl: string;
   toMintUrl: string;
   amount: number; // Amount to transfer in sats
+  // Middleman chain metadata (set when rerouting through intermediary)
+  chainId?: string; // shared ID linking all legs of the chain
+  /** Full ordered path of mint URLs: [source, via1, via2, ..., destination]. */
+  chainPath?: string[];
+  /** 0-based index of this step's hop within the chain (0 = first leg). */
+  chainHopIndex?: number;
 }
 
 export interface RebalancePlan {
