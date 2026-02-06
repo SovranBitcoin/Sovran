@@ -268,7 +268,8 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       return;
     }
 
-    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+    const decodedToken = getDecodedToken(token);
+    const receiveHistoryEntry: ReceiveHistoryEntry = {
       id: `receive-${Date.now()}`,
       type: 'receive',
       amount,
@@ -276,7 +277,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       mintUrl,
       createdAt: Date.now(),
       metadata: {},
-      token,
+      token: decodedToken,
     };
 
     router.navigate({

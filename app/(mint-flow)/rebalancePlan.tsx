@@ -46,7 +46,7 @@ interface StepState {
   status: StepStatus;
   errorMessage?: string;
   invoice?: string;
-  quoteId?: string;
+  operationId?: string;
   routeSuggestion?: {
     status: 'searching' | 'found' | 'none';
     viaMintUrl?: string;
@@ -347,22 +347,39 @@ function RebalancePlanScreen() {
 
         let transferAmount = originalAmount;
         let invoice: string;
+        let preparedMeltOp: { id: string } | null = null;
 
         // Create initial invoice
         let mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
         invoice = mintQuote.request;
 
-        // Step 2: Get melt quote to check actual fees
-        // Use createMeltQuote (deprecated but doesn't reserve proofs) for fee estimation
+        // Step 2: Prepare melt to get exact fees (v3 API)
+        // This provides fee transparency and an operation ID for crash recovery.
         updateStepState(id, { status: 'invoiceReady', invoice });
 
-        const feeEstimate = await manager.quotes.createMeltQuote(fromMintUrl, invoice);
-        const totalRequired = feeEstimate.amount + feeEstimate.fee_reserve;
+        const prepareForInvoice = async (invoiceToPay: string) => {
+          const prepared = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoiceToPay);
+          updateStepState(id, { operationId: prepared.id });
+          return prepared as unknown as {
+            id: string;
+            amount?: number | string;
+            fee_reserve?: number | string;
+            swap_fee?: number | string;
+          };
+        };
+
+        let preparedForFees = await prepareForInvoice(invoice);
+        preparedMeltOp = preparedForFees;
+
+        const invoiceAmount = Number(preparedForFees.amount ?? transferAmount);
+        const feeReserve = Number(preparedForFees.fee_reserve ?? 0);
+        const swapFee = Number(preparedForFees.swap_fee ?? 0);
+        const totalRequired = invoiceAmount + feeReserve + swapFee;
 
         // Check if we have enough balance
         if (totalRequired > sourceBalance) {
           // Need to adjust - calculate max we can actually transfer
-          const maxTransferable = sourceBalance - feeEstimate.fee_reserve - MIN_FEE_RESERVE;
+          const maxTransferable = sourceBalance - feeReserve - swapFee - MIN_FEE_RESERVE;
 
           if (maxTransferable <= MIN_TRANSFER_THRESHOLD) {
             throw new Error(
@@ -372,13 +389,17 @@ function RebalancePlanScreen() {
 
           // Recreate invoice with adjusted amount
           console.log(
-            `Adjusting transfer: ${transferAmount} -> ${maxTransferable} (balance: ${sourceBalance}, fee: ${feeEstimate.fee_reserve})`
+            `Adjusting transfer: ${transferAmount} -> ${maxTransferable} (balance: ${sourceBalance}, fee_reserve: ${feeReserve}, swap_fee: ${swapFee})`
           );
           transferAmount = maxTransferable;
           mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
           invoice = mintQuote.request;
 
           updateStepState(id, { status: 'invoiceReady', invoice });
+
+          // Re-prepare for the new invoice amount to get updated fees + operation id.
+          preparedForFees = await prepareForInvoice(invoice);
+          preparedMeltOp = preparedForFees;
         }
 
         // Step 3: Melt from sender mint by paying the invoice
@@ -387,17 +408,42 @@ function RebalancePlanScreen() {
 
         const executeMeltWithRetry = async () => {
           try {
-            // Prepare the melt operation (reserves proofs)
-            const preparedOp = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
-            // Execute the prepared operation
-            await manager.quotes.executeMelt(preparedOp.id);
+            if (!preparedMeltOp) {
+              preparedMeltOp = await prepareForInvoice(invoice);
+            }
+
+            const result = (await manager.quotes.executeMelt(preparedMeltOp.id)) as unknown as
+              | { state?: string; id?: string }
+              | undefined;
+
+            if (result?.state === 'pending') {
+              // Pending payments need explicit handling to avoid double-paying on retries.
+              // We poll briefly; if it remains pending, we fail the step with a non-retriable message.
+              const opId = result.id ?? preparedMeltOp.id;
+              const maxWaitMs = 20000;
+              const pollIntervalMs = 2000;
+              const start = Date.now();
+
+              while (Date.now() - start < maxWaitMs) {
+                const decision = await manager.quotes.checkPendingMelt(opId);
+                if (decision === 'finalize') return;
+                if (decision === 'rollback') {
+                  throw new Error('Melt payment rolled back by mint');
+                }
+                await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+              }
+
+              throw new Error(
+                'Payment pending. Please wait and reopen later; the app will recover this operation automatically.'
+              );
+            }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes('Melt operation already in progress')) {
               // Coco internally serializes melts; give it a moment and retry once.
               await new Promise((resolve) => setTimeout(resolve, 900));
-              const preparedOp = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoice);
-              await manager.quotes.executeMelt(preparedOp.id);
+              preparedMeltOp = await prepareForInvoice(invoice);
+              await manager.quotes.executeMelt(preparedMeltOp.id);
               return;
             }
             throw err;
@@ -897,7 +943,13 @@ function RebalancePlanScreen() {
                   onRouteThrough={
                     runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
                   }
-                  onRetry={runStatus !== 'running' ? () => handleRetry(step) : undefined}
+                  onRetry={
+                    runStatus !== 'running' &&
+                    state.status === 'failed' &&
+                    !String(state.errorMessage ?? '').startsWith('Payment pending.')
+                      ? () => handleRetry(step)
+                      : undefined
+                  }
                   onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
                   stepNumber={index + 1}
                   isCurrent={runPlan ? currentStepId === step.id : false}

@@ -193,7 +193,7 @@ interface CurrencyScreenProps {
   /** Navigate to MeltQuoteScreen with lnUrlOrAddress and amount - screen handles quote creation */
   onMeltQuoteReady: (lnUrlOrAddress: string, amount: number) => void;
   onCameraPress: (unit: string) => void;
-  onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
+  onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry) => void;
   onRoutstrSuccess?: () => void;
   /** Called when this modal flow should dismiss back to the previous screen */
   onDone?: () => void;

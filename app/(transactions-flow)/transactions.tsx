@@ -129,11 +129,10 @@ function TransactionsRoute() {
         return;
       }
       case 'receive': {
-        const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
         router.navigate({
           pathname: '/receiveToken',
           params: {
-            receiveHistoryEntry: JSON.stringify(receiveEntry),
+            receiveHistoryEntry: JSON.stringify(historyEntry as ReceiveHistoryEntry),
           },
         });
         return;

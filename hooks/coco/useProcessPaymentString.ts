@@ -181,7 +181,7 @@ export const useProcessPaymentString = ({
             addScan(scanning.data, _tokenString, 'ecash', source);
 
             // Create a receive history entry for ecash receive
-            const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+            const receiveHistoryEntry: ReceiveHistoryEntry = {
               id: `receive-${Date.now()}`,
               type: 'receive',
               amount: decodedToken.proofs.reduce(
@@ -192,7 +192,7 @@ export const useProcessPaymentString = ({
               mintUrl: decodedToken.mint,
               createdAt: Date.now(),
               metadata: {},
-              token: _tokenString,
+              token: decodedToken,
             };
 
             router.navigate({
@@ -218,7 +218,7 @@ export const useProcessPaymentString = ({
 
           const decodedToken = getDecodedToken(scanning.data);
           // Create a receive history entry for ecash receive
-          const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+          const receiveHistoryEntry: ReceiveHistoryEntry = {
             id: `receive-${Date.now()}`,
             type: 'receive',
             amount: decodedToken.proofs.reduce(
@@ -229,7 +229,7 @@ export const useProcessPaymentString = ({
             mintUrl: decodedToken.mint,
             createdAt: Date.now(),
             metadata: {},
-            token: scanning.data,
+            token: decodedToken,
           };
 
           router.navigate({
