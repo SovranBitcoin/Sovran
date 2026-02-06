@@ -71,12 +71,11 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'pendingEcash',
     title: 'Pending Ecash',
     options: {
-      presentation: 'modal',
+      presentation: 'card',
+      animation: 'fade',
       headerShown: true,
-      headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackButtonDisplayMode: 'minimal',
-      gestureDirection: 'vertical',
     },
   },
   // Map flow modal group - Bitcoin merchant map

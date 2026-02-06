@@ -9,7 +9,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { popup } from 'helper/popup';
 import { truncateMiddle } from 'helper/strings';
@@ -37,6 +37,16 @@ import { usePaginatedHistory } from 'coco-cashu-react';
 import { WalletHealthCard } from '@/components/blocks/health/WalletHealthCard';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
+import { PendingEcashCardFrame } from 'components/blocks/pending/PendingEcashCardFrame';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  runOnJS,
+  FadeInUp,
+} from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -674,184 +684,218 @@ const LightningAddressCard = () => {
     hero.startClaimUsername();
   }, [hero]);
 
+  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
+  const pressed = useSharedValue(0);
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.set(withTiming(1, { duration: 150 }));
+    })
+    .onFinalize(() => {
+      pressed.set(withTiming(0, { duration: 200 }));
+    })
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
+    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
+  }));
+
   // Gold accent color for premium/custom names
   const accentColor = '#f59e0b';
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}
-      onPress={handlePress}>
-      <RNView
-        ref={cardRef}
-        collapsable={false}
-        onLayout={() => hero.registerRef('claimUsername', 'source', cardRef.current)}
-        shouldRasterizeIOS
-        renderToHardwareTextureAndroid
-        style={{ opacity: hero.isHidden('claimUsername', 'source') ? 0 : 1 }}>
-        <ClaimUsernameCardFrame
-          accentColor={accentColor}
-          backgroundColor={primary950}
-          highlightColor={getPrimaryColor('50')}>
-          <VStack style={{ padding: 20, zIndex: 1 }}>
-            {/* Header */}
-            <HStack align="center" style={{ marginBottom: 16 }}>
-              <View
-                style={[
-                  styles.lightningAddressIcon,
-                  { backgroundColor: opacity(accentColor, 0.15) },
-                ]}>
-                <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
-              </View>
-              <VStack style={{ flex: 1, marginLeft: 12 }}>
-                <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
-                  Claim Your Address
-                </Text>
-                <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
-                  Get a memorable Lightning URL
-                </Text>
-              </VStack>
-              <View
-                style={[
-                  styles.lightningAddressBadge,
-                  {
-                    backgroundColor: opacity(accentColor, 0.15),
-                    borderColor: opacity(accentColor, 0.3),
-                  },
-                ]}>
-                <Text size={10} heavy style={{ color: accentColor }}>
-                  PREMIUM
-                </Text>
-              </View>
-            </HStack>
+    <GestureDetector gesture={tap}>
+      <Animated.View style={pressAnimStyle}>
+        <RNView style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}>
+          <RNView
+            ref={cardRef}
+            collapsable={false}
+            onLayout={() => hero.registerRef('claimUsername', 'source', cardRef.current)}
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
+            style={{ opacity: hero.isHidden('claimUsername', 'source') ? 0 : 1 }}>
+            <ClaimUsernameCardFrame
+              accentColor={accentColor}
+              backgroundColor={primary950}
+              highlightColor={getPrimaryColor('50')}>
+              <VStack style={{ padding: 20, zIndex: 1 }}>
+                {/* Header */}
+                <HStack align="center" style={{ marginBottom: 16 }}>
+                  <View
+                    style={[
+                      styles.lightningAddressIcon,
+                      { backgroundColor: opacity(accentColor, 0.15) },
+                    ]}>
+                    <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 12 }}>
+                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                      Claim Your Address
+                    </Text>
+                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                      Get a memorable Lightning URL
+                    </Text>
+                  </VStack>
+                  <View
+                    style={[
+                      styles.lightningAddressBadge,
+                      {
+                        backgroundColor: opacity(accentColor, 0.15),
+                        borderColor: opacity(accentColor, 0.3),
+                      },
+                    ]}>
+                    <Text size={10} heavy style={{ color: accentColor }}>
+                      PREMIUM
+                    </Text>
+                  </View>
+                </HStack>
 
-            {/* Address comparison */}
-            <VStack style={{ gap: 12 }}>
-              {/* Current address (before) */}
-              <VStack>
-                <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
-                  YOUR CURRENT ADDRESS
-                </Text>
-                <View style={[styles.addressBox, { borderColor: opacity(accentColor, 0.2) }]}>
-                  <Icon
-                    name="mdi:close-circle"
-                    size={16}
-                    color="#ef4444"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text
-                    size={13}
-                    mono
-                    style={{ color: opacity(accentColor, 0.7) }}
-                    numberOfLines={1}>
-                    {currentAddress}
-                  </Text>
-                </View>
-              </VStack>
+                {/* Address comparison */}
+                <VStack style={{ gap: 12 }}>
+                  {/* Current address (before) */}
+                  <VStack>
+                    <Text
+                      size={10}
+                      heavy
+                      style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
+                      YOUR CURRENT ADDRESS
+                    </Text>
+                    <View style={[styles.addressBox, { borderColor: opacity(accentColor, 0.2) }]}>
+                      <Icon
+                        name="mdi:close-circle"
+                        size={16}
+                        color="#ef4444"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text
+                        size={13}
+                        mono
+                        style={{ color: opacity(accentColor, 0.7) }}
+                        numberOfLines={1}>
+                        {currentAddress}
+                      </Text>
+                    </View>
+                  </VStack>
 
-              {/* Arrow */}
-              <HStack align="center" justify="center">
-                <View
-                  style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
-                />
+                  {/* Arrow */}
+                  <HStack align="center" justify="center">
+                    <View
+                      style={[
+                        styles.addressArrowLine,
+                        { backgroundColor: opacity(accentColor, 0.3) },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.addressArrowIcon,
+                        { backgroundColor: opacity(accentColor, 0.15) },
+                      ]}>
+                      <Icon name="mdi:arrow-down" size={16} color={accentColor} />
+                    </View>
+                    <View
+                      style={[
+                        styles.addressArrowLine,
+                        { backgroundColor: opacity(accentColor, 0.3) },
+                      ]}
+                    />
+                  </HStack>
+
+                  {/* Custom address (after) */}
+                  <VStack>
+                    <Text
+                      size={10}
+                      heavy
+                      style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
+                      YOUR CUSTOM ADDRESS
+                    </Text>
+                    <View
+                      style={[
+                        styles.addressBox,
+                        {
+                          backgroundColor: opacity(accentColor, 0.1),
+                          borderColor: opacity(accentColor, 0.3),
+                        },
+                      ]}>
+                      <Icon
+                        name="mdi:check-circle"
+                        size={16}
+                        color="#22c55e"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
+                        satoshi
+                      </Text>
+                      <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
+                        @npubx.cash
+                      </Text>
+                    </View>
+                  </VStack>
+                </VStack>
+
+                {/* Benefits */}
+                <HStack style={{ marginTop: 16, gap: 16 }}>
+                  <HStack align="center">
+                    <Icon name="mdi:share-variant" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Easy to share
+                    </Text>
+                  </HStack>
+                  <HStack align="center">
+                    <Icon name="mdi:qrcode" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Scannable QR
+                    </Text>
+                  </HStack>
+                  <HStack align="center">
+                    <Icon name="mdi:account-check" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Memorable
+                    </Text>
+                  </HStack>
+                </HStack>
+
+                {/* CTA row (match Wallet Health “View health details” style) */}
                 <View
                   style={[
-                    styles.addressArrowIcon,
-                    { backgroundColor: opacity(accentColor, 0.15) },
-                  ]}>
-                  <Icon name="mdi:arrow-down" size={16} color={accentColor} />
-                </View>
-                <View
-                  style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
-                />
-              </HStack>
-
-              {/* Custom address (after) */}
-              <VStack>
-                <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
-                  YOUR CUSTOM ADDRESS
-                </Text>
-                <View
-                  style={[
-                    styles.addressBox,
+                    styles.lightningAddressCTA,
                     {
-                      backgroundColor: opacity(accentColor, 0.1),
-                      borderColor: opacity(accentColor, 0.3),
+                      backgroundColor: opacity(accentColor, 0.12),
+                      borderColor: opacity(accentColor, 0.22),
                     },
                   ]}>
-                  <Icon
-                    name="mdi:check-circle"
-                    size={16}
-                    color="#22c55e"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
-                    satoshi
-                  </Text>
-                  <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
-                    @npubx.cash
-                  </Text>
+                  <HStack align="center" justify="space-between">
+                    <HStack align="center" gap={8}>
+                      <Icon
+                        name="mingcute:lightning-fill"
+                        size={16}
+                        color={opacity(accentColor, 0.9)}
+                      />
+                      <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
+                        Get your username
+                      </Text>
+                    </HStack>
+                    <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
+                  </HStack>
                 </View>
               </VStack>
-            </VStack>
-
-            {/* Benefits */}
-            <HStack style={{ marginTop: 16, gap: 16 }}>
-              <HStack align="center">
-                <Icon name="mdi:share-variant" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Easy to share
-                </Text>
-              </HStack>
-              <HStack align="center">
-                <Icon name="mdi:qrcode" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Scannable QR
-                </Text>
-              </HStack>
-              <HStack align="center">
-                <Icon name="mdi:account-check" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Memorable
-                </Text>
-              </HStack>
-            </HStack>
-
-            {/* CTA row (match Wallet Health “View health details” style) */}
-            <View
-              style={[
-                styles.lightningAddressCTA,
-                {
-                  backgroundColor: opacity(accentColor, 0.12),
-                  borderColor: opacity(accentColor, 0.22),
-                },
-              ]}>
-              <HStack align="center" justify="space-between">
-                <HStack align="center" gap={8}>
-                  <Icon
-                    name="mingcute:lightning-fill"
-                    size={16}
-                    color={opacity(accentColor, 0.9)}
-                  />
-                  <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
-                    Get your username
-                  </Text>
-                </HStack>
-                <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
-              </HStack>
-            </View>
-          </VStack>
-        </ClaimUsernameCardFrame>
-      </RNView>
-    </TouchableOpacity>
+            </ClaimUsernameCardFrame>
+          </RNView>
+        </RNView>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
 // Pending Ecash Card - Shows pending send operations that can be reclaimed
-// Styled to match WalletHealthCard with a green color scheme
+// Styled to match WalletHealthCard with a green color scheme + hero transition
 const PendingEcashCard = () => {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const { history } = usePaginatedHistory();
+  const hero = useHeroTransition();
+  const cardRef = useRef<any>(null);
 
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
   const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
@@ -872,8 +916,28 @@ const PendingEcashCard = () => {
   const unit = pendingSends[0]?.unit || 'sat';
 
   const handlePress = useCallback(() => {
-    router.push('/pendingEcash');
-  }, []);
+    hero.registerRef('pendingEcash', 'source', cardRef.current);
+    hero.startPendingEcash();
+  }, [hero]);
+
+  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
+  const pressed = useSharedValue(0);
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.set(withTiming(1, { duration: 150 }));
+    })
+    .onFinalize(() => {
+      pressed.set(withTiming(0, { duration: 200 }));
+    })
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
+    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
+  }));
 
   // Don't show card if no pending transactions
   if (pendingSends.length === 0) {
@@ -881,126 +945,106 @@ const PendingEcashCard = () => {
   }
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={[styles.pendingEcashCard, { borderColor: opacity(accentColor, 0.25) }]}
-      onPress={handlePress}>
-      {/* Base fill */}
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: primary950 }]} />
-
-      {/* Global green wash */}
-      <View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(accentColor, 0.06) }]}
-      />
-
-      {/* Corner gradients */}
-      <LinearGradient
-        colors={[opacity(accentColor, 0.34), opacity(accentColor, 0.12), 'transparent']}
-        locations={[0, 0.55, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      <LinearGradient
-        colors={[opacity(accentColor, 0.22), 'transparent', opacity(accentColor, 0.26)]}
-        locations={[0, 0.55, 1]}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Subtle top highlight */}
-      <LinearGradient
-        colors={[opacity(primary50, 0.06), 'transparent']}
-        locations={[0, 0.7]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Decorative icons */}
-      <View style={styles.pendingDecorationLeft} pointerEvents="none">
-        <Icon name="mdi:clock-outline" size={90} color={opacity(accentColor, 0.08)} />
-      </View>
-      <View style={styles.pendingDecorationRight} pointerEvents="none">
-        <Icon name="mdi:cash-multiple" size={140} color={opacity(accentColor, 0.05)} />
-      </View>
-
-      <VStack style={{ padding: 18 }}>
-        <HStack align="center" justify="space-between">
-          <HStack align="center" gap={10}>
-            <View
-              style={[styles.pendingEcashIcon, { backgroundColor: opacity(accentColor, 0.16) }]}>
-              <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
-            </View>
-            <VStack>
-              <Text size={16} heavy style={{ color: primary50 }}>
-                Pending Ecash
-              </Text>
-              <HStack align="center" gap={8} style={{ marginTop: 6 }}>
-                <View
-                  style={[
-                    styles.pendingUnitPill,
-                    {
-                      backgroundColor: opacity(accentColor, 0.14),
-                      borderColor: opacity(accentColor, 0.22),
-                    },
-                  ]}>
-                  <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                    {pendingSends.length} {pendingSends.length === 1 ? 'TOKEN' : 'TOKENS'}
-                  </Text>
-                </View>
-                <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
-                  Tap to reclaim
-                </Text>
-              </HStack>
-            </VStack>
-          </HStack>
-          <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
-        </HStack>
-
-        {/* Amount display row */}
-        <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-          <HStack align="center" gap={6}>
-            <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
-            <AmountFormatter
-              amount={totalAmount}
-              unit={unit}
-              size={11}
-              weight="medium"
-              color={opacity(accentColor, 0.8)}
-            />
-            <Text size={11} style={{ color: opacity(accentColor, 0.8) }}>
-              unclaimed
-            </Text>
-          </HStack>
-        </HStack>
-
-        {/* CTA row */}
-        <View
+    <GestureDetector gesture={tap}>
+      <Animated.View style={pressAnimStyle}>
+        <RNView
+          ref={cardRef}
+          collapsable={false}
+          onLayout={() => hero.registerRef('pendingEcash', 'source', cardRef.current)}
+          shouldRasterizeIOS
+          renderToHardwareTextureAndroid
           style={[
-            styles.pendingEcashCTA,
+            styles.pendingEcashCard,
             {
-              backgroundColor: opacity(accentColor, 0.12),
-              borderColor: opacity(accentColor, 0.22),
+              borderColor: opacity(accentColor, 0.25),
+              opacity: hero.isHidden('pendingEcash', 'source') ? 0 : 1,
             },
           ]}>
-          <HStack align="center" justify="space-between">
-            <HStack align="center" gap={8}>
-              <Icon
-                name="fluent:arrow-download-16-filled"
-                size={16}
-                color={opacity(accentColor, 0.9)}
-              />
-              <Text size={12} heavy style={{ color: primary50 }}>
-                View & Reclaim
-              </Text>
-            </HStack>
-            <Icon name="mdi:arrow-right" size={18} color={primary50} />
-          </HStack>
-        </View>
-      </VStack>
-    </TouchableOpacity>
+          <PendingEcashCardFrame
+            accentColor={accentColor}
+            backgroundColor={primary950}
+            highlightColor={primary50}>
+            <VStack style={{ padding: 18 }}>
+              <HStack align="center" justify="space-between">
+                <HStack align="center" gap={10}>
+                  <View
+                    style={[
+                      styles.pendingEcashIcon,
+                      { backgroundColor: opacity(accentColor, 0.16) },
+                    ]}>
+                    <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
+                  </View>
+                  <VStack>
+                    <Text size={16} heavy style={{ color: primary50 }}>
+                      Pending Ecash
+                    </Text>
+                    <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                      <View
+                        style={[
+                          styles.pendingUnitPill,
+                          {
+                            backgroundColor: opacity(accentColor, 0.14),
+                            borderColor: opacity(accentColor, 0.22),
+                          },
+                        ]}>
+                        <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                          {pendingSends.length} {pendingSends.length === 1 ? 'TOKEN' : 'TOKENS'}
+                        </Text>
+                      </View>
+                      <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                        Tap to reclaim
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </HStack>
+                <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
+              </HStack>
+
+              {/* Amount display row */}
+              <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+                <HStack align="center" gap={6}>
+                  <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
+                  <AmountFormatter
+                    amount={totalAmount}
+                    unit={unit}
+                    size={11}
+                    weight="medium"
+                    color={opacity(accentColor, 0.8)}
+                  />
+                  <Text size={11} style={{ color: opacity(accentColor, 0.8) }}>
+                    unclaimed
+                  </Text>
+                </HStack>
+              </HStack>
+
+              {/* CTA row */}
+              <View
+                style={[
+                  styles.pendingEcashCTA,
+                  {
+                    backgroundColor: opacity(accentColor, 0.12),
+                    borderColor: opacity(accentColor, 0.22),
+                  },
+                ]}>
+                <HStack align="center" justify="space-between">
+                  <HStack align="center" gap={8}>
+                    <Icon
+                      name="fluent:arrow-download-16-filled"
+                      size={16}
+                      color={opacity(accentColor, 0.9)}
+                    />
+                    <Text size={12} heavy style={{ color: primary50 }}>
+                      View & Reclaim
+                    </Text>
+                  </HStack>
+                  <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                </HStack>
+              </View>
+            </VStack>
+          </PendingEcashCardFrame>
+        </RNView>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
@@ -1134,9 +1178,11 @@ const ExploreScreen = () => {
         <Spacer size={32} />
 
         {/* Pending Ecash Section - only shows when there are pending transactions */}
-        <View style={{ paddingHorizontal: 20 }}>
+        <Animated.View
+          entering={FadeInUp.duration(380).delay(80)}
+          style={{ paddingHorizontal: 20 }}>
           <PendingEcashCard />
-        </View>
+        </Animated.View>
 
         <Spacer size={32} />
 
@@ -1145,9 +1191,11 @@ const ExploreScreen = () => {
           title="Your Lightning Address"
           subtitle="Receive Bitcoin with a memorable URL"
         />
-        <View style={{ paddingHorizontal: 20 }}>
+        <Animated.View
+          entering={FadeInUp.duration(380).delay(160)}
+          style={{ paddingHorizontal: 20 }}>
           <LightningAddressCard />
-        </View>
+        </Animated.View>
 
         <Spacer size={32} />
 
@@ -1156,9 +1204,11 @@ const ExploreScreen = () => {
           title="Wallet Health"
           subtitle="Check distribution drift, pending outgoing ecash, and more"
         />
-        <View style={{ paddingHorizontal: 20 }}>
+        <Animated.View
+          entering={FadeInUp.duration(380).delay(240)}
+          style={{ paddingHorizontal: 20 }}>
           <WalletHealthCard defaultUnit="sat" />
-        </View>
+        </Animated.View>
 
         <Spacer size={32} />
 
@@ -1267,6 +1317,7 @@ const styles = StyleSheet.create({
   aiModelCard: {
     width: 200,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   aiModelBadge: {
@@ -1293,6 +1344,7 @@ const styles = StyleSheet.create({
   },
   mapCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   mapImageSection: {
@@ -1339,6 +1391,7 @@ const styles = StyleSheet.create({
   productCard: {
     width: (SCREEN_WIDTH - 44) / 2,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
@@ -1362,6 +1415,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 180,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -1388,6 +1442,7 @@ const styles = StyleSheet.create({
   },
   esimPromo: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
@@ -1427,6 +1482,7 @@ const styles = StyleSheet.create({
   // Lightning Address Card styles
   lightningAddressCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
@@ -1487,21 +1543,11 @@ const styles = StyleSheet.create({
   // Pending Ecash Card styles (matches WalletHealthCard pattern)
   pendingEcashCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
-  pendingDecorationLeft: {
-    position: 'absolute',
-    top: -18,
-    left: -18,
-    transform: [{ rotate: '-12deg' }],
-  },
-  pendingDecorationRight: {
-    position: 'absolute',
-    bottom: -34,
-    right: -34,
-    transform: [{ rotate: '14deg' }],
-  },
+  // pendingDecorationLeft/Right moved to PendingEcashCardFrame
   pendingEcashIcon: {
     width: 40,
     height: 40,

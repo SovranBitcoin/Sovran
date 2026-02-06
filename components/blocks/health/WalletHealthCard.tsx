@@ -6,13 +6,20 @@ import { View } from 'components/ui/View/View';
 import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { computeWalletHealth } from './walletHealth';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  runOnJS,
+} from 'react-native-reanimated';
 
 function getMintsForUnit(trustedMints: any[], unit: string) {
   const u = unit.toLowerCase();
@@ -80,112 +87,134 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
     hero.startWalletHealth(unit);
   }, [hero, unit]);
 
+  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
+  const pressed = useSharedValue(0);
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.set(withTiming(1, { duration: 150 }));
+    })
+    .onFinalize(() => {
+      pressed.set(withTiming(0, { duration: 200 }));
+    })
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
+    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
+  }));
+
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
-      <RNView
-        ref={cardRef}
-        onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
-        // Keep a real native view node for shared transitions (avoid RN view-flattening).
-        collapsable={false}
-        shouldRasterizeIOS
-        renderToHardwareTextureAndroid
-        style={[
-          styles.card,
-          {
-            borderColor: opacity(accentColor, 0.25),
-            opacity: hero.isHidden('walletHealth', 'source') ? 0 : 1,
-          },
-        ]}>
-        <WalletHealthCardFrame
-          accentColor={accentColor}
-          backgroundColor={primary950}
-          highlightColor={primary50}>
-          <VStack style={{ padding: 18 }}>
-            <HStack align="center" justify="space-between">
-              <HStack align="center" gap={10}>
-                <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
-                  <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
-                </View>
-                <VStack>
-                  <Text size={16} heavy style={{ color: primary50 }}>
-                    Wallet health
-                  </Text>
-                  <HStack align="center" gap={8} style={{ marginTop: 6 }}>
-                    <View
-                      style={[
-                        styles.unitPill,
-                        {
-                          backgroundColor: opacity(accentColor, 0.14),
-                          borderColor: opacity(accentColor, 0.22),
-                        },
-                      ]}>
-                      <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                        {unit.toUpperCase()}
-                      </Text>
-                    </View>
-                    <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
-                      Tap for details
-                    </Text>
-                  </HStack>
-                </VStack>
-              </HStack>
-              <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
-            </HStack>
-
-            {/* Status row - styled like “Easy to share / Scannable QR” */}
-            <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-              {health.chips.map((chip) => {
-                const iconName = chipIconName(chip.label);
-                // On this red/heart card: use white for “Balanced”, and red accent for everything else.
-                const isBalanced = chip.label.toLowerCase().includes('balanced');
-                const displayColor = isBalanced
-                  ? opacity(primary50, 0.85)
-                  : opacity(accentColor, 0.8);
-                return (
-                  <HStack key={chip.label} align="center" gap={6}>
-                    <Icon name={iconName} size={14} color={displayColor} />
-                    <Text size={11} style={{ color: displayColor }}>
-                      {chip.label}
-                    </Text>
-                  </HStack>
-                );
-              })}
-            </HStack>
-
-            {/* Subtle CTA row */}
-            <View
-              style={[
-                styles.cta,
-                {
-                  backgroundColor: opacity(accentColor, 0.12),
-                  borderColor: opacity(accentColor, 0.22),
-                },
-              ]}>
+    <GestureDetector gesture={tap}>
+      <Animated.View style={pressAnimStyle}>
+        <RNView
+          ref={cardRef}
+          onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
+          // Keep a real native view node for shared transitions (avoid RN view-flattening).
+          collapsable={false}
+          shouldRasterizeIOS
+          renderToHardwareTextureAndroid
+          style={[
+            styles.card,
+            {
+              borderColor: opacity(accentColor, 0.25),
+              opacity: hero.isHidden('walletHealth', 'source') ? 0 : 1,
+            },
+          ]}>
+          <WalletHealthCardFrame
+            accentColor={accentColor}
+            backgroundColor={primary950}
+            highlightColor={primary50}>
+            <VStack style={{ padding: 18 }}>
               <HStack align="center" justify="space-between">
-                <HStack align="center" gap={8}>
-                  {/* Use an icon already included in metro.config.js */}
-                  <Icon
-                    name="material-symbols:info-rounded"
-                    size={16}
-                    color={opacity(accentColor, 0.9)}
-                  />
-                  <Text size={12} heavy style={{ color: primary50 }}>
-                    View health details
-                  </Text>
+                <HStack align="center" gap={10}>
+                  <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
+                    <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
+                  </View>
+                  <VStack>
+                    <Text size={16} heavy style={{ color: primary50 }}>
+                      Wallet health
+                    </Text>
+                    <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                      <View
+                        style={[
+                          styles.unitPill,
+                          {
+                            backgroundColor: opacity(accentColor, 0.14),
+                            borderColor: opacity(accentColor, 0.22),
+                          },
+                        ]}>
+                        <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                          {unit.toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                        Tap for details
+                      </Text>
+                    </HStack>
+                  </VStack>
                 </HStack>
-                <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
               </HStack>
-            </View>
-          </VStack>
-        </WalletHealthCardFrame>
-      </RNView>
-    </TouchableOpacity>
+
+              {/* Status row - styled like “Easy to share / Scannable QR” */}
+              <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+                {health.chips.map((chip) => {
+                  const iconName = chipIconName(chip.label);
+                  // On this red/heart card: use white for “Balanced”, and red accent for everything else.
+                  const isBalanced = chip.label.toLowerCase().includes('balanced');
+                  const displayColor = isBalanced
+                    ? opacity(primary50, 0.85)
+                    : opacity(accentColor, 0.8);
+                  return (
+                    <HStack key={chip.label} align="center" gap={6}>
+                      <Icon name={iconName} size={14} color={displayColor} />
+                      <Text size={11} style={{ color: displayColor }}>
+                        {chip.label}
+                      </Text>
+                    </HStack>
+                  );
+                })}
+              </HStack>
+
+              {/* Subtle CTA row */}
+              <View
+                style={[
+                  styles.cta,
+                  {
+                    backgroundColor: opacity(accentColor, 0.12),
+                    borderColor: opacity(accentColor, 0.22),
+                  },
+                ]}>
+                <HStack align="center" justify="space-between">
+                  <HStack align="center" gap={8}>
+                    {/* Use an icon already included in metro.config.js */}
+                    <Icon
+                      name="material-symbols:info-rounded"
+                      size={16}
+                      color={opacity(accentColor, 0.9)}
+                    />
+                    <Text size={12} heavy style={{ color: primary50 }}>
+                      View health details
+                    </Text>
+                  </HStack>
+                  <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                </HStack>
+              </View>
+            </VStack>
+          </WalletHealthCardFrame>
+        </RNView>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },

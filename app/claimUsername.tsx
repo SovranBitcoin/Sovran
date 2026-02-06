@@ -561,6 +561,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
@@ -575,6 +576,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
+    borderCurve: 'continuous',
     borderWidth: 2,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -592,6 +594,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 14,
     borderRadius: 14,
+    borderCurve: 'continuous',
     borderWidth: 1,
   },
   domainIcon: {
