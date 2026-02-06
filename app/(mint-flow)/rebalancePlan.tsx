@@ -28,6 +28,10 @@ import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
 import { MIN_FEE_RESERVE } from 'components/blocks/rebalance';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
 import {
+  useReallocationTransactionsStore,
+  type ReallocationLegLocalStatus,
+} from 'stores/reallocationTransactionsStore';
+import {
   RebalanceStepRow,
   computeRebalancePlan,
   isAlreadyBalanced,
@@ -150,6 +154,10 @@ function RebalancePlanScreen() {
   const auditCacheRef = useRef<Map<string, AuditMintResponse>>(new Map());
   // Ref-based guard to prevent concurrent starts (state-based check has race conditions)
   const isRunningRef = useRef(false);
+
+  // Reallocation grouping (store only; Coco remains source of HistoryEntry truth)
+  const reallocationGroupIdRef = useRef<string | null>(null);
+  const reallocationLegIdByStepIdRef = useRef<Record<string, string>>({});
 
   // Display either the frozen run plan (once started) or the live preview
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -337,6 +345,33 @@ function RebalancePlanScreen() {
 
       const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
 
+      const groupId = reallocationGroupIdRef.current;
+      const ensureLegId = () => {
+        if (!groupId) return null;
+        const existing = reallocationLegIdByStepIdRef.current[id];
+        if (existing) return existing;
+
+        const legId = useReallocationTransactionsStore
+          .getState()
+          .addLeg(groupId, { fromMintUrl, toMintUrl, amount: originalAmount });
+        reallocationLegIdByStepIdRef.current[id] = legId;
+        useReallocationTransactionsStore
+          .getState()
+          .setLegStatus(groupId, legId, { localStatus: 'pending' });
+        return legId;
+      };
+
+      const setLegLocalStatus = (
+        localStatus: ReallocationLegLocalStatus,
+        errorMessage?: string
+      ) => {
+        const legId = ensureLegId();
+        if (!groupId || !legId) return;
+        useReallocationTransactionsStore
+          .getState()
+          .setLegStatus(groupId, legId, { localStatus, errorMessage });
+      };
+
       try {
         // Get fresh balances to check source mint
         const currentBalances = await manager.wallet.getBalances();
@@ -344,6 +379,7 @@ function RebalancePlanScreen() {
 
         // Step 1: Create invoice on receiver mint
         updateStepState(id, { status: 'creatingInvoice', errorMessage: undefined });
+        setLegLocalStatus('creatingInvoice');
 
         let transferAmount = originalAmount;
         let invoice: string;
@@ -352,14 +388,36 @@ function RebalancePlanScreen() {
         // Create initial invoice
         let mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
         invoice = mintQuote.request;
+        {
+          const legId = ensureLegId();
+          const mintQuoteId =
+            (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
+          if (groupId && legId && mintQuoteId) {
+            useReallocationTransactionsStore
+              .getState()
+              .tagMintQuote(groupId, legId, String(mintQuoteId));
+          }
+        }
 
         // Step 2: Prepare melt to get exact fees (v3 API)
         // This provides fee transparency and an operation ID for crash recovery.
         updateStepState(id, { status: 'invoiceReady', invoice });
+        setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
           const prepared = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoiceToPay);
           updateStepState(id, { operationId: prepared.id });
+          {
+            const legId = ensureLegId();
+            const quoteId =
+              (prepared as any)?.quoteId ?? (prepared as any)?.quote ?? (prepared as any)?.id;
+            if (groupId && legId && quoteId) {
+              useReallocationTransactionsStore.getState().tagMelt(groupId, legId, {
+                quoteId: String(quoteId),
+                operationId: String(prepared.id),
+              });
+            }
+          }
           return prepared as unknown as {
             id: string;
             amount?: number | string;
@@ -394,8 +452,19 @@ function RebalancePlanScreen() {
           transferAmount = maxTransferable;
           mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
           invoice = mintQuote.request;
+          {
+            const legId = ensureLegId();
+            const mintQuoteId =
+              (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
+            if (groupId && legId && mintQuoteId) {
+              useReallocationTransactionsStore
+                .getState()
+                .tagMintQuote(groupId, legId, String(mintQuoteId));
+            }
+          }
 
           updateStepState(id, { status: 'invoiceReady', invoice });
+          setLegLocalStatus('invoiceReady');
 
           // Re-prepare for the new invoice amount to get updated fees + operation id.
           preparedForFees = await prepareForInvoice(invoice);
@@ -405,6 +474,7 @@ function RebalancePlanScreen() {
         // Step 3: Melt from sender mint by paying the invoice
         // Use the v3 two-step flow: prepareMeltBolt11 + executeMelt
         updateStepState(id, { status: 'melting' });
+        setLegLocalStatus('melting');
 
         const executeMeltWithRetry = async () => {
           try {
@@ -455,6 +525,7 @@ function RebalancePlanScreen() {
         // Step 4: Verify - wait for balance to increase on receiving mint
         // The MintQuoteProcessor runs every 5 seconds to claim paid quotes
         updateStepState(id, { status: 'verifying' });
+        setLegLocalStatus('verifying');
 
         // Poll for up to 15 seconds for the balance to update
         const balanceUpdated = await waitForBalanceIncrease(toMintUrl, transferAmount, 15000);
@@ -472,6 +543,7 @@ function RebalancePlanScreen() {
 
         // Mark as done
         updateStepState(id, { status: 'done' });
+        setLegLocalStatus('done');
 
         // Add a small delay between steps to avoid overwhelming the mints
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -498,6 +570,7 @@ function RebalancePlanScreen() {
         }
 
         updateStepState(id, { status: 'failed', errorMessage });
+        setLegLocalStatus('failed', errorMessage);
 
         // If this is a no_route failure, compute a route suggestion asynchronously and show progress.
         const rawError = error instanceof Error ? error.message : String(error);
@@ -545,6 +618,11 @@ function RebalancePlanScreen() {
         if (abortRef.current || runIdRef.current !== runId) return;
         setCurrentStepId(null);
         setRunStatus('finished');
+        if (reallocationGroupIdRef.current) {
+          useReallocationTransactionsStore
+            .getState()
+            .finalizeGroup(reallocationGroupIdRef.current, 'finished');
+        }
       } finally {
         // Always reset the running ref when done
         isRunningRef.current = false;
@@ -568,6 +646,12 @@ function RebalancePlanScreen() {
     const snapshot = computedPlan;
     setRunPlan(snapshot);
 
+    // Start a reallocation group for this run (used for Transactions grouping)
+    reallocationLegIdByStepIdRef.current = {};
+    reallocationGroupIdRef.current = useReallocationTransactionsStore
+      .getState()
+      .startGroup({ unit, title: 'Reallocation' });
+
     // Initialize states for frozen steps
     const initial: Record<string, StepState> = {};
     for (const step of snapshot.steps) {
@@ -580,7 +664,7 @@ function RebalancePlanScreen() {
     // Kick off the runner (do not await; keep UI responsive)
     // Use the snapshot steps (stable), not any live recomputed list.
     runStepsSequentially(snapshot.steps, runId);
-  }, [computedPlan, runStatus, runStepsSequentially]);
+  }, [computedPlan, runStatus, runStepsSequentially, unit]);
 
   // Handle retry for a failed step
   const handleRetry = useCallback(
@@ -724,6 +808,12 @@ function RebalancePlanScreen() {
     isRunningRef.current = false;
     setRunStatus('cancelled');
     setCurrentStepId(null);
+
+    if (reallocationGroupIdRef.current) {
+      useReallocationTransactionsStore
+        .getState()
+        .finalizeGroup(reallocationGroupIdRef.current, 'cancelled');
+    }
   }, []);
 
   // Bottom buttons
