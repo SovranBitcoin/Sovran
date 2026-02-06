@@ -1,3 +1,16 @@
+diff --git a/node_modules/coco-cashu-core/dist/index.cjs b/node_modules/coco-cashu-core/dist/index.cjs
+index 2f1628d..b8deec1 100644
+--- a/node_modules/coco-cashu-core/dist/index.cjs
++++ b/node_modules/coco-cashu-core/dist/index.cjs
+@@ -1129,7 +1129,7 @@ var ProofService = class {
+ 	* @throws ProofValidationError if insufficient balance to cover the amount
+ 	*/
+ 	async selectProofsToSend(mintUrl, amount, includeFees = true) {
+-		const proofs = await this.getReadyProofs(mintUrl);
++		const proofs = await this.proofRepository.getAvailableProofs(mintUrl);
+ 		if (proofs.reduce((acc, proof) => acc + proof.amount, 0) < amount) throw new ProofValidationError("Not enough proofs to send");
+ 		const selectedProofs = (await this.walletService.getWallet(mintUrl)).selectProofsToSend(proofs, amount, includeFees);
+ 		this.logger?.debug("Selected proofs to send", {
 diff --git a/node_modules/coco-cashu-core/dist/index.d.cts b/node_modules/coco-cashu-core/dist/index.d.cts
 index 364cd31..dd73ed9 100644
 --- a/node_modules/coco-cashu-core/dist/index.d.cts
@@ -103,9 +116,18 @@ index be84049..d38766e 100644
    private meltOperationService;
    private meltOperationRepository;
 diff --git a/node_modules/coco-cashu-core/dist/index.js b/node_modules/coco-cashu-core/dist/index.js
-index 0ca0399..42421ab 100644
+index 0ca0399..d53e5ba 100644
 --- a/node_modules/coco-cashu-core/dist/index.js
 +++ b/node_modules/coco-cashu-core/dist/index.js
+@@ -1129,7 +1129,7 @@ var ProofService = class {
+ 	* @throws ProofValidationError if insufficient balance to cover the amount
+ 	*/
+ 	async selectProofsToSend(mintUrl, amount, includeFees = true) {
+-		const proofs = await this.getReadyProofs(mintUrl);
++		const proofs = await this.proofRepository.getAvailableProofs(mintUrl);
+ 		if (proofs.reduce((acc, proof) => acc + proof.amount, 0) < amount) throw new ProofValidationError("Not enough proofs to send");
+ 		const selectedProofs = (await this.walletService.getWallet(mintUrl)).selectProofsToSend(proofs, amount, includeFees);
+ 		this.logger?.debug("Selected proofs to send", {
 @@ -6792,6 +6792,10 @@ var MintApi = class {
  	async addMint(mintUrl, options) {
  		return this.mintService.addMintByUrl(mintUrl, options);
