@@ -86,6 +86,8 @@ export interface ModalLayoutWrapperProps {
    * Useful when useCustomScrollView is true to add proper spacing to your custom scroll content.
    */
   onHeaderHeightChange?: (height: number) => void;
+  /** Insets for the scroll indicator (e.g., to offset below a sticky header overlay) */
+  scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
 }
 
 export const ModalLayoutWrapper = ({
@@ -103,6 +105,7 @@ export const ModalLayoutWrapper = ({
   disableHeaderSpacer = false,
   useCustomScrollView = false,
   onHeaderHeightChange,
+  scrollIndicatorInsets,
 }: ModalLayoutWrapperProps) => {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -232,7 +235,8 @@ export const ModalLayoutWrapper = ({
           style={{ flex: 1 }}
           contentContainerStyle={scrollContentStyle}
           onScroll={animatedScrollHandler}
-          scrollEventThrottle={16}>
+          scrollEventThrottle={16}
+          scrollIndicatorInsets={scrollIndicatorInsets}>
           {/* Header spacer (optional) */}
           {!disableHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
           {children}

@@ -437,7 +437,7 @@ function ClaimUsernameScreen() {
                 borderColor: opacity(accentColor, 0.3),
                 opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
                 marginTop: -topOffset,
-                paddingTop: 20 + topOffset * 2,
+                paddingTop: 52 + topOffset * 2,
               },
             ]}>
             <ClaimUsernameCardFrame
