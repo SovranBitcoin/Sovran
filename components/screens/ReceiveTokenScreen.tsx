@@ -28,14 +28,9 @@ import { useReceive, useManager } from 'coco-cashu-react';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 
-type ReceiveHistoryEntryWithToken = ReceiveHistoryEntry & {
-  token?: string;
-  state?: 'pending' | 'redeemed';
-};
-
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
-  receiveHistoryEntry: ReceiveHistoryEntryWithToken | string | undefined;
+  receiveHistoryEntry: ReceiveHistoryEntry | string | undefined;
   onNavigateBack: () => void;
   onRedeemSuccess: () => void;
 }
@@ -77,9 +72,11 @@ export function ReceiveTokenScreen({
 
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: receiveHistoryEntry, error: parseError } =
-    useHistoryEntry<ReceiveHistoryEntryWithToken>(receiveHistoryEntryProp);
+    useHistoryEntry<ReceiveHistoryEntry>(receiveHistoryEntryProp);
 
-  const token = receiveHistoryEntry?.token;
+  const tokenString = receiveHistoryEntry?.token
+    ? manager.wallet.encodeToken(receiveHistoryEntry.token)
+    : undefined;
 
   // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem)
   const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
@@ -123,7 +120,11 @@ export function ReceiveTokenScreen({
   const handleRedeem = async () => {
     setLoading(true);
     try {
-      await receive(token as string);
+      if (!tokenString) {
+        throw new Error('Missing token data');
+      }
+
+      await receive(tokenString);
 
       // Find the real history entry created by coco and store location against it
       const history = await manager.history.getPaginatedHistory(0, 5);
@@ -139,8 +140,8 @@ export function ReceiveTokenScreen({
         await captureAndStoreLocation(realEntry.id);
 
         // Link the scan history entry to the transaction
-        if (token) {
-          useScanHistoryStore.getState().linkTransaction(token, realEntry.id);
+        if (tokenString) {
+          useScanHistoryStore.getState().linkTransaction(tokenString, realEntry.id);
         }
 
         // Store the real transaction id for location section lookup
@@ -202,7 +203,7 @@ export function ReceiveTokenScreen({
             variant: 'primary',
             onPress: handleRedeemPress,
             loading: loading,
-            condition: !!token && !isRedeemed,
+            condition: !!tokenString && !isRedeemed,
           },
         ]}
       />
@@ -229,7 +230,7 @@ export function ReceiveTokenScreen({
         <Section
           items={[
             { title: 'Type', value: 'Ecash • Receive' },
-            ...(token ? [{ title: 'Token', value: truncateMiddle(token, 6) }] : []),
+            ...(tokenString ? [{ title: 'Token', value: truncateMiddle(tokenString, 6) }] : []),
           ]}
           camera={false}
         />

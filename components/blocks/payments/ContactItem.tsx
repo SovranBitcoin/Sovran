@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { Pressable } from 'react-native';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
@@ -29,9 +29,7 @@ interface ContactItemProps {
 }
 
 const styles = {
-  contactItem: {
-    marginBottom: 24,
-  },
+  contactItem: {},
   row: {
     flex: 1,
   },
@@ -54,46 +52,37 @@ const styles = {
   },
 };
 
-export const ContactItem = ({ item, profile, isLoadingProfile = false }: ContactItemProps) => {
-  console.log(
-    `[DEBUG ContactItem] Render for ${item.type}:${item.pubkey?.slice(0, 8) || item.mint?.mintUrl}`
-  );
-  console.log('[DEBUG ContactItem] Received profile:', JSON.stringify(profile));
-  console.log('[DEBUG ContactItem] Item pubkey:', item.pubkey?.slice(0, 16));
-  console.log(
-    '[DEBUG ContactItem] Profile name:',
-    profile?.name || profile?.display_name || 'NO PROFILE'
-  );
-
+// Memoized ContactItem component to prevent unnecessary re-renders in lists
+export const ContactItem = React.memo(function ContactItem({
+  item,
+  profile,
+  isLoadingProfile = false,
+}: ContactItemProps) {
   // Get display info
   const displayInfo = useMemo(() => {
     if (item.type === 'mint') {
-      const mintInfo = {
+      return {
         name: getMintDisplayName(item.mint?.mintUrl || '', item.mintInfo),
         picture: item.mintInfo?.icon_url,
         subtitle: item.dmEvent?.content || item.mint?.mintUrl || 'No messages',
         isMint: true,
       };
-      console.log('[DEBUG ContactItem] Mint displayInfo:', JSON.stringify(mintInfo));
-      return mintInfo;
     }
 
     // Regular contact - use profile data from kind 0 event
     const displayName = profile?.display_name || profile?.name || item.pubkey.slice(0, 16) + '...';
     const lastMessage = item.dmEvent?.content || 'No messages';
 
-    const contactInfo = {
+    return {
       name: displayName,
       picture: profile?.picture,
       subtitle: lastMessage,
       isMint: false,
     };
-    console.log('[DEBUG ContactItem] Contact displayInfo:', JSON.stringify(contactInfo));
-    return contactInfo;
   }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent?.content, profile]);
 
-  // Format date
-  const formattedDate = useMemo(() => {
+  // Format date (kept for future use when date display is re-enabled)
+  const _formattedDate = useMemo(() => {
     if (!item.dmEvent?.created_at) return null;
     return formatCustomDate(new Date(item.dmEvent.created_at * 1000));
   }, [item.dmEvent?.created_at]);
@@ -138,21 +127,21 @@ export const ContactItem = ({ item, profile, isLoadingProfile = false }: Contact
           </Text>
         </VStack>
       </HStack>
-      {formattedDate && (
+      {/* {formattedDate && (
         <Text style={styles.date} className="text-primary-200">
           {formattedDate}
         </Text>
-      )}
+      )} */}
     </HStack>
   );
 
   if (linkHref) {
     return (
       <Link href={linkHref as any} asChild>
-        <TouchableOpacity style={styles.contactItem}>{content}</TouchableOpacity>
+        <Pressable style={styles.contactItem}>{content}</Pressable>
       </Link>
     );
   }
 
-  return <TouchableOpacity style={styles.contactItem}>{content}</TouchableOpacity>;
-};
+  return <Pressable style={styles.contactItem}>{content}</Pressable>;
+});

@@ -1,14 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
+import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type { Token } from '@cashu/cashu-ts';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 
 type SendStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface SendResult {
   token: Token;
   historyEntry: SendHistoryEntry;
+  /** The send operation ID (for finalize/rollback if needed) */
+  operationId: string;
 }
 
 interface SendOptions {
@@ -20,6 +22,10 @@ interface SendOptions {
 /**
  * Enhanced send hook that captures the history entry using coco events.
  * This is the coco-idiomatic way to send and get the full history entry.
+ *
+ * Uses the new v3 two-step send flow:
+ * 1. prepareSend() - prepares the operation and reserves proofs
+ * 2. executePreparedSend() - executes the prepared operation
  *
  * Instead of searching through paginated history after a send,
  * this hook listens to the `history:updated` event to capture
@@ -53,23 +59,32 @@ export function useSendWithHistory() {
       // Create a promise that resolves when we capture the history entry
       let capturedEntry: SendHistoryEntry | null = null;
       let resolveEntryPromise: (entry: SendHistoryEntry) => void;
+      let targetOperationId: string | null = null;
 
       const entryPromise = new Promise<SendHistoryEntry>((resolve) => {
         resolveEntryPromise = resolve;
       });
 
-      // Set up one-time listener for history:updated event
-      // This will fire right after send:created when HistoryService creates the entry
-      const unsubscribe = manager.once('history:updated', ({ entry }) => {
+      // Set up listener for history:updated event
+      // In v3, the history entry is created on send:pending (after execute)
+      const unsubscribe = manager.on('history:updated', ({ entry }) => {
         if (entry.type === 'send') {
-          capturedEntry = entry as SendHistoryEntry;
-          resolveEntryPromise(capturedEntry);
+          const sendEntry = entry as SendHistoryEntry;
+          // Match by operationId if we have it, otherwise accept first send entry
+          if (!targetOperationId || sendEntry.operationId === targetOperationId) {
+            capturedEntry = sendEntry;
+            resolveEntryPromise(capturedEntry);
+          }
         }
       });
 
       try {
-        // Perform the send operation
-        const token = await manager.wallet.send(mintUrl, amount);
+        // Step 1: Prepare the send operation using new v3 API
+        const prepared = await manager.send.prepareSend(mintUrl, amount);
+        targetOperationId = prepared.id;
+
+        // Step 2: Execute the prepared send operation
+        const { token, operation } = await manager.send.executePreparedSend(prepared.id);
 
         // Wait for the history entry to be captured (should be nearly instant)
         // Add a timeout just in case
@@ -78,6 +93,7 @@ export function useSendWithHistory() {
         });
 
         const historyEntry = await Promise.race([entryPromise, timeoutPromise]);
+        unsubscribe();
 
         // In the newer coco version, token might be optional on SendHistoryEntry
         // Verify this is the right entry by comparing tokens (if available)
@@ -97,14 +113,14 @@ export function useSendWithHistory() {
             throw new Error('Failed to find send history entry');
           }
 
-          const result = { token, historyEntry: matchingEntry };
+          const result = { token, historyEntry: matchingEntry, operationId: operation.id };
           setData(result);
           setStatus('success');
           opts.onSuccess?.(result);
           return result;
         }
 
-        const result = { token, historyEntry };
+        const result = { token, historyEntry, operationId: operation.id };
         setData(result);
         setStatus('success');
         opts.onSuccess?.(result);

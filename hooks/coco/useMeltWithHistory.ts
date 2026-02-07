@@ -1,13 +1,26 @@
 import { useCallback, useRef, useState } from 'react';
-import type { MeltQuoteResponse } from '@cashu/cashu-ts';
+import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
 type MeltStatus = 'idle' | 'creating' | 'paying' | 'success' | 'error';
 
+/**
+ * Type for the prepared melt operation returned by prepareMeltBolt11.
+ * We define this inline since PreparedMeltOperation is not exported from coco-cashu-core.
+ */
+interface PreparedMeltOp {
+  id: string;
+  quoteId: string;
+  amount: number;
+  fee_reserve: number;
+}
+
 interface MeltQuoteResult {
-  quote: MeltQuoteResponse;
+  quote: MeltQuoteBolt11Response;
   historyEntry: MeltHistoryEntry;
+  /** The prepared melt operation ID (used for executeMelt) */
+  operationId: string;
 }
 
 interface MeltOptions {
@@ -17,8 +30,30 @@ interface MeltOptions {
 }
 
 /**
+ * Converts a prepared melt operation to MeltQuoteBolt11Response format for backwards compatibility.
+ * The new v3 API uses operations instead of raw quote responses.
+ */
+function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuoteBolt11Response {
+  return {
+    quote: operation.quoteId,
+    amount: operation.amount,
+    fee_reserve: operation.fee_reserve,
+    state: 'UNPAID' as const,
+    expiry: 0, // Not available in operation
+    payment_preimage: null,
+    change: undefined,
+    request: invoice,
+    unit: 'sat', // Default to sat, will be updated from history entry if available
+  };
+}
+
+/**
  * Enhanced melt hook that captures the history entry using coco events.
  * This is the coco-idiomatic way to create melt quotes and get the full history entry.
+ *
+ * Uses the new v3 two-step melt flow:
+ * 1. prepareMeltBolt11() - prepares the operation and reserves proofs
+ * 2. executeMelt() - executes the prepared operation
  *
  * Instead of searching through paginated history after creating a quote,
  * this hook listens to the `history:updated` event to capture
@@ -32,9 +67,10 @@ export function useMeltWithHistory() {
   const isProcessingRef = useRef(false);
 
   /**
-   * Create a melt quote and capture the history entry via coco events
+   * Prepare a melt operation and capture the history entry via coco events.
+   * This is the first step of the two-step melt flow.
    */
-  const createMeltQuote = useCallback(
+  const prepareMeltQuote = useCallback(
     async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
       if (isProcessingRef.current) {
         const err = new Error('Melt operation already in progress');
@@ -88,15 +124,20 @@ export function useMeltWithHistory() {
       const unsubscribe = manager.on('history:updated', handler);
 
       try {
-        // Create the melt quote
-        const quote = await manager.quotes.createMeltQuote(mintUrl, invoice);
-        targetQuoteId = quote.quote;
+        // Prepare the melt operation using the new v3 API
+        const operation = await manager.quotes.prepareMeltBolt11(mintUrl, invoice);
+        targetQuoteId = operation.quoteId;
 
-        // Check if we already captured the entry while creating the quote
-        const alreadyCaptured = capturedMeltEntries.find((e) => e.quoteId === quote.quote);
+        // Convert operation to quote format for backwards compatibility
+        const quote = operationToQuote(operation, invoice);
+
+        // Check if we already captured the entry while preparing
+        const alreadyCaptured = capturedMeltEntries.find((e) => e.quoteId === operation.quoteId);
         if (alreadyCaptured) {
           unsubscribe();
-          const result = { quote, historyEntry: alreadyCaptured };
+          // Update quote unit from history entry
+          quote.unit = alreadyCaptured.unit;
+          const result = { quote, historyEntry: alreadyCaptured, operationId: operation.id };
           setData(result);
           setStatus('idle');
           opts.onSuccess?.(result);
@@ -111,7 +152,9 @@ export function useMeltWithHistory() {
         const historyEntry = await Promise.race([entryPromise, timeoutPromise]);
         unsubscribe();
 
-        const result = { quote, historyEntry };
+        // Update quote unit from history entry
+        quote.unit = historyEntry.unit;
+        const result = { quote, historyEntry, operationId: operation.id };
         setData(result);
         setStatus('idle');
         opts.onSuccess?.(result);
@@ -128,10 +171,14 @@ export function useMeltWithHistory() {
           );
 
           if (matchingEntry && targetQuoteId) {
-            // Get the quote from memory or re-fetch
-            const quote = await manager.quotes.createMeltQuote(mintUrl, invoice).catch(() => null);
-            if (quote) {
-              const result = { quote, historyEntry: matchingEntry };
+            // Try to prepare again to get the operation ID
+            const operation = await manager.quotes
+              .prepareMeltBolt11(mintUrl, invoice)
+              .catch(() => null);
+            if (operation) {
+              const quote = operationToQuote(operation, invoice);
+              quote.unit = matchingEntry.unit;
+              const result = { quote, historyEntry: matchingEntry, operationId: operation.id };
               setData(result);
               setStatus('idle');
               opts.onSuccess?.(result);
@@ -156,10 +203,14 @@ export function useMeltWithHistory() {
   );
 
   /**
-   * Pay a melt quote and track the state change
+   * Execute a prepared melt operation.
+   * This is the second step of the two-step melt flow.
+   *
+   * @param operationId - The operation ID from prepareMeltQuote
+   * @param quoteId - The quote ID (used for backwards compatibility with old API consumers)
    */
-  const payMeltQuote = useCallback(
-    async (mintUrl: string, quoteId: string, opts: MeltOptions = {}): Promise<void> => {
+  const executeMeltQuote = useCallback(
+    async (operationId: string, quoteId: string, opts: MeltOptions = {}): Promise<void> => {
       if (isProcessingRef.current) {
         const err = new Error('Melt operation already in progress');
         opts.onError?.(err);
@@ -171,7 +222,8 @@ export function useMeltWithHistory() {
       setError(null);
 
       try {
-        await manager.quotes.payMeltQuote(mintUrl, quoteId);
+        // Execute the melt operation using the new v3 API
+        await manager.quotes.executeMelt(operationId);
 
         // Update our data with the latest state if we have it
         if (data && data.historyEntry.quoteId === quoteId) {
@@ -197,15 +249,75 @@ export function useMeltWithHistory() {
   );
 
   /**
-   * Create and pay a melt quote in one operation
+   * Prepare and execute a melt operation in one call.
+   * This is the recommended way to melt when you don't need to show intermediate UI.
    */
   const melt = useCallback(
     async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
-      const result = await createMeltQuote(mintUrl, invoice, opts);
-      await payMeltQuote(mintUrl, result.quote.quote, opts);
+      const result = await prepareMeltQuote(mintUrl, invoice, opts);
+      await executeMeltQuote(result.operationId, result.quote.quote, opts);
       return result;
     },
-    [createMeltQuote, payMeltQuote]
+    [prepareMeltQuote, executeMeltQuote]
+  );
+
+  /**
+   * Cancel (rollback) a prepared or pending melt operation and free its reserved proofs.
+   *
+   * For prepared (UNPAID) operations this immediately releases the proofs.
+   * For pending operations it first checks with the mint — if the quote is
+   * still UNPAID the proofs are released; if it's PAID or still in-flight
+   * the cancel is rejected.
+   *
+   * Uses the internal meltOperationService.rollback() which is not part of
+   * the public QuotesApi, so we access it via an unsafe cast (same pattern
+   * used by CocoManager.freeAllReservedProofs).
+   */
+  const cancelMeltQuote = useCallback(
+    async (opts: { operationId?: string; mintUrl?: string; quoteId?: string }): Promise<void> => {
+      // Access the private meltOperationService via unsafe cast
+      const unsafeManager = manager as unknown as {
+        meltOperationService?: {
+          rollback?: (operationId: string, reason?: string) => Promise<void>;
+          getOperationByQuote?: (
+            mintUrl: string,
+            quoteId: string
+          ) => Promise<{ id: string } | null>;
+        };
+      };
+
+      const svc = unsafeManager.meltOperationService;
+      if (!svc?.rollback) {
+        throw new Error('Melt rollback is unavailable on this version of coco');
+      }
+
+      // Resolve the operationId: use directly if provided, otherwise look up by quote
+      let resolvedId = opts.operationId;
+      if (!resolvedId && opts.mintUrl && opts.quoteId) {
+        if (!svc.getOperationByQuote) {
+          throw new Error('Operation lookup by quote is unavailable');
+        }
+        const op = await svc.getOperationByQuote(opts.mintUrl, opts.quoteId);
+        if (!op) {
+          throw new Error('No melt operation found for this quote');
+        }
+        resolvedId = op.id;
+      }
+
+      if (!resolvedId) {
+        throw new Error('No operation ID or quote ID provided');
+      }
+
+      await svc.rollback(resolvedId, 'User cancelled');
+
+      // Update local state so the UI reflects the cancellation
+      if (data && data.operationId === resolvedId) {
+        setData(null);
+      }
+      setStatus('idle');
+      setError(null);
+    },
+    [manager, data]
   );
 
   const reset = useCallback(() => {
@@ -216,14 +328,16 @@ export function useMeltWithHistory() {
 
   return {
     // Core operations
-    createMeltQuote,
-    payMeltQuote,
+    prepareMeltQuote,
+    executeMeltQuote,
+    cancelMeltQuote,
     melt,
 
     // Current state
     data,
     quote: data?.quote ?? null,
     historyEntry: data?.historyEntry ?? null,
+    operationId: data?.operationId ?? null,
 
     // Status
     status,

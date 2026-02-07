@@ -1,23 +1,22 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, View, ViewStyle } from 'react-native';
 import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
-import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
-import { Spacer } from 'components/ui/View/Spacer';
-import { Text } from 'components/ui/Text';
-import Icon from 'assets/icons';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { Avatar } from 'components/ui/Avatar';
-import { Skeleton } from 'components/ui/Skeleton';
-import { extractDomain } from '@/helper/url';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { supportsLiquidGlass } from '@/helper/version';
 import { useBalanceContext } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { VStack } from '../ui/View/VStack';
+import Icon from '@/assets/icons';
+import { Spacer } from '../ui/View/Spacer';
+import { AmountFormatter } from '../ui/AmountFormatter';
+import { extractDomain } from '@/helper/url';
+import { Skeleton } from '../ui/Skeleton';
+import { Avatar } from '../ui/Avatar';
+import { Text } from '../ui/Text';
 
 interface MintBalanceDisplayProps {
   unit: string;
@@ -33,6 +32,10 @@ interface MintBalanceDisplayProps {
   requireValidMint?: boolean;
   showAddMintsButton?: boolean;
   showDetailsButton?: boolean;
+  /** Inner content width (from parent header layout) */
+  contentWidth?: number;
+  /** Inner content height (from parent header layout) */
+  contentHeight?: number;
 }
 
 const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
@@ -45,6 +48,8 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   requireValidMint = false,
   showAddMintsButton = false,
   showDetailsButton = false,
+  contentWidth,
+  contentHeight,
   style,
 }) => {
   const { getPrimaryColor } = useTheme();
@@ -129,8 +134,16 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
     [requireBalance, showAddMintsButton, showDetailsButton, allowedMints]
   );
 
+  // Default content dimensions if not provided
+  const innerHeight = contentHeight ?? 36;
+  const innerWidth = contentWidth;
+
   const mintInfoContent = (
-    <>
+    <HStack
+      align="center"
+      justify="space-between"
+      style={{ height: innerHeight, width: innerWidth }}>
+      {/* Left side: Avatar + Mint info */}
       <HStack align="center">
         {showMintInfo ? (
           <>
@@ -192,39 +205,25 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           </HStack>
         )}
       </HStack>
-      <HStack justify="flex-end" align="center">
+
+      {/* Right side: Chevron */}
+      <View style={{ marginRight: 8 }}>
         <Icon name="fluent:chevron-down-12-filled" size={12} color={getPrimaryColor('0')} />
-        <Spacer size={8} />
-      </HStack>
-    </>
+      </View>
+    </HStack>
   );
 
   // Liquid Glass UI (iOS 26+, iPadOS 26+, macOS 26+)
   if (supportsLiquidGlass()) {
     return (
-      <View style={{ overflow: 'hidden', width: '100%', height: '100%' }}>
-        <Link
-          href={linkHref}
-          style={{
-            width: '100%',
-            height: '100%',
-          }}>
-          <HStack
-            align="center"
-            justify="space-between"
-            style={[
-              {
-                flex: 1,
-                marginVertical: 0,
-                marginHorizontal: 0,
-                alignSelf: 'center',
-              },
-              style,
-            ]}>
-            {mintInfoContent}
-          </HStack>
-        </Link>
-      </View>
+      <Link
+        href={linkHref}
+        style={{
+          width: contentWidth ?? '100%',
+          height: contentHeight ?? '100%',
+        }}>
+        {mintInfoContent}
+      </Link>
     );
   }
 
@@ -239,7 +238,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           className="rounded-2xl"
           style={[
             {
-              flex: 1,
+              // Avoid stretching inside ScrollView/flex containers (e.g. CurrencyScreen)
+              flexGrow: 0,
+              flexShrink: 0,
+              width: '100%',
               padding: 8,
               borderWidth: 0.2,
               borderColor: getPrimaryColor('600'),

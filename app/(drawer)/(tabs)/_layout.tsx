@@ -1,4 +1,4 @@
-import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Tabs } from 'expo-router';
 import { BackgroundProvider } from 'providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet } from 'react-native';
@@ -34,33 +34,33 @@ export default function TabLayout() {
           })}
           disableTransparentOnScrollEdge>
           <NativeTabs.Trigger name="payments">
-            <Icon
+            <NativeTabs.Trigger.Icon
               sf={{
                 default: 'arrow.up.arrow.down',
                 selected: 'arrow.up.arrow.down',
               }}
             />
-            <Label>Payments</Label>
+            <NativeTabs.Trigger.Label>Payments</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="index">
-            <Icon
+            <NativeTabs.Trigger.Icon
               sf={{
                 default: 'wallet.bifold',
                 selected: 'wallet.bifold',
               }}
             />
-            <Label>Wallet</Label>
+            <NativeTabs.Trigger.Label>Wallet</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="explore">
-            <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
-            <Label>Explore</Label>
+            <NativeTabs.Trigger.Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
+            <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
 
           {/* <NativeTabs.Trigger name="example">
-          <Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
-          <Label>Example</Label>
+          <NativeTabs.Trigger.Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
+          <NativeTabs.Trigger.Label>Example</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger> */}
         </NativeTabs>
       </BackgroundProvider>

@@ -68,6 +68,8 @@ interface ScanHistoryActions {
   clearHistory: () => void;
   /** Clear history for a specific type */
   clearHistoryByType: (type: ScanType) => void;
+  /** Clear all stored data (state + AsyncStorage) */
+  clearAllData: () => Promise<void>;
 }
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
@@ -188,6 +190,17 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       clearHistoryByType: (type: ScanType) => {
         const { entries } = get();
         set({ entries: entries.filter((entry) => entry.type !== type) });
+      },
+
+      // Clear all stored data (state + AsyncStorage)
+      clearAllData: async () => {
+        try {
+          await AsyncStorage.removeItem('scan-history-store');
+          set({ entries: [] });
+        } catch (error) {
+          console.error('ScanHistoryStore: Error clearing data:', error);
+          throw error;
+        }
       },
     }),
     {

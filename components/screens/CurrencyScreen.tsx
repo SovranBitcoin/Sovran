@@ -58,17 +58,14 @@ import {
 } from '@cashu/cashu-ts';
 import { nip19 } from 'nostr-tools';
 import type { ProfilePointer } from 'nostr-tools/nip19';
-import Icon from 'assets/icons';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
 import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { Avatar } from 'components/ui/Avatar';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -196,8 +193,10 @@ interface CurrencyScreenProps {
   /** Navigate to MeltQuoteScreen with lnUrlOrAddress and amount - screen handles quote creation */
   onMeltQuoteReady: (lnUrlOrAddress: string, amount: number) => void;
   onCameraPress: (unit: string) => void;
-  onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
+  onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry) => void;
   onRoutstrSuccess?: () => void;
+  /** Called when this modal flow should dismiss back to the previous screen */
+  onDone?: () => void;
   processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<unknown>;
   /** Called when user tries to send more than current mint's balance */
   onInsufficientBalance?: (amount: number, unit: string) => void;
@@ -210,6 +209,7 @@ export function CurrencyScreen({
   onMeltQuoteReady,
   onCameraPress,
   onRoutstrSuccess,
+  onDone: _onDone,
   processPaymentStringFn,
   onInsufficientBalance,
 }: CurrencyScreenProps) {
@@ -384,7 +384,7 @@ export function CurrencyScreen({
     }
 
     // useSendWithHistory returns both the token and the history entry
-    const { token, historyEntry } = await send(selectedMint, amount);
+    const { token, historyEntry } = await send(selectedMint, amount, {});
 
     // Capture and store location (respects settings toggle and permissions)
     await captureAndStoreLocation(historyEntry.id);
@@ -475,7 +475,6 @@ export function CurrencyScreen({
       }
     }
 
-    // Pass the history entry with token attached - the event-captured entry may not have it yet
     onSendTokenCreated({ ...historyEntry, token });
   };
 
@@ -624,7 +623,6 @@ export function CurrencyScreen({
   };
 
   const renderButtons = () => {
-    const isP2PK = params?.profile && params.to === 'sendToken';
     const isEcashSend = params.to === 'sendToken';
     const hasPaymentRequest = params?.paymentRequest;
     // NUT-18 payment request flow uses `to: 'paymentRequest'` and `allowedMints`
@@ -661,7 +659,7 @@ export function CurrencyScreen({
               icon: 'lets-icons:copy',
               variant: 'secondary',
               onPress: handlePastePress,
-              condition: isEcashSend && !isP2PK && !hasPaymentRequest && !!processPaymentStringFn,
+              condition: isEcashSend && !hasPaymentRequest && !!processPaymentStringFn,
             },
             {
               text: 'Next',
@@ -676,7 +674,7 @@ export function CurrencyScreen({
               icon: 'stash:qr-code',
               variant: 'secondary',
               onPress: async () => onCameraPress(unit),
-              condition: isEcashSend && !isP2PK && !hasPaymentRequest,
+              condition: isEcashSend && !hasPaymentRequest,
             },
           ]}
         />
@@ -770,44 +768,6 @@ export function CurrencyScreen({
             enableCurrencyMenu={false}
           />
         </VStack>
-        {params.to === 'sendToken' && params?.profile && (
-          <TouchableOpacity
-            style={[
-              {
-                padding: 8,
-                borderRadius: 16,
-                borderWidth: 0.2,
-                borderColor: getPrimaryColor('600'),
-                marginVertical: 4,
-                alignSelf: 'center',
-              },
-            ]}>
-            <Icon
-              name="solar:key-bold"
-              size={16}
-              style={{
-                backgroundColor: getPrimaryColor('500'),
-                borderRadius: 100,
-                padding: 8,
-              }}
-            />
-            <Text>{'  →  '}</Text>
-            {(() => {
-              const profile = params?.profile ? JSON.parse(params.profile) : null;
-              return profile?.picture || profile?.image ? (
-                <Avatar
-                  picture={profile.picture || profile.image}
-                  size={28}
-                  variant="person"
-                  alt={profile.name || 'User Avatar'}
-                  name={profile.name}
-                />
-              ) : (
-                <Avatar size={28} variant="person" alt="User Avatar" />
-              );
-            })()}
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
       <BottomButtons>

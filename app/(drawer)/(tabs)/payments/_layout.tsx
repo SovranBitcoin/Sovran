@@ -5,7 +5,7 @@ import { Pressable, Platform, useWindowDimensions, TextInput } from 'react-nativ
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 
@@ -34,7 +34,7 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
 
   return (
     <View style={{ alignItems: 'center' }}>
-      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false} fixedSize={true}>
+      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false}>
         <SwiftUIVStack
           modifiers={[
             padding({ horizontal: 12, vertical: 8 }),
@@ -59,10 +59,11 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
   );
 }
 
-// Fallback search header for Android
-function FallbackSearchHeader({ searchQuery }: { searchQuery: string }) {
+// Fallback search header for Android - uses uncontrolled pattern for better responsiveness
+function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
   const { getPrimaryColor } = useTheme();
   const { onSearchChange } = usePaymentsSearch();
+  const inputRef = useRef<TextInput>(null);
 
   return (
     <View
@@ -77,7 +78,9 @@ function FallbackSearchHeader({ searchQuery }: { searchQuery: string }) {
         marginRight: 8,
       }}>
       <TextInput
-        value={searchQuery}
+        key={clearKey}
+        ref={inputRef}
+        defaultValue=""
         onChangeText={onSearchChange}
         placeholder="Search contacts..."
         placeholderTextColor={getPrimaryColor('500')}
@@ -148,7 +151,7 @@ export default function PaymentsLayout() {
               Platform.OS === 'ios' ? (
                 <NativeSearchHeader width={headerWidth} clearKey={clearKey} />
               ) : (
-                <FallbackSearchHeader searchQuery={searchQuery} />
+                <FallbackSearchHeader clearKey={clearKey} />
               ),
             headerLeft: () => (
               <Pressable onPress={openDrawer} style={{ margin: 2 }}>

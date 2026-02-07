@@ -20,22 +20,23 @@ interface UserStats {
 }
 
 export interface UserProfile {
-  profileEvent: string;
-  name: string;
-  displayName: string;
+  // `nostr/search` may return partial user rows (e.g. pubkey/npub only).
+  profileEvent?: string;
+  name?: string;
+  displayName?: string;
   about?: string;
   banner?: string;
-  picture: string;
-  image: string;
+  picture?: string;
+  image?: string;
   website?: string;
-  lud16: string;
+  lud16?: string;
   lud06?: string;
   nip05?: string;
-  nip05Valid: boolean;
-  hasNip05Conflict: boolean;
-  created_at: number;
+  nip05Valid?: boolean;
+  hasNip05Conflict?: boolean;
+  created_at?: number;
   pubkey: string;
-  npub: string;
+  npub?: string;
   reactions?: boolean;
   userStats?: UserStats;
 }

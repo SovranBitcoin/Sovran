@@ -126,7 +126,7 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
 
   return (
     <View style={{ alignItems: 'center' }}>
-      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false} fixedSize={true}>
+      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false}>
         <SwiftUIVStack
           modifiers={[
             padding({ horizontal: 12, vertical: 8 }),

@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
+import { StyleSheet, ScrollView, View as RNView, useWindowDimensions } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { Stack, router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { ModalLayoutWrapper } from './debugModal';
@@ -17,6 +18,9 @@ import { extractDomain } from 'helper/url';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
+import { BottomButtons } from 'components/ui/BottomButtons';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
 import Animated, {
   useAnimatedStyle,
@@ -24,38 +28,32 @@ import Animated, {
   Extrapolation,
   SharedValue,
   useSharedValue,
+  FadeInUp,
 } from 'react-native-reanimated';
 import { popup } from 'helper/popup';
 import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { PendingEcashCardFrame } from 'components/blocks/pending/PendingEcashCardFrame';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 // ============================================================================
 // Header Components
 // ============================================================================
 
-const CloseButton = () => {
-  const { getPrimaryColor } = useTheme();
-  return (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
-    </TouchableOpacity>
-  );
-};
+// CloseButton is defined inline in the screen to access the hero context
 
 // ============================================================================
 // Animation Constants (matching MintCurrencyTabs)
 // ============================================================================
 
 const LARGE_ICON_SIZE = 28;
-const SMALL_ICON_SIZE = 22;
 const LARGE_FONT_SIZE = 14;
-const SMALL_FONT_SIZE = 12;
 const LARGE_PADDING_H = 14;
-const SMALL_PADDING_H = 12;
 const LARGE_PADDING_V = 10;
-const SMALL_PADDING_V = 8;
 const LARGE_GAP = 8;
-const SMALL_GAP = 4;
 const COLLAPSE_THRESHOLD = 50;
+const HEADER_OVERLAP = 24; // content overlaps sticky header for gradient fade
 
 // ============================================================================
 // Animated Mint Tab Component
@@ -65,8 +63,9 @@ interface AnimatedMintTabProps {
   mint: Mint;
   isSelected: boolean;
   pendingCount: number;
+  totalAmount: number;
+  unit: string;
   onPress: () => void;
-  scrollY?: SharedValue<number>;
   primaryColor0: string;
   primaryColor300: string;
   primaryColor700: string;
@@ -77,8 +76,9 @@ function AnimatedMintTab({
   mint,
   isSelected,
   pendingCount,
+  totalAmount,
+  unit,
   onPress,
-  scrollY,
   primaryColor0,
   primaryColor300,
   primaryColor700,
@@ -86,115 +86,19 @@ function AnimatedMintTab({
 }: AnimatedMintTabProps) {
   const displayName = mint.mintInfo?.name || extractDomain(mint.mintUrl) || 'Unknown';
 
-  // Animated container style
-  const animatedContainerStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        paddingHorizontal: SMALL_PADDING_H,
-        paddingVertical: SMALL_PADDING_V,
-      };
-    }
-
-    const paddingH = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_PADDING_H, SMALL_PADDING_H],
-      Extrapolation.CLAMP
-    );
-    const paddingV = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_PADDING_V, SMALL_PADDING_V],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      paddingHorizontal: paddingH,
-      paddingVertical: paddingV,
-    };
-  });
-
-  // Animated icon container - animates size for layout + scale for smooth visuals
-  const animatedIconStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        width: SMALL_ICON_SIZE,
-        height: SMALL_ICON_SIZE,
-        transform: [{ scale: SMALL_ICON_SIZE / LARGE_ICON_SIZE }],
-      };
-    }
-
-    const size = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_ICON_SIZE, SMALL_ICON_SIZE],
-      Extrapolation.CLAMP
-    );
-
-    const scale = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [1, SMALL_ICON_SIZE / LARGE_ICON_SIZE],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      width: size,
-      height: size,
-      transform: [{ scale }],
-    };
-  });
-
-  // Animated text style
-  const animatedTextStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        fontSize: SMALL_FONT_SIZE,
-      };
-    }
-
-    const fontSize = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_FONT_SIZE, SMALL_FONT_SIZE],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      fontSize,
-    };
-  });
-
-  // Animated gap style for the HStack
-  const animatedGapStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        gap: SMALL_GAP,
-      };
-    }
-
-    const gap = interpolate(
-      scrollY.value,
-      [0, COLLAPSE_THRESHOLD],
-      [LARGE_GAP, SMALL_GAP],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      gap,
-    };
-  });
-
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <Animated.View
+      <View
         style={[
           styles.tabContainer,
-          { backgroundColor: isSelected ? primaryColor700 : primaryColor900 },
-          animatedContainerStyle,
+          {
+            backgroundColor: isSelected ? primaryColor700 : primaryColor900,
+            paddingHorizontal: LARGE_PADDING_H,
+            paddingVertical: LARGE_PADDING_V,
+          },
         ]}>
-        <Animated.View style={[styles.tabContent, animatedGapStyle]}>
-          <Animated.View style={[styles.iconContainer, animatedIconStyle]}>
+        <View style={[styles.tabContent, { gap: LARGE_GAP }]}>
+          <View style={styles.iconContainer}>
             <Avatar
               picture={mint.mintInfo?.icon_url || undefined}
               size={LARGE_ICON_SIZE}
@@ -202,19 +106,28 @@ function AnimatedMintTab({
               name={displayName}
               alt={`${displayName} icon`}
             />
-          </Animated.View>
+          </View>
           <VStack>
             <Animated.Text
-              style={[styles.tabText, { color: primaryColor0 }, animatedTextStyle]}
+              style={[styles.tabText, { color: primaryColor0, fontSize: LARGE_FONT_SIZE }]}
               numberOfLines={1}>
               {displayName}
             </Animated.Text>
-            <Text size={10} style={{ color: primaryColor300 }}>
-              {pendingCount} pending
-            </Text>
+            <HStack align="center" gap={2}>
+              <AmountFormatter
+                amount={totalAmount}
+                unit={unit}
+                size={10}
+                weight="heavy"
+                color={primaryColor300}
+              />
+              <Text size={10} style={{ color: primaryColor300 }}>
+                • {pendingCount} pending
+              </Text>
+            </HStack>
           </VStack>
-        </Animated.View>
-      </Animated.View>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -231,8 +144,6 @@ interface MintTabsProps {
   scrollY?: SharedValue<number>;
 }
 
-const STICKY_HEIGHT = 56;
-
 function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY }: MintTabsProps) {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
@@ -246,19 +157,16 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
     [mints, pendingByMint]
   );
 
-  // Animated gap between items
-  const animatedListGapStyle = useAnimatedStyle(() => {
-    if (!scrollY) {
-      return {
-        gap: 6,
-      };
-    }
-
-    const gap = interpolate(scrollY.value, [0, COLLAPSE_THRESHOLD], [10, 6], Extrapolation.CLAMP);
-
-    return {
-      gap,
-    };
+  // GPU-accelerated scale on the entire tab row (Rule 3.1: transform instead of layout props)
+  const animatedRowScale = useAnimatedStyle(() => {
+    if (!scrollY) return {};
+    const scale = interpolate(
+      scrollY.value,
+      [0, COLLAPSE_THRESHOLD],
+      [1, 0.85],
+      Extrapolation.CLAMP
+    );
+    return { transform: [{ scale }] };
   });
 
   if (mintsWithPending.length === 0) {
@@ -271,9 +179,13 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
       showsHorizontalScrollIndicator={false}
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}>
-      <Animated.View style={[styles.tabList, animatedListGapStyle]}>
+      <Animated.View
+        style={[styles.tabList, { gap: 10, transformOrigin: 'left center' }, animatedRowScale]}>
         {mintsWithPending.map((mint) => {
-          const pendingCount = pendingByMint[mint.mintUrl]?.length || 0;
+          const pendingItems = pendingByMint[mint.mintUrl] || [];
+          const pendingCount = pendingItems.length;
+          const totalAmount = pendingItems.reduce((sum, tx) => sum + tx.amount, 0);
+          const unit = pendingItems[0]?.unit || 'sat';
 
           return (
             <AnimatedMintTab
@@ -281,8 +193,9 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
               mint={mint}
               isSelected={selectedMintUrl === mint.mintUrl}
               pendingCount={pendingCount}
+              totalAmount={totalAmount}
+              unit={unit}
               onPress={() => onMintChange(mint.mintUrl)}
-              scrollY={scrollY}
               primaryColor0={primaryColor0}
               primaryColor300={primaryColor300}
               primaryColor700={primaryColor700}
@@ -296,68 +209,23 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
 }
 
 // ============================================================================
-// Bottom Sweep Button
-// ============================================================================
-
-interface SweepButtonProps {
-  pendingTransactions: SendHistoryEntry[];
-  totalAmount: number;
-  unit: string;
-  isLoading: boolean;
-  onSweep: () => void;
-}
-
-const SweepButton = ({
-  pendingTransactions,
-  totalAmount,
-  unit,
-  isLoading,
-  onSweep,
-}: SweepButtonProps) => {
-  const { getPrimaryColor } = useTheme();
-
-  return (
-    <View style={styles.bottomContainer}>
-      <LinearGradient
-        colors={['transparent', opacity(getPrimaryColor('950'), 0.95), getPrimaryColor('950')]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={onSweep}
-        disabled={isLoading || pendingTransactions.length === 0}
-        style={[
-          styles.sweepButton,
-          {
-            backgroundColor: isLoading ? getPrimaryColor('700') : getPrimaryColor('500'),
-            opacity: pendingTransactions.length === 0 ? 0.5 : 1,
-          },
-        ]}>
-        {isLoading ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Icon name="mdi:broom" size={20} color="#fff" />
-        )}
-        <Text size={16} heavy style={{ color: '#fff', marginLeft: 8 }}>
-          {isLoading
-            ? 'Rolling back...'
-            : `Rollback ${pendingTransactions.length} Pending (${totalAmount} ${unit.toUpperCase()})`}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-// ============================================================================
 // Main Screen
 // ============================================================================
 
 export default function PendingEcashScreen() {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getGreenColor } = useTheme();
   const { history } = usePaginatedHistory();
   const { trustedMints: mints } = useMints();
   const manager = useManager();
+  const hero = useHeroTransition();
+  const insets = useSafeAreaInsets();
+  const nativeHeaderHeight = useHeaderHeight();
+  const heroRef = useRef<any>(null);
+  const pagerRef = useRef<PagerView>(null);
+  const { height: windowHeight } = useWindowDimensions();
+
+  const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
+  const topOffset = insets.top;
 
   // Scroll tracking for animated tabs
   const scrollY = useSharedValue(0);
@@ -366,6 +234,15 @@ export default function PendingEcashScreen() {
   // Track which operation IDs are currently being rolled back
   const [rollingBackIds, setRollingBackIds] = useState<Set<string>>(new Set());
   const [isSweeping, setIsSweeping] = useState(false);
+
+  // Measured height of the sticky header (hero + tabs + gradient) for scroll spacer
+  const [stickyHeaderHeight, setStickyHeaderHeight] = useState(250);
+  const handleStickyLayout = useCallback(
+    (event: { nativeEvent: { layout: { height: number } } }) => {
+      setStickyHeaderHeight(event.nativeEvent.layout.height);
+    },
+    []
+  );
 
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
@@ -410,10 +287,52 @@ export default function PendingEcashScreen() {
 
   const totalUnit = displayedTransactions[0]?.unit || 'sat';
 
-  // Get selected mint info for display
-  const selectedMintInfo = useMemo(() => {
-    return mints.find((m) => m.mintUrl === effectiveSelectedMint);
-  }, [mints, effectiveSelectedMint]);
+  // Card colors for transaction list (matching Transactions.tsx pattern)
+  const cardAccentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const cardBorderColor = useMemo(() => opacity(cardAccentColor, 0.3), [cardAccentColor]);
+
+  // PagerView height: fill remaining screen below hero + tabs
+  const pagerHeight = windowHeight * 0.6;
+
+  // Handle mint tab press → update state + animate pager
+  const handleMintChange = useCallback(
+    (mintUrl: string) => {
+      setSelectedMintUrl(mintUrl);
+      const index = mintsWithPending.findIndex((m) => m.mintUrl === mintUrl);
+      if (index >= 0) {
+        pagerRef.current?.setPage(index);
+      }
+    },
+    [mintsWithPending]
+  );
+
+  // Handle pager swipe → update selected tab
+  const onPageSelected = useCallback(
+    (event: { nativeEvent: { position: number } }) => {
+      const pageIndex = event.nativeEvent.position;
+      if (mintsWithPending[pageIndex]) {
+        setSelectedMintUrl(mintsWithPending[pageIndex].mintUrl);
+      }
+    },
+    [mintsWithPending]
+  );
+
+  const handleClose = useCallback(() => {
+    hero.closePendingEcash();
+  }, [hero]);
+
+  const handleHeroLayout = useCallback(() => {
+    hero.registerRef('pendingEcash', 'destination', heroRef.current);
+  }, [hero]);
+
+  const CloseButton = useCallback(
+    () => (
+      <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+        <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+      </TouchableOpacity>
+    ),
+    [getPrimaryColor, handleClose]
+  );
 
   // Rollback all pending transactions for the selected mint
   const handleSweep = useCallback(async () => {
@@ -468,13 +387,24 @@ export default function PendingEcashScreen() {
       return undefined;
     }
     return (
-      <SweepButton
-        pendingTransactions={displayedTransactions}
-        totalAmount={totalPendingAmount}
-        unit={totalUnit}
-        isLoading={isSweeping}
-        onSweep={handleSweep}
-      />
+      <BottomButtons>
+        <ButtonHandler
+          buttons={[
+            {
+              text: isSweeping
+                ? 'Rolling back...'
+                : `Rollback ${displayedTransactions.length} Pending (${totalPendingAmount} ${totalUnit.toUpperCase()})`,
+              variant: 'primary',
+              icon: 'mdi:broom',
+              loading: isSweeping,
+              disabled: isSweeping || displayedTransactions.length === 0,
+              onPress: async () => {
+                await handleSweep();
+              },
+            },
+          ]}
+        />
+      </BottomButtons>
     );
   }, [
     effectiveSelectedMint,
@@ -489,106 +419,168 @@ export default function PendingEcashScreen() {
     <>
       <Stack.Screen
         options={{
-          headerTitle: 'Pending Ecash',
-          headerLeft: () => <CloseButton />,
+          presentation: 'card',
+          animation: 'fade',
+          headerShown: true,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerTitle: '',
+          headerBackVisible: false,
           headerTintColor: getPrimaryColor('0'),
+          headerBlurEffect: 'none',
+          headerBackground: () => null,
+          headerLeft: CloseButton,
         }}
       />
-      <ModalLayoutWrapper
-        headerGradient
-        stickyContent={
-          <MintTabs
-            mints={mints}
-            selectedMintUrl={effectiveSelectedMint}
-            onMintChange={setSelectedMintUrl}
-            pendingByMint={pendingByMint}
-            scrollY={scrollY}
-          />
-        }
-        stickyContentHeight={STICKY_HEIGHT}
-        bottomContent={sweepButton}
-        bottomPadding={displayedTransactions.length > 0 ? 160 : 120}
-        useAnimatedScroll
-        scrollY={scrollY}>
-        {/* Summary Card */}
-        {displayedTransactions.length > 0 && (
-          <View
-            style={[styles.summaryCard, { backgroundColor: opacity(getPrimaryColor('800'), 0.5) }]}>
-            <HStack align="center" justify="space-between">
-              <VStack>
-                <HStack align="center" gap={8}>
-                  {selectedMintInfo && (
-                    <Avatar
-                      picture={selectedMintInfo.mintInfo?.icon_url || undefined}
-                      size={20}
-                      variant="mint"
-                      name={
-                        selectedMintInfo.mintInfo?.name ||
-                        extractDomain(selectedMintInfo.mintUrl) ||
-                        'Unknown'
-                      }
-                    />
-                  )}
-                  <Text size={12} style={{ color: getPrimaryColor('400') }}>
-                    {selectedMintInfo?.mintInfo?.name ||
-                      extractDomain(effectiveSelectedMint || '') ||
-                      'Pending'}
-                  </Text>
-                </HStack>
-                <AmountFormatter
-                  amount={totalPendingAmount}
-                  unit={totalUnit}
-                  size={24}
-                  weight="heavy"
-                  color={getPrimaryColor('50')}
-                />
-              </VStack>
-              <View
-                style={[
-                  styles.pendingBadge,
-                  { backgroundColor: opacity(getPrimaryColor('500'), 0.2) },
-                ]}>
-                <Icon name="mdi:clock-outline" size={16} color={getPrimaryColor('400')} />
-                <Text size={12} heavy style={{ color: getPrimaryColor('300'), marginLeft: 4 }}>
-                  {displayedTransactions.length} pending
+      <RNView style={{ flex: 1 }}>
+        {/* Scrollable content underneath the sticky header */}
+        <ModalLayoutWrapper
+          contentPadding={0}
+          bottomContent={sweepButton}
+          bottomPadding={displayedTransactions.length > 0 ? 160 : 120}
+          useAnimatedScroll
+          scrollY={scrollY}
+          disableHeaderSpacer
+          scrollIndicatorInsets={{ top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight) }}>
+          {/* Spacer matching the sticky header height */}
+          <RNView style={{ height: stickyHeaderHeight }} />
+
+          {/* Transaction pages (swipeable PagerView) */}
+          {!hero.isTransitioning('pendingEcash') && mintsWithPending.length > 0 && (
+            <Animated.View
+              entering={FadeInUp.duration(240).delay(160)}
+              style={{ marginTop: -HEADER_OVERLAP }}>
+              <PagerView
+                ref={pagerRef}
+                style={{ height: pagerHeight }}
+                initialPage={0}
+                onPageSelected={onPageSelected}>
+                {mintsWithPending.map((mint) => {
+                  const transactions = pendingByMint[mint.mintUrl] || [];
+                  return (
+                    <View
+                      key={mint.mintUrl}
+                      style={{ flex: 1, paddingHorizontal: 16, paddingTop: HEADER_OVERLAP }}>
+                      <View style={[styles.transactionList, { borderColor: cardBorderColor }]}>
+                        <BlurCardFrame accentColor={cardAccentColor}>
+                          <View style={{ zIndex: 1 }}>
+                            {transactions.map((tx) => (
+                              <Transaction
+                                key={tx.id}
+                                historyEntry={tx as HistoryEntry}
+                                isLoading={rollingBackIds.has(tx.operationId)}
+                              />
+                            ))}
+                          </View>
+                        </BlurCardFrame>
+                      </View>
+                    </View>
+                  );
+                })}
+              </PagerView>
+            </Animated.View>
+          )}
+
+          {/* Empty state (no pending ecash at all) */}
+          {!hero.isTransitioning('pendingEcash') && mintsWithPending.length === 0 && (
+            <Animated.View
+              entering={FadeInUp.duration(240).delay(160)}
+              style={{
+                paddingHorizontal: 16,
+                marginTop: -HEADER_OVERLAP,
+                paddingTop: HEADER_OVERLAP,
+              }}>
+              <View style={styles.emptyState}>
+                <Icon name="mdi:check-circle-outline" size={48} color={getPrimaryColor('500')} />
+                <Spacer size={12} />
+                <Text size={18} heavy style={{ color: getPrimaryColor('100') }}>
+                  No Pending Ecash
+                </Text>
+                <Text
+                  size={14}
+                  style={{
+                    color: getPrimaryColor('400'),
+                    textAlign: 'center',
+                    marginTop: 4,
+                  }}>
+                  All your sent ecash has been claimed
                 </Text>
               </View>
-            </HStack>
-          </View>
-        )}
+            </Animated.View>
+          )}
+        </ModalLayoutWrapper>
 
-        <Spacer size={16} />
+        {/* Sticky header — always pinned at top, content scrolls behind it */}
+        <RNView style={styles.stickyHeader} pointerEvents="box-none" onLayout={handleStickyLayout}>
+          <RNView>
+            {/* Background layers: solid covers top, gradient fades at bottom */}
+            <RNView
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: getPrimaryColor('950'), bottom: HEADER_OVERLAP },
+              ]}
+            />
+            <LinearGradient
+              colors={[getPrimaryColor('950'), 'transparent']}
+              style={styles.headerGradient}
+              pointerEvents="none"
+            />
 
-        {/* Transaction List */}
-        {displayedTransactions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="mdi:check-circle-outline" size={48} color={getPrimaryColor('500')} />
-            <Spacer size={12} />
-            <Text size={18} heavy style={{ color: getPrimaryColor('100') }}>
-              No Pending Ecash
-            </Text>
-            <Text
-              size={14}
-              style={{ color: getPrimaryColor('400'), textAlign: 'center', marginTop: 4 }}>
-              All your sent ecash has been claimed
-            </Text>
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.transactionList,
-              { backgroundColor: opacity(getPrimaryColor('800'), 0.3) },
-            ]}>
-            {displayedTransactions.map((tx) => (
-              <Transaction
-                key={tx.id}
-                historyEntry={tx as HistoryEntry}
-                isLoading={rollingBackIds.has(tx.operationId)}
-              />
-            ))}
-          </View>
-        )}
-      </ModalLayoutWrapper>
+            {/* Hero card */}
+            <RNView
+              ref={heroRef}
+              onLayout={handleHeroLayout}
+              collapsable={false}
+              shouldRasterizeIOS
+              renderToHardwareTextureAndroid
+              style={[
+                styles.heroCard,
+                {
+                  borderColor: opacity(accentColor, 0.25),
+                  opacity: hero.isHidden('pendingEcash', 'destination') ? 0 : 1,
+                  marginTop: -topOffset,
+                  paddingTop: topOffset,
+                },
+              ]}>
+              <PendingEcashCardFrame
+                accentColor={accentColor}
+                backgroundColor={getPrimaryColor('950')}
+                highlightColor={getPrimaryColor('50')}>
+                <VStack style={{ padding: 18, paddingTop: 52 + topOffset, zIndex: 1 }}>
+                  <HStack align="center" gap={10}>
+                    <View
+                      style={[styles.heroIcon, { backgroundColor: opacity(accentColor, 0.16) }]}>
+                      <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
+                    </View>
+                    <VStack>
+                      <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                        Pending Ecash
+                      </Text>
+                      <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                        {pendingSends.length} unclaimed{' '}
+                        {pendingSends.length === 1 ? 'token' : 'tokens'}
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </VStack>
+              </PendingEcashCardFrame>
+            </RNView>
+
+            {/* Mint tabs */}
+            {!hero.isTransitioning('pendingEcash') && (
+              <Animated.View entering={FadeInUp.duration(220).delay(120)} style={{ marginTop: 10 }}>
+                <MintTabs
+                  mints={mints}
+                  selectedMintUrl={effectiveSelectedMint}
+                  onMintChange={handleMintChange}
+                  pendingByMint={pendingByMint}
+                  scrollY={scrollY}
+                />
+              </Animated.View>
+            )}
+          </RNView>
+        </RNView>
+      </RNView>
     </>
   );
 }
@@ -598,10 +590,26 @@ export default function PendingEcashScreen() {
 // ============================================================================
 
 const styles = StyleSheet.create({
+  // Hero card destination
+  heroCard: {
+    width: '100%',
+    alignSelf: 'stretch',
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  heroIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Tab styles (matching MintCurrencyTabs)
   scrollView: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   scrollContent: {
     alignItems: 'center',
@@ -625,42 +633,32 @@ const styles = StyleSheet.create({
     fontFamily: 'OverpassBold',
     maxWidth: 100,
   },
+  // Gradient covering the bottom of the sticky header — content fades as it scrolls behind
+  headerGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_OVERLAP,
+  },
+  // Sticky header overlay
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   // Other styles
-  summaryCard: {
-    borderRadius: 16,
-    padding: 16,
-  },
-  pendingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
   transactionList: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   emptyState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
-  },
-  bottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  sweepButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
   },
 });

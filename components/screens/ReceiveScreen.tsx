@@ -33,7 +33,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface ReceiveScreenProps {
   unit: string;
-  onReceiveToken: (receiveHistoryEntry: ReceiveHistoryEntry & { token: string }) => void;
+  onReceiveToken: (receiveHistoryEntry: ReceiveHistoryEntry) => void;
   onCamera: (unit: string) => void;
   onFixedAmount: (unit: string) => void;
 }
@@ -91,18 +91,16 @@ export function ReceiveScreen({
   }, []);
 
   const handleEcashToken = ({ token }: { token: string }): void => {
-    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+    const decodedToken = getDecodedToken(token);
+    const receiveHistoryEntry: ReceiveHistoryEntry = {
       id: `receive-${Date.now()}`,
       type: 'receive',
-      amount: getDecodedToken(token).proofs.reduce(
-        (sum: number, proof: Proof) => sum + proof.amount,
-        0
-      ),
+      amount: decodedToken.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0),
       unit: unit,
-      mintUrl: getDecodedToken(token).mint,
+      mintUrl: decodedToken.mint,
       createdAt: Date.now(),
       metadata: {},
-      token: token,
+      token: decodedToken,
     };
 
     onReceiveToken(receiveHistoryEntry);

@@ -329,6 +329,11 @@ interface popupConfig {
   // Core message content
   message: string | MessageCode;
   params?: Record<string, any>;
+  /**
+   * Optional override for the popup body text.
+   * Useful when `message` is a raw string (not a MessageCode) but you still want a separate body.
+   */
+  text?: MessageText;
 
   // Visual customization
   emoji?: string;
@@ -384,7 +389,7 @@ export const popup = (config: popupConfig | string) => {
     config = { message: config };
   }
 
-  const { message, params = {}, ...options } = config;
+  const { message, params = {}, text: overrideText, ...options } = config;
 
   // Handle both message codes and raw strings
   const messageConfig =
@@ -392,8 +397,11 @@ export const popup = (config: popupConfig | string) => {
       ? MESSAGE_CONFIGS[message]
       : { title: message, text: message, type: MESSAGE_TYPES.INFO };
 
-  const text =
+  const resolvedText =
     typeof messageConfig.text === 'function' ? messageConfig.text(params) : messageConfig.text;
+  const resolvedOverrideText =
+    typeof overrideText === 'function' ? overrideText(params) : overrideText;
+  const text = resolvedOverrideText ?? resolvedText;
 
   const variant = options.variant || messageConfig.variant || 'alert';
   const messageType = options.type || messageConfig.type || MESSAGE_TYPES.INFO;

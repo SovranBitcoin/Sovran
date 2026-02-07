@@ -9,7 +9,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { popup } from 'helper/popup';
 import { truncateMiddle } from 'helper/strings';
@@ -29,16 +29,25 @@ import {
   View as RNView,
 } from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
-import { extractDomain } from '@/helper/url';
-import { Avatar } from '@/components/ui/Avatar';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
-import { useMints, usePaginatedHistory } from 'coco-cashu-react';
+import { usePaginatedHistory } from 'coco-cashu-react';
 import { WalletHealthCard } from '@/components/blocks/health/WalletHealthCard';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
+import { PendingEcashCardFrame } from 'components/blocks/pending/PendingEcashCardFrame';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  runOnJS,
+  FadeInUp,
+} from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -676,186 +685,222 @@ const LightningAddressCard = () => {
     hero.startClaimUsername();
   }, [hero]);
 
+  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
+  const pressed = useSharedValue(0);
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.set(withTiming(1, { duration: 150 }));
+    })
+    .onFinalize(() => {
+      pressed.set(withTiming(0, { duration: 200 }));
+    })
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
+    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
+  }));
+
   // Gold accent color for premium/custom names
   const accentColor = '#f59e0b';
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}
-      onPress={handlePress}>
-      <RNView
-        ref={cardRef}
-        collapsable={false}
-        onLayout={() => hero.registerRef('claimUsername', 'source', cardRef.current)}
-        shouldRasterizeIOS
-        renderToHardwareTextureAndroid
-        style={{ opacity: hero.isHidden('claimUsername', 'source') ? 0 : 1 }}>
-        <ClaimUsernameCardFrame
-          accentColor={accentColor}
-          backgroundColor={primary950}
-          highlightColor={getPrimaryColor('50')}>
-          <VStack style={{ padding: 20, zIndex: 1 }}>
-            {/* Header */}
-            <HStack align="center" style={{ marginBottom: 16 }}>
-              <View
-                style={[
-                  styles.lightningAddressIcon,
-                  { backgroundColor: opacity(accentColor, 0.15) },
-                ]}>
-                <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
-              </View>
-              <VStack style={{ flex: 1, marginLeft: 12 }}>
-                <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
-                  Claim Your Address
-                </Text>
-                <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
-                  Get a memorable Lightning URL
-                </Text>
-              </VStack>
-              <View
-                style={[
-                  styles.lightningAddressBadge,
-                  {
-                    backgroundColor: opacity(accentColor, 0.15),
-                    borderColor: opacity(accentColor, 0.3),
-                  },
-                ]}>
-                <Text size={10} heavy style={{ color: accentColor }}>
-                  PREMIUM
-                </Text>
-              </View>
-            </HStack>
+    <GestureDetector gesture={tap}>
+      <Animated.View style={pressAnimStyle}>
+        <RNView style={[styles.lightningAddressCard, { borderColor: opacity(accentColor, 0.3) }]}>
+          <RNView
+            ref={cardRef}
+            collapsable={false}
+            onLayout={() => hero.registerRef('claimUsername', 'source', cardRef.current)}
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
+            style={{ opacity: hero.isHidden('claimUsername', 'source') ? 0 : 1 }}>
+            <ClaimUsernameCardFrame
+              accentColor={accentColor}
+              backgroundColor={primary950}
+              highlightColor={getPrimaryColor('50')}>
+              <VStack style={{ padding: 20, zIndex: 1 }}>
+                {/* Header */}
+                <HStack align="center" style={{ marginBottom: 16 }}>
+                  <View
+                    style={[
+                      styles.lightningAddressIcon,
+                      { backgroundColor: opacity(accentColor, 0.15) },
+                    ]}>
+                    <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 12 }}>
+                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                      Claim Your Address
+                    </Text>
+                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                      Get a memorable Lightning URL
+                    </Text>
+                  </VStack>
+                  <View
+                    style={[
+                      styles.lightningAddressBadge,
+                      {
+                        backgroundColor: opacity(accentColor, 0.15),
+                        borderColor: opacity(accentColor, 0.3),
+                      },
+                    ]}>
+                    <Text size={10} heavy style={{ color: accentColor }}>
+                      PREMIUM
+                    </Text>
+                  </View>
+                </HStack>
 
-            {/* Address comparison */}
-            <VStack style={{ gap: 12 }}>
-              {/* Current address (before) */}
-              <VStack>
-                <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
-                  YOUR CURRENT ADDRESS
-                </Text>
-                <View style={[styles.addressBox, { borderColor: opacity(accentColor, 0.2) }]}>
-                  <Icon
-                    name="mdi:close-circle"
-                    size={16}
-                    color="#ef4444"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text
-                    size={13}
-                    mono
-                    style={{ color: opacity(accentColor, 0.7) }}
-                    numberOfLines={1}>
-                    {currentAddress}
-                  </Text>
-                </View>
-              </VStack>
+                {/* Address comparison */}
+                <VStack style={{ gap: 12 }}>
+                  {/* Current address (before) */}
+                  <VStack>
+                    <Text
+                      size={10}
+                      heavy
+                      style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
+                      YOUR CURRENT ADDRESS
+                    </Text>
+                    <View style={[styles.addressBox, { borderColor: opacity(accentColor, 0.2) }]}>
+                      <Icon
+                        name="mdi:close-circle"
+                        size={16}
+                        color="#ef4444"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text
+                        size={13}
+                        mono
+                        style={{ color: opacity(accentColor, 0.7) }}
+                        numberOfLines={1}>
+                        {currentAddress}
+                      </Text>
+                    </View>
+                  </VStack>
 
-              {/* Arrow */}
-              <HStack align="center" justify="center">
-                <View
-                  style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
-                />
+                  {/* Arrow */}
+                  <HStack align="center" justify="center">
+                    <View
+                      style={[
+                        styles.addressArrowLine,
+                        { backgroundColor: opacity(accentColor, 0.3) },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.addressArrowIcon,
+                        { backgroundColor: opacity(accentColor, 0.15) },
+                      ]}>
+                      <Icon name="mdi:arrow-down" size={16} color={accentColor} />
+                    </View>
+                    <View
+                      style={[
+                        styles.addressArrowLine,
+                        { backgroundColor: opacity(accentColor, 0.3) },
+                      ]}
+                    />
+                  </HStack>
+
+                  {/* Custom address (after) */}
+                  <VStack>
+                    <Text
+                      size={10}
+                      heavy
+                      style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
+                      YOUR CUSTOM ADDRESS
+                    </Text>
+                    <View
+                      style={[
+                        styles.addressBox,
+                        {
+                          backgroundColor: opacity(accentColor, 0.1),
+                          borderColor: opacity(accentColor, 0.3),
+                        },
+                      ]}>
+                      <Icon
+                        name="mdi:check-circle"
+                        size={16}
+                        color="#22c55e"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
+                        satoshi
+                      </Text>
+                      <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
+                        @npubx.cash
+                      </Text>
+                    </View>
+                  </VStack>
+                </VStack>
+
+                {/* Benefits */}
+                <HStack style={{ marginTop: 16, gap: 16 }}>
+                  <HStack align="center">
+                    <Icon name="mdi:share-variant" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Easy to share
+                    </Text>
+                  </HStack>
+                  <HStack align="center">
+                    <Icon name="mdi:qrcode" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Scannable QR
+                    </Text>
+                  </HStack>
+                  <HStack align="center">
+                    <Icon name="mdi:account-check" size={14} color={opacity(accentColor, 0.6)} />
+                    <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
+                      Memorable
+                    </Text>
+                  </HStack>
+                </HStack>
+
+                {/* CTA row (match Wallet Health “View health details” style) */}
                 <View
                   style={[
-                    styles.addressArrowIcon,
-                    { backgroundColor: opacity(accentColor, 0.15) },
-                  ]}>
-                  <Icon name="mdi:arrow-down" size={16} color={accentColor} />
-                </View>
-                <View
-                  style={[styles.addressArrowLine, { backgroundColor: opacity(accentColor, 0.3) }]}
-                />
-              </HStack>
-
-              {/* Custom address (after) */}
-              <VStack>
-                <Text size={10} heavy style={{ color: opacity(accentColor, 0.6), marginBottom: 4 }}>
-                  YOUR CUSTOM ADDRESS
-                </Text>
-                <View
-                  style={[
-                    styles.addressBox,
+                    styles.lightningAddressCTA,
                     {
-                      backgroundColor: opacity(accentColor, 0.1),
-                      borderColor: opacity(accentColor, 0.3),
+                      backgroundColor: opacity(accentColor, 0.12),
+                      borderColor: opacity(accentColor, 0.22),
                     },
                   ]}>
-                  <Icon
-                    name="mdi:check-circle"
-                    size={16}
-                    color="#22c55e"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
-                    satoshi
-                  </Text>
-                  <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
-                    @npubx.cash
-                  </Text>
+                  <HStack align="center" justify="space-between">
+                    <HStack align="center" gap={8}>
+                      <Icon
+                        name="mingcute:lightning-fill"
+                        size={16}
+                        color={opacity(accentColor, 0.9)}
+                      />
+                      <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
+                        Get your username
+                      </Text>
+                    </HStack>
+                    <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
+                  </HStack>
                 </View>
               </VStack>
-            </VStack>
-
-            {/* Benefits */}
-            <HStack style={{ marginTop: 16, gap: 16 }}>
-              <HStack align="center">
-                <Icon name="mdi:share-variant" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Easy to share
-                </Text>
-              </HStack>
-              <HStack align="center">
-                <Icon name="mdi:qrcode" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Scannable QR
-                </Text>
-              </HStack>
-              <HStack align="center">
-                <Icon name="mdi:account-check" size={14} color={opacity(accentColor, 0.6)} />
-                <Text size={11} style={{ color: opacity(accentColor, 0.6), marginLeft: 4 }}>
-                  Memorable
-                </Text>
-              </HStack>
-            </HStack>
-
-            {/* CTA row (match Wallet Health “View health details” style) */}
-            <View
-              style={[
-                styles.lightningAddressCTA,
-                {
-                  backgroundColor: opacity(accentColor, 0.12),
-                  borderColor: opacity(accentColor, 0.22),
-                },
-              ]}>
-              <HStack align="center" justify="space-between">
-                <HStack align="center" gap={8}>
-                  <Icon
-                    name="mingcute:lightning-fill"
-                    size={16}
-                    color={opacity(accentColor, 0.9)}
-                  />
-                  <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
-                    Get your username
-                  </Text>
-                </HStack>
-                <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
-              </HStack>
-            </View>
-          </VStack>
-        </ClaimUsernameCardFrame>
-      </RNView>
-    </TouchableOpacity>
+            </ClaimUsernameCardFrame>
+          </RNView>
+        </RNView>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
-// Pending Ecash Card
-// NOTE: Explore currently hides this section, but we keep the component around for easy re-enable.
-// eslint-disable-next-line unused-imports/no-unused-vars, @typescript-eslint/no-unused-vars
+// Pending Ecash Card - Shows pending send operations that can be reclaimed
+// Styled to match WalletHealthCard with a green color scheme + hero transition
 const PendingEcashCard = () => {
-  const { getPrimaryColor } = useTheme();
+  const { getPrimaryColor, getGreenColor } = useTheme();
   const { history } = usePaginatedHistory();
-  const { trustedMints: mints } = useMints();
+  const hero = useHeroTransition();
+  const cardRef = useRef<any>(null);
+
+  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
+  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
 
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
@@ -863,15 +908,6 @@ const PendingEcashCard = () => {
       (entry) => entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
     );
   }, [history]);
-
-  // Get unique mints with pending transactions (up to 3 for display)
-  const pendingMints = useMemo(() => {
-    const mintUrls = [...new Set(pendingSends.map((tx) => tx.mintUrl))];
-    return mintUrls
-      .map((url) => mints.find((m) => m.mintUrl === url))
-      .flatMap((m) => (m ? [m] : []))
-      .slice(0, 3);
-  }, [pendingSends, mints]);
 
   // Calculate totals
   const totalAmount = useMemo(() => {
@@ -881,122 +917,135 @@ const PendingEcashCard = () => {
   const unit = pendingSends[0]?.unit || 'sat';
 
   const handlePress = useCallback(() => {
-    router.push('/pendingEcash');
-  }, []);
+    hero.registerRef('pendingEcash', 'source', cardRef.current);
+    hero.startPendingEcash();
+  }, [hero]);
+
+  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
+  const pressed = useSharedValue(0);
+
+  const tap = Gesture.Tap()
+    .onBegin(() => {
+      pressed.set(withTiming(1, { duration: 150 }));
+    })
+    .onFinalize(() => {
+      pressed.set(withTiming(0, { duration: 200 }));
+    })
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
+    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
+  }));
 
   // Don't show card if no pending transactions
   if (pendingSends.length === 0) {
     return null;
   }
 
-  // Theme-based accent color for matte black style
-  const accentColor = getPrimaryColor('400');
-
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      style={[styles.pendingEcashCard, { borderColor: opacity(getPrimaryColor('500'), 0.3) }]}
-      onPress={handlePress}>
-      {/* Matte black gradient background */}
-      <LinearGradient
-        colors={[getPrimaryColor('900'), getPrimaryColor('800'), getPrimaryColor('900')]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+    <GestureDetector gesture={tap}>
+      <Animated.View style={pressAnimStyle}>
+        <RNView
+          ref={cardRef}
+          collapsable={false}
+          onLayout={() => hero.registerRef('pendingEcash', 'source', cardRef.current)}
+          shouldRasterizeIOS
+          renderToHardwareTextureAndroid
+          style={[
+            styles.pendingEcashCard,
+            {
+              borderColor: opacity(accentColor, 0.25),
+              opacity: hero.isHidden('pendingEcash', 'source') ? 0 : 1,
+            },
+          ]}>
+          <PendingEcashCardFrame
+            accentColor={accentColor}
+            backgroundColor={primary950}
+            highlightColor={primary50}>
+            <VStack style={{ padding: 18 }}>
+              <HStack align="center" justify="space-between">
+                <HStack align="center" gap={10}>
+                  <View
+                    style={[
+                      styles.pendingEcashIcon,
+                      { backgroundColor: opacity(accentColor, 0.16) },
+                    ]}>
+                    <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
+                  </View>
+                  <VStack>
+                    <Text size={16} heavy style={{ color: primary50 }}>
+                      Pending Ecash
+                    </Text>
+                    <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                      <View
+                        style={[
+                          styles.pendingUnitPill,
+                          {
+                            backgroundColor: opacity(accentColor, 0.14),
+                            borderColor: opacity(accentColor, 0.22),
+                          },
+                        ]}>
+                        <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                          {pendingSends.length} {pendingSends.length === 1 ? 'TOKEN' : 'TOKENS'}
+                        </Text>
+                      </View>
+                      <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                        Tap to reclaim
+                      </Text>
+                    </HStack>
+                  </VStack>
+                </HStack>
+                <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
+              </HStack>
 
-      {/* Decorative clock icon */}
-      <View style={styles.pendingDecorationRight}>
-        <Icon name="mdi:clock-outline" size={100} color={opacity(accentColor, 0.06)} />
-      </View>
-
-      <VStack style={{ padding: 20, zIndex: 1 }}>
-        {/* Header */}
-        <HStack align="center" style={{ marginBottom: 16 }}>
-          <View style={[styles.pendingEcashIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
-            <Icon name="mdi:clock-alert-outline" size={20} color={accentColor} />
-          </View>
-          <VStack style={{ flex: 1, marginLeft: 12 }}>
-            <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
-              Pending Ecash
-            </Text>
-            <Text size={12} style={{ color: getPrimaryColor('400') }}>
-              Unclaimed sent tokens
-            </Text>
-          </VStack>
-          <View
-            style={[
-              styles.pendingCountBadge,
-              {
-                backgroundColor: opacity(accentColor, 0.15),
-                borderColor: opacity(accentColor, 0.3),
-              },
-            ]}>
-            <Text size={12} heavy style={{ color: accentColor }}>
-              {pendingSends.length}
-            </Text>
-          </View>
-        </HStack>
-
-        {/* Amount display */}
-        <View style={[styles.pendingAmountBox, { borderColor: opacity(accentColor, 0.2) }]}>
-          <VStack>
-            <Text size={10} heavy style={{ color: getPrimaryColor('500'), marginBottom: 4 }}>
-              TOTAL UNCLAIMED
-            </Text>
-            <AmountFormatter
-              amount={totalAmount}
-              unit={unit}
-              size={24}
-              weight="heavy"
-              color={getPrimaryColor('50')}
-            />
-          </VStack>
-        </View>
-
-        {/* Mint avatars */}
-        {pendingMints.length > 0 && (
-          <HStack align="center" style={{ marginTop: 16 }}>
-            <HStack style={{ marginRight: 8 }}>
-              {pendingMints.map((mint, index) => (
-                <View
-                  key={mint.mintUrl}
-                  style={{
-                    marginLeft: index > 0 ? -8 : 0,
-                    borderRadius: 16,
-                    borderWidth: 2,
-                    borderColor: getPrimaryColor('900'),
-                  }}>
-                  <Avatar
-                    picture={mint.mintInfo?.icon_url || undefined}
-                    size={28}
-                    variant="mint"
-                    name={mint.mintInfo?.name || extractDomain(mint.mintUrl)}
+              {/* Amount display row */}
+              <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+                <HStack align="center" gap={6}>
+                  <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
+                  <AmountFormatter
+                    amount={totalAmount}
+                    unit={unit}
+                    size={11}
+                    weight="medium"
+                    color={opacity(accentColor, 0.8)}
                   />
-                </View>
-              ))}
-            </HStack>
-            <Text size={12} style={{ color: getPrimaryColor('400') }}>
-              {(() => {
-                const firstMint = pendingMints[0];
-                if (pendingMints.length === 1 && firstMint) {
-                  return `from ${firstMint.mintInfo?.name || extractDomain(firstMint.mintUrl)}`;
-                }
-                return `from ${pendingMints.length} mints`;
-              })()}
-            </Text>
-          </HStack>
-        )}
+                  <Text size={11} style={{ color: opacity(accentColor, 0.8) }}>
+                    unclaimed
+                  </Text>
+                </HStack>
+              </HStack>
 
-        {/* CTA */}
-        <View style={[styles.pendingEcashCTA, { backgroundColor: getPrimaryColor('500') }]}>
-          <Text size={14} heavy style={{ color: '#fff' }}>
-            View & Reclaim
-          </Text>
-          <Icon name="mdi:arrow-right" size={18} color="#fff" style={{ marginLeft: 8 }} />
-        </View>
-      </VStack>
-    </TouchableOpacity>
+              {/* CTA row */}
+              <View
+                style={[
+                  styles.pendingEcashCTA,
+                  {
+                    backgroundColor: opacity(accentColor, 0.12),
+                    borderColor: opacity(accentColor, 0.22),
+                  },
+                ]}>
+                <HStack align="center" justify="space-between">
+                  <HStack align="center" gap={8}>
+                    <Icon
+                      name="fluent:arrow-download-16-filled"
+                      size={16}
+                      color={opacity(accentColor, 0.9)}
+                    />
+                    <Text size={12} heavy style={{ color: primary50 }}>
+                      View & Reclaim
+                    </Text>
+                  </HStack>
+                  <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                </HStack>
+              </View>
+            </VStack>
+          </PendingEcashCardFrame>
+        </RNView>
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
@@ -1009,6 +1058,7 @@ const ExploreScreen = () => {
   const { getPrimaryColor } = useTheme();
   const [contentHeight, setContentHeight] = useState(0);
   const [activeCategory, setActiveCategory] = useState('All');
+  const devMode = useSettingsStore((state) => state.experimental);
 
   // Routstr models state
   const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore();
@@ -1053,9 +1103,17 @@ const ExploreScreen = () => {
     loadModels();
   }, [getCachedModels, setCachedModels, isCacheStale]);
 
-  // Filter models to show - one per provider, in specific order
+  // Filter models to show - one per provider, in specific order, text-only
   const displayModels = useMemo(() => {
     if (models.length === 0) return [];
+
+    // Only keep models that accept text input and produce text-only output
+    // (excludes audio, image, video, and embeddings models)
+    const textModels = models.filter((m) => {
+      const outputs = m.architecture?.output_modalities ?? [];
+      const inputs = m.architecture?.input_modalities ?? [];
+      return inputs.includes('text') && outputs.length > 0 && outputs.every((o) => o === 'text');
+    });
 
     // Providers to show, in order
     const allowedProviders = [
@@ -1075,7 +1133,7 @@ const ExploreScreen = () => {
     const result: RoutstrModel[] = [];
 
     for (const targetProvider of allowedProviders) {
-      const model = models.find((m) => {
+      const model = textModels.find((m) => {
         const { provider } = extractModelName(m);
         return provider.toLowerCase() === targetProvider;
       });
@@ -1130,31 +1188,41 @@ const ExploreScreen = () => {
         <Spacer size={32} />
 
         {/* Pending Ecash Section - only shows when there are pending transactions */}
-        {/* <View style={{ paddingHorizontal: 20 }}>
+        <Animated.View
+          entering={FadeInUp.duration(380).delay(80)}
+          style={{ paddingHorizontal: 20 }}>
           <PendingEcashCard />
-        </View>
-
-        <Spacer size={32} /> */}
-
-        {/* Lightning Address Section */}
-        <SectionHeader
-          title="Your Lightning Address"
-          subtitle="Receive Bitcoin with a memorable URL"
-        />
-        <View style={{ paddingHorizontal: 20 }}>
-          <LightningAddressCard />
-        </View>
+        </Animated.View>
 
         <Spacer size={32} />
+
+        {/* Lightning Address Section - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Your Lightning Address"
+              subtitle="Receive Bitcoin with a memorable URL"
+            />
+            <Animated.View
+              entering={FadeInUp.duration(380).delay(160)}
+              style={{ paddingHorizontal: 20 }}>
+              <LightningAddressCard />
+            </Animated.View>
+
+            <Spacer size={32} />
+          </>
+        ) : null}
 
         {/* Wallet Health */}
         <SectionHeader
           title="Wallet Health"
           subtitle="Check distribution drift, pending outgoing ecash, and more"
         />
-        <View style={{ paddingHorizontal: 20 }}>
+        <Animated.View
+          entering={FadeInUp.duration(380).delay(240)}
+          style={{ paddingHorizontal: 20 }}>
           <WalletHealthCard defaultUnit="sat" />
-        </View>
+        </Animated.View>
 
         <Spacer size={32} />
 
@@ -1166,88 +1234,100 @@ const ExploreScreen = () => {
 
         <Spacer size={32} />
 
-        {/* Shop with Bitcoin */}
-        <SectionHeader
-          title="Shop with Bitcoin"
-          subtitle="Gift cards & vouchers"
-          action="See all"
-          onAction={() => popup('not_implemented')}
-        />
-
-        {/* Category Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-          {PRODUCT_CATEGORIES.map((cat) => (
-            <CategoryPill
-              key={cat.id}
-              name={cat.name}
-              icon={cat.icon}
-              isActive={activeCategory === cat.name}
-              onPress={() => setActiveCategory(cat.name)}
+        {/* Shop with Bitcoin - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Shop with Bitcoin"
+              subtitle="Gift cards & vouchers"
+              action="See all"
+              onAction={() => popup('not_implemented')}
             />
-          ))}
-        </ScrollView>
 
-        {/* Product Cards - 2 column grid */}
-        <View style={styles.productGrid}>
-          {BITREFILL_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
+            {/* Category Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <CategoryPill
+                  key={cat.id}
+                  name={cat.name}
+                  icon={cat.icon}
+                  isActive={activeCategory === cat.name}
+                  onPress={() => setActiveCategory(cat.name)}
+                />
+              ))}
+            </ScrollView>
 
-        <Spacer size={32} />
+            {/* Product Cards - 2 column grid */}
+            <View style={styles.productGrid}>
+              {BITREFILL_PRODUCTS.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </View>
 
-        {/* Bitcoin Conferences */}
-        <SectionHeader
-          title="Bitcoin Events"
-          subtitle="Upcoming conferences & meetups"
-          action="View all"
-          onAction={() => popup('not_implemented')}
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
-          {BITCOIN_CONFERENCES.map((conf) => (
-            <ConferenceCard key={conf.id} conference={conf} />
-          ))}
-        </ScrollView>
+            <Spacer size={32} />
+          </>
+        ) : null}
 
-        <Spacer size={32} />
-
-        {/* eSIM Promo */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.esimPromo}
-            onPress={() => Linking.openURL('https://sovran.money/esims')}>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
-            <LinearGradient
-              colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
+        {/* Bitcoin Conferences - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Bitcoin Events"
+              subtitle="Upcoming conferences & meetups"
+              action="View all"
+              onAction={() => popup('not_implemented')}
             />
-            <HStack align="center" style={{ padding: 20 }}>
-              <View style={styles.esimPromoIcon}>
-                <Icon name="mdi:sim" size={28} color="#fff" />
-              </View>
-              <VStack style={{ flex: 1, marginLeft: 16 }}>
-                <Text size={16} heavy style={{ color: '#fff' }}>
-                  Travel with Bitcoin
-                </Text>
-                <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                  Get eSIMs for 190+ countries, pay with sats
-                </Text>
-              </VStack>
-              <View style={styles.esimPromoArrow}>
-                <Icon name="mdi:arrow-right" size={20} color="#fff" />
-              </View>
-            </HStack>
-          </TouchableOpacity>
-        </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
+              {BITCOIN_CONFERENCES.map((conf) => (
+                <ConferenceCard key={conf.id} conference={conf} />
+              ))}
+            </ScrollView>
+
+            <Spacer size={32} />
+          </>
+        ) : null}
+
+        {/* eSIM Promo - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <View style={{ paddingHorizontal: 20 }}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.esimPromo}
+                onPress={() => Linking.openURL('https://sovran.money/esims')}>
+                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <LinearGradient
+                  colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <HStack align="center" style={{ padding: 20 }}>
+                  <View style={styles.esimPromoIcon}>
+                    <Icon name="mdi:sim" size={28} color="#fff" />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 16 }}>
+                    <Text size={16} heavy style={{ color: '#fff' }}>
+                      Travel with Bitcoin
+                    </Text>
+                    <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                      Get eSIMs for 190+ countries, pay with sats
+                    </Text>
+                  </VStack>
+                  <View style={styles.esimPromoArrow}>
+                    <Icon name="mdi:arrow-right" size={20} color="#fff" />
+                  </View>
+                </HStack>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
 
         <Spacer size={20} />
       </VStack>
@@ -1263,6 +1343,7 @@ const styles = StyleSheet.create({
   aiModelCard: {
     width: 200,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   aiModelBadge: {
@@ -1289,6 +1370,7 @@ const styles = StyleSheet.create({
   },
   mapCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   mapImageSection: {
@@ -1335,6 +1417,7 @@ const styles = StyleSheet.create({
   productCard: {
     width: (SCREEN_WIDTH - 44) / 2,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
@@ -1358,6 +1441,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 180,
     borderRadius: 16,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -1384,6 +1468,7 @@ const styles = StyleSheet.create({
   },
   esimPromo: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
@@ -1423,6 +1508,7 @@ const styles = StyleSheet.create({
   // Lightning Address Card styles
   lightningAddressCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
@@ -1480,18 +1566,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  // Pending Ecash Card styles
+  // Pending Ecash Card styles (matches WalletHealthCard pattern)
   pendingEcashCard: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
-  pendingDecorationRight: {
-    position: 'absolute',
-    bottom: -20,
-    right: -20,
-    transform: [{ rotate: '15deg' }],
-  },
+  // pendingDecorationLeft/Right moved to PendingEcashCardFrame
   pendingEcashIcon: {
     width: 40,
     height: 40,
@@ -1499,28 +1581,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pendingCountBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    minWidth: 36,
-    alignItems: 'center',
-  },
-  pendingAmountBox: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
+  pendingUnitPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
     borderWidth: 1,
   },
   pendingEcashCTA: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
 });
 

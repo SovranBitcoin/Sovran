@@ -634,26 +634,54 @@ export const resetApp = (): AppThunk => {
         // Continue with other cleanup even if this fails
       }
 
-      // 3. Clear Zustand stores
+      // 3. Clear ALL Zustand stores
       try {
         const { useMintStore } = await import('stores/mintStore');
         const { useSettingsStore } = await import('stores/settingsStore');
         const { usePricelistStore } = await import('stores/pricelistStore');
+        const { useSwapTransactionsStore } = await import('stores/swapTransactionsStore');
+        const { useSearchHistoryStore } = await import('stores/searchHistoryStore');
+        const { useBTCMapStore } = await import('stores/btcMapStore');
+        const { useScanHistoryStore } = await import('stores/scanHistoryStore');
+        const { useMintDistributionStore } = await import('stores/mintDistributionStore');
+        const { useRoutstrStore } = await import('stores/routstrStore');
+        const { useAuditMintStore } = await import('stores/auditMintStore');
+        const { useTransactionLocationStore } = await import('stores/transactionLocationStore');
+        const { useKYMMintStore } = await import('stores/kymMintStore');
 
-        // Clear mint store (both state and storage)
-        const mintStore = useMintStore.getState();
-        await mintStore.clearAllData();
-        console.log('✅ Mint store cleared successfully');
+        // Clear each store (both in-memory state and AsyncStorage)
+        const storesToClear = [
+          { name: 'Mint', clear: () => useMintStore.getState().clearAllData() },
+          { name: 'Settings', clear: () => useSettingsStore.getState().clearAllData() },
+          { name: 'Pricelist', clear: () => usePricelistStore.getState().clearAllData() },
+          {
+            name: 'SwapTransactions',
+            clear: () => useSwapTransactionsStore.getState().clearAllData(),
+          },
+          { name: 'SearchHistory', clear: () => useSearchHistoryStore.getState().clearAllData() },
+          { name: 'BTCMap', clear: () => useBTCMapStore.getState().clearAllData() },
+          { name: 'ScanHistory', clear: () => useScanHistoryStore.getState().clearAllData() },
+          {
+            name: 'MintDistribution',
+            clear: () => useMintDistributionStore.getState().clearAllData(),
+          },
+          { name: 'Routstr', clear: () => useRoutstrStore.getState().clearAllData() },
+          { name: 'AuditMint', clear: () => useAuditMintStore.getState().clearAllData() },
+          {
+            name: 'TransactionLocation',
+            clear: () => useTransactionLocationStore.getState().clearAllData(),
+          },
+          { name: 'KYMMint', clear: () => useKYMMintStore.getState().clearAllData() },
+        ];
 
-        // Clear settings store (both state and storage)
-        const settingsStore = useSettingsStore.getState();
-        await settingsStore.clearAllData();
-        console.log('✅ Settings store cleared successfully');
-
-        // Clear pricelist store (both state and storage)
-        const pricelistStore = usePricelistStore.getState();
-        await pricelistStore.clearAllData();
-        console.log('✅ Pricelist store cleared successfully');
+        for (const store of storesToClear) {
+          try {
+            await store.clear();
+            console.log(`✅ ${store.name} store cleared successfully`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to clear ${store.name} store:`, error);
+          }
+        }
       } catch (error) {
         console.warn('⚠️ Failed to clear Zustand stores:', error);
         // Continue with other cleanup even if this fails

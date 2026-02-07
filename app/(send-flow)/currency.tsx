@@ -87,6 +87,9 @@ function ModalScreen() {
           // Dismiss the modal to return to the previous screen (UserMessages)
           router.dismiss();
         }}
+        onDone={() => {
+          router.dismiss();
+        }}
         // Note: Payment request flow is handled entirely in CurrencyScreen
         // which calls onSendTokenCreated after successful Nostr send
         onInsufficientBalance={(amount, _unit) => {

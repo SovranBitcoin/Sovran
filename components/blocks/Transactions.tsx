@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -11,9 +11,35 @@ import { Link } from 'expo-router';
 import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { formatDate } from 'helper/time';
 import { Transaction } from 'components/blocks/Transaction';
+import { SwapTransactionRow } from 'components/blocks/SwapTransactionRow';
 import _ from 'lodash';
 import { mintHistoryEntryExpired } from 'helper/utils';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import opacity from 'hex-color-opacity';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
+import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
+
+// ---------------------------------------------------------------------------
+// Timeline item: a discriminated union so transactions and swap groups can
+// live in the same sorted list.
+// ---------------------------------------------------------------------------
+
+type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
+
+function getTimelineCreatedAt(item: TimelineItem): number {
+  return item.data.createdAt;
+}
+
+function getTimelineKey(item: TimelineItem): string {
+  if (item.kind === 'swap') return `swap-${item.data.id}`;
+  const entry = item.data;
+  if (entry.id) return entry.id;
+  if ('token' in entry && entry.token)
+    return typeof entry.token === 'string' ? entry.token : JSON.stringify(entry.token);
+  return Math.random().toString();
+}
+
+// ---------------------------------------------------------------------------
 
 interface Account {
   unit: string;
@@ -22,7 +48,7 @@ interface Account {
 
 interface Section {
   title: string;
-  data: HistoryEntry[];
+  data: TimelineItem[];
   index?: string;
 }
 
@@ -73,6 +99,17 @@ export const Transactions = React.memo(
   }: Props) => {
     const { getPrimaryColor } = useTheme();
 
+    // Theme colors for the card frame (matching payments style)
+    const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+
+    const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
+    const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
+
+    const swapGroups = useMemo(() => {
+      return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
+    }, [swapGroupsById, account.unit]);
+
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
 
@@ -80,6 +117,13 @@ export const Transactions = React.memo(
       () =>
         _.filter(history, (historyEntry: HistoryEntry) => {
           if (historyEntry.unit !== account.unit) return false;
+
+          // Hide underlying child transactions that are part of a swap group
+          if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
+            const quoteId = (historyEntry as any).quoteId as string | undefined;
+            if (quoteId && quoteIdToGroup[quoteId]) return false;
+          }
+
           if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
           if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
           if (type === 'lightning' && historyEntry.type !== 'mint') return false;
@@ -112,17 +156,48 @@ export const Transactions = React.memo(
 
           return true;
         }),
-      [history, account.unit, filter, type, hideExpired, selectedMonth]
+      [history, account.unit, filter, type, hideExpired, selectedMonth, quoteIdToGroup]
     );
 
-    const sortedHistory = useMemo(
-      () => _.orderBy(filteredHistory, ['createdAt'], ['desc']),
-      [filteredHistory]
+    // Build unified timeline: mix history entries + swap groups chronologically
+    const timelineItems: TimelineItem[] = useMemo(() => {
+      const txItems: TimelineItem[] = filteredHistory.map((entry) => ({
+        kind: 'transaction' as const,
+        data: entry,
+      }));
+
+      // Only include swap items when showing all filters / types
+      if (filter !== 'all' || type !== 'all') return txItems;
+
+      const swapItems: TimelineItem[] = swapGroups
+        .filter((group) => {
+          if (!selectedMonth) return true;
+          const [yearStr, monthStr] = selectedMonth.split('-');
+          const filterYear = parseInt(yearStr, 10);
+          const filterMonthNum = parseInt(monthStr, 10) - 1;
+          const date = new Date(group.createdAt);
+          return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
+        })
+        .map((group) => ({
+          kind: 'swap' as const,
+          data: group,
+        }));
+
+      return [...txItems, ...swapItems];
+    }, [filteredHistory, swapGroups, filter, type, selectedMonth]);
+
+    const sortedTimeline = useMemo(
+      () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
+      [timelineItems]
     );
 
     const { pending, confirmed, expired } = useMemo(
       () =>
-        _.groupBy(sortedHistory, (historyEntry: HistoryEntry) => {
+        _.groupBy(sortedTimeline, (item: TimelineItem) => {
+          // Swap items are always "confirmed"
+          if (item.kind === 'swap') return 'confirmed';
+
+          const historyEntry = item.data;
           const isPending =
             (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
             (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
@@ -138,23 +213,20 @@ export const Transactions = React.memo(
           if (isExpired) return 'expired';
           return isPending ? 'pending' : 'confirmed';
         }),
-      [sortedHistory]
+      [sortedTimeline]
     );
 
     const sections = useMemo(() => {
-      const createSections = (historyEntries: HistoryEntry[]) => {
+      const createSections = (items: TimelineItem[]) => {
         // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = _.groupBy(historyEntries, (historyEntry) =>
-          formatDate(historyEntry.createdAt)
-        );
+        const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
 
         // Create an array of {dateString, originalDate} pairs for proper sorting
         const dateEntries = Object.keys(groupedByDate).map((dateString) => {
-          // Find the first history entry for this date to get the original createdAt
-          const firstEntry = groupedByDate[dateString][0];
+          const firstItem = groupedByDate[dateString][0];
           return {
             dateString,
-            originalDate: new Date(firstEntry.createdAt),
+            originalDate: new Date(getTimelineCreatedAt(firstItem)),
           };
         });
 
@@ -186,23 +258,21 @@ export const Transactions = React.memo(
       };
     }, [pending, confirmed, expired, showMore, days]);
 
-    const flattenedData = useMemo(() => {
-      let sectionsToDisplay;
-      if (tab === 'Pending') {
-        sectionsToDisplay = sections.pending;
-      } else if (tab === 'Confirmed') {
-        sectionsToDisplay = sections.confirmed;
-      } else if (tab === 'Expired') {
-        sectionsToDisplay = sections.expired;
-      } else {
-        sectionsToDisplay = sections.all;
-      }
+    const sectionsToDisplay = useMemo(() => {
+      if (tab === 'Pending') return sections.pending;
+      if (tab === 'Confirmed') return sections.confirmed;
+      if (tab === 'Expired') return sections.expired;
+      return sections.all;
+    }, [sections, tab]);
 
-      return _.flatMap(sectionsToDisplay, (section) => [
-        { type: 'header', title: section.title },
-        ..._.map(section.data, (historyEntry) => ({ type: 'item', historyEntry })),
-      ]);
-    }, [sections.all, sections.pending, sections.confirmed, sections.expired, tab]);
+    /** Render a single timeline item (transaction or swap). */
+    const renderTimelineItem = (item: TimelineItem) => {
+      const key = getTimelineKey(item);
+      if (item.kind === 'swap') {
+        return <SwapTransactionRow key={key} group={item.data} />;
+      }
+      return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
+    };
 
     if (showMore) {
       if (isFetching) {
@@ -234,7 +304,7 @@ export const Transactions = React.memo(
         );
       }
 
-      if (filteredHistory.length === 0) {
+      if (timelineItems.length === 0) {
         return (
           <View
             className="flex items-center"
@@ -253,8 +323,8 @@ export const Transactions = React.memo(
         );
       }
 
-      const renderStatus = (label: string, sections: Section[]) => {
-        if (sections.length === 0) return null;
+      const renderStatus = (label: string, sects: Section[]) => {
+        if (sects.length === 0) return null;
         return (
           <View>
             <VStack spacing={8}>
@@ -262,52 +332,40 @@ export const Transactions = React.memo(
               <Text heavy size={16} color={getPrimaryColor('100')}>
                 {label}
               </Text>
-              {sections.map((section) => (
+              {sects.map((section) => (
                 <View key={section.title}>
                   <VStack spacing={4}>
                     <Text size={14} heavy color={getPrimaryColor('100')}>
                       {section.title}
                     </Text>
-                    <View className="rounded-lg bg-primary-900" blur>
-                      {section.data.map((historyEntry) => {
-                        const key = (() => {
-                          if (historyEntry.id) return historyEntry.id;
-                          if ('token' in historyEntry && historyEntry.token)
-                            return typeof historyEntry.token === 'string'
-                              ? historyEntry.token
-                              : JSON.stringify(historyEntry.token);
-                          return Math.random().toString();
-                        })();
-                        return (
-                          <Transaction
-                            key={key}
-                            historyEntry={historyEntry}
-                            onPress={onTransactionPress}
-                          />
-                        );
-                      })}
-                      {label === 'Confirmed' && (
-                        <Link
-                          href={{
-                            pathname: '/transactions',
-                            params: {
-                              account: JSON.stringify(account),
-                              tab: 'Confirmed',
-                            },
-                          }}
-                          asChild>
-                          <TouchableOpacity>
-                            <View
-                              blur
-                              className="flex items-center rounded-lg border border-primary-700 bg-primary-800 p-3">
-                              <Text size={14} bold>
-                                View all ({filteredHistory.length})
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        </Link>
-                      )}
+                    <View style={[styles.card, { borderColor }]}>
+                      <BlurCardFrame accentColor={accentColor}>
+                        <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+                      </BlurCardFrame>
                     </View>
+                    {label === 'Confirmed' && (
+                      <Link
+                        href={{
+                          pathname: '/transactions',
+                          params: {
+                            account: JSON.stringify(account),
+                            tab: 'Confirmed',
+                          },
+                        }}
+                        asChild>
+                        <TouchableOpacity>
+                          <View style={[styles.viewAllButton, { borderColor }]}>
+                            <BlurCardFrame accentColor={accentColor}>
+                              <View style={styles.viewAllContent}>
+                                <Text size={14} bold>
+                                  View all ({filteredHistory.length})
+                                </Text>
+                              </View>
+                            </BlurCardFrame>
+                          </View>
+                        </TouchableOpacity>
+                      </Link>
+                    )}
                   </VStack>
                 </View>
               ))}
@@ -325,55 +383,35 @@ export const Transactions = React.memo(
       );
     }
 
+    // Estimate section height: header + (items * item height)
+    const estimateSectionHeight = (section: Section) =>
+      HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
+
     return (
       <LegendList
         waitForInitialLayout={false}
         key={listKey}
         style={{ flex: 1 }}
-        data={flattenedData}
-        estimatedItemSize={ITEM_HEIGHT}
+        data={sectionsToDisplay}
+        estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
         scrollEnabled
         maintainVisibleContentPosition
         contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-        ListHeaderComponent={header}
+        ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item, index }) => {
-          if (item.type === 'header') {
-            return (
-              <Text
-                size={14}
-                heavy
-                color={getPrimaryColor('500')}
-                style={{ height: HEADER_HEIGHT }}>
-                {'title' in item ? item.title : ''}
-              </Text>
-            );
-          }
-
-          const prev = flattenedData[index - 1];
-          const next = flattenedData[index + 1];
-          const isFirst = !prev || prev.type === 'header';
-          const isLast = !next || next.type === 'header';
-
-          return (
-            <View
-              blur
-              className="bg-primary-800"
-              style={{
-                borderRadius: 8,
-                borderTopLeftRadius: isFirst ? 8 : 0,
-                borderTopRightRadius: isFirst ? 8 : 0,
-                borderBottomLeftRadius: isLast ? 8 : 0,
-                borderBottomRightRadius: isLast ? 8 : 0,
-                height: ITEM_HEIGHT,
-              }}>
-              {'historyEntry' in item && (
-                <Transaction historyEntry={item.historyEntry} onPress={onTransactionPress} />
-              )}
+        renderItem={({ item: section }) => (
+          <VStack spacing={4} style={{ marginBottom: 16 }}>
+            <Text size={14} heavy color={getPrimaryColor('500')} style={{ height: HEADER_HEIGHT }}>
+              {section.title}
+            </Text>
+            <View style={[styles.card, { borderColor }]}>
+              <BlurCardFrame accentColor={accentColor}>
+                <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+              </BlurCardFrame>
             </View>
-          );
-        }}
+          </VStack>
+        )}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
       />
     );
@@ -381,3 +419,24 @@ export const Transactions = React.memo(
 );
 
 Transactions.displayName = 'Transactions';
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  content: {
+    zIndex: 1,
+  },
+  viewAllButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  viewAllContent: {
+    padding: 12,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+});

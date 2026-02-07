@@ -16,12 +16,26 @@ import Icon from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
-import { Host, Button as SwiftUIButton, ContextMenu } from '@expo/ui/swift-ui';
-import { frame, cornerRadius } from '@expo/ui/swift-ui/modifiers';
+import {
+  Host,
+  Button as SwiftUIButton,
+  ContextMenu,
+  HStack as SwiftUIHStack,
+  VStack as SwiftUIVStack,
+  Image as SwiftUIImage,
+  Text as SwiftUIText,
+} from '@expo/ui/swift-ui';
+import {
+  buttonStyle,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+  padding,
+} from '@expo/ui/swift-ui/modifiers';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -107,36 +121,55 @@ const StatsCard = memo(function StatsCard({
 }: StatsCardProps) {
   const { getPrimaryColor } = useTheme();
 
+  const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
+  const totalText = loading
+    ? 'Loading...'
+    : `${totalCount.toLocaleString()} total • ${CATEGORIES[category].label}`;
+
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ height: 60, width: '100%' }} matchContents fixedSize={true}>
-        <ContextMenu activationMethod="singlePress">
+      <Host style={{ height: 60, width: '100%' }} matchContents>
+        <ContextMenu>
           <ContextMenu.Items>
             {(Object.keys(CATEGORIES) as CategoryFilter[]).map((cat) => (
-              <SwiftUIButton key={cat} onPress={() => onCategoryChange(cat)}>
-                {CATEGORIES[cat].label}
-                {cat === category ? ' ✓' : ''}
-              </SwiftUIButton>
+              <SwiftUIButton
+                key={cat}
+                label={`${CATEGORIES[cat].label}${cat === category ? ' ✓' : ''}`}
+                onPress={() => onCategoryChange(cat)}
+              />
             ))}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <SwiftUIButton variant="glass" modifiers={[frame({ height: 60 })]}>
-              <HStack align="center" style={{ paddingHorizontal: 16, width: '100%' }}>
-                <Icon name="mdi:bitcoin" size={24} color="#F7931A" />
-                <VStack style={{ marginLeft: 12, flex: 1 }}>
-                  <Text size={18} heavy style={{ color: getPrimaryColor('0') }}>
-                    {loading ? '...' : `${visibleCount.toLocaleString()} visible`}
-                  </Text>
-                  <HStack align="center" spacing={4}>
-                    <Text size={12} style={{ color: getPrimaryColor('400') }}>
-                      {loading
-                        ? 'Loading...'
-                        : `${totalCount.toLocaleString()} total • ${CATEGORIES[category].label}`}
-                    </Text>
-                    <Icon name="mdi:chevron-down" size={14} color={getPrimaryColor('400')} />
-                  </HStack>
-                </VStack>
-              </HStack>
+            <SwiftUIButton modifiers={[buttonStyle('glass'), frame({ height: 60 })]}>
+              <SwiftUIHStack
+                alignment="center"
+                spacing={12}
+                modifiers={[
+                  frame({ maxWidth: Infinity, height: 60, alignment: 'leading' }),
+                  padding({ horizontal: 16 }),
+                ]}>
+                <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color="#F7931A" />
+                <SwiftUIVStack alignment="leading" spacing={2}>
+                  <SwiftUIText
+                    modifiers={[
+                      font({ size: 18, weight: 'bold' }),
+                      foregroundStyle(getPrimaryColor('0')),
+                    ]}>
+                    {visibleText}
+                  </SwiftUIText>
+                  <SwiftUIHStack alignment="center" spacing={4}>
+                    <SwiftUIText
+                      modifiers={[font({ size: 12 }), foregroundStyle(getPrimaryColor('400'))]}>
+                      {totalText}
+                    </SwiftUIText>
+                    <SwiftUIImage
+                      systemName="chevron.down"
+                      size={10}
+                      color={getPrimaryColor('400')}
+                    />
+                  </SwiftUIHStack>
+                </SwiftUIVStack>
+              </SwiftUIHStack>
             </SwiftUIButton>
           </ContextMenu.Trigger>
         </ContextMenu>
@@ -162,38 +195,62 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
     return (
       <VStack style={styles.floatingButtons} spacing={8}>
         {/* Location Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({
+                shape: 'circle',
+                glass: { variant: 'regular', interactive: true },
+              }),
+            ]}
             onPress={onMyLocation}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:crosshairs-gps" size={22} color={getPrimaryColor('0')} />
-            </View>
+            <SwiftUIHStack
+              alignment="center"
+              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+              <SwiftUIImage systemName="location.fill" size={20} color={getPrimaryColor('0')} />
+            </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
 
         {/* Zoom In Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({
+                shape: 'circle',
+                glass: { variant: 'regular', interactive: true },
+              }),
+            ]}
             onPress={onZoomIn}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:plus" size={22} color={getPrimaryColor('0')} />
-            </View>
+            <SwiftUIHStack
+              alignment="center"
+              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+              <SwiftUIImage systemName="plus" size={20} color={getPrimaryColor('0')} />
+            </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
 
         {/* Zoom Out Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents fixedSize>
+        <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
-            variant="glass"
-            modifiers={[frame({ height: 48, width: 48 }), cornerRadius(24)]}
+            modifiers={[
+              buttonStyle('glass'),
+              frame({ height: 48, width: 48 }),
+              glassEffect({
+                shape: 'circle',
+                glass: { variant: 'regular', interactive: true },
+              }),
+            ]}
             onPress={onZoomOut}>
-            <View style={styles.circleButtonContent}>
-              <Icon name="mdi:minus" size={22} color={getPrimaryColor('0')} />
-            </View>
+            <SwiftUIHStack
+              alignment="center"
+              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+              <SwiftUIImage systemName="minus" size={20} color={getPrimaryColor('0')} />
+            </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
       </VStack>

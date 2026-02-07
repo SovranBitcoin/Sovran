@@ -71,12 +71,11 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'pendingEcash',
     title: 'Pending Ecash',
     options: {
-      presentation: 'modal',
+      presentation: 'card',
+      animation: 'fade',
       headerShown: true,
-      headerBlurEffect: 'systemMaterial',
       headerTransparent: true,
       headerBackButtonDisplayMode: 'minimal',
-      gestureDirection: 'vertical',
     },
   },
   // Map flow modal group - Bitcoin merchant map
@@ -189,8 +188,16 @@ export const MODAL_SCREENS: ModalConfig[] = [
     title: 'Theme',
   },
   {
+    name: 'settings-pages/routing',
+    title: 'Swap Routing',
+  },
+  {
     name: 'settings-pages/keyring',
     title: 'P2PK Keys',
+  },
+  {
+    name: 'settings-pages/storage',
+    title: 'Storage Inspector',
   },
   {
     name: 'settings-pages/recovery',

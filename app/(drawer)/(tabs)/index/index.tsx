@@ -1,5 +1,6 @@
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
+import { DebugBalancePanel } from 'components/blocks/DebugBalancePanel';
 import { Transactions } from 'components/blocks/Transactions';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { View } from 'components/ui/View/View';
@@ -9,12 +10,14 @@ import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { LayoutDebugWrapper } from '../example';
+import { useSettingsStore } from 'stores/settingsStore';
 
 function TabOneScreen() {
   // Register this tab's background configuration - animates on focus
   useBackgroundConfig({ blurMode: 'partial' });
 
   const { height: windowHeight } = useWindowDimensions();
+  const devMode = useSettingsStore((state) => state.experimental);
   const supportedUnits = useMemo(() => ['sat', 'usd', 'eur', 'gbp'], []);
 
   const accounts = useMemo(
@@ -59,6 +62,7 @@ function TabOneScreen() {
       <ScrollableGradientOverlay contentHeight={contentHeight} />
 
       <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
+      {devMode ? <DebugBalancePanel /> : null}
       <View
         className="p-4 pt-0"
         style={{

@@ -15,7 +15,14 @@ import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Keyboard, Pressable, useWindowDimensions } from 'react-native';
+import {
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View as RNView,
+} from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SkeletonContainer } from 'react-native-skeleton-component';
@@ -23,6 +30,9 @@ import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useSearchHistoryStore } from '@/stores/searchHistoryStore';
+import { ProfilesCardFrame } from '@/components/blocks/payments/ProfilesCardFrame';
+import opacity from 'hex-color-opacity';
 
 // Define proper types
 interface SearchResultData {
@@ -79,7 +89,7 @@ const DEFAULT_CONTACTS = [
 
 const PaymentsContent = () => {
   // Register this tab's background configuration
-  useBackgroundConfig({ blurMode: 'full' });
+  useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('Recent activity');
@@ -94,6 +104,9 @@ const PaymentsContent = () => {
 
   // Get search state from layout context
   const { searchQuery, isSearching } = usePaymentsSearch();
+
+  // Search history store
+  const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
 
   const { mints, loadMints, getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -441,46 +454,64 @@ const PaymentsContent = () => {
   }, []);
 
   // Search functionality
-  const searchUsers = useCallback(async (query: string) => {
-    if (!query.trim()) return;
+  const searchUsers = useCallback(
+    async (query: string) => {
+      if (!query.trim()) return;
 
-    setSearchLoading(true);
-    setHasSearched(true);
+      setSearchLoading(true);
+      setHasSearched(true);
 
-    try {
-      const result = await apiSearchUsers({ query, limit: 10 });
+      try {
+        const result = await apiSearchUsers({ query, limit: 10 });
 
-      if (result.isOk()) {
-        const data = result.value;
+        if (result.isOk()) {
+          const data = result.value;
 
-        if (data.results && Array.isArray(data.results)) {
-          const formattedResults: SearchResultData[] = data.results.map((res) => {
-            const profileEventPubkey = JSON.parse(res.profileEvent).pubkey;
+          if (data.results && Array.isArray(data.results)) {
+            const formattedResults: SearchResultData[] = data.results.map((res) => {
+              // Some search rows may not include a `profileEvent`. Treat those as partial profiles.
+              // Also guard against invalid JSON so one bad row doesn't wipe the entire list.
+              let profileEventPubkey = res.pubkey;
+              if (res.profileEvent) {
+                try {
+                  const parsed = JSON.parse(res.profileEvent);
+                  if (parsed?.pubkey) profileEventPubkey = parsed.pubkey;
+                } catch (e) {
+                  console.warn('Invalid profileEvent JSON for pubkey', res.pubkey, e);
+                }
+              }
 
-            return {
-              pubkey: res.pubkey,
-              profile: {
-                ...res,
-                pubkey: profileEventPubkey,
-              },
-            };
-          });
+              return {
+                pubkey: res.pubkey,
+                profile: {
+                  ...res,
+                  pubkey: profileEventPubkey,
+                },
+              };
+            });
 
-          setSearchResults(formattedResults);
+            setSearchResults(formattedResults);
+
+            // Save successful searches to history
+            if (formattedResults.length > 0) {
+              addSearchToHistory(query, 'payments');
+            }
+          } else {
+            setSearchResults([]);
+          }
         } else {
+          console.error('Error searching users:', result.error);
           setSearchResults([]);
         }
-      } else {
-        console.error('Error searching users:', result.error);
+      } catch (error) {
+        console.error('Unexpected error during search:', error);
         setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
       }
-    } catch (error) {
-      console.error('Unexpected error during search:', error);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, []);
+    },
+    [addSearchToHistory]
+  );
 
   // Debounced search handler
   useEffect(() => {
@@ -496,6 +527,12 @@ const PaymentsContent = () => {
       setSearchLoading(false);
       return;
     }
+
+    // Immediately enter "searching" state so the UI doesn't flash recent searches
+    // or stale results while we wait for the debounce window.
+    setHasSearched(false);
+    setSearchResults([]);
+    setSearchLoading(true);
 
     // Debounce the search
     debounceTimeoutRef.current = setTimeout(() => {
@@ -527,13 +564,12 @@ const PaymentsContent = () => {
   );
 
   // Memoized computed values
-  const displayResults: DisplayResult[] = useMemo(
-    () => (searchLoading ? placeholderResults : searchResults),
-    [searchLoading, placeholderResults, searchResults]
-  );
+  const displayResults: DisplayResult[] = useMemo(() => {
+    // Keep the card height stable while the debounce/request is in-flight.
+    if (searchLoading || !hasSearched) return placeholderResults;
+    return searchResults;
+  }, [hasSearched, placeholderResults, searchLoading, searchResults]);
 
-  const showSearchResults =
-    searchQuery.trim().length > 0 && (searchLoading || searchResults.length > 0);
   const showNoResults =
     searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
 
@@ -547,6 +583,11 @@ const PaymentsContent = () => {
     }),
     [getPrimaryColor, searchLoading]
   );
+
+  // Match Recent activity / Mints card frame styling
+  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
   const navigateToProfile = useCallback(({ pubkey }: { pubkey: string }) => {
     router.navigate({
@@ -570,11 +611,18 @@ const PaymentsContent = () => {
   // Memoized handler for search result press
   const handleSearchResultPress = useCallback(
     (result: DisplayResult) => {
-      if (!searchLoading && result.profile) {
+      if (searchLoading || !result.profile) return;
+
+      // Ensure the search header input is blurred before navigating,
+      // otherwise iOS can keep/reopen the keyboard on the next screen.
+      Keyboard.dismiss();
+
+      // Let the dismiss propagate before route transition.
+      requestAnimationFrame(() => {
         navigateToProfile({
           pubkey: result.pubkey,
         });
-      }
+      });
     },
     [searchLoading, navigateToProfile]
   );
@@ -596,9 +644,6 @@ const PaymentsContent = () => {
   };
 
   const tabs = ['Recent activity', 'Mints'];
-
-  // Constants for LegendList
-  const ITEM_HEIGHT = 80; // Approximate height of ContactItem
 
   // Fetch kind 0 (profile) events for all contacts including defaults
   const profileFilters = useMemo(() => {
@@ -685,53 +730,37 @@ const PaymentsContent = () => {
 
             {/* Search results overlay - positioned absolutely to avoid layout shifts */}
             {isSearching && (
-              <Pressable style={{ flex: 1, paddingHorizontal: 16 }} onPress={dismissKeyboard}>
-                <FlatList
-                  data={showSearchResults ? displayResults : []}
-                  keyExtractor={(item) => item.pubkey}
+              <Pressable style={{ flex: 1 }} onPress={dismissKeyboard}>
+                <ScrollView
                   keyboardShouldPersistTaps="handled"
                   keyboardDismissMode="on-drag"
                   showsVerticalScrollIndicator={false}
-                  initialNumToRender={6}
-                  maxToRenderPerBatch={6}
-                  windowSize={5}
-                  removeClippedSubviews={true}
-                  ListHeaderComponent={
-                    <>
-                      {/* Recommended Users */}
-                      {/* <RecommendedUsers
-                        users={recommendedUsers}
-                        onUserPress={handleRecommendedUserPress}
-                        loading={recommendedLoading}
-                        isSearching={searchLoading}
-                      /> */}
+                  contentContainerStyle={styles.searchContainer}>
+                  <View style={{ marginTop: 16, marginBottom: 12, paddingHorizontal: 16 }}>
+                    <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
+                      Search results
+                    </Text>
+                  </View>
 
-                      {/* Search Results Header */}
-                      {showSearchResults && (
-                        <View
-                          style={{
-                            marginTop: 16,
-                            marginBottom: 12,
-                          }}>
-                          <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
-                            Search results
-                          </Text>
-                        </View>
-                      )}
-                    </>
-                  }
-                  renderItem={({ item }) => (
-                    <View style={{ marginBottom: 12 }}>
-                      <SearchResultItem
-                        result={item}
-                        loading={searchLoading}
-                        onPress={handleSearchResultPress}
-                      />
-                    </View>
-                  )}
-                  ListEmptyComponent={showNoResults ? <NoResultsFound /> : null}
-                  contentContainerStyle={{ paddingBottom: 24 }}
-                />
+                  <RNView style={[styles.card, { borderColor }]}>
+                    <ProfilesCardFrame accentColor={accentColor} highlightColor={primary50}>
+                      <View style={styles.cardContent} className="gap-4">
+                        {showNoResults ? (
+                          <NoResultsFound />
+                        ) : (
+                          displayResults.map((item) => (
+                            <SearchResultItem
+                              key={item.pubkey}
+                              result={item}
+                              loading={searchLoading || !hasSearched}
+                              onPress={handleSearchResultPress}
+                            />
+                          ))
+                        )}
+                      </View>
+                    </ProfilesCardFrame>
+                  </RNView>
+                </ScrollView>
               </Pressable>
             )}
 
@@ -740,7 +769,6 @@ const PaymentsContent = () => {
               <View
                 style={{
                   flex: 1,
-                  paddingHorizontal: 16,
                 }}>
                 <PagerView
                   ref={pagerRef}
@@ -755,7 +783,6 @@ const PaymentsContent = () => {
                       isDecrypting={isDecrypting}
                       isLoadingProfiles={isLoadingProfiles}
                       emptyMessage="No recent conversations found"
-                      itemHeight={ITEM_HEIGHT}
                     />
                   </View>
                   <View key="2" style={{ flex: 1 }}>
@@ -765,7 +792,6 @@ const PaymentsContent = () => {
                       isDecrypting={mintsLoadingInfo || isDecryptingMints}
                       isLoadingProfiles={isLoadingProfiles}
                       emptyMessage="No mints with nostr contacts found"
-                      itemHeight={ITEM_HEIGHT}
                     />
                   </View>
                 </PagerView>
@@ -779,3 +805,19 @@ const PaymentsContent = () => {
 };
 
 export default PaymentsContent;
+
+const styles = StyleSheet.create({
+  searchContainer: {
+    paddingBottom: 24,
+  },
+  card: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginHorizontal: 16,
+  },
+  cardContent: {
+    padding: 16,
+    zIndex: 1,
+  },
+});

@@ -85,12 +85,10 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
       }
       case 'receive': {
         // Coco uses 'receive' for ecash receives
-        // Extended ReceiveHistoryEntry with token property
-        const receiveEntry = historyEntry as ReceiveHistoryEntry & { token?: string };
         router.navigate({
           pathname: '/receiveToken',
           params: {
-            receiveHistoryEntry: JSON.stringify(receiveEntry),
+            receiveHistoryEntry: JSON.stringify(historyEntry as ReceiveHistoryEntry),
           },
         });
         return;

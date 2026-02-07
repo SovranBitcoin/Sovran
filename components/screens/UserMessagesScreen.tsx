@@ -70,6 +70,8 @@ import { formatAmount } from 'helper/currency';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
+  buttonStyle,
+  font,
   foregroundStyle,
   frame,
   padding,
@@ -266,7 +268,8 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       return;
     }
 
-    const receiveHistoryEntry: ReceiveHistoryEntry & { token: string } = {
+    const decodedToken = getDecodedToken(token);
+    const receiveHistoryEntry: ReceiveHistoryEntry = {
       id: `receive-${Date.now()}`,
       type: 'receive',
       amount,
@@ -274,7 +277,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       mintUrl,
       createdAt: Date.now(),
       metadata: {},
-      token,
+      token: decodedToken,
     };
 
     router.navigate({
@@ -572,10 +575,10 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
   const tokensPerSat = pricePerToken > 0 ? Math.round(1 / pricePerToken) : 0;
 
   return (
-    <Host matchContents={false} fixedSize={true} style={{ height: 96 }}>
+    <Host matchContents={false} style={{ height: 96 }}>
       <SwiftUIButton
-        variant="plain"
         modifiers={[
+          buttonStyle('plain'),
           frame({
             height: 96,
             width: Dimensions.get('window').width - 32,
@@ -606,12 +609,13 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
             alignment="leading"
             modifiers={[frame({ maxWidth: Infinity, alignment: 'leading' })]}>
             <SwiftUIText
-              size={16}
-              weight="semibold"
-              modifiers={[foregroundStyle(getPrimaryColor('0'))]}>
+              modifiers={[
+                font({ size: 16, weight: 'semibold' }),
+                foregroundStyle(getPrimaryColor('0')),
+              ]}>
               {modelName}
             </SwiftUIText>
-            <SwiftUIText size={14} modifiers={[foregroundStyle(getShadeColor('400'))]}>
+            <SwiftUIText modifiers={[font({ size: 14 }), foregroundStyle(getShadeColor('400'))]}>
               {provider}
             </SwiftUIText>
             <SwiftUIHStack alignment="center" spacing={8}>
@@ -622,13 +626,13 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
                   color={getPrimaryColor('0')}
                 />
               </SwiftUIVStack>
-              <SwiftUIText size={12} modifiers={[foregroundStyle(getShadeColor('400'))]}>
+              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(getShadeColor('400'))]}>
                 {`${minAmount} sats`}
               </SwiftUIText>
               <SwiftUIVStack alignment="leading" modifiers={[frame({ width: 16, height: 16 })]}>
                 <Icon name={'solar:tag-price-bold'} size={16} color={getPrimaryColor('0')} />
               </SwiftUIVStack>
-              <SwiftUIText size={12} modifiers={[foregroundStyle(getShadeColor('400'))]}>
+              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(getShadeColor('400'))]}>
                 {tokensPerSat > 0 ? `${tokensPerSat.toLocaleString()} tok/sat` : 'Free'}
               </SwiftUIText>
             </SwiftUIHStack>
@@ -687,8 +691,8 @@ export function UserMessagesScreen({
   // Routstr mode detection
   const isRoutstrMode = pubkey === ROUTSTR_PUBKEY;
 
-  // Calculate minimum bottom sheet detent
-  const bottomSheetDetents = useMemo((): ('medium' | 'large' | number)[] => {
+  // Calculate minimum bottom sheet detent (kept for potential future use)
+  const _bottomSheetDetents = useMemo((): ('medium' | 'large' | number)[] => {
     const screenHeight = Dimensions.get('window').height;
     const minHeight = Math.max(screenHeight * 0.5, 500);
     const minFraction = minHeight / screenHeight;
@@ -1453,22 +1457,20 @@ export function UserMessagesScreen({
     SheetManager.show('button-handler', {
       payload: {
         buttons: [
-          // {
-          //   text: 'Send Ecash',
-          //   icon: 'ph:coins',
-          //   variant: 'primary' as const,
-          //   onPress: async (close) => {
-          //     router.navigate({
-          //       pathname: '/(send-flow)/currency',
-          //       params: {
-          //         to: 'sendToken',
-          //         lud16: lud16,
-          //         profile: JSON.stringify(userInfo),
-          //       },
-          //     });
-          //     close({} as any);
-          //   },
-          // },
+          {
+            text: 'Send Ecash',
+            icon: 'ph:coins',
+            variant: 'primary' as const,
+            onPress: async (close) => {
+              router.navigate({
+                pathname: '/(send-flow)/currency',
+                params: {
+                  to: 'sendToken',
+                },
+              });
+              close({} as any);
+            },
+          },
           {
             text: 'Send Lightning',
             icon: 'mingcute:lightning-fill',
@@ -1575,25 +1577,31 @@ export function UserMessagesScreen({
                 <Host style={{ width: screenWidth - 100, height: 48, zIndex: 10 }}>
                   <ContextMenu>
                     <ContextMenu.Items>
-                      <SwiftUIButton systemImage="arrow.clockwise" onPress={handleRefreshBalance}>
-                        Refresh Balance
-                      </SwiftUIButton>
-                      <SwiftUIButton systemImage="creditcard" onPress={handleTopUp}>
-                        Top Up Balance
-                      </SwiftUIButton>
+                      <SwiftUIButton
+                        systemImage="arrow.clockwise"
+                        label="Refresh Balance"
+                        onPress={handleRefreshBalance}
+                      />
+                      <SwiftUIButton
+                        systemImage="creditcard"
+                        label="Top Up Balance"
+                        onPress={handleTopUp}
+                      />
                       <SwiftUIButton
                         systemImage="cpu"
-                        onPress={() => setIsModelSwitchBottomSheetOpen(true)}>
-                        Switch Model
-                      </SwiftUIButton>
+                        label="Switch Model"
+                        onPress={() => setIsModelSwitchBottomSheetOpen(true)}
+                      />
                       <SwiftUIButton
                         systemImage="square.stack"
-                        onPress={() => setIsSessionsPanelOpen(true)}>
-                        View Sessions
-                      </SwiftUIButton>
-                      <SwiftUIButton systemImage="plus.square" onPress={handleNewSession}>
-                        New Session
-                      </SwiftUIButton>
+                        label="View Sessions"
+                        onPress={() => setIsSessionsPanelOpen(true)}
+                      />
+                      <SwiftUIButton
+                        systemImage="plus.square"
+                        label="New Session"
+                        onPress={handleNewSession}
+                      />
                     </ContextMenu.Items>
                     <ContextMenu.Trigger>
                       <View
@@ -1793,8 +1801,8 @@ export function UserMessagesScreen({
               pointerEvents: isAttachmentsBottomSheetOpen ? 'auto' : 'none',
             }}>
             <BottomSheet
-              isOpened={isAttachmentsBottomSheetOpen}
-              onIsOpenedChange={setIsAttachmentsBottomSheetOpen}>
+              isPresented={isAttachmentsBottomSheetOpen}
+              onIsPresentedChange={setIsAttachmentsBottomSheetOpen}>
               <VStack spacing={16} style={{ padding: 20 }}>
                 <Pressable
                   onPress={() => {
@@ -1864,16 +1872,15 @@ export function UserMessagesScreen({
               pointerEvents: isModelSwitchBottomSheetOpen ? 'auto' : 'none',
             }}>
             <BottomSheet
-              isOpened={isModelSwitchBottomSheetOpen}
-              onIsOpenedChange={setIsModelSwitchBottomSheetOpen}
-              presentationDetents={bottomSheetDetents}>
+              isPresented={isModelSwitchBottomSheetOpen}
+              onIsPresentedChange={setIsModelSwitchBottomSheetOpen}>
               <VStack spacing={16} style={{ paddingTop: 20, paddingBottom: 40, flex: 1 }}>
                 <Text size={20} bold style={{ color: getPrimaryColor('0'), paddingHorizontal: 16 }}>
                   Select Model
                 </Text>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <Host matchContents fixedSize={true} style={{ width: screenWidth }}>
+                  <Host matchContents style={{ width: screenWidth }}>
                     <SwiftUIHStack
                       spacing={12}
                       alignment="center"
@@ -1881,9 +1888,10 @@ export function UserMessagesScreen({
                       {uniqueProviders.map((provider) => (
                         <SwiftUIButton
                           key={provider}
-                          variant="plain"
+                          label={provider}
                           onPress={() => setSelectedProvider(provider)}
                           modifiers={[
+                            buttonStyle('plain'),
                             padding({ horizontal: 12, vertical: 8 }),
                             background(
                               selectedProvider === provider
@@ -1892,25 +1900,8 @@ export function UserMessagesScreen({
                             ),
                             cornerRadius(8),
                             fixedSize({ horizontal: true, vertical: false }),
-                          ]}>
-                          <SwiftUIHStack spacing={6} alignment="center">
-                            <SwiftUIVStack
-                              alignment="leading"
-                              modifiers={[frame({ width: 20, height: 20 })]}>
-                              <Icon
-                                name={getProviderIcon(provider)}
-                                size={20}
-                                color={getPrimaryColor('0')}
-                              />
-                            </SwiftUIVStack>
-                            <SwiftUIText
-                              size={16}
-                              weight="semibold"
-                              modifiers={[foregroundStyle(getPrimaryColor('0'))]}>
-                              {provider}
-                            </SwiftUIText>
-                          </SwiftUIHStack>
-                        </SwiftUIButton>
+                          ]}
+                        />
                       ))}
                     </SwiftUIHStack>
                   </Host>
