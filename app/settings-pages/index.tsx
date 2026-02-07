@@ -166,6 +166,8 @@ const ModalScreen = () => {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
+  const devMode = useSettingsStore((state) => state.experimental);
+  const setDevMode = useSettingsStore((state) => state.setExperimental);
 
   const handleExportDatabase = async () => {
     try {
@@ -280,14 +282,40 @@ const ModalScreen = () => {
           <RowButton label="Recover Wallet" href="/settings-pages/recovery" isFirst isLast />
         </Section>
 
-        <Section title="Developer">
-          <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
-          <RowButton label="Free Reserved Proofs" onPress={handleFreeReservedProofs} />
-          <RowButton label="Storage Inspector" href="/settings-pages/storage" isLast />
-        </Section>
+        {devMode ? (
+          <Section title="Developer">
+            <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
+            <RowButton label="Free Reserved Proofs" onPress={handleFreeReservedProofs} />
+            <RowButton label="Storage Inspector" href="/settings-pages/storage" isLast />
+          </Section>
+        ) : null}
 
         <Section title="Danger Zone" isDanger>
-          <RowButton label="Delete Account" href="/settings-pages/delete" isLast isDanger />
+          <RowButton label="Delete Account" href="/settings-pages/delete" isFirst isDanger />
+          <View
+            style={{
+              backgroundColor: getPrimaryColor('800'),
+              borderColor: getPrimaryColor('700'),
+              borderTopWidth: 1,
+              borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              padding: 12,
+            }}>
+            <HStack align="center" justify="space-between">
+              <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                Developer Mode
+              </Text>
+              <Switch
+                value={devMode}
+                onValueChange={setDevMode}
+                trackColor={{
+                  false: getPrimaryColor('700'),
+                  true: getShadeColor('300'),
+                }}
+                thumbColor={getPrimaryColor('0')}
+              />
+            </HStack>
+          </View>
         </Section>
 
         <Link href="/settings-pages/design" asChild>

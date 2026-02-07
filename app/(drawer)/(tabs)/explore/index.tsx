@@ -29,6 +29,7 @@ import {
   View as RNView,
 } from 'react-native';
 import { useBTCMapStore } from 'stores/btcMapStore';
+import { useSettingsStore } from 'stores/settingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { LayoutDebugWrapper } from '../example';
@@ -1057,6 +1058,7 @@ const ExploreScreen = () => {
   const { getPrimaryColor } = useTheme();
   const [contentHeight, setContentHeight] = useState(0);
   const [activeCategory, setActiveCategory] = useState('All');
+  const devMode = useSettingsStore((state) => state.experimental);
 
   // Routstr models state
   const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore();
@@ -1186,18 +1188,22 @@ const ExploreScreen = () => {
 
         <Spacer size={32} />
 
-        {/* Lightning Address Section */}
-        <SectionHeader
-          title="Your Lightning Address"
-          subtitle="Receive Bitcoin with a memorable URL"
-        />
-        <Animated.View
-          entering={FadeInUp.duration(380).delay(160)}
-          style={{ paddingHorizontal: 20 }}>
-          <LightningAddressCard />
-        </Animated.View>
+        {/* Lightning Address Section - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Your Lightning Address"
+              subtitle="Receive Bitcoin with a memorable URL"
+            />
+            <Animated.View
+              entering={FadeInUp.duration(380).delay(160)}
+              style={{ paddingHorizontal: 20 }}>
+              <LightningAddressCard />
+            </Animated.View>
 
-        <Spacer size={32} />
+            <Spacer size={32} />
+          </>
+        ) : null}
 
         {/* Wallet Health */}
         <SectionHeader
@@ -1220,88 +1226,100 @@ const ExploreScreen = () => {
 
         <Spacer size={32} />
 
-        {/* Shop with Bitcoin */}
-        <SectionHeader
-          title="Shop with Bitcoin"
-          subtitle="Gift cards & vouchers"
-          action="See all"
-          onAction={() => popup('not_implemented')}
-        />
-
-        {/* Category Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-          {PRODUCT_CATEGORIES.map((cat) => (
-            <CategoryPill
-              key={cat.id}
-              name={cat.name}
-              icon={cat.icon}
-              isActive={activeCategory === cat.name}
-              onPress={() => setActiveCategory(cat.name)}
+        {/* Shop with Bitcoin - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Shop with Bitcoin"
+              subtitle="Gift cards & vouchers"
+              action="See all"
+              onAction={() => popup('not_implemented')}
             />
-          ))}
-        </ScrollView>
 
-        {/* Product Cards - 2 column grid */}
-        <View style={styles.productGrid}>
-          {BITREFILL_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
+            {/* Category Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <CategoryPill
+                  key={cat.id}
+                  name={cat.name}
+                  icon={cat.icon}
+                  isActive={activeCategory === cat.name}
+                  onPress={() => setActiveCategory(cat.name)}
+                />
+              ))}
+            </ScrollView>
 
-        <Spacer size={32} />
+            {/* Product Cards - 2 column grid */}
+            <View style={styles.productGrid}>
+              {BITREFILL_PRODUCTS.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </View>
 
-        {/* Bitcoin Conferences */}
-        <SectionHeader
-          title="Bitcoin Events"
-          subtitle="Upcoming conferences & meetups"
-          action="View all"
-          onAction={() => popup('not_implemented')}
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
-          {BITCOIN_CONFERENCES.map((conf) => (
-            <ConferenceCard key={conf.id} conference={conf} />
-          ))}
-        </ScrollView>
+            <Spacer size={32} />
+          </>
+        ) : null}
 
-        <Spacer size={32} />
-
-        {/* eSIM Promo */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.esimPromo}
-            onPress={() => Linking.openURL('https://sovran.money/esims')}>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
-            <LinearGradient
-              colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
+        {/* Bitcoin Conferences - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Bitcoin Events"
+              subtitle="Upcoming conferences & meetups"
+              action="View all"
+              onAction={() => popup('not_implemented')}
             />
-            <HStack align="center" style={{ padding: 20 }}>
-              <View style={styles.esimPromoIcon}>
-                <Icon name="mdi:sim" size={28} color="#fff" />
-              </View>
-              <VStack style={{ flex: 1, marginLeft: 16 }}>
-                <Text size={16} heavy style={{ color: '#fff' }}>
-                  Travel with Bitcoin
-                </Text>
-                <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                  Get eSIMs for 190+ countries, pay with sats
-                </Text>
-              </VStack>
-              <View style={styles.esimPromoArrow}>
-                <Icon name="mdi:arrow-right" size={20} color="#fff" />
-              </View>
-            </HStack>
-          </TouchableOpacity>
-        </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
+              {BITCOIN_CONFERENCES.map((conf) => (
+                <ConferenceCard key={conf.id} conference={conf} />
+              ))}
+            </ScrollView>
+
+            <Spacer size={32} />
+          </>
+        ) : null}
+
+        {/* eSIM Promo - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <View style={{ paddingHorizontal: 20 }}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.esimPromo}
+                onPress={() => Linking.openURL('https://sovran.money/esims')}>
+                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <LinearGradient
+                  colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <HStack align="center" style={{ padding: 20 }}>
+                  <View style={styles.esimPromoIcon}>
+                    <Icon name="mdi:sim" size={28} color="#fff" />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 16 }}>
+                    <Text size={16} heavy style={{ color: '#fff' }}>
+                      Travel with Bitcoin
+                    </Text>
+                    <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                      Get eSIMs for 190+ countries, pay with sats
+                    </Text>
+                  </VStack>
+                  <View style={styles.esimPromoArrow}>
+                    <Icon name="mdi:arrow-right" size={20} color="#fff" />
+                  </View>
+                </HStack>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
 
         <Spacer size={20} />
       </VStack>

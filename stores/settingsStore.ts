@@ -118,7 +118,7 @@ export const useSettingsStore = create<SettingsStore>()(
       sendLocationEnabled: false,
       minTransferThreshold: 5,
       middlemanRouting: {
-        maxHops: 1,
+        maxHops: 2,
         maxFee: 5,
         minSuccessRate: 0.9,
         requireLastOk: true,
@@ -272,7 +272,7 @@ export const useSettingsStore = create<SettingsStore>()(
           sendLocationEnabled: false,
           minTransferThreshold: 5,
           middlemanRouting: {
-            maxHops: 1,
+            maxHops: 2,
             maxFee: 5,
             minSuccessRate: 0.9,
             requireLastOk: true,
@@ -300,7 +300,7 @@ export const useSettingsStore = create<SettingsStore>()(
             sendLocationEnabled: false,
             minTransferThreshold: 5,
             middlemanRouting: {
-              maxHops: 1,
+              maxHops: 2,
               maxFee: 5,
               minSuccessRate: 0.9,
               requireLastOk: true,

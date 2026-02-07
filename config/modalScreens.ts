@@ -188,8 +188,16 @@ export const MODAL_SCREENS: ModalConfig[] = [
     title: 'Theme',
   },
   {
+    name: 'settings-pages/routing',
+    title: 'Swap Routing',
+  },
+  {
     name: 'settings-pages/keyring',
     title: 'P2PK Keys',
+  },
+  {
+    name: 'settings-pages/storage',
+    title: 'Storage Inspector',
   },
   {
     name: 'settings-pages/recovery',

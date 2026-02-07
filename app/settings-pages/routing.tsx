@@ -1,5 +1,7 @@
 import React, { useCallback } from 'react';
-import { ScrollView, Switch } from 'react-native';
+import { ScrollView, Switch, StyleSheet } from 'react-native';
+import { Host, Picker, Text as ExpoText } from '@expo/ui/swift-ui';
+import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import { useTheme } from 'providers/ThemeProvider';
 import { useSettingsStore, type MiddlemanRoutingSettings } from 'stores/settingsStore';
 import Container from 'components/blocks/Container';
@@ -44,26 +46,22 @@ const Stepper: React.FC<{
 
   return (
     <View
-      style={{
-        backgroundColor: getPrimaryColor('900'),
-        borderRadius: 12,
-        padding: 16,
-      }}>
+      style={[
+        styles.card,
+        {
+          backgroundColor: getPrimaryColor('900'),
+        },
+      ]}>
       <HStack align="center" justify="space-between">
-        <VStack flex={1} style={{ marginRight: 12 }}>
+        <VStack flex={1} style={styles.labelContainer}>
           <Text size={16} style={{ color: getPrimaryColor('0') }}>
             {label}
           </Text>
-          {description && (
-            <Text
-              size={13}
-              style={{
-                color: getPrimaryColor('400'),
-                marginTop: 4,
-              }}>
+          {description ? (
+            <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
               {description}
             </Text>
-          )}
+          ) : null}
         </VStack>
 
         <HStack align="center" gap={2}>
@@ -71,27 +69,23 @@ const Stepper: React.FC<{
             onPress={decrement}
             disabled={atMin}
             haptics
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: atMin ? getPrimaryColor('800') : getPrimaryColor('700'),
-              opacity: atMin ? 0.4 : 1,
-            }}>
+            style={[
+              styles.stepperButton,
+              {
+                backgroundColor: atMin ? getPrimaryColor('800') : getPrimaryColor('700'),
+                opacity: atMin ? 0.4 : 1,
+              },
+            ]}>
             <Icon name="mdi:minus" size={18} color={getPrimaryColor('0')} />
           </TouchableOpacity>
 
           <View
-            style={{
-              minWidth: 56,
-              height: 32,
-              borderRadius: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: getShadeColor('800'),
-            }}>
+            style={[
+              styles.stepperValue,
+              {
+                backgroundColor: getShadeColor('800'),
+              },
+            ]}>
             <Text bold overpass size={15} style={{ color: getPrimaryColor('0') }}>
               {displayValue}
             </Text>
@@ -101,57 +95,18 @@ const Stepper: React.FC<{
             onPress={increment}
             disabled={atMax}
             haptics
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: atMax ? getPrimaryColor('800') : getPrimaryColor('700'),
-              opacity: atMax ? 0.4 : 1,
-            }}>
+            style={[
+              styles.stepperButton,
+              {
+                backgroundColor: atMax ? getPrimaryColor('800') : getPrimaryColor('700'),
+                opacity: atMax ? 0.4 : 1,
+              },
+            ]}>
             <Icon name="mdi:plus" size={18} color={getPrimaryColor('0')} />
           </TouchableOpacity>
         </HStack>
       </HStack>
     </View>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// TrustModeOption – pill-style selector for trust mode
-// ---------------------------------------------------------------------------
-
-const TrustModeOption: React.FC<{
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}> = ({ label, active, onPress }) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      haptics
-      style={{
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-        backgroundColor: active ? getShadeColor('700') : getPrimaryColor('800'),
-        borderWidth: 1,
-        borderColor: active ? getShadeColor('500') : getPrimaryColor('700'),
-      }}>
-      <Text
-        bold={active}
-        overpass
-        size={13}
-        style={{
-          color: active ? getPrimaryColor('0') : getPrimaryColor('400'),
-        }}>
-        {label}
-      </Text>
-    </TouchableOpacity>
   );
 };
 
@@ -175,7 +130,10 @@ function RoutingSettingsScreen() {
 
   return (
     <Container>
-      <ScrollView style={{ paddingHorizontal: 16 }}>
+      <ScrollView
+        style={styles.scrollView}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.scrollContent}>
         <Section title="Rebalancing">
           <VStack gap={12}>
             <Stepper
@@ -223,22 +181,18 @@ function RoutingSettingsScreen() {
             />
 
             <View
-              style={{
-                backgroundColor: getPrimaryColor('900'),
-                borderRadius: 12,
-                padding: 16,
-              }}>
+              style={[
+                styles.card,
+                {
+                  backgroundColor: getPrimaryColor('900'),
+                },
+              ]}>
               <HStack align="center" justify="space-between">
-                <VStack flex={1} style={{ marginRight: 12 }}>
+                <VStack flex={1} style={styles.labelContainer}>
                   <Text size={16} style={{ color: getPrimaryColor('0') }}>
                     Last swap must be OK
                   </Text>
-                  <Text
-                    size={13}
-                    style={{
-                      color: getPrimaryColor('400'),
-                      marginTop: 4,
-                    }}>
+                  <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
                     Require the most recent swap on each edge to have been successful.
                   </Text>
                 </VStack>
@@ -259,55 +213,52 @@ function RoutingSettingsScreen() {
         <Section title="Mint Trust">
           <VStack gap={12}>
             <View
-              style={{
-                backgroundColor: getPrimaryColor('900'),
-                borderRadius: 12,
-                padding: 16,
-              }}>
+              style={[
+                styles.card,
+                {
+                  backgroundColor: getPrimaryColor('900'),
+                },
+              ]}>
               <VStack gap={12}>
                 <VStack>
                   <Text size={16} style={{ color: getPrimaryColor('0') }}>
                     Intermediary trust policy
                   </Text>
-                  <Text
-                    size={13}
-                    style={{
-                      color: getPrimaryColor('400'),
-                      marginTop: 4,
-                    }}>
+                  <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
                     Controls which mints can act as middlemen. Trusted mints are always preferred
                     regardless of this setting.
                   </Text>
                 </VStack>
 
-                <HStack gap={8}>
-                  <TrustModeOption
-                    label="Trusted only"
-                    active={middlemanRouting.trustMode === 'trusted_only'}
-                    onPress={() => update({ trustMode: 'trusted_only' })}
-                  />
-                  <TrustModeOption
-                    label="Allow untrusted"
-                    active={middlemanRouting.trustMode === 'allow_untrusted'}
-                    onPress={() => update({ trustMode: 'allow_untrusted' })}
-                  />
-                </HStack>
+                <Host matchContents>
+                  <Picker
+                    selection={middlemanRouting.trustMode}
+                    onSelectionChange={(value) => {
+                      if (value === 'trusted_only' || value === 'allow_untrusted') {
+                        update({ trustMode: value });
+                      }
+                    }}
+                    modifiers={[pickerStyle('segmented')]}>
+                    <ExpoText modifiers={[tag('trusted_only')]}>Trusted only</ExpoText>
+                    <ExpoText modifiers={[tag('allow_untrusted')]}>Allow untrusted</ExpoText>
+                  </Picker>
+                </Host>
 
-                {middlemanRouting.trustMode === 'allow_untrusted' && (
+                {middlemanRouting.trustMode === 'allow_untrusted' ? (
                   <HStack gap={8} align="flex-start">
                     <Icon
                       name="mdi:alert-circle-outline"
                       size={16}
                       color="#f59e0b"
-                      style={{ marginTop: 2 }}
+                      style={styles.warningIcon}
                     />
-                    <Text size={12} style={{ color: '#f59e0b', flex: 1 }}>
+                    <Text size={12} style={styles.warningText}>
                       Untrusted mints will be temporarily trusted for the swap and untrusted
                       afterward. Your ecash passes through mints you have not verified. Only use
                       this with small amounts.
                     </Text>
                   </HStack>
-                )}
+                ) : null}
               </VStack>
             </View>
           </VStack>
@@ -316,5 +267,48 @@ function RoutingSettingsScreen() {
     </Container>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollView: {
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  card: {
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    padding: 16,
+  },
+  labelContainer: {
+    marginRight: 12,
+  },
+  description: {
+    marginTop: 4,
+  },
+  stepperButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValue: {
+    minWidth: 56,
+    height: 32,
+    borderRadius: 8,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  warningIcon: {
+    marginTop: 2,
+  },
+  warningText: {
+    color: '#f59e0b',
+    flex: 1,
+  },
+});
 
 export default withSheetProvider(RoutingSettingsScreen);
