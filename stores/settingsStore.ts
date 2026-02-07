@@ -38,6 +38,7 @@ interface SettingsState {
   displayCurrency: DisplayCurrency;
   passcode: string;
   experimental: boolean;
+  mockMode: boolean;
   termsAccepted: TermsAccepted | null;
   quickAccessP2PK: boolean;
   sendLocationEnabled: boolean;
@@ -73,6 +74,10 @@ interface SettingsActions {
   // Experimental features
   setExperimental: (experimental: boolean) => void;
   getExperimental: () => boolean;
+
+  // Mock mode (demo data)
+  setMockMode: (enabled: boolean) => void;
+  getMockMode: () => boolean;
 
   // Terms acceptance
   acceptTerms: (date: string) => void;
@@ -113,6 +118,7 @@ export const useSettingsStore = create<SettingsStore>()(
       displayCurrency: 'usd',
       passcode: '',
       experimental: false,
+      mockMode: false,
       termsAccepted: null,
       quickAccessP2PK: false,
       sendLocationEnabled: false,
@@ -191,6 +197,24 @@ export const useSettingsStore = create<SettingsStore>()(
         return experimental;
       },
 
+      // Mock mode
+      setMockMode: (enabled: boolean) => {
+        // Lazy-import to avoid circular dependency at module load time
+        const { useMockDataStore } = require('stores/mockDataStore') as {
+          useMockDataStore: { getState: () => { activate: () => void; deactivate: () => void } };
+        };
+        if (enabled) {
+          useMockDataStore.getState().activate();
+        } else {
+          useMockDataStore.getState().deactivate();
+        }
+        set({ mockMode: enabled });
+      },
+
+      getMockMode: () => {
+        return get().mockMode;
+      },
+
       // Terms acceptance
       acceptTerms: (date: string) => {
         set({
@@ -267,6 +291,7 @@ export const useSettingsStore = create<SettingsStore>()(
           displayCurrency: 'usd',
           passcode: '',
           experimental: false,
+          mockMode: false,
           termsAccepted: null,
           quickAccessP2PK: false,
           sendLocationEnabled: false,
@@ -295,6 +320,7 @@ export const useSettingsStore = create<SettingsStore>()(
             displayCurrency: 'usd',
             passcode: '',
             experimental: false,
+            mockMode: false,
             termsAccepted: null,
             quickAccessP2PK: false,
             sendLocationEnabled: false,
@@ -324,6 +350,7 @@ export const useSettingsStore = create<SettingsStore>()(
         displayBtc: state.displayBtc,
         displayCurrency: state.displayCurrency,
         experimental: state.experimental,
+        mockMode: state.mockMode,
         termsAccepted: state.termsAccepted,
         quickAccessP2PK: state.quickAccessP2PK,
         sendLocationEnabled: state.sendLocationEnabled,
@@ -337,6 +364,15 @@ export const useSettingsStore = create<SettingsStore>()(
           console.warn('SettingsStore: Failed to rehydrate from storage:', error);
         } else {
           console.log('SettingsStore: Successfully rehydrated from storage:', state);
+          // Re-activate mock mode if it was persisted as enabled
+          if (state?.mockMode) {
+            const { useMockDataStore } = require('stores/mockDataStore') as {
+              useMockDataStore: {
+                getState: () => { activate: () => void };
+              };
+            };
+            useMockDataStore.getState().activate();
+          }
         }
       },
     }
