@@ -5,8 +5,9 @@
  * Each step shows mint avatars with arrow overlays and a colored separator
  * derived from the destination mint's brand color.
  *
- * When legs are part of a middleman chain, they are grouped into a single card
- * with a "Middleman route: A → B → C" header showing the full routing path.
+ * When legs are part of a middleman chain, they are grouped into a single card.
+ * Failed direct legs are hidden when a successful chain covers the same route.
+ * Consecutive entries on the same mint omit the redundant arrow separator.
  *
  * Note: Coco's v3 `prepareMeltBolt11` → `executeMelt` flow creates the melt quote
  * inside the handler (via cashu-ts directly) and does NOT emit `melt-quote:created`,
@@ -201,62 +202,6 @@ const StepSeparator = React.memo(({ failed }: StepSeparatorProps) => {
 StepSeparator.displayName = 'StepSeparator';
 
 // -----------------------------------------------------------------------
-// Sub-component: chain route header showing A → B → C
-// -----------------------------------------------------------------------
-
-interface ChainRouteHeaderProps {
-  /** Full ordered path of mint URLs: [source, via1, …, destination]. */
-  chainPath: string[];
-  mintInfoMap: Record<string, { name?: string; icon_url?: string } | null>;
-}
-
-const ChainRouteHeader = React.memo(({ chainPath, mintInfoMap }: ChainRouteHeaderProps) => {
-  const { getPrimaryColor } = useTheme();
-
-  return (
-    <View style={[styles.chainHeader, { backgroundColor: opacity(getPrimaryColor('400'), 0.1) }]}>
-      <VStack spacing={6}>
-        <UntranslatedText bold size={11} color={getPrimaryColor('400')}>
-          Middleman route
-        </UntranslatedText>
-        <HStack align="center" spacing={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
-          {chainPath.map((url, idx) => {
-            const info = mintInfoMap[url];
-            const name = info?.name || extractDomain(url);
-            const isIntermediary = idx > 0 && idx < chainPath.length - 1;
-
-            return (
-              <React.Fragment key={url + idx}>
-                {idx > 0 && (
-                  <Icon name="mdi:chevron-right" size={14} color={getPrimaryColor('400')} />
-                )}
-                <HStack align="center" spacing={4} style={styles.chainMintItem}>
-                  <Avatar
-                    picture={info?.icon_url}
-                    size={20}
-                    variant="mint"
-                    name={name}
-                    alt={`${name} icon`}
-                  />
-                  <UntranslatedText
-                    bold={isIntermediary}
-                    size={11}
-                    numberOfLines={1}
-                    color={getPrimaryColor('0')}>
-                    {name}
-                  </UntranslatedText>
-                </HStack>
-              </React.Fragment>
-            );
-          })}
-        </HStack>
-      </VStack>
-    </View>
-  );
-});
-ChainRouteHeader.displayName = 'ChainRouteHeader';
-
-// -----------------------------------------------------------------------
 // Main screen
 // -----------------------------------------------------------------------
 
@@ -317,10 +262,36 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return map;
   }, [history]);
 
-  // Group legs by chainId for visual grouping
+  // Group legs by chainId for visual grouping, then filter out standalone
+  // legs whose route was superseded by a middleman chain.
+  //
+  // When a direct A→C melt fails with no_route the auto-router creates chain
+  // legs (A→B, B→C). The original standalone leg still exists and may even be
+  // marked 'done' (because the overall step succeeded via the chain). We hide
+  // it so the user only sees the actual chain that moved the funds.
   const legGroups = useMemo(() => {
     if (!group) return [];
-    return groupLegs(group.legs);
+    const raw = groupLegs(group.legs);
+
+    // Collect routes covered by a chain group (regardless of success/failure —
+    // if a chain was attempted for this route, the standalone direct attempt is
+    // redundant in the UI).
+    const chainRoutes = new Set<string>();
+    for (const lg of raw) {
+      if (!lg.chainId || !lg.chainPath || lg.chainPath.length < 3) continue;
+      const src = lg.chainPath[0];
+      const dst = lg.chainPath[lg.chainPath.length - 1];
+      chainRoutes.add(`${src}→${dst}`);
+    }
+
+    // Remove standalone legs whose route is covered by a chain
+    return raw.filter((lg) => {
+      if (lg.chainId) return true; // always keep chain groups
+      const leg = lg.legs[0];
+      if (!leg) return true;
+      const routeKey = `${leg.fromMintUrl}→${leg.toMintUrl}`;
+      return !chainRoutes.has(routeKey);
+    });
   }, [group]);
 
   if (!groupId || !group) {
@@ -341,7 +312,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
             style={{ marginHorizontal: 0 }}
             items={[
               { title: 'Status', value: group.state.toUpperCase() },
-              { title: 'Steps', value: String(group.legs.length) },
+              {
+                title: 'Steps',
+                value: String(legGroups.reduce((sum, lg) => sum + lg.legs.length, 0)),
+              },
               { title: 'Date', value: new Date(group.createdAt).toLocaleString() },
             ]}
           />
@@ -356,14 +330,6 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 <View style={[styles.card, { borderColor }]}>
                   <BlurCardFrame accentColor={accentColor}>
                     <View style={styles.content}>
-                      {/* Chain route header for middleman groups */}
-                      {isChain && legGroup.chainPath && legGroup.chainPath.length >= 3 && (
-                        <ChainRouteHeader
-                          chainPath={legGroup.chainPath}
-                          mintInfoMap={mintInfoMap}
-                        />
-                      )}
-
                       {/* Render each leg in the group */}
                       {legGroup.legs.map((leg, legIdx) => {
                         const mintEntry = leg.mintQuoteId
@@ -395,10 +361,19 @@ export function SwapTransactionScreen({ groupId }: Props) {
                         const toName = toInfo?.name || extractDomain(leg.toMintUrl);
                         const hasError = leg.localStatus === 'failed';
 
+                        // Skip the separator between chained legs when the previous
+                        // leg's destination is the same mint as this leg's source
+                        // (e.g. Mint on B followed by Melt from B — same mint, no arrow needed)
+                        const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
+                        const sameMintAsPrev =
+                          prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
+
                         return (
                           <View key={leg.id}>
-                            {/* Separator between chained legs */}
-                            {isChain && legIdx > 0 && <StepSeparator failed={hasError} />}
+                            {/* Separator between chained legs (skip if same mint) */}
+                            {isChain && legIdx > 0 && !sameMintAsPrev && (
+                              <StepSeparator failed={hasError} />
+                            )}
 
                             {/* Melt row (send from source) */}
                             {meltEntryForDisplay ? (
@@ -513,18 +488,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     borderRadius: 6,
-  },
-  chainHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 6,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  chainMintItem: {
-    flex: 1,
-    minWidth: 0,
   },
   legSpacer: {
     height: 8,
