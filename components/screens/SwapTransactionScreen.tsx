@@ -193,12 +193,12 @@ interface StepSeparatorProps {
 }
 
 const StepSeparator = React.memo(({ failed }: StepSeparatorProps) => {
-  const { getGreenColor, getRedColor } = useTheme();
-  const color = failed ? getRedColor('400') : getGreenColor('400');
+  const { getPrimaryColor, getRedColor } = useTheme();
+  const bgColor = failed ? getRedColor('500') : getPrimaryColor('500');
 
   return (
-    <View style={[styles.separator, { backgroundColor: opacity(color, 0.15) }]}>
-      <Icon name="mdi:arrow-down" size={14} color={color} />
+    <View style={[styles.separator, { backgroundColor: bgColor }]}>
+      <Icon name="mdi:arrow-down" size={14} color="#fff" />
     </View>
   );
 });
