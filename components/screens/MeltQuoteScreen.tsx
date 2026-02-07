@@ -452,14 +452,14 @@ export function MeltQuoteScreen({
               condition: isPaid,
             },
             // ── UNPAID (not expired): Cancel | Send | Cancel ──
-            {
-              text: isCancelling ? 'Cancelling...' : 'Cancel',
-              icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
-              variant: 'secondary',
-              onPress: async () => handleCancelMelt(),
-              condition: isUnpaid && !isExpired,
-              disabled: isBusy,
-            },
+            // {
+            //   text: isCancelling ? 'Cancelling...' : 'Cancel',
+            //   icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
+            //   variant: 'secondary',
+            //   onPress: async () => handleCancelMelt(),
+            //   condition: isUnpaid && !isExpired,
+            //   disabled: isBusy,
+            // },
             {
               text: isPaying ? 'Sending...' : isCreating ? 'Updating...' : 'Send',
               icon: isPaying || isCreating ? 'ri:loader-line' : 'ri:send-plane-2-fill',
@@ -478,14 +478,14 @@ export function MeltQuoteScreen({
               disabled: isBusy,
             },
             // ── Expired: Cancel ──
-            {
-              text: isCancelling ? 'Cancelling...' : 'Cancel',
-              icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
-              variant: 'secondary',
-              onPress: async () => handleCancelMelt(),
-              // condition: isExpired && !isPaid,
-              disabled: isBusy,
-            },
+            // {
+            //   text: isCancelling ? 'Cancelling...' : 'Cancel',
+            //   icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
+            //   variant: 'secondary',
+            //   onPress: async () => handleCancelMelt(),
+            //   // condition: isExpired && !isPaid,
+            //   disabled: isBusy,
+            // },
           ]}
         />
       </HStack>
