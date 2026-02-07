@@ -305,7 +305,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
   const { history } = usePaginatedHistory();
   const { getMintInfo } = useMintManagement();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const toggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
