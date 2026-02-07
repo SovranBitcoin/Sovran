@@ -1,12 +1,18 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
 import { useSettingsStore, DisplayCurrency } from 'stores/settingsStore';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { UntranslatedText } from 'components/ui/Text';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { useBalanceContext, useMints } from 'coco-cashu-react';
+import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { FiatCurrencyPill } from 'components/blocks/FiatCurrencyPill';
+import { useTheme } from 'providers/ThemeProvider';
+import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
+import type { SendHistoryEntry } from 'coco-cashu-core';
 
 interface Account {
   unit: CurrencyUnit;
@@ -25,6 +31,59 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
   eur: { symbol: '€', label: 'EUR' },
   gbp: { symbol: '£', label: 'GBP' },
 };
+
+// ---------------------------------------------------------------------------
+// Pending outgoing ecash pill – shows total unclaimed send tokens
+// ---------------------------------------------------------------------------
+
+function usePendingEcash() {
+  const { history } = usePaginatedHistory();
+
+  return useMemo(() => {
+    const pendingSends = history.filter(
+      (entry): entry is SendHistoryEntry =>
+        entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
+    );
+
+    const totalAmount = pendingSends.reduce((sum, tx) => sum + tx.amount, 0);
+    const unit = pendingSends[0]?.unit || 'sat';
+
+    return { totalAmount, unit, count: pendingSends.length };
+  }, [history]);
+}
+
+function PendingEcashPill(): React.ReactElement | null {
+  const { getPrimaryColor } = useTheme();
+  const { totalAmount, unit } = usePendingEcash();
+
+  if (totalAmount <= 0) return null;
+
+  const formatted = totalAmount.toLocaleString();
+
+  return (
+    <HStack
+      align="center"
+      justify="center"
+      gap={6}
+      className="overflow-hidden rounded-full"
+      style={{
+        backgroundColor: opacity(getPrimaryColor('500'), 0.15),
+        borderWidth: 1,
+        borderColor: opacity(getPrimaryColor('400'), 0.2),
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+      }}>
+      <Icon name="majesticons:coins" size={14} color={getPrimaryColor('200')} />
+      <UntranslatedText
+        bold
+        size={11}
+        color={getPrimaryColor('200')}
+        style={{ letterSpacing: 0.5 }}>
+        {`PENDING: ${formatted} ${unit.toUpperCase()}`}
+      </UntranslatedText>
+    </HStack>
+  );
+}
 
 /**
  * Component that displays the primary balance with unit toggling capability
@@ -68,6 +127,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
         <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
       </TouchableOpacity>
+      <PendingEcashPill />
     </VStack>
   );
 }
