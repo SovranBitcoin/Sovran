@@ -124,10 +124,18 @@ export const Transactions = React.memo(
             if (quoteId && quoteIdToGroup[quoteId]) return false;
           }
 
-          if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
-          if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
-          if (type === 'lightning' && historyEntry.type !== 'mint') return false;
-          if (type === 'ecash' && historyEntry.type !== 'send') return false;
+          if (
+            filter === 'incoming' &&
+            historyEntry.type !== 'mint' &&
+            historyEntry.type !== 'receive'
+          )
+            return false;
+          if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
+            return false;
+          if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
+            return false;
+          if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
+            return false;
 
           // Filter out expired transactions if hideExpired is true
           if (hideExpired) {

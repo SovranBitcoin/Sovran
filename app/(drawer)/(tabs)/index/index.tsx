@@ -1,4 +1,4 @@
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { DebugBalancePanel } from 'components/blocks/DebugBalancePanel';
 import { Transactions } from 'components/blocks/Transactions';
@@ -48,7 +48,7 @@ function TabOneScreen() {
 
   const onRefresh = useCallback(async () => {}, []);
 
-  const { history } = usePaginatedHistory();
+  const { history } = useHistoryWithMelts();
 
   useDeeplink();
   useVersionCheck();
@@ -63,6 +63,7 @@ function TabOneScreen() {
 
       <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
       {devMode ? <DebugBalancePanel /> : null}
+
       <View
         className="p-4 pt-0"
         style={{
