@@ -1003,12 +1003,11 @@ const PendingEcashCard = () => {
 
               {/* Amount display row */}
               <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-                <HStack align="center" gap={6}>
-                  <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
+                <HStack align="center" gap={4}>
                   <AmountFormatter
                     amount={totalAmount}
                     unit={unit}
-                    size={11}
+                    size={13}
                     weight="medium"
                     color={opacity(accentColor, 0.8)}
                   />
