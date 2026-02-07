@@ -1103,9 +1103,17 @@ const ExploreScreen = () => {
     loadModels();
   }, [getCachedModels, setCachedModels, isCacheStale]);
 
-  // Filter models to show - one per provider, in specific order
+  // Filter models to show - one per provider, in specific order, text-only
   const displayModels = useMemo(() => {
     if (models.length === 0) return [];
+
+    // Only keep models that accept text input and produce text-only output
+    // (excludes audio, image, video, and embeddings models)
+    const textModels = models.filter((m) => {
+      const outputs = m.architecture?.output_modalities ?? [];
+      const inputs = m.architecture?.input_modalities ?? [];
+      return inputs.includes('text') && outputs.length > 0 && outputs.every((o) => o === 'text');
+    });
 
     // Providers to show, in order
     const allowedProviders = [
@@ -1125,7 +1133,7 @@ const ExploreScreen = () => {
     const result: RoutstrModel[] = [];
 
     for (const targetProvider of allowedProviders) {
-      const model = models.find((m) => {
+      const model = textModels.find((m) => {
         const { provider } = extractModelName(m);
         return provider.toLowerCase() === targetProvider;
       });
