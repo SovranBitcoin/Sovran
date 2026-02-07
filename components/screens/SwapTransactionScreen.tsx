@@ -211,87 +211,54 @@ StepSeparator.displayName = 'StepSeparator';
 interface CollapsedLegGroupProps {
   legGroup: LegGroup;
   mintInfoMap: Record<string, { name?: string; icon_url?: string } | null>;
-  historyByQuoteId: Map<string, HistoryEntry>;
-  unit: string;
 }
 
-const CollapsedLegGroup = React.memo(
-  ({ legGroup, mintInfoMap, historyByQuoteId, unit }: CollapsedLegGroupProps) => {
-    const { getPrimaryColor, getRedColor } = useTheme();
+const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
+  const { getPrimaryColor } = useTheme();
 
-    // Source = first leg's from, Destination = last leg's to
-    const firstLeg = legGroup.legs[0];
-    const lastLeg = legGroup.legs[legGroup.legs.length - 1];
-    const srcUrl = firstLeg?.fromMintUrl ?? '';
-    const dstUrl = lastLeg?.toMintUrl ?? '';
-    const srcInfo = mintInfoMap[srcUrl];
-    const dstInfo = mintInfoMap[dstUrl];
-    const srcName = srcInfo?.name || extractDomain(srcUrl);
-    const dstName = dstInfo?.name || extractDomain(dstUrl);
+  // Source = first leg's from, Destination = last leg's to
+  const firstLeg = legGroup.legs[0];
+  const lastLeg = legGroup.legs[legGroup.legs.length - 1];
+  const srcUrl = firstLeg?.fromMintUrl ?? '';
+  const dstUrl = lastLeg?.toMintUrl ?? '';
+  const srcInfo = mintInfoMap[srcUrl];
+  const dstInfo = mintInfoMap[dstUrl];
+  const srcName = srcInfo?.name || extractDomain(srcUrl);
+  const dstName = dstInfo?.name || extractDomain(dstUrl);
 
-    // Compute fees (sent - received) for this leg group
-    const fee = useMemo(() => {
-      let sent = 0;
-      let received = 0;
-      for (const leg of legGroup.legs) {
-        const meltEntry = leg.meltQuoteId
-          ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
-          : undefined;
-        const mintEntry = leg.mintQuoteId
-          ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
-          : undefined;
-        if (meltEntry) sent += Math.abs(meltEntry.amount);
-        else if (leg.amount > 0) sent += leg.amount;
-        if (mintEntry) received += Math.abs(mintEntry.amount);
-      }
-      return Math.max(0, sent - received);
-    }, [legGroup, historyByQuoteId]);
-
-    return (
-      <View style={styles.collapsedRow}>
-        {/* Row 1: [mint a] → [mint b] — equal width */}
-        <HStack spacing={8} align="center">
-          <HStack spacing={8} align="center" flex={1}>
-            <Avatar picture={srcInfo?.icon_url} size={28} variant="mint" name={srcName} />
-            <UntranslatedText
-              bold
-              size={13}
-              color={getPrimaryColor('50')}
-              numberOfLines={1}
-              style={{ flex: 1 }}>
-              {srcName}
-            </UntranslatedText>
-          </HStack>
-          <View style={[styles.collapsedArrow, { backgroundColor: getPrimaryColor('500') }]}>
-            <Icon name="mdi:arrow-right" size={10} color="#fff" />
-          </View>
-          <HStack spacing={8} align="center" flex={1}>
-            <Avatar picture={dstInfo?.icon_url} size={28} variant="mint" name={dstName} />
-            <UntranslatedText
-              bold
-              size={13}
-              color={getPrimaryColor('50')}
-              numberOfLines={1}
-              style={{ flex: 1 }}>
-              {dstName}
-            </UntranslatedText>
-          </HStack>
-        </HStack>
-
-        {/* Row 2: [space] [fees right-aligned] */}
-        {fee > 0 && (
+  return (
+    <View style={styles.collapsedRow}>
+      {/* Row 1: [mint a] → [mint b] — equal width */}
+      <HStack spacing={8} align="center">
+        <HStack spacing={8} align="center" flex={1}>
+          <Avatar picture={srcInfo?.icon_url} size={28} variant="mint" name={srcName} />
           <UntranslatedText
-            size={11}
             bold
-            color={getRedColor('300')}
-            style={{ textAlign: 'right' }}>
-            {fee} {unit} fee
+            size={13}
+            color={getPrimaryColor('50')}
+            numberOfLines={1}
+            style={{ flex: 1 }}>
+            {srcName}
           </UntranslatedText>
-        )}
-      </View>
-    );
-  }
-);
+        </HStack>
+        <View style={[styles.collapsedArrow, { backgroundColor: getPrimaryColor('500') }]}>
+          <Icon name="mdi:arrow-right" size={10} color="#fff" />
+        </View>
+        <HStack spacing={8} align="center" flex={1}>
+          <Avatar picture={dstInfo?.icon_url} size={28} variant="mint" name={dstName} />
+          <UntranslatedText
+            bold
+            size={13}
+            color={getPrimaryColor('50')}
+            numberOfLines={1}
+            style={{ flex: 1 }}>
+            {dstName}
+          </UntranslatedText>
+        </HStack>
+      </HStack>
+    </View>
+  );
+});
 CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 
 // -----------------------------------------------------------------------
@@ -611,12 +578,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                           }}
                         />
                       )}
-                      <CollapsedLegGroup
-                        legGroup={legGroup}
-                        mintInfoMap={mintInfoMap}
-                        historyByQuoteId={historyByQuoteId}
-                        unit={unit}
-                      />
+                      <CollapsedLegGroup legGroup={legGroup} mintInfoMap={mintInfoMap} />
                     </React.Fragment>
                   ))}
                 </View>
