@@ -135,7 +135,9 @@ export function MeltQuoteScreen({
     error: meltError,
     reset: resetMeltState,
     executeMeltQuote,
+    cancelMeltQuote,
   } = useMeltWithHistory();
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Local state for quote creation flow
   const [resolvedInvoice, setResolvedInvoice] = useState<string | null>(null);
@@ -333,6 +335,41 @@ export function MeltQuoteScreen({
     }
   };
 
+  /**
+   * Cancel the melt operation, freeing reserved proofs, then close the screen.
+   * Works for both UNPAID (prepared) and PENDING (if quote is actually UNPAID on mint side).
+   */
+  const handleCancelMelt = async () => {
+    setIsCancelling(true);
+    try {
+      await cancelMeltQuote({
+        operationId: createdOperationId ?? undefined,
+        mintUrl: currentTransaction?.mintUrl,
+        quoteId: currentTransaction?.quoteId,
+      });
+      popup({
+        message: 'Payment cancelled',
+        type: 'success',
+        text: 'Reserved proofs have been freed.',
+      });
+      onCancel();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      // If the operation is already finalized/rolled back or not found, just close
+      if (
+        msg.includes('Cannot rollback') ||
+        msg.includes('not found') ||
+        msg.includes('No melt operation')
+      ) {
+        onCancel();
+        return;
+      }
+      popup({ message: 'Could not cancel', type: 'error', text: msg });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   // Handle pay action
   const handleMelt = async () => {
     // CRITICAL: Use the mint URL from the current transaction, not from the store
@@ -397,11 +434,16 @@ export function MeltQuoteScreen({
   const feeReserve = displayQuote?.fee_reserve || 0;
   const quoteId = displayQuote?.quote || '';
 
+  const isPending = currentTransaction.state === 'PENDING';
+  const isUnpaid = currentTransaction.state === 'UNPAID';
+  const isBusy = isPaying || isCreating || isCancelling;
+
   const bottomButtons = (
     <BottomButtons>
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
+            // ── PAID ──
             {
               text: 'Close',
               icon: 'ri:close-circle-line',
@@ -409,27 +451,40 @@ export function MeltQuoteScreen({
               onPress: async () => onCancel(),
               condition: isPaid,
             },
+            // ── UNPAID (not expired): Cancel | Send | Cancel ──
             {
-              text: 'Cancel',
-              icon: 'ri:close-circle-line',
+              text: isCancelling ? 'Cancelling...' : 'Cancel',
+              icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
-              onPress: async () => onCancel(),
-              condition: currentTransaction.state === 'UNPAID' && !isExpired,
-            },
-            {
-              text: 'Close',
-              icon: 'ri:close-circle-line',
-              variant: 'secondary',
-              onPress: async () => onCancel(),
-              condition: isExpired,
+              onPress: async () => handleCancelMelt(),
+              condition: isUnpaid && !isExpired,
+              disabled: isBusy,
             },
             {
               text: isPaying ? 'Sending...' : isCreating ? 'Updating...' : 'Send',
               icon: isPaying || isCreating ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
               onPress: async () => handleMelt(),
-              condition: currentTransaction.state === 'UNPAID' && !isExpired,
-              disabled: isPaying || isCreating,
+              condition: isUnpaid && !isExpired,
+              disabled: isBusy,
+            },
+            // ── PENDING: Cancel ──
+            {
+              text: isCancelling ? 'Cancelling...' : 'Cancel',
+              icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => handleCancelMelt(),
+              condition: isPending,
+              disabled: isBusy,
+            },
+            // ── Expired: Cancel ──
+            {
+              text: isCancelling ? 'Cancelling...' : 'Cancel',
+              icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: async () => handleCancelMelt(),
+              // condition: isExpired && !isPaid,
+              disabled: isBusy,
             },
           ]}
         />

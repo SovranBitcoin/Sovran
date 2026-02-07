@@ -1,5 +1,6 @@
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
+import { DebugBalancePanel } from 'components/blocks/DebugBalancePanel';
 import { Transactions } from 'components/blocks/Transactions';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { View } from 'components/ui/View/View';
@@ -59,6 +60,7 @@ function TabOneScreen() {
       <ScrollableGradientOverlay contentHeight={contentHeight} />
 
       <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
+      <DebugBalancePanel />
       <View
         className="p-4 pt-0"
         style={{
