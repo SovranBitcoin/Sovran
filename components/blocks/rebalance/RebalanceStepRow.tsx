@@ -30,6 +30,7 @@ export type StepStatus =
   | 'invoiceReady'
   | 'melting'
   | 'verifying'
+  | 'routing'
   | 'done'
   | 'failed'
   | 'skipped';
@@ -86,6 +87,14 @@ interface RebalanceStepRowProps {
   isCurrent?: boolean;
   /** Chain info when this step is part of a middleman route */
   chainInfo?: ChainInfo;
+  /** Sub-status detail during auto-routing (e.g. "Hop 1/2: Sending…") */
+  routingDetail?: string;
+  /** Chain path being auto-routed through (shown during routing) */
+  routingChainPath?: string[];
+  /** Human-readable names for routingChainPath */
+  routingChainPathNames?: string[];
+  /** Current hop index during auto-routing */
+  routingHopIndex?: number;
 }
 
 function extractDomain(url: string): string {
@@ -117,6 +126,10 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   stepNumber,
   isCurrent,
   chainInfo,
+  routingDetail,
+  routingChainPath,
+  routingChainPathNames,
+  routingHopIndex,
 }) => {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
@@ -134,10 +147,12 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
     status === 'creatingInvoice' ||
     status === 'invoiceReady' ||
     status === 'melting' ||
-    status === 'verifying';
+    status === 'verifying' ||
+    status === 'routing';
   const isDone = status === 'done';
   const isFailed = status === 'failed';
   const isSkipped = status === 'skipped';
+  const isRouting = status === 'routing';
 
   const statusColor = isDone
     ? greenColor
@@ -145,7 +160,9 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
       ? redColor
       : isSkipped
         ? primaryColor400
-        : primaryColor300;
+        : isRouting
+          ? '#c084fc' // purple for routing
+          : primaryColor300;
 
   const getStatusText = () => {
     switch (status) {
@@ -159,12 +176,14 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
         return 'Sending...';
       case 'verifying':
         return 'Verifying...';
+      case 'routing':
+        return routingDetail || 'Routing via middleman...';
       case 'done':
         return 'Complete';
       case 'failed':
         return 'Failed';
       case 'skipped':
-        return 'Skipped';
+        return 'Skipped — already transferred';
       default:
         return '';
     }
@@ -302,6 +321,65 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               </Text>
             </HStack>
           </HStack>
+        )}
+
+        {/* Auto-routing chain path (shown during or after routing) */}
+        {isRouting && routingChainPath && routingChainPath.length >= 3 && (
+          <VStack gap={4} style={{ marginTop: 2 }}>
+            <HStack align="center" gap={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
+              {routingChainPath.map((url, idx) => {
+                const name = routingChainPathNames?.[idx] || extractDomain(url);
+                const isActiveNode =
+                  routingHopIndex != null &&
+                  (idx === routingHopIndex || idx === routingHopIndex + 1);
+                const isIntermediary = idx > 0 && idx < routingChainPath.length - 1;
+
+                return (
+                  <React.Fragment key={url + idx}>
+                    {idx > 0 && (
+                      <Icon
+                        name="mdi:chevron-right"
+                        size={14}
+                        color={
+                          routingHopIndex != null && idx === routingHopIndex + 1
+                            ? '#c084fc'
+                            : primaryColor400
+                        }
+                      />
+                    )}
+                    <HStack
+                      align="center"
+                      gap={3}
+                      style={[
+                        styles.chainMintSection,
+                        routingHopIndex != null && !isActiveNode && styles.chainDimmed,
+                        { flexShrink: 1 },
+                      ]}>
+                      <Avatar
+                        picture={undefined}
+                        size={18}
+                        variant="mint"
+                        name={name}
+                        alt={`${name} icon`}
+                      />
+                      <Text
+                        size={10}
+                        numberOfLines={1}
+                        bold={isIntermediary}
+                        style={{ color: isActiveNode ? '#c084fc' : primaryColor0 }}>
+                        {name}
+                      </Text>
+                    </HStack>
+                  </React.Fragment>
+                );
+              })}
+            </HStack>
+            {routingHopIndex != null && (
+              <Text size={10} style={{ color: '#c084fc' }}>
+                Hop {routingHopIndex + 1} of {routingChainPath.length - 1}
+              </Text>
+            )}
+          </VStack>
         )}
 
         {/* Amount and status row */}

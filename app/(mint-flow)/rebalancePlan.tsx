@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -20,6 +20,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useMints, useBalanceContext, useManager } from 'coco-cashu-react';
@@ -34,14 +35,25 @@ import {
   isAlreadyBalanced,
   buildSwapGraph,
   pickIntermediaryPath,
+  addLocalHistoryEdges,
+  getLocalCandidatesForDestination,
   type TransferStep,
   type RebalancePlan,
   type StepStatus,
 } from 'components/blocks/rebalance';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useSettingsStore } from 'stores/settingsStore';
+import { CocoManager } from 'helper/coco/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from 'helper/apiClient';
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
 
 interface StepState {
   status: StepStatus;
@@ -55,6 +67,11 @@ interface StepState {
     /** Human-readable names for each mint in the path (parallel array). */
     pathNames?: string[];
   };
+  // Auto-routing state
+  routingDetail?: string;
+  routingChainPath?: string[];
+  routingChainPathNames?: string[];
+  routingHopIndex?: number;
 }
 
 function RebalancePlanScreen() {
@@ -162,6 +179,14 @@ function RebalancePlanScreen() {
   const swapGroupIdRef = useRef<string | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
+  // Debug error log – appended to on every step start / error / completion
+  const [debugLog, setDebugLog] = useState<Record<string, unknown>[]>([]);
+  const appendDebug = useCallback((entry: Record<string, unknown>) => {
+    const stamped = { ...entry, _ts: new Date().toISOString() };
+    console.log('[REBALANCE]', JSON.stringify(stamped));
+    setDebugLog((prev) => [...prev, stamped]);
+  }, []);
+
   // Display either the frozen run plan (once started) or the live preview
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
 
@@ -206,13 +231,18 @@ function RebalancePlanScreen() {
         state?.status === 'creatingInvoice' ||
         state?.status === 'invoiceReady' ||
         state?.status === 'melting' ||
-        state?.status === 'verifying'
+        state?.status === 'verifying' ||
+        state?.status === 'routing'
       );
     });
   }, [plan.steps, stepStates]);
 
   const failedCount = useMemo(() => {
     return plan.steps.filter((step) => stepStates[step.id]?.status === 'failed').length;
+  }, [plan.steps, stepStates]);
+
+  const skippedCount = useMemo(() => {
+    return plan.steps.filter((step) => stepStates[step.id]?.status === 'skipped').length;
   }, [plan.steps, stepStates]);
 
   const terminalCount = useMemo(() => {
@@ -255,13 +285,22 @@ function RebalancePlanScreen() {
       // This improves the chance of finding an intermediary without exploding API calls.
       const planMints = runPlan.steps.flatMap((s) => [s.fromMintUrl, s.toMintUrl]);
       const trustedUrls = trustedMints.map((m) => m.mintUrl);
+
+      // Also include mints from local swap history that have reached the destination
+      const allGroups = Object.values(useSwapTransactionsStore.getState().groups);
+      const localCandidateMints = getLocalCandidatesForDestination(
+        allGroups,
+        toMintUrl,
+        fromMintUrl
+      );
+
       /**
        * Keep this bounded:
        * - Each mint candidate can require an auditor call.
        * - This runs after a failure, so we want a quick suggestion, not a full graph crawl.
        */
       const candidates = Array.from(
-        new Set([...planMints, ...trustedUrls, fromMintUrl, toMintUrl])
+        new Set([...planMints, ...trustedUrls, ...localCandidateMints, fromMintUrl, toMintUrl])
       ).slice(0, 12);
 
       const audits: AuditMintResponse[] = [];
@@ -271,6 +310,11 @@ function RebalancePlanScreen() {
       }
 
       const graph = buildSwapGraph(audits);
+
+      // Merge our own local swap history into the graph so personally observed
+      // routes (e.g. "minibits → sovran worked last week") supplement auditor data
+      addLocalHistoryEdges(graph, allGroups);
+
       const trustedMintUrls = new Set(trustedUrls);
       const result = pickIntermediaryPath({
         from: fromMintUrl,
@@ -355,6 +399,16 @@ function RebalancePlanScreen() {
 
       const { id, fromMintUrl, toMintUrl, amount: originalAmount } = step;
 
+      appendDebug({
+        event: 'step_start',
+        stepId: id,
+        fromMintUrl,
+        toMintUrl,
+        amount: originalAmount,
+        chainId: step.chainId,
+        chainHopIndex: step.chainHopIndex,
+      });
+
       const groupId = swapGroupIdRef.current;
       const ensureLegId = () => {
         if (!groupId) return null;
@@ -391,6 +445,31 @@ function RebalancePlanScreen() {
         const currentBalances = await manager.wallet.getBalances();
         const sourceBalance = currentBalances[fromMintUrl] || 0;
 
+        appendDebug({
+          event: 'balances_fetched',
+          stepId: id,
+          sourceBalance,
+          allBalances: currentBalances,
+        });
+
+        // ── Fee headroom constant ──
+        const FEE_HEADROOM = MIN_FEE_RESERVE + 2; // 3 (planner constant) + 2 extra for input fees
+
+        // ── Early skip: source balance too low ──
+        // This commonly happens when a prior step's middleman routing already
+        // swept the funds from this mint to the destination.  Rather than
+        // reporting an error, we skip the step gracefully.
+        if (sourceBalance < minTransferThreshold + FEE_HEADROOM) {
+          appendDebug({
+            event: 'step_skipped_low_balance',
+            stepId: id,
+            sourceBalance,
+            minRequired: minTransferThreshold + FEE_HEADROOM,
+          });
+          updateStepState(id, { status: 'skipped' });
+          return true; // not a failure — funds already transferred
+        }
+
         // Step 1: Create invoice on receiver mint
         updateStepState(id, { status: 'creatingInvoice', errorMessage: undefined });
         setLegLocalStatus('creatingInvoice');
@@ -399,17 +478,42 @@ function RebalancePlanScreen() {
         let invoice: string;
         let preparedMeltOp: { id: string } | null = null;
 
-        // Create initial invoice
-        let mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
-        invoice = mintQuote.request;
-        {
-          const legId = ensureLegId();
-          const mintQuoteId =
-            (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
-          if (groupId && legId && mintQuoteId) {
-            useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mintQuoteId));
+        // ── Fee headroom ──
+        // prepareMeltBolt11 internally selects proofs for (invoiceAmount + fee_reserve).
+        // If the planned transfer is close to the full balance, that sum exceeds what's
+        // available and throws "Not enough proofs to send" before we can adjust.
+        // Pre-cap the amount to leave room for fees (fee_reserve + input fees).
+        if (transferAmount + FEE_HEADROOM > sourceBalance) {
+          const capped = sourceBalance - FEE_HEADROOM;
+          if (capped < minTransferThreshold) {
+            throw new Error(
+              `Insufficient balance after fee headroom: ${sourceBalance} sats, need at least ${minTransferThreshold + FEE_HEADROOM}`
+            );
           }
+          appendDebug({
+            event: 'amount_capped',
+            stepId: id,
+            original: transferAmount,
+            capped,
+            sourceBalance,
+            feeHeadroom: FEE_HEADROOM,
+          });
+          transferAmount = capped;
         }
+
+        // Helper: create invoice + tag the leg
+        const createInvoiceForAmount = async (amt: number) => {
+          const mq = await requestLightningInvoice(toMintUrl, amt);
+          const legId = ensureLegId();
+          const mqId = (mq as any)?.quote ?? (mq as any)?.quoteId ?? (mq as any)?.id;
+          if (groupId && legId && mqId) {
+            useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mqId));
+          }
+          return mq;
+        };
+
+        let mintQuote = await createInvoiceForAmount(transferAmount);
+        invoice = mintQuote.request;
 
         // Step 2: Prepare melt to get exact fees (v3 API)
         // This provides fee transparency and an operation ID for crash recovery.
@@ -438,7 +542,45 @@ function RebalancePlanScreen() {
           };
         };
 
-        let preparedForFees = await prepareForInvoice(invoice);
+        // ── Prepare with automatic retry on "Not enough proofs" ──
+        // Even with the pre-cap, some mints may have higher fee_reserve or input
+        // fees than expected.  We retry up to 2 times, reducing the amount each time.
+        const MAX_PREPARE_RETRIES = 3;
+        const RETRY_REDUCE_SATS = 1;
+        let preparedForFees: Awaited<ReturnType<typeof prepareForInvoice>> | null = null;
+
+        for (let attempt = 0; attempt <= MAX_PREPARE_RETRIES; attempt++) {
+          try {
+            preparedForFees = await prepareForInvoice(invoice);
+            break; // success
+          } catch (prepErr) {
+            const msg = prepErr instanceof Error ? prepErr.message : String(prepErr);
+            const isProofErr = msg.includes('Not enough proofs');
+
+            if (isProofErr && attempt < MAX_PREPARE_RETRIES) {
+              transferAmount -= RETRY_REDUCE_SATS;
+              if (transferAmount < minTransferThreshold) {
+                throw prepErr; // can't reduce further
+              }
+              appendDebug({
+                event: 'prepare_retry',
+                stepId: id,
+                attempt: attempt + 1,
+                reducedAmount: transferAmount,
+                reason: msg,
+              });
+              mintQuote = await createInvoiceForAmount(transferAmount);
+              invoice = mintQuote.request;
+              updateStepState(id, { status: 'invoiceReady', invoice });
+              continue;
+            }
+            throw prepErr; // non-proof error or retries exhausted
+          }
+        }
+
+        if (!preparedForFees) {
+          throw new Error('Failed to prepare melt after retries');
+        }
         preparedMeltOp = preparedForFees;
 
         const invoiceAmount = Number(preparedForFees.amount ?? transferAmount);
@@ -446,40 +588,17 @@ function RebalancePlanScreen() {
         const swapFee = Number(preparedForFees.swap_fee ?? 0);
         const totalRequired = invoiceAmount + feeReserve + swapFee;
 
-        // Check if we have enough balance
-        if (totalRequired > sourceBalance) {
-          // Need to adjust - calculate max we can actually transfer
-          const maxTransferable = sourceBalance - feeReserve - swapFee - MIN_FEE_RESERVE;
-
-          if (maxTransferable <= minTransferThreshold) {
-            throw new Error(
-              `Insufficient balance: need ${totalRequired} sats but only have ${sourceBalance} sats`
-            );
-          }
-
-          // Recreate invoice with adjusted amount
-          console.log(
-            `Adjusting transfer: ${transferAmount} -> ${maxTransferable} (balance: ${sourceBalance}, fee_reserve: ${feeReserve}, swap_fee: ${swapFee})`
-          );
-          transferAmount = maxTransferable;
-          mintQuote = await requestLightningInvoice(toMintUrl, transferAmount);
-          invoice = mintQuote.request;
-          {
-            const legId = ensureLegId();
-            const mintQuoteId =
-              (mintQuote as any)?.quote ?? (mintQuote as any)?.quoteId ?? (mintQuote as any)?.id;
-            if (groupId && legId && mintQuoteId) {
-              useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mintQuoteId));
-            }
-          }
-
-          updateStepState(id, { status: 'invoiceReady', invoice });
-          setLegLocalStatus('invoiceReady');
-
-          // Re-prepare for the new invoice amount to get updated fees + operation id.
-          preparedForFees = await prepareForInvoice(invoice);
-          preparedMeltOp = preparedForFees;
-        }
+        appendDebug({
+          event: 'melt_prepared',
+          stepId: id,
+          operationId: preparedForFees.id,
+          invoiceAmount,
+          feeReserve,
+          swapFee,
+          totalRequired,
+          sourceBalance,
+          preparedRaw: preparedForFees,
+        });
 
         // Step 3: Melt from sender mint by paying the invoice
         // Use the v3 two-step flow: prepareMeltBolt11 + executeMelt
@@ -487,60 +606,446 @@ function RebalancePlanScreen() {
         setLegLocalStatus('melting');
 
         const executeMeltWithRetry = async () => {
-          try {
-            if (!preparedMeltOp) {
-              preparedMeltOp = await prepareForInvoice(invoice);
-            }
-
-            const result = (await manager.quotes.executeMelt(preparedMeltOp.id)) as unknown as
-              | { state?: string; id?: string }
-              | undefined;
-
-            if (result?.state === 'pending') {
-              // Pending payments need explicit handling to avoid double-paying on retries.
-              // We poll briefly; if it remains pending, we fail the step with a non-retriable message.
-              const opId = result.id ?? preparedMeltOp.id;
-              const maxWaitMs = 20000;
-              const pollIntervalMs = 2000;
-              const start = Date.now();
-
-              while (Date.now() - start < maxWaitMs) {
-                const decision = await manager.quotes.checkPendingMelt(opId);
-                if (decision === 'finalize') return;
-                if (decision === 'rollback') {
-                  throw new Error('Melt payment rolled back by mint');
-                }
-                await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+          // Retry loop: handles "not enough inputs" from the mint at execute time.
+          // The mint's actual fee requirement can be higher than what prepare estimated,
+          // so we reduce the amount and re-prepare when this happens.
+          const MAX_EXECUTE_RETRIES = 2;
+          for (let execAttempt = 0; execAttempt <= MAX_EXECUTE_RETRIES; execAttempt++) {
+            try {
+              if (!preparedMeltOp) {
+                preparedMeltOp = await prepareForInvoice(invoice);
               }
 
-              throw new Error(
-                'Payment pending. Please wait and reopen later; the app will recover this operation automatically.'
-              );
+              const result = (await manager.quotes.executeMelt(preparedMeltOp.id)) as unknown as
+                | { state?: string; id?: string }
+                | undefined;
+
+              if (result?.state === 'pending') {
+                const opId = result.id ?? preparedMeltOp.id;
+                const maxWaitMs = 20000;
+                const pollIntervalMs = 2000;
+                const start = Date.now();
+
+                while (Date.now() - start < maxWaitMs) {
+                  const decision = await manager.quotes.checkPendingMelt(opId);
+                  if (decision === 'finalize') return;
+                  if (decision === 'rollback') {
+                    throw new Error('Melt payment rolled back by mint');
+                  }
+                  await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+                }
+
+                throw new Error(
+                  'Payment pending. Please wait and reopen later; the app will recover this operation automatically.'
+                );
+              }
+
+              return; // success
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+
+              if (msg.includes('Melt operation already in progress')) {
+                await new Promise((resolve) => setTimeout(resolve, 900));
+                preparedMeltOp = await prepareForInvoice(invoice);
+                await manager.quotes.executeMelt(preparedMeltOp.id);
+                return;
+              }
+
+              // Mint rejected inputs as insufficient — reduce amount and retry
+              // e.g. "not enough inputs provided for melt. Provided: 13, needed: 14"
+              const isInputShortfall =
+                msg.includes('not enough inputs') || msg.includes('inputs provided for melt');
+
+              if (isInputShortfall && execAttempt < MAX_EXECUTE_RETRIES) {
+                transferAmount -= RETRY_REDUCE_SATS;
+                if (transferAmount < minTransferThreshold) throw err;
+
+                appendDebug({
+                  event: 'execute_input_retry',
+                  stepId: id,
+                  attempt: execAttempt + 1,
+                  reducedAmount: transferAmount,
+                  reason: msg,
+                });
+
+                // Restore proofs from the failed attempt, then start fresh
+                await CocoManager.restoreInflightProofsForMint(fromMintUrl);
+                mintQuote = await createInvoiceForAmount(transferAmount);
+                invoice = mintQuote.request;
+                preparedMeltOp = null;
+                updateStepState(id, { status: 'invoiceReady', invoice });
+                continue;
+              }
+
+              throw err;
             }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('Melt operation already in progress')) {
-              // Coco internally serializes melts; give it a moment and retry once.
-              await new Promise((resolve) => setTimeout(resolve, 900));
-              preparedMeltOp = await prepareForInvoice(invoice);
-              await manager.quotes.executeMelt(preparedMeltOp.id);
-              return;
-            }
-            throw err;
           }
         };
 
-        await executeMeltWithRetry();
+        // ── Execute melt — with automatic middleman rerouting on no_route ──
+        let meltSucceeded = false;
+        try {
+          await executeMeltWithRetry();
+          meltSucceeded = true;
+        } catch (meltErr) {
+          const meltMsg = meltErr instanceof Error ? meltErr.message : String(meltErr);
+          const lower = meltMsg.toLowerCase();
+          const isNoRoute =
+            lower.includes('no_route') ||
+            lower.includes('failure_reason_no_route') ||
+            lower.includes('ran out of routes');
+
+          if (!isNoRoute) throw meltErr; // non-route error → outer catch
+
+          // ── Auto-route through middleman ──
+          appendDebug({ event: 'no_route_auto_routing', stepId: id, fromMintUrl, toMintUrl });
+
+          updateStepState(id, {
+            status: 'routing',
+            errorMessage: undefined,
+            routingDetail: 'Searching for middleman route…',
+            routeSuggestion: { status: 'searching' },
+          });
+
+          // Restore any proofs stuck in "inflight" by the failed melt so they're
+          // available for the middleman chain. This is the app-level equivalent of
+          // the debug panel's "Restore Inflight" button.
+          await CocoManager.restoreInflightProofsForMint(fromMintUrl);
+
+          // ── Build candidate paths ──
+          // 1. Try the BFS graph (auditor + local history merged) for the best scored path
+          // 2. If BFS finds nothing, fall back to local history candidates: mints we know
+          //    have successfully swapped TO the destination. We "just try" each one —
+          //    if a hop fails, we move to the next candidate.
+          type CandidateRoute = { path: string[]; pathNames: string[]; source: string };
+          const candidateRoutes: CandidateRoute[] = [];
+
+          const suggestion = await computeRouteSuggestion(fromMintUrl, toMintUrl);
+
+          if (suggestion?.path && suggestion.path.length >= 3) {
+            candidateRoutes.push({
+              path: suggestion.path,
+              pathNames: suggestion.pathNames ?? suggestion.path.map(extractDomain),
+              source: 'graph',
+            });
+          }
+
+          // Even if BFS found a path, also add local history candidates as fallbacks
+          // (in case the BFS-scored path fails at runtime)
+          const allSwapGroups = Object.values(useSwapTransactionsStore.getState().groups);
+          const localFallbacks = getLocalCandidatesForDestination(
+            allSwapGroups,
+            toMintUrl,
+            fromMintUrl
+          );
+
+          for (const candidateUrl of localFallbacks) {
+            // Skip if this candidate is already part of the BFS path
+            const alreadyInBfs = candidateRoutes.some(
+              (r) => r.source === 'graph' && r.path.includes(candidateUrl)
+            );
+            if (alreadyInBfs) continue;
+
+            candidateRoutes.push({
+              path: [fromMintUrl, candidateUrl, toMintUrl],
+              pathNames: [
+                mintInfoMap[fromMintUrl]?.name || extractDomain(fromMintUrl),
+                mintInfoMap[candidateUrl]?.name || extractDomain(candidateUrl),
+                mintInfoMap[toMintUrl]?.name || extractDomain(toMintUrl),
+              ],
+              source: 'local_history',
+            });
+          }
+
+          appendDebug({
+            event: 'routing_candidates',
+            stepId: id,
+            candidateCount: candidateRoutes.length,
+            candidates: candidateRoutes.map((r) => ({
+              path: r.path.map(extractDomain),
+              source: r.source,
+            })),
+          });
+
+          if (candidateRoutes.length === 0) {
+            appendDebug({ event: 'no_route_no_middleman', stepId: id });
+            throw meltErr;
+          }
+
+          // ── Try each candidate route sequentially ──
+          let anyRouteSucceeded = false;
+          let lastCandidateError: unknown = meltErr;
+
+          for (let candidateIdx = 0; candidateIdx < candidateRoutes.length; candidateIdx++) {
+            if (abortRef.current || runIdRef.current !== runId) break;
+
+            const candidate = candidateRoutes[candidateIdx];
+            const chainPath = candidate.path;
+            const chainPathNames = candidate.pathNames;
+
+            appendDebug({
+              event: 'trying_candidate_route',
+              stepId: id,
+              candidateIdx,
+              candidateCount: candidateRoutes.length,
+              chainPath: chainPath.map(extractDomain),
+              source: candidate.source,
+            });
+
+            updateStepState(id, {
+              routeSuggestion: { status: 'found', path: chainPath, pathNames: chainPathNames },
+              routingChainPath: chainPath,
+              routingChainPathNames: chainPathNames,
+              routingDetail:
+                candidateRoutes.length > 1
+                  ? `Trying route ${candidateIdx + 1}/${candidateRoutes.length}: via ${chainPathNames.slice(1, -1).join(' → ')}…`
+                  : `Routing via ${chainPathNames.slice(1, -1).join(' → ')}…`,
+            });
+
+            // Trust intermediary mints temporarily
+            const trustedUrls = new Set(trustedMints.map((m) => m.mintUrl));
+            const intermediaries = chainPath.slice(1, -1);
+            const temporarilyTrusted: string[] = [];
+
+            for (const url of intermediaries) {
+              if (!trustedUrls.has(url)) {
+                try {
+                  try {
+                    await manager.mint.addMint(url);
+                  } catch {
+                    /* already added */
+                  }
+                  await manager.mint.trustMint(url);
+                  temporarilyTrusted.push(url);
+                } catch (trustErr) {
+                  console.warn('Failed to temporarily trust intermediary:', url, trustErr);
+                }
+              }
+            }
+
+            // Execute chain hops sequentially
+            const chainId = `chain-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+            let chainSuccess = true;
+
+            try {
+              for (let hopIdx = 0; hopIdx < chainPath.length - 1; hopIdx++) {
+                if (abortRef.current || runIdRef.current !== runId) {
+                  chainSuccess = false;
+                  break;
+                }
+
+                const hopFrom = chainPath[hopIdx];
+                const hopTo = chainPath[hopIdx + 1];
+                const hopLabel = `${extractDomain(hopFrom)} → ${extractDomain(hopTo)}`;
+
+                updateStepState(id, {
+                  routingDetail: `Hop ${hopIdx + 1}/${chainPath.length - 1}: ${hopLabel}`,
+                  routingHopIndex: hopIdx,
+                });
+
+                // Get fresh balance for this hop's source
+                const hopBalances = await manager.wallet.getBalances();
+                const hopSourceBalance = hopBalances[hopFrom] || 0;
+
+                // Determine hop amount
+                let hopAmount: number;
+                if (hopIdx === 0) {
+                  hopAmount = Math.min(transferAmount, hopSourceBalance - FEE_HEADROOM);
+                } else {
+                  // Use whatever landed on the intermediary, minus fee headroom
+                  hopAmount = hopSourceBalance - FEE_HEADROOM;
+                }
+
+                if (hopAmount < minTransferThreshold) {
+                  appendDebug({
+                    event: 'chain_hop_insufficient',
+                    stepId: id,
+                    hopIdx,
+                    hopAmount,
+                    hopSourceBalance,
+                  });
+                  chainSuccess = false;
+                  break;
+                }
+
+                appendDebug({
+                  event: 'chain_hop_start',
+                  stepId: id,
+                  hopIdx,
+                  hopFrom,
+                  hopTo,
+                  hopAmount,
+                  hopSourceBalance,
+                });
+
+                // Create invoice on receiving mint
+                const hopMq = await requestLightningInvoice(hopTo, hopAmount);
+                let hopInvoice = hopMq.request;
+
+                // Tag leg in swap store
+                const hopLegId = groupId
+                  ? useSwapTransactionsStore.getState().addLeg(groupId, {
+                      fromMintUrl: hopFrom,
+                      toMintUrl: hopTo,
+                      amount: hopAmount,
+                      chainId,
+                      chainPath,
+                      chainHopIndex: hopIdx,
+                    })
+                  : null;
+
+                if (groupId && hopLegId) {
+                  const mqId =
+                    (hopMq as any)?.quote ?? (hopMq as any)?.quoteId ?? (hopMq as any)?.id;
+                  if (mqId) {
+                    useSwapTransactionsStore
+                      .getState()
+                      .tagMintQuote(groupId, hopLegId, String(mqId));
+                  }
+                  useSwapTransactionsStore
+                    .getState()
+                    .setLegStatus(groupId, hopLegId, { localStatus: 'melting' });
+                }
+
+                // Prepare melt with retry for "Not enough proofs"
+                let hopPrepared: any = null;
+                let hopTransferAmt = hopAmount;
+                for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
+                  try {
+                    hopPrepared = await manager.quotes.prepareMeltBolt11(hopFrom, hopInvoice);
+                    break;
+                  } catch (pErr) {
+                    const pm = pErr instanceof Error ? pErr.message : String(pErr);
+                    if (pm.includes('Not enough proofs') && att < MAX_PREPARE_RETRIES) {
+                      hopTransferAmt -= RETRY_REDUCE_SATS;
+                      if (hopTransferAmt < minTransferThreshold) throw pErr;
+                      const retryMq = await requestLightningInvoice(hopTo, hopTransferAmt);
+                      hopInvoice = retryMq.request;
+                      continue;
+                    }
+                    throw pErr;
+                  }
+                }
+
+                // Execute melt
+                const hopResult = (await manager.quotes.executeMelt(hopPrepared.id)) as unknown as
+                  | { state?: string; id?: string }
+                  | undefined;
+
+                // Handle pending state
+                if (hopResult?.state === 'pending') {
+                  const opId = hopResult.id ?? hopPrepared.id;
+                  const maxWait = 15000;
+                  const start = Date.now();
+                  while (Date.now() - start < maxWait) {
+                    const dec = await manager.quotes.checkPendingMelt(opId);
+                    if (dec === 'finalize') break;
+                    if (dec === 'rollback') throw new Error('Hop melt rolled back');
+                    await new Promise((r) => setTimeout(r, 2000));
+                  }
+                }
+
+                // Tag melt in swap store
+                if (groupId && hopLegId) {
+                  const qId = (hopPrepared as any)?.quoteId ?? hopPrepared.id;
+                  useSwapTransactionsStore.getState().tagMelt(groupId, hopLegId, {
+                    quoteId: String(qId),
+                    operationId: String(hopPrepared.id),
+                  });
+                  useSwapTransactionsStore
+                    .getState()
+                    .setLegStatus(groupId, hopLegId, { localStatus: 'done' });
+                }
+
+                appendDebug({
+                  event: 'chain_hop_done',
+                  stepId: id,
+                  hopIdx,
+                  hopFrom,
+                  hopTo,
+                  amount: hopTransferAmt,
+                });
+
+                // Wait for balance on the receiving mint before next hop
+                if (hopIdx < chainPath.length - 2) {
+                  await waitForBalanceIncrease(hopTo, hopTransferAmt, 12000);
+                }
+              }
+            } catch (hopErr) {
+              appendDebug({
+                event: 'chain_candidate_error',
+                stepId: id,
+                candidateIdx,
+                chainPath: chainPath.map(extractDomain),
+                error: hopErr instanceof Error ? hopErr.message : String(hopErr),
+              });
+              // Restore inflight proofs on ALL mints in the chain so they're
+              // available for the next candidate attempt
+              for (const url of chainPath) {
+                await CocoManager.restoreInflightProofsForMint(url);
+              }
+              chainSuccess = false;
+              lastCandidateError = hopErr;
+            }
+
+            // Untrust temporary intermediaries (if no funds remain)
+            const finalBals = await manager.wallet
+              .getBalances()
+              .catch(() => ({}) as Record<string, number>);
+            for (const url of temporarilyTrusted) {
+              const bal = finalBals[url] ?? 0;
+              if (bal > 0) {
+                console.warn(`Keeping temp middleman ${url} trusted — ${bal} sats remain`);
+                continue;
+              }
+              try {
+                await manager.mint.untrustMint(url);
+              } catch {
+                /* ignore */
+              }
+            }
+
+            if (chainSuccess) {
+              meltSucceeded = true;
+              anyRouteSucceeded = true;
+              appendDebug({
+                event: 'auto_route_chain_complete',
+                stepId: id,
+                chainPath,
+                candidateIdx,
+              });
+              break; // success — stop trying candidates
+            }
+
+            // Chain failed — give coco a moment to settle before trying next candidate
+            appendDebug({
+              event: 'candidate_route_failed_trying_next',
+              stepId: id,
+              candidateIdx,
+              remainingCandidates: candidateRoutes.length - candidateIdx - 1,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
+
+          if (!anyRouteSucceeded) {
+            const triedCount = candidateRoutes.length;
+            throw triedCount > 1
+              ? new Error(
+                  `All ${triedCount} middleman routes failed. Some funds may be on intermediary mints — check the debug panel.`
+                )
+              : lastCandidateError;
+          }
+        }
 
         // Step 4: Verify - wait for balance to increase on receiving mint
         // The MintQuoteProcessor runs every 5 seconds to claim paid quotes
-        updateStepState(id, { status: 'verifying' });
+        updateStepState(id, { status: 'verifying', routingDetail: undefined });
         setLegLocalStatus('verifying');
 
         // Poll for up to 15 seconds for the balance to update
         const balanceUpdated = await waitForBalanceIncrease(toMintUrl, transferAmount, 15000);
 
-        if (!balanceUpdated) {
+        if (!balanceUpdated && meltSucceeded) {
           /**
            * Verification is best-effort:
            * - receiving mint may not have redeemed the quote yet (processor runs periodically)
@@ -552,13 +1057,42 @@ function RebalancePlanScreen() {
         }
 
         // Mark as done
-        updateStepState(id, { status: 'done' });
+        updateStepState(id, {
+          status: 'done',
+          routingDetail: undefined,
+          routingHopIndex: undefined,
+        });
         setLegLocalStatus('done');
+
+        appendDebug({
+          event: 'step_done',
+          stepId: id,
+          fromMintUrl,
+          toMintUrl,
+          amount: transferAmount,
+        });
 
         // Add a small delay between steps to avoid overwhelming the mints
         await new Promise((resolve) => setTimeout(resolve, 500));
         return true;
       } catch (error) {
+        // Sanity check: restore any proofs stuck in "inflight" on the source mint
+        await CocoManager.restoreInflightProofsForMint(fromMintUrl);
+
+        const rawErrorMessage = error instanceof Error ? error.message : String(error);
+        const rawStack = error instanceof Error ? error.stack : undefined;
+
+        appendDebug({
+          event: 'step_error',
+          stepId: id,
+          fromMintUrl,
+          toMintUrl,
+          amount: originalAmount,
+          error: rawErrorMessage,
+          stack: rawStack,
+          errorObject: String(error),
+        });
+
         let errorMessage = error instanceof Error ? error.message : 'Transfer failed';
 
         // Parse and improve error messages for common Lightning/mint errors
@@ -566,11 +1100,10 @@ function RebalancePlanScreen() {
           errorMessage =
             'Mint Lightning node is not ready. The mint may be starting up or syncing. Try again in a few minutes.';
         } else if (
-          errorMessage.includes('FAILURE_REASON_NO_ROUTE') ||
-          errorMessage.includes('no_route')
+          errorMessage.toLowerCase().includes('no_route') ||
+          errorMessage.toLowerCase().includes('ran out of routes')
         ) {
-          errorMessage =
-            'No Lightning route found between mints. Try routing through an intermediary.';
+          errorMessage = 'No Lightning route found. No middleman route available either.';
         } else if (errorMessage.includes('FAILURE_REASON_TIMEOUT')) {
           errorMessage = 'Lightning payment timed out. The mint may be slow to respond.';
         } else if (errorMessage.includes('invoice expired') || errorMessage.includes('EXPIRED')) {
@@ -579,22 +1112,13 @@ function RebalancePlanScreen() {
           errorMessage = 'Insufficient balance or liquidity for this transfer.';
         }
 
-        updateStepState(id, { status: 'failed', errorMessage });
+        updateStepState(id, {
+          status: 'failed',
+          errorMessage,
+          routingDetail: undefined,
+          routingHopIndex: undefined,
+        });
         setLegLocalStatus('failed', errorMessage);
-
-        // If this is a no_route failure, compute a route suggestion asynchronously and show progress.
-        const rawError = error instanceof Error ? error.message : String(error);
-        if (rawError.includes('no_route') || rawError.includes('FAILURE_REASON_NO_ROUTE')) {
-          updateStepState(id, { routeSuggestion: { status: 'searching' } });
-          (async () => {
-            const suggestion = await computeRouteSuggestion(fromMintUrl, toMintUrl);
-            if (!suggestion) {
-              updateStepState(id, { routeSuggestion: { status: 'none' } });
-              return;
-            }
-            updateStepState(id, { routeSuggestion: { status: 'found', ...suggestion } });
-          })();
-        }
         return false;
       } finally {
         // Always release the lock
@@ -609,6 +1133,9 @@ function RebalancePlanScreen() {
       manager,
       computeRouteSuggestion,
       minTransferThreshold,
+      appendDebug,
+      trustedMints,
+      mintInfoMap,
     ]
   );
 
@@ -1024,6 +1551,16 @@ function RebalancePlanScreen() {
                 {completedCount}/{plan.steps.length}
               </Text>
             </HStack>
+            {runPlan && skippedCount > 0 && (
+              <HStack justify="space-between" align="center">
+                <Text size={14} style={{ color: primaryColor300 }}>
+                  Skipped
+                </Text>
+                <Text bold overpass size={18} style={{ color: primaryColor400 }}>
+                  {skippedCount}
+                </Text>
+              </HStack>
+            )}
             {runPlan && (
               <HStack justify="space-between" align="center">
                 <Text size={14} style={{ color: primaryColor300 }}>
@@ -1094,6 +1631,10 @@ function RebalancePlanScreen() {
                   status={state.status}
                   errorMessage={state.errorMessage}
                   routeSuggestion={state.routeSuggestion}
+                  routingDetail={state.routingDetail}
+                  routingChainPath={state.routingChainPath}
+                  routingChainPathNames={state.routingChainPathNames}
+                  routingHopIndex={state.routingHopIndex}
                   onRouteThrough={
                     runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
                   }
@@ -1148,6 +1689,38 @@ function RebalancePlanScreen() {
             </VStack>
           </View>
         )}
+
+        {/* Debug log – raw JSON of every event / error */}
+        {debugLog.length > 0 && (
+          <View style={styles.debugContainer}>
+            <HStack justify="space-between" align="center" style={{ marginBottom: 4 }}>
+              <Text size={11} weight="bold" style={{ color: '#facc15' }}>
+                REBALANCE DEBUG LOG ({debugLog.length} entries)
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('[REBALANCE] === FULL DEBUG LOG DUMP ===');
+                  debugLog.forEach((entry, i) =>
+                    console.log(`[REBALANCE] [${i}]`, JSON.stringify(entry))
+                  );
+                  console.log('[REBALANCE] === END DUMP ===');
+                }}
+                style={styles.debugDumpBtn}>
+                <Text size={9} weight="bold" style={{ color: '#facc15' }}>
+                  Log All
+                </Text>
+              </TouchableOpacity>
+            </HStack>
+            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled showsVerticalScrollIndicator>
+              <Text
+                size={9}
+                style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}
+                selectable>
+                {JSON.stringify(debugLog, null, 2)}
+              </Text>
+            </ScrollView>
+          </View>
+        )}
       </ModalLayoutWrapper>
     </View>
   );
@@ -1177,6 +1750,22 @@ const styles = StyleSheet.create({
   completeContainer: {
     padding: 24,
     alignItems: 'center',
+  },
+  debugContainer: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(250,204,21,0.3)',
+  },
+  debugDumpBtn: {
+    backgroundColor: 'rgba(250,204,21,0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(250,204,21,0.3)',
   },
 });
 

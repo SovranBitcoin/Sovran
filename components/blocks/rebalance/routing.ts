@@ -1,5 +1,6 @@
 import type { AuditMintResponse } from 'helper/apiClient';
 import type { MiddlemanRoutingSettings } from 'stores/settingsStore';
+import type { SwapGroup } from 'stores/swapTransactionsStore';
 
 /**
  * Auditor-based routing helper for Lightning "no_route" failures.
@@ -7,6 +8,10 @@ import type { MiddlemanRoutingSettings } from 'stores/settingsStore';
  * The auditor API provides historical swap outcomes between mints. We build a directed graph of
  * observed swaps (both successful and failed), then pick intermediary mint(s) that satisfy the
  * user's quality settings (success rate, max fee, last swap OK, max hops).
+ *
+ * Local swap history from swapTransactionsStore is also merged into the graph so that
+ * personally observed swap outcomes (e.g. minibits → sovran.money worked last week) supplement
+ * the auditor data and improve routing decisions.
  *
  * This is intentionally heuristic:
  * - It's a best-effort suggestion (not a guarantee of a route).
@@ -280,4 +285,68 @@ export function pickIntermediaryPath({
     path: bestPath,
     reason: `Found route via ${bestPath.length - 2} intermediary mint(s) in auditor history.${trustNote}`,
   };
+}
+
+// ── Local swap history helpers ──────────────────────────────────────────
+
+/**
+ * Merge completed swap legs from the local swapTransactionsStore into an existing
+ * SwapGraph so the BFS can leverage personally observed routes.
+ *
+ * Each completed ("done") leg adds a successful edge; each failed leg adds a
+ * failed edge. This augments the auditor data without replacing it.
+ */
+export function addLocalHistoryEdges(graph: SwapGraph, groups: SwapGroup[]): void {
+  for (const group of groups) {
+    for (const leg of group.legs) {
+      if (!leg.fromMintUrl || !leg.toMintUrl) continue;
+      if (leg.fromMintUrl === leg.toMintUrl) continue;
+
+      const ok = leg.localStatus === 'done';
+      const failed = leg.localStatus === 'failed';
+      if (!ok && !failed) continue;
+
+      // We don't track exact fees/time per leg, so use 0 for both.
+      // The timestamp comes from the parent group.
+      addEdge(graph, leg.fromMintUrl, leg.toMintUrl, 0, 0, group.createdAt, ok);
+    }
+  }
+}
+
+/**
+ * Get intermediary candidates purely from local swap history.
+ *
+ * Returns mint URLs that have **successfully** swapped TO the given destination,
+ * ordered by most recent success first. Excludes the source mint itself and the
+ * destination (no self-loops).
+ *
+ * This is the "just try it" fallback: when the BFS graph (auditor + local edges)
+ * finds no qualifying path (e.g. no data on source→intermediary), we still know
+ * these intermediaries can reach the destination, so we let the user try each one
+ * sequentially.
+ */
+export function getLocalCandidatesForDestination(
+  groups: SwapGroup[],
+  destination: string,
+  excludeSource: string
+): string[] {
+  // mintUrl → most recent successful timestamp
+  const candidateMap = new Map<string, number>();
+
+  for (const group of groups) {
+    for (const leg of group.legs) {
+      if (leg.localStatus !== 'done') continue;
+      if (leg.toMintUrl !== destination) continue;
+      if (leg.fromMintUrl === excludeSource) continue;
+      if (leg.fromMintUrl === destination) continue;
+
+      const existing = candidateMap.get(leg.fromMintUrl) ?? 0;
+      candidateMap.set(leg.fromMintUrl, Math.max(existing, group.createdAt));
+    }
+  }
+
+  // Sort by most recent success first
+  return Array.from(candidateMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([url]) => url);
 }

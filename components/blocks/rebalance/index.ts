@@ -6,4 +6,9 @@ export {
   type TransferStep,
   type RebalancePlan,
 } from './rebalancePlanner';
-export { buildSwapGraph, pickIntermediaryPath } from './routing';
+export {
+  buildSwapGraph,
+  pickIntermediaryPath,
+  addLocalHistoryEdges,
+  getLocalCandidatesForDestination,
+} from './routing';

@@ -20,9 +20,11 @@ const MIN_TRANSFER_THRESHOLD = 5;
 const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
 
 /**
- * Minimum fee reserve in sats (even small amounts have some base fee)
+ * Minimum fee reserve in sats.
+ * Must be high enough to cover the mint's Lightning fee_reserve (1–3 sats)
+ * plus potential input fees per proof. 3 sats is a safe conservative floor.
  */
-export const MIN_FEE_RESERVE = 1;
+export const MIN_FEE_RESERVE = 3;
 
 export interface MintBalance {
   mintUrl: string;

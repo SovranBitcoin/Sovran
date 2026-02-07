@@ -695,4 +695,44 @@ export class CocoManager {
       this.isFreeingReservedProofs = false;
     }
   }
+
+  /**
+   * Restore inflight proofs to "ready" state for a specific mint.
+   *
+   * Call this after a melt operation fails (e.g. no_route, timeout) to ensure
+   * proofs don't remain stuck in "inflight" state. This is the application-level
+   * equivalent of the "Restore Inflight" button in the debug panel, scoped to a
+   * single mint.
+   *
+   * Safe to call even when no inflight proofs exist — it's a no-op.
+   */
+  static async restoreInflightProofsForMint(mintUrl: string): Promise<number> {
+    const manager = this.getInstance();
+
+    const unsafeManager = manager as unknown as {
+      proofRepository?: {
+        getInflightProofs: (urls?: string[]) => Promise<{ mintUrl: string; secret: string }[]>;
+      };
+      proofService?: {
+        restoreProofsToReady: (mintUrl: string, secrets: string[]) => Promise<void>;
+      };
+    };
+
+    const repo = unsafeManager.proofRepository;
+    const svc = unsafeManager.proofService;
+    if (!repo?.getInflightProofs || !svc?.restoreProofsToReady) return 0;
+
+    try {
+      const inflight = await repo.getInflightProofs([mintUrl]);
+      if (inflight.length === 0) return 0;
+
+      const secrets = inflight.map((p) => p.secret);
+      await svc.restoreProofsToReady(mintUrl, secrets);
+      console.log(`[CocoManager] Restored ${secrets.length} inflight proofs on ${mintUrl}`);
+      return secrets.length;
+    } catch (err) {
+      console.warn('[CocoManager] Failed to restore inflight proofs:', err);
+      return 0;
+    }
+  }
 }
