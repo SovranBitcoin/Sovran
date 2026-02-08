@@ -16,10 +16,11 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   InteractionManager,
+  TextInput as RNTextInput,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { SheetManager } from 'react-native-actions-sheet';
 import { nip19 } from 'nostr-tools';
 import {
@@ -54,6 +55,7 @@ import {
   Button as SwiftUIButton,
   BottomSheet,
   Text as SwiftUIText,
+  TextField,
   VStack as SwiftUIVStack,
   HStack as SwiftUIHStack,
 } from '@expo/ui/swift-ui';
@@ -79,6 +81,7 @@ import {
   background,
   cornerRadius,
   fixedSize,
+  glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 import { truncateMiddle } from '@/helper/strings';
@@ -663,7 +666,7 @@ interface UserMessagesScreenProps {
 export function UserMessagesScreen({
   pubkey,
   onBack,
-  isFlowContext = false,
+  isFlowContext: _isFlowContext = false,
 }: UserMessagesScreenProps) {
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get('window').width;
@@ -685,6 +688,9 @@ export function UserMessagesScreen({
   const [isAttachmentsBottomSheetOpen, setIsAttachmentsBottomSheetOpen] = useState(false);
   const [isModelSwitchBottomSheetOpen, setIsModelSwitchBottomSheetOpen] = useState(false);
   const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+  const [sessionClearKey, setSessionClearKey] = useState(0);
+  const [isSessionSearchFocused, setIsSessionSearchFocused] = useState(false);
   const [availableModels, setAvailableModels] = useState<RoutstrModel[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
@@ -1654,258 +1660,335 @@ export function UserMessagesScreen({
     setMessages([]);
   };
 
+  const handleCloseSessionsPanel = useCallback(() => {
+    setIsSessionsPanelOpen(false);
+    setSessionSearchQuery('');
+    setSessionClearKey((prev) => prev + 1);
+    setIsSessionSearchFocused(false);
+  }, []);
+
+  const handleSessionSearchChange = useCallback((text: string) => {
+    setSessionSearchQuery(text);
+  }, []);
+
+  const handleDismissSessionSearch = useCallback(() => {
+    // Increment clear key to force SwiftUI TextField to remount, dropping focus
+    setSessionClearKey((prev) => prev + 1);
+    setIsSessionSearchFocused(false);
+  }, []);
+
+  // Track keyboard visibility while sessions panel is open for search focus state
+  useEffect(() => {
+    if (!isSessionsPanelOpen) {
+      setIsSessionSearchFocused(false);
+      return;
+    }
+
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      setIsSessionSearchFocused(true);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setIsSessionSearchFocused(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [isSessionsPanelOpen]);
+
   // ===========================
   // RENDER
   // ===========================
+
+  // Calculate header title width (matching payments pattern)
+  const headerTitleWidth = screenWidth - 124 - 24;
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <StatusBar barStyle="light-content" backgroundColor={getPrimaryColor('800')} />
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
-        {/* Header */}
-        <View
-          style={{
-            backgroundColor: getPrimaryColor('800'),
-            paddingHorizontal: 16,
-            paddingTop: isFlowContext ? 12 : insets.top + 12,
-            paddingBottom: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: getPrimaryColor('700'),
-          }}>
-          <HStack align="center" justify="space-between" style={{ height: 48 }}>
-            <HStack align="center" spacing={12} style={{ flex: 1, minWidth: 0 }}>
-              {isRoutstrMode ? (
-                <Pressable onPress={() => setIsSessionsPanelOpen(true)} className="p-2">
-                  <Icon name="mdi:menu" size={24} color={getPrimaryColor('0')} />
-                </Pressable>
-              ) : (
-                <Pressable onPress={handleBack} className="p-2">
-                  <Icon
-                    name="material-symbols:arrow-back-rounded"
-                    size={24}
-                    color={getPrimaryColor('0')}
-                  />
-                </Pressable>
-              )}
-
-              {Platform.OS === 'ios' && isRoutstrMode ? (
-                <Host style={{ width: screenWidth - 100, height: 48, zIndex: 10 }}>
-                  <ContextMenu>
-                    <ContextMenu.Items>
-                      <SwiftUIButton
-                        systemImage="arrow.clockwise"
-                        label="Refresh Balance"
-                        onPress={handleRefreshBalance}
-                      />
-                      <SwiftUIButton
-                        systemImage="creditcard"
-                        label="Top Up Balance"
-                        onPress={handleTopUp}
-                      />
-                      <SwiftUIButton
-                        systemImage="cpu"
-                        label="Switch Model"
-                        onPress={() => setIsModelSwitchBottomSheetOpen(true)}
-                      />
-                      <SwiftUIButton
-                        systemImage="square.stack"
-                        label="View Sessions"
-                        onPress={() => setIsSessionsPanelOpen(true)}
-                      />
-                      <SwiftUIButton
-                        systemImage="plus.square"
-                        label="New Session"
-                        onPress={handleNewSession}
-                      />
-                    </ContextMenu.Items>
-                    <ContextMenu.Trigger>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          width: '100%',
-                          height: '100%',
-                        }}>
-                        <Avatar
-                          size={40}
-                          picture={userPicture}
-                          seed={pubkey}
-                          name={displayName}
-                          loading={shouldShowAvatarLoading}
-                        />
-                        <View
-                          style={{
-                            marginLeft: 8,
-                            flex: 1,
-                            minWidth: 0,
-                            justifyContent: 'flex-start',
-                            alignItems: 'flex-start',
-                          }}>
-                          <Text
-                            loading={shouldShowAvatarLoading}
-                            size={16}
-                            bold
-                            style={{
-                              color: getPrimaryColor('0'),
-                              textAlign: 'left',
-                            }}>
-                            {displayName}
-                          </Text>
-                          {isRoutstrMode ? (
-                            <HStack
-                              align="center"
-                              justify="flex-start"
-                              spacing={4}
-                              style={{ marginTop: 2 }}>
-                              {getAnonymousMode() && (
-                                <>
-                                  <Icon
-                                    name="mdi:anonymous"
-                                    size={14}
-                                    color={getShadeColor('400')}
-                                    className="border-r-[1.5px] border-r-shade-300 pr-1"
-                                  />
-                                </>
-                              )}
-                              <Icon
-                                name="material-symbols:account-balance-wallet"
-                                size={14}
-                                color={getShadeColor('400')}
-                              />
-                              <Text size={12} style={{ color: getShadeColor('400') }}>
-                                {formatBalance(balance)}
-                              </Text>
-                              <Spacer size={4} />
-                              <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
-                              <Text
-                                size={12}
-                                style={{ color: getShadeColor('400') }}
-                                numberOfLines={1}>
-                                {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
-                              </Text>
-                            </HStack>
-                          ) : (
-                            <Text
-                              size={12}
-                              style={{
-                                color: getShadeColor('400'),
-                                marginTop: 2,
-                                textAlign: 'left',
-                              }}
-                              numberOfLines={1}>
-                              {nip19.npubEncode(pubkey)}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </ContextMenu.Trigger>
-                  </ContextMenu>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerStyle: { backgroundColor: getPrimaryColor('800') },
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          headerTintColor: getPrimaryColor('0'),
+          headerLeft: () =>
+            isRoutstrMode ? (
+              <Pressable
+                onPress={
+                  isSessionsPanelOpen
+                    ? handleCloseSessionsPanel
+                    : () => setIsSessionsPanelOpen(true)
+                }
+                style={{ padding: 8 }}>
+                <Icon name={'mdi:menu'} size={24} color={getPrimaryColor('0')} />
+              </Pressable>
+            ) : (
+              <Pressable onPress={handleBack} style={{ padding: 8 }}>
+                <Icon
+                  name="material-symbols:arrow-back-rounded"
+                  size={24}
+                  color={getPrimaryColor('0')}
+                />
+              </Pressable>
+            ),
+          headerTitle: () =>
+            isSessionsPanelOpen && isRoutstrMode ? (
+              Platform.OS === 'ios' ? (
+                <Host matchContents={false} style={{ width: headerTitleWidth, height: 44 }}>
+                  <SwiftUIVStack
+                    modifiers={[
+                      padding({ horizontal: 12, vertical: 8 }),
+                      frame({ width: headerTitleWidth, height: 44, alignment: 'center' }),
+                      glassEffect(),
+                    ]}>
+                    <TextField
+                      key={sessionClearKey}
+                      defaultValue=""
+                      placeholder="Search sessions..."
+                      onChangeText={handleSessionSearchChange}
+                      keyboardType="web-search"
+                      autocorrection={false}
+                      modifiers={[
+                        foregroundStyle(getPrimaryColor('0')),
+                        frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
+                      ]}
+                    />
+                  </SwiftUIVStack>
                 </Host>
               ) : (
                 <View
                   style={{
+                    width: headerTitleWidth,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    width: '100%',
-                    height: '100%',
+                    backgroundColor: getPrimaryColor('700'),
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
                   }}>
-                  <Avatar
-                    size={40}
-                    picture={userPicture}
-                    seed={pubkey}
-                    name={displayName}
-                    loading={shouldShowAvatarLoading}
-                  />
-                  <VStack
-                    spacing={2}
+                  <RNTextInput
+                    key={sessionClearKey}
+                    defaultValue=""
+                    onChangeText={handleSessionSearchChange}
+                    placeholder="Search sessions..."
+                    placeholderTextColor={getPrimaryColor('500')}
                     style={{
-                      marginLeft: 8,
                       flex: 1,
-                      minWidth: 0,
-                      justifyContent: 'flex-start',
-                      alignItems: 'flex-start',
-                    }}>
-                    <View style={{ width: screenWidth, overflow: 'hidden' }}>
-                      <Text
-                        loading={shouldShowAvatarLoading}
-                        size={16}
-                        bold
-                        style={{
-                          color: getPrimaryColor('0'),
-                          textAlign: 'left',
-                        }}>
-                        {displayName}
-                      </Text>
-                    </View>
-                    {isRoutstrMode ? (
-                      <HStack align="center" justify="flex-start">
-                        <Icon
-                          name="material-symbols:account-balance-wallet"
-                          size={14}
-                          color={getShadeColor('400')}
-                        />
-                        <Text size={12} style={{ color: getShadeColor('400') }}>
-                          {formatBalance(balance)}
-                        </Text>
-                        <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
-                        <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
-                          {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
-                        </Text>
-                      </HStack>
-                    ) : (
-                      <Text
-                        size={12}
-                        style={{
-                          color: getShadeColor('400'),
-                          marginTop: 2,
-                          textAlign: 'left',
-                        }}
-                        numberOfLines={1}>
-                        {truncateMiddle(nip19.npubEncode(pubkey), 8)}
-                      </Text>
-                    )}
-                  </VStack>
+                      color: getPrimaryColor('0'),
+                      fontSize: 16,
+                      fontFamily: 'OverpassRegular',
+                    }}
+                    keyboardType="web-search"
+                    autoCorrect={false}
+                  />
                 </View>
-              )}
-            </HStack>
-
-            <HStack align="center" spacing={12} style={{ flexShrink: 0 }}>
-              {isRoutstrMode ? (
-                <>
-                  {messages.length > 0 && !getAnonymousMode() ? (
-                    <Pressable onPress={handleNewSession} className="p-2">
-                      <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
-                    </Pressable>
-                  ) : (
-                    <Pressable onPress={toggleAnonymousMode} className="p-2">
-                      <Icon
-                        name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
-                        size={20}
-                        color={getPrimaryColor('0')}
+              )
+            ) : Platform.OS === 'ios' && isRoutstrMode ? (
+              <Host matchContents={false} style={{ width: headerTitleWidth, height: 48 }}>
+                <ContextMenu>
+                  <ContextMenu.Items>
+                    <SwiftUIButton
+                      systemImage="arrow.clockwise"
+                      label="Refresh Balance"
+                      onPress={handleRefreshBalance}
+                    />
+                    <SwiftUIButton
+                      systemImage="creditcard"
+                      label="Top Up Balance"
+                      onPress={handleTopUp}
+                    />
+                    <SwiftUIButton
+                      systemImage="cpu"
+                      label="Switch Model"
+                      onPress={() => setIsModelSwitchBottomSheetOpen(true)}
+                    />
+                    <SwiftUIButton
+                      systemImage="square.stack"
+                      label="View Sessions"
+                      onPress={() => setIsSessionsPanelOpen(true)}
+                    />
+                    <SwiftUIButton
+                      systemImage="plus.square"
+                      label="New Session"
+                      onPress={handleNewSession}
+                    />
+                  </ContextMenu.Items>
+                  <ContextMenu.Trigger>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        width: '100%',
+                        height: '100%',
+                      }}>
+                      <Avatar
+                        size={40}
+                        picture={userPicture}
+                        seed={pubkey}
+                        name={displayName}
+                        loading={shouldShowAvatarLoading}
                       />
-                    </Pressable>
+                      <View
+                        style={{
+                          marginLeft: 8,
+                          flex: 1,
+                          minWidth: 0,
+                          justifyContent: 'flex-start',
+                          alignItems: 'flex-start',
+                        }}>
+                        <Text
+                          loading={shouldShowAvatarLoading}
+                          size={16}
+                          bold
+                          style={{
+                            color: getPrimaryColor('0'),
+                            textAlign: 'left',
+                          }}>
+                          {displayName}
+                        </Text>
+                        <HStack
+                          align="center"
+                          justify="flex-start"
+                          spacing={4}
+                          style={{ marginTop: 2 }}>
+                          {getAnonymousMode() && (
+                            <Icon
+                              name="mdi:anonymous"
+                              size={14}
+                              color={getShadeColor('400')}
+                              className="border-r-[1.5px] border-r-shade-300 pr-1"
+                            />
+                          )}
+                          <Icon
+                            name="material-symbols:account-balance-wallet"
+                            size={14}
+                            color={getShadeColor('400')}
+                          />
+                          <Text size={12} style={{ color: getShadeColor('400') }}>
+                            {formatBalance(balance)}
+                          </Text>
+                          <Spacer size={4} />
+                          <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
+                          <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                            {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
+                          </Text>
+                        </HStack>
+                      </View>
+                    </View>
+                  </ContextMenu.Trigger>
+                </ContextMenu>
+              </Host>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  width: headerTitleWidth,
+                  height: 48,
+                }}>
+                <Avatar
+                  size={40}
+                  picture={userPicture}
+                  seed={pubkey}
+                  name={displayName}
+                  loading={shouldShowAvatarLoading}
+                />
+                <VStack
+                  spacing={2}
+                  style={{
+                    marginLeft: 8,
+                    flex: 1,
+                    minWidth: 0,
+                    justifyContent: 'flex-start',
+                    alignItems: 'flex-start',
+                  }}>
+                  <Text
+                    loading={shouldShowAvatarLoading}
+                    size={16}
+                    bold
+                    style={{
+                      color: getPrimaryColor('0'),
+                      textAlign: 'left',
+                    }}
+                    numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                  {isRoutstrMode ? (
+                    <HStack align="center" justify="flex-start">
+                      <Icon
+                        name="material-symbols:account-balance-wallet"
+                        size={14}
+                        color={getShadeColor('400')}
+                      />
+                      <Text size={12} style={{ color: getShadeColor('400') }}>
+                        {formatBalance(balance)}
+                      </Text>
+                      <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
+                      <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                        {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
+                      </Text>
+                    </HStack>
+                  ) : (
+                    <Text
+                      size={12}
+                      style={{
+                        color: getShadeColor('400'),
+                        marginTop: 2,
+                        textAlign: 'left',
+                      }}
+                      numberOfLines={1}>
+                      {truncateMiddle(nip19.npubEncode(pubkey), 8)}
+                    </Text>
                   )}
-                </>
-              ) : (
-                <Pressable
-                  onPress={() =>
-                    router.navigate({
-                      pathname: '/share',
-                      params: {
-                        type: 'profile',
-                        data: nip19.npubEncode(pubkey),
-                      },
-                    })
-                  }>
-                  <Icon name="stash:qr-code" size={20} color={getPrimaryColor('0')} />
+                </VStack>
+              </View>
+            ),
+          headerRight: () =>
+            isSessionsPanelOpen && isRoutstrMode && isSessionSearchFocused ? (
+              <Pressable onPress={handleDismissSessionSearch} style={{ padding: 8 }}>
+                <Icon
+                  name="material-symbols:close-rounded"
+                  size={20}
+                  color={getPrimaryColor('0')}
+                />
+              </Pressable>
+            ) : isRoutstrMode ? (
+              messages.length > 0 && !getAnonymousMode() ? (
+                <Pressable onPress={handleNewSession} style={{ padding: 8 }}>
+                  <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
                 </Pressable>
-              )}
-            </HStack>
-          </HStack>
-        </View>
-
+              ) : (
+                <Pressable onPress={toggleAnonymousMode} style={{ padding: 8 }}>
+                  <Icon
+                    name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
+                    size={20}
+                    color={getPrimaryColor('0')}
+                  />
+                </Pressable>
+              )
+            ) : (
+              <Pressable
+                onPress={() =>
+                  router.navigate({
+                    pathname: '/share',
+                    params: {
+                      type: 'profile',
+                      data: nip19.npubEncode(pubkey),
+                    },
+                  })
+                }
+                style={{ padding: 8 }}>
+                <Icon name="stash:qr-code" size={20} color={getPrimaryColor('0')} />
+              </Pressable>
+            ),
+        }}
+      />
+      <StatusBar barStyle="light-content" backgroundColor={getPrimaryColor('800')} />
+      <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
         {/* Attachments Bottom Sheet */}
         {isRoutstrMode && Platform.OS === 'ios' && (
           <Host
@@ -2229,9 +2312,13 @@ export function UserMessagesScreen({
       {isRoutstrMode && (
         <SessionsPanel
           isOpen={isSessionsPanelOpen}
-          onClose={() => setIsSessionsPanelOpen(false)}
+          onClose={handleCloseSessionsPanel}
           onSessionSelect={() => {}}
           onNewSession={handleNewSession}
+          searchQuery={sessionSearchQuery}
+          onRefreshBalance={handleRefreshBalance}
+          onTopUp={handleTopUp}
+          onSwitchModel={() => setIsModelSwitchBottomSheetOpen(true)}
         />
       )}
     </KeyboardAvoidingView>

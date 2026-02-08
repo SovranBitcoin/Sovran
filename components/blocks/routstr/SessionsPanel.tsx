@@ -10,14 +10,7 @@
  */
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import {
-  FlatList,
-  ListRenderItem,
-  Pressable,
-  useWindowDimensions,
-  Keyboard,
-  Platform,
-} from 'react-native';
+import { FlatList, ListRenderItem, Pressable, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -40,28 +33,16 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useRoutstrStore, RoutstrSession } from 'stores/routstrStore';
 import { getUsername } from 'helper/username';
-import {
-  Host,
-  TextField,
-  Button,
-  GlassEffectContainer,
-  VStack as SwiftUIVStack,
-  HStack as SwiftUIHStack,
-} from '@expo/ui/swift-ui';
-import {
-  buttonStyle,
-  foregroundStyle,
-  frame,
-  padding,
-  cornerRadius,
-  glassEffect,
-} from '@expo/ui/swift-ui/modifiers';
 
 interface SessionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSessionSelect?: (sessionId: string) => void;
   onNewSession?: () => void;
+  searchQuery?: string;
+  onRefreshBalance?: () => void;
+  onTopUp?: () => void;
+  onSwitchModel?: () => void;
 }
 
 const ANIMATION_CONFIG = {
@@ -165,6 +146,10 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
   onClose,
   onSessionSelect,
   onNewSession,
+  searchQuery: externalSearchQuery,
+  onRefreshBalance,
+  onTopUp,
+  onSwitchModel,
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -180,8 +165,9 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
     getCachedModels,
   } = useRoutstrStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  // Use external search query from parent header when provided, otherwise use internal
+  const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const translateX = useSharedValue(-width);
   const backdropOpacity = useSharedValue(0);
   const panStartX = useSharedValue(0);
@@ -232,37 +218,10 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
     } else {
       translateX.value = withTiming(-width, ANIMATION_CONFIG);
       backdropOpacity.value = withTiming(0, ANIMATION_CONFIG);
-      // Clear search and reset focus when closing
-      setSearchQuery('');
-      setIsSearchFocused(false);
-      Keyboard.dismiss();
+      // Clear internal search when closing
+      setInternalSearchQuery('');
     }
   }, [isOpen, width, translateX, backdropOpacity]);
-
-  // Track keyboard visibility to infer search focus
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
-      setIsSearchFocused(true);
-    });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-      setIsSearchFocused(false);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [isOpen]);
-
-  // Also set focus when user starts typing
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-    if (text.length > 0) {
-      setIsSearchFocused(true);
-    }
-  }, []);
 
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
@@ -282,22 +241,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
   const handleBackdropPress = useCallback(() => {
     onClose();
   }, [onClose]);
-
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    setIsSearchFocused(false);
-    Keyboard.dismiss();
-  }, []);
-
-  const handleMenuButtonPress = useCallback(() => {
-    if (isSearchFocused || searchQuery) {
-      setIsSearchFocused(false);
-      setSearchQuery('');
-      Keyboard.dismiss();
-    } else {
-      onClose();
-    }
-  }, [isSearchFocused, searchQuery, onClose]);
 
   // Pan gesture handler for swipe-to-close
   const panGesture = Gesture.Pan()
@@ -425,291 +368,140 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                 panelStyle,
               ]}>
               <VStack flex={1} style={{ paddingHorizontal: 16, paddingBottom: 0 }}>
-                {/* Header with menu, search, and new session/clear button - Absolutely Positioned */}
-                {Platform.OS === 'ios' ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      // top: insets.top,
-                      left: 16,
-                      right: 16,
-                      zIndex: 10,
-                      paddingBottom: 8,
-                    }}>
-                    <Host matchContents={false} style={{ marginBottom: 0 }}>
-                      <SwiftUIHStack
-                        spacing={12}
-                        alignment="center"
-                        modifiers={[
-                          frame({
-                            width: width - 32,
-                            height: 44,
-                            alignment: 'leading',
-                          }),
-                        ]}>
-                        {/* Menu/Close Button - Liquid Glass */}
-                        {/* <GlassEffectContainer spacing={0}> */}
-                        <Host
-                          modifiers={[frame({ width: 44, height: 44, alignment: 'center' })]}
-                          matchContents={false}>
-                          <Button
-                            systemImage={isSearchFocused ? 'xmark' : 'line.horizontal.3'}
-                            onPress={handleMenuButtonPress}
-                            modifiers={[
-                              buttonStyle('plain'),
-                              frame({
-                                width: 44,
-                                height: 44,
-                                alignment: 'center',
-                              }),
-                              glassEffect({
-                                shape: 'circle',
-                              }),
-                            ]}
-                          />
-                        </Host>
-                        {/* </GlassEffectContainer> */}
-
-                        {/* Search Bar - Flex to fill remaining space */}
-                        <SwiftUIVStack
-                          modifiers={[
-                            // frame({
-                            //   maxWidth: Infinity,
-                            //   height: 44,
-                            //   alignment: 'leading',
-                            // }),
-                            // background(getPrimaryColor('800')),
-                            // cornerRadius(12),
-                            // padding({ horizontal: 12, vertical: 10 }),
-                            padding({ horizontal: 12, vertical: 10 }),
-                            frame({ width: width - 44 * 2 - 64, height: 44, alignment: 'leading' }),
-                            glassEffect(),
-                          ]}>
-                          <TextField
-                            key={searchQuery}
-                            defaultValue={searchQuery}
-                            placeholder="Search"
-                            onChangeText={handleSearchChange}
-                            keyboardType="web-search"
-                            autocorrection={false}
-                            modifiers={[
-                              foregroundStyle(getPrimaryColor('0')),
-                              // glassEffect(),
-                              // frame({
-                              //   maxWidth: Infinity,
-                              //   height: 44,
-                              //   alignment: 'leading',
-                              // }),
-                              // padding({ horizontal: 12, vertical: 10 }),
-                            ]}
-                          />
-                        </SwiftUIVStack>
-
-                        {/* New Session / Clear Button */}
-                        {searchQuery ? (
-                          <Pressable
-                            onPress={handleClearSearch}
-                            style={{
-                              width: 44,
-                              height: 44,
-                              borderRadius: 22,
-                              backgroundColor: getPrimaryColor('800'),
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                            <Icon name="mdi:close" size={24} color={getPrimaryColor('0')} />
-                          </Pressable>
-                        ) : (
-                          // <GlassEffectContainer spacing={0}>
-                          <Host matchContents={false} style={{ width: 44, height: 44 }}>
-                            <Button
-                              systemImage="square.and.pencil"
-                              onPress={handleNewSession}
-                              modifiers={[
-                                buttonStyle('plain'),
-                                frame({
-                                  width: 44,
-                                  height: 44,
-                                  alignment: 'center',
-                                }),
-                                glassEffect({
-                                  shape: 'circle',
-                                }),
-                              ]}
-                            />
-                          </Host>
-                          // </GlassEffectContainer>
-                        )}
-                      </SwiftUIHStack>
-                    </Host>
-                  </View>
-                ) : (
-                  <View
-                    blur
-                    blurIntensity={70}
-                    blurTint="dark"
-                    style={{
-                      position: 'absolute',
-                      top: insets.top,
-                      left: 16,
-                      right: 16,
-                      zIndex: 10,
-                      backgroundColor: getPrimaryColor('900'),
-                      paddingBottom: 8,
-                    }}>
-                    <HStack align="center" spacing={12} style={{ marginBottom: 0 }}>
-                      {/* Menu/Close Button */}
-                      <Pressable
-                        onPress={handleMenuButtonPress}
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 22,
-                          backgroundColor: getPrimaryColor('800'),
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                        <Icon
-                          name={isSearchFocused ? 'mdi:close' : 'mdi:menu'}
-                          size={24}
-                          color={getPrimaryColor('0')}
-                        />
-                      </Pressable>
-
-                      {/* Search Bar - Flex to fill remaining space */}
+                {/* Sessions List with Action Buttons */}
+                <FlatList
+                  data={filteredSessions}
+                  renderItem={renderItem}
+                  keyExtractor={keyExtractor}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingTop: 8,
+                    paddingBottom: userPubkey ? 100 : 16,
+                  }}
+                  ListHeaderComponent={
+                    <>
+                      {/* Action Buttons (settings-style rows) */}
                       <View
                         style={{
-                          flex: 1,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: getPrimaryColor('800'),
                           borderRadius: 12,
-                          paddingHorizontal: 12,
-                          paddingVertical: 10,
+                          overflow: 'hidden',
+                          marginBottom: 16,
                         }}>
-                        <Icon
-                          name="majesticons:search-line"
-                          size={20}
-                          color={getPrimaryColor('400')}
-                        />
-                        <Host matchContents={false} style={{ flex: 1, marginLeft: 8 }}>
-                          <TextField
-                            key={searchQuery}
-                            defaultValue={searchQuery}
-                            placeholder="Search"
-                            onChangeText={handleSearchChange}
-                            keyboardType="web-search"
-                            autocorrection={false}
-                            modifiers={[foregroundStyle(getPrimaryColor('0'))]}
-                          />
-                        </Host>
-                      </View>
-
-                      {/* New Session / Clear Button */}
-                      {searchQuery ? (
-                        <Pressable
-                          onPress={handleClearSearch}
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            backgroundColor: getPrimaryColor('800'),
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                          <Icon name="mdi:close" size={24} color={getPrimaryColor('0')} />
-                        </Pressable>
-                      ) : (
-                        <Pressable
+                        <TouchableOpacity
                           onPress={handleNewSession}
                           style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            backgroundColor: getPrimaryColor('700'),
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: 1,
-                            borderColor: getPrimaryColor('600'),
+                            backgroundColor: getPrimaryColor('800'),
+                            padding: 12,
+                            borderTopLeftRadius: 12,
+                            borderTopRightRadius: 12,
                           }}>
-                          <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
-                        </Pressable>
+                          <HStack align="center" spacing={8}>
+                            <Icon name="lucide:square-pen" size={18} color={getPrimaryColor('0')} />
+                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                              New Session
+                            </Text>
+                            <View style={{ flex: 1 }} />
+                            <Icon
+                              name="fa6-solid:chevron-right"
+                              size={14}
+                              color={getPrimaryColor('400')}
+                            />
+                          </HStack>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={onRefreshBalance}
+                          style={{
+                            backgroundColor: getPrimaryColor('800'),
+                            padding: 12,
+                            borderTopWidth: 1,
+                            borderTopColor: getPrimaryColor('700'),
+                          }}>
+                          <HStack align="center" spacing={8}>
+                            <Icon name="ic:round-refresh" size={18} color={getPrimaryColor('0')} />
+                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                              Refresh Balance
+                            </Text>
+                            <View style={{ flex: 1 }} />
+                            <Icon
+                              name="fa6-solid:chevron-right"
+                              size={14}
+                              color={getPrimaryColor('400')}
+                            />
+                          </HStack>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={onTopUp}
+                          style={{
+                            backgroundColor: getPrimaryColor('800'),
+                            padding: 12,
+                            borderTopWidth: 1,
+                            borderTopColor: getPrimaryColor('700'),
+                          }}>
+                          <HStack align="center" spacing={8}>
+                            <Icon name="ph:coins" size={18} color={getPrimaryColor('0')} />
+                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                              Top Up Balance
+                            </Text>
+                            <View style={{ flex: 1 }} />
+                            <Icon
+                              name="fa6-solid:chevron-right"
+                              size={14}
+                              color={getPrimaryColor('400')}
+                            />
+                          </HStack>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={onSwitchModel}
+                          style={{
+                            backgroundColor: getPrimaryColor('800'),
+                            padding: 12,
+                            borderTopWidth: 1,
+                            borderTopColor: getPrimaryColor('700'),
+                            borderBottomLeftRadius: 12,
+                            borderBottomRightRadius: 12,
+                          }}>
+                          <HStack align="center" spacing={8}>
+                            <Icon name="mdi:robot" size={18} color={getPrimaryColor('0')} />
+                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                              Switch Model
+                            </Text>
+                            <View style={{ flex: 1 }} />
+                            <Icon
+                              name="fa6-solid:chevron-right"
+                              size={14}
+                              color={getPrimaryColor('400')}
+                            />
+                          </HStack>
+                        </TouchableOpacity>
+                      </View>
+                      {/* Sessions section header */}
+                      {filteredSessions.length > 0 && (
+                        <Text
+                          size={13}
+                          medium
+                          overpass
+                          style={{
+                            color: getPrimaryColor('300'),
+                            marginBottom: 8,
+                            marginLeft: 4,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                          }}>
+                          Sessions
+                        </Text>
                       )}
-                    </HStack>
-                  </View>
-                )}
-
-                {/* Sessions List */}
-                {filteredSessions.length === 0 ? (
-                  <VStack align="center" justify="center" flex={1}>
-                    <Icon name="lucide:square-pen" size={48} color={getPrimaryColor('500')} />
-                    <Spacer size={16} />
-                    <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
-                      {searchQuery
-                        ? 'No sessions found'
-                        : 'No sessions yet. Create your first session to get started!'}
-                    </Text>
-                    {!searchQuery && (
-                      <>
-                        <Spacer size={24} />
-                        {Platform.OS === 'ios' ? (
-                          <GlassEffectContainer spacing={0}>
-                            <Host matchContents={false}>
-                              <Button
-                                label="New Session"
-                                onPress={handleNewSession}
-                                modifiers={[
-                                  buttonStyle('glass'),
-                                  padding({ horizontal: 24, vertical: 12 }),
-                                  cornerRadius(12),
-                                  glassEffect({
-                                    shape: 'capsule',
-                                  }),
-                                ]}
-                              />
-                            </Host>
-                          </GlassEffectContainer>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={handleNewSession}
-                            style={{
-                              backgroundColor: getPrimaryColor('700'),
-                              borderRadius: 12,
-                              paddingHorizontal: 24,
-                              paddingVertical: 12,
-                              borderWidth: 1,
-                              borderColor: getPrimaryColor('600'),
-                            }}>
-                            <HStack align="center" spacing={8}>
-                              <Icon
-                                name="lucide:square-pen"
-                                size={20}
-                                color={getPrimaryColor('0')}
-                              />
-                              <Text
-                                weight="heavy"
-                                size={16}
-                                style={{ color: getPrimaryColor('0') }}>
-                                New Session
-                              </Text>
-                            </HStack>
-                          </TouchableOpacity>
-                        )}
-                      </>
-                    )}
-                  </VStack>
-                ) : (
-                  <FlatList
-                    data={filteredSessions}
-                    renderItem={renderItem}
-                    keyExtractor={keyExtractor}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{
-                      paddingTop: 64, // Space for absolutely positioned header (44px height + 8px padding)
-                      paddingBottom: userPubkey ? 100 : 16, // Space for bottom profile section
-                    }}
-                  />
-                )}
+                    </>
+                  }
+                  ListEmptyComponent={
+                    searchQuery ? (
+                      <VStack align="center" justify="center" style={{ paddingTop: 32 }}>
+                        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
+                          No sessions found
+                        </Text>
+                      </VStack>
+                    ) : null
+                  }
+                />
 
                 {/* Profile Information at Bottom - Absolutely Positioned with Blur */}
                 {userPubkey && (
