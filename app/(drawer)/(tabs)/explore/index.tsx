@@ -1212,18 +1212,22 @@ const ExploreScreen = () => {
           </>
         ) : null}
 
-        {/* Wallet Health */}
-        <SectionHeader
-          title="Wallet Health"
-          subtitle="Check distribution drift, pending outgoing ecash, and more"
-        />
-        <Animated.View
-          entering={FadeInUp.duration(380).delay(240)}
-          style={{ paddingHorizontal: 20 }}>
-          <WalletHealthCard defaultUnit="sat" />
-        </Animated.View>
+        {/* Wallet Health - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Wallet Health"
+              subtitle="Check distribution drift, pending outgoing ecash, and more"
+            />
+            <Animated.View
+              entering={FadeInUp.duration(380).delay(240)}
+              style={{ paddingHorizontal: 20 }}>
+              <WalletHealthCard defaultUnit="sat" />
+            </Animated.View>
 
-        <Spacer size={32} />
+            <Spacer size={32} />
+          </>
+        ) : null}
 
         {/* Map Section */}
         <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />
