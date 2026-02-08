@@ -357,7 +357,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   bottom: 0,
                   width: width,
                   backgroundColor: getPrimaryColor('900'),
-                  paddingTop: insets.top,
+                  paddingTop: 0,
                   paddingBottom: insets.bottom,
                   shadowColor: '#000',
                   shadowOffset: { width: 2, height: 0 },
@@ -375,7 +375,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   keyExtractor={keyExtractor}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{
-                    paddingTop: 8,
+                    paddingTop: 16,
                     paddingBottom: userPubkey ? 100 : 16,
                   }}
                   ListHeaderComponent={
