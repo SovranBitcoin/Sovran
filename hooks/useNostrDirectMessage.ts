@@ -12,11 +12,11 @@
  */
 
 import { useCallback, useState } from 'react';
-import { NDKEvent, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { nip19, nip44, getPublicKey, generateSecretKey } from 'nostr-tools';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { nip19 } from 'nostr-tools';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { buildGiftWrappedDM } from 'utils/nip17';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
@@ -44,13 +44,6 @@ interface UseNostrDirectMessageReturn {
   isSending: boolean;
   /** Error from the last send attempt */
   error: Error | null;
-}
-
-/**
- * Generate a random timestamp within the last 2 days for gift wrap privacy
- */
-function randomTimeUpTo2DaysInThePast(): number {
-  return Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 172800);
 }
 
 /**
@@ -101,89 +94,26 @@ export function useNostrDirectMessage(): UseNostrDirectMessageReturn {
           DEFAULT_PAYMENT_RELAY,
         ].filter((relay, index, self) => self.indexOf(relay) === index); // Deduplicate
 
-        // Convert private key to hex string for nip44
-        const senderPrivateKeyHex = bytesToHex(nostrKeys.privateKey);
-        const senderPublicKey = nostrKeys.pubkey;
-
-        // 1. Create kind 14 DM event (the actual message content)
-        // This is the innermost layer - the actual direct message
-        const dmEvent = {
-          kind: 14,
+        // Build the NIP-17 gift-wrapped DM using the shared utility
+        const giftWrap = buildGiftWrappedDM({
           content: message,
-          tags: [['p', recipientPubkey]],
-          created_at: Math.floor(Date.now() / 1000),
-          pubkey: senderPublicKey,
-        };
-
-        // Calculate the event id for the DM
-        const dmEventForHash = {
-          ...dmEvent,
-          id: '', // Will be calculated
-        };
-        // We need to create a proper NDK event to get the hash
-        const tempDmNdkEvent = new NDKEvent(ndk);
-        tempDmNdkEvent.kind = dmEvent.kind;
-        tempDmNdkEvent.content = dmEvent.content;
-        tempDmNdkEvent.tags = dmEvent.tags;
-        tempDmNdkEvent.created_at = dmEvent.created_at;
-        tempDmNdkEvent.pubkey = dmEvent.pubkey;
-        // The ID will be set when we serialize
-        const dmEventString = JSON.stringify({
-          ...dmEvent,
-          id: tempDmNdkEvent.id || '',
+          senderPrivateKey: nostrKeys.privateKey,
+          recipientPublicKey: recipientPubkey,
         });
 
-        // 2. Create kind 13 seal event (encrypted with NIP-44)
-        // The seal encrypts the DM event and is signed by the sender
-        const conversationKey = nip44.v2.utils.getConversationKey(
-          hexToBytes(senderPrivateKeyHex),
-          recipientPubkey
-        );
-        const sealedContent = nip44.v2.encrypt(dmEventString, conversationKey);
-
-        // Create and sign the seal with sender's key
-        const sealEvent = new NDKEvent(ndk);
-        sealEvent.kind = 13;
-        sealEvent.content = sealedContent;
-        sealEvent.created_at = randomTimeUpTo2DaysInThePast();
-        sealEvent.pubkey = senderPublicKey;
-        sealEvent.tags = [];
-
-        const senderSigner = new NDKPrivateKeySigner(senderPrivateKeyHex);
-        await sealEvent.sign(senderSigner);
-
-        const sealEventString = JSON.stringify(await sealEvent.toNostrEvent());
-
-        // 3. Create kind 1059 gift wrap (random throwaway key)
-        // The gift wrap hides the sender's identity from relays
-        const randomPrivateKey = generateSecretKey();
-        const randomPublicKey = getPublicKey(randomPrivateKey);
-        const randomPrivateKeyHex = bytesToHex(randomPrivateKey);
-
-        // Encrypt the seal with the random key to the recipient
-        const wrapConversationKey = nip44.v2.utils.getConversationKey(
-          randomPrivateKey,
-          recipientPubkey
-        );
-        const wrappedContent = nip44.v2.encrypt(sealEventString, wrapConversationKey);
-
-        // Create the gift wrap event with the random key
-        const randomSigner = new NDKPrivateKeySigner(randomPrivateKeyHex);
-
+        // Convert to NDKEvent for publishing via NDK relay management
         const wrapEvent = new NDKEvent(ndk);
-        wrapEvent.kind = 1059;
-        wrapEvent.tags = [['p', recipientPubkey]];
-        wrapEvent.content = wrappedContent;
-        wrapEvent.created_at = randomTimeUpTo2DaysInThePast();
-        wrapEvent.pubkey = randomPublicKey;
+        wrapEvent.kind = giftWrap.kind;
+        wrapEvent.content = giftWrap.content;
+        wrapEvent.tags = giftWrap.tags;
+        wrapEvent.created_at = giftWrap.created_at;
+        wrapEvent.pubkey = giftWrap.pubkey;
+        wrapEvent.id = giftWrap.id;
+        wrapEvent.sig = giftWrap.sig;
 
-        await wrapEvent.sign(randomSigner);
-
-        // 4. Publish to target relays
-        // We need to explicitly connect to and publish to the target relays
+        // Connect to and publish to the target relays
         for (const relay of targetRelays) {
           try {
-            // Use NDK's helper so we don't depend on a specific NDKRelay class instance/type.
             const ndkRelay = ndk.addExplicitRelay(relay, undefined, true);
             await ndkRelay.connect(2500).catch(() => undefined);
           } catch (relayError) {

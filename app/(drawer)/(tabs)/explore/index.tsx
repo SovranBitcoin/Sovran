@@ -1003,12 +1003,11 @@ const PendingEcashCard = () => {
 
               {/* Amount display row */}
               <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-                <HStack align="center" gap={6}>
-                  <Icon name="mdi:bitcoin" size={14} color={opacity(accentColor, 0.8)} />
+                <HStack align="center" gap={4}>
                   <AmountFormatter
                     amount={totalAmount}
                     unit={unit}
-                    size={11}
+                    size={13}
                     weight="medium"
                     color={opacity(accentColor, 0.8)}
                   />
@@ -1213,18 +1212,22 @@ const ExploreScreen = () => {
           </>
         ) : null}
 
-        {/* Wallet Health */}
-        <SectionHeader
-          title="Wallet Health"
-          subtitle="Check distribution drift, pending outgoing ecash, and more"
-        />
-        <Animated.View
-          entering={FadeInUp.duration(380).delay(240)}
-          style={{ paddingHorizontal: 20 }}>
-          <WalletHealthCard defaultUnit="sat" />
-        </Animated.View>
+        {/* Wallet Health - hidden unless dev mode */}
+        {devMode ? (
+          <>
+            <SectionHeader
+              title="Wallet Health"
+              subtitle="Check distribution drift, pending outgoing ecash, and more"
+            />
+            <Animated.View
+              entering={FadeInUp.duration(380).delay(240)}
+              style={{ paddingHorizontal: 20 }}>
+              <WalletHealthCard defaultUnit="sat" />
+            </Animated.View>
 
-        <Spacer size={32} />
+            <Spacer size={32} />
+          </>
+        ) : null}
 
         {/* Map Section */}
         <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />

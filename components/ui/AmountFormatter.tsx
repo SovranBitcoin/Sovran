@@ -113,7 +113,7 @@ export function AmountFormatter({
           <HStack align="center" style={style}>
             <View
               style={{
-                marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
+                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.14 : -0.1)),
                 marginRight: centered ? 4 : 0,
               }}>
               <BtcIcon weight={weight} size={size} color={currentColor} />
@@ -123,7 +123,7 @@ export function AmountFormatter({
               weight={weight}
               style={{
                 color: currentColor,
-                marginLeft: centered ? 0 : weight === 'heavy' ? -2 : -4,
+                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1)),
                 margin: 0,
                 zIndex: 2,
                 textAlign: centered ? 'center' : 'left',
@@ -182,7 +182,7 @@ export function AmountFormatter({
           <HStack align="center" style={style}>
             <View
               style={{
-                marginLeft: centered ? 0 : weight === 'heavy' ? -6 : -4,
+                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.14 : -0.1)),
                 marginRight: centered ? 4 : 0,
               }}>
               <BtcIcon weight={weight} size={size} color={currentColor} />
@@ -192,7 +192,7 @@ export function AmountFormatter({
               weight={weight}
               style={{
                 color: currentColor,
-                marginLeft: centered ? 0 : weight === 'heavy' ? -2 : -4,
+                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1)),
                 margin: 0,
                 zIndex: 2,
                 textAlign: centered ? 'center' : 'left',

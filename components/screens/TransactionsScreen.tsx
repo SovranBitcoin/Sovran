@@ -16,7 +16,7 @@ import { View } from 'components/ui/View/View';
 import { Transactions } from 'components/blocks/Transactions';
 import { MonthSelector } from 'components/blocks/MonthSelector';
 import { HistoryEntry } from 'coco-cashu-core';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import { ModalLayoutWrapper } from 'app/debugModal';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
@@ -92,7 +92,7 @@ export function TransactionsScreen({
     return [];
   }, [paymentType, direction]);
 
-  const { history, isFetching } = usePaginatedHistory();
+  const { history, isFetching } = useHistoryWithMelts();
 
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${selectedMonth}`;
 

@@ -168,6 +168,8 @@ const ModalScreen = () => {
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
   const setDevMode = useSettingsStore((state) => state.setExperimental);
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const setMockMode = useSettingsStore((state) => state.setMockMode);
 
   const handleExportDatabase = async () => {
     try {
@@ -286,7 +288,31 @@ const ModalScreen = () => {
           <Section title="Developer">
             <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
             <RowButton label="Free Reserved Proofs" onPress={handleFreeReservedProofs} />
-            <RowButton label="Storage Inspector" href="/settings-pages/storage" isLast />
+            <RowButton label="Storage Inspector" href="/settings-pages/storage" />
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('800'),
+                borderColor: getPrimaryColor('700'),
+                borderTopWidth: 1,
+                borderBottomLeftRadius: 12,
+                borderBottomRightRadius: 12,
+                padding: 12,
+              }}>
+              <HStack align="center" justify="space-between">
+                <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                  Mock Mode
+                </Text>
+                <Switch
+                  value={mockMode}
+                  onValueChange={setMockMode}
+                  trackColor={{
+                    false: getPrimaryColor('700'),
+                    true: getShadeColor('300'),
+                  }}
+                  thumbColor={getPrimaryColor('0')}
+                />
+              </HStack>
+            </View>
           </Section>
         ) : null}
 

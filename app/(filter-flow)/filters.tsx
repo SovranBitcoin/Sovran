@@ -8,12 +8,13 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { ScrollView, View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
@@ -41,18 +42,18 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
           borderColor: isSelected ? getPrimaryColor('500') : getPrimaryColor('800'),
         },
       ]}>
-      {icon && (
+      {icon ? (
         <Icon
           name={icon}
           size={16}
           color={isSelected ? getPrimaryColor('0') : getPrimaryColor('400')}
         />
-      )}
+      ) : null}
       <Text
         size={14}
         style={{
           color: isSelected ? getPrimaryColor('0') : getPrimaryColor('400'),
-          fontFamily: isSelected ? 'OverpassBold' : 'OverpassMedium',
+          fontFamily: 'OverpassSemibold',
         }}>
         {label}
       </Text>
@@ -88,7 +89,6 @@ const Section: React.FC<SectionProps> = ({ title, children }) => {
 
 export default function FiltersScreen() {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
 
   // Get initial values from params
   const params = useLocalSearchParams<{
@@ -135,11 +135,30 @@ export default function FiltersScreen() {
   }, [currency, paymentType, direction, status]);
 
   return (
-    <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+    <ModalScreenLayout
+      bottomButtons={
+        <View style={styles.bottomArea}>
+          <ButtonHandler
+            style={{ paddingBottom: 0 }}
+            buttons={[
+              {
+                text: 'Apply Filters',
+                variant: 'primary',
+                onPress: async () => handleApply(),
+              },
+            ]}
+          />
+          <Pressable
+            onPress={handleReset}
+            disabled={!hasActiveFilters}
+            style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
+            <Text size={14} style={{ color: getPrimaryColor('400'), fontFamily: 'OverpassMedium' }}>
+              Reset
+            </Text>
+          </Pressable>
+        </View>
+      }>
+      <View style={styles.filterContent}>
         {/* Currency */}
         <Section title="Currency">
           {SUPPORTED_CURRENCIES.map((curr) => (
@@ -223,47 +242,14 @@ export default function FiltersScreen() {
             onPress={() => setStatus('Expired')}
           />
         </Section>
-      </ScrollView>
-
-      {/* Bottom buttons */}
-      <View
-        style={[
-          styles.bottomButtons,
-          {
-            paddingBottom: insets.bottom + 16,
-            backgroundColor: getPrimaryColor('950'),
-          },
-        ]}>
-        <Pressable
-          onPress={handleApply}
-          style={[styles.applyButton, { backgroundColor: getPrimaryColor('600') }]}>
-          <Text size={16} style={{ color: getPrimaryColor('0'), fontFamily: 'OverpassBold' }}>
-            Apply Filters
-          </Text>
-        </Pressable>
-        {hasActiveFilters && (
-          <Pressable onPress={handleReset} style={styles.resetButton}>
-            <Text size={14} style={{ color: getPrimaryColor('400'), fontFamily: 'OverpassMedium' }}>
-              Reset
-            </Text>
-          </Pressable>
-        )}
       </View>
-    </View>
+    </ModalScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 24 + 64,
-    paddingBottom: 120,
+  filterContent: {
+    paddingHorizontal: 16,
   },
   section: {
     marginBottom: 24,
@@ -277,26 +263,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
   },
-  bottomButtons: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  applyButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+  bottomArea: {
+    paddingBottom: 8,
   },
   resetButton: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
     alignItems: 'center',
   },
 });

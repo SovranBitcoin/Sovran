@@ -191,7 +191,7 @@ export const useProcessPaymentString = ({
               unit: decodedToken.unit ?? 'sat',
               mintUrl: decodedToken.mint,
               createdAt: Date.now(),
-              metadata: {},
+              metadata: { rawToken: _tokenString },
               token: decodedToken,
             };
 
@@ -228,7 +228,7 @@ export const useProcessPaymentString = ({
             unit: decodedToken.unit ?? 'sat',
             mintUrl: decodedToken.mint,
             createdAt: Date.now(),
-            metadata: {},
+            metadata: { rawToken: scanning.data },
             token: decodedToken,
           };
 

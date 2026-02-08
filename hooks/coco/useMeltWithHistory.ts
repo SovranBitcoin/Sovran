@@ -14,6 +14,7 @@ interface PreparedMeltOp {
   quoteId: string;
   amount: number;
   fee_reserve: number;
+  mintUrl: string;
 }
 
 interface MeltQuoteResult {
@@ -30,8 +31,8 @@ interface MeltOptions {
 }
 
 /**
- * Converts a prepared melt operation to MeltQuoteBolt11Response format for backwards compatibility.
- * The new v3 API uses operations instead of raw quote responses.
+ * Converts a prepared melt operation to MeltQuoteBolt11Response format.
+ * The v3 API uses operations instead of raw quote responses.
  */
 function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuoteBolt11Response {
   return {
@@ -39,25 +40,39 @@ function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuote
     amount: operation.amount,
     fee_reserve: operation.fee_reserve,
     state: 'UNPAID' as const,
-    expiry: 0, // Not available in operation
+    expiry: 0,
     payment_preimage: null,
     change: undefined,
     request: invoice,
-    unit: 'sat', // Default to sat, will be updated from history entry if available
+    unit: 'sat',
   };
 }
 
 /**
- * Enhanced melt hook that captures the history entry using coco events.
- * This is the coco-idiomatic way to create melt quotes and get the full history entry.
- *
- * Uses the new v3 two-step melt flow:
+ * Constructs a MeltHistoryEntry from a prepared melt operation.
+ * The v3 prepareMeltBolt11 flow does not create history entries,
+ * so we build one locally for UI display and location tracking.
+ */
+function operationToHistoryEntry(operation: PreparedMeltOp): MeltHistoryEntry {
+  return {
+    id: operation.id,
+    type: 'melt',
+    createdAt: Date.now(),
+    mintUrl: operation.mintUrl,
+    unit: 'sat',
+    quoteId: operation.quoteId,
+    state: 'UNPAID',
+    amount: operation.amount,
+  };
+}
+
+/**
+ * Hook for the v3 two-step melt flow:
  * 1. prepareMeltBolt11() - prepares the operation and reserves proofs
  * 2. executeMelt() - executes the prepared operation
  *
- * Instead of searching through paginated history after creating a quote,
- * this hook listens to the `history:updated` event to capture
- * the MeltHistoryEntry directly when it's created.
+ * Constructs quote and history entry data directly from the operation
+ * response returned by prepareMeltBolt11.
  */
 export function useMeltWithHistory() {
   const manager = useManager();
@@ -67,8 +82,8 @@ export function useMeltWithHistory() {
   const isProcessingRef = useRef(false);
 
   /**
-   * Prepare a melt operation and capture the history entry via coco events.
-   * This is the first step of the two-step melt flow.
+   * Prepare a melt operation.
+   * Returns quote and history entry data constructed from the operation response.
    */
   const prepareMeltQuote = useCallback(
     async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
@@ -94,101 +109,22 @@ export function useMeltWithHistory() {
       setStatus('creating');
       setError(null);
 
-      // Collect all melt entries that come through - we'll match by quoteId after
-      const capturedMeltEntries: MeltHistoryEntry[] = [];
-      let resolveEntryPromise: (entry: MeltHistoryEntry) => void;
-      let targetQuoteId: string | null = null;
-
-      const entryPromise = new Promise<MeltHistoryEntry>((resolve) => {
-        resolveEntryPromise = resolve;
-      });
-
-      // Set up listener for history:updated events (not 'once' - keep listening until we match)
-      const handler = ({
-        entry,
-      }: {
-        mintUrl: string;
-        entry: { type: string; quoteId?: string };
-      }) => {
-        if (entry.type === 'melt') {
-          const meltEntry = entry as MeltHistoryEntry;
-          capturedMeltEntries.push(meltEntry);
-
-          // If we already know the target quoteId and this matches, resolve
-          if (targetQuoteId && meltEntry.quoteId === targetQuoteId) {
-            resolveEntryPromise(meltEntry);
-          }
-        }
-      };
-
-      const unsubscribe = manager.on('history:updated', handler);
-
       try {
-        // Prepare the melt operation using the new v3 API
         const operation = await manager.quotes.prepareMeltBolt11(mintUrl, invoice);
-        targetQuoteId = operation.quoteId;
 
-        // Convert operation to quote format for backwards compatibility
         const quote = operationToQuote(operation, invoice);
+        const historyEntry = operationToHistoryEntry(operation);
+        const result: MeltQuoteResult = {
+          quote,
+          historyEntry,
+          operationId: operation.id,
+        };
 
-        // Check if we already captured the entry while preparing
-        const alreadyCaptured = capturedMeltEntries.find((e) => e.quoteId === operation.quoteId);
-        if (alreadyCaptured) {
-          unsubscribe();
-          // Update quote unit from history entry
-          quote.unit = alreadyCaptured.unit;
-          const result = { quote, historyEntry: alreadyCaptured, operationId: operation.id };
-          setData(result);
-          setStatus('idle');
-          opts.onSuccess?.(result);
-          return result;
-        }
-
-        // Wait for the history entry to be captured
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout waiting for history entry')), 5000);
-        });
-
-        const historyEntry = await Promise.race([entryPromise, timeoutPromise]);
-        unsubscribe();
-
-        // Update quote unit from history entry
-        quote.unit = historyEntry.unit;
-        const result = { quote, historyEntry, operationId: operation.id };
         setData(result);
         setStatus('idle');
         opts.onSuccess?.(result);
         return result;
       } catch (e) {
-        unsubscribe();
-
-        // Last resort: search history directly
-        try {
-          const history = await manager.history.getPaginatedHistory(0, 20);
-          const matchingEntry = history.find(
-            (h): h is MeltHistoryEntry =>
-              h.type === 'melt' && targetQuoteId !== null && h.quoteId === targetQuoteId
-          );
-
-          if (matchingEntry && targetQuoteId) {
-            // Try to prepare again to get the operation ID
-            const operation = await manager.quotes
-              .prepareMeltBolt11(mintUrl, invoice)
-              .catch(() => null);
-            if (operation) {
-              const quote = operationToQuote(operation, invoice);
-              quote.unit = matchingEntry.unit;
-              const result = { quote, historyEntry: matchingEntry, operationId: operation.id };
-              setData(result);
-              setStatus('idle');
-              opts.onSuccess?.(result);
-              return result;
-            }
-          }
-        } catch {
-          // Ignore fallback errors
-        }
-
         const err = e instanceof Error ? e : new Error(String(e));
         setError(err);
         setStatus('error');

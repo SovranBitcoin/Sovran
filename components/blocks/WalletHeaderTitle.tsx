@@ -197,7 +197,7 @@ export default function WalletHeaderTitle({
     ? [
         buttonStyle('glass'),
         frame({ height: 50, width: buttonWidth, alignment: 'center' }),
-        glassEffect({ shape: 'capsule' }),
+        // glassEffect({ shape: 'capsule' }),
       ]
     : [
         buttonStyle('glass'),

@@ -171,7 +171,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
                 <>
                   <Text
                     style={{
-                      color: getPrimaryColor('50'),
+                      color: getPrimaryColor('0'),
                     }}
                     size={12}
                     bold

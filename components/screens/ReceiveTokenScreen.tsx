@@ -139,9 +139,13 @@ export function ReceiveTokenScreen({
       if (realEntry?.id) {
         await captureAndStoreLocation(realEntry.id);
 
-        // Link the scan history entry to the transaction
-        if (tokenString) {
-          useScanHistoryStore.getState().linkTransaction(tokenString, realEntry.id);
+        // Link the scan history entry to the transaction.
+        // Prefer the original raw token string (stored in metadata) because
+        // re-encoding via encodeToken() can produce a different string than
+        // what was stored as `processed` in the scan history.
+        const rawToken = (receiveHistoryEntry.metadata as any)?.rawToken;
+        if (rawToken || tokenString) {
+          useScanHistoryStore.getState().linkTransaction(rawToken || tokenString, realEntry.id);
         }
 
         // Store the real transaction id for location section lookup

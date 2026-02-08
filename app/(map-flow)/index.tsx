@@ -100,6 +100,9 @@ const DEFAULT_ZOOM = 4;
 // Track if we're ready to render the map (after transition completes)
 const DEFER_MAP_RENDER_MS = 50; // Small delay to let modal animation start
 
+// Numeric width for the stats card Host (percentage widths don't work with SwiftUI Host)
+const STATS_CARD_WIDTH = SCREEN_WIDTH - 32; // matches left: 16 + right: 16
+
 // ============================================================================
 // Components
 // ============================================================================
@@ -128,7 +131,7 @@ const StatsCard = memo(function StatsCard({
 
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ height: 60, width: '100%' }} matchContents>
+      <Host style={{ zIndex: 10, height: 60, width: STATS_CARD_WIDTH }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
             {(Object.keys(CATEGORIES) as CategoryFilter[]).map((cat) => (
@@ -140,37 +143,47 @@ const StatsCard = memo(function StatsCard({
             ))}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            <SwiftUIButton modifiers={[buttonStyle('glass'), frame({ height: 60 })]}>
-              <SwiftUIHStack
-                alignment="center"
-                spacing={12}
+            <SwiftUIHStack>
+              <SwiftUIButton
                 modifiers={[
-                  frame({ maxWidth: Infinity, height: 60, alignment: 'leading' }),
-                  padding({ horizontal: 16 }),
+                  // buttonStyle('glass'),
+                  frame({ width: STATS_CARD_WIDTH, height: 60, alignment: 'center' }),
+                  glassEffect({
+                    shape: 'capsule',
+                    glass: { variant: 'regular', interactive: true },
+                  }),
                 ]}>
-                <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color="#F7931A" />
-                <SwiftUIVStack alignment="leading" spacing={2}>
-                  <SwiftUIText
-                    modifiers={[
-                      font({ size: 18, weight: 'bold' }),
-                      foregroundStyle(getPrimaryColor('0')),
-                    ]}>
-                    {visibleText}
-                  </SwiftUIText>
-                  <SwiftUIHStack alignment="center" spacing={4}>
+                <SwiftUIHStack
+                  alignment="center"
+                  spacing={12}
+                  modifiers={[
+                    frame({ maxWidth: Infinity, height: 60, alignment: 'leading' }),
+                    padding({ horizontal: 16 }),
+                  ]}>
+                  <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color="#F7931A" />
+                  <SwiftUIVStack alignment="leading" spacing={2}>
                     <SwiftUIText
-                      modifiers={[font({ size: 12 }), foregroundStyle(getPrimaryColor('400'))]}>
-                      {totalText}
+                      modifiers={[
+                        font({ size: 18, weight: 'bold' }),
+                        foregroundStyle(getPrimaryColor('0')),
+                      ]}>
+                      {visibleText}
                     </SwiftUIText>
-                    <SwiftUIImage
-                      systemName="chevron.down"
-                      size={10}
-                      color={getPrimaryColor('400')}
-                    />
-                  </SwiftUIHStack>
-                </SwiftUIVStack>
-              </SwiftUIHStack>
-            </SwiftUIButton>
+                    <SwiftUIHStack alignment="center" spacing={4}>
+                      <SwiftUIText
+                        modifiers={[font({ size: 12 }), foregroundStyle(getPrimaryColor('0'))]}>
+                        {totalText}
+                      </SwiftUIText>
+                      <SwiftUIImage
+                        systemName="chevron.down"
+                        size={10}
+                        color={getPrimaryColor('0')}
+                      />
+                    </SwiftUIHStack>
+                  </SwiftUIVStack>
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </SwiftUIHStack>
           </ContextMenu.Trigger>
         </ContextMenu>
       </Host>
@@ -445,6 +458,8 @@ function MapScreen() {
   }, []);
 
   // Initialize/update cluster manager when points change - DEFERRED
+  // Performance: on category switches, keep old markers visible while rebuilding.
+  // Only show loading overlay on initial load (no markers yet).
   useEffect(() => {
     if (filteredPoints.length === 0) {
       clusterManagerRef.current = null;
@@ -454,7 +469,11 @@ function MapScreen() {
       return;
     }
 
-    setIsClusteringReady(false);
+    // Only show loading overlay on initial load, not on category switches
+    const isInitialLoad = lastRenderedMarkersRef.current.length === 0;
+    if (isInitialLoad) {
+      setIsClusteringReady(false);
+    }
 
     // Defer clustering work until after interactions complete
     const task = InteractionManager.runAfterInteractions(() => {

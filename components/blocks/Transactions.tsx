@@ -124,10 +124,18 @@ export const Transactions = React.memo(
             if (quoteId && quoteIdToGroup[quoteId]) return false;
           }
 
-          if (filter === 'incoming' && historyEntry.type !== 'mint') return false;
-          if (filter === 'outgoing' && historyEntry.type !== 'send') return false;
-          if (type === 'lightning' && historyEntry.type !== 'mint') return false;
-          if (type === 'ecash' && historyEntry.type !== 'send') return false;
+          if (
+            filter === 'incoming' &&
+            historyEntry.type !== 'mint' &&
+            historyEntry.type !== 'receive'
+          )
+            return false;
+          if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
+            return false;
+          if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
+            return false;
+          if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
+            return false;
 
           // Filter out expired transactions if hideExpired is true
           if (hideExpired) {
@@ -274,6 +282,38 @@ export const Transactions = React.memo(
       return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
     };
 
+    const emptyComponent = useMemo(
+      () => (
+        <View style={{ paddingTop: 32, paddingHorizontal: 16 }}>
+          <View style={[styles.card, { borderColor }]}>
+            <BlurCardFrame accentColor={accentColor}>
+              <View style={styles.emptyState}>
+                <Icon name="fluent:clock-12-filled" size={36} color={getPrimaryColor('500')} />
+                <Text
+                  size={16}
+                  style={{
+                    color: getPrimaryColor('300'),
+                    fontFamily: 'OverpassSemibold',
+                    textAlign: 'center',
+                  }}>
+                  No transactions found
+                </Text>
+                <Text
+                  size={14}
+                  style={{
+                    color: getPrimaryColor('500'),
+                    textAlign: 'center',
+                  }}>
+                  Try adjusting your filters or check back later
+                </Text>
+              </View>
+            </BlurCardFrame>
+          </View>
+        </View>
+      ),
+      [accentColor, borderColor, getPrimaryColor]
+    );
+
     if (showMore) {
       if (isFetching) {
         return (
@@ -398,6 +438,7 @@ export const Transactions = React.memo(
         maintainVisibleContentPosition
         contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
         ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
+        ListEmptyComponent={emptyComponent}
         onScroll={onScroll}
         scrollEventThrottle={16}
         renderItem={({ item: section }) => (
@@ -423,6 +464,7 @@ Transactions.displayName = 'Transactions';
 const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
@@ -431,12 +473,20 @@ const styles = StyleSheet.create({
   },
   viewAllButton: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
   viewAllContent: {
     padding: 12,
     alignItems: 'center',
+    zIndex: 1,
+  },
+  emptyState: {
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 8,
     zIndex: 1,
   },
 });

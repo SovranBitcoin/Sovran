@@ -21,7 +21,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Spacer } from 'components/ui/View/Spacer';
 import { ModalLayoutWrapper } from 'app/debugModal';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { useSwapTransactionsStore, type SwapLeg } from 'stores/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
@@ -270,7 +270,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
   const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
-  const { history } = usePaginatedHistory();
+  const { history } = useHistoryWithMelts();
   const { getMintInfo } = useMintManagement();
   const [expanded, setExpanded] = useState(false);
 
