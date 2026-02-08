@@ -99,7 +99,7 @@ export function ReceiveScreen({
       unit: unit,
       mintUrl: decodedToken.mint,
       createdAt: Date.now(),
-      metadata: {},
+      metadata: { rawToken: token },
       token: decodedToken,
     };
 
