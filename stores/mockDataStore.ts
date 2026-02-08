@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import { useScanHistoryStore, type ScanSource } from 'stores/scanHistoryStore';
 import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
+import { useTransactionLocationStore } from 'stores/transactionLocationStore';
 import type { HistoryEntry } from 'coco-cashu-core';
 
 // ---------------------------------------------------------------------------
@@ -143,11 +144,31 @@ function buildMockData() {
     }
   });
 
+  // Random NYC-area locations for completed transactions
+  const NYC_LOCATIONS: { latitude: number; longitude: number }[] = [
+    { latitude: 40.758, longitude: -73.9855 }, // Times Square
+    { latitude: 40.7484, longitude: -73.9857 }, // Empire State Building
+    { latitude: 40.7061, longitude: -74.0089 }, // Tribeca
+    { latitude: 40.7282, longitude: -73.7949 }, // Jamaica, Queens
+    { latitude: 40.6892, longitude: -74.0445 }, // Statue of Liberty area
+    { latitude: 40.7527, longitude: -73.9772 }, // Grand Central
+  ];
+
+  const locations: Record<string, { latitude: number; longitude: number; createdAt: number }> = {};
+  history.forEach((entry, i) => {
+    // Only add locations for completed (non-cancelled) transactions
+    const isCancelled = entry.type === 'send' && 'state' in entry && entry.state === 'rolledBack';
+    if (!isCancelled) {
+      const loc = NYC_LOCATIONS[i % NYC_LOCATIONS.length];
+      locations[entry.id] = { ...loc, createdAt: entry.createdAt };
+    }
+  });
+
   const pendingAmount = history
     .filter((e) => e.type === 'send' && 'state' in e && e.state === 'pending')
     .reduce((sum, e) => sum + e.amount, 0);
 
-  return { history, scanEntries, swapGroups, balance: 247_382, pendingAmount };
+  return { history, scanEntries, swapGroups, locations, balance: 247_382, pendingAmount };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +206,7 @@ const MOCK = buildMockData();
 // are never serialised / compared.
 let unsubScans: (() => void) | null = null;
 let unsubSwaps: (() => void) | null = null;
+let unsubLocations: (() => void) | null = null;
 
 function injectScans() {
   useScanHistoryStore.setState((state) => ({
@@ -217,6 +239,22 @@ function removeSwaps() {
   });
 }
 
+function injectLocations() {
+  useTransactionLocationStore.setState((state) => ({
+    locations: { ...state.locations, ...MOCK.locations },
+  }));
+}
+
+function removeLocations() {
+  useTransactionLocationStore.setState((state) => {
+    const cleaned: Record<string, { latitude: number; longitude: number; createdAt: number }> = {};
+    for (const [k, v] of Object.entries(state.locations)) {
+      if (!k.startsWith('demo-')) cleaned[k] = v;
+    }
+    return { locations: cleaned };
+  });
+}
+
 export const useMockDataStore = create<MockDataStore>()((_set) => ({
   // Pre-built mock data — never changes at runtime.
   mockHistory: MOCK.history,
@@ -227,21 +265,26 @@ export const useMockDataStore = create<MockDataStore>()((_set) => ({
     // Inject immediately
     injectScans();
     injectSwaps();
+    injectLocations();
 
     // Re-inject after rehydration from AsyncStorage
     unsubScans = useScanHistoryStore.persist.onFinishHydration(injectScans);
     unsubSwaps = useSwapTransactionsStore.persist.onFinishHydration(injectSwaps);
+    unsubLocations = useTransactionLocationStore.persist.onFinishHydration(injectLocations);
   },
 
   deactivate: () => {
     // Unsubscribe rehydration listeners
     unsubScans?.();
     unsubSwaps?.();
+    unsubLocations?.();
     unsubScans = null;
     unsubSwaps = null;
+    unsubLocations = null;
 
     // Remove all demo entries from real stores
     removeScans();
     removeSwaps();
+    removeLocations();
   },
 }));
