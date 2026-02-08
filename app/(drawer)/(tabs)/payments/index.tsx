@@ -1,4 +1,5 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { unwrapGiftWrap } from 'utils/nip17';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult } from 'components/blocks/contacts';
 import { ContactItem } from 'components/blocks/payments';
@@ -125,7 +126,7 @@ const PaymentsContent = () => {
   const [_recommendedUsers, setRecommendedUsers] = useState<UserProfile[]>([]);
   const [_recommendedLoading, setRecommendedLoading] = useState(false);
 
-  // Get all DM events for the current user (single subscription)
+  // Get all NIP-04 DM events for the current user
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
 
@@ -143,21 +144,52 @@ const PaymentsContent = () => {
 
   const { events: dmEvents } = useSubscribe({ filters: dmFilters });
 
+  // Get all NIP-17 gift-wrapped events addressed to us (kind 1059)
+  const giftWrapFilters = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+
+    return [
+      {
+        kinds: [1059 as number],
+        '#p': [nostrKeys.pubkey],
+      },
+    ];
+  }, [nostrKeys?.pubkey]);
+
+  const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
+
+  // Unwrap NIP-17 gift-wrapped events to extract sender and content
+  const unwrappedDMs = useMemo(() => {
+    if (!giftWrapEvents?.length || !nostrKeys?.privateKey) return [];
+
+    return giftWrapEvents
+      .map((event) => {
+        const unwrapped = unwrapGiftWrap(
+          { content: event.content, pubkey: event.pubkey },
+          nostrKeys.privateKey
+        );
+        if (!unwrapped) return null;
+        return { ...unwrapped, wrapId: event.id };
+      })
+      .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
+  }, [giftWrapEvents, nostrKeys?.privateKey]);
+
   // State for decrypted contacts
   const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
   const [isDecrypting, setIsDecrypting] = useState(false);
 
-  // Extract unique pubkeys from DM events and create contact list
+  // Extract unique pubkeys from both NIP-04 and NIP-17 events and create contact list
   const recentActivityContacts = useMemo(() => {
-    if (!dmEvents || !nostrKeys?.pubkey) {
-      return [];
-    }
+    if (!nostrKeys?.pubkey) return [];
 
-    // Group events by pubkey
-    const contactMap = new Map();
+    // contactMap stores the most recent event per contact pubkey
+    const contactMap = new Map<
+      string,
+      { type: string; event?: NDKEvent; dm?: (typeof unwrappedDMs)[number]; timestamp: number }
+    >();
 
-    dmEvents.forEach((event) => {
-      // Determine the other person's pubkey
+    // Process NIP-04 (kind 4) events
+    dmEvents?.forEach((event) => {
       const otherPubkey =
         event.pubkey === nostrKeys.pubkey
           ? event.tags.find((tag) => tag[0] === 'p')?.[1]
@@ -165,23 +197,38 @@ const PaymentsContent = () => {
 
       if (!otherPubkey) return;
 
-      // Keep the most recent event for each contact
       const existing = contactMap.get(otherPubkey);
-      if (!existing || (event.created_at && event.created_at > existing.created_at)) {
-        contactMap.set(otherPubkey, event);
+      const ts = event.created_at || 0;
+      if (!existing || ts > existing.timestamp) {
+        contactMap.set(otherPubkey, { type: 'nip04', event, timestamp: ts });
+      }
+    });
+
+    // Process NIP-17 (kind 1059 → 14) unwrapped events
+    unwrappedDMs.forEach((dm) => {
+      const otherPubkey =
+        dm.senderPubkey === nostrKeys.pubkey ? dm.recipientPubkeys[0] : dm.senderPubkey;
+
+      if (!otherPubkey) return;
+
+      const existing = contactMap.get(otherPubkey);
+      if (!existing || dm.created_at > existing.timestamp) {
+        contactMap.set(otherPubkey, { type: 'nip17', dm, timestamp: dm.created_at });
       }
     });
 
     // Convert map to array and sort by most recent
     return Array.from(contactMap.entries())
-      .map(([pubkey, event]) => ({
+      .map(([pubkey, entry]) => ({
         type: 'contact',
         pubkey,
-        dmEvent: event,
-        timestamp: event.created_at || 0,
+        // For NIP-04 events, decryption happens later; for NIP-17, content is already available
+        dmEvent: entry.type === 'nip04' ? entry.event : null,
+        nip17Content: entry.type === 'nip17' ? entry.dm?.content : undefined,
+        timestamp: entry.timestamp,
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
-  }, [dmEvents, nostrKeys?.pubkey]);
+  }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
   const contactsWithDefaults = useMemo(() => {
@@ -195,6 +242,7 @@ const PaymentsContent = () => {
         type: 'contact' as const,
         pubkey: dc.pubkey,
         dmEvent: null,
+        nip17Content: undefined as string | undefined,
         timestamp: 0, // No timestamp for default contacts without messages
         isDefault: true,
       }));
@@ -221,6 +269,15 @@ const PaymentsContent = () => {
         const decryptedResults = [];
         for (const contact of contactsWithDefaults) {
           try {
+            // NIP-17 messages are already decrypted during unwrapping
+            if (contact.nip17Content !== undefined) {
+              decryptedResults.push({
+                ...contact,
+                dmEvent: { content: contact.nip17Content },
+              });
+              continue;
+            }
+
             // Skip decryption for contacts without DM events (default contacts)
             if (!contact.dmEvent) {
               decryptedResults.push(contact);
@@ -228,7 +285,7 @@ const PaymentsContent = () => {
             }
 
             if (contact.dmEvent instanceof NDKEvent) {
-              // Decrypt the message content
+              // Decrypt the NIP-04 message content
               // Use contact.pubkey (the other party) not dmEvent.pubkey
               // because dmEvent.pubkey could be our own pubkey if we sent it
               const counterparty = new NDKUser({ pubkey: contact.pubkey });

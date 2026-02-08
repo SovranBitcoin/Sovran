@@ -30,6 +30,7 @@ import {
   useSubscribe,
 } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { buildGiftWrappedDMPair, unwrapGiftWrap } from 'utils/nip17';
 import { LegendList } from '@legendapp/list';
 
 // Custom hooks and providers
@@ -762,6 +763,50 @@ export function UserMessagesScreen({
 
   const { events: dmEvents } = useSubscribe({ filters: dmFilters });
 
+  // NIP-17: Subscribe to gift-wrapped events (kind 1059) addressed to us
+  const giftWrapFilters = useMemo(() => {
+    if (isRoutstrMode || !nostrKeys?.pubkey) return null;
+
+    return [
+      {
+        kinds: [1059 as number],
+        '#p': [nostrKeys.pubkey],
+      },
+    ];
+  }, [nostrKeys?.pubkey, isRoutstrMode]);
+
+  const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
+
+  // NIP-17: Unwrap gift-wrapped events and filter for this conversation
+  const unwrappedGiftWrapMessages = useMemo(() => {
+    if (!giftWrapEvents?.length || !nostrKeys?.privateKey || !nostrKeys?.pubkey) return [];
+
+    return giftWrapEvents
+      .map((event) => {
+        const unwrapped = unwrapGiftWrap(
+          { content: event.content, pubkey: event.pubkey },
+          nostrKeys.privateKey
+        );
+        if (!unwrapped) return null;
+
+        // Filter: only messages in this conversation (between us and pubkey)
+        const isFromCounterparty =
+          unwrapped.senderPubkey === pubkey &&
+          unwrapped.recipientPubkeys.includes(nostrKeys.pubkey);
+        const isFromMe =
+          unwrapped.senderPubkey === nostrKeys.pubkey &&
+          unwrapped.recipientPubkeys.includes(pubkey);
+
+        if (!isFromCounterparty && !isFromMe) return null;
+
+        return {
+          wrapId: event.id,
+          ...unwrapped,
+        };
+      })
+      .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
+  }, [giftWrapEvents, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey]);
+
   // ===========================
   // DERIVED STATE
   // ===========================
@@ -947,7 +992,7 @@ export function UserMessagesScreen({
     setIsLoading(true);
   }, [pubkey, isRoutstrMode]);
 
-  // Process DM events - deferred to avoid blocking navigation
+  // Process NIP-04 DM events - deferred to avoid blocking navigation
   useEffect(() => {
     if (isRoutstrMode) return;
 
@@ -992,7 +1037,7 @@ export function UserMessagesScreen({
                 pubkey: senderPubkey,
               };
             } catch (error) {
-              console.error('Failed to decrypt message:', error);
+              console.error('Failed to decrypt NIP-04 message:', error);
               processedEventIds.current.add(event.id);
               return null;
             }
@@ -1020,7 +1065,7 @@ export function UserMessagesScreen({
           return merged.sort((a, b) => a.created_at - b.created_at);
         });
       } catch (error) {
-        console.error('Error processing DMs:', error);
+        console.error('Error processing NIP-04 DMs:', error);
       } finally {
         setIsLoading(false);
       }
@@ -1028,6 +1073,55 @@ export function UserMessagesScreen({
 
     return () => handle.cancel();
   }, [dmEvents, nostrKeys?.pubkey, nostrKeys?.privateKey, pubkey, isRoutstrMode]);
+
+  // Process NIP-17 gift-wrapped DM events (already decrypted by unwrapGiftWrap)
+  useEffect(() => {
+    if (isRoutstrMode || !nostrKeys?.pubkey) return;
+
+    if (unwrappedGiftWrapMessages.length === 0) return;
+
+    const newMessages = unwrappedGiftWrapMessages.filter(
+      (dm) => !processedEventIds.current.has(dm.wrapId)
+    );
+
+    if (newMessages.length === 0) return;
+
+    const formatted = newMessages.map((dm) => {
+      processedEventIds.current.add(dm.wrapId);
+      const isMe = dm.senderPubkey === nostrKeys.pubkey;
+
+      return {
+        id: dm.wrapId,
+        content: dm.content,
+        sender: isMe ? ('me' as const) : ('other' as const),
+        timestamp: formatTimestamp(dm.created_at),
+        isRead: true,
+        created_at: dm.created_at,
+        pubkey: dm.senderPubkey,
+      };
+    });
+
+    setMessages((prev) => {
+      const existingIds = new Set(prev.map((m) => m.id));
+      const existingContentKeys = new Set(
+        prev.map((m) => `${m.content}-${m.created_at}-${m.sender}`)
+      );
+
+      const uniqueNewMessages = formatted.filter((m) => {
+        if (existingIds.has(m.id)) return false;
+        const contentKey = `${m.content}-${m.created_at}-${m.sender}`;
+        if (existingContentKeys.has(contentKey)) return false;
+        return true;
+      });
+
+      if (uniqueNewMessages.length === 0) return prev;
+
+      const merged = [...prev, ...uniqueNewMessages];
+      return merged.sort((a, b) => a.created_at - b.created_at);
+    });
+
+    setIsLoading(false);
+  }, [unwrappedGiftWrapMessages, nostrKeys?.pubkey, isRoutstrMode]);
 
   const handleRefreshBalance = async () => {
     if (!apiKey || isRefreshingBalance) return;
@@ -1409,30 +1503,53 @@ export function UserMessagesScreen({
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
 
     try {
-      const dmEvent = new NDKEvent(ndk);
-      dmEvent.kind = EncryptedDirectMessage;
-      dmEvent.content = text;
-      dmEvent.tags = [['p', pubkey]];
+      // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
+      // Both share the same rumor (with the counterparty in the `p` tag) per NIP-17.
+      const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
+        content: text,
+        senderPrivateKey: nostrKeys.privateKey,
+        recipientPublicKey: pubkey,
+      });
 
-      const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-      const recipient = new NDKUser({ pubkey: pubkey });
+      // Convert recipient wrap to NDKEvent for publishing
+      const wrapEvent = new NDKEvent(ndk);
+      wrapEvent.kind = recipientWrap.kind;
+      wrapEvent.content = recipientWrap.content;
+      wrapEvent.tags = recipientWrap.tags;
+      wrapEvent.created_at = recipientWrap.created_at;
+      wrapEvent.pubkey = recipientWrap.pubkey;
+      wrapEvent.id = recipientWrap.id;
+      wrapEvent.sig = recipientWrap.sig;
 
-      await dmEvent.encrypt(recipient, signer);
-      await dmEvent.sign(signer);
-
-      processedEventIds.current.add(dmEvent.id);
+      processedEventIds.current.add(wrapEvent.id);
 
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempMessageId ? { ...msg, id: dmEvent.id } : msg))
+        prev.map((msg) => (msg.id === tempMessageId ? { ...msg, id: wrapEvent.id } : msg))
       );
 
-      await dmEvent.publish();
+      await wrapEvent.publish();
 
-      console.log('DM sent successfully:', dmEvent.id);
+      console.log('NIP-17 DM sent successfully:', wrapEvent.id);
+
+      // Publish the self-copy so we can retrieve our own sent messages later
+      const selfWrapEvent = new NDKEvent(ndk);
+      selfWrapEvent.kind = senderWrap.kind;
+      selfWrapEvent.content = senderWrap.content;
+      selfWrapEvent.tags = senderWrap.tags;
+      selfWrapEvent.created_at = senderWrap.created_at;
+      selfWrapEvent.pubkey = senderWrap.pubkey;
+      selfWrapEvent.id = senderWrap.id;
+      selfWrapEvent.sig = senderWrap.sig;
+
+      processedEventIds.current.add(selfWrapEvent.id);
+
+      await selfWrapEvent.publish().catch((err: unknown) => {
+        console.warn('Failed to publish self-copy of DM:', err);
+      });
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === dmEvent.id ? { ...msg, isRead: true, isSending: false } : msg
+          msg.id === wrapEvent.id ? { ...msg, isRead: true, isSending: false } : msg
         )
       );
     } catch (error) {
