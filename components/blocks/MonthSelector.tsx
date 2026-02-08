@@ -68,7 +68,7 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
           className="text-center"
           style={{
             color: isSelected ? getPrimaryColor('0') : getPrimaryColor('400'),
-            fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassSemibold',
+            fontFamily: 'OverpassSemibold',
             fontSize: 15,
           }}>
           {showYear ? item.fullLabel : item.label}
