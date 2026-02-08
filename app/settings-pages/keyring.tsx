@@ -37,7 +37,7 @@ const CurrentKeyItem: React.FC<{
   const { getPrimaryColor } = useTheme();
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
-  const isDerived = !!keypair.derivationIndex;
+  const isDerived = keypair.derivationIndex !== undefined;
 
   // Get the npub value for non-derived keys
   const npubValue = !isDerived
@@ -209,7 +209,7 @@ const KeyItem: React.FC<{
 }> = ({ keypair, onCopy }) => {
   const { getPrimaryColor } = useTheme();
 
-  const isDerived = !!keypair.derivationIndex;
+  const isDerived = keypair.derivationIndex !== undefined;
 
   // Convert to npub if derived key, otherwise show raw hex
   const displayKey = !isDerived
