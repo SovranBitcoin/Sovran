@@ -3,8 +3,9 @@ import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useWindowDimensions } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { supportsLiquidGlass } from 'helper/version';
+import opacity from 'hex-color-opacity';
 import {
   Host,
   Button as SwiftUIButton,
@@ -124,7 +125,8 @@ export function AccountPagerView({
     });
   }, [getBalances, selectedMintUrl, account.unit]);
 
-  // Button components (2-column row + centered overlay)
+  // Button components
+  const ACTION_SIZE = 48;
   const BUTTON_H = 48;
   const QR_SIZE = 72;
   // Keep Send/Receive foreground neutral; reserve accent tint for the QR background only.
@@ -194,6 +196,22 @@ export function AccountPagerView({
     );
   }
 
+  // Quick-action handlers
+  const handleSweep = useCallback(() => {
+    router.navigate('/pendingEcash');
+  }, []);
+
+  const handleSwap = useCallback(() => {
+    router.navigate('/(mint-flow)/distribution');
+  }, []);
+
+  const handleMore = useCallback(() => {
+    // Placeholder — can be wired to a menu / settings later
+  }, []);
+
+  const actionFg = useMemo(() => opacity(getPrimaryColor('0'), 0.66), [getPrimaryColor]);
+  const actionBg = useMemo(() => opacity(getPrimaryColor('0'), 0.08), [getPrimaryColor]);
+
   return (
     <>
       <View style={{ height: pagerHeight, width: '100%' }}>
@@ -219,6 +237,136 @@ export function AccountPagerView({
           ))}
         </Swiper>
       </View>
+
+      {/* Quick action buttons — Sweep / Swap / More */}
+      {/* <View style={actionStyles.row}>
+        {supportsLiquidGlass() ? (
+          <>
+            <View style={actionStyles.button}>
+              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
+                <SwiftUIButton
+                  modifiers={[
+                    buttonStyle('glass'),
+                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
+                    glassEffect({
+                      shape: 'circle',
+                      glass: { variant: 'regular', interactive: true },
+                    }),
+                  ]}
+                  onPress={handleSweep}>
+                  <SwiftUIHStack
+                    alignment="center"
+                    modifiers={[
+                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                    ]}>
+                    <SwiftUIImage
+                      systemName="tray.and.arrow.down"
+                      size={18}
+                      color={liquidGlassForeground}
+                    />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+              </Host>
+              <Text size={12} semibold color={actionFg}>
+                Sweep
+              </Text>
+            </View>
+            <View style={actionStyles.button}>
+              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
+                <SwiftUIButton
+                  modifiers={[
+                    buttonStyle('glass'),
+                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
+                    glassEffect({
+                      shape: 'circle',
+                      glass: { variant: 'regular', interactive: true },
+                    }),
+                  ]}
+                  onPress={handleSwap}>
+                  <SwiftUIHStack
+                    alignment="center"
+                    modifiers={[
+                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                    ]}>
+                    <SwiftUIImage
+                      systemName="arrow.triangle.2.circlepath"
+                      size={18}
+                      color={liquidGlassForeground}
+                    />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+              </Host>
+              <Text size={12} semibold color={actionFg}>
+                Swap
+              </Text>
+            </View>
+            <View style={actionStyles.button}>
+              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
+                <SwiftUIButton
+                  modifiers={[
+                    buttonStyle('glass'),
+                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
+                    glassEffect({
+                      shape: 'circle',
+                      glass: { variant: 'regular', interactive: true },
+                    }),
+                  ]}
+                  onPress={handleMore}>
+                  <SwiftUIHStack
+                    alignment="center"
+                    modifiers={[
+                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                    ]}>
+                    <SwiftUIImage systemName="ellipsis" size={18} color={liquidGlassForeground} />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+              </Host>
+              <Text size={12} semibold color={actionFg}>
+                More
+              </Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={actionStyles.button}
+              onPress={handleSweep}
+              haptics={{ type: 'impact', impactStyle: 'light' }}
+              activeOpacity={0.7}>
+              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
+                <Icon name="fluent:arrow-download-16-filled" size={20} color={actionFg} />
+              </View>
+              <Text size={12} semibold color={actionFg}>
+                Sweep
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={actionStyles.button}
+              onPress={handleSwap}
+              haptics={{ type: 'impact', impactStyle: 'light' }}
+              activeOpacity={0.7}>
+              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
+                <Icon name="fluent:arrow-swap-16-filled" size={20} color={actionFg} />
+              </View>
+              <Text size={12} semibold color={actionFg}>
+                Swap
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={actionStyles.button}
+              onPress={handleMore}
+              haptics={{ type: 'impact', impactStyle: 'light' }}
+              activeOpacity={0.7}>
+              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
+                <Icon name="tabler:dots" size={20} color={actionFg} />
+              </View>
+              <Text size={12} semibold color={actionFg}>
+                More
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View> */}
 
       <View
         style={{
@@ -329,3 +477,24 @@ export function AccountPagerView({
     </>
   );
 }
+
+const actionStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 32,
+    paddingTop: 0,
+    paddingBottom: 8,
+  },
+  button: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  circle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -3,12 +3,20 @@
  *
  * This module provides the core camera UI for QR code scanning.
  * Payment processing and navigation routing are handled via callbacks.
+ * Header close/back buttons are handled by the route wrappers via Stack.Screen.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Dimensions, AppState } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Dimensions, AppState, Platform } from 'react-native';
+import { CameraView, useCameraPermissions, scanFromURLAsync } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
+import {
+  Host,
+  Button as SwiftUIButton,
+  HStack as SwiftUIHStack,
+  Image as SwiftUIImage,
+} from '@expo/ui/swift-ui';
+import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
@@ -17,6 +25,7 @@ import Icon from 'assets/icons';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -34,16 +43,9 @@ export interface ScanningData {
 interface CameraScreenProps {
   onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number }>;
   onReset?: () => void;
-  showCustomCloseButton?: boolean;
-  onClose?: () => void;
 }
 
-export function CameraScreen({
-  onScan,
-  onReset,
-  showCustomCloseButton = false,
-  onClose,
-}: CameraScreenProps) {
+export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
   const { getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState<number>(0);
@@ -143,8 +145,28 @@ export function CameraScreen({
   }, []);
 
   const handleGalleryPress = useCallback(async (): Promise<void> => {
-    popup({ message: 'feature_coming_soon', emoji: '📸', type: 'info' });
-  }, []);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      const scannedCodes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
+
+      if (scannedCodes.length === 0) {
+        popup({ message: 'No QR code found in image', emoji: '🔍', type: 'info' });
+        return;
+      }
+
+      const scanning: ScanningData = { data: scannedCodes[0].data, type: 'qr' };
+      await handleScan(scanning);
+    } catch {
+      popup({ message: 'Failed to scan QR code from image', emoji: '❌', type: 'error' });
+    }
+  }, [handleScan]);
 
   const handleClipboardPress = useCallback(async (): Promise<void> => {
     const text = await Clipboard.getStringAsync();
@@ -177,17 +199,6 @@ export function CameraScreen({
         onCameraReady={handleCameraReady}
         onBarcodeScanned={handleScan}
       />
-
-      {/* Custom close button - only shown for standalone camera */}
-      {showCustomCloseButton && onClose && (
-        <View className="absolute left-6 top-12 z-10">
-          <Button
-            onPress={onClose}
-            icon={<Icon name="material-symbols:close-rounded" color={getPrimaryColor('0')} />}
-            blur
-          />
-        </View>
-      )}
 
       {/* Scanning overlay with white corners and progress text */}
       <View
@@ -266,29 +277,106 @@ export function CameraScreen({
       {/* Bottom buttons */}
       <HStack
         justify="space-between"
-        style={{ paddingBottom: showCustomCloseButton ? 24 : insets.bottom + 24 }}
+        style={{ paddingBottom: insets.bottom + 24 }}
         className="absolute bottom-0 left-0 right-0 w-full px-8">
-        <Button
-          onPress={handleClipboardPress}
-          icon={<Icon name="lets-icons:copy" color={getPrimaryColor('0')} />}
-          blur
-        />
-        <Button
-          onPress={handleGalleryPress}
-          icon={<Icon name="proicons:photo" color={getPrimaryColor('0')} />}
-          blur
-        />
-        <Button
-          onPress={toggleFlashlight}
-          icon={
-            !flashlightOn ? (
-              <Icon name="mdi:lightbulb-on-outline" color={getPrimaryColor('0')} />
-            ) : (
-              <Icon name="mdi:lightbulb-on" color={getPrimaryColor('0')} />
-            )
-          }
-          blur
-        />
+        {Platform.OS === 'ios' ? (
+          <>
+            {/* Clipboard — liquid glass */}
+            <Host style={{ height: 52, width: 52 }} matchContents={false}>
+              <SwiftUIButton
+                modifiers={[
+                  buttonStyle('glass'),
+                  frame({ height: 52, width: 52 }),
+                  glassEffect({
+                    shape: 'circle',
+                    glass: { variant: 'regular', interactive: true },
+                  }),
+                ]}
+                onPress={handleClipboardPress}>
+                <SwiftUIHStack
+                  alignment="center"
+                  modifiers={[
+                    frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                  ]}>
+                  <SwiftUIImage systemName="doc.on.clipboard" size={22} color="white" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </Host>
+
+            {/* Gallery — liquid glass */}
+            <Host style={{ height: 52, width: 52 }} matchContents={false}>
+              <SwiftUIButton
+                modifiers={[
+                  buttonStyle('glass'),
+                  frame({ height: 52, width: 52 }),
+                  glassEffect({
+                    shape: 'circle',
+                    glass: { variant: 'regular', interactive: true },
+                  }),
+                ]}
+                onPress={handleGalleryPress}>
+                <SwiftUIHStack
+                  alignment="center"
+                  modifiers={[
+                    frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                  ]}>
+                  <SwiftUIImage systemName="photo" size={22} color="white" />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </Host>
+
+            {/* Flashlight — liquid glass */}
+            <Host style={{ height: 52, width: 52 }} matchContents={false}>
+              <SwiftUIButton
+                modifiers={[
+                  buttonStyle('glass'),
+                  frame({ height: 52, width: 52 }),
+                  glassEffect({
+                    shape: 'circle',
+                    glass: { variant: 'regular', interactive: true },
+                  }),
+                ]}
+                onPress={toggleFlashlight}>
+                <SwiftUIHStack
+                  alignment="center"
+                  modifiers={[
+                    frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                  ]}>
+                  <SwiftUIImage
+                    systemName={flashlightOn ? 'flashlight.on.fill' : 'flashlight.off.fill'}
+                    size={22}
+                    color="white"
+                  />
+                </SwiftUIHStack>
+              </SwiftUIButton>
+            </Host>
+          </>
+        ) : (
+          <>
+            {/* Android fallback — blur buttons */}
+            <Button
+              onPress={handleClipboardPress}
+              icon={<Icon name="lets-icons:copy" color={getPrimaryColor('0')} />}
+              blur
+            />
+            <Button
+              onPress={handleGalleryPress}
+              icon={<Icon name="proicons:photo" color={getPrimaryColor('0')} />}
+              blur
+            />
+            <Button
+              onPress={toggleFlashlight}
+              icon={
+                !flashlightOn ? (
+                  <Icon name="mdi:lightbulb-on-outline" color={getPrimaryColor('0')} />
+                ) : (
+                  <Icon name="mdi:lightbulb-on" color={getPrimaryColor('0')} />
+                )
+              }
+              blur
+            />
+          </>
+        )}
       </HStack>
     </View>
   );

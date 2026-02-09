@@ -6,222 +6,400 @@
 
 <img width="100%" src="./sovran.png" />
 
+## Features
+
+### Wallet
+
+<!-- Code: components/blocks/AccountPagerView.tsx — account pager with send/receive/scan buttons -->
+<!-- Code: components/blocks/PrimaryBalance.tsx — balance display with unit toggling and fiat conversion -->
+<!-- Code: components/blocks/Account.tsx — single account view with currency icon and balance -->
+<!-- Code: app/(drawer)/(tabs)/index/index.tsx — wallet tab: balances, transactions, account pager -->
+
+- Send and receive Bitcoin via Cashu ecash tokens
+- Lightning Network payments and invoices
+- Multi-account support with swipeable account pager
+- Real-time balance with sats/fiat toggle
+
+### Lightning Address
+
+<!-- Code: app/claimUsername.tsx — claim username modal with domain selector and availability checking -->
+<!-- Code: components/blocks/claim/ClaimUsernameCardFrame.tsx — card frame on explore page -->
+
+- Claim a custom Lightning address username
+- Choose between npubx.cash and sovran.money domains
+- Real-time availability checking across all domains
+
+### Multi-Currency Display
+
+<!-- Code: stores/settingsStore.ts — displayCurrency setting (USD/EUR/GBP) -->
+<!-- Code: components/blocks/FiatCurrencyPill.tsx — currency pill with context menu for switching -->
+<!-- Code: stores/pricelistStore.ts — BTC price data in USD/EUR/GBP with cache -->
+<!-- Code: components/ui/AmountFormatter.tsx — formatted amount display with unit conversion -->
+
+- Display balances in USD, EUR, GBP, or sats
+- Real-time fiat conversion with price caching
+- Quick-switch currency pill in the header
+
+### Transaction Sources
+
+<!-- Code: stores/scanHistoryStore.ts — tracks scans with source: qr, nfc, paste, deeplink -->
+<!-- Code: hooks/coco/useProcessPaymentString.ts — processes QR codes, NFC data, pasted strings, deeplinks -->
+<!-- Code: components/blocks/Transaction.tsx — shows scan source badge (NFC/QR/paste) on each transaction -->
+
+- Every transaction shows how it started — QR scan, NFC tap, clipboard paste, or deeplink
+- Swaps, pending sends, and cancelled transactions all live in one unified timeline
+
+<img width="1600" height="1200" alt="transaction-sources" src="https://gist.github.com/user-attachments/assets/556ba721-4ded-4dbc-bcd3-e1d869ad5d95" />
+
+### Transaction Filters
+
+<!-- Code: app/(filter-flow)/filters.tsx — filter UI: currency, payment type, direction, status -->
+<!-- Code: components/screens/TransactionsFilterContext.tsx — filter state context -->
+<!-- Code: components/blocks/Transactions.tsx — virtualized transaction list with date grouping and filtering -->
+<!-- Code: components/blocks/MonthSelector.tsx — horizontal scrollable month tabs -->
+
+- Filter by currency, type (lightning or ecash), direction, status, and month
+- Horizontal month selector for quick time navigation
+
+<img width="1600" height="1200" alt="filters" src="https://gist.github.com/user-attachments/assets/586f42f7-6059-4fad-be4a-78a23f96d2c2" />
+
+### Transaction Timelines
+
+<!-- Code: components/blocks/Transaction/HistoryEntryTimeline.tsx — timeline showing transaction progress steps -->
+<!-- Code: components/blocks/Transaction/HistoryEntryHeader.tsx — header for transaction detail screens -->
+<!-- Code: components/blocks/Transaction/HistoryEntryRefresh.tsx — refresh component for checking status -->
+
+- Live timeline per transaction that updates as state changes — step by step
+- Mint quotes counting down to expiry, sends progressing through preparation to finalization, melts moving from pending to paid
+
+<img width="1600" height="1200" alt="HistoryEntryTimeline" src="https://gist.github.com/user-attachments/assets/35b40af1-ee73-4d3c-8da5-e1c0af6ff654" />
+
+### P2PK
+
+<!-- Code: app/settings-pages/keyring.tsx — P2PK key management: generate, import (nsec/hex), QR display -->
+<!-- Code: stores/settingsStore.ts — quickAccessP2PK setting for receive screen shortcut -->
+<!-- Code: components/screens/ReceiveScreen.tsx — receive screen with Lightning and P2PK tabs -->
+
+- Generate or import locking keys (nsec or raw hex)
+- Keys derived from your seed using a BIP-39 path
+- Quick Access shows your latest locking key on the receive screen
+
+<img width="1600" height="1200" alt="p2pk" src="https://gist.github.com/user-attachments/assets/550f9f6f-5536-4c28-ad75-6ee350fbe535" />
+
+### Themes
+
+<!-- Code: themes.js — 37 theme definitions (color palettes + background image themes) -->
+<!-- Code: providers/ThemeProvider.tsx — theme provider with dynamic color access -->
+<!-- Code: app/settings-pages/theme.tsx — theme selection screen -->
+
+- 37 themes including color palettes and background image wallpapers
+- Pick a color or a background image — applies everywhere, instantly
+
+<img width="850" height="850" alt="themes" src="https://gist.github.com/user-attachments/assets/5843614b-3e6a-41f1-ac2d-ddebacf97e52" />
+
+### Know Your Mint
+
+<!-- Code: hooks/coco/useAuditedMint.ts — fetches audit info and mint info for a single mint -->
+<!-- Code: hooks/coco/useAuditedMints.ts — batch audit data for multiple mints -->
+<!-- Code: hooks/coco/useKYMMint.ts — fetches Nostr kind 38000 recommendation events, calculates average score -->
+<!-- Code: hooks/coco/useKYMMints.ts — batch KYM ratings for multiple mints -->
+<!-- Code: stores/auditMintStore.ts — audit data cache with staleness checking -->
+<!-- Code: stores/kymMintStore.ts — KYM rating cache from Nostr recommendations -->
+<!-- Code: app/(mint-flow)/info.tsx — mint info/details screen -->
+<!-- Code: app/(mint-flow)/reviews.tsx — mint reviews screen -->
+
+- Mints accessible from the payments page — tap to message them over Nostr
+- Audit any mint through the Cashu Auditor: lightning node connectivity, success rates, average swap times, and community ratings
+
+<img width="1370" height="878" alt="kym" src="https://gist.github.com/user-attachments/assets/9e027f01-4fd7-4f4c-8a76-6793a485bd25" />
+
+### User Profiles
+
+<!-- Code: app/(user-flow)/profile.tsx — user profile: banner, avatar, stats, followers, actions -->
+<!-- Code: hooks/useNostrProfile.ts — fetches profile data, follower/following counts, top followers, rank -->
+<!-- Code: app/(user-flow)/share.tsx — share screen: QR code and sharing options -->
+
+- Tap any user to see their profile — reputation score, follower count, and most-followed connections
+- Powered by Nostr social graph data
+
+### Nostr Direct Messages
+
+<!-- Code: components/screens/UserMessagesScreen.tsx — DM conversation screen -->
+<!-- Code: hooks/useNostrDirectMessage.ts — NIP-17 DM sending with NIP-44 encryption -->
+<!-- Code: utils/nip17.ts — NIP-17/NIP-59 gift wrap utilities (rumor → seal → wrap) -->
+<!-- Code: app/message/components/CashuTokenMessage.tsx — inline Cashu token messages -->
+<!-- Code: app/message/components/PaymentMessage.tsx — inline payment messages -->
+
+- Encrypted peer-to-peer messaging rebuilt on NIP-17 gift-wrapped DMs
+- Send Cashu tokens and payment requests inline in conversations
+
+### Contacts
+
+<!-- Code: app/(drawer)/(tabs)/payments/index.tsx — payments tab: contact search, recent activity, mints -->
+<!-- Code: components/blocks/payments/DraggableContactsList.tsx — scrollable contact list -->
+<!-- Code: components/blocks/payments/ContactItem.tsx — contact item with avatar, name, last message -->
+<!-- Code: components/blocks/contacts/SearchResult.tsx — Nostr profile search with NIP-05 validation -->
+
+- Nostr-based contact system on the payments page
+- Search for users by npub, NIP-05, or name
+- Recent conversations with message previews
+
+<img width="1200" height="1200" alt="profiles+messages" src="https://gist.github.com/user-attachments/assets/7359b8c0-2f66-4012-822a-5c323c83cb0e" />
+
+### BTCMaps
+
+<!-- Code: app/(map-flow)/index.tsx — interactive map with clustering and category filters -->
+<!-- Code: app/(map-flow)/detail.tsx — merchant detail screen with contact info -->
+<!-- Code: stores/btcMapStore.ts — BTC Map merchant data cache with 24h TTL -->
+<!-- Code: utils/mapClustering.ts — Supercluster-based marker clustering -->
+<!-- Code: utils/btcMapClusterCache.ts — LRU cluster cache (max 3 entries) -->
+
+- Built-in map (powered by BTCMap) shows merchants near you that accept Bitcoin
+- Filter by category — food, retail, ATMs, accommodation — and tap for details
+- Efficient map clustering with viewport-based rendering
+
+<img width="1600" height="1200" alt="maps" src="https://gist.github.com/user-attachments/assets/841f8c73-ae06-404b-81b2-f73e0c92cc46" />
+
+### Pending Ecash Sweeper
+
+<!-- Code: app/pendingEcash.tsx — pending ecash management: view and rollback unclaimed sent tokens -->
+<!-- Code: components/blocks/pending/PendingEcashCardFrame.tsx — card frame on explore page -->
+<!-- Code: hooks/useAppPendingAmount.ts — calculates total pending send transactions -->
+
+- Explore page shows total unspent balance across all pending sends
+- One tap starts a sweep — rolling back each transaction and reclaiming tokens, grouped by mint
+
+<img width="1600" height="1200" alt="pending-ecash-sweeping" src="https://gist.github.com/user-attachments/assets/1a66717b-2cb2-445c-b342-b83eb8a1ba43" />
+
+### Mint Swapper / Rebalancer
+
+<!-- Code: app/(mint-flow)/rebalancePlan.tsx — rebalance planning screen -->
+<!-- Code: components/blocks/rebalance/RebalanceStepRow.tsx — single rebalance step with mint avatars and status -->
+<!-- Code: components/blocks/rebalance/rebalancePlanner.ts — planning logic for rebalance operations -->
+<!-- Code: components/blocks/rebalance/routing.ts — routing logic for finding middleman paths -->
+<!-- Code: stores/swapTransactionsStore.ts — swap transaction grouping and tracking -->
+<!-- Code: components/blocks/distribution/DistributionSlider.tsx — distribution percentage slider with haptic feedback -->
+<!-- Code: components/blocks/distribution/MintDistributionItem.tsx — per-mint distribution item -->
+<!-- Code: stores/mintDistributionStore.ts — distribution as basis points (0-10000) -->
+
+- Rebalance ecash across mints without doing the transfers yourself
+- The health page monitors your distribution drift and flags when things are off
+- Set target distribution percentages per mint with sliders
+- Supports middleman routing chains for mints that can't swap directly
+
+<img width="1600" height="1200" alt="rebalancing" src="https://gist.github.com/user-attachments/assets/4cb03232-1307-4a73-966b-9901540bfb54" />
+
+### Wallet Health
+
+<!-- Code: components/blocks/health/WalletHealthCard.tsx — wallet health card with distribution status -->
+<!-- Code: components/blocks/health/WalletHealthModalContent.tsx — detailed wallet health view -->
+<!-- Code: app/(drawer)/(tabs)/explore/healthModal.tsx — wallet health modal -->
+
+- Balance distribution monitoring card on the explore page
+- Shows distribution status, pending transactions, and rebalance suggestions
+- Hero transition animation from card to full modal
+
+### Mint Selector
+
+<!-- Code: app/(mint-flow)/add.tsx — add mints: search, discover, and add new mints -->
+<!-- Code: app/(mint-flow)/list.tsx — mint list with balances -->
+<!-- Code: hooks/coco/useNostrDiscoveredMints.ts — discovers mints from Nostr kind 38000 events -->
+<!-- Code: hooks/coco/useSovranDiscoveredMints.ts — fetches mint list from Sovran API -->
+<!-- Code: hooks/coco/useMintManagement.ts — load, add, remove, restore mints -->
+<!-- Code: components/blocks/MintBalanceDisplay.tsx — mint selector with avatar, name, balance -->
+<!-- Code: components/blocks/WalletHeaderTitle.tsx — header with mint selector context menu -->
+
+- Browse community-recommended mints discovered via Nostr or the Sovran API
+- Paste a URL manually to add any mint
+- Every mint shows its KYM score before you commit
+
+<img width="1600" height="1200" alt="mint-selection" src="https://gist.github.com/user-attachments/assets/3ed6db59-7ae8-4e35-8e50-e31250a87880" />
+
+### Swap Routing
+
+<!-- Code: app/settings-pages/routing.tsx — swap routing settings -->
+<!-- Code: stores/settingsStore.ts — rebalancing and middleman routing settings (maxHops, maxFeePercent, minSuccessRate, trustMode) -->
+
+- Configure routing parameters for mint swaps
+- Set max hops, max fee percentage, minimum success rate, and trust mode
+
+### Location Stamps
+
+<!-- Code: hooks/useTransactionLocation.ts — captures GPS coordinates at transaction time -->
+<!-- Code: hooks/useTransactionLocationSection.ts — manages location reveal/hide state -->
+<!-- Code: stores/transactionLocationStore.ts — maps transaction IDs to GPS coordinates -->
+<!-- Code: components/blocks/TransactionLocationSection.tsx — displays location data with tap-to-reveal -->
+
+- Opt-in location stamps — tag where a transaction happened
+- Stored locally, shown on a map with a privacy-first "tap to reveal" blur
+- Off by default
+
+<img width="1600" height="1200" alt="location-stamps" src="https://gist.github.com/user-attachments/assets/edb6048e-80c2-4947-9f43-922a0999de3a" />
+
+### Routstr
+
+<!-- Code: app/(drawer)/(tabs)/explore/index.tsx — explore tab with Routstr AI section -->
+<!-- Code: components/blocks/routstr/SessionsPanel.tsx — animated side panel for chat session management -->
+<!-- Code: stores/routstrStore.ts — API key, balance, conversations, model selection, session management -->
+<!-- Code: helper/routstr/api.ts — Routstr API client for models and chat -->
+
+- Built-in AI chat through Routstr
+- Pick from dozens of models across providers — each one shows exactly what it costs in sats per token
+- No subscription — send ecash to fund your balance
+- Session management with search, model switching, and anonymous mode
+
+<img width="1600" height="1200" alt="routstr" src="https://gist.github.com/user-attachments/assets/0fdf5184-03b1-4f8d-9766-efd9096a7da6" />
+
+### Payment Requests
+
+<!-- Code: app/(send-flow)/sendToken.tsx — send token screen with payment request support (NUT-18) -->
+<!-- Code: components/screens/SendTokenScreen.tsx — unified send screen supporting payment request mode -->
+<!-- Code: hooks/coco/useProcessPaymentString.ts — processes payment request strings -->
+
+- Cashu payment requests (NUT-18) — send ecash directly over Nostr
+- No Lightning invoice needed — just a request, a tap, and it's done
+
+### NFC
+
+<!-- Code: helper/nfc.ts — NFC payment service (NDEF Type 4 Tag protocol) -->
+<!-- Code: app/(drawer)/(tabs)/index/_layout.tsx — NFC payment handler with mint selection and amount limits -->
+<!-- Code: stores/scanHistoryStore.ts — tracks NFC scans in history -->
+
+- NFC tap payments — scan NFC tags to pay Lightning invoices or receive ecash
+- Includes rollback handling, robust mint selection, and POS payment recovery
+
+### QR Scanner
+
+<!-- Code: components/screens/CameraScreen.tsx — QR scanner with torch, clipboard paste, gallery QR import, UR code progress -->
+<!-- Code: hooks/useHandleCameraPermission.ts — camera permission management -->
+<!-- Code: hooks/coco/useProcessPaymentString.ts — processes scanned QR codes into actions -->
+
+- Full-featured QR code scanner with torch toggle
+- Import QR codes from your photo library — pick an image and the app decodes it automatically via `expo-camera` `scanFromURLAsync`
+- UR code support with multi-frame progress tracking
+- Clipboard paste fallback for quick input
+
+### Emoji Token Encoding
+
+<!-- Code: components/blocks/sheets/emoji-picker/index.tsx — emoji picker sheet for token encoding -->
+<!-- Code: components/blocks/sheets/emoji-picker/routes/routeA.tsx — emoji grid with 11 Bitcoin-themed emojis -->
+
+- Encode ecash tokens with Bitcoin-themed emojis for creative sharing
+- Select an emoji, token is encoded, copied to clipboard automatically
+
+### Deep Linking
+
+<!-- Code: hooks/useDeeplink.ts — processes cashu:// and sovran:// URLs -->
+<!-- Code: app.json — deep link schemes: ["sovran", "cashu"] -->
+
+- `cashu://` and `sovran://` URL schemes for seamless payment handling
+- Automatically routes to the right screen based on link content
+
+### Passcode Lock
+
+<!-- Code: app/settings-pages/passcode.tsx — passcode settings: create, confirm 4-digit PIN -->
+<!-- Code: components/blocks/passcode/PasscodeScreen.tsx — passcode entry screen -->
+<!-- Code: components/blocks/passcode/NumericKeyboard.tsx — custom numeric keyboard -->
+<!-- Code: components/blocks/PasscodeGate.tsx — passcode protection gate -->
+
+- 4-digit PIN code for app-level protection
+- Custom numeric keyboard with passcode gate on launch
+
+### Wallet Recovery
+
+<!-- Code: app/settings-pages/recovery.tsx — wallet recovery screen: restore tokens from seed across all mints -->
+<!-- Code: hooks/coco/useMintManagement.ts — restoreMint function -->
+
+- Restore your wallet from a BIP-39 seed phrase
+- Sweeps all known mints to recover ecash proofs
+- Progress tracking per mint during recovery
+
+### Security & Privacy
+
+<!-- Code: hooks/useSecureStore.ts — secure storage access, useMnemonic, useCashuMnemonic hooks -->
+<!-- Code: helper/secureStorage.ts — secure storage helper with biometric support -->
+<!-- Code: providers/NostrKeysProvider.tsx — BIP39 seed → Nostr key derivation (NIP-06) -->
+<!-- Code: components/blocks/AppGate.tsx — terms acceptance and onboarding gate -->
+
+- BIP-39 mnemonic seed phrase generation and storage
+- NIP-06 deterministic key derivation for Nostr identity
+- Encrypted local storage via expo-secure-store
+- No data collection — privacy-first, open source
+
+---
+
 ## Scripts
 
 ### Development
 
-Start the Expo development server:
-
 ```sh
-yarn start
-```
-
-Run on iOS simulator/device:
-
-```sh
-yarn ios
-```
-
-Run on Android emulator/device:
-
-```sh
-yarn android
+yarn start     # Start Expo development server
+yarn ios       # Run on iOS simulator/device
+yarn android   # Run on Android emulator/device
 ```
 
 ### Building
 
-Prebuild native projects (cleans existing native directories):
-
 ```sh
-yarn prebuild
+yarn prebuild          # Prebuild native projects
+yarn build:ios         # Build iOS for production (EAS)
+yarn build:dev:ios     # Build iOS for development (EAS)
+yarn build:android:apk # Build Android APK (preview)
 ```
 
-Build iOS app for production (via EAS):
+### Submitting
 
 ```sh
-yarn build:ios
-```
-
-Build iOS app for development (via EAS):
-
-```sh
-yarn build:dev:ios
-```
-
-Build Android APK (preview profile):
-
-```sh
-yarn build:android:apk
-```
-
-### Submitting to App Stores
-
-Submit iOS build to App Store:
-
-```sh
-yarn submit:ios
-```
-
-Submit Android build to Play Store:
-
-```sh
-yarn submit:android
+yarn submit:ios      # Submit iOS build to App Store
+yarn submit:android  # Submit Android build to Play Store
 ```
 
 ### Code Quality
 
-Run ESLint:
-
 ```sh
-yarn lint
-```
-
-Run TypeScript type checking:
-
-```sh
-yarn type-check
-```
-
-Format code with Prettier:
-
-```sh
-yarn pretty
+yarn lint         # Run ESLint
+yarn type-check   # Run TypeScript type checking
+yarn pretty       # Format code with Prettier
+yarn pretty:check # Check formatting without writing
+yarn knip         # Find unused exports/dependencies
 ```
 
 ### Testing
 
-Run Maestro UI tests:
-
 ```sh
-yarn maestro
+yarn maestro  # Run Maestro UI tests
 ```
-
-## Features
-
-### Core Wallet Functionality ✅
-
-- **Cashu ecash support** - Send and receive Bitcoin via ecash tokens
-- **Lightning Network integration** - Lightning payments and invoices
-- **Multi-currency support** - USD, EUR, GBP, and Satoshi units
-- **QR code scanning** - Camera-based payment processing
-- **NFC support** - Contactless payment capabilities
-
-### Security & Privacy ✅
-
-- **BIP39 mnemonic recovery** - 12-word seed phrase backup
-- **NIP-06 key derivation** - Deterministic key generation for nostr profiles
-- **Passcode protection** - Device-level security
-- **Secure storage** - Encrypted local data storage
-- **No data collection** - Privacy-first approach
-- **Open source** - Fully auditable codebase
-
-### Nostr Integration ✅
-
-- **Decentralized identity** - Nostr profile management
-- **Direct messaging** - Encrypted peer-to-peer communication
-- **Contact management** - Nostr-based contact system
-- **Profile sharing** - QR code profile sharing
-
-### User Experience ✅
-
-- **Modern UI/UX** - Clean, intuitive interface
-- **Theme support** - Multiple visual themes
-- **Transaction history** - Comprehensive transaction tracking
-- **Mint management** - Add and manage multiple mints
-- **Real-time updates** - Live balance and transaction updates
-
-## Current Status
-
-**Version:** 0.0.51 (Build 9)
-
-### Recent Updates
-
-- **Mint Audit Page** - Added comprehensive mint auditing capabilities
-- **Mint Messaging** - Direct communication with mints
-- **Enhanced Error Handling** - Improved Lightning payment error messages
-- **Payment State Tracking** - Real-time transaction status updates
-- **Auto-updating Mint Auditor** - Daily mint health checks
-
-## Roadmap
-
-### Phase 1: Foundation Stabilization
-
-- [ ] **Coco Multi-Unit Support** - Full support for multiple currency units
-- [ ] **Code Quality** - Zero TypeScript errors and linting issues
-- [ ] **Expired Transaction Polish** - Improved handling of expired transactions
-- [ ] **Performance Optimization** - Enhanced app responsiveness
-
-### Phase 2: Core Features Restoration
-
-- [ ] **Swap Functionality** - Re-implement token swapping between mints
-- [ ] **Advanced Mint Management** - Enhanced mint discovery and management
-- [x] **Transaction Filtering** - Advanced transaction search and filtering
-- [ ] **Export Capabilities** - Transaction history export
-- [x] **Restore backup** - Restore cashu tokens for mints that support it
-
-### Phase 3: Enhanced User Experience
-
-- [ ] **Push Notifications** - Real-time payment notifications
-- [ ] **Biometric Authentication** - Fingerprint/Face ID support (infrastructure exists, needs enabling)
-- [ ] **Advanced Security** - Hardware wallet integration
-- [ ] **Offline Mode** - Limited functionality without internet
-
-### Phase 4: Advanced Features
-
-- [ ] **Lightning Address Support** - Full LNURL-pay integration
-- [ ] **Plugin System** - Extensible architecture
 
 ## Technical Architecture
 
 ### Code Structure
 
-This is a **React Native** project built with **Expo** that provides a modern Bitcoin wallet experience. The app uses a clean, modular architecture with clear separation of concerns:
+React Native app built with Expo, using file-based routing via Expo Router.
 
-- **Frontend**: React Native with Expo for cross-platform mobile development
-- **Styling**: Tailwind CSS via NativeWind for consistent, utility-first styling
-- **State Management**: Zustand for lightweight, performant state management
-- **Bitcoin, Lightning and Cashu Operations**: Coco-Cashu for modular ecash processing and mint operations
-- **Nostr Integration**: nostr-development-kit (NDK) for decentralized communication and identity
+<!-- Code: app/_layout.tsx — root layout with providers, theme, and navigation stack -->
+<!-- Code: app/(drawer)/_layout.tsx — drawer layout (Wallet, Payments, Settings) -->
+<!-- Code: app/(drawer)/(tabs)/_layout.tsx — tab bar layout (Payments, Wallet, Explore) -->
 
-### Built With
-
-- **React Native** - Cross-platform mobile development framework
-- **Expo** - Development platform and build tools
-- **TypeScript** - Type-safe development with full type coverage
-- **Tailwind CSS** - Utility-first CSS framework via NativeWind
-- **Zustand** - Lightweight state management (replacing Redux)
-- **Coco-Cashu** - Modular Cashu implementation for ecash operations
-- **nostr-development-kit (NDK)** - Nostr protocol integration and utilities
-- **Redux** - Legacy state management (being migrated to Zustand)
+- **Frontend**: React Native with Expo
+- **Styling**: Tailwind CSS via NativeWind
+- **State Management**: Zustand (migrating from Redux)
+- **Cashu Operations**: Coco-Cashu for ecash processing
+- **Nostr Integration**: NDK for decentralized communication
+- **Animations**: Reanimated with hero transitions
 
 ### Protocol Support
 
-- **Cashu NUTs** - NUT-00 through NUT-13, NUT-17, NUT-18, NUT-23
-- **Lightning Network** - BOLT11 invoices
-- **Nostr** - NIP-04 (encrypted DMs), NIP-05 (identifiers), NIP-06 (key derivation), NIP-19 (bech32)
-- **BIP39/BIP32** - Hierarchical deterministic wallets
-
-## Development Status
-
-Due to migrating to the Coco architecture, several features were temporarily removed to ensure a more reliable foundation. This "one step back, two steps forward" approach ensures long-term stability and maintainability.
-
-### Known Issues
-
-- Some experimental features require manual activation
-- Limited multi-unit support in current Coco implementation
-- Transaction expiration handling needs refinement
+- **Cashu NUTs** — NUT-00 through NUT-13, NUT-17, NUT-18, NUT-23
+- **Lightning Network** — BOLT11 invoices
+- **Nostr** — NIP-04, NIP-05, NIP-06, NIP-17, NIP-19, NIP-44, NIP-59
+- **BIP-39 / BIP-32** — Hierarchical deterministic wallets
 
 ## Contributing
 
-We welcome contributions! Please see our [GitHub repository](https://github.com/SovranBitcoin/Sovran) for:
-
-- Issue reporting
-- Feature requests
-- Code contributions
-- Documentation improvements
+We welcome contributions! See our [GitHub repository](https://github.com/SovranBitcoin/Sovran) for issues, feature requests, and code contributions.
 
 ## Support
 
-- **GitHub Issues** - Bug reports and feature requests
-- **Nostr** - Direct messaging via Nostr protocol
-- **Twitter** - [@KevinKelbie](https://x.com/KevinKelbie)
+- **GitHub Issues** — Bug reports and feature requests
+- **Nostr** — Direct messaging via Nostr protocol
+- **Twitter** — [@KevinKelbie](https://x.com/KevinKelbie)

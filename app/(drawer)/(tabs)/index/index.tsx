@@ -1,6 +1,8 @@
 import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
 import { DebugBalancePanel } from 'components/blocks/DebugBalancePanel';
+import { BitcoinNearYou } from 'components/blocks/BitcoinNearYou';
+import { ReceivedThisMonth, SpentThisMonth } from 'components/blocks/MonthlyChart';
 import { Transactions } from 'components/blocks/Transactions';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { View } from 'components/ui/View/View';
@@ -65,12 +67,16 @@ function TabOneScreen() {
       {devMode ? <DebugBalancePanel /> : null}
 
       <View
-        className="p-4 pt-0"
+        className="p-4 pb-24 pt-4"
         style={{
           // Account for the AccountPagerView height (50% of screen) plus button area (~88px)
           minHeight: windowHeight - windowHeight * 0.5 - 88,
+          gap: 16,
         }}>
         <Transactions account={account} showMore={true} history={history} hideExpired={true} />
+        <SpentThisMonth history={history} unit={account.unit} />
+        <ReceivedThisMonth history={history} unit={account.unit} />
+        <BitcoinNearYou />
       </View>
     </LayoutDebugWrapper>
   );
