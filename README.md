@@ -270,11 +270,12 @@
 
 ### QR Scanner
 
-<!-- Code: components/screens/CameraScreen.tsx — QR scanner with torch, clipboard paste, gallery support, UR code progress -->
+<!-- Code: components/screens/CameraScreen.tsx — QR scanner with torch, clipboard paste, gallery QR import, UR code progress -->
 <!-- Code: hooks/useHandleCameraPermission.ts — camera permission management -->
 <!-- Code: hooks/coco/useProcessPaymentString.ts — processes scanned QR codes into actions -->
 
-- Full-featured QR code scanner with torch toggle and gallery import
+- Full-featured QR code scanner with torch toggle
+- Import QR codes from your photo library — pick an image and the app decodes it automatically via `expo-camera` `scanFromURLAsync`
 - UR code support with multi-frame progress tracking
 - Clipboard paste fallback for quick input
 
