@@ -7,7 +7,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Dimensions, AppState } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, scanFromURLAsync } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -17,6 +17,7 @@ import Icon from 'assets/icons';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -143,8 +144,28 @@ export function CameraScreen({
   }, []);
 
   const handleGalleryPress = useCallback(async (): Promise<void> => {
-    popup({ message: 'feature_coming_soon', emoji: '📸', type: 'info' });
-  }, []);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      const scannedCodes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
+
+      if (scannedCodes.length === 0) {
+        popup({ message: 'No QR code found in image', emoji: '🔍', type: 'info' });
+        return;
+      }
+
+      const scanning: ScanningData = { data: scannedCodes[0].data, type: 'qr' };
+      await handleScan(scanning);
+    } catch {
+      popup({ message: 'Failed to scan QR code from image', emoji: '❌', type: 'error' });
+    }
+  }, [handleScan]);
 
   const handleClipboardPress = useCallback(async (): Promise<void> => {
     const text = await Clipboard.getStringAsync();
