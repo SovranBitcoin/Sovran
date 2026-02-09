@@ -33,7 +33,13 @@ const Camera: React.FC = () => {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Scan QR' }} />
+      <Stack.Screen
+        options={{
+          title: 'Scan QR',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <CameraScreen onScan={handleScan} onReset={reset} />
     </>
   );
