@@ -42,6 +42,7 @@ import {
   type StepStatus,
 } from 'components/blocks/rebalance';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import { useSettingsStore } from 'stores/settingsStore';
 import { CocoManager } from 'helper/coco/manager';
 import Icon from 'assets/icons';
@@ -1239,9 +1240,9 @@ function RebalancePlanScreen() {
     [updateStepState, runStatus]
   );
 
-  // Handle done - go back
+  // Handle done - dismiss everything back to home
   const handleDone = useCallback(() => {
-    router.back();
+    router.dismissTo('/');
   }, []);
 
   // Check if there's a failed step
@@ -1664,29 +1665,27 @@ function RebalancePlanScreen() {
           </VStack>
         )}
 
-        {/* Run finished message */}
-        {runStatus === 'finished' && plan.steps.length > 0 && (
-          <View style={styles.completeContainer}>
-            <VStack gap={8} align="center">
-              {failedCount > 0 ? (
-                <>
-                  <Icon name="mdi:alert-circle" size={32} color={'#ef4444'} />
-                  <Text size={14} style={{ color: '#ef4444', textAlign: 'center' }}>
-                    Finished with errors
-                  </Text>
-                  <Text size={12} style={{ color: primaryColor300, textAlign: 'center' }}>
-                    Some transfers failed. You can retry the failed ones.
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Icon name="mdi:check-circle" size={32} color={greenColor} />
-                  <Text size={14} style={{ color: greenColor, textAlign: 'center' }}>
-                    Rebalance complete!
-                  </Text>
-                </>
-              )}
-            </VStack>
+        {/* View Swap button — shown when run finishes */}
+        {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (
+          <View style={styles.viewSwapContainer}>
+            <TouchableOpacity
+              haptics
+              onPress={() => {
+                router.navigate({
+                  pathname: '/swap' as any,
+                  params: { groupId: swapGroupIdRef.current! },
+                });
+              }}>
+              <View style={[styles.viewSwapButton, { borderColor: primaryColor700 }]}>
+                <BlurCardFrame accentColor={primaryColor300}>
+                  <View style={styles.viewSwapContent}>
+                    <Text size={14} bold style={{ color: primaryColor0 }}>
+                      View Swap
+                    </Text>
+                  </View>
+                </BlurCardFrame>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1747,9 +1746,21 @@ const styles = StyleSheet.create({
     padding: 40,
     alignItems: 'center',
   },
-  completeContainer: {
-    padding: 24,
+  viewSwapContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  viewSwapButton: {
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  viewSwapContent: {
+    padding: 12,
     alignItems: 'center',
+    zIndex: 1,
   },
   debugContainer: {
     margin: 16,
