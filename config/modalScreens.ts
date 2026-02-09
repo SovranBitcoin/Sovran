@@ -102,6 +102,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
   },
   {
     name: 'camera',
+    title: 'Scan QR',
+    options: {
+      headerShown: true,
+      headerTransparent: true,
+      headerStyle: { backgroundColor: 'transparent' },
+    },
   },
   {
     name: 'share',
