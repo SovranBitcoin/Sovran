@@ -197,6 +197,7 @@ module.exports = withMonicon(nativeWindConfig, {
     'mdi:key-variant',
 
     // Lightning Address card icons
+    'mdi:arrow-up',
     'mdi:arrow-down',
     'mdi:share-variant',
     'mdi:qrcode',
