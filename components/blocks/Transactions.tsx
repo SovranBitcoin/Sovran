@@ -368,19 +368,22 @@ export const Transactions = React.memo(
         return (
           <View>
             <VStack spacing={8}>
-              <Spacer size={8} />
-              <Text heavy size={16} color={getPrimaryColor('100')}>
-                {label}
-              </Text>
               {sects.map((section) => (
                 <View key={section.title}>
-                  <VStack spacing={4}>
-                    <Text size={14} heavy color={getPrimaryColor('100')}>
-                      {section.title}
-                    </Text>
+                  <VStack spacing={8}>
                     <View style={[styles.card, { borderColor }]}>
                       <BlurCardFrame accentColor={accentColor}>
-                        <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+                        <View style={styles.content}>
+                          <View style={styles.sectionHeader}>
+                            <Text heavy size={16} color={getPrimaryColor('0')}>
+                              {label}
+                            </Text>
+                            <Text size={12} color={opacity(getPrimaryColor('0'), 0.66)}>
+                              {section.title}
+                            </Text>
+                          </View>
+                          {section.data.map(renderTimelineItem)}
+                        </View>
                       </BlurCardFrame>
                     </View>
                     {label === 'Confirmed' && (
@@ -415,7 +418,7 @@ export const Transactions = React.memo(
       };
 
       return (
-        <View className="w-full pb-24">
+        <View className="w-full">
           {renderStatus('Pending', sections.pending)}
           {renderStatus('Expired', sections.expired)}
           {renderStatus('Confirmed', sections.confirmed)}
@@ -470,6 +473,11 @@ const styles = StyleSheet.create({
   },
   content: {
     zIndex: 1,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
   },
   viewAllButton: {
     borderRadius: 20,
