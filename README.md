@@ -122,8 +122,6 @@
 - Tap any user to see their profile — reputation score, follower count, and most-followed connections
 - Powered by Nostr social graph data
 
-<img width="1200" height="1200" alt="profiles+messages" src="https://gist.github.com/user-attachments/assets/7359b8c0-2f66-4012-822a-5c323c83cb0e" />
-
 ### Nostr Direct Messages
 
 <!-- Code: components/screens/UserMessagesScreen.tsx — DM conversation screen -->
@@ -145,6 +143,8 @@
 - Nostr-based contact system on the payments page
 - Search for users by npub, NIP-05, or name
 - Recent conversations with message previews
+
+<img width="1200" height="1200" alt="profiles+messages" src="https://gist.github.com/user-attachments/assets/7359b8c0-2f66-4012-822a-5c323c83cb0e" />
 
 ### BTCMaps
 
