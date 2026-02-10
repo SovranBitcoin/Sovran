@@ -4,11 +4,11 @@ import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { router } from 'expo-router';
@@ -75,28 +75,9 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
     refs.current[id][role] = ref;
   }, []);
 
-  const finishOverlay = useCallback((onDone: () => void) => {
-    onDone();
-  }, []);
-
-  const runOverlayAnimationOnUI = useCallback(
-    (onDone: () => void) => {
-      cancelAnimation(progress);
-      progress.set(0);
-      progress.set(
-        withTiming(1, { duration: DURATION_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
-          if (finished) {
-            scheduleOnRN(finishOverlay, onDone);
-          }
-        })
-      );
-    },
-    [finishOverlay, progress]
-  );
-
   const animateOverlay = useCallback(
     (fromRect: Rect, toRect: Rect, onDone: () => void) => {
-      // Set geometry synchronously so the overlay never mounts “empty/invisible”.
+      // Set geometry synchronously so the overlay never mounts "empty/invisible".
       fromX.set(fromRect.x);
       fromY.set(fromRect.y);
       fromW.set(fromRect.width);
@@ -106,9 +87,22 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       toW.set(toRect.width);
       toH.set(toRect.height);
 
-      scheduleOnUI(runOverlayAnimationOnUI, onDone);
+      // Drive animation directly from JS thread — reanimated handles the UI-thread
+      // transition internally. On completion, bounce back to JS via runOnJS.
+      // (Previously used scheduleOnUI/scheduleOnRN from react-native-worklets which
+      // caused SIGABRT crashes when combined with navigation transitions.)
+      cancelAnimation(progress);
+      progress.set(0);
+      progress.set(
+        withTiming(1, { duration: DURATION_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
+          'worklet';
+          if (finished) {
+            runOnJS(onDone)();
+          }
+        })
+      );
     },
-    [fromH, fromW, fromX, fromY, runOverlayAnimationOnUI, toH, toW, toX, toY]
+    [fromH, fromW, fromX, fromY, progress, toH, toW, toX, toY]
   );
 
   const overlayStyle = useAnimatedStyle(() => {
@@ -164,7 +158,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const isHidden = useCallback(
     (id: HeroId, role: HeroRole) => {
       // While overlay is visible, hide both source and destination nodes to avoid double-render flicker.
-      // (The overlay is the “one true” element during the morph.)
+      // (The overlay is the "one true" element during the morph.)
       if (!overlayVisible) return false;
       if (phase.state === 'idle') return false;
       if (!('id' in phase)) return false;

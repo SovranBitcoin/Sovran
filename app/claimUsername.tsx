@@ -36,7 +36,12 @@ import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -281,6 +286,29 @@ function ClaimUsernameScreen() {
     hero.registerRef('claimUsername', 'destination', heroRef.current);
   }, [hero]);
 
+  // ---------------------------------------------------------------------------
+  // Safe fade-in animation (always mounted, no mount/unmount race with Core Animation)
+  // ---------------------------------------------------------------------------
+  const isHeroTransitioning = hero.isTransitioning('claimUsername');
+
+  const contentOpacity = useSharedValue(0);
+  const contentTranslateY = useSharedValue(20);
+
+  useEffect(() => {
+    if (!isHeroTransitioning) {
+      contentOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
+      contentTranslateY.value = withDelay(120, withTiming(0, { duration: 220 }));
+    } else {
+      contentOpacity.value = 0;
+      contentTranslateY.value = 20;
+    }
+  }, [isHeroTransitioning, contentOpacity, contentTranslateY]);
+
+  const contentAnimStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [{ translateY: contentTranslateY.value }],
+  }));
+
   const topOffset = insets.top;
   const accentColor = '#f59e0b';
 
@@ -475,81 +503,76 @@ function ClaimUsernameScreen() {
             </ClaimUsernameCardFrame>
           </RNView>
 
-          {!hero.isTransitioning('claimUsername') ? (
-            <Animated.View entering={FadeInUp.duration(220).delay(120)}>
-              <View style={{ paddingHorizontal: 16 }}>
-                <VStack style={{ gap: 8, marginTop: 18 }}>
-                  <Text
-                    size={12}
-                    heavy
-                    style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
-                    SELECT DOMAIN
+          <Animated.View style={contentAnimStyle}>
+            <View style={{ paddingHorizontal: 16 }}>
+              <VStack style={{ gap: 8, marginTop: 18 }}>
+                <Text
+                  size={12}
+                  heavy
+                  style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
+                  SELECT DOMAIN
+                </Text>
+                {DOMAINS.map((domain) => (
+                  <DomainOption
+                    key={domain.id}
+                    domain={domain}
+                    isSelected={selectedDomain === domain.id}
+                    onSelect={() => setSelectedDomain(domain.id)}
+                    availabilityResult={
+                      username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
+                    }
+                  />
+                ))}
+              </VStack>
+
+              {username.length === 0 && (
+                <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
+                  <Text size={13} heavy style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
+                    Username Guidelines
                   </Text>
-                  {DOMAINS.map((domain) => (
-                    <DomainOption
-                      key={domain.id}
-                      domain={domain}
-                      isSelected={selectedDomain === domain.id}
-                      onSelect={() => setSelectedDomain(domain.id)}
-                      availabilityResult={
-                        username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
-                      }
-                    />
-                  ))}
-                </VStack>
+                  <VStack style={{ gap: 10 }}>
+                    {[
+                      { text: 'At least 3 characters', icon: 'mdi:check' },
+                      { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
+                      { text: 'No spaces or special characters', icon: 'mdi:check' },
+                    ].map((item, index) => (
+                      <HStack key={index} align="center">
+                        <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
+                        <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
+                          {item.text}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </View>
+              )}
 
-                {username.length === 0 && (
-                  <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
-                    <Text
-                      size={13}
-                      heavy
-                      style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
-                      Username Guidelines
-                    </Text>
-                    <VStack style={{ gap: 10 }}>
-                      {[
-                        { text: 'At least 3 characters', icon: 'mdi:check' },
-                        { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
-                        { text: 'No spaces or special characters', icon: 'mdi:check' },
-                      ].map((item, index) => (
-                        <HStack key={index} align="center">
-                          <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
-                          <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
-                            {item.text}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </View>
-                )}
-
-                {/* Preview - show when valid username */}
-                {username.length >= 3 && selectedDomainAvailable && (
-                  <View
-                    style={[
-                      styles.previewBox,
-                      {
-                        backgroundColor: opacity(getPrimaryColor('500'), 0.08),
-                        borderColor: opacity(getPrimaryColor('500'), 0.2),
-                      },
-                    ]}>
-                    <Text
-                      size={11}
-                      heavy
-                      style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
-                      YOUR NEW ADDRESS
-                    </Text>
-                    <Text
-                      size={18}
-                      heavy
-                      style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
-                      {username}@{selectedDomainLabel}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          ) : null}
+              {/* Preview - show when valid username */}
+              {username.length >= 3 && selectedDomainAvailable && (
+                <View
+                  style={[
+                    styles.previewBox,
+                    {
+                      backgroundColor: opacity(getPrimaryColor('500'), 0.08),
+                      borderColor: opacity(getPrimaryColor('500'), 0.2),
+                    },
+                  ]}>
+                  <Text
+                    size={11}
+                    heavy
+                    style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
+                    YOUR NEW ADDRESS
+                  </Text>
+                  <Text
+                    size={18}
+                    heavy
+                    style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
+                    {username}@{selectedDomainLabel}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Animated.View>
         </VStack>
       </ModalLayoutWrapper>
     </>

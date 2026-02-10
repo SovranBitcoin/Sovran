@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { StyleSheet, ScrollView, View as RNView, useWindowDimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { Stack, router } from 'expo-router';
@@ -28,7 +28,8 @@ import Animated, {
   Extrapolation,
   SharedValue,
   useSharedValue,
-  FadeInUp,
+  withTiming,
+  withDelay,
 } from 'react-native-reanimated';
 import { popup } from 'helper/popup';
 import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
@@ -334,6 +335,40 @@ export default function PendingEcashScreen() {
     [getPrimaryColor, handleClose]
   );
 
+  // ---------------------------------------------------------------------------
+  // Safe fade-in animations (always mounted, no mount/unmount race with Core Animation)
+  // ---------------------------------------------------------------------------
+  const isHeroTransitioning = hero.isTransitioning('pendingEcash');
+
+  const tabsOpacity = useSharedValue(0);
+  const tabsTranslateY = useSharedValue(20);
+  const contentOpacity = useSharedValue(0);
+  const contentTranslateY = useSharedValue(20);
+
+  useEffect(() => {
+    if (!isHeroTransitioning) {
+      tabsOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
+      tabsTranslateY.value = withDelay(120, withTiming(0, { duration: 220 }));
+      contentOpacity.value = withDelay(160, withTiming(1, { duration: 240 }));
+      contentTranslateY.value = withDelay(160, withTiming(0, { duration: 240 }));
+    } else {
+      tabsOpacity.value = 0;
+      tabsTranslateY.value = 20;
+      contentOpacity.value = 0;
+      contentTranslateY.value = 20;
+    }
+  }, [isHeroTransitioning, tabsOpacity, tabsTranslateY, contentOpacity, contentTranslateY]);
+
+  const tabsAnimStyle = useAnimatedStyle(() => ({
+    opacity: tabsOpacity.value,
+    transform: [{ translateY: tabsTranslateY.value }],
+  }));
+
+  const contentAnimStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [{ translateY: contentTranslateY.value }],
+  }));
+
   // Rollback all pending transactions for the selected mint
   const handleSweep = useCallback(async () => {
     if (isSweeping || displayedTransactions.length === 0) return;
@@ -446,10 +481,8 @@ export default function PendingEcashScreen() {
           <RNView style={{ height: stickyHeaderHeight }} />
 
           {/* Transaction pages (swipeable PagerView) */}
-          {!hero.isTransitioning('pendingEcash') && mintsWithPending.length > 0 && (
-            <Animated.View
-              entering={FadeInUp.duration(240).delay(160)}
-              style={{ marginTop: -HEADER_OVERLAP }}>
+          {mintsWithPending.length > 0 && (
+            <Animated.View style={[contentAnimStyle, { marginTop: -HEADER_OVERLAP }]}>
               <PagerView
                 ref={pagerRef}
                 style={{ height: pagerHeight }}
@@ -482,14 +515,16 @@ export default function PendingEcashScreen() {
           )}
 
           {/* Empty state (no pending ecash at all) */}
-          {!hero.isTransitioning('pendingEcash') && mintsWithPending.length === 0 && (
+          {mintsWithPending.length === 0 && (
             <Animated.View
-              entering={FadeInUp.duration(240).delay(160)}
-              style={{
-                paddingHorizontal: 16,
-                marginTop: -HEADER_OVERLAP,
-                paddingTop: HEADER_OVERLAP,
-              }}>
+              style={[
+                contentAnimStyle,
+                {
+                  paddingHorizontal: 16,
+                  marginTop: -HEADER_OVERLAP,
+                  paddingTop: HEADER_OVERLAP,
+                },
+              ]}>
               <View style={styles.emptyState}>
                 <Icon name="mdi:check-circle-outline" size={48} color={getPrimaryColor('500')} />
                 <Spacer size={12} />
@@ -567,17 +602,15 @@ export default function PendingEcashScreen() {
             </RNView>
 
             {/* Mint tabs */}
-            {!hero.isTransitioning('pendingEcash') && (
-              <Animated.View entering={FadeInUp.duration(220).delay(120)} style={{ marginTop: 10 }}>
-                <MintTabs
-                  mints={mints}
-                  selectedMintUrl={effectiveSelectedMint}
-                  onMintChange={handleMintChange}
-                  pendingByMint={pendingByMint}
-                  scrollY={scrollY}
-                />
-              </Animated.View>
-            )}
+            <Animated.View style={[tabsAnimStyle, { marginTop: 10 }]}>
+              <MintTabs
+                mints={mints}
+                selectedMintUrl={effectiveSelectedMint}
+                onMintChange={handleMintChange}
+                pendingByMint={pendingByMint}
+                scrollY={scrollY}
+              />
+            </Animated.View>
           </RNView>
         </RNView>
       </RNView>
