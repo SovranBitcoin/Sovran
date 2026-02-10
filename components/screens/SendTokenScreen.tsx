@@ -11,8 +11,9 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Share, ActivityIndicator } from 'react-native';
+import { Share, ActivityIndicator, ScrollView, Pressable } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as SQLite from 'expo-sqlite';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
@@ -64,6 +65,37 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://nos.lol',
   'wss://relay.primal.net',
 ];
+
+/**
+ * Update state for a legacy send history entry (no operationId).
+ *
+ * Legacy entries (pre-Dec 2025) have operationId = NULL in the DB. Coco's
+ * update methods all key on (mintUrl, operationId), and NULL = NULL is false
+ * in SQL, so they can never match these rows.
+ *
+ * We open the same coco.db directly and UPDATE by the row's primary key `id`,
+ * then emit `history:updated` so usePaginatedHistory re-fetches from the
+ * now-updated DB.
+ */
+async function updateLegacyHistoryState(
+  entry: SendHistoryEntry,
+  state: string,
+  mintUrl: string,
+  manager: ReturnType<typeof useManager>
+) {
+  if (!entry.id) return;
+  try {
+    const db = SQLite.openDatabaseSync('coco.db');
+    db.runSync(`UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`, [
+      state,
+      Number(entry.id),
+    ]);
+    // Emit so the UI refreshes from the updated DB
+    await manager.historyService.handleHistoryUpdated(mintUrl, { ...entry, state } as any);
+  } catch (err) {
+    console.warn('[SendTokenScreen] Failed to update legacy history state:', err);
+  }
+}
 
 /** Payment request data for confirmation mode (no token yet) */
 interface PaymentRequestData {
@@ -298,7 +330,78 @@ export function SendTokenScreen({
 
   const handleCancelSend = useCallback(
     async (onClose: (event: any) => void) => {
-      if (!currentTransaction?.operationId) return;
+      // --- Legacy fallback: no operationId but we have a token ---
+      if (!currentTransaction?.operationId) {
+        if (!token) {
+          popup({
+            message: 'Cannot Cancel',
+            text: 'No operation ID and no token available to reclaim.',
+            type: 'warning',
+            onClose: () => onClose({}),
+          });
+          return;
+        }
+        try {
+          const mintUrl = currentTransaction?.mintUrl;
+          if (!mintUrl) throw new Error('Missing mint URL');
+
+          // Check proof states with the mint (NUT-07)
+          const wallet = await manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+
+          const allSpent = proofStates.every((s) => s.state === 'SPENT');
+          if (allSpent) {
+            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            popup({
+              message: 'Token Already Redeemed',
+              text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
+              type: 'info',
+              onClose: () => onClose({}),
+            });
+            return;
+          }
+
+          // Filter to only unspent proofs — mint rejects swaps containing spent proofs
+          const unspentProofs = token.proofs.filter((_, i) => proofStates[i]?.state === 'UNSPENT');
+
+          if (unspentProofs.length === 0) {
+            // All proofs are PENDING at the mint
+            popup({
+              message: 'Cannot Reclaim Yet',
+              text: 'All proofs are in a pending state at the mint. Try again shortly.',
+              type: 'warning',
+              onClose: () => onClose({}),
+            });
+            return;
+          }
+
+          // Reclaim unspent proofs
+          const reclaimToken: Token = { mint: token.mint, proofs: unspentProofs, unit: token.unit };
+          await manager.wallet.receive(reclaimToken);
+          await updateLegacyHistoryState(currentTransaction, 'rolledBack', mintUrl, manager);
+
+          const amt = unspentProofs.reduce((s, p) => s + p.amount, 0);
+          popup({
+            message: 'Funds Reclaimed',
+            text: `${amt} ${currentTransaction?.unit || 'sat'} reclaimed back into your wallet.`,
+            type: 'success',
+            onClose: () => onClose({}),
+          });
+        } catch (error) {
+          console.error('[SendTokenScreen] Legacy cancel failed:', error);
+          popup({
+            message: 'Reclaim Failed',
+            text: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            onClose: () => onClose({}),
+          });
+        }
+        return;
+      }
+
+      // --- Normal path: operationId exists ---
       try {
         await manager.send.rollback(currentTransaction.operationId);
         popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
@@ -309,12 +412,75 @@ export function SendTokenScreen({
         });
       }
     },
-    [currentTransaction?.operationId, manager]
+    [currentTransaction, manager, token]
   );
 
   const handleCheckStatus = useCallback(
     async (onClose: (event: any) => void) => {
-      if (!currentTransaction?.operationId) return;
+      // --- Legacy fallback: no operationId but we have a token ---
+      if (!currentTransaction?.operationId) {
+        if (!token) {
+          popup({
+            message: 'Cannot Check Status',
+            text: 'No operation ID and no token available to verify.',
+            type: 'warning',
+            onClose: () => onClose({}),
+          });
+          return;
+        }
+        setIsCheckingStatus(true);
+        try {
+          const mintUrl = currentTransaction?.mintUrl;
+          if (!mintUrl) throw new Error('Missing mint URL');
+
+          const wallet = await manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+
+          const spentCount = proofStates.filter((s) => s.state === 'SPENT').length;
+          const unspentCount = proofStates.filter((s) => s.state === 'UNSPENT').length;
+          const pendingCount = proofStates.filter((s) => s.state === 'PENDING').length;
+          const total = proofStates.length;
+
+          if (spentCount === total) {
+            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            popup({
+              message: 'Token Redeemed',
+              text: 'All proofs are spent — the recipient has claimed this token.',
+              type: 'success',
+              onClose: () => onClose({}),
+            });
+          } else if (unspentCount === total) {
+            popup({
+              message: 'Token Still Pending',
+              text: 'All proofs are unspent — the recipient has not claimed this token yet. You can cancel to reclaim the funds.',
+              type: 'info',
+              onClose: () => onClose({}),
+            });
+          } else {
+            popup({
+              message: 'Mixed Proof States',
+              text: `${spentCount}/${total} spent, ${unspentCount}/${total} unspent, ${pendingCount}/${total} pending.`,
+              type: 'warning',
+              onClose: () => onClose({}),
+            });
+          }
+        } catch (error) {
+          console.error('[SendTokenScreen] Legacy check status failed:', error);
+          popup({
+            message: 'Check Status Failed',
+            text: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            onClose: () => onClose({}),
+          });
+        } finally {
+          setIsCheckingStatus(false);
+        }
+        return;
+      }
+
+      // --- Normal path: operationId exists ---
       setIsCheckingStatus(true);
       try {
         const operation = await manager.send.getOperation(currentTransaction.operationId);
@@ -374,7 +540,7 @@ export function SendTokenScreen({
         setIsCheckingStatus(false);
       }
     },
-    [currentTransaction?.operationId, manager]
+    [currentTransaction, manager, token]
   );
 
   const handleCopyEmoji = useCallback(
@@ -755,7 +921,162 @@ export function SendTokenScreen({
         {!isPaymentRequestMode && currentTransaction && (
           <TransactionDebugCode historyEntry={currentTransaction} />
         )}
+
+        {/* Comprehensive debug dump */}
+        {!isPaymentRequestMode && currentTransaction && (
+          <SendTokenDebugView
+            currentTransaction={currentTransaction}
+            sendHistoryEntryProp={sendHistoryEntryProp}
+            createdEntry={createdEntry}
+            token={token ?? null}
+            createdToken={createdToken}
+            mintInfo={mintInfo}
+            isMintTrusted={isMintTrusted}
+            parseError={parseError ?? null}
+            isCheckingStatus={isCheckingStatus}
+            manager={manager}
+          />
+        )}
       </VStack>
     </ModalLayoutWrapper>
+  );
+}
+
+/**
+ * Debug view that dumps all available state for a SendToken screen.
+ * Fetches the SendOperation record (if operationId exists) and proof states
+ * from the mint so you can see everything in one place.
+ */
+function SendTokenDebugView({
+  currentTransaction,
+  sendHistoryEntryProp,
+  createdEntry,
+  token,
+  createdToken,
+  mintInfo,
+  isMintTrusted,
+  parseError,
+  isCheckingStatus,
+  manager,
+}: {
+  currentTransaction: SendHistoryEntry;
+  sendHistoryEntryProp?: SendHistoryEntry | string;
+  createdEntry: SendHistoryEntry | null;
+  token: Token | null;
+  createdToken: Token | null;
+  mintInfo: GetInfoResponse | null;
+  isMintTrusted: boolean | null;
+  parseError: string | null;
+  isCheckingStatus: boolean;
+  manager: ReturnType<typeof useManager>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [operationData, setOperationData] = useState<unknown>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [proofStates, setProofStates] = useState<unknown>(null);
+  const [proofStatesError, setProofStatesError] = useState<string | null>(null);
+
+  // Fetch operation + proof states when expanded
+  useEffect(() => {
+    if (!expanded) return;
+
+    // Fetch SendOperation record
+    if (currentTransaction.operationId) {
+      manager.send
+        .getOperation(currentTransaction.operationId)
+        .then((op) => setOperationData(op ?? 'NOT_FOUND'))
+        .catch((err: unknown) =>
+          setOperationError(err instanceof Error ? err.message : String(err))
+        );
+    } else {
+      setOperationData('NO_OPERATION_ID');
+    }
+
+    // Fetch proof states from mint (NUT-07)
+    if (token?.proofs?.length && currentTransaction.mintUrl) {
+      (async () => {
+        try {
+          const wallet = await manager.walletService.getWallet(currentTransaction.mintUrl);
+          const states = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+          setProofStates(states);
+        } catch (err: unknown) {
+          setProofStatesError(err instanceof Error ? err.message : String(err));
+        }
+      })();
+    } else {
+      setProofStates(token?.proofs?.length ? 'NO_MINT_URL' : 'NO_PROOFS');
+    }
+  }, [expanded, currentTransaction, token, manager]);
+
+  const debugData = {
+    _meta: {
+      expandedAt: expanded ? new Date().toISOString() : null,
+      isCheckingStatus,
+      isMintTrusted,
+      parseError,
+    },
+    historyEntry: { ...currentTransaction, token: undefined },
+    propEntry:
+      sendHistoryEntryProp && typeof sendHistoryEntryProp === 'string'
+        ? { _raw: sendHistoryEntryProp.slice(0, 200) + '…' }
+        : (sendHistoryEntryProp ?? null),
+    createdEntry: createdEntry ?? null,
+    token: token ?? null,
+    createdToken: createdToken ?? null,
+    mintInfo: mintInfo ?? null,
+    sendOperation: operationError ? { error: operationError } : operationData,
+    proofStates: proofStatesError ? { error: proofStatesError } : proofStates,
+  };
+
+  return (
+    <View style={{ marginHorizontal: 16, marginTop: 16 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          style={{
+            flex: 1,
+            padding: 12,
+            borderRadius: 8,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+          }}>
+          <Text mono style={{ fontSize: 12 }}>
+            {expanded ? '[-] Hide Debug Info' : '[+] Show Debug Info'}
+          </Text>
+        </Pressable>
+        {expanded && (
+          <Pressable
+            onPress={() => {
+              Clipboard.setStringAsync(JSON.stringify(debugData, null, 2));
+              popup({ message: 'Debug JSON copied', type: 'success' });
+            }}
+            style={{
+              padding: 12,
+              borderRadius: 8,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              justifyContent: 'center',
+            }}>
+            <Text mono style={{ fontSize: 12 }}>
+              Copy
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {expanded && (
+        <ScrollView
+          horizontal
+          style={{ marginTop: 8 }}
+          contentContainerStyle={{
+            padding: 12,
+            borderRadius: 8,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+          }}>
+          <Text mono style={{ fontSize: 10 }} selectable>
+            {JSON.stringify(debugData, null, 2)}
+          </Text>
+        </ScrollView>
+      )}
+    </View>
   );
 }
