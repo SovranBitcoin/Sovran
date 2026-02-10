@@ -77,7 +77,8 @@ index 5c74304..33496a6 100644
    private eventBus;
 @@ -2451,10 +2452,10 @@ declare class Manager {
    private meltQuoteService;
-   private historyService;
+-  private historyService;
++  historyService: HistoryService;
    private seedService;
 -  private counterService;
 +  counterService: CounterService;
@@ -129,7 +130,8 @@ index e61e5be..91f1436 100644
    private eventBus;
 @@ -2451,10 +2452,10 @@ declare class Manager {
    private meltQuoteService;
-   private historyService;
+-  private historyService;
++  historyService: HistoryService;
    private seedService;
 -  private counterService;
 +  counterService: CounterService;

@@ -46,7 +46,6 @@ expo-env.d.ts
 
 android/
 
-.monicon
 .vscode
 .env
 
