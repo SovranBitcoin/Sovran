@@ -51,6 +51,7 @@ import { useBTCMapStore } from 'stores/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from 'utils/mapClustering';
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from 'utils/btcMapClusterCache';
+import { applySafetyOffset } from 'utils/locationPrivacy';
 
 // ============================================================================
 // Types & Constants
@@ -545,8 +546,10 @@ function MapScreen() {
         }
 
         const loc = await Location.getCurrentPositionAsync({});
-        setMapCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 12 });
-        updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 12);
+        // Privacy: offset camera so it doesn't centre on exact position
+        const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+        setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
+        updateMarkersForCamera(safe.latitude, safe.longitude, 12);
       } catch (err) {
         console.error('Location error:', err);
       }
@@ -555,12 +558,13 @@ function MapScreen() {
     return () => task.cancel();
   }, [setMapCamera, updateMarkersForCamera]);
 
-  // My location button
+  // My location button — applies safety offset so camera doesn't centre on exact position
   const handleMyLocation = useCallback(async () => {
     try {
       const loc = await Location.getCurrentPositionAsync({});
-      setMapCamera({ lat: loc.coords.latitude, lon: loc.coords.longitude, zoom: 15 });
-      updateMarkersForCamera(loc.coords.latitude, loc.coords.longitude, 15);
+      const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+      setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
+      updateMarkersForCamera(safe.latitude, safe.longitude, 15);
     } catch (err) {
       console.error('Location error:', err);
     }
@@ -665,7 +669,7 @@ function MapScreen() {
             coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
             zoom: DEFAULT_ZOOM,
           }}
-          properties={{ isMyLocationEnabled: true }}
+          properties={{ isMyLocationEnabled: false }}
           uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
           markers={markers}
           onMarkerClick={handleMarkerClick}
