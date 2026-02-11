@@ -1,7 +1,10 @@
 import React, { useCallback } from 'react';
 import { Drawer } from 'expo-router/drawer';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
+import {
+  GestureHandlerRootView,
+  Pressable as GesturePressable,
+} from 'react-native-gesture-handler';
+import { StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -124,11 +127,12 @@ function MenuButton({
   const { getPrimaryColor } = useTheme();
 
   return (
-    <Pressable
+    <GesturePressable
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.menuButton,
         isActive && { backgroundColor: opacity(getPrimaryColor('700'), 0.5) },
+        pressed && { opacity: 0.6 },
       ]}>
       <HStack align="center" spacing={12}>
         <Icon
@@ -143,7 +147,7 @@ function MenuButton({
           {label}
         </Text>
       </HStack>
-    </Pressable>
+    </GesturePressable>
   );
 }
 
@@ -153,18 +157,25 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const handleNavigation = useCallback(
     (route: string) => {
-      props.navigation.closeDrawer();
       router.navigate(`/${route}` as any);
+      props.navigation.closeDrawer();
     },
     [props.navigation]
   );
 
   const isRouteActive = (route: string) => {
-    if (
-      route.includes('(tabs)/wallet') &&
-      (pathname === '/' || pathname === '/wallet' || pathname.includes('wallet'))
-    ) {
-      return true;
+    // Wallet is (drawer)/(tabs) - the index tab (no "wallet" in path, it's index)
+    if (route === '(drawer)/(tabs)') {
+      return (
+        pathname === '/' ||
+        pathname === '/index' ||
+        pathname === '/(drawer)/(tabs)' ||
+        pathname === '/(drawer)/(tabs)/' ||
+        pathname.includes('(tabs)/index') ||
+        (pathname.includes('(tabs)') &&
+          !pathname.includes('payments') &&
+          !pathname.includes('explore'))
+      );
     }
     if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
       return true;
@@ -208,7 +219,7 @@ export default function DrawerLayout() {
       <Drawer
         screenOptions={{
           headerShown: false,
-          drawerType: 'front',
+          drawerType: 'slide',
           drawerStyle: {
             width: DRAWER_WIDTH,
             backgroundColor: getPrimaryColor('900'),
