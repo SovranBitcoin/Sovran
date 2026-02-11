@@ -453,19 +453,41 @@ function RebalancePlanScreen() {
           allBalances: currentBalances,
         });
 
-        // ── Fee headroom constant ──
-        const FEE_HEADROOM = MIN_FEE_RESERVE + 2; // 3 (planner constant) + 2 extra for input fees
+        // ── Dynamic fee headroom ──
+        // Compute actual input fees from the source mint's proof set instead
+        // of using a static constant.  When proofs are fragmented and the mint
+        // charges per-proof input fees (input_fee_ppk), a static headroom of
+        // ~5 sats can be far too small, causing "Not enough proofs to send".
+        const STATIC_FEE_HEADROOM = MIN_FEE_RESERVE + 2; // fallback: 5 sats
+        let feeHeadroom = STATIC_FEE_HEADROOM;
+        let worstCaseInputFee = 0;
+        try {
+          const proofs = await manager.proofService.getReadyProofs(fromMintUrl);
+          const wallet = await manager.walletService.getWallet(fromMintUrl);
+          worstCaseInputFee = wallet.getFeesForProofs(proofs as any);
+          // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
+          feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
+          appendDebug({
+            event: 'fee_headroom_computed',
+            stepId: id,
+            proofCount: proofs.length,
+            inputFee: worstCaseInputFee,
+            feeHeadroom,
+          });
+        } catch {
+          // Fallback to static headroom if proof query fails
+        }
 
         // ── Early skip: source balance too low ──
         // This commonly happens when a prior step's middleman routing already
         // swept the funds from this mint to the destination.  Rather than
         // reporting an error, we skip the step gracefully.
-        if (sourceBalance < minTransferThreshold + FEE_HEADROOM) {
+        if (sourceBalance < minTransferThreshold + feeHeadroom) {
           appendDebug({
             event: 'step_skipped_low_balance',
             stepId: id,
             sourceBalance,
-            minRequired: minTransferThreshold + FEE_HEADROOM,
+            minRequired: minTransferThreshold + feeHeadroom,
           });
           updateStepState(id, { status: 'skipped' });
           return true; // not a failure — funds already transferred
@@ -484,11 +506,11 @@ function RebalancePlanScreen() {
         // If the planned transfer is close to the full balance, that sum exceeds what's
         // available and throws "Not enough proofs to send" before we can adjust.
         // Pre-cap the amount to leave room for fees (fee_reserve + input fees).
-        if (transferAmount + FEE_HEADROOM > sourceBalance) {
-          const capped = sourceBalance - FEE_HEADROOM;
+        if (transferAmount + feeHeadroom > sourceBalance) {
+          const capped = sourceBalance - feeHeadroom;
           if (capped < minTransferThreshold) {
             throw new Error(
-              `Insufficient balance after fee headroom: ${sourceBalance} sats, need at least ${minTransferThreshold + FEE_HEADROOM}`
+              `Insufficient balance after fee headroom: ${sourceBalance} sats, need at least ${minTransferThreshold + feeHeadroom}`
             );
           }
           appendDebug({
@@ -497,7 +519,7 @@ function RebalancePlanScreen() {
             original: transferAmount,
             capped,
             sourceBalance,
-            feeHeadroom: FEE_HEADROOM,
+            feeHeadroom,
           });
           transferAmount = capped;
         }
@@ -515,6 +537,51 @@ function RebalancePlanScreen() {
 
         let mintQuote = await createInvoiceForAmount(transferAmount);
         invoice = mintQuote.request;
+
+        // ── Probe melt quote for actual fee_reserve ──
+        // The mint's fee_reserve varies wildly (e.g. 2 vs 10 sats) and we can't
+        // know it without asking.  Probe via the cashu-ts wallet directly (pure
+        // HTTP, no persistence/events) to discover the real fee_reserve, then
+        // re-cap the transfer amount if needed — avoiding blind retry loops.
+        try {
+          const probeWallet = await manager.walletService.getWallet(fromMintUrl);
+          const probeQuote = await (probeWallet as any).createMeltQuoteBolt11(invoice);
+          const actualFeeReserve = Number(probeQuote.fee_reserve ?? 0);
+
+          if (actualFeeReserve > 0) {
+            const probedHeadroom = actualFeeReserve + worstCaseInputFee;
+            appendDebug({
+              event: 'melt_probe_result',
+              stepId: id,
+              actualFeeReserve,
+              worstCaseInputFee,
+              probedHeadroom,
+              previousHeadroom: feeHeadroom,
+            });
+            feeHeadroom = Math.max(feeHeadroom, probedHeadroom);
+
+            // Re-cap transfer amount if the probed headroom reveals we're over budget
+            if (transferAmount + feeHeadroom > sourceBalance) {
+              const capped = sourceBalance - feeHeadroom;
+              if (capped >= minTransferThreshold) {
+                appendDebug({
+                  event: 'amount_recapped_after_probe',
+                  stepId: id,
+                  original: transferAmount,
+                  capped,
+                  sourceBalance,
+                  feeHeadroom,
+                });
+                transferAmount = capped;
+                mintQuote = await createInvoiceForAmount(transferAmount);
+                invoice = mintQuote.request;
+              }
+            }
+          }
+        } catch {
+          // Probe failed — proceed with existing headroom estimate; the retry
+          // loop below will handle any "Not enough proofs" errors.
+        }
 
         // Step 2: Prepare melt to get exact fees (v3 API)
         // This provides fee transparency and an operation ID for crash recovery.
@@ -544,10 +611,10 @@ function RebalancePlanScreen() {
         };
 
         // ── Prepare with automatic retry on "Not enough proofs" ──
-        // Even with the pre-cap, some mints may have higher fee_reserve or input
-        // fees than expected.  We retry up to 2 times, reducing the amount each time.
-        const MAX_PREPARE_RETRIES = 3;
-        const RETRY_REDUCE_SATS = 1;
+        // Even with the dynamic fee headroom, fee estimates can be slightly off
+        // (e.g. swap changes proof set).  Retry with larger reductions per attempt.
+        const MAX_PREPARE_RETRIES = 5;
+        const RETRY_REDUCE_SATS = 2;
         let preparedForFees: Awaited<ReturnType<typeof prepareForInvoice>> | null = null;
 
         for (let attempt = 0; attempt <= MAX_PREPARE_RETRIES; attempt++) {
@@ -848,13 +915,26 @@ function RebalancePlanScreen() {
                 const hopBalances = await manager.wallet.getBalances();
                 const hopSourceBalance = hopBalances[hopFrom] || 0;
 
+                // ── Per-hop dynamic fee headroom ──
+                // Each hop's source mint may have different input_fee_ppk, so
+                // compute the headroom specifically for this hop's source mint.
+                let hopFeeHeadroom = STATIC_FEE_HEADROOM;
+                try {
+                  const hopProofs = await manager.proofService.getReadyProofs(hopFrom);
+                  const hopWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopInputFee = hopWallet.getFeesForProofs(hopProofs as any);
+                  hopFeeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + hopInputFee);
+                } catch {
+                  // Fallback to static headroom if proof query fails
+                }
+
                 // Determine hop amount
                 let hopAmount: number;
                 if (hopIdx === 0) {
-                  hopAmount = Math.min(transferAmount, hopSourceBalance - FEE_HEADROOM);
+                  hopAmount = Math.min(transferAmount, hopSourceBalance - hopFeeHeadroom);
                 } else {
                   // Use whatever landed on the intermediary, minus fee headroom
-                  hopAmount = hopSourceBalance - FEE_HEADROOM;
+                  hopAmount = hopSourceBalance - hopFeeHeadroom;
                 }
 
                 if (hopAmount < minTransferThreshold) {
@@ -880,8 +960,50 @@ function RebalancePlanScreen() {
                 });
 
                 // Create invoice on receiving mint
-                const hopMq = await requestLightningInvoice(hopTo, hopAmount);
+                let hopMq = await requestLightningInvoice(hopTo, hopAmount);
                 let hopInvoice = hopMq.request;
+
+                // ── Probe melt quote for this hop's actual fee_reserve ──
+                try {
+                  const hopProbeWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopProbeQuote = await (hopProbeWallet as any).createMeltQuoteBolt11(
+                    hopInvoice
+                  );
+                  const hopActualFeeReserve = Number(hopProbeQuote.fee_reserve ?? 0);
+
+                  if (hopActualFeeReserve > 0) {
+                    // Recompute hop fee headroom with probed fee_reserve
+                    let hopProbeInputFee = 0;
+                    try {
+                      const hpProofs = await manager.proofService.getReadyProofs(hopFrom);
+                      const hpWallet = await manager.walletService.getWallet(hopFrom);
+                      hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as any);
+                    } catch {
+                      /* use 0 */
+                    }
+                    const hopProbedHeadroom = hopActualFeeReserve + hopProbeInputFee;
+
+                    if (hopAmount + hopProbedHeadroom > hopSourceBalance) {
+                      const cappedHop = hopSourceBalance - hopProbedHeadroom;
+                      if (cappedHop >= minTransferThreshold) {
+                        appendDebug({
+                          event: 'hop_amount_recapped_after_probe',
+                          stepId: id,
+                          hopIdx,
+                          original: hopAmount,
+                          capped: cappedHop,
+                          hopSourceBalance,
+                          hopProbedHeadroom,
+                        });
+                        hopAmount = cappedHop;
+                        hopMq = await requestLightningInvoice(hopTo, hopAmount);
+                        hopInvoice = hopMq.request;
+                      }
+                    }
+                  }
+                } catch {
+                  // Probe failed — proceed with existing estimate
+                }
 
                 // Tag leg in swap store
                 const hopLegId = groupId
