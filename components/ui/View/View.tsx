@@ -128,7 +128,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   const {
     blur = false,
     blurIntensity = 70,
-    blurTint = 'prominent',
+    blurTint = 'dark',
     style,
     children,
     className,

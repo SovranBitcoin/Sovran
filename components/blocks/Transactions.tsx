@@ -284,15 +284,19 @@ export const Transactions = React.memo(
 
     const emptyComponent = useMemo(
       () => (
-        <View style={{ paddingTop: 32, paddingHorizontal: 16 }}>
+        <View style={{ paddingTop: 32 }}>
           <View style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={accentColor}>
               <View style={styles.emptyState}>
-                <Icon name="fluent:clock-12-filled" size={36} color={getPrimaryColor('500')} />
+                <Icon
+                  name="fluent:clock-12-filled"
+                  size={36}
+                  color={opacity(getPrimaryColor('0'), 0.33)}
+                />
                 <Text
                   size={16}
                   style={{
-                    color: getPrimaryColor('300'),
+                    color: opacity(getPrimaryColor('0'), 0.66),
                     fontFamily: 'OverpassSemibold',
                     textAlign: 'center',
                   }}>
@@ -301,7 +305,7 @@ export const Transactions = React.memo(
                 <Text
                   size={14}
                   style={{
-                    color: getPrimaryColor('500'),
+                    color: opacity(getPrimaryColor('0'), 0.4),
                     textAlign: 'center',
                   }}>
                   Try adjusting your filters or check back later
@@ -346,19 +350,36 @@ export const Transactions = React.memo(
 
       if (timelineItems.length === 0) {
         return (
-          <View
-            className="flex items-center"
-            style={{
-              minHeight: Dimensions.get('screen').height / 2,
-            }}>
+          <View>
             <Spacer size={24} />
-            <Icon name="fluent:clock-12-filled" size={32} color={getPrimaryColor('300')} />
-            <Text heavy size={16} style={{ color: getPrimaryColor('300') }}>
-              No History
-            </Text>
-            <Text color={getPrimaryColor('300')} size={16}>
-              Your history will show up here
-            </Text>
+            <View style={[styles.card, { borderColor }]}>
+              <BlurCardFrame accentColor={accentColor}>
+                <View style={styles.emptyState}>
+                  <Icon
+                    name="fluent:clock-12-filled"
+                    size={36}
+                    color={opacity(getPrimaryColor('0'), 0.33)}
+                  />
+                  <Text
+                    size={16}
+                    style={{
+                      color: opacity(getPrimaryColor('0'), 0.66),
+                      fontFamily: 'OverpassSemibold',
+                      textAlign: 'center',
+                    }}>
+                    No History
+                  </Text>
+                  <Text
+                    size={14}
+                    style={{
+                      color: opacity(getPrimaryColor('0'), 0.4),
+                      textAlign: 'center',
+                    }}>
+                    Your history will show up here
+                  </Text>
+                </View>
+              </BlurCardFrame>
+            </View>
           </View>
         );
       }

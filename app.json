@@ -5,7 +5,7 @@
     "version": "0.0.57",
     "orientation": "portrait",
     "scheme": ["sovran", "cashu"],
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/splash.png",
       "backgroundColor": "#000000",
@@ -15,6 +15,7 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "buildNumber": "1",
+      "userInterfaceStyle": "dark",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -44,6 +45,7 @@
     },
     "android": {
       "versionCode": 1,
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/production.png",
         "backgroundColor": "#ffffff"
@@ -74,6 +76,7 @@
           "selectIdentifiers": ["D2760000850100", "D2760000850101", "5361746f63617368"]
         }
       ],
+      "expo-system-ui",
       "expo-build-properties",
       "expo-font",
       "expo-router",
