@@ -634,7 +634,7 @@ export const resetApp = (): AppThunk => {
         // Continue with other cleanup even if this fails
       }
 
-      // 3. Clear ALL Zustand stores
+      // 3. Clear ALL Zustand stores (in-memory + current profile AsyncStorage)
       try {
         const { useMintStore } = await import('stores/mintStore');
         const { useSettingsStore } = await import('stores/settingsStore');
@@ -684,6 +684,21 @@ export const resetApp = (): AppThunk => {
         }
       } catch (error) {
         console.warn('⚠️ Failed to clear Zustand stores:', error);
+        // Continue with other cleanup even if this fails
+      }
+
+      // 3b. Clear profile-scoped store data for ALL profiles (not just active)
+      // clearAllData() above only removes the current profile's AsyncStorage key.
+      // This ensures no orphaned data remains for other profiles after a full reset.
+      try {
+        const { clearAllProfileScopedData } = await import('helper/profileScopedStorage');
+        const { useProfileStore } = await import('stores/profileStore');
+        const profiles = useProfileStore.getState().profiles;
+        const maxIndex = profiles.length > 0 ? Math.max(...profiles.map((p) => p.accountIndex)) : 0;
+        await clearAllProfileScopedData(maxIndex);
+        console.log('✅ All profile-scoped store data cleared across all profiles');
+      } catch (error) {
+        console.warn('⚠️ Failed to clear profile-scoped data:', error);
         // Continue with other cleanup even if this fails
       }
 

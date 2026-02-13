@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -75,9 +75,14 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
+  // Guard against concurrent profile switches (double-tap / rapid taps)
+  const switchInProgress = useRef(false);
+
   const handleSwitchProfile = useCallback(
     async (accountIndex: number) => {
       if (accountIndex === activeAccountIndex) return;
+      if (switchInProgress.current) return;
+      switchInProgress.current = true;
 
       try {
         // 1. Close drawer immediately
@@ -99,12 +104,17 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
       } catch (error) {
         console.error('Failed to switch profile:', error);
         cancelResetStages();
+      } finally {
+        switchInProgress.current = false;
       }
     },
     [activeAccountIndex, closeDrawer, resetStages, cancelResetStages]
   );
 
   const handleAddProfile = useCallback(async () => {
+    if (switchInProgress.current) return;
+    switchInProgress.current = true;
+
     try {
       // 1. Close drawer and show loading screen instantly — no perceived delay
       closeDrawer();
@@ -132,6 +142,8 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     } catch (error) {
       console.error('Failed to add profile:', error);
       cancelResetStages();
+    } finally {
+      switchInProgress.current = false;
     }
   }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
 
