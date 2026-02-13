@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { popup } from '@/helper/popup';
 import { SheetManager } from 'react-native-actions-sheet';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
@@ -231,12 +231,11 @@ export function ReceiveTokenScreen({
           historyEntry={{ ...receiveHistoryEntry, state: receiveState } as ReceiveHistoryEntry}
         />
 
-        <Section
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
-            { title: 'Type', value: 'Ecash • Receive' },
             ...(tokenString ? [{ title: 'Token', value: truncateMiddle(tokenString, 6) }] : []),
           ]}
-          camera={false}
         />
 
         <TransactionDebugCode historyEntry={receiveHistoryEntry} />

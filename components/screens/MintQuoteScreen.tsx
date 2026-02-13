@@ -16,7 +16,7 @@ import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager } from 'coco-cashu-react';
-import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
@@ -137,30 +137,12 @@ export function MintQuoteScreen({
 
         <HistoryEntryTimeline historyEntry={currentTransaction} />
 
-        <Section
-          special={false}
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             {
-              title: 'Request',
+              title: 'Invoice',
               value: truncateMiddle(currentTransaction.paymentRequest, 10),
-            },
-            {
-              title: 'Type',
-              value: 'Lightning • Receive',
-            },
-            {
-              title: 'Status',
-              value: (
-                <HStack align="center">
-                  <Text className="text-primary-0" size={16} overpass bold>
-                    {isPaid ? 'Completed' : 'Pending'}
-                  </Text>
-                </HStack>
-              ),
-            },
-            {
-              title: 'Amount',
-              value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
             },
           ]}
         />

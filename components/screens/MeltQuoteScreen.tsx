@@ -20,6 +20,7 @@ import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useMintStore } from '@/stores/mintStore';
@@ -511,7 +512,20 @@ export function MeltQuoteScreen({
 
         <HistoryEntryTimeline historyEntry={currentTransaction} meltQuote={displayQuote} />
 
-        <Section
+        {/* Fee - shown prominently since it's unique info not displayed elsewhere */}
+        {feeReserve > 0 ? (
+          <Section
+            items={[
+              {
+                title: 'Fee',
+                value: formatAmount({ amount: feeReserve, unit }),
+              },
+            ]}
+          />
+        ) : null}
+
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             {
               title: 'Date',
@@ -519,27 +533,18 @@ export function MeltQuoteScreen({
                 ? convertTime(new Date(getLightningTimestamp(displayQuote.request) * 1000))
                 : convertTime(new Date(currentTransaction.createdAt)),
             },
-            { title: 'Type', value: 'Send • Lightning' },
             ...(displayQuote?.request
               ? [
                   {
-                    title: 'Request',
+                    title: 'Invoice',
                     value: truncateMiddle(displayQuote.request, 5),
                   },
                 ]
               : []),
-            { title: 'Quote', value: truncateMiddle(quoteId, 7) },
-            {
-              title: 'Fee',
-              value: formatAmount({ amount: feeReserve, unit }),
-            },
+            { title: 'Quote ID', value: truncateMiddle(quoteId, 7) },
             {
               title: 'Amount',
               value: `${amount} ${unit.toUpperCase()}`,
-            },
-            {
-              title: 'State',
-              value: currentTransaction.state,
             },
           ]}
         />

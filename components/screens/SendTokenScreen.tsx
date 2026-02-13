@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Share, ActivityIndicator, ScrollView, Pressable } from 'react-native';
+import { Share, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as SQLite from 'expo-sqlite';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -38,12 +38,11 @@ import type { SendHistoryEntry } from 'coco-cashu-core';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { Card } from 'components/ui/Card';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -656,7 +655,6 @@ export function SendTokenScreen({
   }
 
   // Derive display values
-  const amount = currentTransaction?.amount ?? paymentRequest?.amount ?? 0;
   const unit = currentTransaction?.unit ?? decodedRequest?.unit ?? 'sat';
   const mintUrl =
     currentTransaction?.mintUrl ?? paymentRequest?.mintUrl ?? decodedRequest?.mints?.[0] ?? '';
@@ -845,16 +843,12 @@ export function SendTokenScreen({
           />
         )}
 
-        {/* Details Section */}
-        <Section
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             // Payment request mode items
             ...(isPaymentRequestMode && recipientInfo
               ? [
-                  {
-                    title: 'Type',
-                    value: 'Payment Request • Nostr',
-                  },
                   {
                     title: 'Recipient',
                     value: truncateMiddle(recipientInfo.pubkey, 10),
@@ -868,43 +862,16 @@ export function SendTokenScreen({
                     title: 'Date',
                     value: convertTime(new Date(currentTransaction.createdAt)),
                   },
-                  {
-                    title: 'Type',
-                    value: 'Ecash • Send',
-                  },
-                  {
-                    title: 'Status',
-                    value: (
-                      <HStack align="center">
-                        <Text className="text-primary-0" size={16} overpass bold>
-                          {currentTransaction.state === 'finalized'
-                            ? 'Completed'
-                            : currentTransaction.state === 'rolledBack'
-                              ? 'Rolled Back'
-                              : 'Pending'}
-                        </Text>
-                      </HStack>
-                    ),
-                  },
-                  {
-                    title: 'Token',
-                    value: token ? truncateMiddle(getEncodedTokenV4(token), 6) : 'N/A',
-                  },
+                  ...(token
+                    ? [
+                        {
+                          title: 'Token',
+                          value: truncateMiddle(getEncodedTokenV4(token), 6),
+                        },
+                      ]
+                    : []),
                 ]
               : []),
-            // Common items
-            {
-              title: 'Mint',
-              value: mintInfo?.name || truncateMiddle(mintUrl, 20),
-            },
-            {
-              title: 'Amount',
-              value: `${amount} ${unit.toUpperCase()}`,
-            },
-            {
-              title: 'Unit',
-              value: unit.toUpperCase(),
-            },
             // Payment request ID
             ...(isPaymentRequestMode && decodedRequest?.id
               ? [
@@ -916,167 +883,7 @@ export function SendTokenScreen({
               : []),
           ]}
         />
-
-        {/* Debug code (normal mode) */}
-        {!isPaymentRequestMode && currentTransaction && (
-          <TransactionDebugCode historyEntry={currentTransaction} />
-        )}
-
-        {/* Comprehensive debug dump */}
-        {!isPaymentRequestMode && currentTransaction && (
-          <SendTokenDebugView
-            currentTransaction={currentTransaction}
-            sendHistoryEntryProp={sendHistoryEntryProp}
-            createdEntry={createdEntry}
-            token={token ?? null}
-            createdToken={createdToken}
-            mintInfo={mintInfo}
-            isMintTrusted={isMintTrusted}
-            parseError={parseError ?? null}
-            isCheckingStatus={isCheckingStatus}
-            manager={manager}
-          />
-        )}
       </VStack>
     </ModalLayoutWrapper>
-  );
-}
-
-/**
- * Debug view that dumps all available state for a SendToken screen.
- * Fetches the SendOperation record (if operationId exists) and proof states
- * from the mint so you can see everything in one place.
- */
-function SendTokenDebugView({
-  currentTransaction,
-  sendHistoryEntryProp,
-  createdEntry,
-  token,
-  createdToken,
-  mintInfo,
-  isMintTrusted,
-  parseError,
-  isCheckingStatus,
-  manager,
-}: {
-  currentTransaction: SendHistoryEntry;
-  sendHistoryEntryProp?: SendHistoryEntry | string;
-  createdEntry: SendHistoryEntry | null;
-  token: Token | null;
-  createdToken: Token | null;
-  mintInfo: GetInfoResponse | null;
-  isMintTrusted: boolean | null;
-  parseError: string | null;
-  isCheckingStatus: boolean;
-  manager: ReturnType<typeof useManager>;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [operationData, setOperationData] = useState<unknown>(null);
-  const [operationError, setOperationError] = useState<string | null>(null);
-  const [proofStates, setProofStates] = useState<unknown>(null);
-  const [proofStatesError, setProofStatesError] = useState<string | null>(null);
-
-  // Fetch operation + proof states when expanded
-  useEffect(() => {
-    if (!expanded) return;
-
-    // Fetch SendOperation record
-    if (currentTransaction.operationId) {
-      manager.send
-        .getOperation(currentTransaction.operationId)
-        .then((op) => setOperationData(op ?? 'NOT_FOUND'))
-        .catch((err: unknown) =>
-          setOperationError(err instanceof Error ? err.message : String(err))
-        );
-    } else {
-      setOperationData('NO_OPERATION_ID');
-    }
-
-    // Fetch proof states from mint (NUT-07)
-    if (token?.proofs?.length && currentTransaction.mintUrl) {
-      (async () => {
-        try {
-          const wallet = await manager.walletService.getWallet(currentTransaction.mintUrl);
-          const states = await wallet.checkProofsStates(
-            token.proofs.map((p) => ({ secret: p.secret }))
-          );
-          setProofStates(states);
-        } catch (err: unknown) {
-          setProofStatesError(err instanceof Error ? err.message : String(err));
-        }
-      })();
-    } else {
-      setProofStates(token?.proofs?.length ? 'NO_MINT_URL' : 'NO_PROOFS');
-    }
-  }, [expanded, currentTransaction, token, manager]);
-
-  const debugData = {
-    _meta: {
-      expandedAt: expanded ? new Date().toISOString() : null,
-      isCheckingStatus,
-      isMintTrusted,
-      parseError,
-    },
-    historyEntry: { ...currentTransaction, token: undefined },
-    propEntry:
-      sendHistoryEntryProp && typeof sendHistoryEntryProp === 'string'
-        ? { _raw: sendHistoryEntryProp.slice(0, 200) + '…' }
-        : (sendHistoryEntryProp ?? null),
-    createdEntry: createdEntry ?? null,
-    token: token ?? null,
-    createdToken: createdToken ?? null,
-    mintInfo: mintInfo ?? null,
-    sendOperation: operationError ? { error: operationError } : operationData,
-    proofStates: proofStatesError ? { error: proofStatesError } : proofStates,
-  };
-
-  return (
-    <View style={{ marginHorizontal: 16, marginTop: 16 }}>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Pressable
-          onPress={() => setExpanded((v) => !v)}
-          style={{
-            flex: 1,
-            padding: 12,
-            borderRadius: 8,
-            backgroundColor: 'rgba(255,255,255,0.05)',
-          }}>
-          <Text mono style={{ fontSize: 12 }}>
-            {expanded ? '[-] Hide Debug Info' : '[+] Show Debug Info'}
-          </Text>
-        </Pressable>
-        {expanded && (
-          <Pressable
-            onPress={() => {
-              Clipboard.setStringAsync(JSON.stringify(debugData, null, 2));
-              popup({ message: 'Debug JSON copied', type: 'success' });
-            }}
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              backgroundColor: 'rgba(255,255,255,0.05)',
-              justifyContent: 'center',
-            }}>
-            <Text mono style={{ fontSize: 12 }}>
-              Copy
-            </Text>
-          </Pressable>
-        )}
-      </View>
-      {expanded && (
-        <ScrollView
-          horizontal
-          style={{ marginTop: 8 }}
-          contentContainerStyle={{
-            padding: 12,
-            borderRadius: 8,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-          }}>
-          <Text mono style={{ fontSize: 10 }} selectable>
-            {JSON.stringify(debugData, null, 2)}
-          </Text>
-        </ScrollView>
-      )}
-    </View>
   );
 }

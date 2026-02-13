@@ -37,31 +37,31 @@ const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
 // Payment request states include Nostr Send step
 const PAYMENT_REQUEST_STATES = ['prepared', 'nostrSent', 'pending', 'finalized'] as const;
 const SEND_STATE_LABELS: Record<string, string> = {
-  prepared: 'Prepared',
-  nostrSent: 'Nostr Send',
+  prepared: 'Created',
+  nostrSent: 'Delivered',
   pending: 'Pending',
-  finalized: 'Finalized',
-  rolledBack: 'Rolled Back',
+  finalized: 'Claimed',
+  rolledBack: 'Cancelled',
 };
 
 // Receive states: pending (in memory, not yet redeemed) → redeemed (claimed to wallet)
 const RECEIVE_STATES = ['pending', 'redeemed'] as const;
 const RECEIVE_STATE_LABELS: Record<string, string> = {
   pending: 'Pending',
-  redeemed: 'Redeemed',
+  redeemed: 'Added to wallet',
 };
 
 // Mint/Melt state display labels
 const MINT_STATE_LABELS: Record<string, string> = {
-  [MintQuoteState.UNPAID]: 'Unpaid',
-  [MintQuoteState.PAID]: 'Paid',
-  [MintQuoteState.ISSUED]: 'Issued',
+  [MintQuoteState.UNPAID]: 'Waiting for payment',
+  [MintQuoteState.PAID]: 'Payment received',
+  [MintQuoteState.ISSUED]: 'Complete',
 };
 
 const MELT_STATE_LABELS: Record<string, string> = {
-  [MeltQuoteState.UNPAID]: 'Request processed',
-  [MeltQuoteState.PENDING]: 'Pending',
-  [MeltQuoteState.PAID]: 'Paid',
+  [MeltQuoteState.UNPAID]: 'Ready to send',
+  [MeltQuoteState.PENDING]: 'Sending',
+  [MeltQuoteState.PAID]: 'Sent',
 };
 
 const EXPIRED_STATE = 'expired';
@@ -134,11 +134,11 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === MintQuoteState.UNPAID) {
-          info = 'Waiting for Lightning payment';
+          info = 'Pay the invoice to receive funds';
         } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
-          info = 'Minting tokens...';
+          info = 'Adding to wallet...';
         } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
-          info = `+${mintTx.amount} sats received`;
+          info = `+${mintTx.amount} sats added to wallet`;
         }
 
         return {
@@ -190,11 +190,11 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
-          info = 'Quote ready, awaiting execution';
+          info = 'Tap Send to complete payment';
         } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
-          info = 'Pending blockchain confirmation';
+          info = 'Payment in progress...';
         } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
-          info = 'Invoice paid successfully';
+          info = 'Payment complete';
         }
 
         return {
@@ -286,15 +286,15 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === 'prepared') {
-          info = 'Token created, ready to share';
+          info = 'Ready to share';
         } else if (stepType === 'complete' && state === 'nostrSent') {
-          info = 'Sent via Nostr DM';
+          info = 'Sent via Nostr';
         } else if (stepType === 'current' && state === 'nostrSent') {
-          info = 'Sending via Nostr...';
+          info = 'Sending...';
         } else if (stepType === 'current' && state === 'pending') {
-          info = 'Waiting for recipient to claim';
+          info = 'Waiting for recipient';
         } else if (stepType === 'success' && state === 'finalized') {
-          info = 'Token claimed by recipient';
+          info = 'Claimed by recipient';
         }
 
         return {
@@ -326,7 +326,7 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === 'pending') {
-          info = 'Ready to redeem token';
+          info = 'Tap Redeem to add to wallet';
         } else if (stepType === 'success' && state === 'redeemed') {
           info = `+${receiveTx.amount} sats added to wallet`;
         }
@@ -578,7 +578,7 @@ const getCardLabel = (
       } else {
         status = 'Awaiting Payment';
       }
-      return `Mint • ${status}`;
+      return `Receive • ${status}`;
     }
     case 'melt': {
       const meltTx = historyEntry as MeltHistoryEntry;
@@ -589,26 +589,26 @@ const getCardLabel = (
       } else if (meltTx.state === MeltQuoteState.PENDING) {
         status = 'In Progress';
       } else {
-        status = 'Ready to Pay';
+        status = 'Ready';
       }
-      return `Melt • ${status}`;
+      return `Send • ${status}`;
     }
     case 'send': {
       const sendTx = historyEntry as SendHistoryEntry;
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
-      const label = isPaymentRequestMode ? 'Payment Request' : 'Send';
+      const label = isPaymentRequestMode ? 'Payment' : 'Send';
       if (!tokenCreated && !nostrSent && isPaymentRequestMode) {
-        status = 'Ready to Send';
+        status = 'Ready';
       } else if (tokenCreated && !nostrSent) {
-        status = 'Sending via Nostr';
+        status = 'Delivering';
       } else if (sendTx.state === 'rolledBack') {
-        status = 'Rolled Back';
+        status = 'Cancelled';
       } else if (sendTx.state === 'finalized') {
         status = 'Complete';
       } else if (sendTx.state === 'pending') {
         status = 'In Progress';
       } else {
-        status = nostrSent ? 'Sent' : 'Prepared';
+        status = nostrSent ? 'Sent' : 'Ready';
       }
       return `${label} • ${status}`;
     }
