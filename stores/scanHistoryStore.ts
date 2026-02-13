@@ -12,7 +12,9 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 /** What type of data was scanned */
 type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
@@ -195,7 +197,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       // Clear all stored data (state + AsyncStorage)
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('scan-history-store');
+          await profileStorage.removeItem('scan-history-store');
           set({ entries: [] });
         } catch (error) {
           console.error('ScanHistoryStore: Error clearing data:', error);
@@ -205,7 +207,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
     }),
     {
       name: 'scan-history-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
     }
   )
 );

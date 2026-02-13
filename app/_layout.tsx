@@ -29,7 +29,7 @@ import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvi
 import { NostrNDKProvider } from 'providers/NostrNDKProvider';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
-import { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
@@ -39,6 +39,8 @@ import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/helper/coco/CocoProvider';
 import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { useProfileStore } from '@/stores/profileStore';
+import { useAppBalance } from '@/hooks/useAppBalance';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
@@ -47,24 +49,54 @@ registerAllSheets({ context: 'global' });
 
 LogBox.ignoreAllLogs();
 
-// Provider components for composition
-const AppProviders = compose([
+// Outer providers — stable across profile switches, never remount
+const OuterProviders = compose([
   KeyboardProvider,
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
   HeroTransitionProvider,
-  [InitializationProvider, { forceVisible: false }], // Set to true to always show loading screen
-  MigrationGate,
-  [NostrKeysProvider, { defaultAccountIndex: 0 }],
-  NostrNDKProvider, // Initialize NDK with signer after keys are available
-  CocoProvider,
-  ActionSheetProvider,
-  [SheetProvider, { context: 'global' }],
-  PricelistProvider,
-  PasscodeGate,
-  AppGate,
+  [InitializationProvider, { forceVisible: false }],
 ]);
+
+// Inner providers — remounted on profile switch via React key change
+function AccountScopedProviders({
+  accountIndex,
+  children,
+}: {
+  accountIndex: number;
+  children: React.ReactNode;
+}) {
+  const InnerProviders = useMemo(
+    () =>
+      compose([
+        MigrationGate,
+        [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
+        NostrNDKProvider,
+        CocoProvider,
+        ActionSheetProvider,
+        [SheetProvider, { context: 'global' }],
+        PricelistProvider,
+        PasscodeGate,
+        AppGate,
+      ]),
+    [accountIndex]
+  );
+
+  return <InnerProviders>{children}</InnerProviders>;
+}
+
+/** Invisible component that syncs the live balance to the profile store for the active profile */
+function ProfileBalanceSync() {
+  const balance = useAppBalance();
+  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+
+  useEffect(() => {
+    useProfileStore.getState().updateProfileBalance(activeAccountIndex, balance);
+  }, [balance, activeAccountIndex]);
+
+  return null;
+}
 
 // Inner component that can access theme context
 function RootLayoutContent() {
@@ -143,6 +175,7 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ProfileBalanceSync />
       <StatusBar
         backgroundColor={getPrimaryColor('950')}
         style={currentTheme.includes('light') ? 'dark' : 'light'}
@@ -170,6 +203,7 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts();
+  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
   // Hide splash screen once fonts are loaded
   useEffect(() => {
@@ -184,8 +218,12 @@ export default function RootLayout() {
   }
 
   return (
-    <AppProviders>
-      <RootLayoutContent />
-    </AppProviders>
+    <OuterProviders>
+      <AccountScopedProviders
+        key={`account-${activeAccountIndex}`}
+        accountIndex={activeAccountIndex}>
+        <RootLayoutContent />
+      </AccountScopedProviders>
+    </OuterProviders>
   );
 }

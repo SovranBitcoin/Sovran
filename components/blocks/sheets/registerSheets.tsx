@@ -2,6 +2,7 @@ import { default as registerPopup } from 'components/blocks/sheets/popup';
 import { default as registerMintAccepter } from 'components/blocks/sheets/mintAccepter';
 import { default as registerButtonHandler } from 'components/blocks/sheets/buttonHandler';
 import { default as registerEmojiPicker } from 'components/blocks/sheets/emoji-picker';
+import { default as registerProfileSwitcher } from 'components/blocks/sheets/profileSwitcher';
 
 /**
  * Registers all application sheets with the react-native-actions-sheet system.
@@ -37,4 +38,5 @@ export function registerAllSheets({ context }: { context?: 'global' }) {
   registerMintAccepter({ context });
   registerButtonHandler({ context });
   registerEmojiPicker({ context });
+  registerProfileSwitcher({ context });
 }

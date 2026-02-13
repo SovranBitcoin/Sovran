@@ -51,6 +51,7 @@ import {
 } from 'hooks/useNostrProfile';
 import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
+import { UserFeed } from 'components/blocks/UserFeed';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -795,6 +796,13 @@ function UserProfileScreen() {
             )}
           </Section>
         </View>
+
+        <Spacer size={8} />
+
+        {/* User Feed */}
+        {pubkey ? (
+          <UserFeed pubkey={pubkey} authorName={displayName} authorPicture={userInfo?.picture} />
+        ) : null}
       </ScrollView>
 
       <BottomButtons>

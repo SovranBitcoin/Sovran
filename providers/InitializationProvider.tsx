@@ -40,6 +40,8 @@ interface InitializationContextValue {
   ) => void;
   canStageStart: (id: string) => boolean;
   startTestAnimation: () => void;
+  /** Clear all stages and log history, forcing the initialization screen to show immediately. */
+  resetStages: () => void;
 }
 
 const InitializationContext = createContext<InitializationContextValue>({
@@ -51,6 +53,7 @@ const InitializationContext = createContext<InitializationContextValue>({
   updateStage: () => {},
   canStageStart: () => true,
   startTestAnimation: () => {},
+  resetStages: () => {},
 });
 
 const useInitializationContext = () => {
@@ -73,6 +76,8 @@ export function InitializationProvider({
     { message: string; timestamp: number; stageId: string }[]
   >([]);
   const [isTestMode, setIsTestMode] = useState(testMode);
+  // When true, forces isInitializing=true until real stages register
+  const [forceReinitialize, setForceReinitialize] = useState(false);
   // Track pending log updates per stage to debounce rapid calls
   const pendingLogUpdates = useRef<Map<string, { message: string; timeout: NodeJS.Timeout }>>(
     new Map()
@@ -233,9 +238,30 @@ export function InitializationProvider({
   const isInitializing =
     forceVisible ||
     isTestMode ||
+    forceReinitialize ||
     Array.from(stages.values()).some(
       (stage) => stage.status === 'loading' || stage.status === 'pending'
     );
+
+  // Clear forceReinitialize once real stages have registered (they'll keep isInitializing true)
+  useEffect(() => {
+    if (forceReinitialize && stages.size > 0) {
+      setForceReinitialize(false);
+    }
+  }, [forceReinitialize, stages.size]);
+
+  const resetStages = useCallback(() => {
+    console.log('[InitializationProvider] resetStages called — forcing loading screen');
+    // Force the loading screen to show immediately
+    setForceReinitialize(true);
+    // Clear all stages so inner providers can re-register fresh
+    setStages(new Map());
+    // Clear log history so the animation starts from scratch
+    setLogHistory([]);
+    // Clear any pending log updates
+    pendingLogUpdates.current.forEach((update) => clearTimeout(update.timeout));
+    pendingLogUpdates.current.clear();
+  }, []);
 
   const startTestAnimation = useCallback(() => {
     console.log('[InitializationProvider] Starting test animation');
@@ -345,6 +371,7 @@ export function InitializationProvider({
     updateStage,
     canStageStart,
     startTestAnimation,
+    resetStages,
   };
 
   // Render children directly without Animated.View wrapper to preserve native blur effects (liquid glass)
@@ -822,6 +849,15 @@ function InitializationScreenInternal() {
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * Hook to trigger a full re-initialization (e.g. during profile switch).
+ * Calling resetStages() immediately shows the loading screen and clears all stages.
+ */
+export function useInitializationReset() {
+  const { resetStages } = useInitializationContext();
+  return { resetStages };
 }
 
 export function useInitializationStage(

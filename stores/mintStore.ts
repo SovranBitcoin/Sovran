@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 interface MintState {
   // Map of pubkey to selectedMint
@@ -71,7 +73,7 @@ export const useMintStore = create<MintStore>()(
       // Debug method to check what's actually stored in AsyncStorage
       debugStorage: async () => {
         try {
-          const stored = await AsyncStorage.getItem('mint-store');
+          const stored = await profileStorage.getItem('mint-store');
           console.log('MintStore: Raw storage data:', stored);
           const parsed = stored ? JSON.parse(stored) : null;
           console.log('MintStore: Parsed storage data:', parsed);
@@ -86,8 +88,8 @@ export const useMintStore = create<MintStore>()(
       clearAllData: async () => {
         try {
           console.log('MintStore: clearAllData called');
-          // Clear from AsyncStorage
-          await AsyncStorage.removeItem('mint-store');
+          // Clear from profile-scoped AsyncStorage
+          await profileStorage.removeItem('mint-store');
           // Reset state to initial values
           set({
             selectedMints: {},
@@ -101,7 +103,7 @@ export const useMintStore = create<MintStore>()(
     }),
     {
       name: 'mint-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       // Only persist the selectedMints
       partialize: (state) => ({ selectedMints: state.selectedMints }),
       // Add error handling for storage issues

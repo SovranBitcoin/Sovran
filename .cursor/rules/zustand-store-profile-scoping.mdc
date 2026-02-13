@@ -1,0 +1,85 @@
+---
+description: Zustand store profile-scoping rules — decide global vs per-profile for every new store
+globs: stores/*.ts
+alwaysApply: false
+---
+
+# Zustand Store Profile Scoping
+
+This app supports **multiple profiles** (accounts) derived from a single mnemonic. Each profile has isolated data. When creating or modifying a Zustand store, you **must** decide whether it is **global** or **profile-scoped**.
+
+## Decision rule
+
+Ask: "If the user switches to a different profile, should this data reset / change?"
+
+- **Yes → profile-scoped** (e.g. balances, mint selections, transaction history, chat sessions)
+- **No → global** (e.g. theme, language, passcode, price cache, audit data, display preferences)
+
+## Profile-scoped stores
+
+Use `createProfileScopedStorage()` instead of raw `AsyncStorage`:
+
+```typescript
+// ✅ CORRECT — profile-scoped
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+export const useMyStore = create<MyStore>()(
+  persist(
+    (set, get) => ({ /* ... */ }),
+    {
+      name: 'my-store',
+      storage: createJSONStorage(() => createProfileScopedStorage()),
+    }
+  )
+);
+```
+
+If the store has `clearAllData` or `debugStorage` methods that access storage directly, use a module-level instance:
+
+```typescript
+const profileStorage = createProfileScopedStorage();
+// then use profileStorage.removeItem('my-store') instead of AsyncStorage.removeItem(...)
+```
+
+After creating a profile-scoped store, add it to `rehydrateProfileStores()` in `helper/profileScopedStorage.ts`:
+1. Add the import
+2. Add a `setState(...)` call with the store's initial state
+3. Add `.persist.rehydrate()` to the `Promise.all`
+
+### Currently profile-scoped stores
+
+`mintStore`, `mintDistributionStore`, `routstrStore`, `scanHistoryStore`, `searchHistoryStore`, `swapTransactionsStore`, `transactionLocationStore`
+
+## Global stores
+
+Use `AsyncStorage` directly (the default pattern):
+
+```typescript
+// ✅ CORRECT — global
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const useMyGlobalStore = create<MyGlobalStore>()(
+  persist(
+    (set, get) => ({ /* ... */ }),
+    {
+      name: 'my-global-store',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
+```
+
+### Currently global stores
+
+`settingsStore`, `pricelistStore`, `btcMapStore`, `auditMintStore`, `kymMintStore`, `mockDataStore`, `profileStore`
+
+## Common mistakes
+
+```typescript
+// ❌ BAD — using AsyncStorage for per-profile data
+import AsyncStorage from '@react-native-async-storage/async-storage';
+storage: createJSONStorage(() => AsyncStorage), // data leaks across profiles!
+
+// ❌ BAD — forgetting to add to rehydrateProfileStores()
+// Store uses profile-scoped storage but isn't reset on profile switch → stale data
+```

@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
 import { RoutstrModel } from 'helper/routstr/api';
+
+const profileStorage = createProfileScopedStorage();
 
 interface RoutstrMessage {
   id: string;
@@ -369,7 +371,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
         try {
           console.log('RoutstrStore: clearAllData called');
           // Clear from AsyncStorage
-          await AsyncStorage.removeItem('routstr-store');
+          await profileStorage.removeItem('routstr-store');
           // Reset state to initial values
           set({
             apiKey: null,
@@ -390,7 +392,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
     }),
     {
       name: 'routstr-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       // Persist all state (don't persist cache, it will be refreshed)
       partialize: (state) => ({
         apiKey: state.apiKey,

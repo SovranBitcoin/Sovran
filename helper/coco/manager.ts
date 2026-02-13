@@ -38,6 +38,22 @@ export class CocoManager {
   private static isInitializing = false;
   private static cashuMnemonic: string | null = null;
   private static isFreeingReservedProofs = false;
+  /** Current account index — controls which DB file and NPC signer to use */
+  private static accountIndex = 0;
+
+  /**
+   * Set the account index for per-profile database isolation.
+   * Must be called before initialize().
+   * Account 0 uses 'coco.db' (backward compatible), N>0 uses 'coco-N.db'.
+   */
+  static setAccountIndex(index: number): void {
+    this.accountIndex = index;
+  }
+
+  /** Get the SQLite database name for the current account index */
+  private static getDbName(): string {
+    return this.accountIndex === 0 ? 'coco.db' : `coco-${this.accountIndex}.db`;
+  }
 
   /**
    * Set the cashu mnemonic from NostrKeysProvider
@@ -81,8 +97,10 @@ export class CocoManager {
     this.instance = null;
 
     try {
-      // Initialize SQLite database
-      const db = SQLite.openDatabaseSync('coco.db');
+      // Initialize SQLite database (per-profile: account 0 = coco.db, N>0 = coco-N.db)
+      const dbName = this.getDbName();
+      console.log(`Opening Coco database: ${dbName} (account index: ${this.accountIndex})`);
+      const db = SQLite.openDatabaseSync(dbName);
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
 
@@ -102,7 +120,7 @@ export class CocoManager {
         // Derive cashu mnemonic using the same logic as useCashuMnemonic hook
         const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic, ''));
         const DERIVATION_PATH = `m/44'/129372'`;
-        const path = `${DERIVATION_PATH}/0'/0'/0/0`; // Account index 0
+        const path = `${DERIVATION_PATH}/0'/${this.accountIndex}'/0/0`;
         const seed = root.derive(path);
         const derivedCashuMnemonic = bip39.entropyToMnemonic(
           seed.privateKey as Uint8Array,
@@ -296,8 +314,8 @@ export class CocoManager {
         return null;
       }
 
-      // Derive Nostr keys using NIP-06 (account index 0)
-      const { privateKey: sk } = nip06.accountFromSeedWords(mnemonic, undefined, 0);
+      // Derive Nostr keys using NIP-06 for the current account
+      const { privateKey: sk } = nip06.accountFromSeedWords(mnemonic, undefined, this.accountIndex);
 
       return new NsecSigner(sk);
     } catch (error) {
@@ -364,7 +382,7 @@ export class CocoManager {
         this.isInitializing = false;
       }
 
-      const dbName = 'coco.db';
+      const dbName = this.getDbName();
       console.log('Deleting database:', dbName);
 
       try {
@@ -439,7 +457,7 @@ export class CocoManager {
   }
 
   static async exportDatabase(): Promise<string> {
-    const dbName = 'coco.db';
+    const dbName = this.getDbName();
     const dbDirectory = FileSystem.documentDirectory;
     const dbPath = `${dbDirectory}SQLite/${dbName}`;
 

@@ -122,6 +122,7 @@
     "react-native-qrcode-svg": "^6.3.14",
     "react-native-reanimated": "~4.2.0",
     "react-native-safe-area-context": "~5.6.0",
+    "react-native-screen-transitions": "^3.2.1",
     "react-native-screens": "~4.20.0",
     "react-native-skeleton-component": "^1.0.0",
     "react-native-svg": "^15.15.0",

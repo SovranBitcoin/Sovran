@@ -8,7 +8,9 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 export interface TransactionLocation {
   latitude: number;
@@ -79,7 +81,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('transaction-location-store');
+          await profileStorage.removeItem('transaction-location-store');
           set({ locations: {} });
         } catch (error) {
           console.error('TransactionLocationStore: Error clearing data:', error);
@@ -89,7 +91,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
     }),
     {
       name: 'transaction-location-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       partialize: (state) => ({
         locations: state.locations,
       }),
