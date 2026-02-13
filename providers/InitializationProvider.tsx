@@ -42,6 +42,8 @@ interface InitializationContextValue {
   startTestAnimation: () => void;
   /** Clear all stages and log history, forcing the initialization screen to show immediately. */
   resetStages: () => void;
+  /** Cancel force re-initialization when a profile switch/add flow aborts before stages re-register. */
+  cancelResetStages: () => void;
 }
 
 const InitializationContext = createContext<InitializationContextValue>({
@@ -54,6 +56,7 @@ const InitializationContext = createContext<InitializationContextValue>({
   canStageStart: () => true,
   startTestAnimation: () => {},
   resetStages: () => {},
+  cancelResetStages: () => {},
 });
 
 const useInitializationContext = () => {
@@ -263,6 +266,10 @@ export function InitializationProvider({
     pendingLogUpdates.current.clear();
   }, []);
 
+  const cancelResetStages = useCallback(() => {
+    setForceReinitialize(false);
+  }, []);
+
   const startTestAnimation = useCallback(() => {
     console.log('[InitializationProvider] Starting test animation');
     setIsTestMode(true);
@@ -372,6 +379,7 @@ export function InitializationProvider({
     canStageStart,
     startTestAnimation,
     resetStages,
+    cancelResetStages,
   };
 
   // Render children directly without Animated.View wrapper to preserve native blur effects (liquid glass)
@@ -856,8 +864,8 @@ function InitializationScreenInternal() {
  * Calling resetStages() immediately shows the loading screen and clears all stages.
  */
 export function useInitializationReset() {
-  const { resetStages } = useInitializationContext();
-  return { resetStages };
+  const { resetStages, cancelResetStages } = useInitializationContext();
+  return { resetStages, cancelResetStages };
 }
 
 export function useInitializationStage(

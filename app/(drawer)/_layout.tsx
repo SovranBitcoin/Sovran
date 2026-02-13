@@ -70,7 +70,7 @@ const MENU_ITEMS: MenuItem[] = [
 function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const { getKeysForAccount } = useNostrKeysContext();
-  const { resetStages } = useInitializationReset();
+  const { resetStages, cancelResetStages } = useInitializationReset();
   const devMode = useSettingsStore((s) => s.experimental);
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
@@ -79,50 +79,61 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     async (accountIndex: number) => {
       if (accountIndex === activeAccountIndex) return;
 
-      // 1. Close drawer immediately
-      closeDrawer();
+      try {
+        // 1. Close drawer immediately
+        closeDrawer();
 
-      // 2. Show loading screen instantly
-      resetStages();
+        // 2. Show loading screen instantly
+        resetStages();
 
-      // 3. Cleanup Coco manager
-      await CocoManager.cleanup();
+        // 3. Cleanup Coco manager
+        await CocoManager.cleanup();
 
-      // 4. Switch profile (sets activeAccountIndex)
-      useProfileStore.getState().switchProfile(accountIndex);
+        // 4. Switch profile (sets activeAccountIndex)
+        useProfileStore.getState().switchProfile(accountIndex);
 
-      // 5. Rehydrate all profile-scoped stores from new profile's storage
-      await rehydrateProfileStores();
+        // 5. Rehydrate all profile-scoped stores from new profile's storage
+        await rehydrateProfileStores();
 
-      // 6. Key change in _layout.tsx triggers full inner provider remount
+        // 6. Key change in _layout.tsx triggers full inner provider remount
+      } catch (error) {
+        console.error('Failed to switch profile:', error);
+        cancelResetStages();
+      }
     },
-    [activeAccountIndex, closeDrawer, resetStages]
+    [activeAccountIndex, closeDrawer, resetStages, cancelResetStages]
   );
 
   const handleAddProfile = useCallback(async () => {
-    // 1. Close drawer and show loading screen instantly — no perceived delay
-    closeDrawer();
-    resetStages();
+    try {
+      // 1. Close drawer and show loading screen instantly — no perceived delay
+      closeDrawer();
+      resetStages();
 
-    const nextIndex = useProfileStore.getState().getNextAccountIndex();
+      const nextIndex = useProfileStore.getState().getNextAccountIndex();
 
-    // 2. Derive keys (crypto work happens behind the loading screen)
-    const newKeys = await getKeysForAccount(nextIndex);
-    if (!newKeys?.pubkey) {
-      console.warn('Failed to derive keys for new profile');
-      return;
+      // 2. Derive keys (crypto work happens behind the loading screen)
+      const newKeys = await getKeysForAccount(nextIndex);
+      if (!newKeys?.pubkey) {
+        console.warn('Failed to derive keys for new profile');
+        cancelResetStages();
+        return;
+      }
+
+      // 3. Store the new profile
+      useProfileStore.getState().addProfile(nextIndex, newKeys.pubkey);
+
+      // 4. Cleanup Coco, switch profile, rehydrate stores
+      await CocoManager.cleanup();
+      useProfileStore.getState().switchProfile(nextIndex);
+      await rehydrateProfileStores();
+
+      // 5. Key change in _layout.tsx triggers full inner provider remount
+    } catch (error) {
+      console.error('Failed to add profile:', error);
+      cancelResetStages();
     }
-
-    // 3. Store the new profile
-    useProfileStore.getState().addProfile(nextIndex, newKeys.pubkey);
-
-    // 4. Cleanup Coco, switch profile, rehydrate stores
-    await CocoManager.cleanup();
-    useProfileStore.getState().switchProfile(nextIndex);
-    await rehydrateProfileStores();
-
-    // 5. Key change in _layout.tsx triggers full inner provider remount
-  }, [getKeysForAccount, closeDrawer, resetStages]);
+  }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
 
   const handleOpenProfileSheet = useCallback(() => {
     SheetManager.show('profile-switcher', {
