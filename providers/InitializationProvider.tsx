@@ -13,6 +13,48 @@ import { View } from 'components/ui/View/View';
 import { Text } from '@/components/ui/Text';
 import Icon from '@/assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, {
+  Path as SvgPath,
+  Rect as SvgRect,
+  Defs,
+  ClipPath,
+  G,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+} from 'react-native-svg';
+import {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  withDelay,
+  withSequence,
+  withRepeat,
+  Easing as REasing,
+  createAnimatedComponent,
+} from 'react-native-reanimated';
+
+// ── Initialization display type ──────────────────────────────
+// 'text' = scrolling text steps, 'logo' = animated S logo
+const INITIALIZATION_DISPLAY_TYPE: 'text' | 'logo' = 'logo';
+
+// ── Animated Logo SVG Constants ──────────────────────────────
+const PATH1_LENGTH = 850;
+const PATH2_LENGTH = 290;
+const LOGO_EASE = REasing.bezier(0.4, 0, 0.2, 1);
+
+const SHAPE_BODY_D =
+  'M219.746 260.45C180.994 183.892 264.298 139.013 321.504 133.469C321.504 133.469 274.385 138.982 258.758 180.724C242.154 225.075 279.517 262.521 330.24 295.561C353.313 310.59 377.914 325.92 395.577 344.136C421.675 371.855 431.956 415.15 392.413 453.693C357.646 487.581 298.313 507.377 257.175 489.068C219.214 472.173 201.166 439.479 210.52 402.742C223.964 349.944 274.579 333.048 274.579 333.048C245.845 352.848 242.81 380.039 244 399.046C246.167 433.669 276.161 456.333 276.161 456.333C306.477 479.828 340.748 471.909 356.829 456.069C370.01 444.189 380.22 422.806 368.955 396.143C363.396 382.985 353.665 365.783 307.795 335.16C271.68 311.929 234.35 289.301 219.746 260.45Z';
+
+const SHAPE_CURL_D =
+  'M353.141 149.573C315.443 149.573 289.081 165.94 280.909 180.988C296.199 164.356 327.306 158.285 351.032 173.332C374.758 188.38 383.721 208.707 383.721 231.675C383.721 254.642 378.185 270.746 354.195 288.961C398.22 268.898 421.946 242.762 422.473 207.651C423 172.54 390.838 149.573 353.141 149.573Z';
+
+const STROKE_BODY_D =
+  'M321.256 133C257 144.5 202.321 202 257 271C299 324 383 340.5 394 385.5C405 430.5 380.252 458.658 349.5 473C295.977 497.962 231.26 477.061 227.252 413.031C225.687 388.031 230.252 358.031 274.331 332.579';
+
+const STROKE_CURL_D =
+  'M280.909 180.988C313 142 405.858 154.333 405 211.5C404.473 246.611 394 263 354.195 288.961';
+
+const AnimatedSvgPath = createAnimatedComponent(SvgPath);
 
 type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
 
@@ -387,7 +429,11 @@ export function InitializationProvider({
   return (
     <InitializationContext.Provider value={contextValue}>
       {children}
-      <InitializationScreenInternal />
+      {INITIALIZATION_DISPLAY_TYPE === 'logo' ? (
+        <LogoInitializationScreen />
+      ) : (
+        <InitializationScreenInternal />
+      )}
     </InitializationContext.Provider>
   );
 }
@@ -534,6 +580,147 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
     </Animated.View>
   );
 });
+
+// ── Animated Logo Splash (SVG with looping overlap-70% stroke animation) ────
+function AnimatedLogoSplash() {
+  const dash1 = useSharedValue(PATH1_LENGTH);
+  const dash2 = useSharedValue(PATH2_LENGTH);
+  const { width: screenW, height: screenH } = Dimensions.get('window');
+  const logoSize = Math.min(screenW, screenH) * 1.25;
+
+  useEffect(() => {
+    // Overlap 70%: path2 starts when path1 is ~70% drawn (delay = 2000 * 0.7 = 1400ms)
+    // Forward draw: path1 (2s) + path2 starts at 1.4s (0.6s) → both done by ~2.6s
+    // Hold 0.8s
+    // Reverse erase: path2 (0.6s) then path1 (2s, starts when path2 is ~30% erased = 0.18s overlap)
+    // Hold 0.4s → total ≈ 6.4s
+
+    // Path1: draw → hold → erase → hold
+    dash1.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 2000, easing: LOGO_EASE }),
+        withDelay(1400, withTiming(0, { duration: 0 })),
+        withTiming(PATH1_LENGTH, { duration: 2000, easing: LOGO_EASE }),
+        withDelay(400, withTiming(PATH1_LENGTH, { duration: 0 }))
+      ),
+      -1
+    );
+
+    // Path2: wait for overlap point → draw → hold → erase → wait for next loop
+    dash2.value = withRepeat(
+      withSequence(
+        withDelay(1400, withTiming(0, { duration: 600, easing: LOGO_EASE })),
+        withDelay(1000, withTiming(PATH2_LENGTH, { duration: 600, easing: LOGO_EASE })),
+        withDelay(2200, withTiming(PATH2_LENGTH, { duration: 0 }))
+      ),
+      -1
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const animatedProps1 = useAnimatedProps(() => ({
+    strokeDashoffset: dash1.value,
+  }));
+
+  const animatedProps2 = useAnimatedProps(() => ({
+    strokeDashoffset: dash2.value,
+  }));
+
+  return (
+    <Svg width={logoSize} height={logoSize} viewBox="0 0 631 631">
+      <Defs>
+        <SvgLinearGradient id="logoGrad" x1="0.2" y1="0" x2="0.8" y2="1">
+          <Stop offset="0" stopColor="#FF976B" />
+          <Stop offset="0.5048" stopColor="#F82E30" />
+          <Stop offset="1" stopColor="#7E004E" />
+        </SvgLinearGradient>
+        <ClipPath id="clipBody">
+          <SvgPath d={SHAPE_BODY_D} />
+        </ClipPath>
+        <ClipPath id="clipCurl">
+          <SvgPath d={SHAPE_CURL_D} />
+        </ClipPath>
+      </Defs>
+      <SvgRect width={630.564} height={630.564} rx={315.282} fill="black" />
+      <G clipPath="url(#clipBody)">
+        <AnimatedSvgPath
+          d={STROKE_BODY_D}
+          stroke="url(#logoGrad)"
+          strokeWidth={57}
+          fill="none"
+          strokeDasharray={`${PATH1_LENGTH}`}
+          animatedProps={animatedProps1}
+        />
+      </G>
+      <G clipPath="url(#clipCurl)">
+        <AnimatedSvgPath
+          d={STROKE_CURL_D}
+          stroke="url(#logoGrad)"
+          strokeWidth={57}
+          fill="none"
+          strokeDasharray={`${PATH2_LENGTH}`}
+          animatedProps={animatedProps2}
+        />
+      </G>
+    </Svg>
+  );
+}
+
+// ── Logo Initialization Screen ───────────────────────────────
+function LogoInitializationScreen() {
+  const { isInitializing } = useInitializationContext();
+  const [shouldRender, setShouldRender] = useState(true);
+  const screenOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!isInitializing && shouldRender) {
+      Animated.timing(screenOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      }).start(() => {
+        setShouldRender(false);
+      });
+    } else if (isInitializing) {
+      screenOpacity.setValue(1);
+      setShouldRender(true);
+    }
+  }, [isInitializing, shouldRender, screenOpacity]);
+
+  if (!shouldRender && !isInitializing) return null;
+  if (!shouldRender) return null;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        backgroundColor: '#000',
+      }}>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          backgroundColor: '#000',
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: screenOpacity,
+          pointerEvents: isInitializing ? 'auto' : 'none',
+        }}>
+        <AnimatedLogoSplash />
+      </Animated.View>
+    </View>
+  );
+}
 
 function InitializationScreenInternal() {
   const { logHistory, currentStage, isInitializing } = useInitializationContext();
