@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { ScrollView, Linking, Alert, Switch } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
@@ -167,6 +167,8 @@ export const RowButton: React.FC<{
   );
 };
 
+const TRIPLE_TAP_WINDOW_MS = 1500;
+
 const ModalScreen = () => {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
@@ -175,6 +177,27 @@ const ModalScreen = () => {
   const setDevMode = useSettingsStore((state) => state.setExperimental);
   const mockMode = useSettingsStore((state) => state.mockMode);
   const setMockMode = useSettingsStore((state) => state.setMockMode);
+
+  const tapCountRef = useRef(0);
+  const lastTapRef = useRef(0);
+
+  const handleVersionPress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current > TRIPLE_TAP_WINDOW_MS) {
+      tapCountRef.current = 0;
+    }
+    tapCountRef.current += 1;
+    lastTapRef.current = now;
+
+    if (tapCountRef.current >= 3) {
+      tapCountRef.current = 0;
+      setDevMode(!devMode);
+      popup({
+        message: devMode ? 'Developer mode disabled' : 'Developer mode enabled',
+        type: 'success',
+      });
+    }
+  }, [devMode, setDevMode]);
 
   const handleExportDatabase = async () => {
     try {
@@ -324,59 +347,33 @@ const ModalScreen = () => {
         ) : null}
 
         <Section title="Danger Zone" isDanger>
-          <RowButton label="Delete Account" href="/settings-pages/delete" isFirst isDanger />
-          <View
-            style={{
-              backgroundColor: getPrimaryColor('800'),
-              borderColor: getPrimaryColor('700'),
-              borderTopWidth: 1,
-              borderBottomLeftRadius: 12,
-              borderBottomRightRadius: 12,
-              padding: 12,
-            }}>
-            <HStack align="center" justify="space-between">
-              <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                Developer Mode
-              </Text>
-              <Switch
-                value={devMode}
-                onValueChange={setDevMode}
-                trackColor={{
-                  false: getPrimaryColor('700'),
-                  true: getShadeColor('300'),
-                }}
-                thumbColor={getPrimaryColor('0')}
-              />
-            </HStack>
-          </View>
+          <RowButton label="Delete Account" href="/settings-pages/delete" isFirst isLast isDanger />
         </Section>
 
-        <Link href="/settings-pages/design" asChild>
-          <TouchableOpacity>
-            <VStack spacing={4}>
-              <Text
-                className="text-center"
-                overpass
-                bold
-                size={13}
-                style={{
-                  color: opacity(getPrimaryColor('0'), 0.5),
-                }}>
-                {name}
-              </Text>
-              <Text
-                className="text-center"
-                size={13}
-                overpass
-                medium
-                style={{
-                  color: opacity(getPrimaryColor('0'), 0.5),
-                }}>
-                App Version {version} ({buildNumber})
-              </Text>
-            </VStack>
-          </TouchableOpacity>
-        </Link>
+        <TouchableOpacity onPress={handleVersionPress}>
+          <VStack spacing={4}>
+            <Text
+              className="text-center"
+              overpass
+              bold
+              size={13}
+              style={{
+                color: opacity(getPrimaryColor('0'), 0.5),
+              }}>
+              {name}
+            </Text>
+            <Text
+              className="text-center"
+              size={13}
+              overpass
+              medium
+              style={{
+                color: opacity(getPrimaryColor('0'), 0.5),
+              }}>
+              App Version {version} ({buildNumber})
+            </Text>
+          </VStack>
+        </TouchableOpacity>
       </ScrollView>
     </Container>
   );
