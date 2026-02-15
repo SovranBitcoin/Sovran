@@ -3,25 +3,37 @@ import { CheckStateEnum } from '@cashu/cashu-ts';
 import { store } from 'redux/store';
 import { RootState } from 'redux/store/reducer';
 import { CashuProfile } from 'redux/cashu/types';
-import { Alert } from 'react-native';
 
 /**
- * Data migration utility to move from Redux-based Cashu state to Coco repositories
- * This handles the migration of existing user data safely
+ * Data migration utility to move from Redux-based Cashu state to Coco repositories.
+ * This handles the migration of existing user data safely.
+ *
+ * Each instance is scoped to a single account index so that the correct Redux
+ * profile entry is migrated into the corresponding per-profile Coco database.
  */
 export class DataMigration {
-  constructor(private manager: Manager) {}
+  constructor(
+    private manager: Manager,
+    private accountIndex: number
+  ) {}
 
   /**
-   * Migrate all Redux Cashu data to Coco repositories
-   * This should be run once during the migration phase
+   * Get the Redux profile for the current account index.
+   * Returns undefined if no profile exists at this index.
+   */
+  private getReduxProfile(): CashuProfile | undefined {
+    const state = store.getState() as unknown as RootState;
+    return state.cashu.profiles[this.accountIndex];
+  }
+
+  /**
+   * Migrate Redux Cashu data for this account to Coco repositories.
+   * Only migrates data from the Redux profile matching this.accountIndex.
    */
   async migrateFromRedux(): Promise<MigrationResult> {
-    const state = store.getState() as unknown as RootState;
-    const cashuState = state.cashu;
+    const profile = this.getReduxProfile();
 
-    console.log('Starting Redux to Coco migration...');
-    console.log('Redux cashu state:', JSON.stringify(cashuState, null, 2));
+    console.log(`Starting Redux to Coco migration for account ${this.accountIndex}...`);
 
     const result: MigrationResult = {
       mintsMigrated: 0,
@@ -30,15 +42,22 @@ export class DataMigration {
       errors: [],
     };
 
+    if (!profile) {
+      console.log(`No Redux profile found at index ${this.accountIndex}, skipping migration`);
+      return result;
+    }
+
+    console.log('Redux profile data:', JSON.stringify(profile, null, 2));
+
     try {
       // Migrate mints first
-      await this.migrateMints(cashuState.profiles, result);
+      await this.migrateMints(profile, result);
 
       // Migrate proofs
-      await this.migrateProofs(cashuState.profiles, result);
+      await this.migrateProofs(profile, result);
 
       // Migrate counters
-      await this.migrateCounters(cashuState.profiles, result);
+      await this.migrateCounters(profile, result);
 
       console.log('Migration completed:', result);
       return result;
@@ -55,20 +74,15 @@ export class DataMigration {
   /**
    * Migrate mint URLs to Coco
    */
-  private async migrateMints(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
+  private async migrateMints(profile: CashuProfile, result: MigrationResult): Promise<void> {
     const uniqueMints = new Set<string>();
 
-    // Collect all unique mint URLs from both mints array and proofs keys
-    for (const profile of profiles) {
-      // Add mints from the mints array
-      for (const mintUrl of profile.mints) {
-        uniqueMints.add(mintUrl);
-      }
-
-      // Add mints from proofs keys (mint URLs that have proofs)
-      for (const mintUrl of Object.keys(profile.proofs)) {
-        uniqueMints.add(mintUrl);
-      }
+    // Collect unique mint URLs from both mints array and proofs keys
+    for (const mintUrl of profile.mints) {
+      uniqueMints.add(mintUrl);
+    }
+    for (const mintUrl of Object.keys(profile.proofs)) {
+      uniqueMints.add(mintUrl);
     }
 
     // Add each mint to Coco
@@ -104,67 +118,65 @@ export class DataMigration {
    * Migrate proofs to Coco repositories
    * Only migrates proofs with "sat" unit that are unspent
    */
-  private async migrateProofs(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
-    for (const profile of profiles) {
-      for (const [mintUrl, proofs] of Object.entries(profile.proofs)) {
-        if (!Array.isArray(proofs) || proofs.length === 0) continue;
+  private async migrateProofs(profile: CashuProfile, result: MigrationResult): Promise<void> {
+    for (const [mintUrl, proofs] of Object.entries(profile.proofs)) {
+      if (!Array.isArray(proofs) || proofs.length === 0) continue;
 
-        try {
-          // Get keysets from mint to filter by unit
-          const keysets = await this.manager.mint.getKeysets(mintUrl);
-          const keysetUnitMap = new Map(
-            keysets.map((k: { id: string; unit: string }) => [k.id, k.unit])
-          );
+      try {
+        // Get keysets from mint to filter by unit
+        const keysets = await this.manager.mint.getKeysets(mintUrl);
+        const keysetUnitMap = new Map(
+          keysets.map((k: { id: string; unit: string }) => [k.id, k.unit])
+        );
 
-          // Filter to only sat proofs first
-          const satProofs = proofs.filter((proof) => {
-            const unit = keysetUnitMap.get(proof.id);
-            if (unit !== 'sat') {
-              console.log(`Skipping non-sat proof (unit: ${unit || 'unknown'}) for ${mintUrl}`);
-              return false;
-            }
-            return true;
-          });
+        // Filter to only sat proofs first
+        const satProofs = proofs.filter((proof) => {
+          const unit = keysetUnitMap.get(proof.id);
+          if (unit !== 'sat') {
+            console.log(`Skipping non-sat proof (unit: ${unit || 'unknown'}) for ${mintUrl}`);
+            return false;
+          }
+          return true;
+        });
 
-          if (satProofs.length === 0) {
-            console.log(`No sat proofs to migrate for ${mintUrl}`);
+        if (satProofs.length === 0) {
+          console.log(`No sat proofs to migrate for ${mintUrl}`);
+          continue;
+        }
+
+        // Check proof states with the mint to filter out spent proofs
+        const wallet = await this.manager.walletService.getWallet(mintUrl);
+        const proofStates = await wallet.checkProofsStates(satProofs);
+
+        // Filter and save only unspent proofs
+        for (let i = 0; i < satProofs.length; i++) {
+          const proof = satProofs[i];
+          const state = proofStates[i];
+
+          if (state.state === CheckStateEnum.SPENT) {
+            console.log(`Skipping spent proof for ${mintUrl}`);
             continue;
           }
 
-          // Check proof states with the mint to filter out spent proofs
-          const wallet = await this.manager.walletService.getWallet(mintUrl);
-          const proofStates = await wallet.checkProofsStates(satProofs);
-
-          // Filter and save only unspent proofs
-          for (let i = 0; i < satProofs.length; i++) {
-            const proof = satProofs[i];
-            const state = proofStates[i];
-
-            if (state.state === CheckStateEnum.SPENT) {
-              console.log(`Skipping spent proof for ${mintUrl}`);
-              continue;
-            }
-
-            if (state.state === CheckStateEnum.PENDING) {
-              console.log(`Skipping pending proof for ${mintUrl}`);
-              continue;
-            }
-
-            // Save unspent proof
-            await this.manager.proofService.saveProofs(mintUrl, [
-              { ...proof, mintUrl, state: 'ready' as const },
-            ]);
-            result.proofsMigrated++;
+          if (state.state === CheckStateEnum.PENDING) {
+            console.log(`Skipping pending proof for ${mintUrl}`);
+            continue;
           }
 
-          console.log(`Migrated proofs for ${mintUrl}`);
-        } catch (error) {
-          console.error(`Failed to migrate proofs for ${mintUrl}:`, error);
-          result.errors.push({
-            type: 'proofs_migration_failed',
-            message: `Failed to migrate proofs for ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
+          // Save unspent proof
+          await this.manager.proofService.saveProofs(mintUrl, [
+            { ...proof, mintUrl, state: 'ready' as const },
+          ]);
+          result.proofsMigrated++;
         }
+
+        console.log(`Migrated proofs for ${mintUrl}`);
+      } catch (error) {
+        console.error(`Failed to migrate proofs for ${mintUrl}:`, error);
+        result.errors.push({
+          type: 'proofs_migration_failed',
+          message: `Failed to migrate proofs for ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
     }
   }
@@ -172,15 +184,13 @@ export class DataMigration {
   /**
    * Migrate counter values to Coco
    */
-  private async migrateCounters(profiles: CashuProfile[], result: MigrationResult): Promise<void> {
+  private async migrateCounters(profile: CashuProfile, result: MigrationResult): Promise<void> {
     let totalCounters = 0;
 
     // Count total counters first for logging
-    for (const profile of profiles) {
-      console.log('Profile counters:', profile.counters);
-      for (const [, counters] of Object.entries(profile.counters)) {
-        totalCounters += Object.keys(counters).length;
-      }
+    console.log('Profile counters:', profile.counters);
+    for (const [, counters] of Object.entries(profile.counters)) {
+      totalCounters += Object.keys(counters).length;
     }
 
     if (totalCounters === 0) {
@@ -190,45 +200,45 @@ export class DataMigration {
 
     console.log(`Found ${totalCounters} counters to migrate`);
 
-    Alert.alert(`Migrated counter for ${totalCounters} counters`);
-    for (const profile of profiles) {
-      for (const [mintUrl, counters] of Object.entries(profile.counters)) {
-        for (const [keysetId, counter] of Object.entries(counters)) {
-          try {
-            await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
-            result.countersMigrated++;
-            console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
-          } catch (error) {
-            result.errors.push({
-              type: 'counter_migration_failed',
-              message: `Failed to migrate counter for ${mintUrl}:${keysetId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            });
-          }
+    for (const [mintUrl, counters] of Object.entries(profile.counters)) {
+      for (const [keysetId, counter] of Object.entries(counters)) {
+        try {
+          await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
+          result.countersMigrated++;
+          console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
+        } catch (error) {
+          result.errors.push({
+            type: 'counter_migration_failed',
+            message: `Failed to migrate counter for ${mintUrl}:${keysetId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
         }
       }
     }
   }
 
   /**
-   * Check if migration is needed by comparing Redux state with Coco state
+   * Check if migration is needed for this account by comparing its Redux
+   * profile entry with the current Coco database.
    */
   async isMigrationNeeded(): Promise<boolean> {
-    const state = store.getState() as unknown as RootState;
-    const cashuState = state.cashu;
+    const profile = this.getReduxProfile();
 
-    // Check if there's any data in Redux that needs migration
-    const hasData = cashuState.profiles.some(
-      (profile) =>
-        profile.mints.length > 0 ||
-        Object.keys(profile.proofs).length > 0 ||
-        Object.keys(profile.counters).length > 0
-    );
+    // No Redux profile at this index — nothing to migrate
+    if (!profile) {
+      return false;
+    }
+
+    // Check if this specific profile has any data worth migrating
+    const hasData =
+      profile.mints.length > 0 ||
+      Object.keys(profile.proofs).length > 0 ||
+      Object.keys(profile.counters).length > 0;
 
     if (!hasData) {
       return false;
     }
 
-    // Check if Coco already has data
+    // Check if Coco already has data (migration already ran for this DB)
     try {
       const mints = await this.manager.mint.getAllMints();
       return mints.length === 0; // Migration needed if Coco has no mints but Redux has data

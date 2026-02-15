@@ -6,6 +6,7 @@ import { DataMigration } from './migration';
 import { useInitializationStage } from '@/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/providers/NostrKeysProvider';
 import { useMintStore } from '@/stores/mintStore';
+import { useProfileStore } from '@/stores/profileStore';
 interface CocoContextValue {
   manager: Manager | null;
   isReady: boolean;
@@ -124,14 +125,17 @@ export function CocoProvider({ children }: CocoProviderProps) {
         const mgr = await CocoManager.initialize();
         setManager(mgr);
 
-        // Check if migration is needed
+        // Check if migration is needed for this specific account.
+        // The Redux profiles array is indexed by account — each Coco DB should
+        // only receive data from its corresponding Redux profile entry.
+        const activeAccountIndex = useProfileStore.getState().activeAccountIndex;
         stage.log('Checking for data migration...');
-        const migration = new DataMigration(mgr);
+        const migration = new DataMigration(mgr, activeAccountIndex);
         const needsMigration = await migration.isMigrationNeeded();
 
         if (needsMigration) {
           stage.log('Migrating data...');
-          console.log('Migration needed, starting data migration...');
+          console.log(`Migration needed for account ${activeAccountIndex}, starting...`);
           setIsMigrating(true);
 
           try {
@@ -149,7 +153,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
             setIsMigrating(false);
           }
         } else {
-          console.log('No migration needed');
+          console.log(`No migration needed for account ${activeAccountIndex}`);
         }
 
         // Initialize default mints for new users
