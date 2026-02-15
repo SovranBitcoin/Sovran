@@ -5,6 +5,7 @@ import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { Section } from 'components/ui/Section';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 
 interface SectionItem {
@@ -49,10 +50,10 @@ export function DetailsSection({
         <HStack align="center" gap={6}>
           <Icon
             name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-            color={getPrimaryColor('300')}
+            color={opacity(getPrimaryColor('0'), 0.5)}
             size={18}
           />
-          <Text size={14} bold style={{ color: getPrimaryColor('300') }}>
+          <Text size={14} bold style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
             {label}
           </Text>
         </HStack>

@@ -330,7 +330,7 @@ export const Transactions = React.memo(
             <Icon
               name="ant-design:loading-outlined"
               size={32}
-              color={getPrimaryColor('500')}
+              color={opacity(getPrimaryColor('0'), 0.33)}
               spin={{
                 duration: 1000,
                 outputRange: ['0deg', '360deg'],
@@ -338,10 +338,10 @@ export const Transactions = React.memo(
                 easing: 'linear',
               }}
             />
-            <Text heavy size={16} style={{ color: getPrimaryColor('500') }}>
+            <Text heavy size={16} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
               Loading Transactions...
             </Text>
-            <Text color={getPrimaryColor('500')} size={16}>
+            <Text color={opacity(getPrimaryColor('0'), 0.4)} size={16}>
               Please wait while we fetch your history
             </Text>
           </View>
@@ -467,7 +467,11 @@ export const Transactions = React.memo(
         scrollEventThrottle={16}
         renderItem={({ item: section }) => (
           <VStack spacing={4} style={{ marginBottom: 16 }}>
-            <Text size={14} heavy color={getPrimaryColor('500')} style={{ height: HEADER_HEIGHT }}>
+            <Text
+              size={14}
+              heavy
+              color={opacity(getPrimaryColor('0'), 0.33)}
+              style={{ height: HEADER_HEIGHT }}>
               {section.title}
             </Text>
             <View style={[styles.card, { borderColor }]}>

@@ -121,9 +121,9 @@ export function WalletHealthModalContent({
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const heroTransition = useHeroTransition();
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
-  const primary300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const primary400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primary50 = useMemo(() => opacity(getPrimaryColor('0'), 0.9), [getPrimaryColor]);
+  const primary300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const primary400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
   const red = useMemo(() => getRedColor('300'), [getRedColor]);
 

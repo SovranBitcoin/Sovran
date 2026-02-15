@@ -55,7 +55,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
               className="text-xs"
               style={{
                 fontFamily: 'OverpassBold',
-                color: isSelected ? getPrimaryColor('0') : getPrimaryColor('100'),
+                color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.8),
               }}>
               {`(${amount})`}
             </Text>

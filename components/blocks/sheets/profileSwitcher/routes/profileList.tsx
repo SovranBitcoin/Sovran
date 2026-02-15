@@ -105,16 +105,20 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                       unit="sat"
                       size={14}
                       weight="heavy"
-                      color={getPrimaryColor('400')}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
                     />
                   ) : (
-                    <Text style={{ color: getPrimaryColor('400') }} size={12}>
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.4) }} size={12}>
                       —
                     </Text>
                   )}
                 </VStack>
                 {isActive && (
-                  <Icon name="mdi:check-circle" size={22} color={getPrimaryColor('400')} />
+                  <Icon
+                    name="mdi:check-circle"
+                    size={22}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 )}
               </HStack>
             </TouchableOpacity>

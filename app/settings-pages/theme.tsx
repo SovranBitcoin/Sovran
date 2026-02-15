@@ -23,6 +23,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
+import opacity from 'hex-color-opacity';
 
 const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 20;
@@ -314,8 +315,12 @@ function ThemeSettings() {
 
         {!hasResults && (
           <VStack style={styles.emptyState} spacing={8}>
-            <Icon name="mingcute:search-3-line" size={48} color={getPrimaryColor('500')} />
-            <Text size={16} style={{ color: getPrimaryColor('400') }}>
+            <Icon
+              name="mingcute:search-3-line"
+              size={48}
+              color={opacity(getPrimaryColor('0'), 0.33)}
+            />
+            <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
               No themes found
             </Text>
           </VStack>
@@ -328,7 +333,7 @@ function ThemeSettings() {
               size={13}
               medium
               overpass
-              style={[styles.sectionTitle, { color: getPrimaryColor('300') }]}>
+              style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
               WALLPAPERS
             </Text>
             <Spacer size={12} />
@@ -343,7 +348,7 @@ function ThemeSettings() {
               size={13}
               medium
               overpass
-              style={[styles.sectionTitle, { color: getPrimaryColor('300') }]}>
+              style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
               COLOR THEMES
             </Text>
             <Spacer size={12} />

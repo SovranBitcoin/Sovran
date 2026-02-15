@@ -12,6 +12,7 @@ import { CocoManager } from 'helper/coco/manager';
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import { useNavigation, router } from 'expo-router';
 import { Mint } from 'coco-cashu-core';
+import opacity from 'hex-color-opacity';
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
 
@@ -124,7 +125,11 @@ const RecoveryScreen: React.FC = () => {
         </Text>
         <Text
           size={16}
-          style={{ color: getPrimaryColor('300'), textAlign: 'center', lineHeight: 24 }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.5),
+            textAlign: 'center',
+            lineHeight: 24,
+          }}>
           This will attempt to recover your ecash from {mints.length} mint
           {mints.length !== 1 ? 's' : ''} using your seed phrase.
         </Text>
@@ -132,12 +137,12 @@ const RecoveryScreen: React.FC = () => {
 
       <View className="w-full rounded-xl p-4" style={{ backgroundColor: getPrimaryColor('900') }}>
         <HStack spacing={12} className="items-start">
-          <Icon name="mdi:information" size={24} color={getPrimaryColor('400')} />
+          <Icon name="mdi:information" size={24} color={opacity(getPrimaryColor('0'), 0.4)} />
           <VStack spacing={4} className="flex-1">
-            <Text size={14} medium style={{ color: getPrimaryColor('200') }}>
+            <Text size={14} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
               What happens during recovery?
             </Text>
-            <Text size={13} style={{ color: getPrimaryColor('400'), lineHeight: 20 }}>
+            <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), lineHeight: 20 }}>
               • Contacts each mint to restore proofs{'\n'}• Recovers any interrupted transactions
               {'\n'}• This may take several minutes
             </Text>
@@ -159,7 +164,7 @@ const RecoveryScreen: React.FC = () => {
           onPress={handleClose}
           className="w-full items-center rounded-xl p-4"
           style={{ backgroundColor: getPrimaryColor('800') }}>
-          <Text size={16} medium style={{ color: getPrimaryColor('200') }}>
+          <Text size={16} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
             Cancel
           </Text>
         </TouchableOpacity>
@@ -174,7 +179,7 @@ const RecoveryScreen: React.FC = () => {
         <Text size={20} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
           Recovering...
         </Text>
-        <Text size={14} style={{ color: getPrimaryColor('300'), textAlign: 'center' }}>
+        <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), textAlign: 'center' }}>
           Please do not close this screen
         </Text>
       </VStack>
@@ -209,7 +214,9 @@ const RecoveryScreen: React.FC = () => {
               size={14}
               style={{
                 color:
-                  currentMintIndex >= mints.length ? getPrimaryColor('0') : getPrimaryColor('500'),
+                  currentMintIndex >= mints.length
+                    ? getPrimaryColor('0')
+                    : opacity(getPrimaryColor('0'), 0.33),
               }}>
               Recovering pending transactions
             </Text>
@@ -239,7 +246,11 @@ const RecoveryScreen: React.FC = () => {
         </Text>
         <Text
           size={16}
-          style={{ color: getPrimaryColor('300'), textAlign: 'center', lineHeight: 24 }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.5),
+            textAlign: 'center',
+            lineHeight: 24,
+          }}>
           {failureCount === 0
             ? `Successfully recovered from ${successCount} mint${successCount !== 1 ? 's' : ''}.`
             : `Recovered from ${successCount} mint${successCount !== 1 ? 's' : ''}. Failed for ${failureCount} mint${failureCount !== 1 ? 's' : ''}.`}
@@ -298,7 +309,11 @@ const RecoveryScreen: React.FC = () => {
         </Text>
         <Text
           size={16}
-          style={{ color: getPrimaryColor('300'), textAlign: 'center', lineHeight: 24 }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.5),
+            textAlign: 'center',
+            lineHeight: 24,
+          }}>
           {errorMessage || 'An unexpected error occurred during recovery.'}
         </Text>
       </VStack>
@@ -317,7 +332,7 @@ const RecoveryScreen: React.FC = () => {
           onPress={handleClose}
           className="w-full items-center rounded-xl p-4"
           style={{ backgroundColor: getPrimaryColor('800') }}>
-          <Text size={16} medium style={{ color: getPrimaryColor('200') }}>
+          <Text size={16} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
             Close
           </Text>
         </TouchableOpacity>
@@ -382,7 +397,7 @@ const MintRecoveryRow: React.FC<{
           size={14}
           numberOfLines={1}
           style={{
-            color: isPending ? getPrimaryColor('500') : getPrimaryColor('0'),
+            color: isPending ? opacity(getPrimaryColor('0'), 0.33) : getPrimaryColor('0'),
           }}>
           {hostname}
         </Text>

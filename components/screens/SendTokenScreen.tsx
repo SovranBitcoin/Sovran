@@ -53,6 +53,7 @@ import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 // Default relay for payment requests
@@ -116,10 +117,11 @@ interface SendTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
+  const { getPrimaryColor } = useTheme();
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>{message}</Text>
+        <Text color={opacity(getPrimaryColor('0'), 0.66)}>{message}</Text>
         <ButtonHandler
           buttons={[
             {
@@ -141,9 +143,9 @@ function LoadingState() {
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={getPrimaryColor('400')} />
+        <ActivityIndicator size="large" color={opacity(getPrimaryColor('0'), 0.4)} />
         <Spacer size={16} />
-        <Text color={getPrimaryColor('300')}>Loading payment request...</Text>
+        <Text color={opacity(getPrimaryColor('0'), 0.5)}>Loading payment request...</Text>
       </View>
     </ModalLayoutWrapper>
   );

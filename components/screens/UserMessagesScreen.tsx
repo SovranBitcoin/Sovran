@@ -550,7 +550,7 @@ function MessageBubble({
                 <Icon
                   name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
                   size={14}
-                  color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
+                  color={message.isRead ? opacity(getPrimaryColor('0'), 0.4) : getShadeColor('500')}
                 />
               ))}
           </HStack>
@@ -1779,7 +1779,7 @@ export function UserMessagesScreen({
                     defaultValue=""
                     onChangeText={handleSessionSearchChange}
                     placeholder="Search sessions..."
-                    placeholderTextColor={getPrimaryColor('500')}
+                    placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
                     style={{
                       flex: 1,
                       color: getPrimaryColor('0'),

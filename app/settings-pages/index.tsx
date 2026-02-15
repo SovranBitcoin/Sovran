@@ -21,6 +21,7 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getUsername } from '@/helper/username';
 import { CocoManager } from 'helper/coco/manager';
 import { popup } from '@/helper/popup';
+import opacity from 'hex-color-opacity';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -41,7 +42,7 @@ export const Section: React.FC<{
         medium
         overpass
         style={{
-          color: isDanger ? getRedColor('300') : getPrimaryColor('300'),
+          color: isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.5),
         }}>
         {title}
       </Text>
@@ -77,13 +78,17 @@ const ProfileButton = () => {
               <Text
                 size={16}
                 style={{
-                  color: getPrimaryColor('400'),
+                  color: opacity(getPrimaryColor('0'), 0.4),
                 }}>
                 {truncateMiddle(nostrKeys?.npub || '', 8)}
               </Text>
             </VStack>
           </HStack>
-          <Icon name="fa6-solid:chevron-right" color={getPrimaryColor('400')} size={22} />
+          <Icon
+            name="fa6-solid:chevron-right"
+            color={opacity(getPrimaryColor('0'), 0.4)}
+            size={22}
+          />
         </View>
       </TouchableOpacity>
     </Link>
@@ -127,7 +132,7 @@ export const RowButton: React.FC<{
             bold
             size={16}
             style={{
-              color: isDanger ? getRedColor('300') : getPrimaryColor('400'),
+              color: isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4),
             }}>
             {value}
           </Text>
@@ -136,7 +141,7 @@ export const RowButton: React.FC<{
           (rightIcon ?? (
             <Icon
               name="fa6-solid:chevron-right"
-              color={isDanger ? getRedColor('300') : getPrimaryColor('400')}
+              color={isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4)}
               size={19}
             />
           ))
@@ -260,7 +265,7 @@ const ModalScreen = () => {
                 <Text
                   size={13}
                   style={{
-                    color: getPrimaryColor('400'),
+                    color: opacity(getPrimaryColor('0'), 0.4),
                     marginTop: 4,
                   }}>
                   Attach your approximate location when making transactions. (metadata only stored
@@ -353,7 +358,7 @@ const ModalScreen = () => {
                 bold
                 size={13}
                 style={{
-                  color: getPrimaryColor('300'),
+                  color: opacity(getPrimaryColor('0'), 0.5),
                 }}>
                 {name}
               </Text>
@@ -363,7 +368,7 @@ const ModalScreen = () => {
                 overpass
                 medium
                 style={{
-                  color: getPrimaryColor('300'),
+                  color: opacity(getPrimaryColor('0'), 0.5),
                 }}>
                 App Version {version} ({buildNumber})
               </Text>

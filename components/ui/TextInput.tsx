@@ -6,6 +6,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 
 /**
  * Custom TextInput component with default styling based on the current theme.
@@ -32,7 +33,7 @@ const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }
         },
         style,
       ]}
-      placeholderTextColor={placeholderTextColor || getPrimaryColor('300')}
+      placeholderTextColor={placeholderTextColor || opacity(getPrimaryColor('0'), 0.5)}
       {...props}
     />
   );

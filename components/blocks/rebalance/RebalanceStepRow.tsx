@@ -14,6 +14,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -138,8 +139,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 }) => {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const primaryColor400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const primaryColor400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
 
   const fromName = fromMintInfo?.name || extractDomain(fromMintUrl);

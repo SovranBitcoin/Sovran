@@ -13,6 +13,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from '@/providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 
@@ -38,21 +39,25 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
       style={[
         styles.chip,
         {
-          backgroundColor: isSelected ? getPrimaryColor('600') : getPrimaryColor('900'),
-          borderColor: isSelected ? getPrimaryColor('500') : getPrimaryColor('800'),
+          backgroundColor: isSelected
+            ? opacity(getPrimaryColor('0'), 0.15)
+            : opacity(getPrimaryColor('0'), 0.05),
+          borderColor: isSelected
+            ? opacity(getPrimaryColor('0'), 0.25)
+            : opacity(getPrimaryColor('0'), 0.08),
         },
       ]}>
       {icon ? (
         <Icon
           name={icon}
           size={16}
-          color={isSelected ? getPrimaryColor('0') : getPrimaryColor('400')}
+          color={isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4)}
         />
       ) : null}
       <Text
         size={14}
         style={{
-          color: isSelected ? getPrimaryColor('0') : getPrimaryColor('400'),
+          color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4),
           fontFamily: 'OverpassSemibold',
         }}>
         {label}
@@ -74,7 +79,7 @@ const Section: React.FC<SectionProps> = ({ title, children }) => {
       <Text
         size={13}
         style={{
-          color: getPrimaryColor('500'),
+          color: opacity(getPrimaryColor('0'), 0.33),
           fontFamily: 'OverpassSemibold',
           textTransform: 'uppercase',
           letterSpacing: 1,
@@ -152,7 +157,9 @@ export default function FiltersScreen() {
             onPress={handleReset}
             disabled={!hasActiveFilters}
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
-            <Text size={14} style={{ color: getPrimaryColor('400'), fontFamily: 'OverpassMedium' }}>
+            <Text
+              size={14}
+              style={{ color: opacity(getPrimaryColor('0'), 0.4), fontFamily: 'OverpassMedium' }}>
               Reset
             </Text>
           </Pressable>

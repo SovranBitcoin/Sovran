@@ -13,6 +13,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Section } from './index';
 import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
 
 // ---------------------------------------------------------------------------
 // Stepper – a simple +/- row for integer or percentage values
@@ -58,7 +59,9 @@ const Stepper: React.FC<{
             {label}
           </Text>
           {description ? (
-            <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
+            <Text
+              size={13}
+              style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
               {description}
             </Text>
           ) : null}
@@ -192,7 +195,9 @@ function RoutingSettingsScreen() {
                   <Text size={16} style={{ color: getPrimaryColor('0') }}>
                     Last swap must be OK
                   </Text>
-                  <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
+                  <Text
+                    size={13}
+                    style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
                     Require the most recent swap on each edge to have been successful.
                   </Text>
                 </VStack>
@@ -224,7 +229,9 @@ function RoutingSettingsScreen() {
                   <Text size={16} style={{ color: getPrimaryColor('0') }}>
                     Intermediary trust policy
                   </Text>
-                  <Text size={13} style={[styles.description, { color: getPrimaryColor('400') }]}>
+                  <Text
+                    size={13}
+                    style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
                     Controls which mints can act as middlemen. Trusted mints are always preferred
                     regardless of this setting.
                   </Text>

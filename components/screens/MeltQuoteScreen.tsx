@@ -30,6 +30,7 @@ import { MeltHistoryEntry } from 'coco-cashu-core';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from 'helper/time';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
@@ -68,12 +69,20 @@ function ErrorState({ message, onCancel }: { message: string; onCancel: () => vo
         <Text
           size={18}
           bold
-          style={{ color: getPrimaryColor('0'), marginBottom: 16, textAlign: 'center' }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.9),
+            marginBottom: 16,
+            textAlign: 'center',
+          }}>
           Error
         </Text>
         <Text
           size={14}
-          style={{ color: getPrimaryColor('300'), marginBottom: 24, textAlign: 'center' }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.5),
+            marginBottom: 24,
+            textAlign: 'center',
+          }}>
           {message}
         </Text>
         <ButtonHandler
@@ -99,7 +108,7 @@ function LoadingState({ message }: { message: string }) {
     <ModalLayoutWrapper>
       <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
-        <Text size={16} style={{ color: getPrimaryColor('300'), marginTop: 16 }}>
+        <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
           {message}
         </Text>
       </VStack>

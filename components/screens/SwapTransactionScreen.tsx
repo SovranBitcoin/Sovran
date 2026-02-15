@@ -176,13 +176,14 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={getPrimaryColor('50')}
+            color={opacity(getPrimaryColor('0'), 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {srcName}
           </UntranslatedText>
         </HStack>
-        <View style={[styles.collapsedArrow, { backgroundColor: getPrimaryColor('500') }]}>
+        <View
+          style={[styles.collapsedArrow, { backgroundColor: opacity(getPrimaryColor('0'), 0.33) }]}>
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
@@ -190,7 +191,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={getPrimaryColor('50')}
+            color={opacity(getPrimaryColor('0'), 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {dstName}
@@ -330,7 +331,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return (
       <ModalLayoutWrapper>
         <View style={styles.center}>
-          <Text color={getPrimaryColor('200')}>Swap not found.</Text>
+          <Text color={opacity(getPrimaryColor('0'), 0.66)}>Swap not found.</Text>
         </View>
       </ModalLayoutWrapper>
     );
@@ -363,8 +364,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 color={headerColor}
               />
             </HStack>
-            <Text size={18} color={getPrimaryColor('50')} bold>
-              <Text size={18} color={getPrimaryColor('50')} style={{ marginLeft: 8 }}>
+            <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} bold>
+              <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} style={{ marginLeft: 8 }}>
                 {fiatAmount}
               </Text>
             </Text>
@@ -372,20 +373,20 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
           {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
           <View className="scale-125 transform bg-transparent p-4">
-            <Icon name="mdi:swap-horizontal" size={28} color={getPrimaryColor('50')} />
+            <Icon name="mdi:swap-horizontal" size={28} color={opacity(getPrimaryColor('0'), 0.9)} />
           </View>
         </HStack>
 
         {/* ── Toggle header ── */}
         <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
           <HStack align="center" justify="space-between" style={styles.toggleHeader}>
-            <UntranslatedText bold size={13} color={getPrimaryColor('200')}>
+            <UntranslatedText bold size={13} color={opacity(getPrimaryColor('0'), 0.66)}>
               Transactions
             </UntranslatedText>
             <Icon
               name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
               size={18}
-              color={getPrimaryColor('300')}
+              color={opacity(getPrimaryColor('0'), 0.5)}
             />
           </HStack>
         </TouchableOpacity>
@@ -487,7 +488,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                     <View
                       style={{
                         height: StyleSheet.hairlineWidth,
-                        backgroundColor: opacity(getPrimaryColor('400'), 0.2),
+                        backgroundColor: opacity(getPrimaryColor('0'), 0.1),
                         marginHorizontal: 16,
                       }}
                     />

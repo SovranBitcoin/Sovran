@@ -211,7 +211,7 @@ export const TransferStepChain = React.memo(({ status, routingDetail }: Transfer
   const greenColor = useMemo(() => getGreenColor('300'), [getGreenColor]);
   const redColor = useMemo(() => getRedColor('300'), [getRedColor]);
   const greyColor = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
-  const labelColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const labelColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
 
   const chain = useMemo(() => buildChain(status), [status]);
 

@@ -119,7 +119,7 @@ function UsernameInput({
         onChangeText={handleChange}
         placeholder="username"
         placeholderTextColor={opacity(accentColor, 0.45)}
-        style={[styles.input, { color: getPrimaryColor('50') }]}
+        style={[styles.input, { color: opacity(getPrimaryColor('0'), 0.9) }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
@@ -150,7 +150,8 @@ function DomainOption({
 
   const getStatusInfo = () => {
     if (!availabilityResult) return null;
-    if (availabilityResult.loading) return { color: getPrimaryColor('500'), text: 'Checking...' };
+    if (availabilityResult.loading)
+      return { color: opacity(getPrimaryColor('0'), 0.33), text: 'Checking...' };
     if (availabilityResult.error)
       return { color: '#ef4444', text: availabilityResult.error, icon: 'mdi:close-circle' };
     if (availabilityResult.available === true)
@@ -188,13 +189,19 @@ function DomainOption({
           <Icon
             name="mingcute:lightning-fill"
             size={16}
-            color={isSelected ? getPrimaryColor('400') : getPrimaryColor('500')}
+            color={
+              isSelected ? opacity(getPrimaryColor('0'), 0.4) : opacity(getPrimaryColor('0'), 0.33)
+            }
           />
         </View>
         <Text
           size={15}
           heavy={isSelected}
-          style={{ color: isSelected ? getPrimaryColor('50') : getPrimaryColor('300') }}>
+          style={{
+            color: isSelected
+              ? opacity(getPrimaryColor('0'), 0.9)
+              : opacity(getPrimaryColor('0'), 0.5),
+          }}>
           @{domain.label}
         </Text>
       </HStack>
@@ -479,7 +486,7 @@ function ClaimUsernameScreen() {
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                    <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                       Claim Your Address
                     </Text>
                     <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
@@ -488,7 +495,9 @@ function ClaimUsernameScreen() {
                   </VStack>
                 </HStack>
 
-                <Text size={14} style={{ color: getPrimaryColor('300'), marginBottom: 14 }}>
+                <Text
+                  size={14}
+                  style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 14 }}>
                   Choose a memorable username for receiving Bitcoin.
                 </Text>
 
@@ -509,7 +518,11 @@ function ClaimUsernameScreen() {
                 <Text
                   size={12}
                   heavy
-                  style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
+                  style={{
+                    color: opacity(getPrimaryColor('0'), 0.33),
+                    marginLeft: 4,
+                    marginBottom: 4,
+                  }}>
                   SELECT DOMAIN
                 </Text>
                 {DOMAINS.map((domain) => (
@@ -527,7 +540,10 @@ function ClaimUsernameScreen() {
 
               {username.length === 0 && (
                 <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
-                  <Text size={13} heavy style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
+                  <Text
+                    size={13}
+                    heavy
+                    style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 12 }}>
                     Username Guidelines
                   </Text>
                   <VStack style={{ gap: 10 }}>
@@ -537,8 +553,14 @@ function ClaimUsernameScreen() {
                       { text: 'No spaces or special characters', icon: 'mdi:check' },
                     ].map((item, index) => (
                       <HStack key={index} align="center">
-                        <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
-                        <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
+                        <Icon
+                          name={item.icon}
+                          size={16}
+                          color={opacity(getPrimaryColor('0'), 0.33)}
+                        />
+                        <Text
+                          size={13}
+                          style={{ color: opacity(getPrimaryColor('0'), 0.4), marginLeft: 10 }}>
                           {item.text}
                         </Text>
                       </HStack>
@@ -560,13 +582,17 @@ function ClaimUsernameScreen() {
                   <Text
                     size={11}
                     heavy
-                    style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
+                    style={{
+                      color: opacity(getPrimaryColor('0'), 0.33),
+                      marginBottom: 8,
+                      letterSpacing: 1,
+                    }}>
                     YOUR NEW ADDRESS
                   </Text>
                   <Text
                     size={18}
                     heavy
-                    style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
+                    style={{ color: opacity(getPrimaryColor('0'), 0.9), fontFamily: 'monospace' }}>
                     {username}@{selectedDomainLabel}
                   </Text>
                 </View>

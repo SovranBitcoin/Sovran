@@ -734,7 +734,7 @@ export function CurrencyScreen({
                   ? params?.to === 'sendToken' || params?.to === 'meltQuote'
                     ? getShadeColor('300')
                     : getPrimaryColor('0')
-                  : getPrimaryColor('400')
+                  : opacity(getPrimaryColor('0'), 0.4)
               }
               placeholderColor={opacity(
                 params?.to === 'sendToken' || params?.to === 'meltQuote'

@@ -5,6 +5,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { formatAmount } from 'helper/currency';
 import { Avatar } from 'components/ui/Avatar';
@@ -85,7 +86,7 @@ export function HistoryEntryHeader({
             }}>
             <Icon
               name="fluent:arrow-upload-16-filled"
-              color={getPrimaryColor('50')}
+              color={opacity(getPrimaryColor('0'), 0.9)}
               size={iconOverlaySize - 8}
             />
           </View>
@@ -107,7 +108,7 @@ export function HistoryEntryHeader({
       <View className="scale-125 transform bg-transparent p-4">
         <Icon
           name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
-          color={getPrimaryColor('50')}
+          color={opacity(getPrimaryColor('0'), 0.9)}
           size={28}
         />
       </View>
@@ -119,7 +120,10 @@ export function HistoryEntryHeader({
       <VStack>
         <HStack align="center">
           <Spacer size={8} />
-          <Text size={isSend ? 32 : 24} color={isSend ? getRedColor('300') : getGreenColor('300')}>
+          <Text
+            size={isSend ? 32 : 24}
+            color={isSend ? getRedColor('300') : getGreenColor('300')}
+            style={{ opacity: 0.9 }}>
             {isSend ? '-' : '+'}
           </Text>
           <Spacer size={8} />
@@ -131,9 +135,9 @@ export function HistoryEntryHeader({
             color={isReceive ? getGreenColor('300') : getRedColor('300')}
           />
         </HStack>
-        <Text size={18} color={getPrimaryColor('50')} bold>
+        <Text size={18} color={opacity(getPrimaryColor('0'), 0.66)} bold>
           {amount < 0 ? '-' : ''}
-          <Text size={18} color={getPrimaryColor('50')} style={{ marginLeft: 8 }}>
+          <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} style={{ marginLeft: 8 }}>
             {amount < 0 ? '-' : ''}
             {formatAmount(
               { amount: Math.abs(amount), unit },

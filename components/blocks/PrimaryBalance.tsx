@@ -47,7 +47,7 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 // ---------------------------------------------------------------------------
 
 function PendingEcashPill(): React.ReactElement | null {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
 
   const { totalAmount, unit } = useAppPendingAmount();
 
@@ -113,11 +113,11 @@ function PendingEcashPill(): React.ReactElement | null {
         paddingHorizontal: 12,
         paddingVertical: 5,
       }}>
-      <Icon name="majesticons:coins" size={14} color={getPrimaryColor('200')} />
+      <Icon name="majesticons:coins" size={14} color={opacity(getPrimaryColor('0'), 0.66)} />
       <UntranslatedText
         bold
         size={11}
-        color={getPrimaryColor('200')}
+        color={opacity(getPrimaryColor('0'), 0.66)}
         style={{ letterSpacing: 0.5 }}>
         {text}
       </UntranslatedText>

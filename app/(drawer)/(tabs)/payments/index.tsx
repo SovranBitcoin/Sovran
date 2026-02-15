@@ -794,7 +794,11 @@ const PaymentsContent = () => {
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.searchContainer}>
                   <View style={{ marginTop: 16, marginBottom: 12, paddingHorizontal: 16 }}>
-                    <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
+                    <Text
+                      overpass
+                      bold
+                      size={14}
+                      style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                       Search results
                     </Text>
                   </View>

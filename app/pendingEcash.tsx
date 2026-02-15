@@ -148,7 +148,7 @@ interface MintTabsProps {
 function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY }: MintTabsProps) {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
   const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
 
@@ -526,15 +526,19 @@ export default function PendingEcashScreen() {
                 },
               ]}>
               <View style={styles.emptyState}>
-                <Icon name="mdi:check-circle-outline" size={48} color={getPrimaryColor('500')} />
+                <Icon
+                  name="mdi:check-circle-outline"
+                  size={48}
+                  color={opacity(getPrimaryColor('0'), 0.33)}
+                />
                 <Spacer size={12} />
-                <Text size={18} heavy style={{ color: getPrimaryColor('100') }}>
+                <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.8) }}>
                   No Pending Ecash
                 </Text>
                 <Text
                   size={14}
                   style={{
-                    color: getPrimaryColor('400'),
+                    color: opacity(getPrimaryColor('0'), 0.4),
                     textAlign: 'center',
                     marginTop: 4,
                   }}>
@@ -588,7 +592,7 @@ export default function PendingEcashScreen() {
                       <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
                     </View>
                     <VStack>
-                      <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                      <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                         Pending Ecash
                       </Text>
                       <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>

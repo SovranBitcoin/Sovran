@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -78,8 +79,8 @@ interface StepState {
 function RebalancePlanScreen() {
   const { getPrimaryColor, getGreenColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const primaryColor400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const primaryColor400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
   const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
   const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);

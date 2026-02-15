@@ -7,6 +7,7 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { truncateMiddle } from 'helper/strings';
 
@@ -30,7 +31,7 @@ interface SectionProps {
 }
 
 export function Section({ items, style, camera = false, special }: SectionProps) {
-  const { getShadeColor } = useTheme();
+  const { getShadeColor, getPrimaryColor } = useTheme();
 
   const ContainerView = camera ? BlurView : View;
 
@@ -57,14 +58,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
 
           return (
             <HStack key={index} justify="space-between" className="p-2">
-              <Text
-                id={titleId}
-                bold
-                size={16}
-                className="text-primary-300"
-                style={{
-                  fontFamily: 'OverpassRegular',
-                }}>
+              <Text id={titleId} heavy size={16} color={opacity(getPrimaryColor('0'), 0.9)}>
                 {titleText}
               </Text>
               {titleText !== '' && <Spacer size={8} />}
@@ -101,7 +95,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             mono
             size={18}
-            className="text-primary-50"
+            color={opacity(getPrimaryColor('0'), 0.9)}
             style={{
               textAlign: 'center',
             }}>
@@ -166,7 +160,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           <Text
             bold
             size={12}
-            className="text-primary-50"
+            color={opacity(getPrimaryColor('0'), 0.9)}
             style={{
               textAlign: 'left',
               fontFamily: 'OverpassMono',
@@ -185,7 +179,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           weight={titleText === '' ? 'mono' : 'bold'}
           size={titleText === '' ? 12 : 16}
-          className="text-primary-0"
+          color={getPrimaryColor('0')}
           style={{
             textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
             flex: 1,
@@ -212,7 +206,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
         <Text
           bold
           size={12}
-          className="text-primary-50"
+          color={opacity(getPrimaryColor('0'), 0.9)}
           style={{
             textAlign: 'center',
             fontFamily: 'OverpassMono',

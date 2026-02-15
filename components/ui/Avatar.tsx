@@ -49,7 +49,7 @@ import Icon from 'assets/icons';
 // eslint-disable-next-line import/namespace
 import * as AvatarPrimitive from '@rn-primitives/avatar';
 import { useTheme } from 'providers/ThemeProvider';
-import { rgba } from 'polished';
+import opacity from 'hex-color-opacity';
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
@@ -407,10 +407,10 @@ export const Avatar = ({
       const initial = name.charAt(0).toUpperCase();
       return (
         <Text
-          className="text-primary-300/75"
           size={iconSize}
           bold
           overpass
+          color={opacity(getPrimaryColor('0'), 0.375)}
           style={{
             position: 'absolute',
           }}>
@@ -427,7 +427,7 @@ export const Avatar = ({
       return (
         <Icon
           name={fallbackIcon}
-          color={rgba(getPrimaryColor('300'), 0.75)}
+          color={opacity(getPrimaryColor('0'), 0.375)}
           size={iconSize}
           style={{
             position: 'absolute',

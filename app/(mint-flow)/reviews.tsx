@@ -23,6 +23,7 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import opacity from 'hex-color-opacity';
 
 // ============================================================================
 // Star Rating Component
@@ -98,7 +99,7 @@ const ReviewItem = React.memo(function ReviewItem({
               {displayName}
             </Text>
             {formattedDate && (
-              <Text size={12} style={{ color: getPrimaryColor('400') }}>
+              <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                 {formattedDate}
               </Text>
             )}
@@ -111,7 +112,7 @@ const ReviewItem = React.memo(function ReviewItem({
           {reviewText && (
             <Text
               size={14}
-              style={{ color: getPrimaryColor('200'), lineHeight: 20 }}
+              style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 20 }}
               numberOfLines={10}>
               {reviewText.trim()}
             </Text>
@@ -231,7 +232,11 @@ const EmptyState = React.memo(function EmptyState() {
       <Spacer size={8} />
       <Text
         size={14}
-        style={{ color: getPrimaryColor('400'), textAlign: 'center', paddingHorizontal: 32 }}>
+        style={{
+          color: opacity(getPrimaryColor('0'), 0.4),
+          textAlign: 'center',
+          paddingHorizontal: 32,
+        }}>
         This mint has not received any reviews yet. Be the first to share your experience!
       </Text>
     </VStack>
@@ -305,7 +310,7 @@ const HeaderStats = React.memo(function HeaderStats({
             }}
           />
         ) : (
-          <Text size={14} style={{ color: getPrimaryColor('400'), marginTop: 4 }}>
+          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 4 }}>
             {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
           </Text>
         )}

@@ -18,6 +18,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
 import { useTransactionsFilter } from 'components/screens/TransactionsFilterContext';
+import opacity from 'hex-color-opacity';
 
 function FilterButton() {
   const { getPrimaryColor } = useTheme();
@@ -28,7 +29,7 @@ function FilterButton() {
       <Icon
         name="fluent:filter-16-filled"
         size={22}
-        color={hasActiveFilters ? getPrimaryColor('400') : getPrimaryColor('0')}
+        color={hasActiveFilters ? opacity(getPrimaryColor('0'), 0.4) : getPrimaryColor('0')}
       />
       {hasActiveFilters && (
         <View

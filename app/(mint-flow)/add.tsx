@@ -50,6 +50,7 @@ import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuditedMints, type AuditedMintData } from 'hooks/coco/useAuditedMints';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import opacity from 'hex-color-opacity';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
@@ -172,7 +173,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   const { getPrimaryColor } = useTheme();
 
   const getStatusColor = () => {
-    if (validationState.isLoading) return getPrimaryColor('400');
+    if (validationState.isLoading) return opacity(getPrimaryColor('0'), 0.4);
     if (validationState.isValid === true) return '#10B981';
     if (validationState.isValid === false) return '#EF4444';
     return getPrimaryColor('600');
@@ -198,7 +199,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder="Search mints or enter URL..."
-        placeholderTextColor={getPrimaryColor('500')}
+        placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
         style={{
           flex: 1,
           color: getPrimaryColor('0'),
@@ -210,7 +211,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         autoCapitalize="none"
       />
       {validationState.isLoading && (
-        <ActivityIndicator size="small" color={getPrimaryColor('400')} />
+        <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.4)} />
       )}
       {!validationState.isLoading && validationState.isValid === true && (
         <Text size={16} style={{ color: '#10B981' }}>
@@ -275,7 +276,7 @@ const MintItem = memo(function MintItem({
   auditData: AuditedMintData;
   globalLoading: boolean;
 }) {
-  const { getYellowColor, getGreenColor } = useTheme();
+  const { getPrimaryColor, getYellowColor, getGreenColor } = useTheme();
 
   const displayName = useMemo(
     () => getMintDisplayName(mint.url, mint.mintInfo),
@@ -347,7 +348,7 @@ const MintItem = memo(function MintItem({
             </Text>
 
             <View style={{ alignSelf: 'flex-start' }}>
-              <Text heavy className="text-primary-300" size={14}>
+              <Text heavy size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
                 {extractDomain(mint.url)}
               </Text>
             </View>

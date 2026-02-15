@@ -26,6 +26,7 @@ import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useSearchHistoryStore } from 'stores/searchHistoryStore';
 import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
 import { useTransactionLocationStore } from 'stores/transactionLocationStore';
+import opacity from 'hex-color-opacity';
 
 interface StoreSection {
   name: string;
@@ -45,7 +46,7 @@ const JSONDisplay: React.FC<{ data: any }> = ({ data }) => {
     <Text
       size={12}
       style={{
-        color: getPrimaryColor('200'),
+        color: opacity(getPrimaryColor('0'), 0.66),
         fontFamily: 'monospace',
         lineHeight: 18,
       }}>
@@ -133,16 +134,16 @@ const StoreCard: React.FC<{
               height: 40,
               backgroundColor: getPrimaryColor('800'),
             }}>
-            <Icon name={section.icon} color={getPrimaryColor('300')} size={20} />
+            <Icon name={section.icon} color={opacity(getPrimaryColor('0'), 0.5)} size={20} />
           </View>
 
           {/* Title & Meta */}
           <VStack spacing={2} style={{ flex: 1 }}>
-            <Text size={15} bold style={{ color: getPrimaryColor('50') }}>
+            <Text size={15} bold style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
               {section.name}
             </Text>
             <HStack spacing={8} className="items-center">
-              <Text size={11} style={{ color: getPrimaryColor('500') }}>
+              <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
                 {section.storageKey}
               </Text>
               <View
@@ -153,7 +154,7 @@ const StoreCard: React.FC<{
                   backgroundColor: getPrimaryColor('600'),
                 }}
               />
-              <Text size={11} style={{ color: getPrimaryColor('500') }}>
+              <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
                 {formattedSize}
               </Text>
               {entryCount !== null ? (
@@ -166,7 +167,7 @@ const StoreCard: React.FC<{
                       backgroundColor: getPrimaryColor('600'),
                     }}
                   />
-                  <Text size={11} style={{ color: getPrimaryColor('500') }}>
+                  <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
                     {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
                   </Text>
                 </>
@@ -177,7 +178,7 @@ const StoreCard: React.FC<{
           {/* Chevron */}
           <Icon
             name={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-            color={getPrimaryColor('500')}
+            color={opacity(getPrimaryColor('0'), 0.33)}
             size={22}
           />
         </HStack>
@@ -227,8 +228,8 @@ const StoreCard: React.FC<{
                   borderRadius: 8,
                   gap: 6,
                 }}>
-                <Icon name="ri:share-fill" color={getPrimaryColor('300')} size={14} />
-                <Text size={13} medium style={{ color: getPrimaryColor('200') }}>
+                <Icon name="ri:share-fill" color={opacity(getPrimaryColor('0'), 0.5)} size={14} />
+                <Text size={13} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
                   Share
                 </Text>
               </TouchableOpacity>
@@ -267,7 +268,10 @@ const ScopeHeader: React.FC<{ label: string; description: string }> = ({ label, 
   const { getPrimaryColor } = useTheme();
   return (
     <VStack spacing={2} style={{ marginTop: 12, marginBottom: 8 }}>
-      <Text size={13} bold style={{ color: getPrimaryColor('300'), textTransform: 'uppercase' }}>
+      <Text
+        size={13}
+        bold
+        style={{ color: opacity(getPrimaryColor('0'), 0.5), textTransform: 'uppercase' }}>
         {label}
       </Text>
       <Text size={11} style={{ color: getPrimaryColor('600') }}>
@@ -378,10 +382,10 @@ const RawStorageCard: React.FC = () => {
             <Icon name="mdi:database-search" color={getGreenColor('400')} size={20} />
           </View>
           <VStack spacing={2} style={{ flex: 1 }}>
-            <Text size={15} bold style={{ color: getPrimaryColor('50') }}>
+            <Text size={15} bold style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
               Raw AsyncStorage
             </Text>
-            <Text size={11} style={{ color: getPrimaryColor('500') }}>
+            <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
               {loading
                 ? 'Reading...'
                 : rawData
@@ -392,7 +396,7 @@ const RawStorageCard: React.FC = () => {
           {rawData ? (
             <Icon
               name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-              color={getPrimaryColor('500')}
+              color={opacity(getPrimaryColor('0'), 0.33)}
               size={22}
             />
           ) : null}
@@ -443,14 +447,20 @@ const RawStorageCard: React.FC = () => {
                           </Text>
                           <Text
                             size={10}
-                            style={{ color: getPrimaryColor('500'), fontFamily: 'monospace' }}>
+                            style={{
+                              color: opacity(getPrimaryColor('0'), 0.33),
+                              fontFamily: 'monospace',
+                            }}>
                             {formattedSize}
                           </Text>
                         </HStack>
                         {stateKeys ? (
                           <Text
                             size={11}
-                            style={{ color: getPrimaryColor('400'), fontFamily: 'monospace' }}>
+                            style={{
+                              color: opacity(getPrimaryColor('0'), 0.4),
+                              fontFamily: 'monospace',
+                            }}>
                             state keys: [{stateKeys.join(', ')}]
                           </Text>
                         ) : null}
@@ -469,7 +479,7 @@ const RawStorageCard: React.FC = () => {
                     );
                   })}
                   {summary?.withData.length === 0 ? (
-                    <Text size={12} style={{ color: getPrimaryColor('500') }}>
+                    <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
                       No data found in AsyncStorage
                     </Text>
                   ) : null}
@@ -490,8 +500,8 @@ const RawStorageCard: React.FC = () => {
                   borderRadius: 8,
                   gap: 6,
                 }}>
-                <Icon name="mdi:refresh" color={getPrimaryColor('300')} size={14} />
-                <Text size={13} medium style={{ color: getPrimaryColor('200') }}>
+                <Icon name="mdi:refresh" color={opacity(getPrimaryColor('0'), 0.5)} size={14} />
+                <Text size={13} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
                   Reload
                 </Text>
               </TouchableOpacity>
@@ -507,8 +517,8 @@ const RawStorageCard: React.FC = () => {
                   borderRadius: 8,
                   gap: 6,
                 }}>
-                <Icon name="ri:share-fill" color={getPrimaryColor('300')} size={14} />
-                <Text size={13} medium style={{ color: getPrimaryColor('200') }}>
+                <Icon name="ri:share-fill" color={opacity(getPrimaryColor('0'), 0.5)} size={14} />
+                <Text size={13} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
                   Share Full Dump
                 </Text>
               </TouchableOpacity>
@@ -786,7 +796,7 @@ export default function StorageScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={getPrimaryColor('300')}
+            tintColor={opacity(getPrimaryColor('0'), 0.5)}
           />
         }>
         {/* Header Stats */}
@@ -799,10 +809,10 @@ export default function StorageScreen() {
           }}>
           <HStack className="items-center justify-between">
             <VStack spacing={2}>
-              <Text size={13} style={{ color: getPrimaryColor('500') }}>
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
                 Total Storage ({allSections.length} stores)
               </Text>
-              <Text size={22} bold style={{ color: getPrimaryColor('50') }}>
+              <Text size={22} bold style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                 {totalSize}
               </Text>
               <Text size={11} style={{ color: getPrimaryColor('600') }}>
@@ -819,7 +829,7 @@ export default function StorageScreen() {
                   borderRadius: 8,
                   backgroundColor: getPrimaryColor('800'),
                 }}>
-                <Icon name="mdi:minus" color={getPrimaryColor('300')} size={18} />
+                <Icon name="mdi:minus" color={opacity(getPrimaryColor('0'), 0.5)} size={18} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={expandAll}
@@ -830,7 +840,7 @@ export default function StorageScreen() {
                   borderRadius: 8,
                   backgroundColor: getPrimaryColor('800'),
                 }}>
-                <Icon name="mdi:plus" color={getPrimaryColor('300')} size={18} />
+                <Icon name="mdi:plus" color={opacity(getPrimaryColor('0'), 0.5)} size={18} />
               </TouchableOpacity>
             </HStack>
           </HStack>

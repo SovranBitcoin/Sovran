@@ -37,6 +37,7 @@ import {
   padding,
 } from '@expo/ui/swift-ui/modifiers';
 import { router } from 'expo-router';
+import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -632,8 +633,8 @@ function MapScreen() {
     return (
       <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
         <View style={styles.errorContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={getPrimaryColor('400')} />
-          <Text size={16} style={{ color: getPrimaryColor('300'), marginTop: 16 }}>
+          <Icon name="mdi:alert-circle" size={48} color={opacity(getPrimaryColor('0'), 0.4)} />
+          <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
             {error}
           </Text>
           <TouchableOpacity

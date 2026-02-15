@@ -673,8 +673,8 @@ export function HistoryEntryTimeline({
   const orangeColor = '#fb923c'; // accent-orange from spec
   const greyColor = getPrimaryColor('400');
   const primaryWhite = getPrimaryColor('0');
-  const primaryGrey200 = getPrimaryColor('200');
-  const primaryGrey300 = getPrimaryColor('300');
+  const primaryGrey200 = opacity(getPrimaryColor('0'), 0.66);
+  const primaryGrey300 = opacity(getPrimaryColor('0'), 0.5);
 
   // Update time every second for real-time countdown
   useEffect(() => {

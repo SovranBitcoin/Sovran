@@ -194,7 +194,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
             borderWidth: 2,
           },
         ]}>
-        <Icon name="tabler:dots" size={32} color={getPrimaryColor('300')} />
+        <Icon name="tabler:dots" size={32} color={opacity(getPrimaryColor('0'), 0.5)} />
       </TouchableOpacity>
     </HStack>
   );
@@ -277,13 +277,13 @@ function MenuButton({
       <HStack align="center" spacing={12}>
         <Icon
           name={icon}
-          color={isActive ? getPrimaryColor('0') : getPrimaryColor('300')}
+          color={isActive ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.5)}
           size={24}
         />
         <Text
           size={18}
           bold
-          style={{ color: isActive ? getPrimaryColor('0') : getPrimaryColor('300') }}>
+          style={{ color: isActive ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.5) }}>
           {label}
         </Text>
       </HStack>

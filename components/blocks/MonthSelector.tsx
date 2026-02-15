@@ -11,6 +11,7 @@ import { Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HistoryEntry } from 'coco-cashu-core';
 
@@ -67,7 +68,7 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
         <Text
           className="text-center"
           style={{
-            color: isSelected ? getPrimaryColor('0') : getPrimaryColor('400'),
+            color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4),
             fontFamily: 'OverpassSemibold',
             fontSize: 15,
           }}>

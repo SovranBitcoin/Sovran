@@ -6,6 +6,8 @@ import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { formatCustomDate } from 'helper/time';
 import { Link } from 'expo-router';
+import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { getMintDisplayName } from '@/helper/url';
 
@@ -58,6 +60,7 @@ export const ContactItem = React.memo(function ContactItem({
   profile,
   isLoadingProfile = false,
 }: ContactItemProps) {
+  const { getPrimaryColor } = useTheme();
   // Get display info
   const displayInfo = useMemo(() => {
     if (item.type === 'mint') {
@@ -120,7 +123,7 @@ export const ContactItem = React.memo(function ContactItem({
           <Text style={styles.profileName} className="text-primary-0">
             {displayInfo.name}
           </Text>
-          <Text style={styles.previewText} className="text-primary-100">
+          <Text style={[styles.previewText, { color: opacity(getPrimaryColor('0'), 0.8) }]}>
             {displayInfo.subtitle.length > 50
               ? `${displayInfo.subtitle.slice(0, 50)}...`
               : displayInfo.subtitle}

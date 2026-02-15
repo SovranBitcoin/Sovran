@@ -12,6 +12,7 @@ import React, { FC, useCallback, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { HStack } from 'components/ui/View/HStack';
@@ -70,8 +71,8 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
 }) => {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const primaryColor50 = useMemo(() => opacity(getPrimaryColor('0'), 0.9), [getPrimaryColor]);
+  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
   const primaryColor600 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
   const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);

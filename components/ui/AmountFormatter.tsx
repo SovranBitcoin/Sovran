@@ -6,6 +6,7 @@ import { View } from 'components/ui/View/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { useSettingsStore } from 'stores/settingsStore';
 import { cn } from '@/helper/utils';
 
@@ -53,7 +54,7 @@ export function AmountFormatter({
 
   // Dynamic color logic (only if useTypeColors is true)
   const getTypeColor = (): string => {
-    if (!amount) return getPrimaryColor('400');
+    if (!amount) return opacity(getPrimaryColor('0'), 0.4);
     // Receive = white, Send = shade color
     return transactionType === 'receive' ? getPrimaryColor('0') : getShadeColor('300');
   };

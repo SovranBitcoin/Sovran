@@ -19,6 +19,7 @@ import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { truncateMiddle } from 'helper/strings';
 import { Proof } from '@cashu/cashu-ts';
 import { isValidEcashToken } from '@/helper/coco/utils';
@@ -181,15 +182,21 @@ export function ReceiveScreen({
             <RowButton
               label={
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
-                  <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
+                  <Icon
+                    name="mingcute:lightning-fill"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                  <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
                     {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
                   </Text>
                 </View>
               }
               isFirst
               onPress={handleCopyLightningAddress}
-              rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+              rightIcon={
+                <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+              }
             />
           </Section>
         </View>
@@ -218,15 +225,25 @@ export function ReceiveScreen({
               <RowButton
                 label={
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="solar:key-bold" size={20} color={getPrimaryColor('400')} />
-                    <Text style={{ marginLeft: 8 }} className="text-primary-50" bold>
+                    <Icon
+                      name="solar:key-bold"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                    <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
                       {truncateMiddle(latestKeypair.publicKeyHex, 10)}
                     </Text>
                   </View>
                 }
                 isFirst
                 onPress={handleCopyP2PKKey}
-                rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+                rightIcon={
+                  <Icon
+                    name="lets-icons:copy"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                }
               />
             </Section>
           </View>
@@ -240,11 +257,11 @@ export function ReceiveScreen({
               padding: 24,
               alignItems: 'center',
             }}>
-            <Icon name="mdi:key-variant" size={48} color={getPrimaryColor('600')} />
+            <Icon name="mdi:key-variant" size={48} color={opacity(getPrimaryColor('0'), 0.25)} />
             <Text
               size={14}
               style={{
-                color: getPrimaryColor('400'),
+                color: opacity(getPrimaryColor('0'), 0.4),
                 marginTop: 12,
                 textAlign: 'center',
               }}>

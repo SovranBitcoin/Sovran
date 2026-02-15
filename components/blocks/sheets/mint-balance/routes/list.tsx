@@ -194,7 +194,7 @@ const MintItem: React.FC<MintItemProps> = ({
                   className="ml-[2px]"
                 />
               ) : displayMintUrl ? (
-                <Text heavy className="text-primary-300" size={14}>
+                <Text heavy size={14} color={opacity(getPrimaryColor('0'), 0.5)}>
                   {extractDomain(displayMintUrl)}
                 </Text>
               ) : null}

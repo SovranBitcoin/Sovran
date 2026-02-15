@@ -4,6 +4,8 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
+import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { Avatar } from 'components/ui/Avatar';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
@@ -15,6 +17,7 @@ interface HistoryEntryRefreshProps {
 }
 
 export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefreshProps) {
+  const { getPrimaryColor } = useTheme();
   return (
     <HStack
       align="center"
@@ -50,7 +53,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefr
                   : 'Receiving with'
                 : 'Processing with'}
           </Text>
-          <Text regular size={16} className="text-primary-50">
+          <Text regular size={16} color={opacity(getPrimaryColor('0'), 0.9)}>
             {mintInfo?.name}
           </Text>
         </VStack>

@@ -37,6 +37,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { ShortTextNote, Repost, Reaction, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
@@ -361,7 +362,7 @@ const InlineMention = React.memo(function InlineMention({
     <Text
       bold
       size={15}
-      style={{ color: getPrimaryColor('300') }}
+      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
       onPress={() => {
         router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
       }}>
@@ -373,7 +374,7 @@ const InlineMention = React.memo(function InlineMention({
 const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
   const { getPrimaryColor } = useTheme();
   return (
-    <Text bold size={15} style={{ color: getPrimaryColor('300') }}>
+    <Text bold size={15} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
       #{tag}
     </Text>
   );
@@ -384,7 +385,7 @@ const InlineLink = React.memo(function InlineLink({ url }: { url: string }) {
   return (
     <Text
       size={15}
-      style={{ color: getPrimaryColor('300') }}
+      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
       onPress={() => Linking.openURL(url).catch(() => {})}>
       {prettifyUrl(url)}
     </Text>
@@ -455,16 +456,16 @@ const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice
         { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
       ]}>
       <HStack align="center" gap={8}>
-        <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
+        <Icon name="mingcute:lightning-fill" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
         <VStack style={styles.flex1}>
-          <Text bold size={13} style={{ color: getPrimaryColor('200') }}>
+          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
             Lightning Invoice
           </Text>
-          <Text size={11} numberOfLines={1} style={{ color: getPrimaryColor('500') }}>
+          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
             {invoice.slice(0, 30)}…
           </Text>
         </VStack>
-        <Icon name="mdi:chevron-right" size={18} color={getPrimaryColor('500')} />
+        <Icon name="mdi:chevron-right" size={18} color={opacity(getPrimaryColor('0'), 0.33)} />
       </HStack>
     </TouchableOpacity>
   );
@@ -491,8 +492,8 @@ const QuotedPostCard = React.memo(function QuotedPostCard({
           { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
         ]}>
         <HStack align="center" gap={6}>
-          <Icon name="mdi:message-text" size={14} color={getPrimaryColor('500')} />
-          <Text size={13} italic style={{ color: getPrimaryColor('500') }}>
+          <Icon name="mdi:message-text" size={14} color={opacity(getPrimaryColor('0'), 0.33)} />
+          <Text size={13} italic style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
             Quoted post
           </Text>
         </HStack>
@@ -527,11 +528,15 @@ const QuotedPostCard = React.memo(function QuotedPostCard({
             variant="person"
             name={displayName}
           />
-          <Text bold size={13} style={{ color: getPrimaryColor('200'), flex: 1 }} numberOfLines={1}>
+          <Text
+            bold
+            size={13}
+            style={{ color: opacity(getPrimaryColor('0'), 0.66), flex: 1 }}
+            numberOfLines={1}>
             {displayName}
           </Text>
           {timestamp ? (
-            <Text size={11} semibold style={{ color: getPrimaryColor('500') }}>
+            <Text size={11} semibold style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
               {timestamp}
             </Text>
           ) : null}
@@ -597,7 +602,7 @@ const NoteContent = React.memo(function NoteContent({
     <VStack gap={0}>
       {/* Inline text flow */}
       {hasInline && (
-        <Text size={15} style={{ color: getPrimaryColor('50'), lineHeight: 22 }}>
+        <Text size={15} style={{ color: opacity(getPrimaryColor('0'), 0.9), lineHeight: 22 }}>
           {inlineSegments.map((seg, i) => {
             switch (seg.kind) {
               case 'text':
@@ -620,7 +625,11 @@ const NoteContent = React.memo(function NoteContent({
                 return <InlineLink key={i} url={seg.url} />;
               case 'naddr':
                 return (
-                  <Text key={i} bold size={15} style={{ color: getPrimaryColor('300') }}>
+                  <Text
+                    key={i}
+                    bold
+                    size={15}
+                    style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
                     [article]
                   </Text>
                 );
@@ -733,11 +742,11 @@ const NoteCard = React.memo(function NoteCard({
           />
         </TouchableOpacity>
         <VStack style={styles.flex1}>
-          <Text bold size={14} style={{ color: getPrimaryColor('50') }}>
+          <Text bold size={14} style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
             {authorName}
           </Text>
         </VStack>
-        <Text semibold size={13} style={{ color: getPrimaryColor('400') }}>
+        <Text semibold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
           {timestamp}
         </Text>
       </HStack>
@@ -761,9 +770,9 @@ const NoteCard = React.memo(function NoteCard({
               <Icon
                 name="garden:speech-bubble-typing-fill-12"
                 size={15}
-                color={getPrimaryColor('400')}
+                color={opacity(getPrimaryColor('0'), 0.4)}
               />
-              <Text size={13} style={{ color: getPrimaryColor('400') }}>
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                 {formatCount(metrics.replyCount)}
               </Text>
             </HStack>
@@ -772,8 +781,12 @@ const NoteCard = React.memo(function NoteCard({
           {/* Reposts */}
           <View style={styles.metricItem}>
             <HStack align="center" gap={5} style={styles.metricRow}>
-              <Icon name="garden:arrow-retweet-fill-16" size={17} color={getPrimaryColor('400')} />
-              <Text size={13} style={{ color: getPrimaryColor('400') }}>
+              <Icon
+                name="garden:arrow-retweet-fill-16"
+                size={17}
+                color={opacity(getPrimaryColor('0'), 0.4)}
+              />
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                 {formatCount(metrics.repostCount)}
               </Text>
             </HStack>
@@ -782,8 +795,12 @@ const NoteCard = React.memo(function NoteCard({
           {/* Likes */}
           <View style={styles.metricItem}>
             <HStack align="center" gap={5} style={styles.metricRow}>
-              <Icon name="garden:heart-fill-16" size={16} color={getPrimaryColor('400')} />
-              <Text size={13} style={{ color: getPrimaryColor('400') }}>
+              <Icon
+                name="garden:heart-fill-16"
+                size={16}
+                color={opacity(getPrimaryColor('0'), 0.4)}
+              />
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                 {formatCount(metrics.likeCount)}
               </Text>
             </HStack>
@@ -865,8 +882,12 @@ const RepostCard = React.memo(function RepostCard({
           })
         }>
         <HStack align="center" gap={6} style={styles.mb10}>
-          <Icon name="garden:arrow-retweet-fill-16" size={14} color={getPrimaryColor('500')} />
-          <Text size={12} semibold style={{ color: getPrimaryColor('500') }}>
+          <Icon
+            name="garden:arrow-retweet-fill-16"
+            size={14}
+            color={opacity(getPrimaryColor('0'), 0.33)}
+          />
+          <Text size={12} semibold style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
             {reposterName} reposted
           </Text>
         </HStack>
@@ -894,11 +915,11 @@ const RepostCard = React.memo(function RepostCard({
               />
             </TouchableOpacity>
             <VStack style={styles.flex1}>
-              <Text bold size={14} style={{ color: getPrimaryColor('50') }}>
+              <Text bold size={14} style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                 {originalName}
               </Text>
             </VStack>
-            <Text semibold size={13} style={{ color: getPrimaryColor('400') }}>
+            <Text semibold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
               {originalTimestamp}
             </Text>
           </HStack>
@@ -921,8 +942,8 @@ const RepostCard = React.memo(function RepostCard({
             },
           ]}>
           <HStack align="center" gap={6}>
-            <Icon name="mdi:message-text" size={14} color={getPrimaryColor('500')} />
-            <Text size={13} italic style={{ color: getPrimaryColor('500') }}>
+            <Icon name="mdi:message-text" size={14} color={opacity(getPrimaryColor('0'), 0.33)} />
+            <Text size={13} italic style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
               Original post unavailable
             </Text>
           </HStack>
@@ -1042,11 +1063,13 @@ function EmptyFeed() {
     <VStack align="center" style={styles.emptyState}>
       <Icon name="mdi:message-text" size={40} color={getPrimaryColor('600')} />
       <Spacer size={8} />
-      <Text bold size={16} style={{ color: getPrimaryColor('300') }}>
+      <Text bold size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
         No posts yet
       </Text>
       <Spacer size={4} />
-      <Text size={13} style={[styles.textAlignCenter, { color: getPrimaryColor('500') }]}>
+      <Text
+        size={13}
+        style={[styles.textAlignCenter, { color: opacity(getPrimaryColor('0'), 0.33) }]}>
         {"This user hasn't posted any notes."}
       </Text>
     </VStack>
@@ -1301,7 +1324,7 @@ function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps)
         medium
         overpass
         size={13}
-        style={[styles.sectionTitle, { color: getPrimaryColor('300') }]}>
+        style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
         Notes
       </Text>
 

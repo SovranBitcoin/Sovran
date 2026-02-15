@@ -18,6 +18,8 @@ import { TransactionLocationSection } from 'components/blocks/TransactionLocatio
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
+import opacity from 'hex-color-opacity';
+import { useTheme } from 'providers/ThemeProvider';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -37,10 +39,11 @@ interface ReceiveTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
+  const { getPrimaryColor } = useTheme();
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>{message}</Text>
+        <Text color={opacity(getPrimaryColor('0'), 0.66)}>{message}</Text>
         <ButtonHandler
           buttons={[
             {

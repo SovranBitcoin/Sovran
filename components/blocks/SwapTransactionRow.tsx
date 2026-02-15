@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { UntranslatedText } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -20,7 +21,8 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   const aggregate = useMemo(() => {
     const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
     if (anyFailed) return { text: 'Failed', color: getRedColor('300') };
-    if (group.state === 'running') return { text: 'Pending', color: getPrimaryColor('300') };
+    if (group.state === 'running')
+      return { text: 'Pending', color: opacity(getPrimaryColor('0'), 0.5) };
     return { text: 'Completed', color: getGreenColor('300') };
   }, [group.legs, group.state, getPrimaryColor, getRedColor, getGreenColor]);
 
@@ -45,7 +47,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
         <View className="relative h-7 w-7 items-center justify-center bg-transparent">
-          <Icon name="mdi:swap-horizontal" color={getPrimaryColor('50')} size={28} />
+          <Icon name="mdi:swap-horizontal" color={opacity(getPrimaryColor('0'), 0.9)} size={28} />
         </View>
 
         <VStack spacing={0} flex={1}>
@@ -59,10 +61,10 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
           </HStack>
 
           <HStack justify="space-between" align="center">
-            <UntranslatedText regular size={10} color={getPrimaryColor('100')}>
+            <UntranslatedText regular size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
               {convertTime(new Date(group.createdAt))}
             </UntranslatedText>
-            <UntranslatedText bold size={10} color={getPrimaryColor('100')}>
+            <UntranslatedText bold size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
               {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}
             </UntranslatedText>
           </HStack>
