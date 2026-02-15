@@ -49,6 +49,7 @@ const RECEIVE_STATES = ['pending', 'redeemed'] as const;
 const RECEIVE_STATE_LABELS: Record<string, string> = {
   pending: 'Pending',
   redeemed: 'Added to wallet',
+  alreadySpent: 'Already spent',
 };
 
 // Mint/Melt state display labels
@@ -74,6 +75,7 @@ type TimelineStepType =
   | 'future-small'
   | 'expired'
   | 'rolled-back'
+  | 'already-spent'
   | 'success';
 
 interface TimelineItem {
@@ -311,6 +313,24 @@ function buildTimeline({
       const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
       const txState = receiveTx.state || 'redeemed';
 
+      // Local-only terminal state for scans that were already redeemed elsewhere.
+      if (txState === 'alreadySpent') {
+        return [
+          {
+            state: 'pending',
+            displayLabel: RECEIVE_STATE_LABELS.pending,
+            stepType: 'complete',
+            timestamp: receiveTx.createdAt,
+          },
+          {
+            state: 'alreadySpent',
+            displayLabel: RECEIVE_STATE_LABELS.alreadySpent,
+            stepType: 'already-spent',
+            info: 'Token was already redeemed elsewhere',
+          },
+        ];
+      }
+
       const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
       const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
 
@@ -429,6 +449,10 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
     case 'rolled-back':
       backgroundColor = orangeColor;
       iconName = 'ic:round-refresh';
+      break;
+    case 'already-spent':
+      backgroundColor = orangeColor;
+      iconName = 'mdi:alert-circle';
       break;
   }
 
@@ -561,7 +585,10 @@ const getCardLabel = (
   nostrSent?: boolean
 ): string => {
   const isFailed = timeline.some(
-    (item) => item.stepType === 'expired' || item.stepType === 'rolled-back'
+    (item) =>
+      item.stepType === 'expired' ||
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
   );
 
   let status = '';
@@ -617,6 +644,8 @@ const getCardLabel = (
       const txState = receiveTx.state || 'redeemed';
       if (txState === 'redeemed') {
         status = 'Complete';
+      } else if (txState === 'alreadySpent') {
+        status = 'Already Spent';
       } else {
         status = 'Pending';
       }
@@ -634,7 +663,8 @@ const getStatusHeader = (timeline: TimelineItem[]): string => {
       item.stepType === 'current' ||
       item.stepType === 'success' ||
       item.stepType === 'expired' ||
-      item.stepType === 'rolled-back'
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
   );
   if (current) {
     return current.displayLabel.toUpperCase();
@@ -648,9 +678,11 @@ type StatusColorType = 'default' | 'success' | 'error' | 'warning';
 const getStatusColorType = (timeline: TimelineItem[]): StatusColorType => {
   const hasExpired = timeline.some((item) => item.stepType === 'expired');
   const hasRolledBack = timeline.some((item) => item.stepType === 'rolled-back');
+  const hasAlreadySpent = timeline.some((item) => item.stepType === 'already-spent');
   const hasSuccess = timeline.some((item) => item.stepType === 'success');
 
   if (hasExpired) return 'error';
+  if (hasAlreadySpent) return 'warning';
   if (hasRolledBack) return 'warning';
   if (hasSuccess) return 'success';
   return 'default';
@@ -726,6 +758,7 @@ export function HistoryEntryTimeline({
     nextItem: TimelineItem
   ): 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient' => {
     if (nextItem.stepType === 'expired') return 'expired-gradient';
+    if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
     if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
     if (
       currentItem.stepType === 'complete' ||
@@ -761,6 +794,7 @@ export function HistoryEntryTimeline({
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
     if (isFuture) return primaryGrey300;
     if (stepType === 'expired') return redColor;
+    if (stepType === 'already-spent') return orangeColor;
     if (stepType === 'rolled-back') return orangeColor;
     return primaryWhite;
   };

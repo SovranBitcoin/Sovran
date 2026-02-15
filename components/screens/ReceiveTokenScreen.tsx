@@ -70,6 +70,7 @@ export function ReceiveTokenScreen({
   const [loading, setLoading] = useState(false);
   const [mintInfo, setMintInfo] = useState<any>({});
   const [isRedeemed, setIsRedeemed] = useState(false);
+  const [isAlreadySpent, setIsAlreadySpent] = useState(false);
   // Holds the real history entry id after redeem (for location lookup)
   const [finalizedTransactionId, setFinalizedTransactionId] = useState<string | null>(null);
 
@@ -83,11 +84,19 @@ export function ReceiveTokenScreen({
 
   // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem)
   const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
+  // A persisted receive history entry is already redeemed.
+  const isPersistedReceive = !isScanPlaceholder;
+  const effectiveIsRedeemed = isPersistedReceive || isRedeemed;
+  const effectiveIsAlreadySpent = !effectiveIsRedeemed && isAlreadySpent;
   // Entry is finalized if it's a real history entry (not scan placeholder) or has been redeemed
-  const isFinalizedReceive = !isScanPlaceholder || isRedeemed;
+  const isFinalizedReceive = isPersistedReceive || effectiveIsRedeemed;
 
-  // Determine the state: pending until redeemed locally
-  const receiveState = isRedeemed ? 'redeemed' : 'pending';
+  // Determine local UI state for timeline.
+  const receiveState = effectiveIsRedeemed
+    ? 'redeemed'
+    : effectiveIsAlreadySpent
+      ? 'alreadySpent'
+      : 'pending';
 
   useEffect(() => {
     const loadMintInfo = async () => {
@@ -106,6 +115,61 @@ export function ReceiveTokenScreen({
     loadMintInfo();
   }, [receiveHistoryEntry?.mintUrl, getMintInfo]);
 
+  // Reconcile "already redeemed" state:
+  // - If this screen was opened from Transactions, the receive entry is persisted (non-placeholder id)
+  //   and should immediately render as redeemed.
+  // - If opened from a scan placeholder, try resolving to an already-linked/persisted receive entry.
+  useEffect(() => {
+    if (!receiveHistoryEntry) return;
+
+    if (isPersistedReceive) {
+      setIsRedeemed(true);
+      if (receiveHistoryEntry.id) {
+        setFinalizedTransactionId(receiveHistoryEntry.id);
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveExistingRedeem = async () => {
+      const rawToken = (receiveHistoryEntry.metadata as any)?.rawToken as string | undefined;
+      const processedToken = rawToken || tokenString;
+
+      // Search recent receive history entries for an exact token match.
+      if (!tokenString) return;
+      try {
+        const recent = await manager.history.getPaginatedHistory(0, 200);
+        const matchingReceive = recent.find((entry) => {
+          if (entry.type !== 'receive' || !entry.token) return false;
+          try {
+            return manager.wallet.encodeToken(entry.token) === tokenString;
+          } catch {
+            return false;
+          }
+        });
+
+        if (!matchingReceive?.id || cancelled) return;
+
+        setFinalizedTransactionId(matchingReceive.id);
+        setIsRedeemed(true);
+
+        // Persist link for future quick lookups.
+        if (processedToken) {
+          useScanHistoryStore.getState().linkTransaction(processedToken, matchingReceive.id);
+        }
+      } catch (error) {
+        console.error('Failed to resolve existing redeemed token:', error);
+      }
+    };
+
+    resolveExistingRedeem();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [receiveHistoryEntry, isPersistedReceive, tokenString, manager]);
+
   // Show error state if parsing failed
   if (parseError || !receiveHistoryEntry) {
     return (
@@ -122,6 +186,7 @@ export function ReceiveTokenScreen({
 
   const handleRedeem = async () => {
     setLoading(true);
+    setIsAlreadySpent(false);
     try {
       if (!tokenString) {
         throw new Error('Missing token data');
@@ -164,6 +229,14 @@ export function ReceiveTokenScreen({
       });
     } catch (error) {
       console.error(error);
+      const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
+      const tokenAlreadySpent =
+        errorMessage.includes('token already spent') ||
+        errorMessage.includes('proof already spent') ||
+        errorMessage.includes('already spent');
+      if (tokenAlreadySpent) {
+        setIsAlreadySpent(true);
+      }
       popup({
         message: error instanceof Error ? error.message : 'Unknown error',
         type: 'error',
@@ -197,20 +270,20 @@ export function ReceiveTokenScreen({
             icon: 'ri:close-circle-line',
             variant: 'secondary',
             onPress: async () => onNavigateBack(),
-            condition: isRedeemed,
+            condition: effectiveIsRedeemed || effectiveIsAlreadySpent,
           },
           {
             text: 'Cancel',
             variant: 'secondary',
             onPress: async () => handleCancel(),
-            condition: !isRedeemed,
+            condition: !effectiveIsRedeemed && !effectiveIsAlreadySpent,
           },
           {
             text: 'Redeem Ecash',
             variant: 'primary',
             onPress: handleRedeemPress,
             loading: loading,
-            condition: !!tokenString && !isRedeemed,
+            condition: !!tokenString && !effectiveIsRedeemed && !effectiveIsAlreadySpent,
           },
         ]}
       />
