@@ -9,6 +9,7 @@ import { formatAmount } from 'helper/currency';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useSettingsStore } from 'stores/settingsStore';
+import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
 import type { HistoryEntry } from 'coco-cashu-core';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
   const { getPrimaryColor, getShadeColor } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const mockMode = useSettingsStore((s) => s.mockMode);
+  const quoteIdToGroup = useSwapTransactionsStore((s) => s.quoteIdToGroup);
 
   const config = MODE_CONFIG[mode];
 
@@ -192,6 +194,10 @@ const MonthlyChart = React.memo(function MonthlyChart({
       const matching = history.filter((entry) => {
         if (entry.unit !== unit) return false;
         if (entry.createdAt < monthStart || entry.createdAt > monthEnd) return false;
+        if (entry.type === 'mint' || entry.type === 'melt') {
+          const quoteId = (entry as any).quoteId as string | undefined;
+          if (quoteId && quoteIdToGroup[quoteId]) return false;
+        }
         return config.filter(entry);
       });
 
@@ -244,7 +250,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
       daysInMonth,
       todayDay,
     };
-  }, [history, unit, mockMode, config, drawableWidth, drawableHeight]);
+  }, [history, unit, mockMode, config, drawableWidth, drawableHeight, quoteIdToGroup]);
 
   // ---------------------------------------------------------------------------
   // Build SVG paths
